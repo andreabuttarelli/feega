@@ -3,7 +3,7 @@
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
-  import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { CoreMotion, createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
   import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
@@ -319,6 +319,7 @@
         putting.clear();
         sent = new SentUses();
         sentOverlay = new SentParts();
+        r.setBudget?.(budget.textureBytes);
         raster = r;
       },
       (e: unknown) => {
@@ -530,6 +531,7 @@
     for (const part of quiet ? sentOverlay.changed(overlay) : []) {
       into.setOverlay(part, overlay[part]);
     }
+    into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
     into.setCamera(at.x, at.y, at.zoom);
     const { outcome, pending, skipped } = into.frame(performance.now());
     painted[outcome]++;
