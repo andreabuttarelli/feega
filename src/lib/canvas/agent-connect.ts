@@ -69,7 +69,7 @@ function localClients(port: string): ConnectClient[] {
       steps: [{ text: 'Add to ~/.codex/config.toml:', snippet: `[mcp_servers.${LOCAL_SERVER_NAME}]\ncommand = "npx"\nargs = [${args.map((a) => `"${a}"`).join(', ')}]` }]
     },
     { id: 'cursor', name: 'Cursor', steps: [{ text: 'Add to ~/.cursor/mcp.json:', snippet: stdio }] },
-    { id: 'claude-desktop', name: 'Desktop', steps: [{ text: 'Add to claude_desktop_config.json (Settings → Developer → Edit Config), then restart:', snippet: stdio }] }
+    { id: 'claude-desktop', name: 'Claude Desktop', steps: [{ text: 'Add to claude_desktop_config.json (Settings → Developer → Edit Config), then restart:', snippet: stdio }] }
   ];
 }
 

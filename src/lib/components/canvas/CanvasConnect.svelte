@@ -146,7 +146,8 @@
   }
 
   .tabs {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 2px;
     padding: 2px;
     border-radius: var(--ui-radius-sm);
@@ -154,7 +155,6 @@
   }
   .tab {
     display: inline-flex;
-    flex: 1 1 auto;
     overflow: hidden;
     min-width: 0;
     align-items: center;
