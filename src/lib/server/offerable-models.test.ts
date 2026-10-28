@@ -831,3 +831,48 @@ describe('a video is priced per second from its own synced row, per resolution',
     expect(credits(choice, { resolution: '720p', duration: 5 })).toBe(billedCreditsFor(0.0000107 * 21600 * 5));
   });
 });
+
+describe('one entry per underlying image model, with a price and a clean name', () => {
+  const gemini = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    label: name,
+    catalogue: 'image',
+    input_modalities: ['text', 'image'],
+    output_modalities: ['image'],
+    supported_resolutions: ['1K', '2K', '4K'],
+    pricing: { endpoints: [{ provider: 'google-ai-studio', lines: [{ billable: 'output_image', unit: 'token', cost_usd: 0.00006 }] }] },
+    ...extra
+  }) as never;
+
+  const offered = async (rows: never[]) => (await offerableModels(fakeAdmin(rows), 'image')).choices;
+
+  it('a preview id is the same model as its release and is offered once', async () => {
+    const choices = await offered([
+      gemini('google/gemini-3.1-flash-image', 'Google: Nano Banana 2 (Gemini 3.1 Flash Image)'),
+      gemini('google/gemini-3.1-flash-image-preview', 'Google: Nano Banana 2 (Gemini 3.1 Flash Image Preview)'),
+      gemini('google/gemini-3-pro-image', 'Google: Nano Banana Pro (Gemini 3 Pro Image)'),
+      gemini('google/gemini-3-pro-image-preview', 'Google: Nano Banana Pro (Gemini 3 Pro Image Preview)')
+    ]);
+
+    expect(choices.map((c) => c.label)).toEqual(['Nano Banana 2', 'Nano Banana Pro']);
+  });
+
+  it('keeps the preview when its release is not served', async () => {
+    const choices = await offered([gemini('google/gemini-3-pro-image-preview', 'Google: Nano Banana Pro (Gemini 3 Pro Image Preview)')]);
+
+    expect(choices.map((c) => c.id)).toEqual(['google/gemini-3-pro-image-preview']);
+  });
+
+  it('a Google image model we have no token table for shows an estimated price', async () => {
+    const [choice] = await offered([gemini('google/gemini-3.1-flash-image-2.1', 'Google: Nano Banana 2.1')]);
+
+    expect(choice.label).toBe('Nano Banana 2.1');
+    expect(creditsForRun({ medium: 'image', model: choice, params: { resolution: '1K' } })).toBe(billedCreditsFor(1120 * 0.00006));
+  });
+
+  it('the older Nano Banana is its own model and keeps a plain name', async () => {
+    const [choice] = await offered([gemini('google/gemini-2.5-flash-image', 'Google: Nano Banana (Gemini 2.5 Flash Image)')]);
+
+    expect(choice.label).toBe('Nano Banana');
+  });
+});

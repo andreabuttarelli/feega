@@ -393,7 +393,7 @@
       {/if}
       <span class="gen-run">
         {#if runCredits !== null}
-          <span class="gen-price" data-testid="gen-price">{formatPrice(runCredits)}</span>
+          <span class="gen-price" data-testid="gen-price">{quote.variable ? "~" : ""}{formatPrice(runCredits)}</span>
         {:else if quote.variable}
           <span class="gen-price">variable</span>
         {/if}
