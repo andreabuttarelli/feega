@@ -451,7 +451,9 @@ export const actions: Actions<CanvasParams> = {
     if (!deps) {
       return fail(HTTP_UNAVAILABLE, { error: 'elevenlabs_not_configured' });
     }
-    return { voiceId: await deps.provider.addShared(input), name: input.name };
+    const { addLibraryVoice } = await import('$lib/server/voices/custom-voices');
+    const out = await addLibraryVoice(deps, voiceScopeOf(scope), input);
+    return out.ok ? { voiceId: out.voice.providerVoiceId, name: out.voice.name } : voiceFail(out.error);
   },
 
   voice_design: async ({ request, params, locals }) => {
