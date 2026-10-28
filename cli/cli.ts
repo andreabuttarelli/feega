@@ -328,6 +328,17 @@ motion
   });
 
 motion
+  .command('code <nodeId>')
+  .description('Export a frame as a code project: React + Tailwind, HTML + CSS or Svelte (free, no AI)')
+  .option('--target <target>', 'react, html or svelte', 'react')
+  .option('--out <dir>', 'Folder to write the files to (default: the frame name)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionCode } = await import('./commands/motion.ts');
+    await cmdMotionCode(nodeId, opts);
+  });
+
+motion
   .command('revisions <nodeId>')
   .description('List the saved versions of a video, or put one back as a new version (free)')
   .option('--restore <version>', 'Restore this version; history is kept')

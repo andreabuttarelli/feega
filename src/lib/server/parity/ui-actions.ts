@@ -395,6 +395,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'create-formats': canvas('create_formats'),
   'combine-video': canvas('combine_scenes'),
   export: canvas('export_selection'),
+  'frame-code': tool('export_code'),
   'frame-voice': editor('generate_sound'),
   'frame-music': editor('generate_sound'),
   'frame-interactive': motion('declare_var'),

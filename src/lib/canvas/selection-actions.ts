@@ -156,6 +156,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
   { id: 'combine-video', label: 'Combine into video', group: 'menu', minNodes: 2 },
   { id: 'export', label: 'Export…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-code', label: 'Export code…', group: 'overflow', minNodes: 1 },
   { id: 'frame-voice', label: 'Add voice-over…', group: 'overflow', minNodes: 1 },
   { id: 'frame-music', label: 'Add music…', group: 'overflow', minNodes: 1 },
   { id: 'frame-interactive', label: 'Interactive…', group: 'overflow', minNodes: 1 },

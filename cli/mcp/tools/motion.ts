@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { awaitRun, motionApi } from '../../lib/motion.ts';
+import { awaitRun, CODE_TARGETS, motionApi } from '../../lib/motion.ts';
 import { requireAuth, withAuth, fail, okText, type ToolResult } from '../util.ts';
 import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 
@@ -180,6 +180,21 @@ export function registerMotionTools(server: McpServer) {
       annotations: { readOnlyHint: true }
     },
     async ({ org, node_id }) => withAuth((token) => motionApi.summary(token, node_id, org))
+  );
+
+  server.registerTool(
+    'export_code',
+    {
+      title: 'Export a frame as code',
+      description:
+        'Turn a frame (with its nested frames, text, images, vectors and component instances) into a code project a developer keeps: ' +
+        '`target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Auto layout becomes flex/grid, components become one file each ' +
+        'with typed props for what differs between instances, colours and fonts become tokens. Returns `files` (path + content) and `notes` for what has no static ' +
+        'code equivalent. Static only: animation is not exported. Reads only, free, no AI.',
+      inputSchema: z.object({ org, node_id: z.string(), target: z.enum(CODE_TARGETS).optional() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, node_id, target }) => withAuth((token) => motionApi.code(token, node_id, target ?? 'react', org))
   );
 
   server.registerTool(

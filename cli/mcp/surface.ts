@@ -45,6 +45,7 @@ export const TOOL_FAMILY: Readonly<Record<string, ToolFamily>> = {
   get_motion_summary: ToolFamily.Motion,
   motion_budget: ToolFamily.Motion,
   list_motion_revisions: ToolFamily.Motion,
+  export_code: ToolFamily.Motion,
   restore_motion_revision: ToolFamily.Motion,
   view_motion_frames: ToolFamily.Motion,
   share_motion_frame: ToolFamily.Motion,

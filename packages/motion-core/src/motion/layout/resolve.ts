@@ -24,6 +24,10 @@ function boundsOf(boxes: readonly Box[]): Box | null {
   return { left, top, width: right - left, height: bottom - top };
 }
 
+export function compBounds(comp: MotionDoc['comps'][string], space: Size): Box | null {
+  return boundsOf(visualClips(comp.tracks).filter((c) => !c.parent && !c.hidden).map((c) => pivotBox(c.props, space)));
+}
+
 function instanceContent(doc: MotionDoc, size: Size): Content {
   const cache = new Map<string, Box | null>();
   return (clip) => {
@@ -33,8 +37,7 @@ function instanceContent(doc: MotionDoc, size: Size): Content {
       return null;
     }
     if (!cache.has(id)) {
-      const space = comp.frame ?? size;
-      cache.set(id, boundsOf(visualClips(comp.tracks).filter((c) => !c.parent && !c.hidden).map((c) => pivotBox(c.props, space))));
+      cache.set(id, compBounds(comp, comp.frame ?? size));
     }
     return cache.get(id) ?? null;
   };
