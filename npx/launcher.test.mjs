@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createServer } from 'node:net';
-import { appDir, freePort, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from './launcher.mjs';
+import { appDir, boundUrl, freePort, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from './launcher.mjs';
 
 describe('parseArgs', () => {
   it('risolve il file contro la cartella di chi lancia, non quella del pacchetto', () => {
@@ -19,8 +19,8 @@ describe('parseArgs', () => {
     expect(parseArgs(['/tmp/x.feega'], '/home/u').file).toBe('/tmp/x.feega');
   });
 
-  it('porta 5173 di default, --port nelle due forme', () => {
-    expect(parseArgs([], '/').port).toBe(5173);
+  it('porta 0 di default, scelta dal sistema, --port nelle due forme', () => {
+    expect(parseArgs([], '/').port).toBe(0);
     expect(parseArgs(['--port=8080'], '/').port).toBe(8080);
     expect(parseArgs(['--port', '9000', 'b.feega'], '/h')).toMatchObject({ port: 9000, file: '/h/b.feega' });
   });
@@ -131,12 +131,16 @@ describe('pickVersion', () => {
 });
 
 describe('freePort', () => {
-  it('salta una porta occupata solo su ::1, come fa vite dev su localhost', async () => {
+  it("l'URL aperto è l'indirizzo su cui il server si lega, anche con 5173 occupata su ::1", async () => {
     const taken = createServer();
-    await new Promise((r) => taken.listen(0, '::1', r));
-    const busy = taken.address().port;
+    await new Promise((r) => taken.listen(5173, '::1', r).on('error', r));
+    const port = await freePort(0);
+    const server = createServer();
+    await new Promise((r) => server.listen(port, '127.0.0.1', r));
+    const { address, port: bound } = server.address();
 
-    expect(await freePort(busy)).toBeGreaterThan(busy);
+    expect(boundUrl(port)).toBe(`http://${address}:${bound}`);
+    server.close();
     taken.close();
   });
 });

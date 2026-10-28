@@ -3,9 +3,8 @@ import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 
 const DEFAULT_FILE = 'canvas.feega';
-const DEFAULT_PORT = 5173;
-const LOOPBACKS = ['127.0.0.1', '::1'];
-const MAX_PORT = 65535;
+const DEFAULT_PORT = 0;
+export const LOOPBACK = '127.0.0.1';
 export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--help] [--version]`;
 const CACHED_MARKER = '.complete';
 const APP_TAG = 'app-v';
@@ -111,20 +110,14 @@ export function pickVersion(latest, cached) {
   return { version: cached[0], action: 'cache' };
 }
 
-const isFree = (port, host) =>
-  new Promise((done) => {
+export const boundUrl = (port) => `http://${LOOPBACK}:${port}`;
+
+export const freePort = (port) =>
+  new Promise((done, fail) => {
     const probe = createServer();
-    probe.once('error', (error) => done(error.code === 'EAFNOSUPPORT' || error.code === 'EADDRNOTAVAIL'));
-    probe.listen(port, host, () => probe.close(() => done(true)));
+    probe.once('error', fail);
+    probe.listen(port, LOOPBACK, () => {
+      const { port: bound } = probe.address();
+      probe.close(() => done(bound));
+    });
   });
-
-export async function freePort(start) {
-  for (let port = start; port <= MAX_PORT; port++) {
-    const free = await Promise.all(LOOPBACKS.map((host) => isFree(port, host)));
-    if (free.every(Boolean)) {
-      return port;
-    }
-  }
-
-  throw new Error(`no free port from ${start}`);
-}

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { USAGE, appDir, bundleSource, cachedVersions, freePort, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from '../launcher.mjs';
+import { USAGE, appDir, bundleSource, boundUrl, cachedVersions, freePort, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
 const WEBSTORAGE_NODE_MAJOR = 25;
@@ -107,7 +107,7 @@ async function main() {
     await install(dir, version);
   }
 
-  const url = `http://127.0.0.1:${port}`;
+  const url = boundUrl(port);
   console.log(`feega: saving to ${file}`);
   console.log(`feega: open ${url}`);
 
