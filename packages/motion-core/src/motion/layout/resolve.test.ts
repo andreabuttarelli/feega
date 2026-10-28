@@ -121,6 +121,20 @@ describe('withAutoLayout', () => {
     expect(laid.props).toEqual({ comp: 'k' });
     expect(laid.transform).toMatchObject({ x: -0.39, y: -0.55 });
   });
+
+  it('an instance takes the size its own overrides give it, not the size of the main component', () => {
+    const button = shape('btn', { x: 0.6, y: 0.6, width: 0.2, height: 0.1 });
+    const wide = newClip({ id: 'i', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'k', overrides: { btn: { width: 0.4 } } }, parent: 'c' });
+    const next = newClip({ id: 'j', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'k' }, parent: 'c' });
+    const doc = {
+      ...docOf([wide, next, shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow({ gap: 0 }) })]),
+      comps: { k: { name: 'Button', durationInFrames: 30, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: '', clips: [button] }] } }
+    } as MotionDoc;
+    const out = withAutoLayout(doc);
+    const x = (id: string) => Number(out.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!.transform?.x);
+    const mainLeft = 0.5;
+    expect(x('j') + mainLeft).toBeCloseTo(0.4);
+  });
 });
 
 describe('strokes in layout', () => {

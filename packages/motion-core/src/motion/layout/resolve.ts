@@ -1,6 +1,7 @@
 import type { MotionClip, MotionComp, MotionDoc, MotionTrack } from '../doc';
 import type { Box } from '../layout';
 import { pivotBox, type Size } from '../parent';
+import { overridden } from '../instance-overrides';
 import type { ShapeKind } from '../shape/schema';
 import { StrokeAlign, sidesShown, strokesOf } from '../stroke/model';
 import { Sizing, layoutTree, type Item, type Padding } from './auto-layout';
@@ -36,10 +37,14 @@ function instanceContent(doc: MotionDoc, size: Size): Content {
     if (!comp) {
       return null;
     }
-    if (!cache.has(id)) {
-      cache.set(id, compBounds(comp, comp.frame ?? size));
+    const space = comp.frame ?? size;
+    const own = { overrides: clip.props.overrides, values: clip.props.propValues };
+    const key = own.overrides || own.values ? `${id}${JSON.stringify(own)}` : id;
+    if (!cache.has(key)) {
+      const tracks = key === id ? comp.tracks : laidOut(overridden(comp.tracks, clip, comp.component), space, instanceContent(doc, space));
+      cache.set(key, compBounds({ ...comp, tracks }, space));
     }
-    return cache.get(id) ?? null;
+    return cache.get(key) ?? null;
   };
 }
 
