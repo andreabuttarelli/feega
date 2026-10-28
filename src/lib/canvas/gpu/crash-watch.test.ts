@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blankSample, wasInGesture } from './crash-record';
-import { Motion, track, type Tick } from './crash-watch';
+import { Motion, gauged, track, type Tick } from './crash-watch';
 
 const tick = (over: Partial<Tick>): Tick => ({ x: 0, y: 0, zoom: 1, now: 0, motion: Motion.Moving, rastered: false, ...over });
 
@@ -38,5 +38,24 @@ describe("which crash records are worth sending", () => {
   it("only those written during a gesture", () => {
     expect(wasInGesture({ ...blankSample(), gestureFrames: 3 })).toBe(true);
     expect(wasInGesture({ ...blankSample(), gestureFrames: 0 })).toBe(false);
+  });
+});
+
+describe('gauged', () => {
+  const gpu = { textureBytes: 5, textures: 1, created: 2, submits: 3, lagMs: 0, wasm: [], queue: null, polling: false };
+  const raster = { cacheBytes: 1, pictureBytes: 2, scratchBytes: 4, wasmBytes: 8, width: 780, height: 1688 };
+
+  it('reads the drawing buffer size every tick, not the area seen at mount', () => {
+    const s = blankSample();
+    s.canvas = '0x0';
+    gauged(s, gpu, raster);
+    expect(s.canvas).toBe('780x1688');
+  });
+
+  it('takes the core memory and scratch textures from the raster when the probe missed the wasm load', () => {
+    const s = blankSample();
+    gauged(s, gpu, raster);
+    expect(s.wasmBytes).toBe(8);
+    expect(s.scratchBytes).toBe(4);
   });
 });

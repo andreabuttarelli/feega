@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -534,10 +533,9 @@ const SOURCES: [(Op, &str); 15] = [
     (Op::Warp, WARP),
 ];
 
-const POOL_PER_SIZE: usize = 6;
-const POOL_SIZES: usize = 48;
+const POOL_BYTES: u64 = 32 * 1024 * 1024;
 
-type Shelves = HashMap<(u32, u32), Vec<wgpu::Texture>>;
+type Shelves = crate::texture_budget::Shelves<wgpu::Texture>;
 
 struct Slot {
     texture: wgpu::Texture,
@@ -546,18 +544,10 @@ struct Slot {
 
 impl Drop for Slot {
     fn drop(&mut self) {
-        let mut shelves = self.shelves.borrow_mut();
         let size = (self.texture.width(), self.texture.height());
-        if shelves.len() >= POOL_SIZES && !shelves.contains_key(&size) {
-            self.texture.destroy();
-            return;
+        for gone in self.shelves.borrow_mut().give(size, self.texture.clone()) {
+            gone.destroy();
         }
-        let shelf = shelves.entry(size).or_default();
-        if shelf.len() >= POOL_PER_SIZE {
-            self.texture.destroy();
-            return;
-        }
-        shelf.push(self.texture.clone());
     }
 }
 
@@ -636,13 +626,23 @@ impl FilterPasses {
                 (*op, device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: None, layout: Some(&shared), module: &module, entry_point: Some("main"), compilation_options: Default::default(), cache: None }))
             })
             .collect();
-        Self { layout, pipelines, shelves: Rc::new(RefCell::new(HashMap::new())) }
+        Self { layout, pipelines, shelves: Rc::new(RefCell::new(Shelves::new(POOL_BYTES))) }
     }
 
     pub fn texture(&self, device: &wgpu::Device, width: u32, height: u32) -> Pooled {
-        let reused = self.shelves.borrow_mut().get_mut(&(width, height)).and_then(Vec::pop);
+        let reused = self.shelves.borrow_mut().take((width, height));
         let texture = reused.unwrap_or_else(|| layer_texture(device, width, height));
         Pooled(Rc::new(Slot { texture, shelves: self.shelves.clone() }))
+    }
+
+    pub fn set_pool_bytes(&self, bytes: u64) {
+        for gone in self.shelves.borrow_mut().set_cap(bytes) {
+            gone.destroy();
+        }
+    }
+
+    pub fn pooled_bytes(&self) -> u64 {
+        self.shelves.borrow().bytes()
     }
 
     pub fn run(&self, device: &wgpu::Device, queue: &wgpu::Queue, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {

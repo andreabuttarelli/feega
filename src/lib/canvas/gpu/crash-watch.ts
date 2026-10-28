@@ -8,7 +8,7 @@ export enum Motion {
 
 export type Tick = { x: number; y: number; zoom: number; now: number; motion: Motion; rastered: boolean };
 
-export type Sizes = { device: string; dpr: number; resolution: number; width: number; height: number };
+export type Sizes = { device: string; dpr: number; resolution: number };
 
 const CRASH_URL = '/api/v1/telemetry/crash';
 const MS_PER_SECOND = 1000;
@@ -36,15 +36,19 @@ export function track(sample: CrashSample, t: Tick): void {
   }
 }
 
-function counted(sample: CrashSample, gpu: GpuCounters, raster: { cacheBytes: number; pictureBytes: number }): void {
+export type Gauges = { cacheBytes: number; pictureBytes: number; scratchBytes: number; wasmBytes: number; width: number; height: number };
+
+export function gauged(sample: CrashSample, gpu: GpuCounters, raster: Gauges): void {
   sample.textureBytes = gpu.textureBytes;
   sample.textures = gpu.textures;
   sample.texturesCreated = gpu.created;
   sample.submits = gpu.submits;
   sample.gpuLagMs = gpu.lagMs;
-  sample.wasmBytes = wasmBytes(gpu);
+  sample.wasmBytes = Math.max(wasmBytes(gpu), raster.wasmBytes);
   sample.cacheBytes = raster.cacheBytes;
   sample.pictureBytes = raster.pictureBytes;
+  sample.scratchBytes = raster.scratchBytes;
+  sample.canvas = `${raster.width}x${raster.height}`;
 }
 
 function send(report: CrashSample): void {
@@ -59,7 +63,7 @@ function shelf(): Storage | null {
   }
 }
 
-export type CrashWatch = { tick: (t: Tick, raster: { cacheBytes: number; pictureBytes: number }) => void; sample: CrashSample; stop: () => void };
+export type CrashWatch = { tick: (t: Tick, raster: Gauges) => void; sample: CrashSample; stop: () => void };
 
 export function watchCrashes(sizes: Sizes): CrashWatch {
   const gpu = probeGpu(window as never);
@@ -71,7 +75,7 @@ export function watchCrashes(sizes: Sizes): CrashWatch {
   }
 
   const sample = blankSample();
-  Object.assign(sample, { device: sizes.device, dpr: sizes.dpr, resolution: sizes.resolution, canvas: `${sizes.width}x${sizes.height}` });
+  Object.assign(sample, { device: sizes.device, dpr: sizes.dpr, resolution: sizes.resolution });
 
   const hidden = () => recorder?.endCleanly();
   const visibility = () => (document.visibilityState === 'hidden' ? recorder?.endCleanly() : recorder?.resume());
@@ -82,7 +86,7 @@ export function watchCrashes(sizes: Sizes): CrashWatch {
     sample,
     tick(t, raster) {
       track(sample, t);
-      counted(sample, gpu, raster);
+      gauged(sample, gpu, raster);
       pollLag(gpu, () => performance.now());
       recorder?.sample(sample, t.now);
     },
@@ -98,4 +102,4 @@ const MB = 1024 * 1024;
 const mb = (bytes: number) => (bytes / MB).toFixed(1);
 
 export const hudLine = (s: CrashSample) =>
-  `${s.device} dpr=${s.dpr} res=${s.resolution} canvas=${s.canvas} tex=${mb(s.textureBytes)}MB/${s.textures} made=${s.texturesCreated} submits=${s.submits} lag=${Math.round(s.gpuLagMs)}ms cache=${mb(s.cacheBytes)}MB pict=${mb(s.pictureBytes)}MB wasm=${mb(s.wasmBytes)}MB zoom/s=${s.zoomPerSecond.toFixed(2)} pan/s=${Math.round(s.panPerSecond)} gf=${s.gestureFrames} rasterZoom=${s.rasterZoom.toFixed(3)}`;
+  `${s.device} dpr=${s.dpr} res=${s.resolution} canvas=${s.canvas} tex=${mb(s.textureBytes)}MB/${s.textures} made=${s.texturesCreated} submits=${s.submits} lag=${Math.round(s.gpuLagMs)}ms cache=${mb(s.cacheBytes)}MB scratch=${mb(s.scratchBytes)}MB pict=${mb(s.pictureBytes)}MB wasm=${mb(s.wasmBytes)}MB zoom/s=${s.zoomPerSecond.toFixed(2)} pan/s=${Math.round(s.panPerSecond)} gf=${s.gestureFrames} rasterZoom=${s.rasterZoom.toFixed(3)}`;
