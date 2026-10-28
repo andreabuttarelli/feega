@@ -1,7 +1,7 @@
 <script lang="ts">
   import Play from '@lucide/svelte/icons/play';
   import {
-    AUDIO_OPERATION_IDS,
+    audioOperationIdsFor,
     DUBBING_LANGUAGES,
     audioModelFor,
     audioModelsOf,
@@ -22,6 +22,7 @@
     custom = [],
     slots = null,
     cloningAllowed = false,
+    musicEnabled = false,
     onvoiceaction,
     onvoiceschanged,
     onparams,
@@ -35,6 +36,7 @@
     custom?: CustomVoiceChoice[];
     slots?: VoiceSlots | null;
     cloningAllowed?: boolean;
+    musicEnabled?: boolean;
     onvoiceaction: VoiceAction;
     onvoiceschanged: () => void;
     onparams: (params: GenParams) => void;
@@ -53,6 +55,7 @@
 
   const operation = $derived(audioOperationOf(node.params));
   const spec = $derived(operationSpec(operation));
+  const choosable = $derived(audioOperationIdsFor(musicEnabled || operation === 'music'));
   const model = $derived(audioModelFor(operation, node.model));
   const range = $derived(spec.duration);
 
@@ -97,7 +100,7 @@
   <label>
     <span>Operation</span>
     <select value={operation} onchange={(e) => pickOperation(e.currentTarget.value as AudioOperationId)} aria-label="Audio operation">
-      {#each AUDIO_OPERATION_IDS as id (id)}
+      {#each choosable as id (id)}
         <option value={id}>{operationSpec(id).label}</option>
       {/each}
     </select>

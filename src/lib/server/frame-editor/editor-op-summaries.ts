@@ -1,4 +1,5 @@
 import type { OpSummaries } from '$lib/server/ops-description';
+import { musicEnabled } from '$lib/server/elevenlabs-music';
 import type { EDITOR_OPS } from './editor-ops';
 
 export const EDITOR_OP_SUMMARIES: OpSummaries<typeof EDITOR_OPS> = {
@@ -14,7 +15,11 @@ export const EDITOR_OP_SUMMARIES: OpSummaries<typeof EDITOR_OPS> = {
   analyze_sounds: 'Tempo, beats and speech of audio assets.',
   template_sounds: 'Lay the template clip sound effects into the doc.',
   save_template: 'Save the doc as an org template.',
-  generate_sound: 'Make a voice-over (sound:"voice") or music (sound:"music") from text; answers assetId and url (spends credits).',
+  get generate_sound() {
+    return musicEnabled()
+      ? 'Make a voice-over (sound:"voice") or music (sound:"music") from text; answers assetId and url (spends credits).'
+      : 'Make a voice-over (sound:"voice") from text; answers assetId and url (spends credits).';
+  },
   render_batch: 'One server render per row of template field values (spends credits).',
   list_revisions: 'Saved revisions, newest first.',
   name_revision: 'Give a revision a name.',

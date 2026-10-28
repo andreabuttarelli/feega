@@ -3152,6 +3152,7 @@
       catalogueSynced={selectionMedium && props.catalogueSyncedFor ? props.catalogueSyncedFor(selectionMedium) : true}
       runQuote={props.runQuoteFor?.(selected) ?? null}
       frameTools
+      musicEnabled={props.musicEnabled}
       onrun={() => props.onRunNode?.(selected[0])}
       variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
       oncancelvariants={() => props.onCancelVariants?.(selected[0])}

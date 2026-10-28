@@ -51,6 +51,7 @@
     catalogueSynced = true,
     runQuote = null,
     frameTools = false,
+    musicEnabled = false,
     onrun,
     oncancelvariants,
     variantsInFlight = 0,
@@ -74,6 +75,7 @@
     catalogueSynced?: boolean;
     runQuote?: RunQuote | null;
     frameTools?: boolean;
+    musicEnabled?: boolean;
     onrun?: () => void;
     oncancelvariants?: () => void;
     variantsInFlight?: number;
@@ -135,7 +137,7 @@
 
   const primary = $derived(actionsIn('primary', count));
   const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
-  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameDialogAction(a.id))));
+  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameDialogAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
   const danger = $derived(actionsIn('danger', count));
   const slots = $derived(toolbarSlots([...secondary, ...overflow, ...danger]));
 
