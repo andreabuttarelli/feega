@@ -298,3 +298,23 @@ fn the_library_knows_the_size_of_a_group() {
     assert_eq!(lib.size_of("a"), Some((100.0, 50.0)));
     assert_eq!(lib.size_of("nope"), None);
 }
+
+#[test]
+fn a_fast_zoom_re_rasters_a_cached_group_once_per_rung_not_every_step() {
+    let mut lib = library(&["a"]);
+    let steps = 60;
+    let rasters: usize = (0..=steps).map(|i| lib.plan(&screen(&[("a", 1.0 + i as f64 / steps as f64, 0.0)]), LIMITS).rasters.len()).sum();
+
+    assert!(rasters <= 5, "{rasters} rasters for one doubling");
+}
+
+#[test]
+fn a_cached_group_is_never_shown_blurrier_than_its_screen_scale() {
+    let mut lib = library(&["a"]);
+    for i in 0..=60 {
+        let want = 1.0 + i as f64 / 60.0;
+        let plan = lib.plan(&screen(&[("a", want, 0.0)]), LIMITS);
+        let Item::Image(image) = &plan.screen.items[0] else { panic!() };
+        assert!(image.size.width >= (100.0 * want).floor(), "texture {} under {} wide at zoom {want}", image.size.width, 100.0 * want);
+    }
+}

@@ -4,6 +4,7 @@ import type { CodeFile } from '../model';
 import { BASE_CSS, fontLinks, lookupOf, ruleBlock, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, type Dialect } from './markup';
 import { readme } from './project';
+import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
 
 type Ctx = { tokens: TokenLookup; block: string | null; values: Map<string, string | boolean>; components: Map<string, ComponentSpec>; extraClass: string | null; root: ElementNode | null };
 
@@ -36,16 +37,21 @@ function expand(node: UseNode, depth: number, ctx: Ctx): string[] {
   for (const p of node.props) {
     values.set(p.name, p.value);
   }
+  for (const f of node.forwards) {
+    if (ctx.values.has(f.prop)) {
+      values.set(f.name, ctx.values.get(f.prop)!);
+    }
+  }
   return nodeLines(spec.root, depth, dialect, { ...ctx, block: kebab(spec.name), values, extraClass: node.rules.length ? scopedClass(ctx.block, node.className) : null, root: spec.root });
 }
 
 function svgOf(node: SvgNode, ctx: Ctx): string {
   const cls = node.rules.length ? ` class="${scopedClass(ctx.block, node.className)}"` : '';
-  return `<svg${cls} width="${node.width}" height="${node.height}" viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${node.markup}</svg>`;
+  return `<svg${cls}${inView(node) ? ` ${INVIEW_ATTR}` : ''} width="${node.width}" height="${node.height}" viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${node.markup}</svg>`;
 }
 
 const dialect: Dialect<Ctx> = {
-  openTag: (node, ctx) => `<${node.tag}${classList(node, ctx)}${attrs(node, ctx)}${styleOf(node, ctx)}>`,
+  openTag: (node, ctx) => `<${node.tag}${classList(node, ctx)}${attrs(node, ctx)}${styleOf(node, ctx)}${inView(node) ? ` ${INVIEW_ATTR}` : ''}>`,
   text: (value, ctx) => escapeHtml(valueOf(value, ctx)).replace(/\n/g, '<br>'),
   lineBreak: '<br>',
   use: expand,
@@ -69,19 +75,40 @@ export function stylesheet(root: ElementNode, block: string | null, tokens: Toke
   return cssBlocks(root, (n) => scopedClass(block, n.className), tokens).join('\n');
 }
 
+const INVIEW_ATTR = 'data-inview';
+
+function animationFiles(page: PageSpec): CodeFile[] {
+  const roots = [{ root: page.root, block: null as string | null }, ...page.components.map((c) => ({ root: c.root, block: kebab(c.name) }))];
+  const nodes = roots.flatMap(({ root, block }) => animatedNodes(root).map((node) => ({ node, local: scopedClass(block, node.className) })));
+  if (!nodes.length) {
+    return [];
+  }
+  const properties = nodes.some(({ node }) => translates(node.animation)) ? [...PROPERTY_RULES, ''] : [];
+  const css = nodes.flatMap(({ node, local }) => animationCss(node.animation, { base: `.${local}`, inView: `.${local}.${INVIEW_CLASS}` }, local));
+  const script = nodes.some(({ node }) => inView(node)) ? [{ path: INVIEW_JS, content: [...INVIEW_SCRIPT, `document.querySelectorAll('[${INVIEW_ATTR}]').forEach((el) => seen.observe(el));`, ''].join('\n') }] : [];
+  return [{ path: ANIMATIONS_CSS, content: [...properties, ...css].join('\n') }, ...script];
+}
+
+const ANIMATIONS_CSS = 'styles/animations.css';
+const INVIEW_JS = 'scripts/inview.js';
+
 export function htmlProject(page: PageSpec): CodeFile[] {
   const tokens = lookupOf(page.tokens);
   const components = new Map(page.components.map((c) => [c.name, c]));
   const body = nodeLines(page.root, 2, dialect, { tokens, block: null, values: new Map(), components, extraClass: null, root: null });
   const componentCss = page.components.map((c) => ({ path: `styles/components/${kebab(c.name)}.css`, content: stylesheet(c.root, kebab(c.name), tokens) }));
-  const links = ['styles/tokens.css', 'styles/base.css', ...componentCss.map((c) => c.path), 'styles/page.css'].map((href) => `    <link rel="stylesheet" href="${href}" />`);
-  const html = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${escapeHtml(page.name)}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), ...links, '  </head>', '  <body>', ...body, '  </body>', '</html>', ''];
+  const animations = animationFiles(page);
+  const has = (path: string) => animations.some((f) => f.path === path);
+  const scripts = has(INVIEW_JS) ? [`    <script src="${INVIEW_JS}" defer></script>`] : [];
+  const links = ['styles/tokens.css', 'styles/base.css', ...componentCss.map((c) => c.path), 'styles/page.css', ...(has(ANIMATIONS_CSS) ? [ANIMATIONS_CSS] : [])].map((href) => `    <link rel="stylesheet" href="${href}" />`);
+  const html = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${escapeHtml(page.name)}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), ...links, ...scripts, '  </head>', '  <body>', ...body, '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'HTML + CSS', ['npx serve .'], 'styles/components/') },
     { path: 'index.html', content: html.join('\n') },
     { path: 'styles/tokens.css', content: tokensCss(page.tokens) },
     { path: 'styles/base.css', content: BASE_CSS },
     ...componentCss,
-    { path: 'styles/page.css', content: stylesheet(page.root, null, tokens) }
+    { path: 'styles/page.css', content: stylesheet(page.root, null, tokens) },
+    ...animations
   ];
 }

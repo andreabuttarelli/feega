@@ -14,6 +14,7 @@ struct Fake {
     painted: Vec<(Rect, Quality, Vec<Item>)>,
     presented: Vec<Lookup>,
     tile: Option<(u32, u32)>,
+    rasters: usize,
 }
 
 impl Painter for Fake {
@@ -33,6 +34,7 @@ impl Painter for Fake {
     }
 
     fn paint(&mut self, plan: Plan, into: Rect, quality: Quality) -> Result<Vec<Skipped>, ()> {
+        self.rasters += plan.rasters.len();
         self.painted.push((into, quality, plan.screen.items));
         Ok(vec![])
     }
@@ -288,4 +290,23 @@ fn clearing_the_live_overlay_keeps_the_fixed_one() {
     c.set_overlay(OverlayPart::Live, vec![], &mut lib);
 
     assert_eq!((lib.items_in(OverlayPart::Fixed.group()), lib.items_in(OverlayPart::Live.group())), (Some(1), None));
+}
+
+#[test]
+fn a_frame_painted_in_tiles_rasters_at_most_one_cached_group() {
+    let mut lib = Library::new();
+    for g in ["a", "b", "c"] {
+        lib.put_group(g, &parse(FRAME).unwrap());
+    }
+    let mut c = Compositor::new(800, 600);
+    let patch = parse_patch(r#"{ "put": [
+      { "kind": "use", "clip": "a", "group": "a", "matrix": [1, 0, 0, 1, 0, 0], "cache": true },
+      { "kind": "use", "clip": "b", "group": "b", "matrix": [1, 0, 0, 1, 500, 0], "cache": true },
+      { "kind": "use", "clip": "c", "group": "c", "matrix": [1, 0, 0, 1, 0, 400], "cache": true }], "drop": [] }"#).unwrap();
+    c.patch(patch, &lib);
+    let mut fake = Fake { tile: Some((300, 300)), ..Fake::default() };
+
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    assert_eq!(fake.rasters, 1);
 }

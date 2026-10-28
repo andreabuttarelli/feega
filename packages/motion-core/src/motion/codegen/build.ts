@@ -16,7 +16,8 @@ import { literal, NodeKind, type Attr, type Bound, type CodeNode, type Component
 import { absoluteRules, containerRules, flowItemRules, isFlowChild, px, Shape } from './place';
 import { backgroundRules, borderRules, effectRules, radiusRules, typeRules, type Painter } from './paint';
 import { ColourRole, TokenBook } from './tokens';
-import { planComponents, PropKey, READINGS, type Binding, type ComponentPlan } from './instances';
+import { animationOf, timelineOf, type Timeline } from './animate';
+import { planComponents, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
 
 export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; brand: BrandTokens | null };
 
@@ -31,6 +32,7 @@ type Shared = {
   notes: Set<string>;
   h1: { taken: boolean };
   content: Map<string, Box>;
+  timeline: Timeline;
 };
 
 type Scope = {
@@ -45,6 +47,7 @@ type Scope = {
   rootId: string | null;
   open: string[];
   boxOf: (clip: MotionClip) => Box;
+  timeline: Timeline;
 };
 
 const SEMANTIC_CONTAINERS: readonly [RegExp, string][] = [
@@ -161,8 +164,11 @@ function element(tag: string, clip: MotionClip, rules: Rule[], scope: Scope, ext
   const effects = effectRules(clip);
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
-  return { kind: NodeKind.Element, tag, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...extra };
+  const animation = animated(clip, scope);
+  return { kind: NodeKind.Element, tag, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...(animation ? { animation } : {}), ...extra };
 }
+
+const animated = (clip: MotionClip, scope: Scope) => animationOf(clip, { timeline: scope.timeline, space: scope.space, notes: scope.shared.notes, label: layerName(clip) });
 
 function styleBinds(clip: MotionClip, scope: Scope): StyleBind[] {
   return bindingsOf(clip, scope).flatMap((b) => (READINGS[b.key].css ? [{ property: READINGS[b.key].css!, prop: b.spec.name }] : []));
@@ -298,7 +304,8 @@ function svgNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   const effects = effectRules(clip);
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
-  return { kind: NodeKind.Svg, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
+  const animation = animated(clip, scope);
+  return { ...(animation ? { animation } : {}), kind: NodeKind.Svg, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
 }
 
 function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): CodeNode | null {
@@ -308,14 +315,20 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   }
   ensureComponent(plan, scope.shared);
   scope.uses.add(plan.name);
-  const values = plan.values.get(clip.id) ?? new Map();
+  if (Object.keys(clip.keyframes).length) {
+    scope.shared.notes.add(`${layerName(clip)}: animation on a component instance is not exported; animate the layers inside the component.`);
+  }
+  const forwards = scope.plan?.forwards.get(clip.id) ?? [];
+  const forwarded = new Set(forwards.map((f) => f.name));
+  const values = [...(plan.values.get(clip.id) ?? new Map<string, string | boolean>()).entries()].filter(([name]) => !forwarded.has(name));
   const shownBy = bound(clip, PropKey.Hidden, scope);
   return {
     kind: NodeKind.Use,
     component: plan.name,
     className: scope.names.unique(kebab(layerName(clip))),
     rules: placement(clip, parent, scope),
-    props: [...values.entries()].map(([name, value]) => ({ name, value })),
+    props: values.map(([name, value]) => ({ name, value })),
+    forwards,
     ...(shownBy ? { shownBy } : {})
   };
 }
@@ -346,7 +359,7 @@ function nodeOf(clip: MotionClip, parent: MotionClip | null, scope: Scope, paren
   return null;
 }
 
-function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, plan: ComponentPlan | null, frame: number): Scope {
+function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, plan: ComponentPlan | null, frame: number, timeline: Timeline): Scope {
   const clips = tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => visibleAt(c, frame));
   const painter: Painter = {
     tokens: shared.tokens,
@@ -363,7 +376,7 @@ function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, pl
     const dy = (clip.transform.y ?? 0) * space.height;
     return { ...content, left: content.left + dx, top: content.top + dy };
   };
-  return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf };
+  return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf, timeline };
 }
 
 function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): ElementNode {
@@ -389,7 +402,7 @@ function ensureComponent(plan: ComponentPlan, shared: Shared) {
     return;
   }
   const space = plan.comp.frame ?? { width: shared.doc.width, height: shared.doc.height };
-  const scope = scopeOf(shared, plan.comp.tracks, space, plan, 0);
+  const scope = scopeOf(shared, plan.comp.tracks, space, plan, 0, { ...shared.timeline, start: 0, length: plan.comp.durationInFrames });
   const content = shared.content.get(plan.compId);
   scope.names.unique(plan.block);
   const label = plan.comp.component?.name ?? plan.comp.name;
@@ -402,7 +415,7 @@ function ensureComponent(plan: ComponentPlan, shared: Shared) {
   if (instanceTag) {
     root.tag = tag;
   }
-  const props = [...plan.bindings.values()].flat().map((b) => b.spec);
+  const props = specsOf(plan);
   shared.built.set(plan.compId, { name: plan.name, props, root, uses: [...scope.uses].sort() });
 }
 
@@ -421,8 +434,9 @@ export function buildPage(input: BuildInput): PageSpec {
   const tokens = new TokenBook(input.brand);
   const urls = input.assets;
   const resolve = (key: PropKey, value: string | boolean) => (key === PropKey.Image && typeof value === 'string' ? (urls[value] ?? `/assets/${value}`) : value);
-  const shared: Shared = { doc, tokens, plans: planComponents(doc, resolve), built: new Map(), assets: new Map(), urls, brand: input.brand, notes: new Set(), h1: { taken: false }, content: contentOf(doc) };
-  const scope = scopeOf(shared, doc.tracks, { width: doc.width, height: doc.height }, null, doc.still?.frame ?? 0);
+  const notes = new Set<string>();
+  const shared: Shared = { doc, tokens, plans: planComponents(doc, resolve), built: new Map(), assets: new Map(), urls, brand: input.brand, notes, h1: { taken: false }, content: contentOf(doc), timeline: timelineOf(doc, notes) };
+  const scope = scopeOf(shared, doc.tracks, { width: doc.width, height: doc.height }, null, doc.still?.frame ?? 0, shared.timeline);
   const backdrop = scope.clips.find((c) => c.component === 'BrandBackground' && !c.parent);
   const background: Rule[] = backdrop ? [['background-color', tokens.colour(String(backdrop.props.fill ?? 'brand.background'), ColourRole.Page)]] : pageBackground(doc, tokens);
   const page = kebab(input.name);

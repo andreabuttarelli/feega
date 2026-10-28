@@ -1,6 +1,6 @@
 <script lang="ts">
   import { KEY_EASE_IDS, EASE_LABEL } from '@feega/motion-core/motion/design';
-  import { easeCss } from '$lib/motion/ease-css';
+  import { easeCss } from '@feega/motion-core/motion/ease-css';
   import { DEFAULT_INTENSITY, INTERPS, INTERP_LABEL, Interp, isSpring, type Bezier, type EaseSpec } from '@feega/motion-core/motion/keyframes';
   import { KeySide, easePath } from '$lib/motion/timeline-view';
   import { parseDecimal } from '$lib/motion/inspector';
