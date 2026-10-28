@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { snapBox, snapDrag } from './snap';
+import { snapBox, snapDrag, snapResize } from './snap';
 
 const box = (x: number, y: number, w = 100, h = 100) => ({ x, y, w, h });
 
@@ -58,5 +58,36 @@ describe('equal spacing while dragging between two tiles', () => {
     const snap = snapBox(box(253, 0), [box(0, 0), box(500, 0), box(254, 900)], 8);
     expect(snap.dx).toBe(1);
     expect(snap.spacing).toEqual([]);
+  });
+});
+
+describe('smart guides while resizing a tile', () => {
+  const other = box(300, 0, 100, 500);
+
+  it('snaps only the dragged edge and keeps the opposite edge', () => {
+    const r = snapResize(box(0, 100, 295, 100), [1, 0.5], [other], 8, false);
+    expect(r.box).toEqual({ x: 0, y: 100, w: 300, h: 100 });
+    expect(r.guides).toContainEqual({ axis: 'x', at: 300, from: 0, to: 500 });
+  });
+
+  it('snaps the start edge by moving origin and shrinking size', () => {
+    const r = snapResize(box(405, 100, 100, 100), [0, 0.5], [other], 8, false);
+    expect(r.box).toEqual({ x: 400, y: 100, w: 105, h: 100 });
+  });
+
+  it('snaps both edges of a corner independently', () => {
+    const r = snapResize(box(0, 0, 297, 496), [1, 1], [other], 8, false);
+    expect(r.box).toMatchObject({ w: 300, h: 500 });
+  });
+
+  it('does nothing out of reach', () => {
+    const r = snapResize(box(0, 100, 250, 100), [1, 0.5], [other], 8, false);
+    expect(r).toEqual({ box: box(0, 100, 250, 100), guides: [] });
+  });
+
+  it('keeps the aspect ratio when locked, anchoring the opposite corner', () => {
+    const r = snapResize({ x: 0, y: 0, w: 297, h: 148.5 }, [1, 1], [other], 8, true);
+    expect(r.box.w).toBe(300);
+    expect(r.box.h).toBeCloseTo(150);
   });
 });

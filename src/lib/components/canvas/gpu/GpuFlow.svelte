@@ -163,7 +163,7 @@
   import { STACK_GAP, alignTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
-  import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
+  import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
   import { dragOffset } from '$lib/canvas/duplicate-plan';
   import { enterSelected } from '$lib/canvas/enter-frame';
@@ -2027,7 +2027,8 @@
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const box = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
+        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
+        const box = snapResized(a, free, e.shiftKey, e.altKey);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
@@ -2111,6 +2112,7 @@
           return;
         }
         props.onLive?.([]);
+        snapGuides = [];
         const box = overrides.get(a.id);
         if (box && (box.x !== a.box.x || box.y !== a.box.y)) {
           props.onMove?.(a.id, box.x, box.y);
@@ -2298,6 +2300,17 @@
     snapSpacing = snap.spacing;
     const at = new Map(snap.moves.map((m) => [m.id, m]));
     return raw.map((m) => at.get(m.id) ?? m);
+  }
+
+  function snapResized(a: Extract<Active, { kind: GestureKind.Resize }>, free: Box, locked: boolean, symmetric: boolean): Box {
+    snapGuides = [];
+    if (a.rotation || symmetric) {
+      return free;
+    }
+    const others = tiles.filter((t) => t.id !== a.id).map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
+    const snap = snapResize(free, a.unit, others, SNAP_SCREEN_PX / view.zoom, locked);
+    snapGuides = snap.guides;
+    return snap.box.w < a.min.w || snap.box.h < a.min.h ? free : snap.box;
   }
 
   const measured = $derived.by(() => {

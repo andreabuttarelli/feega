@@ -12,8 +12,8 @@ const lines = (a: Axis, r: SnapRect) => [a.start(r), a.start(r) + a.size(r) / 2,
 
 type Hit = { delta: number; at: number; other: SnapRect };
 
-function nearest(a: Axis, moving: SnapRect, others: readonly SnapRect[], reach: number): Hit[] {
-  const hits = others.flatMap((other) => lines(a, other).flatMap((at) => lines(a, moving).map((mine) => ({ delta: at - mine, at, other }))));
+function nearest(a: Axis, moving: SnapRect, others: readonly SnapRect[], reach: number, mine: number[] = lines(a, moving)): Hit[] {
+  const hits = others.flatMap((other) => lines(a, other).flatMap((at) => mine.map((mine) => ({ delta: at - mine, at, other }))));
   const close = hits.filter((h) => Math.abs(h.delta) <= reach);
   if (!close.length) {
     return [];
@@ -96,4 +96,50 @@ export function snapDrag(dragged: readonly DraggedRect[], others: readonly SnapR
   const joint = { x, y, w: Math.max(...dragged.map((r) => r.x + r.w)) - x, h: Math.max(...dragged.map((r) => r.y + r.h)) - y };
   const snap = snapBox(joint, others, reach);
   return { moves: dragged.map((r) => ({ id: r.id, x: r.x + snap.dx, y: r.y + snap.dy })), guides: snap.guides, spacing: snap.spacing };
+}
+
+const END_EDGE = 1;
+const START_EDGE = 0;
+const NO_EDGE = 0.5;
+
+export type ResizeUnit = [number, number];
+export type Resize = { box: SnapRect; guides: SnapGuide[] };
+
+function edgeSnap(a: Axis, box: SnapRect, unit: number, others: readonly SnapRect[], reach: number): { delta: number; hits: Hit[] } {
+  if (unit === NO_EDGE) {
+    return { delta: 0, hits: [] };
+  }
+  const edge = unit === END_EDGE ? a.start(box) + a.size(box) : a.start(box);
+  const hits = nearest(a, box, others, reach, [edge]);
+  return { delta: hits[0]?.delta ?? 0, hits };
+}
+
+function withEdge(a: Axis, box: SnapRect, unit: number, delta: number): SnapRect {
+  const grow = unit === END_EDGE ? delta : -delta;
+  const size = a.size(box) + grow;
+  const start = unit === END_EDGE ? a.start(box) : a.start(box) + delta;
+  return a.axis === 'x' ? { ...box, x: start, w: size } : { ...box, y: start, h: size };
+}
+
+function fitCross(box: SnapRect, before: SnapRect, unit: number, vertical: boolean): SnapRect {
+  const ratio = before.w / before.h;
+  if (!vertical) {
+    const h = box.w / ratio;
+    return { ...box, h, y: unit === END_EDGE ? before.y : unit === START_EDGE ? before.y + before.h - h : before.y + (before.h - h) / 2 };
+  }
+  const w = box.h * ratio;
+  return { ...box, w, x: unit === END_EDGE ? before.x : unit === START_EDGE ? before.x + before.w - w : before.x + (before.w - w) / 2 };
+}
+
+export function snapResize(box: SnapRect, unit: ResizeUnit, others: readonly SnapRect[], reach: number, locked: boolean): Resize {
+  const x = edgeSnap(X, box, unit[0], others, reach);
+  const y = edgeSnap(Y, box, unit[1], others, reach);
+  const vertical = unit[0] === NO_EDGE || (locked && unit[1] !== NO_EDGE && (!x.hits.length || (y.hits.length > 0 && Math.abs(y.delta) < Math.abs(x.delta))));
+  const used = locked ? (vertical ? { x: { delta: 0, hits: [] as Hit[] }, y } : { x, y: { delta: 0, hits: [] as Hit[] } }) : { x, y };
+  let snapped = withEdge(X, box, unit[0], used.x.delta);
+  snapped = withEdge(Y, snapped, unit[1], used.y.delta);
+  if (locked) {
+    snapped = fitCross(snapped, box, vertical ? unit[0] : unit[1], vertical);
+  }
+  return { box: snapped, guides: [...guidesFor(X, used.x.hits, snapped), ...guidesFor(Y, used.y.hits, snapped)] };
 }
