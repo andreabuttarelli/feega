@@ -65,7 +65,9 @@ const styleTag = (root: ElementNode, ctx: Ctx) => {
   return blocks.length ? ['<style>', ...blocks.slice(0, -1), '</style>', ''] : [];
 };
 
-const imports = (uses: readonly string[], from: string, root: ElementNode) => [...uses.map((u) => `  import ${u} from '${from}${u}.svelte';`), ...(animatedNodes(root).some(inView) ? [`  import { inview } from '$lib/inview';`] : [])];
+const INVIEW_MODULE = '$lib/inview';
+
+const imports = (uses: readonly string[], from: string, root: ElementNode) => [...uses.map((u) => `  import ${u} from '${from}${u}.svelte';`), ...(animatedNodes(root).some(inView) ? [`  import { inview } from '${INVIEW_MODULE}';`] : [])];
 
 const INVIEW_ACTION = ['export function inview(node: Element) {', ...INVIEW_SCRIPT.map((l) => (l ? `  ${l}` : l)).slice(0, -1), '  seen.observe(node);', '  return { destroy: () => seen.disconnect() };', '}', ''];
 
