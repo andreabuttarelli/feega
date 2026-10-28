@@ -3433,3 +3433,6 @@ Signal: inpaint keeps the painted area and regenerates the rest; reframe returns
 
 ### Un valore letto da una `Map` non reattiva resta quello del primo render
 Segnale: l'etichetta della modalità (Design/Motion) non cambia al clic e le modifiche si comportano diversamente da ciò che dice. Causa: `savers.get(id)?.mode` in un template, con `savers` una `Map` semplice. Mossa: uno `$state` che riceve le notifiche della sessione, mai la mappa nel template.
+
+### 431 on localhost: cookies are shared across ports and per-ref names accumulate
+Segnale: `localhost:5173` risponde "431 Request Header Fields Too Large" nel profilo normale, non in incognito. Causa: `sb-<ref>-auth-token.N` ha un nome diverso per ogni progetto Supabase, e i cookie di `localhost` valgono per tutte le porte. Mossa: il server cancella i cookie di sessione di altri ref (`stale-session-cookies.ts`); per sbloccarsi a mano, cancella i cookie di localhost.
