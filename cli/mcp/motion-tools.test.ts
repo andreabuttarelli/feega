@@ -300,6 +300,11 @@ describe('the motion agent over MCP', () => {
     expect(JSON.stringify(result)).toContain('clips');
   });
 
+  test('export_code reads the frame as files for the target', async () => {
+    await callTool('export_code', { node_id: NODE, target: 'svelte' });
+    expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/code?target=svelte` });
+  });
+
   test('get_render reads a render and its file', async () => {
     const result = await callTool('get_render', { run_id: 'render-1' });
     expect(calls[0].path).toBe('/api/v1/motion/renders/render-1');

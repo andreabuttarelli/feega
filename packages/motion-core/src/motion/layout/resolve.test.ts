@@ -3,6 +3,7 @@ import { MotionFormat, newClip, newMotionDoc, parseMotionDoc, type MotionClip, t
 import { Align, Direction, Justify, Sizing } from './auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
 import { withAutoLayout } from './resolve';
+import { TrackKind } from '../components';
 import { textBaseline, textExtent } from './text-extent';
 
 const W = 1000;
@@ -97,6 +98,19 @@ describe('withAutoLayout', () => {
     const inner = docOf([shape('a', { x: 0, y: 0, width: 0.5, height: 0.5 }, { parent: 'c' }), shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow() })]);
     const doc = { ...docOf([]), comps: { k: { name: 'k', durationInFrames: 30, frame: { width: 200, height: 100 }, tracks: inner.tracks } } };
     expect(propsOf({ ...doc, tracks: withAutoLayout(doc).comps.k.tracks } as MotionDoc, 'a')).toMatchObject({ x: 0.25, y: 0.25 });
+  });
+
+  it('a component instance takes the size of what it shows and moves by its offset, not by a box it has not got', () => {
+    const button = shape('btn', { x: 0.6, y: 0.6, width: 0.2, height: 0.1 });
+    const host = newClip({ id: 'i', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'k' }, parent: 'c' });
+    const doc = {
+      ...docOf([shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }), host, shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow({ gap: 10 }) })]),
+      comps: { k: { name: 'Button', durationInFrames: 30, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: '', clips: [button] }] } }
+    } as MotionDoc;
+    const out = withAutoLayout(doc);
+    const laid = out.tracks.flatMap((t) => t.clips).find((c) => c.id === 'i')!;
+    expect(laid.props).toEqual({ comp: 'k' });
+    expect(laid.transform).toMatchObject({ x: -0.39, y: -0.55 });
   });
 });
 

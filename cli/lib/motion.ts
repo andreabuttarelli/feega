@@ -34,6 +34,10 @@ export type MotionFrames = { revision: number; frames: { time: number; mime: str
 
 export type MotionRevision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
 
+export const CODE_TARGETS = ['react', 'html', 'svelte'] as const;
+export type CodeTarget = (typeof CODE_TARGETS)[number];
+export type FrameCode = { name: string; target: CodeTarget; files: { path: string; content: string }[]; notes: string[] };
+
 export type VideoBudget = { ok: true; spent_usd: number; cap_usd: number; raise_usd: number };
 
 export type FrameShare = { url: string; embed_url: string };
@@ -99,6 +103,7 @@ export const motionApi = {
   raiseBudget: (token: string, nodeId: string, org?: string) => request<VideoBudget>(withOrg(`/api/v1/motion/${id(nodeId)}/budget`, org), token, { method: 'POST' }),
   frames: (token: string, nodeId: string, ask: { times: number[]; width?: number }, org?: string) =>
     request<MotionFrames>(withOrg(`/api/v1/motion/${id(nodeId)}/frames`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
+  code: (token: string, nodeId: string, target: CodeTarget, org?: string) => request<FrameCode>(withOrg(`/api/v1/motion/${id(nodeId)}/code?target=${target}`, org), token),
   revisions: (token: string, nodeId: string, org?: string) => request<{ revisions: MotionRevision[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token),
   templates: (token: string, org?: string) => request<{ templates: MotionTemplate[] }>(withOrg('/api/v1/motion/templates', org), token),
   fromTemplate: (token: string, body: FromTemplate, org?: string) => request<FromTemplateMade>(withOrg('/api/v1/motion/from-template', org), token, { method: 'POST', body: JSON.stringify(body) }),

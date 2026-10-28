@@ -1,5 +1,6 @@
 export enum FrameDialog {
   Export = 'export',
+  Code = 'code',
   Voice = 'voice',
   Music = 'music',
   Interactive = 'interactive',
@@ -13,6 +14,7 @@ export enum FrameDialog {
 }
 
 export const FRAME_DIALOG_ACTIONS = {
+  'frame-code': FrameDialog.Code,
   'frame-voice': FrameDialog.Voice,
   'frame-music': FrameDialog.Music,
   'frame-interactive': FrameDialog.Interactive,
