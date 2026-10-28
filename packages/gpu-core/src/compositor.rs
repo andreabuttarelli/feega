@@ -27,6 +27,7 @@ pub struct Frame {
     pub outcome: Option<Outcome>,
     pub pending: bool,
     pub skipped: Vec<Skipped>,
+    pub rastered: usize,
 }
 
 impl Frame {
@@ -105,6 +106,7 @@ impl Compositor {
         let damage: Damage = self.world.take_damage();
         let step = self.retained.step(camera, damage, now_ms);
         let mut skipped = Vec::new();
+        let mut rastered_all = 0;
         let outcome = match &step {
             Step::Idle => None,
             Step::Present => Some(Outcome::Reused),
@@ -121,6 +123,7 @@ impl Compositor {
                     let (missed, rastered) = self.region(painter, library, raster, part, limits)?;
                     skipped.extend(missed);
                     limits.rasters = limits.rasters.saturating_sub(rastered);
+                    rastered_all += rastered;
                 }
                 if raster.outcome == Outcome::Full && raster.quality == Quality::Sharp {
                     self.retained.took(clock() - started);
@@ -131,6 +134,6 @@ impl Compositor {
         if outcome.is_some() {
             painter.present(self.retained.lookup(camera))?;
         }
-        Ok(Frame { outcome, pending: self.pending || self.retained.pending(), skipped })
+        Ok(Frame { outcome, pending: self.pending || self.retained.pending(), skipped, rastered: rastered_all })
     }
 }

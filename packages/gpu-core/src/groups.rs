@@ -210,6 +210,7 @@ const RGBA_BYTES: u64 = 4;
 const CULL_SLACK_PX: f64 = 2.0;
 const RUNGS_PER_DOUBLING: f64 = 4.0;
 const RUNG_SLACK: f64 = 1e-9;
+const FAR_PX: f64 = 4096.0;
 const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
 #[derive(Debug, Clone, Copy)]
@@ -543,8 +544,28 @@ pub struct Library {
     building: FxHashMap<String, Building>,
     stale: Vec<String>,
     retiring: Vec<String>,
+    motion: Motion,
+    budget: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     fonts: Fonts,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Motion {
+    #[default]
+    Still,
+    Gesture,
+}
+
+fn sharp_enough(motion: Motion, want: f64, held: f64) -> bool {
+    match motion {
+        Motion::Still => fresh(want, held),
+        Motion::Gesture => held >= want * (1.0 - RUNG_SLACK),
+    }
+}
+
+fn distance_to(r: Rect, view: Rect) -> f64 {
+    (r.center() - view.center()).hypot()
 }
 
 fn draws(item: &Item, picture: &str) -> bool {
@@ -690,6 +711,67 @@ impl Library {
         self.held.values().map(|h| h.bytes).sum()
     }
 
+    pub fn set_motion(&mut self, motion: Motion) {
+        self.motion = motion;
+    }
+
+    pub fn set_budget(&mut self, bytes: u64) {
+        self.budget = Some(bytes);
+    }
+
+    fn sharpened_first(&self, list: &DisplayList, side: u32) -> Option<String> {
+        if self.motion == Motion::Still {
+            return None;
+        }
+        let view = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
+        let wanting = list.items.iter().filter_map(|item| {
+            let Item::Use(u) = item else { return None };
+            let group = self.groups.get(&u.group)?;
+            let whole = self.encodings.get(&u.group).cloned().flatten().is_some_and(|c| c.whole().is_some());
+            if !u.cache || whole || (u.hold && self.held.contains_key(&u.group)) {
+                return None;
+            }
+            let at = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
+            let want = held_within(u, group, rung(scale_of(u.matrix)), side);
+            let (w, h) = texels(group, want);
+            let sharp = self.held.get(&u.group).is_some_and(|k| sharp_enough(self.motion, want, k.scale));
+            let new_build = !self.building.contains_key(&u.group);
+            (at.overlaps(view) && want > 0.0 && w.max(h) <= side && !sharp).then(|| (u.group.clone(), (new_build, distance_to(at, view))))
+        });
+        wanting.min_by(|a, b| a.1 .0.cmp(&b.1 .0).then(a.1 .1.total_cmp(&b.1 .1))).map(|(g, _)| g)
+    }
+
+    pub fn is_building(&self) -> bool {
+        !self.building.is_empty()
+    }
+
+    fn may_raster(&self, group: &str, first: &Option<String>) -> bool {
+        match self.motion {
+            Motion::Gesture => first.as_deref() == Some(group),
+            Motion::Still => true,
+        }
+    }
+
+    fn fits(&self, bytes: u64) -> bool {
+        self.budget.is_none_or(|b| self.cache_bytes() + bytes <= b)
+    }
+
+    fn over_budget(&mut self, off_screen: Vec<(String, f64)>) -> Vec<String> {
+        let Some(budget) = self.budget else { return vec![] };
+        let mut farthest = off_screen;
+        farthest.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let mut gone = Vec::new();
+        for (group, _) in farthest {
+            if self.cache_bytes() <= budget {
+                break;
+            }
+            if self.held.remove(&group).is_some() {
+                gone.push(group);
+            }
+        }
+        gone
+    }
+
     pub fn plan(&mut self, list: &DisplayList, limits: Limits) -> Plan {
         let mut missing = Vec::new();
         let mut rasters = Vec::new();
@@ -700,6 +782,8 @@ impl Library {
         let mut items = Vec::with_capacity(list.items.len());
         let mut encoded: HashMap<String, Arc<Encoded>> = HashMap::new();
         let view = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
+        let first = self.sharpened_first(list, limits.side);
+        let mut off_screen = Vec::new();
         for item in &list.items {
             let Item::Use(u) = item else {
                 items.push(item.clone());
@@ -709,7 +793,8 @@ impl Library {
                 missing.push(u.group.clone());
                 continue;
             };
-            let on_screen = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64)).overlaps(Rect::new(0.0, 0.0, list.width as f64, list.height as f64));
+            let at_screen = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
+            let on_screen = at_screen.overlaps(view);
             let cast = self.encoding(&u.group);
             let Some(group) = self.groups.get(&u.group) else { continue };
             if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some()) {
@@ -722,6 +807,9 @@ impl Library {
             }
             let want = held_within(u, group, rung(scale_of(u.matrix)), limits.side);
             let (w, h) = texels(group, want);
+            if u.cache && !at_screen.overlaps(view.inflate(FAR_PX, FAR_PX)) {
+                off_screen.push((u.group.clone(), distance_to(at_screen, view)));
+            }
             if let (true, Some(kept)) = (u.cache && u.hold, self.held.get(&u.group).copied()) {
                 seen.insert(u.group.clone());
                 if on_screen {
@@ -745,10 +833,13 @@ impl Library {
             }
             seen.insert(u.group.clone());
             let held = self.held.get(&u.group).copied();
+            if !on_screen && held.is_none() && !self.fits(w as u64 * h as u64 * RGBA_BYTES) {
+                continue;
+            }
             let shown = match held {
-                Some(h) if fresh(want, h.scale) => Some(h.scale),
-                _ if rasters.len() < limits.rasters => {
-                    let at = self.building.get(&u.group).copied().filter(|b| fresh(want, b.scale)).unwrap_or(Building { scale: want, next: 0 });
+                Some(h) if sharp_enough(self.motion, want, h.scale) => Some(h.scale),
+                _ if rasters.len() < limits.rasters && self.may_raster(&u.group, &first) => {
+                    let at = self.building.get(&u.group).copied().filter(|b| sharp_enough(self.motion, want, b.scale)).unwrap_or(Building { scale: want, next: 0 });
                     let chunk = chunk_of(u, group, at, limits.items);
                     let next = at.next + limits.items;
                     rasters.push(chunk.raster);
@@ -791,8 +882,9 @@ impl Library {
         for key in &abandoned {
             self.building.remove(key);
         }
+        let squeezed = self.over_budget(off_screen);
         let mut evicted = std::mem::replace(&mut self.stale, std::mem::take(&mut self.retiring));
-        evicted.extend(gone.iter().map(|k| cache_clip(k)));
+        evicted.extend(gone.iter().chain(&squeezed).map(|k| cache_clip(k)));
         evicted.extend(abandoned.iter().map(|k| building_clip(k)));
         let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable_owned(r.list).0, clip: r.clip }).collect();
         let (mut screen, unset) = self.drawable_owned(DisplayList { items, ..list.clone_empty() });
