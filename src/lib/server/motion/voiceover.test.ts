@@ -5,13 +5,14 @@ const { runAudio, voiceUseRefusal } = vi.hoisted(() => ({ runAudio: vi.fn(), voi
 vi.mock('$lib/server/canvas/audio-run', () => ({ runAudio }));
 vi.mock('$lib/server/voices/voice-guard', () => ({ voiceUseRefusal }));
 vi.mock('$lib/server/elevenlabs-config', () => ({ configuredAudioProvider: () => ({}) }));
+vi.mock('$lib/server/elevenlabs-music', () => ({ musicRefusalFor: (op: string) => (op === 'music' ? 'music_unavailable' : null) }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/canvas/sign-media', () => ({
   createAssetSigningDb: () => ({}),
   signAssetPaths: async () => new Map([['p', 'https://signed']])
 }));
 
-import { speakVoiceover } from './voiceover';
+import { Sound, generateSound, speakVoiceover } from './voiceover';
 
 const SCOPE = { orgId: 'o', projectId: 'p1', nodeId: 'n', userId: 'u', actor: { kind: 'user' as const, id: 'u' } };
 
@@ -32,6 +33,13 @@ describe('the motion voice-over', () => {
     voiceUseRefusal.mockResolvedValue('voice_not_yours');
     expect(await speakVoiceover({} as never, SCOPE, { text: 'hi', voiceId: 'theirs' })).toEqual({ ok: false, error: 'voice_not_yours' });
     expect(voiceUseRefusal).toHaveBeenCalledWith({}, { orgId: 'o', projectId: 'p1', voiceId: 'theirs' });
+    expect(runAudio).not.toHaveBeenCalled();
+  });
+});
+
+describe('the generated music', () => {
+  it('is refused upfront while the switch is off', async () => {
+    expect(await generateSound({} as never, SCOPE, Sound.Music, { text: 'a bed' })).toEqual({ ok: false, error: 'music_unavailable' });
     expect(runAudio).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ import { runAudio } from '$lib/server/canvas/audio-run';
 import { voiceUseRefusal } from '$lib/server/voices/voice-guard';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { defaultAudioModel, voiceIdOf, type AudioOperationId, type AudioParams } from '$lib/canvas/audio-operations';
+import { musicRefusalFor } from '$lib/server/elevenlabs-music';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import type { Voiceover } from './motion-tools';
@@ -32,6 +33,12 @@ const SOUNDS: Record<Sound, SoundSpec> = {
 };
 
 export async function generateSound(db: Db, scope: VoiceoverScope, sound: Sound, input: SoundInput): Promise<Voiceover> {
+  const spec = SOUNDS[sound];
+  const unavailable = musicRefusalFor(spec.operation);
+  if (unavailable) {
+    return { ok: false, error: unavailable };
+  }
+
   const screened = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: [input.text], scope: { ...scope, actor: scope.actor } });
   if (!screened.ok) {
     return { ok: false, error: 'blocked_by_moderation' };
@@ -43,7 +50,6 @@ export async function generateSound(db: Db, scope: VoiceoverScope, sound: Sound,
     return { ok: false, error: AUDIO_NOT_CONFIGURED };
   }
 
-  const spec = SOUNDS[sound];
   const params = spec.params(input);
   const refusal = params.voiceId ? await voiceUseRefusal(db, { orgId: scope.orgId, projectId: scope.projectId, voiceId: params.voiceId }) : null;
   if (refusal) {

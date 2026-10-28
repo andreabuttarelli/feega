@@ -1,11 +1,12 @@
-import { AUDIO_OPERATION_IDS, DUBBING_LANGUAGES, audioModelsOf, operationSpec } from '$lib/canvas/audio-operations';
+import { DUBBING_LANGUAGES, audioOperationIdsFor, audioModelsOf, operationSpec } from '$lib/canvas/audio-operations';
 import { configuredAudioProvider } from '$lib/server/elevenlabs-config';
+import { musicEnabled } from '$lib/server/elevenlabs-music';
 import { cachedVoices } from './audio-voices';
 import type { Voice } from './audio-provider';
 
 export function audioOperations() {
   return Object.fromEntries(
-    AUDIO_OPERATION_IDS.map((id) => {
+    audioOperationIdsFor(musicEnabled()).map((id) => {
       const op = operationSpec(id);
       return [
         id,

@@ -122,6 +122,8 @@ export type AudioOperationId = keyof typeof AUDIO_OPERATIONS;
 
 export const AUDIO_OPERATION_IDS = Object.keys(AUDIO_OPERATIONS) as AudioOperationId[];
 
+export const audioOperationIdsFor = (music: boolean): AudioOperationId[] => (music ? AUDIO_OPERATION_IDS : AUDIO_OPERATION_IDS.filter((id) => id !== 'music'));
+
 export const DEFAULT_AUDIO_OPERATION: AudioOperationId = 'text_to_speech';
 
 export const AUDIO_PROVIDER = { provider: 'elevenlabs', providerLabel: 'ElevenLabs' } as const;

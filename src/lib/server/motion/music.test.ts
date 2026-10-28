@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Mood } from '$lib/motion/music-library';
 
-const world = vi.hoisted(() => ({ provider: null as unknown, uploads: [] as string[], inserted: [] as Record<string, unknown>[], sounds: [] as unknown[] }));
+const world = vi.hoisted(() => ({ music: true, provider: null as unknown, uploads: [] as string[], inserted: [] as Record<string, unknown>[], sounds: [] as unknown[] }));
 
+vi.mock('$lib/server/elevenlabs-music', () => ({ musicEnabled: () => world.music }));
 vi.mock('$lib/server/elevenlabs-config', () => ({ configuredAudioProvider: () => world.provider }));
 vi.mock('./music-files', () => ({ libraryBytes: async () => new Uint8Array([1, 2, 3]) }));
 vi.mock('./voiceover', () => ({
@@ -31,6 +32,7 @@ const scope = { orgId: 'o', projectId: 'p', nodeId: 'n', userId: 'u', actor: { k
 describe('layMusic', () => {
   beforeEach(() => {
     world.provider = null;
+    world.music = true;
     world.uploads = [];
     world.inserted = [];
     world.sounds = [];
@@ -52,5 +54,14 @@ describe('layMusic', () => {
 
     expect(out).toMatchObject({ ok: true, assetId: 'gen', source: 'generated' });
     expect(world.uploads).toEqual([]);
+  });
+
+  it('with a generator but music off lays the library track', async () => {
+    world.provider = {};
+    world.music = false;
+    const out = await layMusic(db, scope, { mood: Mood.Calm, seconds: 15 });
+
+    expect(out).toMatchObject({ ok: true, source: 'library' });
+    expect(world.sounds).toEqual([]);
   });
 });

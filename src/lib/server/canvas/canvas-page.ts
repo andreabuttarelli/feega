@@ -1,4 +1,5 @@
 import { exportCodeNode, isExportMode } from '$lib/server/canvas/code-export-node';
+import { musicEnabled } from '$lib/server/elevenlabs-music';
 import { ExportMode } from '$lib/canvas/code-frame';
 import { cardPreviews } from '$lib/server/canvas/card-previews';
 import { z } from 'zod';
@@ -286,6 +287,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     shareToken,
     references,
     mode,
+    musicEnabled: musicEnabled(),
     projectBrandId,
     onboarding,
     orgTemplates,
