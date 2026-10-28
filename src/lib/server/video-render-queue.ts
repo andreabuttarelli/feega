@@ -159,6 +159,8 @@ async function attachTask(
 
 export type TrackedVideoRender = SubmittedVideoRender & { jobId: string };
 
+const PROVIDER_REFUSED = 'provider refused';
+
 export async function submitAndTrackVideoRender(
 	opts: RenderOwner & {
 		admin: SupabaseClient;
@@ -175,6 +177,7 @@ export async function submitAndTrackVideoRender(
 	}
 
 	const { submitVideoRender } = await import('$lib/server/video');
+	let refusal = PROVIDER_REFUSED;
 	const submitted = await submitVideoRender(opts.imagePrompt, {
 		...opts.render,
 		onSubmitError: opts.onSubmitError
@@ -182,14 +185,16 @@ export async function submitAndTrackVideoRender(
 		if (e instanceof Error && e.name === 'CreditsExhaustedError') {
 			throw e;
 		}
-		console.error('[video-render] submit failed:', e instanceof Error ? e.message : e);
+		const reason = e instanceof Error ? e.message : String(e);
+		console.error('[video-render] submit failed:', reason);
+		refusal = `${PROVIDER_REFUSED}: ${reason}`;
 		return undefined;
 	});
 
 	if (!submitted) {
 		await opts.admin
 			.from('video_renders')
-			.update({ status: 'failed', error: 'provider refused', finished_at: new Date().toISOString() })
+			.update({ status: 'failed', error: refusal, finished_at: new Date().toISOString() })
 			.eq('id', jobId)
 			.then(undefined, () => {});
 		return null;

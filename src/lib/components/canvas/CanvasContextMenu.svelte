@@ -2,7 +2,8 @@
   import Layers from '@lucide/svelte/icons/layers';
   import { menuFor, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
-  import { Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
+  import FloatingMenu from './FloatingMenu.svelte';
+  import { Kbd, MENU_ITEM } from '$lib/components/ui/shell';
 
   const MENU = '[data-testid="canvas-menu"]';
 
@@ -49,7 +50,7 @@
 <svelte:window onpointerdown={outside} onkeydown={(e) => e.key === 'Escape' && onclose()} />
 
 {#if items.length || pickable.length}
-  <div class={MENU_CONTENT} role="menu" data-testid="canvas-menu" onclick={(e) => e.stopPropagation()} onpointerdown={(e) => e.stopPropagation()} style={`position: fixed; z-index: 30; min-width: 200px; left: ${at.x}px; top: ${at.y}px; max-height: calc(100vh - ${at.y}px - 8px); overflow-y: auto`}>
+  <FloatingMenu {at}>
     {#if pickable.length}
       <div class="px-2 pt-2 pb-1 text-ui-caption text-ui-text-3" role="presentation">Select layer</div>
       {#each pickable as layer (layer.id)}
@@ -67,5 +68,5 @@
         {#if item.shortcut}<Kbd shortcut={item.shortcut} class="text-ui-text-3" />{/if}
       </button>
     {/each}
-  </div>
+  </FloatingMenu>
 {/if}

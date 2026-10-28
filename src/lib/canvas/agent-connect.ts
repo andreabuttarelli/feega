@@ -51,7 +51,16 @@ function cloudClients(): ConnectClient[] {
 
 function localClients(port: string): ConnectClient[] {
   const args = ['-y', 'feega', 'mcp', '--port', port];
-  const stdio = json({ mcpServers: { [LOCAL_SERVER_NAME]: { command: 'npx', args } } });
+  const stdio = [
+    '{',
+    '  "mcpServers": {',
+    `    "${LOCAL_SERVER_NAME}": {`,
+    '      "command": "npx",',
+    `      "args": [${args.map((a) => `"${a}"`).join(', ')}]`,
+    '    }',
+    '  }',
+    '}'
+  ].join('\n');
   return [
     { id: 'claude-code', name: 'Claude Code', steps: [{ text: 'Run in a terminal:', snippet: `claude mcp add ${LOCAL_SERVER_NAME} -- npx ${args.join(' ')}` }] },
     {

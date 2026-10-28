@@ -4,7 +4,9 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { toWorld } from '$lib/canvas/gpu/camera';
-import { FrameFit, framePicker, frameSpace } from './frame-pick';
+import { FrameFit, FramePickers, framePicker, frameSpace } from './frame-pick';
+import { addTrack } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import { groupClips } from '$lib/motion/group';
 
 const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 900, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'card');
@@ -149,5 +151,54 @@ describe('a stretched frame space', () => {
     const stretched = frameSpace({ x: 10, y: 20, w: 400, h: 100 }, { width: 200, height: 200 }, 0, FrameFit.Stretch);
     expect(stretched.pointToWorld([200, 200])).toEqual({ x: 410, y: 120 });
     expect(stretched.toFrame({ x: 210, y: 70 })).toEqual([100, 100]);
+  });
+});
+
+describe('a text at its first frame, still fading up', () => {
+  const START = 60;
+  const fading = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: START, durationInFrames: 90, props: { text: 'Hi', x: 0.1, y: 0.6, width: 0.4, height: 0.15 } }, 'copy');
+  if (!fading.ok) {
+    throw new Error(fading.error);
+  }
+  const atStart = framePicker({ doc: fading.doc, tokens: FEEGA_TOKENS, assets: {}, playhead: START });
+  const centre = () => {
+    const box = atStart.outline('copy', space)!;
+    return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+  };
+
+  it('is still the element a double-click lands on once it is selected', () => {
+    expect(atStart.pickHeld(centre(), space, ['copy'])).toBe('copy');
+  });
+
+  it('is not picked when nothing holds it', () => {
+    expect(atStart.pickHeld(centre(), space, [])).toBeNull();
+  });
+});
+
+describe('an image inserted in a frame', () => {
+  const STAGE = { width: 1000, height: 530 };
+  const stage = frameSpace({ x: 0, y: 0, w: STAGE.width, h: STAGE.height }, STAGE, 0);
+  const backed = addClip({ ...newMotionDoc(MotionFormat.Landscape), ...STAGE }, { component: 'Shape', from: 0, durationInFrames: 150, props: { shape: 'rect', x: 0.05, y: 0.05, width: 0.9, height: 0.9 } }, 'back');
+  const tracked = backed.ok ? addTrack(backed.doc, TrackKind.Visual, 'top') : backed;
+  const placed = tracked.ok ? addClip(tracked.doc, { component: 'Image', from: 0, durationInFrames: 150, trackId: 'top', props: { x: 0.5, y: 0.5, width: 0.064, height: 0.12, assetId: 'shot', fit: 'contain' } }, 'img') : tracked;
+  if (!placed.ok) {
+    throw new Error(placed.error);
+  }
+  const centre = { x: STAGE.width / 2, y: STAGE.height / 2 };
+
+  it('is picked once its file arrives, even though the doc did not change', () => {
+    const pickers = new FramePickers();
+    const uploading = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };
+    pickers.of('frame', uploading).pick(centre, stage);
+
+    const arrived = { ...uploading, assets: { shot: 'blob:https://app.test/0b1c' } };
+    expect(pickers.of('frame', arrived).pick(centre, stage)).toBe('img');
+  });
+
+  it('reuses the picker while neither the doc nor the files change', () => {
+    const pickers = new FramePickers();
+    const live = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };
+
+    expect(pickers.of('frame', live)).toBe(pickers.of('frame', { ...live }));
   });
 });

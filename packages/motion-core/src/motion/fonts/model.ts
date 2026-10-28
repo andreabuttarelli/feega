@@ -201,7 +201,7 @@ export function usedFaces(doc: FontDoc): Face[] {
   return allFaces(doc).filter((f) => !isBuiltin(f.family));
 }
 
-const BUILTIN_NAME: Record<BuiltinFont, string> = {
+export const BUILTIN_NAME: Record<BuiltinFont, string> = {
   [BuiltinFont.Sans]: 'DM Sans',
   [BuiltinFont.Mono]: 'Fragment Mono'
 };

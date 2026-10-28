@@ -3,10 +3,10 @@
   import Sun from '@lucide/svelte/icons/sun';
   import Moon from '@lucide/svelte/icons/moon';
   import type { Component } from 'svelte';
-  import { THEME_LABEL, THEME_PREFS, ThemePref, applyTheme, parseThemePref } from '$lib/theme';
+  import { THEME_LABEL, THEME_PREFS, ThemePref, parseThemePref } from '$lib/theme';
+  import { chooseTheme } from '$lib/theme-choice';
 
   const ICON: Record<ThemePref, Component> = { [ThemePref.System]: Monitor, [ThemePref.Light]: Sun, [ThemePref.Dark]: Moon };
-  const LEGACY_KEY = 'theme';
 
   let pref = $state(ThemePref.System);
 
@@ -16,17 +16,7 @@
 
   function pick(next: ThemePref) {
     pref = next;
-    applyTheme(next);
-    try {
-      if (next === ThemePref.System) {
-        localStorage.removeItem(LEGACY_KEY);
-      } else {
-        localStorage.setItem(LEGACY_KEY, next);
-      }
-    } catch {
-      void 0;
-    }
-    void fetch('/api/theme', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ theme: next }) });
+    chooseTheme(next);
   }
 </script>
 

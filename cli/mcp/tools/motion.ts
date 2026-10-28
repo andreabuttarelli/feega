@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { awaitRun, motionApi } from '../../lib/motion.ts';
+import { awaitRun, CODE_TARGETS, motionApi } from '../../lib/motion.ts';
 import { requireAuth, withAuth, fail, okText, type ToolResult } from '../util.ts';
 import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 
@@ -12,7 +12,7 @@ const EDITOR_WRITES =
   'save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), ' +
   'record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a TTF, OTF, WOFF or WOFF2 already in canvas-assets under the org fonts folder; joins the org library), rename_font {family,to}, delete_font {family}, analyze_sounds {assetIds} (tempo, beats, speech), ' +
   'template_sounds {doc,clipId} (lays the template clip SFX; answers the doc), save_template {doc,name,description,compId?,posterFrame?}. ' +
-  'Spends credits: generate_sound {sound:voice|music,text,seconds?} (answers assetId, url), render_batch {version,rows:[{name,values}],settings?} (one server render per row of template field values; poll batch_status)';
+  'Spends credits: generate_sound {sound:voice|music,text,seconds?; music only where the server offers it} (answers assetId, url), render_batch {version,rows:[{name,values}],settings?} (one server render per row of template field values; poll batch_status)';
 
 const org = z.string().optional().describe('Which org, if you belong to more than one.');
 
@@ -180,6 +180,21 @@ export function registerMotionTools(server: McpServer) {
       annotations: { readOnlyHint: true }
     },
     async ({ org, node_id }) => withAuth((token) => motionApi.summary(token, node_id, org))
+  );
+
+  server.registerTool(
+    'export_code',
+    {
+      title: 'Export a frame as code',
+      description:
+        'Turn a frame (with its nested frames, text, images, vectors and component instances) into a code project a developer keeps: ' +
+        '`target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Auto layout becomes flex/grid, components become one file each ' +
+        'with typed props for what differs between instances, colours and fonts become tokens. Returns `files` (path + content) and `notes` for what has no static ' +
+        'code equivalent. Static only: animation is not exported. Reads only, free, no AI.',
+      inputSchema: z.object({ org, node_id: z.string(), target: z.enum(CODE_TARGETS).optional() }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org, node_id, target }) => withAuth((token) => motionApi.code(token, node_id, target ?? 'react', org))
   );
 
   server.registerTool(

@@ -4286,6 +4286,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCancelRun={cancelRunFor}
     {nodeSummaries}
     {modelChoicesFor}
+    musicEnabled={data.musicEnabled}
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
@@ -4454,6 +4455,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
                   custom={customVoices}
                   slots={voiceSlots}
                   cloningAllowed={data.mode !== 'uncensored'}
+                  musicEnabled={data.musicEnabled}
                   onvoiceaction={voiceAction}
                   onvoiceschanged={() => void loadVoices()}
                   onparams={(params) => changeGen(id, gen, { params })}

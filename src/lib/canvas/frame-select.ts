@@ -80,3 +80,5 @@ export function siblingsOf(doc: MotionDoc, picks: readonly string[]): string[] {
   const level = picks.length ? parentOf(doc, picks[0]) : null;
   return doc.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => (c.parent ?? null) === level).map((c) => c.id));
 }
+
+export const grabbedInstead = (picks: readonly string[], under: string | null): string | null => (picks.length === 1 && under && under !== picks[0] ? under : null);

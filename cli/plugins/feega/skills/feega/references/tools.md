@@ -305,6 +305,7 @@ list. Returns how many combinations it actually stopped.
 | `motion_budget` | `feega motion budget <nodeId> [--raise]` |
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
+| `export_code` | `feega motion code <nodeId> [--target react\|html\|svelte] [--out <dir>]` |
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
 | `list_motion_templates` | `feega motion templates` |
 | `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16, 1:1, 4:5 or "A poster"] [--still s] [--project id]` |

@@ -35,10 +35,11 @@ import { TEXT_NODE_CREDITS } from '$lib/server/content-cost';
 import { CREDITS_PER_USD_SUBSCRIPTION_LIST } from '$lib/credit-ladder';
 import { withRecommendations, type CandidateModel, type Recommendation } from '$lib/canvas/recommended-models';
 import { syncedCandidates } from './recommended-models';
-import { AUDIO_INPUT_MODALITIES, AUDIO_OPERATION_IDS, AUDIO_PROVIDER, audioModelsOf, operationSpec } from '$lib/canvas/audio-operations';
+import { AUDIO_INPUT_MODALITIES, AUDIO_PROVIDER, audioModelsOf, audioOperationIdsFor, operationSpec } from '$lib/canvas/audio-operations';
+import { musicEnabled } from './elevenlabs-music';
 
 function audioChoices(): ModelChoice[] {
-  return AUDIO_OPERATION_IDS.flatMap((operation) =>
+  return audioOperationIdsFor(musicEnabled()).flatMap((operation) =>
     audioModelsOf(operation).map((id) => ({
       id,
       label: `${operationSpec(operation).label} · ${id}`,

@@ -2,7 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { allowlistRefusal } from '$lib/server/model-allowlist/allowlist';
 import { capRefusal, liveCapReader } from '$lib/server/spend-caps/gate';
 import { RENDER_DEADLINE_MS } from '$lib/server/motion/farm-render';
-import { BROWSER_RENDER_DEADLINE_MS } from '$lib/motion/render-link';
+import { BROWSER_RENDER_DEADLINE_MS, LINK_NEVER_OPENED, unopenedPast } from '$lib/motion/render-link';
 import { releaseHold } from '$lib/server/motion/render-run';
 import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
@@ -1404,16 +1404,18 @@ export async function expireStuckRuns(db: Db): Promise<ExpireOutcome> {
   for (const run of running) {
     const node = run.externalJobId ? await findNode(db, { orgId: run.orgId, nodeId: run.nodeId }).catch(() => null) : null;
     const kind = jobKindOf(run, node?.type ?? null);
+    const unopened = kind === 'browser_render' && unopenedPast(run.params, now);
     const cap = JOB_TIMEOUTS_MS[kind];
-    if (now - new Date(run.startedAt).getTime() < cap) continue;
+    if (!unopened && now - new Date(run.startedAt).getTime() < cap) continue;
 
     const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
     if (!claimed) continue;
 
-    await expireRun(db, { orgId: run.orgId, runId: run.id, error: RUN_TIMED_OUT });
+    const error = unopened ? LINK_NEVER_OPENED : RUN_TIMED_OUT;
+    await expireRun(db, { orgId: run.orgId, runId: run.id, error });
     await ON_EXPIRE[kind]?.(run);
 
-    await showRunState(db, run, { running: false, runId: run.id, error: RUN_TIMED_OUT });
+    await showRunState(db, run, { running: false, runId: run.id, error });
 
     expired += 1;
   }

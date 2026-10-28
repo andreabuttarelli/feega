@@ -1,0 +1,14 @@
+---
+import Base from '../../layouts/Base.astro';
+import { postsNewestFirst, tagSlug } from '../../site';
+
+const posts = await postsNewestFirst();
+const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort();
+---
+
+<Base title="Tags">
+  <h1 class="page-title">Tags</h1>
+  <ul class="tag-index">
+    {tags.map((tag) => <li><a href={`/tags/${tagSlug(tag)}/`}>#{tag}</a></li>)}
+  </ul>
+</Base>

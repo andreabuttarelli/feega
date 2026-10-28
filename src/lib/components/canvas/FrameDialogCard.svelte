@@ -2,12 +2,13 @@
   import type { Snippet } from 'svelte';
   import IconButton from '$lib/components/motion/IconButton.svelte';
   import { Action } from '$lib/motion/actions';
+  import { CardWidth } from './frame-dialog-card';
 
-  let { title, testid, onclose, children }: { title: string; testid: string; onclose: () => void; children: Snippet } = $props();
+  let { title, testid, width = CardWidth.Narrow, onclose, children }: { title: string; testid: string; width?: CardWidth; onclose: () => void; children: Snippet } = $props();
 </script>
 
 <div class="scrim" role="presentation" onclick={onclose}></div>
-<div class="card" role="dialog" aria-modal="true" aria-label={title} data-testid={testid}>
+<div class="card" class:wide={width === CardWidth.Wide} role="dialog" aria-modal="true" aria-label={title} data-testid={testid}>
   <header>
     <h2>{title}</h2>
     <IconButton action={Action.Close} onclick={onclose} />
@@ -40,6 +41,10 @@
     border-radius: var(--ui-radius-lg);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
+  }
+
+  .card.wide {
+    width: min(1040px, calc(100vw - 32px));
   }
 
   header {

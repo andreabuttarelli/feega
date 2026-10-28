@@ -21,6 +21,7 @@ import {
 } from '$lib/canvas/audio-operations';
 import type { AudioFile, AudioProvider, VoiceSettings } from './audio-provider';
 import { extractAudioTrack } from './audio-track';
+import { musicRefusalFor } from '$lib/server/elevenlabs-music';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 const MP3_BYTES_PER_SECOND = 16_000;
@@ -202,6 +203,11 @@ export async function depositAudio(db: Db, scope: AudioScope, file: AudioFile, s
 }
 
 export async function runAudio(db: Db, provider: AudioProvider, req: AudioRequest): Promise<AudioResult> {
+  const unavailable = musicRefusalFor(req.operation);
+  if (unavailable) {
+    return { kind: 'refused', error: unavailable };
+  }
+
   const problem = audioInputProblem(
     req.operation,
     { text: req.text, audio: req.audioUrls.length, video: req.videoUrls.length },

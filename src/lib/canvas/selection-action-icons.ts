@@ -6,6 +6,7 @@
 import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import Globe from '@lucide/svelte/icons/globe';
+import CodeXml from '@lucide/svelte/icons/code-xml';
 import Eraser from '@lucide/svelte/icons/eraser';
 import Scaling from '@lucide/svelte/icons/scaling';
 import Paintbrush from '@lucide/svelte/icons/paintbrush';
@@ -131,6 +132,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'create-formats': Proportions,
   'combine-video': Clapperboard,
   export: Download,
+  'frame-code': CodeXml,
   'frame-voice': Mic,
   'frame-music': Music,
   'frame-interactive': SlidersHorizontal,

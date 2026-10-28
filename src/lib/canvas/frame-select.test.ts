@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { Reach, clickTarget, frameLevel, ownClipToPick, siblingsOf, stepInside, videoSide } from './frame-select';
+import { Reach, clickTarget, frameLevel, grabbedInstead, ownClipToPick, siblingsOf, stepInside, videoSide } from './frame-select';
 
 const FRAME = frameLevel();
 const clipLevel = (clip: string) => ({ depth: Depth.Clip, clip, part: null });
@@ -91,5 +91,23 @@ describe('siblingsOf', () => {
   it('selects every element sharing the parent of the pick', () => {
     expect(siblingsOf(nested(), ['leaf'])).toEqual(['leaf']);
     expect(siblingsOf(nested(), ['other']).sort()).toEqual(['other', 'outer']);
+  });
+});
+
+describe('grabbedInstead', () => {
+  it('a press on an image lying over the one selected shape grabs the image', () => {
+    expect(grabbedInstead(['shape'], 'image')).toBe('image');
+  });
+
+  it('a press on the selected element keeps the selection', () => {
+    expect(grabbedInstead(['shape'], 'shape')).toBeNull();
+  });
+
+  it('a press inside a multiple selection drags the whole selection, like Figma', () => {
+    expect(grabbedInstead(['a', 'b'], 'c')).toBeNull();
+  });
+
+  it('a press on nothing keeps the selection', () => {
+    expect(grabbedInstead(['shape'], null)).toBeNull();
   });
 });

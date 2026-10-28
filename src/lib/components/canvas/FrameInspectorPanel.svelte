@@ -3,6 +3,7 @@
   import MultiInspector from '$lib/components/motion/MultiInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
+  import FrameModeRow from '$lib/components/canvas/FrameModeRow.svelte';
   import DevInspector from '$lib/components/canvas/DevInspector.svelte';
   import { frameProperties } from './frame-properties.svelte';
   import HeaderActions from '$lib/components/motion/HeaderActions.svelte';
@@ -33,8 +34,7 @@
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { MODE_LABEL, EditMode, modeSwitchShown } from '$lib/motion/edit-mode';
-  import { mergeScope, scopeView } from '$lib/motion/instance-view';
+    import { mergeScope, scopeView } from '$lib/motion/instance-view';
 
   const FIRST_FRAME = 0;
 
@@ -79,15 +79,14 @@
   }
 </script>
 
-{#snippet devToggle(label: string)}<button type="button" class="dev-toggle" title="⇧D" onclick={() => frameProperties.toggleDev?.()} data-testid="dev-toggle">{label}</button>{/snippet}
-{#snippet modeSwitch()}{#if session && doc && modeSwitchShown(doc)}<button type="button" class="dev-toggle" aria-pressed={session.mode === EditMode.Motion} title={MODE_LABEL[session.mode]} onclick={() => session.toggleMode()} data-testid="frame-mode-switch" data-mode={session.mode}>{session.mode === EditMode.Motion ? 'Motion' : 'Design'}</button>{/if}{/snippet}
+{#snippet modeRow()}{#if session}<FrameModeRow {session} />{/if}{/snippet}
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
 
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
 {#if frameProperties.dev && session && doc}
-  <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Dev mode">
-    {@render devToggle('Exit dev mode')}
+  <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Coder mode">
+    {@render modeRow()}
     {#if shown?.clip}
       <DevInspector doc={shownDoc!} clipId={shown.clip.id} brand={tokens} onexport={frameProperties.exportPicks} />
     {:else}
@@ -96,8 +95,7 @@
   </aside>
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
-    {@render modeSwitch()}
-    {@render devToggle('Dev mode')}
+    {@render modeRow()}
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />
@@ -110,8 +108,7 @@
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
-    {@render modeSwitch()}
-    {@render devToggle('Dev mode')}
+    {@render modeRow()}
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
@@ -137,23 +134,6 @@
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
-  }
-
-  .dev-toggle {
-    align-self: flex-end;
-    margin: var(--ui-space-2) var(--ui-space-4) 0;
-    padding: var(--ui-space-1) var(--ui-space-3);
-    font: inherit;
-    font-size: var(--ui-type-caption);
-    color: var(--ui-text);
-    background: var(--ui-input);
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    cursor: pointer;
-  }
-
-  .dev-toggle:hover {
-    background: var(--ui-input-hover);
   }
 
   .empty {

@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { configuredAudioProvider } from '$lib/server/elevenlabs-config';
+import { musicEnabled } from '$lib/server/elevenlabs-music';
 import { insertAsset } from '$lib/server/repos/assets';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
@@ -33,5 +34,5 @@ const LAY: Record<MusicSource, (db: Db, scope: VoiceoverScope, ask: MusicAsk) =>
 };
 
 export function layMusic(db: Db, scope: VoiceoverScope, ask: MusicAsk): Promise<Music> {
-  return LAY[musicSource({ generator: configuredAudioProvider() !== null })](db, scope, ask);
+  return LAY[musicSource({ generator: configuredAudioProvider() !== null && musicEnabled() })](db, scope, ask);
 }

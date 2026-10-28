@@ -58,6 +58,7 @@ const RESTANO = [
   'get_motion_run',
   'get_motion_summary',
   'list_motion_revisions',
+  'export_code',
   'restore_motion_revision',
   'get_storyboard',
   'write_storyboard',

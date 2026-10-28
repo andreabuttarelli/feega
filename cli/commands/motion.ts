@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { loadSession } from '../lib/auth.ts';
-import { awaitRun, motionApi, type FrameElementMoved, type MotionRun, type RenderStart } from '../lib/motion.ts';
+import { awaitRun, CODE_TARGETS, motionApi, type CodeTarget, type FrameElementMoved, type MotionRun, type RenderStart } from '../lib/motion.ts';
 import { attachmentSource } from '../lib/attachments.ts';
 
 type AskOpts = { org?: string; wait?: boolean; attach?: string[]; follow?: string[]; avoid?: string[]; note?: string; reject?: string | boolean; avoidAll?: boolean };
@@ -103,6 +103,25 @@ function printRender(started: RenderStart) {
     console.log(`Rendering on our servers: about ${started.credits} credits.`);
   }
   console.log(`Check it: feega motion render-status ${started.run_id}`);
+}
+
+export async function cmdMotionCode(nodeId: string, opts: { org?: string; target?: string; out?: string }) {
+  const target = (opts.target ?? 'react') as CodeTarget;
+  if (!CODE_TARGETS.includes(target)) {
+    console.error(`--target is one of ${CODE_TARGETS.join(', ')}`);
+    process.exit(1);
+  }
+  const code = await motionApi.code(await token(), nodeId, target, opts.org);
+  const root = opts.out ?? code.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  for (const file of code.files) {
+    const path = join(root, file.path);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, file.content);
+  }
+  console.log(`Wrote ${code.files.length} files to ${root}/ (${code.target}).`);
+  for (const note of code.notes) {
+    console.log(`  not exported: ${note}`);
+  }
 }
 
 export async function cmdMotionRevisions(nodeId: string, opts: { org?: string; restore?: string }) {

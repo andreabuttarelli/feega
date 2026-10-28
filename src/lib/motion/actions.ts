@@ -33,6 +33,7 @@ import Pipette from '@lucide/svelte/icons/pipette';
 import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
 import TypeIcon from '@lucide/svelte/icons/type';
 import SquareIcon from '@lucide/svelte/icons/square';
+import FrameIcon from '@lucide/svelte/icons/frame';
 import CircleIcon from '@lucide/svelte/icons/circle';
 import TriangleIcon from '@lucide/svelte/icons/triangle';
 import StarIcon from '@lucide/svelte/icons/star';
@@ -348,6 +349,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToolArrow]: { name: 'Arrow tool', icon: MoveUpRight, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from tail to head' },
   [Command.ToolPencil]: { name: 'Pencil tool', icon: Pencil, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw, hold Shift for straight segments' },
   [Command.ToolShapeBuilder]: { name: 'Shape builder', icon: Combine, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click regions to merge, Alt-click to subtract, Enter to apply' },
+  [Command.ToolFrame]: { name: 'Frame tool', icon: FrameIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw a frame' },
   [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },
@@ -359,7 +361,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleRulers]: { name: 'Rulers', icon: Ruler, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
-  [Command.ToggleDevMode]: { name: 'Dev mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleDevMode]: { name: 'Coder mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
   [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },

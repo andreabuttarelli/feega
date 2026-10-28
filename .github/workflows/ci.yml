@@ -109,6 +109,22 @@ jobs:
       - name: Build the docs site (generates the references from the code)
         run: npm --prefix web-docs run build
 
+  web-blog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web-blog/package-lock.json
+
+      - run: npm --prefix web-blog ci
+
+      - name: Build the blog
+        run: npm --prefix web-blog run build
+
   landing:
     runs-on: ubuntu-latest
     steps:

@@ -7,11 +7,13 @@ import {
   NUDGE_STEP_BIG,
   addableOf,
   matchCanvasShortcut,
+  canvasToolKeys,
   nudgeOf,
   type CanvasCommand
 } from './shortcuts';
 import { CANVAS_ADD_BAR } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { Command } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 
@@ -98,6 +100,17 @@ describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
     expect(matchCanvasShortcut(ev('O', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Ellipse });
     expect(matchCanvasShortcut(ev('P', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Pen });
     expect(matchCanvasShortcut(ev('v'))).toEqual({ id: 'tool', tool: DrawTool.Select });
+  });
+
+  it('⇧F disegna un frame, come gli altri strumenti della tela', () => {
+    expect(matchCanvasShortcut(ev('F', { shiftKey: true, code: 'KeyF' }))).toEqual({ id: 'tool', tool: DrawTool.Frame });
+  });
+
+  it('il tooltip di uno strumento mostra solo i tasti che la tela ascolta', () => {
+    expect(canvasToolKeys(Command.ToolText)).toBe('⇧T');
+    expect(canvasToolKeys(Command.ToolRectangle)).toBe('⇧R');
+    expect(canvasToolKeys(Command.ToolSelect)).toBe('V');
+    expect(canvasToolKeys(Command.ToolFrame)).toBe('⇧F');
   });
 
   it('⇧L disegna una linea, come gli altri strumenti della tela', () => {
@@ -234,9 +247,9 @@ describe('comment mode', () => {
   });
 });
 
-describe('non pesta i piedi al registro globale', () => {
+describe('le lettere nude restano della timeline', () => {
   for (const key of ['g', 'k', 'l', 's', 'r', 'd', 't', 'h', 'b', 'm', 'w', 'p', 'z']) {
-    it(`"${key}" nudo resta del registro globale`, () => {
+    it(`"${key}" nudo non è una scorciatoia della tela`, () => {
       expect(matchCanvasShortcut(ev(key))).toBeNull();
     });
   }
@@ -252,6 +265,13 @@ describe('non pesta i piedi al registro globale', () => {
   it('Alt non è mai un modificatore nostro: su macOS scrive caratteri veri', () => {
     expect(matchCanvasShortcut(ev('a', { metaKey: true, altKey: true }))).toBeNull();
     expect(matchCanvasShortcut(ev('ArrowLeft', { altKey: true }))).toBeNull();
+  });
+});
+
+describe('ordine dei tile', () => {
+  it('⌥⌘[ manda in fondo e ⌥⌘] porta in cima, come nel frame', () => {
+    expect(matchCanvasShortcut(ev('“', { metaKey: true, altKey: true, code: 'BracketLeft' }))).toEqual({ id: 'send-back' });
+    expect(matchCanvasShortcut(ev('‘', { metaKey: true, altKey: true, code: 'BracketRight' }))).toEqual({ id: 'bring-front' });
   });
 });
 
