@@ -987,7 +987,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     read_layer_css: tool({
-      description: 'Dev mode for one layer: its CSS, the same as a Tailwind class list, the box in px of the frame, and the names it takes from the design (brand colours as variables, fonts, named styles, bound variables). Read-only: nothing changes. Brand colours stay variables (var(--brand-accent)) because the brand values come with the render, not the video.',
+      description: 'Coder mode for one layer: its CSS, the same as a Tailwind class list, the box in px of the frame, and the names it takes from the design (brand colours as variables, fonts, named styles, bound variables). Read-only: nothing changes. Brand colours stay variables (var(--brand-accent)) because the brand values come with the render, not the video.',
       inputSchema: z.object({ clip_id: z.string() }),
       execute: async (input) => {
         const layer = devLayer(session.doc, input.clip_id, null);
