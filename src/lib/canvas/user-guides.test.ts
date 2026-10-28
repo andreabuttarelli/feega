@@ -89,4 +89,10 @@ describe('ruler ticks', () => {
       { at: 100, label: '100' }
     ]);
   });
+
+  it('drops a tick whose label would run past the end of the ruler', () => {
+    const ticks = rulerTicks(1000, 0.8, 36);
+
+    expect(ticks.at(-1)?.at).toBe(950);
+  });
 });

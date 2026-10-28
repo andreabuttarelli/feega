@@ -179,7 +179,8 @@ const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'>
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
-  if (isTypingTarget(e.target) || e.shiftKey) return null;
+  if (isTypingTarget(e.target)) return null;
+  if (e.shiftKey) return e.code === 'KeyR' ? { id: 'view', view: FrameView.Rulers } : null;
   const mod = e.metaKey || e.ctrlKey;
   if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
   if (e.code === 'KeyR') return { id: 'view', view: FrameView.Pivot };

@@ -27,6 +27,7 @@
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
+  import { flipRulers, rulersPref } from '$lib/canvas/rulers-pref.svelte';
   import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -2475,7 +2476,9 @@
     'send-back': () => props.onRestack?.(selected, Stack.Back),
     help: () => (shortcutHelp.open = true),
     view: (c) => {
-      if (c.id === 'view') {
+      if (c.id === 'view' && c.view === FrameView.Rulers) {
+        flipRulers();
+      } else if (c.id === 'view') {
         frameViews = flipView(frameViews, c.view);
       }
     }
@@ -2995,7 +2998,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}

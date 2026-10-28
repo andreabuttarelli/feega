@@ -7,6 +7,8 @@
 
   const RULER_PX = 16;
   const GRAB_PX = 10;
+  const LABEL_PX = 36;
+  const HANDLE_PX = 8;
 
   let { doc, size, onchange }: { doc: MotionDoc; size: Size; onchange: (next: MotionDoc, summary: string) => void } = $props();
 
@@ -15,8 +17,8 @@
 
   const scale = $derived(size.width / doc.width);
   const guides = $derived(doc.userGuides ?? []);
-  const across = $derived(rulerTicks(doc.width, scale));
-  const down = $derived(rulerTicks(doc.height, scale));
+  const across = $derived(rulerTicks(doc.width, scale, LABEL_PX));
+  const down = $derived(rulerTicks(doc.height, scale, LABEL_PX));
   const shown = $derived(drag ? [...guides.filter((g) => !drag?.from || g.axis !== drag.from.axis || g.at !== drag.from.at), { axis: drag.axis, at: drag.at }] : guides);
 
   const AXIS_POINT: Record<GuideAxis, (e: PointerEvent, rect: DOMRect) => number> = {
@@ -63,12 +65,12 @@
   }
 </script>
 
-<div class="rulers" bind:this={stage} data-testid="rulers" style={`--ruler:${RULER_PX}px;--grab:${GRAB_PX}px`}>
+<div class="rulers" bind:this={stage} data-testid="rulers" style={`--ruler:${RULER_PX}px;--grab:${GRAB_PX}px;--handle:${HANDLE_PX}px`}>
   <div class="ruler top" role="presentation" data-testid="ruler-top" onpointerdown={(e) => grab(e, GuideAxis.Horizontal, null)}>
     {#each across as t (t.at)}<span class="tick" style={`left:${t.at * scale}px`}>{t.label}</span>{/each}
   </div>
   <div class="ruler left" role="presentation" data-testid="ruler-left" onpointerdown={(e) => grab(e, GuideAxis.Vertical, null)}>
-    {#each down as t (t.at)}<span class="tick" style={`top:${t.at * scale}px`}><i>{t.label}</i></span>{/each}
+    {#each down as t (t.at)}<span class="tick" style={`top:${t.at * scale - RULER_PX}px`}><i>{t.label}</i></span>{/each}
   </div>
   {#each shown as g (g.axis + ':' + g.at)}
     {#if g.axis === GuideAxis.Vertical}
@@ -91,8 +93,9 @@
   .ruler {
     position: absolute;
     pointer-events: auto;
-    background: var(--ui-bg);
+    background: color-mix(in srgb, var(--ui-bg) 85%, transparent);
     color: var(--ui-fg-muted, #888);
+    border-radius: var(--ui-radius-sm, 4px);
     font-size: 9px;
     line-height: var(--ruler);
     overflow: hidden;
@@ -101,16 +104,16 @@
 
   .top {
     left: 0;
-    right: 0;
-    top: calc(var(--ruler) * -1);
+    right: var(--handle);
+    top: 0;
     height: var(--ruler);
     cursor: ns-resize;
   }
 
   .left {
-    top: 0;
-    bottom: 0;
-    left: calc(var(--ruler) * -1);
+    top: var(--ruler);
+    bottom: var(--handle);
+    left: 0;
     width: var(--ruler);
     cursor: ew-resize;
   }
@@ -118,7 +121,7 @@
   .tick {
     position: absolute;
     border-left: 1px solid currentColor;
-    padding-left: 2px;
+    padding-left: 6px;
     height: 100%;
     white-space: nowrap;
   }

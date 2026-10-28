@@ -9,7 +9,7 @@ export enum FrameView {
 
 export type FrameViews = Readonly<Record<FrameView, boolean>>;
 
-export const FRAME_VIEW_DEFAULT: FrameViews = { [FrameView.PixelGrid]: true, [FrameView.Guides]: true, [FrameView.Outlines]: false, [FrameView.Pivot]: false, [FrameView.Dev]: false, [FrameView.Rulers]: true };
+export const FRAME_VIEW_DEFAULT: FrameViews = { [FrameView.PixelGrid]: true, [FrameView.Guides]: true, [FrameView.Outlines]: false, [FrameView.Pivot]: false, [FrameView.Dev]: false, [FrameView.Rulers]: false };
 
 export const shows = (views: FrameViews, view: FrameView): boolean => views[view];
 
