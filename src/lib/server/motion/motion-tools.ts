@@ -1,4 +1,5 @@
 import { ungroupClip } from '$lib/motion/group';
+import { addBreakpoint, BreakpointPreset, clearOverride, OVERRIDE_KEYS, OverrideKey, removeBreakpoint, setOverride, stackOn } from '@feega/motion-core/motion/breakpoints/model';
 import { groupLight, settleGroups, ungroupLight } from '$lib/motion/light-group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
 import { StyleAction, StyleKind, StyleSlot, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesOf } from '$lib/motion/styles';
@@ -454,6 +455,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
         constraints: c.constraints ?? null,
+        overrides: c.overrides ?? null,
         interactions: c.interactions ?? [],
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
@@ -483,6 +485,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     fields: doc.fields,
     referenceLook: doc.referenceLook ?? null,
     layoutGuides: doc.layoutGuides ?? [],
+    breakpoints: doc.breakpoints ?? [],
     userGuides: doc.userGuides ?? [],
     fonts: doc.fonts,
     styles: stylesOf(doc),
@@ -1931,6 +1934,38 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Pin clips to the frame for when it is resized (set_canvas, the frame on the canvas). horizontal: left, right, left_right (stretch), center or scale (default). vertical: top, bottom, top_bottom (stretch), center or scale. Only the axes given change; clip_ids may list several clips.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }),
       execute: async ({ clip_ids, ...patch }) => apply(setConstraints(session.doc, clip_ids, patch), `pinned ${clip_ids.length} clip(s) to the frame`)
+    }),
+
+    add_breakpoint: tool({
+      description: 'Add a responsive view of the frame at a narrower width, shown beside it on the canvas: preset tablet (810) or phone (390), or name + width. A new view inherits everything; nothing reflows or stacks until you set an override for it. Returns breakpoint_id.',
+      inputSchema: z.object({ preset: z.enum([BreakpointPreset.Tablet, BreakpointPreset.Phone]).optional(), name: z.string().min(1).max(40).optional(), width: z.number().int().optional() }),
+      execute: async ({ preset, name, width }) => {
+        const id = deps.newId();
+        const spec = preset ?? { name: name ?? `${width}px`, width: width ?? 0 };
+        const out = apply(addBreakpoint(session.doc, spec, id), `added breakpoint ${id}`);
+        return out.ok ? { ...out, breakpoint_id: id } : out;
+      }
+    }),
+
+    remove_breakpoint: tool({
+      description: 'Remove a responsive view of the frame and every override it carried.',
+      inputSchema: z.object({ breakpoint_id: z.string() }),
+      execute: async ({ breakpoint_id }) => apply({ ok: true, doc: removeBreakpoint(session.doc, breakpoint_id) }, `removed breakpoint ${breakpoint_id}`)
+    }),
+
+    set_breakpoint_override: tool({
+      description: `Change one property of a clip only at a breakpoint and the smaller ones (largest-first cascade; the base frame is edited with the normal tools). key is one of ${OVERRIDE_KEYS.join(', ')}; value is in the same units as the base property (props.* are fractions of the frame). value null removes the override so the clip inherits again. stack true on an auto layout container instead switches it to vertical and its children to fill width at that breakpoint.`,
+      inputSchema: z.object({ breakpoint_id: z.string(), clip_id: z.string(), key: z.enum(OVERRIDE_KEYS as [OverrideKey, ...OverrideKey[]]).optional(), value: z.unknown().optional(), stack: z.boolean().optional() }),
+      execute: async ({ breakpoint_id, clip_id, key, value, stack }) => {
+        if (stack) {
+          return apply(stackOn(session.doc, breakpoint_id, clip_id), `stacked ${clip_id} at ${breakpoint_id}`);
+        }
+        if (!key) {
+          return { ok: false, error: 'key or stack is required' };
+        }
+        const out = value === null ? ({ ok: true, doc: clearOverride(session.doc, breakpoint_id, clip_id, key) } as OpResult) : setOverride(session.doc, breakpoint_id, clip_id, key, value);
+        return apply(out, `${key} of ${clip_id} at ${breakpoint_id}`);
+      }
     }),
 
     set_part_fill: tool({

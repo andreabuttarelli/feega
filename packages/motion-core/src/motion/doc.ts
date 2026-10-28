@@ -34,6 +34,7 @@ import { stillSchema } from './still-model';
 import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 import { constraintsSchema } from './constraints/model';
+import { breakpointsSchema, overridesSchema } from './breakpoints/model';
 import { flowSchema } from './prototype/flow';
 import { interactionsSchema } from './prototype/model';
 import { layoutGuidesSchema } from './layout-guides/model';
@@ -125,6 +126,7 @@ const clipSchema = z.object({
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
   constraints: constraintsSchema.optional(),
+  overrides: overridesSchema,
   interactions: interactionsSchema.optional(),
   lockRatio: z.boolean().optional(),
   acceptsLights: z.boolean().optional(),
@@ -231,6 +233,7 @@ export const motionDocSchema = z
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
+    breakpoints: breakpointsSchema,
     layoutGuides: layoutGuidesSchema,
     userGuides: userGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
