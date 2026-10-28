@@ -191,6 +191,7 @@ function pricing(kit: DocKit) {
           name: { text: t.name, ...(t.ink ? { color: t.ink } : {}) },
           price: { text: t.price, ...(t.ink ? { color: t.ink } : {}) },
           pitch: { text: t.pitch, ...(t.body ? { color: t.body } : {}) },
+          ...(t.body ? Object.fromEntries([1, 2, 3, 4].map((n) => [`line-${n}`, { color: t.body }])) : {}),
           ...(t.fill ? { root: { fills: [{ type: 'solid', color: t.fill, opacity: 1, visible: true, blend: 'normal' }] } } : {}),
           'cta-label': { text: t.cta }
         }
