@@ -34,6 +34,7 @@
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
+  import { documentColours } from '$lib/motion/selection-colours';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Settings2 from '@lucide/svelte/icons/settings-2';
@@ -189,6 +190,7 @@
   }
 
   let error = $state('');
+  const palette = () => documentColours(doc);
   const voices = $derived(voicesOver(doc, clip.id));
   const pulsable = $derived(PULSE_PROPS.filter((p) => isAnimatable(clip.component, p)));
   let voice = $state('');
@@ -631,12 +633,12 @@
     {@const fillBind = fillTarget(clip)}
     <div class="stack bindable" data-prop={field.key}>
       {#if fillBind && clip.bind?.[fillBind]}<BindChip {doc} {clip} target={fillBind} {commit} />{:else}
-        <FillStack {gesture} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
+        <FillStack {gesture} {palette} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
         {#if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
       {/if}
     </div>
   {:else if field.control === Control.Strokes}
-    <div class="stack" data-prop={field.key}><StrokeStack {gesture} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><StrokeStack {gesture} {palette} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
@@ -662,7 +664,7 @@
         {:else if field.control === Control.Toggle}
           <SegmentedField name={field.label} options={YES_NO} value={answerOf(value(field))} onchange={(v) => setProp(field, v === Answer.Yes)} />
         {:else if field.control === Control.Color}
-          <ColorField {gesture} id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
+          <ColorField {gesture} {palette} id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
           <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
         {:else if field.control === Control.MediaItem}
@@ -781,7 +783,6 @@
   {@const aligns = ['align', 'verticalAlign'].map(textField).filter((f) => f !== undefined)}
   {@const italic = textField('italic')}
   {@const casing = textField('textCase')}
-  {@const colour = textField('fills') ?? textField('color')}
   {@const advanced = textFields.filter((f) => textTier(f.key, decorationNow) === TextTier.Advanced)}
   <div class="text-primary">
     {#if font}{@render fieldRow(font)}{/if}
@@ -799,7 +800,6 @@
       {/if}
       <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={14} /></button>
     </div>
-    {#if colour}{@render fieldRow(colour)}{/if}
   </div>
   {#if advancedOpen && advancedRow && advanced.length}
     <SidePopover anchor={advancedRow} title="Advanced type" onclose={() => (advancedOpen = false)}>
@@ -1055,7 +1055,7 @@
                   {@const alphaKey = alphaKeyOf(effect)}
                   <div class="line" data-prop={prop.key}>
                     <span class="label">{afterDot(prop)}</span>
-                    <div class="control"><ColorField {gesture} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
+                    <div class="control"><ColorField {gesture} {palette} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
                   </div>
                 {:else}

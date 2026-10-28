@@ -138,7 +138,7 @@ section a field lands in is another (`src/lib/motion/inspector-sections.ts`).
 
 - Rows are 28px, labels in English on the left (88px), never a glyph alone; numbers carry their
   unit and scrub when the label is dragged. Short numbers pair up in two columns.
-- A colour is one field: swatch, hex, and a popover with the picker, brand and recent colours.
+- A colour is one field: swatch, hex, and a popover with the picker (saturation square, hue and opacity sliders, eyedropper, Hex / RGB / HSL / HSB) and document, brand and recent swatches. Fill popovers embed the picker inline.
 - Two to three exclusive options are a segmented toggle (align, fit), not a dropdown.
 - Several layers show their shared value, or an empty field reading `Mixed`.
 - The panel runs the editor's full height and scrolls on its own.

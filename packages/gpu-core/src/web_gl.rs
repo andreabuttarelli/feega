@@ -12,7 +12,7 @@ use crate::groups::{report, Library, Limits, Plan};
 use crate::gl_passes::{texture, GlRunner, Tex};
 use crate::gl_reproject::{held, smooth, GlReprojector, Held, Target};
 use crate::retained::{Camera, Lookup, Quality};
-use crate::world::{parse_overlay, parse_patch};
+use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
 use crate::Skipped;
@@ -308,7 +308,12 @@ impl WebGlCore {
     }
 
     pub fn set_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
-        self.compositor.set_overlay(parse_overlay(items_json).map_err(failed)?, &mut self.library);
+        self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(items_json).map_err(failed)?, &mut self.library);
+        Ok(())
+    }
+
+    pub fn set_live_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Live, parse_overlay(items_json).map_err(failed)?, &mut self.library);
         Ok(())
     }
 

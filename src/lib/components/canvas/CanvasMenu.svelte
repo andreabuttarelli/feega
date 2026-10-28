@@ -19,6 +19,8 @@
   import { env as publicEnv } from '$env/dynamic/public';
   import { LocalOff, isLocalMode, isOff } from '$lib/local-user';
   import { NAV_ICONS } from './nav-icons';
+  import Ruler from '@lucide/svelte/icons/ruler';
+  import { flipRulers, rulersPref } from '$lib/canvas/rulers-pref.svelte';
   import Scale from '@lucide/svelte/icons/scale';
   import Flag from '@lucide/svelte/icons/flag';
   import { REPORT_PATH } from '$lib/reports/report-link';
@@ -185,6 +187,16 @@
         {/each}
       </DropdownMenu.Group>
     {/if}
+
+    <DropdownMenu.Separator />
+
+    <DropdownMenu.Group>
+      <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.view')}</DropdownMenu.GroupHeading>
+      <DropdownMenu.CheckboxItem class="menu-row" checked={rulersPref.on} onCheckedChange={flipRulers}>
+        <Ruler size={16} />
+        <span>{$_('app.shell.menu.rulers')}</span>
+      </DropdownMenu.CheckboxItem>
+    </DropdownMenu.Group>
 
     <DropdownMenu.Separator />
 

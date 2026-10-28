@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lastGesture, type LoggedEvent } from './undo-last';
+import { agentChanges, lastGesture, type LoggedEvent } from './undo-last';
 
 const ME = { kind: 'agent' as const, id: 'user', agentKey: 'mcp' };
 const T0 = Date.parse('2026-10-26T10:00:00Z');
@@ -57,5 +57,28 @@ describe('the last gesture of an actor', () => {
 
   it('drops events it cannot turn into an item', () => {
     expect(lastGesture([event(1, { kind: 'edge.create', nodeId: null, edgeId: 'e', after: null })], ME)).toBeNull();
+  });
+});
+
+describe('a logged agent move', () => {
+  it('is not an undo item: undo_last leaves moves to move_node', () => {
+    const move = event(1, { before: { position: { x: 0, y: 0 } }, after: { position: { x: 9, y: 0 } } });
+    expect(lastGesture([move], ME)).toBeNull();
+  });
+});
+
+describe('agent changes: one row per agent gesture', () => {
+  const at = (ms: number) => new Date(T0 + ms).toISOString();
+
+  it('groups one agent writes made in the same instant, newest first, and leaves people out', () => {
+    const events = [
+      event(5, { createdAt: at(9000) }),
+      event(4, { actorKind: 'user', agentKey: null, createdAt: at(8000) }),
+      event(3, { createdAt: at(1000) }),
+      event(2, { createdAt: at(500) }),
+      event(1, { agentKey: 'sidebar', createdAt: at(400) })
+    ];
+
+    expect(agentChanges(events).map((change) => change.map((e) => e.id))).toEqual([[5], [3, 2], [1]]);
   });
 });

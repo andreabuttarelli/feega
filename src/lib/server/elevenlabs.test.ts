@@ -100,7 +100,7 @@ describe('elevenLabs adapter', () => {
     expect(await provider.voices()).toEqual([
       { id: 'v1', name: 'Rachel', previewUrl: 'https://p/1.mp3', category: 'premade', labels: { accent: 'american' } }
     ]);
-    expect(calls[0].url).toBe('https://api.test/v2/voices?page_size=100');
+    expect(calls[0].url).toBe('https://api.test/v2/voices?page_size=100&voice_type=default');
   });
 
   it('lists only premade voices, never the custom voices other workspaces made on the shared account', async () => {

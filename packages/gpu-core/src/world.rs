@@ -25,18 +25,42 @@ pub fn parse_overlay(json: &str) -> Result<Vec<Item>, serde_json::Error> {
 
 pub type Sizes<'a> = &'a dyn Fn(&str) -> Option<(f64, f64)>;
 
-pub const OVERLAY_GROUP: &str = "overlay:";
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OverlayPart {
+    Fixed,
+    Live,
+}
+
+const OVERLAY_PARTS: [OverlayPart; 2] = [OverlayPart::Fixed, OverlayPart::Live];
+
+impl OverlayPart {
+    pub fn group(self) -> &'static str {
+        match self {
+            OverlayPart::Fixed => "overlay:fixed",
+            OverlayPart::Live => "overlay:live",
+        }
+    }
+
+    fn index(self) -> usize {
+        self as usize
+    }
+}
+
+#[derive(Default)]
+struct Overlay {
+    items: Vec<Item>,
+    at: Option<UseItem>,
+}
 
 pub struct World {
     uses: Vec<UseItem>,
-    overlay: Vec<Item>,
-    overlay_at: Option<UseItem>,
+    overlays: [Overlay; 2],
     damage: Damage,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Vec::new(), overlay: Vec::new(), overlay_at: None, damage: Damage::none() }
+        World { uses: Vec::new(), overlays: Default::default(), damage: Damage::none() }
     }
 }
 
@@ -145,35 +169,37 @@ impl World {
         reaches.into_iter().for_each(|r| self.mark_if_sized(r));
     }
 
-    pub fn set_overlay(&mut self, items: Vec<Item>) {
-        let old = std::mem::replace(&mut self.overlay, items);
+    pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>) {
+        let old = std::mem::replace(&mut self.overlays[part.index()].items, items);
+        let new = &self.overlays[part.index()].items;
         let by_clip = |items: &[Item]| {
             let mut m: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
             items.iter().enumerate().for_each(|(i, item)| m.entry(item.clip().to_string()).or_default().push(i));
             m
         };
-        let (was, now) = (by_clip(&old), by_clip(&self.overlay));
+        let (was, now) = (by_clip(&old), by_clip(new));
         let kept = |item: &Item, other: &[Item], index: &std::collections::HashMap<String, Vec<usize>>| index.get(item.clip()).is_some_and(|at| at.iter().any(|&i| same(item, &other[i])));
-        let gone = old.iter().filter(|i| !kept(i, &self.overlay, &now));
-        let came = self.overlay.iter().filter(|i| !kept(i, &old, &was));
+        let gone = old.iter().filter(|i| !kept(i, new, &now));
+        let came = new.iter().filter(|i| !kept(i, &old, &was));
         let bounds: Vec<Option<Rect>> = gone.chain(came).map(extent).collect();
         bounds.into_iter().for_each(|b| self.mark(b));
     }
 
-    pub fn overlay_group(&self) -> Option<(DisplayList, UseItem)> {
-        let reach = self.overlay.iter().map(extent).collect::<Option<Vec<Rect>>>()?.into_iter().reduce(|a, b| a.union(b))?;
-        let blur = self.overlay.iter().filter_map(|i| i.look()).map(|l| l.blur).fold(0.0, f64::max);
+    pub fn overlay_group(&self, part: OverlayPart) -> Option<(DisplayList, UseItem)> {
+        let overlay = &self.overlays[part.index()].items;
+        let reach = overlay.iter().map(extent).collect::<Option<Vec<Rect>>>()?.into_iter().reduce(|a, b| a.union(b))?;
+        let blur = overlay.iter().filter_map(|i| i.look()).map(|l| l.blur).fold(0.0, f64::max);
         let pad = blur * BLUR_REACH + OVERLAY_SLACK_PX;
         let corner = reach.inflate(pad, pad);
         let (x, y) = (corner.x0.floor(), corner.y0.floor());
         let into = [1.0, 0.0, 0.0, 1.0, -x, -y];
-        let items = self.overlay.iter().map(|i| through(i, into)).collect();
+        let items = overlay.iter().map(|i| through(i, into)).collect();
         let list = DisplayList { width: (corner.x1 - x).ceil() as u32, height: (corner.y1 - y).ceil() as u32, background: None, items, faces: Vec::new(), fragments: Default::default() };
-        Some((list, UseItem { clip: OVERLAY_GROUP.into(), group: OVERLAY_GROUP.into(), matrix: [1.0, 0.0, 0.0, 1.0, x, y], cache: false, hold: false, reach: None }))
+        Some((list, UseItem { clip: part.group().into(), group: part.group().into(), matrix: [1.0, 0.0, 0.0, 1.0, x, y], cache: false, hold: false, reach: None }))
     }
 
-    pub fn place_overlay(&mut self, at: Option<UseItem>) {
-        self.overlay_at = at;
+    pub fn place_overlay(&mut self, part: OverlayPart, at: Option<UseItem>) {
+        self.overlays[part.index()].at = at;
     }
 
     pub fn take_damage(&mut self) -> Damage {
@@ -182,10 +208,13 @@ impl World {
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
         let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
-        let overlay: Vec<Item> = match &self.overlay_at {
-            Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
-            None => self.overlay.iter().map(|i| through(i, camera)).collect(),
-        };
+        let overlay = OVERLAY_PARTS.iter().flat_map(|p| {
+            let part = &self.overlays[p.index()];
+            match &part.at {
+                Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
+                None => part.items.iter().map(|i| through(i, camera)).collect(),
+            }
+        });
         DisplayList { width, height, background: None, items: uses.chain(overlay).collect(), faces: Vec::new(), fragments: Default::default() }
     }
 }

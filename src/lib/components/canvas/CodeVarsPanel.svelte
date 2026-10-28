@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from '$lib/components/motion/ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import type { VarValue, VarValues } from '$lib/canvas/code-frame';
   import { VarType, checkVarValue, type VarDecl } from '$lib/canvas/code-vars';
 
@@ -33,14 +35,14 @@
   {#each declared as decl (decl.name)}
     {@const value = valueOf(decl)}
     <label class="var" data-var={decl.name}>
-      <span class="name">{decl.label ?? decl.name}<small>{decl.type}</small></span>
+      <span class="name">{decl.name}<small>{decl.type}</small></span>
       {#if decl.type === VarType.Text || decl.type === VarType.Font}
         <input type="text" value={String(value)} onchange={(e) => set(decl, text(e))} />
       {:else if decl.type === VarType.LongText}
         <textarea rows="3" value={String(value)} onchange={(e) => set(decl, text(e))}></textarea>
       {:else if decl.type === VarType.Color}
         <span class="row">
-          <input type="color" value={String(value)} oninput={(e) => set(decl, text(e))} />
+          <ColorField name={decl.name} display={ColourDisplay.Chip} value={String(value)} onchange={(v) => set(decl, v)} />
           <input type="text" value={String(value)} onchange={(e) => set(decl, text(e))} />
         </span>
       {:else if decl.type === VarType.Range}
@@ -120,12 +122,6 @@
     border-radius: var(--ui-radius-sm, 4px);
     background: var(--paper, #fff);
     color: var(--ink, #1d1d1f);
-  }
-  input[type='color'] {
-    width: 28px;
-    height: 24px;
-    padding: 0;
-    border: none;
   }
   img {
     width: 28px;

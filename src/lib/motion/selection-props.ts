@@ -6,22 +6,24 @@ import { MIXED, shared, type Shared } from './mixed';
 import type { Bounds } from './scene-select';
 import { moveBy } from './space';
 import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Control, Group } from '@feega/motion-core/motion/components';
+import { fieldsOf, type Field } from './inspector';
 
-export enum PropKind {
-  Colour = 'colour',
-  Number = 'number',
-  Text = 'text'
+const SIMPLE_CONTROLS: ReadonlySet<Control> = new Set([Control.Color, Control.Range, Control.Select, Control.Toggle, Control.Font, Control.Text]);
+
+const declares = (clip: MotionClip, field: Field) => fieldsOf(clip.component).some((f) => f.key === field.key && f.control === field.control);
+
+export type SharedField = { field: Field; value: Shared<unknown> };
+
+export function sharedFields(clips: readonly MotionClip[]): SharedField[] {
+  const [first, ...rest] = clips;
+  if (!first) {
+    return [];
+  }
+  return fieldsOf(first.component)
+    .filter((field) => field.group === Group.Style && SIMPLE_CONTROLS.has(field.control) && rest.every((clip) => declares(clip, field)))
+    .map((field) => ({ field, value: shared(clips.map((clip) => clip.props[field.key] ?? field.fallback)) }));
 }
-
-export const STYLE_PROPS = [
-  { key: 'fill', label: 'Fill', kind: PropKind.Colour },
-  { key: 'stroke', label: 'Stroke', kind: PropKind.Colour },
-  { key: 'strokeWidth', label: 'Stroke width', kind: PropKind.Number },
-  { key: 'font', label: 'Font', kind: PropKind.Text },
-  { key: 'size', label: 'Font size', kind: PropKind.Number },
-  { key: 'weight', label: 'Weight', kind: PropKind.Number },
-  { key: 'roundness', label: 'Roundness', kind: PropKind.Number }
-] as const;
 
 const CONSTRAINT_DEFAULT = { horizontal: Horizontal.Scale, vertical: Vertical.Scale } as const;
 
@@ -37,7 +39,7 @@ export function sharedProp(clips: readonly MotionClip[], key: string): Shared<un
 }
 
 export function setPropAcross(doc: MotionDoc, ids: readonly string[], key: string, value: unknown): OpResult {
-  const own = owners(ids.flatMap((id) => findClip(doc, id)?.clip ?? []), key);
+  const own = ids.flatMap((id) => findClip(doc, id)?.clip ?? []).filter((c) => c.props[key] !== undefined || fieldsOf(c.component).some((f) => f.key === key));
   if (!own.length) {
     return { ok: false, error: `no selected clip has ${key}` };
   }

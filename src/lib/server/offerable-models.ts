@@ -14,7 +14,9 @@ import { allowedIds, applyAllowlist } from './model-allowlist/allowlist';
 import { taskChoice } from './task-choice';
 import { configuredIn, taskProviderOf, TaskProviderName } from './generation/task-providers';
 import { discountBook, withDiscountPrices } from './generation/discount-routes';
-import { DEFAULT_IMAGE_RESOLUTION, IMAGE_OUTPUT_TOKENS } from './image-output-tokens';
+import { DEFAULT_IMAGE_RESOLUTION, imageOutputTokens } from './image-output-tokens';
+import { withoutAliases } from './canonical-image-models';
+import { cleanLabels } from '$lib/canvas/model-labels';
 import { videoPerSecondCredits } from './video-pricing';
 import { model3dChoiceParams, REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
 
@@ -187,7 +189,7 @@ function tokenPrice(tokens: Readonly<Record<string, number>>, row: SyncedRow): I
 }
 
 function imagePrice(wireId: string, row: SyncedRow): ImagePrice {
-  const tokens = IMAGE_OUTPUT_TOKENS[wireId];
+  const tokens = imageOutputTokens(wireId);
   const priced = tokens ? tokenPrice(tokens, row) : null;
   return priced ?? { unitCredits: imageUnitCredits(row.pricing), creditOverrides: imageCreditOverrides(row), variableCredits: hasVariableCredits(row.pricing) };
 }
@@ -361,7 +363,8 @@ function videoChoice(spec: VideoModelSpec, row: SyncedRow, inputModalities: stri
 }
 
 async function offerableImages(admin: SupabaseClient, view = PricingView.Offered): Promise<OfferableModels> {
-  const { rows, synced } = await syncedRows(admin, 'image');
+  const { rows: allRows, synced } = await syncedRows(admin, 'image');
+  const rows = withoutAliases(allRows);
 
   const specs = IMAGE_MODEL_CHOICES.map((c) => imageModelSpec(c.id)).filter(
     (spec): spec is ImageModelSpec => !!spec
@@ -386,7 +389,7 @@ async function offerableImages(admin: SupabaseClient, view = PricingView.Offered
     if (!specced.has(id)) choices.push(unspeccedChoice(row, genericImageChoice));
   }
 
-  return { synced, choices: await priced(admin, 'image', choices, view) };
+  return { synced, choices: await priced(admin, 'image', cleanLabels(choices), view) };
 }
 
 async function offerableVideos(admin: SupabaseClient, view = PricingView.Offered): Promise<OfferableModels> {
@@ -410,7 +413,7 @@ async function offerableVideos(admin: SupabaseClient, view = PricingView.Offered
     if (!specced.has(id)) choices.push(unspeccedChoice(row, genericVideoChoice));
   }
 
-  return { synced, choices: await priced(admin, 'video', choices, view) };
+  return { synced, choices: await priced(admin, 'video', cleanLabels(choices), view) };
 }
 
 export type OfferableModels = { synced: boolean; choices: ModelChoice[] };

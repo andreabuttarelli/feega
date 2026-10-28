@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from '$lib/components/motion/ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import { onMount, tick } from 'svelte';
   import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
@@ -397,10 +399,11 @@
   <div bind:this={bar} class="range" data-testid="text-range-bar" role="toolbar" tabindex="-1" style="left:{barAt.left}px;top:{barAt.top}px" onmousedown={(e) => e.target instanceof HTMLButtonElement && e.preventDefault()} onpointerdown={(e) => e.stopPropagation()}>
     <button type="button" data-testid="text-range-bold" title="Bold (⌘B)" onclick={() => restyle({ weight: RunToggle.Bold })}><b>B</b></button>
     <button type="button" data-testid="text-range-italic" title="Italic (⌘I)" onclick={() => restyle({ italic: RunToggle.Italic })}><i>I</i></button>
-    <input type="color" data-testid="text-range-colour" title="Colour" bind:value={tint} onchange={() => {
-        restyle({ color: tint, fill: null });
+    <span data-testid="text-range-colour"><ColorField name="Colour" display={ColourDisplay.Chip} value={tint} onchange={(v) => {
+        tint = v;
+        restyle({ color: v, fill: null });
         refocus();
-      }} />
+      }} /></span>
     <button type="button" data-testid="text-range-link" title="Link (⇧⌘U)" onclick={openLink}>Link</button>
     {#if linkOpen}
       <input bind:this={linkField} type="url" class="url" data-testid="text-range-url" placeholder="https://" value={textRange.values?.link === MIXED ? '' : (textRange.values?.link ?? '')} onkeydown={onLinkKey} onblur={applyLink} />

@@ -12,3 +12,9 @@ export const IMAGE_OUTPUT_TOKENS: Readonly<Record<string, Readonly<Record<string
   'google/gemini-3-pro-image-preview': NANO_BANANA_PRO_TOKENS,
   'google/gemini-2.5-flash-image': { [DEFAULT_IMAGE_RESOLUTION]: 1290 }
 };
+
+const TOKENS_BY_WIRE_PREFIX: ReadonlyArray<readonly [prefix: string, tokens: Readonly<Record<string, number>>]> = [['google/gemini-', NANO_BANANA_2_TOKENS]];
+
+export function imageOutputTokens(wireId: string): Readonly<Record<string, number>> | undefined {
+  return IMAGE_OUTPUT_TOKENS[wireId] ?? TOKENS_BY_WIRE_PREFIX.find(([prefix]) => wireId.startsWith(prefix))?.[1];
+}

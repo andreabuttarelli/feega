@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { DEFAULT_MODE, VARIABLE_NAME, VarType, type VarAlias, type VarLiteral } from '@feega/motion-core/motion/variables-model';
@@ -89,7 +91,7 @@
               {#if isAlias(value)}
                 <output>→ {value.alias}</output>
               {:else if v.type === VarType.Colour}
-                <input type="color" data-testid={`variable-value-${group}-${variable}-${m}`} value={colourValue(value)} onchange={(e) => setValue(group, variable, v.type, v.values, m, e.currentTarget.value)} />
+                <span data-testid={`variable-value-${group}-${variable}-${m}`}><ColorField name={`${variable} ${m}`} display={ColourDisplay.Chip} value={colourValue(value)} onchange={(c) => setValue(group, variable, v.type, v.values, m, c)} /></span>
               {:else if v.type === VarType.Number}
                 <input type="number" step="any" data-testid={`variable-value-${group}-${variable}-${m}`} value={Number(value)} onchange={(e) => setValue(group, variable, v.type, v.values, m, Number(e.currentTarget.value))} />
               {:else if v.type === VarType.Boolean}
@@ -162,14 +164,6 @@
     font: inherit;
   }
 
-  input[type='color'] {
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: 1px solid var(--ui-line);
-    border-radius: var(--ui-radius-xs);
-    background: transparent;
-  }
 
   button {
     padding: 4px 8px;

@@ -25,7 +25,7 @@ describe('the template inspector on a prompt input', () => {
     expect(key).toContain('Typed text');
     expect(key).toContain('Button label');
     expect(key).toContain('Theme');
-    expect(key).toContain('type="color"');
+    expect(key).toContain('data-colour=');
     expect(key).not.toContain('Corner radius when rounded');
   });
 

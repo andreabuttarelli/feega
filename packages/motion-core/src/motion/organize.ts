@@ -1,5 +1,6 @@
 import { COMPONENTS } from './components';
 import { findClip, type Marker, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
+import type { Keyframe } from './keyframes';
 import { ClipEdge, moveClip, trimClip, type OpResult } from './timeline';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
@@ -60,6 +61,46 @@ export function setWorkArea(doc: MotionDoc, area: Area | null): OpResult {
     return fail('the work area needs its out point after its in point');
   }
   return watchable(doc, { from, to }) ? ok({ ...doc, workArea: { from, to } }) : fail(`the work area needs at least ${MIN_WORK_AREA_S}s between its in and out points`);
+}
+
+export function loopRange(doc: MotionDoc): Area {
+  const area = doc.workArea;
+  return area && watchable(doc, area) ? area : { from: 0, to: doc.durationInFrames };
+}
+
+function closeTrack(track: Keyframe[], end: number): Keyframe[] | null {
+  if (track.length < 2 || track[0].frame >= end) {
+    return null;
+  }
+  const before = track.filter((k) => k.frame < end);
+  const ease = before.at(-1)!.ease;
+  return [...before, { frame: end, value: track[0].value, ease }];
+}
+
+function closeClip(clip: MotionClip, to: number): MotionClip | null {
+  const end = to - clip.from;
+  if (clip.from >= to || clip.from + clip.durationInFrames < to) {
+    return null;
+  }
+  const closed = Object.entries(clip.keyframes).flatMap(([key, track]) => {
+    const next = closeTrack(track, end);
+    return next ? [[key, next] as const] : [];
+  });
+  return closed.length ? { ...clip, keyframes: { ...clip.keyframes, ...Object.fromEntries(closed) } } : null;
+}
+
+export function closeLoop(doc: MotionDoc): OpResult {
+  const { to } = loopRange(doc);
+  let changed = false;
+  const tracks = doc.tracks.map((t) => ({
+    ...t,
+    clips: (t.clips as MotionClip[]).map((c) => {
+      const closed = closeClip(c, to);
+      changed ||= closed !== null;
+      return closed ?? c;
+    })
+  })) as MotionDoc['tracks'];
+  return changed ? ok({ ...doc, tracks }) : fail('nothing is animated across the loop end: key a prop first');
 }
 
 export function loopFrame(doc: MotionDoc, frame: number): number {

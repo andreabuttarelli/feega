@@ -127,7 +127,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
-  import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
+  import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
@@ -242,6 +242,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
+  import AgentChangesPanel from '$lib/components/canvas/AgentChangesPanel.svelte';
+  import { RejectOutcome, type AgentChange, type Choice, type RejectResult } from '$lib/canvas/reject-plan';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
   import { ImageTool } from '$lib/image-tools';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
@@ -540,13 +542,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const regroups = inOrder();
   let regrouping = 0;
 
-  function regroup(action: string, fields: Record<string, string>) {
+  function regroup(action: string, fields: Record<string, string>, after?: () => Promise<void>) {
     regrouping += 1;
     void regroups(async () => {
       await places.flush();
       const res = await post(action, fields);
       if (res?.outcome === 'done') {
         pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+        await after?.();
       }
     }).finally(() => {
       regrouping -= 1;
@@ -577,13 +580,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return true;
   }
 
-  function groupElements(ids: string[]) {
+  function groupElements(ids: string[], after?: (groupId: string) => Promise<void>) {
     if (ids.length < 2) {
       return;
     }
     const id = crypto.randomUUID();
     nodes = groupedLocally(nodes, ids, id, (record) => toTile(record));
-    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id });
+    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id }, after && (() => after(id)));
   }
 
   function wrapInSection(ids: string[]) {
@@ -3717,16 +3720,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!landedShapes.length) { return; }
     nodes = [...nodes, ...landedShapes.map((m) => toTile(m.node))];
     pushGesture({ items: landedShapes.flatMap((m) => m.undo) });
-    const hold = frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 });
-    if (hold) {
-      for (const m of landedShapes) {
-        await intoFrame(m.node.id, frameHolding(nodes, m.box) ?? hold);
-      }
-      return;
-    }
     const ids = landedShapes.map((m) => m.node.id);
     focusOn(ids, undefined, FocusMode.Select);
-    groupElements(ids);
+    const hold = groupHolding(nodes, landedShapes.map((m) => m.box));
+    groupElements(ids, hold ? (groupId) => intoFrame(groupId, hold) : undefined);
   }
 
   function pasteText(text: string, at: { x: number; y: number }) {
@@ -3925,6 +3922,28 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * gesto sono già cadute, e rimetterlo in circolo lo farebbe fallire di nuovo nello stesso modo
    * — `failed` dice perché, in chiaro.
    */
+  async function loadAgentChanges(): Promise<AgentChange[]> {
+    const result = await post('agent_changes', {});
+    return (result?.changes ?? []) as AgentChange[];
+  }
+
+  async function rejectAgentChange(eventIds: number[], choices: Choice[], confirm: boolean): Promise<RejectResult | null> {
+    await Promise.all([lines.drain(), places.flush(), saves.flush()]);
+    const result = (await post('reject_change', { event_ids: JSON.stringify(eventIds), choices: JSON.stringify(choices), confirm: String(confirm) })) as RejectResult | null;
+    if (result?.outcome !== RejectOutcome.Rejected) {
+      return result;
+    }
+    await refresh();
+    if (result.undo.length) { pushGesture({ items: result.undo }); }
+    if (result.moves.length) { undoStack.push({ source: 'move', gesture: { kind: 'move', items: result.moves } }); }
+    return result;
+  }
+
+  const changedNodeName = (nodeId: string | null) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    return node ? (node.displayName ?? node.type) : 'a node';
+  };
+
   async function applyUndo(gesture: Gesture, onAccepted: (redo: Gesture) => void) {
     await Promise.all([lines.drain(), places.flush(), saves.flush()]);
     const result = await post('undo', { items: JSON.stringify(gesture.items) });
@@ -4123,7 +4142,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
   {/if}
 
-  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
+  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)}>
+    <AgentChangesPanel load={loadAgentChanges} reject={rejectAgentChange} nameOf={changedNodeName} />
+  </RunsPanel>
 
   {#if exportFor}
     <ExportDialog count={exportFor.length} onexport={(rows) => exportFrames(exportFor!, rows)} onclose={() => (exportFor = null)} />

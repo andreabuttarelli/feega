@@ -17,8 +17,8 @@
   import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
-  import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
-  import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+  import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
+  import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { drawsAny, frameOfLive, logGaps, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
@@ -36,7 +36,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -315,7 +315,7 @@
         pictured.clear();
         putting.clear();
         sent = new SentUses();
-        sentOverlay = new SentOverlay();
+        sentOverlay = new SentParts();
         raster = r;
       },
       (e: unknown) => {
@@ -341,7 +341,7 @@
   const PICTURES_PER_FRAME = 4;
   const ITEMS_PER_FRAME = 2 * PART_ITEMS;
   let sent = new SentUses();
-  let sentOverlay = new SentOverlay();
+  let sentOverlay = new SentParts();
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
   let paintedLabel = $state('');
 
@@ -524,8 +524,8 @@
       into.patchUses(patch);
     }
     const quiet = !gesture.active();
-    if (quiet && sentOverlay.changed(overlay)) {
-      into.setOverlay(overlay);
+    for (const part of quiet ? sentOverlay.changed(overlay) : []) {
+      into.setOverlay(part, overlay[part]);
     }
     into.setCamera(at.x, at.y, at.zoom);
     const { outcome, pending, skipped } = into.frame(performance.now());

@@ -27,6 +27,20 @@ Colour fields accept hex with or without `#` (`f`, `ff` and `fff` all mean white
 
 <DemoVideo name="colour-typing" caption="Type a short hex or rgb value into a colour field." />
 
+## Colour picker
+
+Every colour in the editor opens the same picker: fill (text included), stroke, effects, background, guides, shared styles and variables.
+
+- A fill opens with the saturation and brightness square already showing. Drag in it, or focus it and use the arrow keys (Shift moves by 10).
+- A hue slider and an opacity slider sit under the square; opacity has a checkerboard behind it.
+- The eyedropper samples any pixel on screen. It shows only in browsers that support the EyeDropper API.
+- The format menu switches the value fields between Hex (one field), RGB, HSL and HSB (three fields), with an opacity percentage next to them. Arrow keys nudge a number; Shift nudges by 10.
+- Swatches list the colours already used in the document, the brand colours and the ones you picked recently.
+- A fill popover keeps the paint type (Solid, Linear, Radial, Angular, Diamond, Image) at the top. A gradient stop uses the same picker.
+- Dragging updates the canvas live and counts as one undo step.
+
+Colours are still stored as `#rrggbb` (or `#rrggbbaa`) or a brand token, so scripts, the CLI and agents read and write them as before.
+
 ## Editing points
 
 Double-click a selected shape, or press `Enter`, to edit its points. Rectangles, ellipses, polygons, stars and lines become free paths when you do.

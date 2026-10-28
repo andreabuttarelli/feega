@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
   import { styleLabel } from '$lib/motion/style-library';
@@ -39,7 +41,7 @@
       <div class="style" data-testid="style-library-row" data-kind={style.kind}>
         <div class="row">
           {#if style.kind === StyleKind.Text || style.kind === StyleKind.Colour}
-            <input type="color" data-testid={`style-library-colour-${name}`} value={colourOf(style)} onchange={(e) => edit(name, style, { color: e.currentTarget.value })} />
+            <span data-testid={`style-library-colour-${name}`}><ColorField {name} display={ColourDisplay.Chip} value={colourOf(style)} {tokens} onchange={(v) => edit(name, style, { color: v })} /></span>
           {:else}
             <span class="swatch" data-testid={`style-library-swatch-${name}`} style={`background:${swatch(style) ?? 'var(--ui-input)'}`}></span>
           {/if}
@@ -93,14 +95,6 @@
     gap: var(--ui-space-2);
   }
 
-  input[type='color'] {
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: 1px solid var(--ui-line);
-    border-radius: var(--ui-radius-xs);
-    background: transparent;
-  }
 
   .swatch {
     width: 24px;

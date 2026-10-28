@@ -68,3 +68,9 @@ export function startMode(doc: MotionDoc, stored: string | null): EditMode {
 }
 
 export const shownMode = (toggled: Partial<Record<string, EditMode>>, nodeId: string, doc: MotionDoc, stored: string | null): EditMode => toggled[nodeId] ?? startMode(doc, stored);
+
+export const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
+
+export const timelineShown = (kindHasTimeline: boolean, mode: EditMode): boolean => kindHasTimeline && mode === EditMode.Motion;
+
+export const modeSwitchShown = (doc: MotionDoc): boolean => controlShown(doc, VideoControl.EditMode) && timelineFits(doc);

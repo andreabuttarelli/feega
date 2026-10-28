@@ -38,6 +38,18 @@ describe('sent overlay', () => {
 });
 
 describe('sent overlay, item by item', () => {
+  it('does not read an item again when an item before it is gone', () => {
+    const sent = new SentOverlay();
+    const first = { kind: 'path', clip: 'a', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem;
+    const second = { kind: 'path', clip: 'b', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem;
+    sent.changed([first, second]);
+    const read = vi.spyOn(JSON, 'stringify');
+
+    expect(sent.changed([second])).toBe(true);
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
+  });
+
   it('reads only the items it has not sent before', () => {
     const sent = new SentOverlay();
     const kept = { kind: 'path', clip: 'wire', matrix: [1, 0, 0, 1, 0, 0] } as unknown as PathItem;

@@ -27,6 +27,7 @@
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
+  import { flipRulers, rulersPref } from '$lib/canvas/rulers-pref.svelte';
   import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -86,7 +87,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
-  import { EditMode, recalledMode, rememberMode, shownMode, startMode } from '$lib/motion/edit-mode';
+  import { EditMode, recalledMode, rememberMode, shownMode, startMode, timelineShown } from '$lib/motion/edit-mode';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
@@ -121,7 +122,7 @@
   import { imageSourceTile } from '$lib/canvas/free-image';
   import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
-  import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
+  import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
   import Repeat from '@lucide/svelte/icons/repeat';
@@ -1391,7 +1392,8 @@
   const timeline = $derived.by(() => {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
-    const shown = nodeId ? frameChrome(kindOfNode(nodeId)).timeline : false;
+    const mode = nodeId && live ? shownMode(toggledModes, nodeId, live.doc, recalledMode(modeStore())) : EditMode.Design;
+    const shown = nodeId ? timelineShown(frameChrome(kindOfNode(nodeId)).timeline, mode) : false;
     return nodeId && live && shown ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
   });
 
@@ -2268,8 +2270,9 @@
   const corePeers = $derived(coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
+  const coreTheme = $derived(coreLook ? { ...coreLook, panel: coreLook.paper } : null);
   const coreOverlay = $derived(
-    coreLook && coreType
+    coreTheme && coreType
       ? overlayOf({
           curves,
           selected,
@@ -2277,7 +2280,7 @@
           marquee,
           guides: snapGuides,
           zoom: viewZoom,
-          theme: { ...coreLook, panel: coreLook.paper },
+          theme: coreTheme,
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
@@ -2286,7 +2289,7 @@
           running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
           chrome: coreChrome
         })
-      : []
+      : NO_OVERLAY
   );
   let snapSpacing = $state<SpacingGap[]>([]);
   let altHeld = $state(false);
@@ -2475,7 +2478,9 @@
     'send-back': () => props.onRestack?.(selected, Stack.Back),
     help: () => (shortcutHelp.open = true),
     view: (c) => {
-      if (c.id === 'view') {
+      if (c.id === 'view' && c.view === FrameView.Rulers) {
+        flipRulers();
+      } else if (c.id === 'view') {
         frameViews = flipView(frameViews, c.view);
       }
     }
@@ -2995,7 +3000,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} views={frameViews} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}

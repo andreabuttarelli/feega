@@ -373,6 +373,8 @@ export function figmaPlan(html: string, newId: NewId): FigmaPlan | null {
   return message ? planOf(message, newId) : null;
 }
 
+const isStage = (layer: Layer, destination: Destination): layer is FrameLayer => layer.kind === LayerKind.Frame && destination === Destination.Frame && layer.fills.length > 0;
+
 export function planOf(message: FigmaMessage, newId: NewId): FigmaPlan | null {
   const scene = figmaScene(message);
   if (!scene) {
@@ -380,7 +382,7 @@ export function planOf(message: FigmaMessage, newId: NewId): FigmaPlan | null {
   }
   const skipped = new Set(scene.skipped);
   const items = scene.placements.flatMap((pl) => {
-    const made = pl.layer.kind === LayerKind.Frame && pl.destination === Destination.Frame ? frameItem(pl.layer, pl.centre, newId, skipped) : freeItem(pl.layer, pl.size, pl.centre, newId, skipped);
+    const made = isStage(pl.layer, pl.destination) ? frameItem(pl.layer, pl.centre, newId, skipped) : freeItem(pl.layer, pl.size, pl.centre, newId, skipped);
     return made ? [made] : [];
   });
   return items.length ? { items, skipped: [...skipped], fileKey: message.meta.fileKey ?? null } : null;

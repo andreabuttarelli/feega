@@ -20,6 +20,7 @@
   import PosterPartPanel from '$lib/components/motion/PosterPartPanel.svelte';
   import DocFields from '$lib/components/motion/DocFields.svelte';
   import ScenesSection from '$lib/components/motion/ScenesSection.svelte';
+  import FrameColoursSection from '$lib/components/motion/FrameColoursSection.svelte';
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
@@ -32,6 +33,7 @@
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { MODE_LABEL, EditMode, modeSwitchShown } from '$lib/motion/edit-mode';
   import { mergeScope, scopeView } from '$lib/motion/instance-view';
 
   const FIRST_FRAME = 0;
@@ -78,6 +80,7 @@
 </script>
 
 {#snippet devToggle(label: string)}<button type="button" class="dev-toggle" title="⇧D" onclick={() => frameProperties.toggleDev?.()} data-testid="dev-toggle">{label}</button>{/snippet}
+{#snippet modeSwitch()}{#if session && doc && modeSwitchShown(doc)}<button type="button" class="dev-toggle" aria-pressed={session.mode === EditMode.Motion} title={MODE_LABEL[session.mode]} onclick={() => session.toggleMode()} data-testid="frame-mode-switch" data-mode={session.mode}>{session.mode === EditMode.Motion ? 'Motion' : 'Design'}</button>{/if}{/snippet}
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
 
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
@@ -93,10 +96,12 @@
   </aside>
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
+    {@render modeSwitch()}
     {@render devToggle('Dev mode')}
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />
+    <FrameColoursSection {doc} onchange={editGuides} />
     <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
     <LayoutGuidesSection {doc} onchange={editGuides} />
     <FlowSection {doc} onchange={editGuides} />
@@ -105,6 +110,7 @@
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
+    {@render modeSwitch()}
     {@render devToggle('Dev mode')}
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />

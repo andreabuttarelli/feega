@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { setColour } from './fixtures/colour';
 
 const SHOTS = process.env.FIG_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2500;
@@ -55,7 +56,7 @@ test.describe('styles shared by the frames of a canvas @real', () => {
     const boxA = (await hostA.boundingBox())!;
     await page.mouse.click(boxA.x + 4, boxA.y + 4);
     await expect(page.getByTestId('style-library')).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId('style-library-colour-Brand').fill(GREEN);
+    await setColour(page, page.getByTestId('style-library-colour-Brand'), GREEN);
     await page.waitForTimeout(SETTLE_MS * 2);
     await page.screenshot({ path: `${SHOTS}/figD-styles-1-shared.png` });
 

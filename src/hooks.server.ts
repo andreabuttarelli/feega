@@ -1,3 +1,4 @@
+import { staleSessionCookieNames } from '$lib/server/stale-session-cookies';
 import {sequence} from '@sveltejs/kit/hooks';
 import { error, json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
@@ -182,6 +183,7 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
+  staleSessionCookieNames(event.cookies.getAll().map(({ name }) => name), SESSION_COOKIE_NAME).forEach((name) => event.cookies.delete(name, { path: '/' }));
   const requestBearer = bearerTokenOf(event.request) ?? grantBearerOf(event.request);
   const source = sessionSourceOf(event.request, event.url);
   event.locals.supabase = markRlsScoped(createServerClient(publicEnv.PUBLIC_SUPABASE_URL, publicEnv.PUBLIC_SUPABASE_ANON_KEY, {

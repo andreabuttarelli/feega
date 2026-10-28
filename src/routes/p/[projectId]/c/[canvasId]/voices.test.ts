@@ -47,7 +47,7 @@ vi.mock('$lib/server/uncensored-workspace/workspace-server', async (importOrigin
 	canvasReachable: (...a: unknown[]) => canvasReachable(...a)
 }));
 vi.mock('$lib/server/voices/voices-config', () => ({
-	configuredVoiceDeps: () => ({ store: { list }, provider: { addShared }, bill: vi.fn(), plan: null })
+	configuredVoiceDeps: () => ({ store: { list, insert: async (row: { providerVoiceId: string; name: string }) => row }, provider: { addShared, slots: async () => ({ used: 0, limit: 30 }) }, bill: vi.fn(), plan: null })
 }));
 vi.mock('$lib/server/voices/custom-voices', async (importOriginal) => ({
 	...(await importOriginal<object>()),

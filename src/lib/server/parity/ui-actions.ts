@@ -122,6 +122,8 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   detach_technique: canvas('detach_technique'),
   open_technique: canvas('open_technique'),
   undo: canvas('undo_gesture'),
+  agent_changes: canvas('agent_changes'),
+  reject_change: canvas('reject_change'),
   suggestNextStep: canvas('suggest_next_steps')
 };
 
@@ -295,6 +297,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Tool.Snap]: VIEW,
   [Tool.NullFromSelection]: motion('add_null'),
   [Tool.ClearWorkArea]: motion('set_work_area'),
+  [Tool.Loop]: motion('set_interactive'),
+  [Tool.CloseLoop]: motion('close_loop'),
   [Tool.CopyEase]: CLIPBOARD,
   [Tool.PasteEase]: motion('set_ease_handles'),
   [Tool.FitGraph]: VIEW,

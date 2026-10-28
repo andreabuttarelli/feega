@@ -2,7 +2,7 @@ import type { Frame, Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const PORTRAIT = { format: '4:5', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
-const STEPS = ['#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff', '#808080', '#123456', '#fedcba'];
+const STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
 const STEP_GAP_MS = 120;
 const FRAME_MS = 1000 / 60;
 const LIVE_BUDGET_MS = 3 * FRAME_MS;
@@ -83,9 +83,12 @@ for (const renderer of ['gpu']) {
       const stack = page.getByTestId('motion-inspector').getByTestId('fill-stack').first();
       await stack.getByTestId('fill-row').first().getByTestId('fill-swatch').click();
       const editor = page.getByTestId('fill-editor');
-      await editor.locator('.colour .chip').first().click();
-      const wheel = page.getByTestId('colour-popover').locator('input[type=color]');
-      await expect(wheel).toBeVisible();
+      const square = editor.getByTestId('colour-square');
+      await expect(square).toBeVisible();
+      const area = (await square.boundingBox())!;
+      const hexField = editor.getByTestId('colour-channel');
+      await page.mouse.move(area.x + area.width * STEPS[0], area.y + area.height * 0.5);
+      await page.mouse.down();
 
       const frame = await stageFrame(page);
       await watchFill(frame);
@@ -98,12 +101,10 @@ for (const renderer of ['gpu']) {
       });
 
       const lags: number[] = [];
-      for (const hex of STEPS) {
-        const sentAt = await wheel.evaluate((el: HTMLInputElement, value) => {
-          el.value = value;
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          return performance.timeOrigin + performance.now();
-        }, hex);
+      for (const along of STEPS) {
+        await page.mouse.move(area.x + area.width * along, area.y + area.height * 0.5);
+        const sentAt = await page.evaluate(() => performance.timeOrigin + performance.now());
+        const hex = `#${(await hexField.inputValue()).toLowerCase()}`;
         await expect.poll(() => frame.evaluate((rgb) => (window as unknown as { painted: Record<string, number> }).painted[rgb] ?? null, rgbOf(hex)), { timeout: 5_000, intervals: [10] }).not.toBeNull();
         const paintedAt = await frame.evaluate((rgb) => (window as unknown as { painted: Record<string, number> }).painted[rgb], rgbOf(hex));
         lags.push(paintedAt - sentAt);
@@ -111,8 +112,8 @@ for (const renderer of ['gpu']) {
       }
       expect(saves, 'nothing is saved while dragging').toHaveLength(0);
 
-      const last = STEPS.at(-1)!;
-      await wheel.evaluate((el: HTMLInputElement) => el.dispatchEvent(new Event('change', { bubbles: true })));
+      const last = `#${(await hexField.inputValue()).toLowerCase()}`;
+      await page.mouse.up();
       await expect
         .poll(async () => {
           const { data } = await admin.from('motion_revisions').select('version, doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1);

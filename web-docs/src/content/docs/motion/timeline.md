@@ -18,6 +18,16 @@ sidebar:
 | `[` `]` | Move the clip to start / end here |
 | `⌥[` `⌥]` | Trim the clip start / end to here |
 
+## Loop
+
+Videos loop by default: the timeline preview and the embed wrap from the last frame to the first; an MP4 is as long as the video, so a seamless ending matters when a feed replays it.
+
+- **Loop button** (next to play): turns looping on or off. Off, playback stops at the out point and the embed plays once.
+- **Loop region**: the bar on top of the ruler. Drag its start or end handle (or press `B`/`N`, or `I`/`O` in Animate mode, at the playhead) to loop just that part while you work. The clear button resets it to the whole video. At least 0.5 s.
+- **Make seamless** (∞ button): every prop animated across the loop end gets a closing keyframe there with its first value, so the last frame flows into the first with no jump. Keys past the end are dropped.
+
+The motion agent does the same with `set_interactive` (`loop`), `set_work_area` and `close_loop`.
+
 Timeline conveniences:
 
 - Drag over the timeline to select keyframes, then duplicate with `Cmd+D`.

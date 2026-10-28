@@ -24,7 +24,7 @@ describe('the variables panel', () => {
     expect(body).toContain('type="range"');
     expect(body).toContain('type="checkbox"');
     expect(body).toContain('<select');
-    expect(body).toContain('type="color"');
+    expect(body).toContain('data-colour=');
     expect(body).toContain('type="text"');
   });
 

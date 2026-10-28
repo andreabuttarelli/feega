@@ -28,7 +28,7 @@ type TaskRow = {
   outputs?: Array<{ url?: string; contenttype?: string }>;
 };
 
-function authHeaders(config: WiroConfig): Record<string, string> {
+export function wiroAuthHeaders(config: Pick<WiroConfig, 'apiKey' | 'apiSecret' | 'nonce'>): Record<string, string> {
   if (!config.apiSecret) {
     return { 'x-api-key': config.apiKey };
   }
@@ -70,7 +70,7 @@ export function wiro(config: WiroConfig): TaskProvider & Required<Pick<TaskProvi
   async function post<T extends WiroReply>(path: string, body: unknown): Promise<T> {
     const res = await doFetch(`${baseUrl}${path}`, {
       method: 'POST',
-      headers: { ...authHeaders(config), 'content-type': 'application/json' },
+      headers: { ...wiroAuthHeaders(config), 'content-type': 'application/json' },
       body: JSON.stringify(body)
     });
     if (!res.ok) {

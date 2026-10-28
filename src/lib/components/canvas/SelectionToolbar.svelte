@@ -32,6 +32,8 @@
   import Cloud from '@lucide/svelte/icons/cloud';
   import { CLOUD_PROVIDERS, PROVIDER_LABEL, type CloudProviderId } from '$lib/canvas/cloud-picker';
   import { COLOUR_TAGS, COLOUR_TAG_HEX, colourOf, type ColourTag } from '$lib/canvas/node-colour';
+  import ColorField from '$lib/components/motion/ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import { SECTION_DEFAULT_FILL } from '$lib/canvas/node-data';
 
   const ICON_BUTTON = 'size-11 md:size-8';
@@ -233,7 +235,7 @@
         {#if section}
           <div class="group" role="group" aria-label="Section">
             <input class="section-title" aria-label="Section title" value={sectionTitle} onchange={(e) => onsectionchange?.(section.id, { title: e.currentTarget.value.trim() || 'Section' })} onkeydown={(e) => e.stopPropagation()} />
-            <input class="section-fill" type="color" aria-label="Section fill" value={sectionFill} onchange={(e) => onsectionchange?.(section.id, { fill: e.currentTarget.value })} />
+            <ColorField name="Section fill" display={ColourDisplay.Chip} value={sectionFill} onchange={(v) => onsectionchange?.(section.id, { fill: v })} />
           </div>
         {/if}
 
@@ -247,7 +249,7 @@
             {/if}
             {#if runQuote}
               {#if runQuote.credits !== null}
-                <span class="run-price" data-testid="run-price">{formatPrice(runQuote.credits)}</span>
+                <span class="run-price" data-testid="run-price">{runQuote.variable ? "~" : ""}{formatPrice(runQuote.credits)}</span>
               {:else if runQuote.variable}
                 <span class="run-price">variable</span>
               {/if}
@@ -534,13 +536,6 @@
     background: transparent;
   }
 
-  .section-fill {
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
 
   .warn {
     padding: 0 8px;

@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { setColour } from './fixtures/colour';
 
 const SETTLE_MS = 2500;
 const SAVE_MS = 4000;
@@ -51,8 +52,8 @@ test.describe('variables on the canvas @real', () => {
     await expect(page.getByTestId('variable-row')).toHaveCount(1);
     await page.getByTestId('variable-new-mode-Collection').fill('Dark');
     await page.getByTestId('variable-add-mode-Collection').click();
-    await page.getByTestId('variable-value-Collection-surface-Default').fill(LIGHT);
-    await page.getByTestId('variable-value-Collection-surface-Dark').fill(DARK);
+    await setColour(page, page.getByTestId('variable-value-Collection-surface-Default'), LIGHT);
+    await setColour(page, page.getByTestId('variable-value-Collection-surface-Dark'), DARK);
     await shot(page, 'library-two-modes');
 
     await pickElement(0.3, 0.5);
@@ -106,7 +107,7 @@ test.describe('variables on the canvas @real', () => {
     await page.getByText('Properties', { exact: true }).first().click();
     await page.getByTestId('variable-new-name').fill('surface');
     await page.getByTestId('variable-add-button').click();
-    await page.getByTestId('variable-value-Collection-surface-Default').fill(LIGHT);
+    await setColour(page, page.getByTestId('variable-value-Collection-surface-Default'), LIGHT);
 
     await page.waitForTimeout(SAVE_MS);
     expect((await heads()).a.variables!.Collection).toBeDefined();

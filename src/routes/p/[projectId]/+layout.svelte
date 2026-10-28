@@ -70,7 +70,7 @@
     return followDocks(canvasRow, () => (timeline ? [timeline] : []), (px) => (dockLift = px));
   });
 
-  const framePicked = $derived(!!frameProperties.session?.selection.length);
+  const framePicked = $derived(frameProperties.routed !== null);
   const shellLeft = $derived(shellLeftOf(leftPanel));
   const shellRight = $derived(chatOpen || framePicked ? `calc(${fitted(rightBar.width)} + 2 * ${EDGE})` : EDGE);
   let mobileView = $state(INITIAL_MOBILE_VIEW);

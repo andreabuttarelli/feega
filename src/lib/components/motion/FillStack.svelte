@@ -4,7 +4,8 @@
   import { BLEND_MODES } from '@feega/motion-core/motion/blend';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
   import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_CONTROLS, IMAGE_FITS, IMAGE_FIT_LABEL, ImageControl, addFill, cropOf, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '@feega/motion-core/motion/fill/model';
-  import ColorField from './ColorField.svelte';
+  import ColorPicker from './ColorPicker.svelte';
+  import { untrack } from 'svelte';
   import { SliderField } from '$lib/components/ui/control';
   import { ADJUSTMENTS, ADJUSTMENT_LABEL, isNeutral, type Adjustment } from '@feega/motion-core/motion/fill/adjust';
   import type { LiveGesture } from '$lib/motion/live-edit';
@@ -17,10 +18,12 @@
   import type { MediaUploader } from './media-upload';
   import { MediaKind, type MediaPick } from '$lib/motion/media/pick';
 
+  const NO_COLOURS = () => [];
+
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
   type Keys = { mark: (key: string) => KeyMark; toggle: (key: string) => void };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, keys = null, oncrop = null, onchange }: { oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, palette = NO_COLOURS, keys = null, oncrop = null, onchange }: { palette?: () => readonly string[]; oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const setAdjust = (i: number, current: FillOf<FillType.Image>, key: Adjustment, value: number) => patch(i, { adjust: { ...current.adjust, [key]: value / PERCENT } }, 'Image adjustment');
@@ -34,7 +37,13 @@
   const imagePick = (f: FillOf<FillType.Image>): MediaPick | null => (f.src ? { kind: MediaKind.Image, url: f.src } : f.assetId ? { kind: MediaKind.Image, assetId: f.assetId } : null);
   const IMAGE_PATCH = (pick: MediaPick | null): FillPatch => ({ assetId: pick?.assetId ?? '', src: pick?.url });
 
+  let swatches = $state<readonly string[]>([]);
   let open = $state<number | null>(null);
+
+  $effect(() => {
+    void open;
+    swatches = untrack(palette);
+  });
   let adding = $state(false);
   let stopAt = $state(0);
   let dragged = $state<number | null>(null);
@@ -121,10 +130,11 @@
 
 {#snippet colour(name: string, value: string, write: (next: string) => void, key: string | null = null)}
   {@const { base, alpha } = colourAlpha(value)}
-  <div class="flex min-w-0 items-center gap-1">
-    {#if key}{@render diamond(key)}{/if}
-    <div class="min-w-0 flex-1"><ColorField {name} {gesture} value={base} {tokens} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} /></div>
-    <input class={cn(FIELD_INPUT, 'w-12')} type="number" min="0" max="100" step="1" data-testid="fill-alpha" aria-label={`${name} alpha`} title="Alpha %" value={pct(alpha)} onchange={(e) => write(recolour(base, percentOf(e)))} />
+  <div class="flex min-w-0 flex-col gap-1.5" data-colour={name}>
+    {#if key}
+      <div class="flex items-center gap-1">{@render diamond(key)}<span class={LABEL}>{name}</span></div>
+    {/if}
+    <ColorPicker {name} {gesture} value={base} {alpha} {tokens} {swatches} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} />
   </div>
 {/snippet}
 

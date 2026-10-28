@@ -40,6 +40,11 @@ export function timecode(frame: number, fps: number = FPS): string {
   return [Math.floor(seconds / 60), seconds % 60, rest].map((n) => String(n).padStart(2, '0')).join(':');
 }
 
+export enum WorkEdge {
+  In = 'in',
+  Out = 'out'
+}
+
 export enum Snap {
   On = 'on',
   Off = 'off'

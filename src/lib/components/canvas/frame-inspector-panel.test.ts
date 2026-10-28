@@ -69,4 +69,14 @@ describe('frame inspector panel', () => {
   it('shows the inspector for several elements', () => {
     expect(html(['a', 'b'])).toContain('data-testid="frame-inspector"');
   });
+
+  it('carries the Design / Motion switch on the frame and on an element', () => {
+    expect(html([])).toContain('data-testid="frame-mode-switch"');
+    expect(html(['a'])).toContain('data-testid="frame-mode-switch"');
+  });
+
+  it('carries the Design / Motion switch on the frame and on an element', () => {
+    expect(html([])).toContain('data-testid="frame-mode-switch"');
+    expect(html(['a'])).toContain('data-testid="frame-mode-switch"');
+  });
 });

@@ -39,9 +39,21 @@ The first run downloads the app into `~/.feega/app/`; later starts update it whe
 as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
 **Import .feega**. Sharing, comments and saved versions need the cloud and say so.
 
-To generate with your own provider keys, set `KIE_API_KEY` and/or `LLM_API_KEY` (OpenRouter) in the
-environment or in `.env`: the text, image and video nodes appear, no plan or credits. Keys never
-enter the `.feega` file.
+To generate with your own provider keys, set them in the environment or in a `.env` in the folder
+you run `npx feega` from: the AI nodes appear, no plan or credits. Keys never enter the `.feega` file.
+
+| Provider | Variables | Generates |
+|---|---|---|
+| Kie.ai | `KIE_API_KEY` | images, video, text |
+| OpenRouter | `OPENROUTER_API_KEY` | images, video |
+| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt safety check; also counts as the OpenRouter key |
+| Higgsfield | `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` | images, video |
+| Wiro | `WIRO_API_KEY` (+ `WIRO_API_SECRET` if your Wiro project signs requests) | 3D models |
+| ElevenLabs | `ELEVENLABS_API_KEY` (`ELEVENLABS_BASE_URL` optional) | voice-over, sound effects, music, voices |
+
+Image and video prompts pass a safety check that runs on `LLM_API_KEY`; without it they are refused
+with a hint. At start the terminal says, per provider, whether its key works (a free account call,
+never a generation).
 
 ## Run it locally as an agent
 

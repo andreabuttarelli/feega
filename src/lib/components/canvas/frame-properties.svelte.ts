@@ -25,6 +25,14 @@ export class FrameProperties {
     this.extras = extras;
   }
 
+  get routed(): string | null {
+    if (!this.nodeId || !this.session) {
+      return null;
+    }
+    const picked = this.session.selection.join(',');
+    return picked ? `${this.nodeId}:${picked}` : this.nodeId;
+  }
+
   openFrame(): OpenFrame | null {
     if (!this.nodeId || !this.session) {
       return null;

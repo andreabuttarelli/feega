@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import Layers from '@lucide/svelte/icons/layers';
   import type { Bounds } from '$lib/motion/scene-select';
   import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -17,9 +19,9 @@
   import { unionBounds } from '$lib/motion/multi-select';
   import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
-  import { PropKind, STYLE_PROPS, placeBox, setPropAcross, sharedConstraint, sharedProp, type BoxPatch } from '$lib/motion/selection-props';
-  import { isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
-  import { BRAND_COLORS } from '@feega/motion-core/motion/components';
+  import { placeBox, setPropAcross, sharedConstraint, sharedFields, type BoxPatch } from '$lib/motion/selection-props';
+  import { documentColours, isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
+  import { BRAND_COLORS, Control } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import NumberField from './NumberField.svelte';
 
@@ -43,8 +45,7 @@
   const clips = $derived(ids.map((id) => findClip(doc, id)?.clip).filter((c): c is MotionClip => !!c));
   const first = $derived(clips[0]);
   const bounds = $derived(ids.length && ids.every((id) => boxes[id] && findClip(doc, id)) ? unionBounds(ids.map((id) => aabb(quadOf(doc, id, frame, boxes[id])))) : null);
-  const styleProps = $derived(STYLE_PROPS.filter((f) => clips.some((c) => c.props[f.key] !== undefined)));
-  const ownerOf = (key: string) => clips.find((c) => c.props[key] !== undefined)!;
+  const styleFields = $derived(sharedFields(clips));
   const sameColour = (c: string) => c;
 
   const numberOf = (clip: MotionClip, key: SharedKey) => toShown(clip.component, key, Math.round(Number(valueAt(withParams(doc, clip), key, frame, sameColour) ?? TRANSFORM[key].fallback) * 1000) / 1000, doc);
@@ -106,18 +107,9 @@
     }
   }
 
-  const numberProp = (key: string): Shared<number> => {
-    const raw = sharedProp(clips, key);
-    return raw === MIXED ? MIXED : toShown(ownerOf(key).component, key, Number(raw), doc);
-  };
-  const colourProp = (key: string) => {
-    const raw = sharedProp(clips, key);
-    return typeof raw === 'string' && HEX.test(raw) ? raw : FALLBACK_COLOUR;
-  };
-  const textProp = (key: string) => {
-    const raw = sharedProp(clips, key);
-    return raw === MIXED ? '' : String(raw);
-  };
+  const numberShown = (key: string, value: unknown): Shared<number> => (value === MIXED ? MIXED : toShown(first.component, key, Number(value), doc));
+  const colourShown = (value: unknown) => (typeof value === 'string' && HEX.test(value) ? value : FALLBACK_COLOUR);
+  const textShown = (value: unknown) => (value === MIXED ? '' : String(value ?? ''));
 
   const horizontal = $derived(sharedConstraint(clips, 'horizontal'));
   const vertical = $derived(sharedConstraint(clips, 'vertical'));
@@ -172,24 +164,37 @@
         {/each}
       </div>
     </section>
-    {#if styleProps.length}
+    {#if styleFields.length}
       <section class="section ui-section" data-section="style">
-        <h3>Style</h3>
-        {#each styleProps as f (f.key)}
-          {#if f.kind === PropKind.Number}
+        <h3>{clips.every((c) => c.component === first.component) ? first.component : 'Style'}</h3>
+        {#each styleFields as { field: f, value } (f.key)}
+          {#if f.control === Control.Range}
             <div data-prop={f.key}>
-              <NumberField label={f.label} kind={FieldKind.Named} name={f.label} value={numberProp(f.key)} range={PROP_RANGE} onchange={(v) => setStyle(f.key, toStored(ownerOf(f.key).component, f.key, v, doc))} />
+              <NumberField label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
             </div>
-          {:else if f.kind === PropKind.Colour}
+          {:else if f.control === Control.Color}
             <label class="line" data-prop={f.key}>
               <span>{f.label}</span>
-              <input type="color" aria-label={f.label} value={colourProp(f.key)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
-              {#if sharedProp(clips, f.key) === MIXED}<em class="mixed">Mixed</em>{/if}
+              <ColorField name={f.label} display={ColourDisplay.Chip} value={colourShown(value)} palette={() => documentColours(doc)} onchange={(v) => setStyle(f.key, v)} />
+              {#if value === MIXED}<em class="mixed">Mixed</em>{/if}
+            </label>
+          {:else if f.control === Control.Select}
+            <label class="line" data-prop={f.key}>
+              <span>{f.label}</span>
+              <select aria-label={f.label} value={value === MIXED ? MIXED_OPTION : String(value)} onchange={(e) => e.currentTarget.value !== MIXED_OPTION && setStyle(f.key, e.currentTarget.value)}>
+                {#if value === MIXED}<option value={MIXED_OPTION}>Mixed</option>{/if}
+                {#each f.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
+              </select>
+            </label>
+          {:else if f.control === Control.Toggle}
+            <label class="line" data-prop={f.key}>
+              <span>{f.label}</span>
+              <input type="checkbox" aria-label={f.label} checked={value === true} indeterminate={value === MIXED} onchange={(e) => setStyle(f.key, e.currentTarget.checked)} />
             </label>
           {:else}
             <label class="line" data-prop={f.key}>
               <span>{f.label}</span>
-              <input type="text" aria-label={f.label} placeholder="Mixed" value={textProp(f.key)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
+              <input type="text" aria-label={f.label} placeholder={value === MIXED ? "Mixed" : ""} value={textShown(value)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
             </label>
           {/if}
         {/each}
@@ -198,15 +203,16 @@
     {#if colours.length}
       <section class="section ui-section" data-section="colours">
         <h3>Selection colours</h3>
-        {#each colours as colour (colour)}
+        {#each colours as { colour, count } (colour)}
           <label class="line" data-colour={colour}>
             <span>{colour}</span>
+            <span class="count">{count}</span>
             {#if isBrandToken(colour)}
               <select aria-label={`Replace ${colour}`} data-testid="token-swap" value={colour} onchange={(e) => swapColour(colour, e.currentTarget.value)}>
                 {#each BRAND_COLORS as token (token)}<option value={token}>{token}</option>{/each}
               </select>
             {:else}
-              <input type="color" aria-label={`Replace ${colour}`} value={colour.slice(0, 7)} onchange={(e) => swapColour(colour, e.currentTarget.value)} />
+              <ColorField name={`Replace ${colour}`} display={ColourDisplay.Chip} value={colour.slice(0, 7)} palette={() => documentColours(doc)} onchange={(v) => swapColour(colour, v)} />
             {/if}
           </label>
         {/each}
@@ -301,6 +307,11 @@
   .line span {
     width: 88px;
     flex-shrink: 0;
+  }
+
+  .line .count {
+    width: auto;
+    color: var(--ui-ink-3);
   }
 
   select {

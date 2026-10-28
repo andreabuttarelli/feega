@@ -2,7 +2,7 @@ use gpu_core::compositor::{render_tile, Compositor, Painter};
 use gpu_core::display_list::{parse, Item};
 use gpu_core::groups::{Library, Limits, Plan};
 use gpu_core::retained::{Camera, Lookup, Outcome, Quality};
-use gpu_core::world::parse_patch;
+use gpu_core::world::{parse_patch, OverlayPart};
 use gpu_core::Skipped;
 use vello::kurbo::Rect;
 
@@ -230,7 +230,7 @@ fn overlaid(composes: bool) -> (Compositor, Library) {
     if composes {
         lib.compose_encodings();
     }
-    c.set_overlay(gpu_core::world::parse_overlay(RING).unwrap(), &mut lib);
+    c.set_overlay(OverlayPart::Fixed, gpu_core::world::parse_overlay(RING).unwrap(), &mut lib);
     (c, lib)
 }
 
@@ -259,10 +259,33 @@ fn an_expanded_overlay_lands_where_the_camera_puts_it() {
 #[test]
 fn replacing_the_overlay_replaces_what_the_painter_gets() {
     let (mut c, mut lib) = overlaid(true);
-    c.set_overlay(vec![], &mut lib);
+    c.set_overlay(OverlayPart::Fixed, vec![], &mut lib);
     let mut fake = Fake::default();
 
     c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
 
     assert_eq!(fake.painted[0].2.iter().map(|i| i.kind()).collect::<Vec<_>>(), vec!["use"]);
+}
+
+const HOVER: &str = r#"[{ "kind": "path", "clip": "hover", "contours": [[50, 10, 60, 10, 60, 20, 50, 20]], "rule": "nonzero", "paint": { "kind": "solid", "color": [1, 0, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] }]"#;
+
+#[test]
+fn the_fixed_and_live_overlays_reach_the_painter_as_two_uses() {
+    let (mut c, mut lib) = overlaid(true);
+    c.set_overlay(OverlayPart::Live, gpu_core::world::parse_overlay(HOVER).unwrap(), &mut lib);
+    let mut fake = Fake::default();
+
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    assert_eq!(fake.painted[0].2.iter().map(|i| i.kind()).collect::<Vec<_>>(), vec!["use", "use", "use"]);
+}
+
+#[test]
+fn clearing_the_live_overlay_keeps_the_fixed_one() {
+    let (mut c, mut lib) = overlaid(true);
+    c.set_overlay(OverlayPart::Live, gpu_core::world::parse_overlay(HOVER).unwrap(), &mut lib);
+
+    c.set_overlay(OverlayPart::Live, vec![], &mut lib);
+
+    assert_eq!((lib.items_in(OverlayPart::Fixed.group()), lib.items_in(OverlayPart::Live.group())), (Some(1), None));
 }

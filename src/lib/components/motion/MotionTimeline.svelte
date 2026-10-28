@@ -14,7 +14,7 @@
   import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { ClipEdge, duplicateKeyframes, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, setLaneMuted, trimClip, type KeyRef, type OpResult } from '@feega/motion-core/motion/timeline';
   import { withParams } from '@feega/motion-core/motion/custom/params';
-  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped, WorkEdge } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
   import { KeyGlyph, KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '@feega/motion-core/motion/mask';
@@ -31,7 +31,7 @@
   import EasePicker from './EasePicker.svelte';
   import { marqueeHits, relatedSelection } from '$lib/motion/timeline-select';
   import { isTypingTarget } from '$lib/shortcuts';
-  import { allMarkers, isLocked, setClipFlags, setTrackFlags, shownTracks } from '@feega/motion-core/motion/organize';
+  import { allMarkers, isLocked, loopRange, setClipFlags, setTrackFlags, setWorkArea, shownTracks } from '@feega/motion-core/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
@@ -340,6 +340,39 @@
     const result = mark === KeyMark.Here ? removeKeyframes(doc, owner.id, prop, [local]) : setKeyframe(doc, owner.id, prop, local, value ?? 0);
     if (result.ok) {
       onchange(result.doc, 'Toggled a keyframe');
+    }
+  }
+
+  let areaDraft = $state<{ from: number; to: number } | null>(null);
+  let edge: WorkEdge | null = null;
+  const area = $derived(areaDraft ?? loopRange(shown));
+
+  function grabEdge(e: PointerEvent, grabbed: WorkEdge) {
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    edge = grabbed;
+    areaDraft = loopRange(doc);
+  }
+
+  function dragEdge(e: PointerEvent) {
+    if (!edge || !areaDraft) {
+      return;
+    }
+    const at = Math.min(Math.max(0, frameOfPointer(e)), doc.durationInFrames);
+    areaDraft = edge === WorkEdge.In ? { ...areaDraft, from: Math.min(at, areaDraft.to - 1) } : { ...areaDraft, to: Math.max(at, areaDraft.from + 1) };
+  }
+
+  function dropEdge() {
+    const dropped = areaDraft;
+    edge = null;
+    areaDraft = null;
+    if (!dropped) {
+      return;
+    }
+    const whole = dropped.from === 0 && dropped.to === doc.durationInFrames;
+    const result = setWorkArea(doc, whole ? null : dropped);
+    if (result.ok) {
+      onchange(result.doc, 'Set the loop region');
     }
   }
 
@@ -824,9 +857,11 @@
           {#if mark.label}<em>{mark.label}</em>{/if}
         </span>
       {/each}
-      {#if shown.workArea}
-        <span class="work-area" data-testid="work-area" style={`left: ${headPx + shown.workArea.from * ppf}px; width: ${(shown.workArea.to - shown.workArea.from) * ppf}px;`}></span>
-      {/if}
+      <span class="work-area" class:whole={!shown.workArea && !areaDraft} data-testid="work-area" style={`left: ${headPx + area.from * ppf}px; width: ${(area.to - area.from) * ppf}px;`}>
+        {#each [WorkEdge.In, WorkEdge.Out] as side (side)}
+          <button type="button" class={`work-edge ${side}`} data-testid={`work-area-${side}`} aria-label={side === WorkEdge.In ? 'Loop starts here: drag' : 'Loop ends here: drag'} onpointerdown={(e) => grabEdge(e, side)} onpointermove={dragEdge} onpointerup={dropEdge} onpointercancel={dropEdge}></button>
+        {/each}
+      </span>
       {#each cached as run (run.from)}
         <span class="ram-cache" data-testid="ram-cache" style={`left: ${headPx + run.from * ppf}px; width: ${(run.to - run.from) * ppf}px;`}></span>
       {/each}
@@ -1134,11 +1169,34 @@
   .work-area {
     position: absolute;
     top: 0;
-    height: 4px;
+    height: 6px;
     background: color-mix(in srgb, var(--ui-accent) 50%, transparent);
-    border-left: 2px solid var(--ui-accent);
-    border-right: 2px solid var(--ui-accent);
     pointer-events: none;
+  }
+
+  .work-area.whole {
+    background: color-mix(in srgb, var(--ui-accent) 15%, transparent);
+  }
+
+  .work-edge {
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-accent);
+    cursor: ew-resize;
+    pointer-events: auto;
+  }
+
+  .work-edge.in {
+    left: -4px;
+  }
+
+  .work-edge.out {
+    right: -4px;
   }
 
   .marker {

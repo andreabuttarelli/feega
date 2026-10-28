@@ -5,7 +5,10 @@ import { join, resolve } from 'node:path';
 const DEFAULT_FILE = 'canvas.feega';
 const DEFAULT_PORT = 0;
 export const LOOPBACK = '127.0.0.1';
-export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--help] [--version]`;
+export const MCP_PORT = 5173;
+export const MCP_ENTRY = 'mcp.mjs';
+export const USAGE = `usage: feega [file.feega] [--port <n>] [--no-open] [--help] [--version]
+       feega mcp [--port <n>]   MCP server (stdio) for the local feega on that port (default ${MCP_PORT})`;
 const CACHED_MARKER = '.complete';
 const APP_TAG = 'app-v';
 const RELEASES = 'https://github.com/andreabuttarelli/feega/releases/download';
@@ -20,8 +23,41 @@ const portOf = (raw) => {
   return port;
 };
 
+const portFlag = (arg, rest) => {
+  if (arg === '--port') {
+    return portOf(rest.shift());
+  }
+
+  if (arg.startsWith('--port=')) {
+    return portOf(arg.slice('--port='.length));
+  }
+
+  return null;
+};
+
+function parseMcp(rest) {
+  let port = MCP_PORT;
+  while (rest.length) {
+    const arg = rest.shift();
+    const flagged = portFlag(arg, rest);
+    if (flagged === null) {
+      throw new Error(`unknown option: ${arg}\n${USAGE}`);
+    }
+
+    port = flagged;
+  }
+
+  return { command: 'mcp', port };
+}
+
+export const mcpEnv = (port, env) => ({ ...env, PUBLIC_APP_URL: boundUrl(port) });
+
 export function parseArgs(argv, cwd) {
   const rest = [...argv];
+  if (rest[0] === 'mcp') {
+    return parseMcp(rest.slice(1));
+  }
+
   const files = [];
   let port = DEFAULT_PORT;
   let browser = 'open';
@@ -41,13 +77,9 @@ export function parseArgs(argv, cwd) {
       continue;
     }
 
-    if (arg === '--port') {
-      port = portOf(rest.shift());
-      continue;
-    }
-
-    if (arg.startsWith('--port=')) {
-      port = portOf(arg.slice('--port='.length));
+    const flagged = portFlag(arg, rest);
+    if (flagged !== null) {
+      port = flagged;
       continue;
     }
 

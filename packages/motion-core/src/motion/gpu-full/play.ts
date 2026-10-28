@@ -106,7 +106,13 @@ export function mountPlayer(mount: PlayerMount): Player {
         await media.ready(list);
         into.draw(list, (item) => read.picture(item) ?? media.pictures(item));
       })
-      .catch(onfallback)
+      .catch((reason) => {
+        if (reads !== current) {
+          drawn = [null, -1];
+          return;
+        }
+        onfallback(reason);
+      })
       .finally(() => {
         busy = false;
       });

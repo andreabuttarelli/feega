@@ -11,7 +11,7 @@
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
 
-  let { strokes, tokens, sided = false, short, title = '', adder = Adder.Own, gesture = null, onchange }: { gesture?: LiveGesture | null; strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; adder?: Adder; onchange: (strokes: Stroke[], summary: string) => void } = $props();
+  let { strokes, tokens, sided = false, short, title = '', adder = Adder.Own, gesture = null, palette = () => [], onchange }: { palette?: () => readonly string[]; gesture?: LiveGesture | null; strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; adder?: Adder; onchange: (strokes: Stroke[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const PX_DIGITS = 10;
@@ -84,7 +84,7 @@
 
 {#snippet colour(name: string, value: string, write: (next: string) => void)}
   {@const { base, alpha } = colourAlpha(value)}
-  <ColorField {name} {gesture} value={base} {tokens} {alpha} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} onalpha={(next) => write(recolour(base, next))} />
+  <ColorField {name} {gesture} {palette} value={base} {tokens} {alpha} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} onalpha={(next) => write(recolour(base, next))} />
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="stroke-stack" bind:this={root}>

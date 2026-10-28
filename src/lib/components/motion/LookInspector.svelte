@@ -1,10 +1,11 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import type { DocVerdict, MotionDoc } from '@feega/motion-core/motion/doc';
   import { ENVIRONMENT, ENV_PRESETS, LIGHT, LIGHT_KINDS, LightKind, MAX_LIGHTS, type Light } from '@feega/motion-core/motion/look';
   import { removeLight, removeLook, setLight, setLook } from '$lib/motion/look-ops';
   import NumberField from './NumberField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
-  import { liveColour } from './live-colour';
   import { FieldFill, FieldKind } from '$lib/motion/number-field';
 
   let { doc, gesture = null, onchange }: { doc: MotionDoc; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -74,7 +75,7 @@
             <select value={light.kind} aria-label={`Kind of ${light.id}`} onchange={(e) => editLight(light, { kind: e.currentTarget.value as LightKind })}>
               {#each LIGHT_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
             </select>
-            <input type="color" value={light.color} aria-label={`Colour of ${light.id}`} use:liveColour={{ gesture, apply: (color) => editLight(light, { color }) }} />
+            <ColorField name={`Colour of ${light.id}`} display={ColourDisplay.Chip} value={light.color} {gesture} onchange={(color) => editLight(light, { color })} />
             <button type="button" class="link" onclick={() => commit(removeLight(doc, light.id), `Removed light ${light.id}`)}>Remove</button>
           </div>
           <div class="row">
@@ -166,12 +167,6 @@
     font: inherit;
   }
 
-  input[type='color'] {
-    width: 28px;
-    height: 24px;
-    padding: 0;
-    border: 1px solid var(--ui-line-strong);
-  }
 
   button {
     padding: 5px 10px;
