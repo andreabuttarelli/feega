@@ -1,6 +1,9 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { imageInFrame, withAssetSwapped } from './image-in-frame';
+import { framePicker, frameSpace } from './frame-pick';
 
 const EMPTY = newMotionDoc(MotionFormat.Landscape);
 const PICTURE = { assetId: 'asset-1', name: 'photo.png', width: 400, height: 300 };
@@ -35,5 +38,19 @@ describe('withAssetSwapped', () => {
 
     expect(swapped.assets.map((a) => a.id)).toEqual(['real-1']);
     expect(swapped.tracks.flatMap((t) => t.clips)[0].props.assetId).toBe('real-1');
+  });
+});
+
+describe('an image inserted in a frame', () => {
+  it('has a real outline on the stage, so it can be selected and dragged', () => {
+    const placed = imageInFrame(EMPTY, PICTURE);
+    if (!placed.ok) {
+      throw new Error(placed.error);
+    }
+    const picker = framePicker({ doc: placed.doc, tokens: FEEGA_TOKENS, assets: { 'asset-1': 'blob:https://app.test/1' } });
+    const stage = frameSpace({ x: 0, y: 0, w: EMPTY.width, h: EMPTY.height }, { width: EMPTY.width, height: EMPTY.height }, 0);
+
+    const corners = picker.outlineQuad(placed.clipId, stage)!.flatMap((p) => [p.x, p.y]);
+    expect(corners.every(Number.isFinite)).toBe(true);
   });
 });

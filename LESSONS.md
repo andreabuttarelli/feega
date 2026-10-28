@@ -3442,3 +3442,9 @@ Segnale: l'etichetta della modalità (Design/Motion) non cambia al clic e le mod
 
 ### 431 on localhost: cookies are shared across ports and per-ref names accumulate
 Segnale: `localhost:5173` risponde "431 Request Header Fields Too Large" nel profilo normale, non in incognito. Causa: `sb-<ref>-auth-token.N` ha un nome diverso per ogni progetto Supabase, e i cookie di `localhost` valgono per tutte le porte. Mossa: il server cancella i cookie di sessione di altri ref (`stale-session-cookies.ts`); per sbloccarsi a mano, cancella i cookie di localhost.
+
+### An element is drawn but cannot be selected or dragged
+Signal: the image shows in the frame, the inspector names it, yet no selection box appears and a drag moves whatever lies beneath. Cause: the clip was built with `newClip` without `defaultProps`, so compose writes `rotate(undefineddeg)` and the picker's quad is NaN. Move: log `picker.outlineQuad(clip)`; build clips with the component's defaults (`mediaElement` does now).
+
+### A double-click on a new text does nothing while the playhead is past 0
+Signal: outlined box, no caret; it works with the playhead at 0. Cause: the text started at the playhead and `Text` fades up, so at that frame it is transparent and `pickOwnersAt` skips it. Move: check the clip's `from` against the playhead before blaming the editor.

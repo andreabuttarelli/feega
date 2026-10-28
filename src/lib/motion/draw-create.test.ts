@@ -3,7 +3,8 @@ import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from
 import { setStill } from '@feega/motion-core/motion/still';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
-import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
+import { EditMode } from './edit-mode';
+import { CANVAS_INK, CanvasTheme, drawClip, drawStart, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
 import { parsePath, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
@@ -63,6 +64,15 @@ describe('creating an element by drawing inside a frame', () => {
     const onStill = findClip(ok(drawClip(doc, DrawTool.Rectangle, BOX, 40, 'r1')), 'r1')!.clip;
     expect(onStill.from).toBe(0);
     expect(onStill.durationInFrames).toBe(doc.durationInFrames);
+  });
+
+  it('in Design a new layer spans the whole video wherever the playhead is; in Motion it starts at the playhead', () => {
+    const designed = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, drawStart(EditMode.Design, 54), 'r1')), 'r1')!.clip;
+    expect(designed.from).toBe(0);
+    expect(designed.durationInFrames).toBe(300);
+
+    const animated = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, drawStart(EditMode.Motion, 54), 'r1')), 'r1')!.clip;
+    expect(animated.from).toBe(54);
   });
 
   it('the select and pen tools draw no box', () => {
