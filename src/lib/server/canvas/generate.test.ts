@@ -977,6 +977,24 @@ describe('un giro asincrono presso un fornitore ha il proprio tetto, non quello 
     expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
   });
 
+  it('un link di render mai aperto scade quando scade il link, e lo dice', async () => {
+    const link = { hash: 'h', expiresAt: new Date(Date.now() - 60_000).toISOString(), claim: null };
+    const renderRow = { ...runRow, external_job_id: 'browser-render:7', params: { kind: 'browser-render', link }, started_at: startedAgo(31 * 60_000) };
+    const { db, calls } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] }, { updateRows: { node_runs: [renderRow], nodes: [nodeRow] } });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 1 });
+    const runUpdate = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { status?: string })?.status === 'expired');
+    expect((runUpdate?.payload as { error?: string })?.error).toBe('render link was never opened');
+  });
+
+  it('un link di render aperto non scade alla scadenza del link', async () => {
+    const link = { hash: 'h', expiresAt: new Date(Date.now() - 60_000).toISOString(), claim: 'c' };
+    const renderRow = { ...runRow, external_job_id: 'browser-render:7', params: { kind: 'browser-render', link }, started_at: startedAgo(31 * 60_000) };
+    const { db } = fakeDb({ node_runs: [renderRow], nodes: [nodeRow] });
+
+    expect(await expireStuckRuns(db)).toMatchObject({ expired: 0 });
+  });
+
   it('un video generico in coda (non wiro/elevenlabs) sopravvive sotto i 20 minuti', async () => {
     const videoRow = { ...runRow, external_job_id: 'kling:job-1', started_at: startedAgo(15 * 60_000) };
     const { db, calls } = fakeDb({ node_runs: [videoRow], nodes: [nodeRow] });
