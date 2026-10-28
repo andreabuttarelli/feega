@@ -248,6 +248,13 @@ function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Place
   return placed.visibility === Visibility.MatteSource ? `<div class="matte-src" style="${css({ opacity: 0, pointerEvents: 'none' })}">${layer}</div>` : layer;
 }
 
+const NESTS_CHILDREN: ReadonlySet<ComponentId> = new Set(['Precomp']);
+
+function outsideGroup(chain: MotionClip[]): MotionClip[] {
+  const host = chain.findLastIndex((c) => NESTS_CHILDREN.has(c.component));
+  return chain.slice(host + 1);
+}
+
 type TrackStarts = ReadonlyMap<number, number>;
 type GroupSpec = {
   firstLayer: (clip: MotionClip, trackIndex: number, starts: TrackStarts) => number;
@@ -684,7 +691,7 @@ export function composeHtml(raw: ComposeInput): string {
       const group = GROUPS[clip.component];
       layer += 1;
       const study = clip.component === 'Shape' ? shapeStudy({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
-      const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id), extent: study?.extent ?? null, texts: drawnTexts(doc, clip) };
+      const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: outsideGroup(ancestorsOf(doc, clip.id).map((id) => byId.get(id)!)), held: held.has(clip.id), extent: study?.extent ?? null, texts: drawnTexts(doc, clip) };
       const filtered = THREE_D_COMPONENTS.includes(clip.component) ? withoutGrain(clip) : clip;
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(filtered, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
