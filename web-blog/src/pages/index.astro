@@ -1,0 +1,13 @@
+---
+import Base from '../layouts/Base.astro';
+import PostList from '../components/PostList.astro';
+import { postsNewestFirst } from '../site';
+
+const posts = await postsNewestFirst();
+---
+
+<Base>
+  <h1 class="page-title">Building Feega in public</h1>
+  <p class="lede">Notes on the canvas, the motion engine and the decisions behind them.</p>
+  <PostList posts={posts} />
+</Base>
