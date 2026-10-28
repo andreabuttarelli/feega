@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 
 use vello::wgpu;
@@ -22,6 +22,7 @@ use crate::Skipped;
 const CACHE_SIDE: u32 = 4096;
 const RASTERS_PER_DRAW: usize = 1;
 const ITEMS_PER_RASTER: usize = 48;
+const FRAMES_IN_FLIGHT: u32 = 1;
 
 #[wasm_bindgen]
 pub struct WebCore {
@@ -44,6 +45,7 @@ pub struct WebCore {
     spare: wgpu::Texture,
     reprojector: Reprojector,
     lost: Arc<AtomicBool>,
+    in_flight: Arc<AtomicU32>,
 }
 
 struct GpuPainter<'a> {
@@ -207,7 +209,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost })
+        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)) })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -246,6 +248,10 @@ impl WebCore {
 
     pub fn picture_bytes(&self) -> f64 {
         self.textures.values().map(|t| t.width() as f64 * t.height() as f64 * 4.0).sum()
+    }
+
+    pub fn busy(&self) -> bool {
+        self.in_flight.load(Ordering::Relaxed) >= FRAMES_IN_FLIGHT
     }
 
     pub fn lost(&self) -> bool {
@@ -295,6 +301,11 @@ impl WebCore {
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits: self.limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector };
         let frame = self.compositor.frame(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?;
         self.pending = frame.pending;
+        self.in_flight.fetch_add(1, Ordering::Relaxed);
+        let done = self.in_flight.clone();
+        self.queue.on_submitted_work_done(move || {
+            done.fetch_sub(1, Ordering::Relaxed);
+        });
         Ok(frame.report())
     }
 
