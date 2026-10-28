@@ -14,6 +14,7 @@ use crate::scene::{build, Placed};
 use crate::Skipped;
 
 const KEPT_LAYERS: usize = 32;
+const SPARE_TEXTURES: usize = 4;
 const KEPT_FRAMES: u64 = 240;
 const KEYED_POINTS_MAX: usize = 1000;
 const OFF_TARGET: Rect = Rect::new(-2.0, -2.0, -1.0, -1.0);
@@ -79,6 +80,10 @@ fn points(item: &Item) -> usize {
     own + covers.sum::<usize>()
 }
 
+fn reads_itself(list: &DisplayList, clip: &str) -> bool {
+    list.items.iter().any(|i| matches!(i, Item::Image(image) if image.clip == clip))
+}
+
 fn keyed(item: &Item) -> bool {
     plain_content(item) && points(item) <= KEYED_POINTS_MAX
 }
@@ -89,6 +94,7 @@ pub struct Engine {
     filters: FilterPasses,
     cache: LayerCache,
     held: HashMap<String, wgpu::Texture>,
+    spare: Vec<wgpu::Texture>,
 }
 
 pub type EngineError = vello::Error;
@@ -210,7 +216,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new() })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new() })
     }
 
     pub fn cached_layers(&self) -> usize {
@@ -232,7 +238,7 @@ impl Engine {
     }
 
     fn raster(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(ImageData, wgpu::Texture, Vec<Skipped>), EngineError> {
-        let texture = layer_texture(device, list.width, list.height);
+        let texture = self.reused(list.width, list.height).unwrap_or_else(|| layer_texture(device, list.width, list.height));
         let skipped = self.draw(device, queue, list, pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default()))?;
         Ok((self.vello.register_texture(texture.clone()), texture, skipped))
     }
@@ -241,11 +247,22 @@ impl Engine {
         self.held.get(clip)
     }
 
+    fn reused(&mut self, width: u32, height: u32) -> Option<wgpu::Texture> {
+        let at = self.spare.iter().position(|t| t.width() == width && t.height() == height)?;
+        Some(self.spare.swap_remove(at))
+    }
+
     fn release(&mut self, clip: &str, image: ImageData) {
         self.vello.unregister_texture(image);
-        if let Some(texture) = self.held.remove(clip) {
-            texture.destroy();
+        let Some(texture) = self.held.remove(clip) else { return };
+        self.spare.push(texture);
+        if self.spare.len() > SPARE_TEXTURES {
+            self.spare.remove(0).destroy();
         }
+    }
+
+    pub fn spare_bytes(&self) -> u64 {
+        self.spare.iter().map(|t| t.width() as u64 * t.height() as u64 * 4).sum()
     }
 
     pub fn hold(&mut self, held: &mut Pictures, plan: Plan, pictures: &Pictures, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(DisplayList, Vec<Skipped>), EngineError> {
@@ -256,6 +273,11 @@ impl Engine {
         }
         let mut skipped = plan.skipped;
         for raster in plan.rasters {
+            if !reads_itself(&raster.list, &raster.clip) {
+                if let Some(old) = held.remove(&raster.clip) {
+                    self.release(&raster.clip, old);
+                }
+            }
             let both: Pictures = pictures.iter().chain(held.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
             let (image, texture, missed) = self.raster(device, queue, &raster.list, &both)?;
             skipped.extend(missed);

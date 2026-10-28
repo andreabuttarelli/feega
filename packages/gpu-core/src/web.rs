@@ -12,7 +12,7 @@ use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, parse_splice};
 use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
-use crate::groups::{report, Library, Limits, Plan};
+use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Reprojector};
 use crate::retained::{Camera, Lookup, Quality};
@@ -23,6 +23,23 @@ const CACHE_SIDE: u32 = 4096;
 const RASTERS_PER_DRAW: usize = 1;
 const ITEMS_PER_RASTER: usize = 48;
 const FRAMES_IN_FLIGHT: u32 = 1;
+const GESTURE_RASTER_EVERY_MS: f64 = 80.0;
+
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum CoreMotion {
+    Still = 0,
+    Gesture = 1,
+}
+
+impl From<CoreMotion> for Motion {
+    fn from(m: CoreMotion) -> Motion {
+        match m {
+            CoreMotion::Still => Motion::Still,
+            CoreMotion::Gesture => Motion::Gesture,
+        }
+    }
+}
 
 #[wasm_bindgen]
 pub struct WebCore {
@@ -46,6 +63,9 @@ pub struct WebCore {
     reprojector: Reprojector,
     lost: Arc<AtomicBool>,
     in_flight: Arc<AtomicU32>,
+    scratch: Option<wgpu::Texture>,
+    motion: CoreMotion,
+    rastered_at: f64,
 }
 
 struct GpuPainter<'a> {
@@ -60,6 +80,14 @@ struct GpuPainter<'a> {
     retained: &'a mut wgpu::Texture,
     spare: &'a mut wgpu::Texture,
     reprojector: &'a mut Reprojector,
+    scratch: &'a mut Option<wgpu::Texture>,
+}
+
+fn scratch_of<'s>(device: &wgpu::Device, kept: &'s mut Option<wgpu::Texture>, (width, height): (u32, u32)) -> &'s wgpu::Texture {
+    if let Some(stale) = kept.take_if(|t| t.width() != width || t.height() != height) {
+        stale.destroy();
+    }
+    kept.get_or_insert_with(|| layer_texture(device, width, height))
 }
 
 fn held_texture(device: &wgpu::Device, (width, height): (u32, u32)) -> wgpu::Texture {
@@ -107,8 +135,9 @@ impl Painter for GpuPainter<'_> {
     fn paint(&mut self, plan: Plan, into: Rect, quality: Quality) -> Result<Vec<Skipped>, JsValue> {
         let (list, missing) = self.engine.hold(self.cached, plan, self.pictures, self.device, self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
-        let scratch = layer_texture(self.device, list.width.max(1), list.height.max(1));
-        let skipped = self.engine.draw(self.device, self.queue, &list, &pictures, &scratch.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let scratch = scratch_of(self.device, self.scratch, (list.width.max(1), list.height.max(1)));
+        let whole = wgpu::TextureViewDescriptor::default();
+        let skipped = self.engine.draw(self.device, self.queue, &list, &pictures, &scratch.create_view(&whole)).map_err(failed)?;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         match quality {
             Quality::Sharp => encoder.copy_texture_to_texture(texel(&scratch, 0, 0), texel(self.retained, into.x0 as u32, into.y0 as u32), wgpu::Extent3d { width: list.width, height: list.height, depth_or_array_layers: 1 }),
@@ -120,7 +149,6 @@ impl Painter for GpuPainter<'_> {
             }
         }
         self.queue.submit([encoder.finish()]);
-        scratch.destroy();
         Ok([skipped, missing].concat())
     }
 
@@ -209,7 +237,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)) })
+        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -302,9 +330,27 @@ impl WebCore {
         Ok(())
     }
 
+    pub fn set_motion(&mut self, motion: CoreMotion) {
+        self.motion = motion;
+        self.library.set_motion(motion.into());
+    }
+
+    pub fn set_budget(&mut self, bytes: f64) {
+        self.library.set_budget(bytes as u64);
+    }
+
+    fn frame_limits(&self, now_ms: f64) -> Limits {
+        let waiting = matches!(self.motion, CoreMotion::Gesture) && !self.library.is_building() && now_ms - self.rastered_at < GESTURE_RASTER_EVERY_MS;
+        Limits { rasters: if waiting { 0 } else { self.limits.rasters }, ..self.limits }
+    }
+
     pub fn frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
-        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits: self.limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector };
+        let limits = self.frame_limits(now_ms);
+        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
         let frame = self.compositor.frame(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?;
+        if frame.rastered > 0 {
+            self.rastered_at = now_ms;
+        }
         self.pending = frame.pending;
         self.in_flight.fetch_add(1, Ordering::Relaxed);
         let done = self.in_flight.clone();

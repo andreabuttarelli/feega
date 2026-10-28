@@ -12,8 +12,8 @@ const ZOOM_DELTA = 400;
 const MB = 1024 * 1024;
 
 function probe() {
-  type Probe = { live: Map<object, number>; liveBytes: number; peakBytes: number; inFlight: number; peakInFlight: number; submits: number; wasm: WebAssembly.Memory[] };
-  const p: Probe = { live: new Map(), liveBytes: 0, peakBytes: 0, inFlight: 0, peakInFlight: 0, submits: 0, wasm: [] };
+  type Probe = { live: Map<object, number>; liveBytes: number; peakBytes: number; inFlight: number; peakInFlight: number; submits: number; created: number; wasm: WebAssembly.Memory[] };
+  const p: Probe = { live: new Map(), liveBytes: 0, peakBytes: 0, inFlight: 0, peakInFlight: 0, submits: 0, created: 0, wasm: [] };
   (window as unknown as { __burst: Probe }).__burst = p;
 
   const streaming = WebAssembly.instantiateStreaming?.bind(WebAssembly);
@@ -35,6 +35,7 @@ function probe() {
     const s = Array.isArray(d.size) ? { width: d.size[0], height: d.size[1] ?? 1 } : { width: d.size.width, height: d.size.height ?? 1 };
     const bytes = s.width * s.height * (/32float/.test(d.format) ? 16 : /16float/.test(d.format) ? 8 : 4);
     p.live.set(t, bytes);
+    p.created++;
     p.liveBytes += bytes;
     p.peakBytes = Math.max(p.peakBytes, p.liveBytes);
     return t;
@@ -98,10 +99,11 @@ async function main() {
   await page.waitForSelector('[data-testid=core-canvas]', { state: 'attached', timeout: 60_000 }).catch(async (e) => { console.log(page.url()); await page.screenshot({ path: process.env.PERF_SHOT ?? 'burst-fail.png' }); throw e; });
   await page.waitForTimeout(SETTLE_MS);
   await page.evaluate(() => {
-    const p = (window as unknown as { __burst: { peakBytes: number; liveBytes: number; peakInFlight: number; submits: number } }).__burst;
+    const p = (window as unknown as { __burst: { peakBytes: number; liveBytes: number; peakInFlight: number; submits: number; created: number } }).__burst;
     p.peakBytes = p.liveBytes;
     p.peakInFlight = 0;
     p.submits = 0;
+    p.created = 0;
   });
   const settledAt = Date.now();
   for (let n = 0; n < BURSTS; n++) {
@@ -110,10 +112,11 @@ async function main() {
   const ms = Date.now() - settledAt;
   await page.waitForTimeout(3000);
   const r = await page.evaluate(() => {
-    const p = (window as unknown as { __burst: { liveBytes: number; peakBytes: number; peakInFlight: number; submits: number; wasm: WebAssembly.Memory[] } }).__burst;
-    return { liveBytes: p.liveBytes, peakBytes: p.peakBytes, peakInFlight: p.peakInFlight, submits: p.submits, wasm: p.wasm.reduce((a, m) => a + m.buffer.byteLength, 0) };
+    const p = (window as unknown as { __burst: { liveBytes: number; peakBytes: number; peakInFlight: number; submits: number; created: number; wasm: WebAssembly.Memory[] } }).__burst;
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-testid=core-canvas]');
+    return { liveBytes: p.liveBytes, peakBytes: p.peakBytes, peakInFlight: p.peakInFlight, submits: p.submits, created: p.created, buffer: `${canvas?.width}x${canvas?.height}`, wasm: p.wasm.reduce((a, m) => a + m.buffer.byteLength, 0) };
   });
-  console.log(JSON.stringify({ base: BASE, crashed, ms, peakTextureMb: +(r.peakBytes / MB).toFixed(1), afterTextureMb: +(r.liveBytes / MB).toFixed(1), peakSubmitsInFlight: r.peakInFlight, submits: r.submits, wasmMb: +(r.wasm / MB).toFixed(1) }));
+  console.log(JSON.stringify({ base: BASE, crashed, ms, peakTextureMb: +(r.peakBytes / MB).toFixed(1), afterTextureMb: +(r.liveBytes / MB).toFixed(1), peakSubmitsInFlight: r.peakInFlight, submits: r.submits, texturesCreated: r.created, drawingBuffer: r.buffer, wasmMb: +(r.wasm / MB).toFixed(1) }));
   await browser.close();
 }
 

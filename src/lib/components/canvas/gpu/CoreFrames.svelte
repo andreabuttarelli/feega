@@ -3,7 +3,7 @@
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
-  import { createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { CoreMotion, createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
   import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
@@ -32,6 +32,7 @@
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
+  import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -55,6 +56,8 @@
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.scenes ? `:${f.scenes}` : ''}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
+  const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution, width: Math.round(area.width * resolution), height: Math.round(area.height * resolution) });
+  const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
 
   let readsHost = $state<HTMLDivElement | null>(null);
   const READ_LANES = 2;
@@ -316,6 +319,7 @@
         putting.clear();
         sent = new SentUses();
         sentOverlay = new SentParts();
+        r.setBudget?.(budget.textureBytes);
         raster = r;
       },
       (e: unknown) => {
@@ -452,7 +456,7 @@
     const world = { x: (pointer.x - view.x) / view.zoom, y: (pointer.y - view.y) / view.zoom };
     const under = [...placeholders.values()].reverse().find((p) => world.x >= p.box.x && world.x <= p.box.x + p.box.w && world.y >= p.box.y && world.y <= p.box.y + p.box.h);
     const facts = under ? debugFacts.find((f) => f.id === under.id) : null;
-    return `${header}\n${facts ? describe(facts) : 'no node under cursor'}`;
+    return `${hudLine(crashes.sample)}\n${header}\n${facts ? describe(facts) : 'no node under cursor'}`;
   }
 
   $effect(() => {
@@ -527,13 +531,15 @@
     for (const part of quiet ? sentOverlay.changed(overlay) : []) {
       into.setOverlay(part, overlay[part]);
     }
+    into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
     into.setCamera(at.x, at.y, at.zoom);
     const { outcome, pending, skipped } = into.frame(performance.now());
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
+    crashes.tick({ x: view.x, y: view.y, zoom: view.zoom, now: performance.now(), motion: gesture.active() ? Motion.Moving : Motion.Still, rastered: RASTERED.has(outcome) }, { cacheBytes, pictureBytes: into.pictureBytes() });
     if (DEBUG) {
-      (window as Window & { __gpuMem?: object }).__gpuMem = { cacheBytes, pictureBytes: into.pictureBytes(), put: put.size, pictured: pictured.size, resolution };
+      (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
     return pending || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
@@ -588,6 +594,7 @@
   });
 
   $effect(() => () => media.dispose());
+  $effect(() => () => crashes.stop());
 
 </script>
 
