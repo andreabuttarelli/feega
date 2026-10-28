@@ -30,8 +30,16 @@ The first run builds the app, which takes a few minutes.
 
 ## With an agent
 
-The [CLI](/integrations/cli/) and the [MCP server](/integrations/mcp/) find the local server on
-port 5173 and need no `feega login`. What an agent adds or changes appears live in your browser.
+Connect an agent with the local MCP server, which needs no `feega login`. The remote server
+(`mcp.feega.app`) does not see a local canvas. Use the port `npx feega` printed:
+
+```sh
+claude mcp add feega-local -- npx -y feega mcp --port <port>
+```
+
+**Connect** next to the project name shows this and the Codex, Cursor and Claude Desktop configs
+with the port filled in; all of them are in [Local MCP](/integrations/mcp/#local-mcp). What an
+agent adds or changes appears live in your browser.
 `canvas_file` with `action: "save"` writes a copy of the file wherever you ask.
 
 ## AI generation with your own keys

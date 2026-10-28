@@ -9,6 +9,7 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from './CanvasMenu.svelte';
   import CanvasShare from './CanvasShare.svelte';
+  import CanvasConnect from './CanvasConnect.svelte';
   import ConnectionDot from './ConnectionDot.svelte';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
@@ -328,6 +329,7 @@
     </DropdownMenu.Root>
     {/if}
     </div>
+    <CanvasConnect />
   </div>
 
   {#snippet projectRow(project: ProjectRow)}

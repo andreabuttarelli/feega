@@ -4,7 +4,26 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createServer } from 'node:net';
-import { appDir, boundUrl, freePort, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from './launcher.mjs';
+import { appDir, boundUrl, freePort, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion } from './launcher.mjs';
+
+describe('mcp', () => {
+  it('mcp avvia il server MCP sulla porta 5173 di default', () => {
+    expect(parseArgs(['mcp'], '/')).toEqual({ command: 'mcp', port: 5173 });
+  });
+
+  it('mcp --port punta a un altro server locale', () => {
+    expect(parseArgs(['mcp', '--port', '61234'], '/').port).toBe(61234);
+    expect(parseArgs(['mcp', '--port=8080'], '/').port).toBe(8080);
+  });
+
+  it('mcp rifiuta opzioni che non conosce', () => {
+    expect(() => parseArgs(['mcp', '--no-open'], '/')).toThrow(/unknown option/);
+  });
+
+  it('il server MCP parla con il server locale sul loopback', () => {
+    expect(mcpEnv(61234, { HOME: '/h' })).toEqual({ HOME: '/h', PUBLIC_APP_URL: 'http://127.0.0.1:61234' });
+  });
+});
 
 describe('parseArgs', () => {
   it('risolve il file contro la cartella di chi lancia, non quella del pacchetto', () => {

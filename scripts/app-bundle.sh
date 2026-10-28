@@ -14,6 +14,9 @@ mkdir -p "$STAGE/scripts" "$STAGE/src/lib"
 cp -R "$ROOT/build" "$STAGE/build"
 cp "$ROOT/scripts/local.mjs" "$ROOT/scripts/node-server.mjs" "$STAGE/scripts/"
 cp "$ROOT/src/lib/local-ai-keys.js" "$STAGE/src/lib/"
+(cd "$ROOT" && npx esbuild cli/mcp/stdio.ts --bundle --platform=node --target=node22 --format=esm \
+  --external:open --log-level=error --outfile="$STAGE/mcp.mjs" \
+  --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);")
 node -e '
   const p = require(process.argv[1]);
   const out = { name: "feega-app", private: true, type: p.type, dependencies: p.dependencies, overrides: p.overrides };
