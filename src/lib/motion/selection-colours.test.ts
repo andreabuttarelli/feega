@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameColours, isBrandToken, recolour, recolourFrame, selectionColours } from './selection-colours';
+import { documentColours, frameColours, isBrandToken, recolour, recolourFrame, selectionColours } from './selection-colours';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { precompose } from '@feega/motion-core/motion/precomp';
@@ -57,6 +57,12 @@ describe('selection colours', () => {
     const next = ok(recolour(d, ['k'], '#ff0000', '#0000ff'));
 
     expect(findClip(next, 'k')!.clip.props.color).toBe('brand.text');
+  });
+
+  it('lists the solid colours of the whole document, most used first, without alpha or tokens', () => {
+    const d = ok(addClip(doc(), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', fills: [{ type: 'solid', color: '#FF000080' }] } }, 'u'));
+
+    expect(documentColours(d)).toEqual(['#ff0000', '#000000', '#00ff00']);
   });
 });
 

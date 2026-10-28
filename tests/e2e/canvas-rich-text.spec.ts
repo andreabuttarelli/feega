@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { setColour } from './fixtures/colour';
 
 const SHOTS = process.env.FIG_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2500;
@@ -46,7 +47,7 @@ test.describe('rich text in a canvas frame @real', () => {
     }
     await page.keyboard.press('ControlOrMeta+b');
     await expect(page.getByTestId('text-range-bar')).toBeVisible();
-    await page.getByTestId('text-range-colour').fill('#ff0000');
+    await setColour(page, page.getByTestId('text-range-colour'), '#ff0000');
     await page.screenshot({ path: `${SHOTS}/figD-rich-text-1-editing.png` });
 
     await field.press('Escape');

@@ -1,4 +1,4 @@
-import { clipsOf, compsOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { clipsOf, compsOf, everyClip, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { BRAND_COLORS } from '@feega/motion-core/motion/components';
 import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
@@ -93,3 +93,17 @@ const topIds = (doc: MotionDoc) => clipsOf(doc).map((clip) => clip.id);
 export const frameColours = (doc: MotionDoc) => selectionColours(doc, topIds(doc));
 
 export const recolourFrame = (doc: MotionDoc, from: string, to: string) => recolour(doc, topIds(doc), from, to);
+
+const DOCUMENT_COLOURS_MAX = 16;
+const BASE_LENGTH = 7;
+
+export function documentColours(doc: MotionDoc): string[] {
+  const uses = new Map<string, number>();
+  for (const clip of everyClip(doc)) {
+    for (const colour of coloursIn(clip.props, []).filter((c) => !TOKENS.has(c))) {
+      const base = colour.slice(0, BASE_LENGTH);
+      uses.set(base, (uses.get(base) ?? 0) + 1);
+    }
+  }
+  return [...uses].sort((a, b) => b[1] - a[1]).slice(0, DOCUMENT_COLOURS_MAX).map(([colour]) => colour);
+}

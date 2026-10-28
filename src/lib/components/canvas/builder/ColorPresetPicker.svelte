@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from '$lib/components/motion/ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import type { ColorPreset } from '$lib/canvas/influencer-builder-options';
 
   let {
@@ -23,13 +25,7 @@
       onclick={() => onChange(value === preset.color ? null : preset.color)}
     ></button>
   {/each}
-  <input
-    type="color"
-    value={value || '#000000'}
-    oninput={(e) => onChange(e.currentTarget.value)}
-    class="custom"
-    title="Custom color"
-  />
+  <ColorField name="Custom colour" display={ColourDisplay.Chip} value={value || '#000000'} onchange={(v) => onChange(v)} />
 </div>
 
 <style>
@@ -49,14 +45,5 @@
   }
   .dot.active {
     border-color: var(--accent, #7c5cff);
-  }
-  .custom {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border-radius: 0;
-    border: 2px solid var(--line-2, #d2d2d7);
-    background: none;
-    cursor: pointer;
   }
 </style>

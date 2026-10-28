@@ -1,5 +1,6 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
+import { setColour } from './fixtures/colour';
 
 const SETTLE_MS = 2500;
 const SAVED_MS = 25_000;
@@ -86,7 +87,7 @@ test.describe('sections @real', () => {
     await page.mouse.click(box.x + box.width * 0.5, box.y + box.height - 12);
     await page.getByLabel('Section title').fill('Launch');
     await page.getByLabel('Section title').press('Tab');
-    await page.getByLabel('Section fill').fill('#ffe0b2');
+    await setColour(page, page.getByRole('group', { name: 'Section fill' }), '#ffe0b2');
 
     await expect.poll(async () => ((await rows(admin, session.canvasId)).find((n) => n.id === section.id)!.data as { title?: string; fill?: string }), { timeout: SAVED_MS }).toMatchObject({ title: 'Launch', fill: '#ffe0b2' });
     await page.waitForTimeout(SETTLE_MS);

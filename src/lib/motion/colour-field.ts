@@ -91,13 +91,19 @@ export function remember(recent: readonly string[], hex: string, store: LayoutSt
   return next;
 }
 
+export enum ColourDisplay {
+  Field = 'field',
+  Chip = 'chip'
+}
+
 export enum ColourFormat {
   Hex = 'hex',
   Rgb = 'rgb',
-  Hsl = 'hsl'
+  Hsl = 'hsl',
+  Hsb = 'hsb'
 }
 
-export const COLOUR_FORMATS: readonly ColourFormat[] = [ColourFormat.Hex, ColourFormat.Rgb, ColourFormat.Hsl];
+export const COLOUR_FORMATS: readonly ColourFormat[] = [ColourFormat.Hex, ColourFormat.Rgb, ColourFormat.Hsl, ColourFormat.Hsb];
 
 export type Channels = (number | string)[];
 
@@ -145,10 +151,46 @@ function rgbFromHsl(h: number, s: number, l: number): Rgb {
   return sectors[Math.floor(hh) % 6].map((v) => (v + m) * BYTE) as Rgb;
 }
 
+export type Hsb = { h: number; s: number; b: number };
+
+export function hsbOfHex(hex: string): Hsb {
+  const [r, g, b] = rgbOf(hex).map((c) => c / BYTE);
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (d === 0) {
+    return { h: 0, s: 0, b: max * HUNDRED };
+  }
+  const h = (hueOf(r, g, b, max, d) * SIXTH + TURN) % TURN;
+  return { h, s: (d / max) * HUNDRED, b: max * HUNDRED };
+}
+
+export function hexOfHsb({ h, s, b }: Hsb): string {
+  const v = clamp(b, HUNDRED) / HUNDRED;
+  const l = v * (1 - clamp(s, HUNDRED) / HUNDRED / 2);
+  const sl = l === 0 || l === 1 ? 0 : (v - l) / Math.min(l, 1 - l);
+  return hexOf(rgbFromHsl(h, sl * HUNDRED, l * HUNDRED));
+}
+
+export function unitAt(offset: number, size: number): number {
+  return size > 0 ? Math.min(1, Math.max(0, offset / size)) : 0;
+}
+
+export const percentOfAlpha = (alpha: number) => Math.round(alpha * HUNDRED);
+
+export function alphaOfText(text: string): number | null {
+  const n = Number(text.replace('%', ''));
+  return text.trim() === '' || !Number.isFinite(n) ? null : clamp(n, HUNDRED) / HUNDRED;
+}
+
+export const snap = (value: number, step: number) => Math.round(value / step) * step;
+
+export const nudge = (value: number, delta: number, max: number) => clamp(value + delta, max);
+
 const TO_CHANNELS: Record<ColourFormat, (hex: string) => Channels> = {
   [ColourFormat.Hex]: (hex) => [hex.slice(1).toUpperCase()],
   [ColourFormat.Rgb]: (hex) => rgbOf(hex),
-  [ColourFormat.Hsl]: (hex) => hslOf(rgbOf(hex))
+  [ColourFormat.Hsl]: (hex) => hslOf(rgbOf(hex)),
+  [ColourFormat.Hsb]: (hex) => Object.values(hsbOfHex(hex)).map(Math.round)
 };
 
 function hexChannel(c: Channels): string | null {
@@ -159,7 +201,8 @@ function hexChannel(c: Channels): string | null {
 const FROM_CHANNELS: Record<ColourFormat, (c: Channels) => string | null> = {
   [ColourFormat.Hex]: hexChannel,
   [ColourFormat.Rgb]: (c) => hexOf(c.map(Number) as Rgb),
-  [ColourFormat.Hsl]: (c) => hexOf(rgbFromHsl(Number(c[0]), Number(c[1]), Number(c[2])))
+  [ColourFormat.Hsl]: (c) => hexOf(rgbFromHsl(Number(c[0]), Number(c[1]), Number(c[2]))),
+  [ColourFormat.Hsb]: (c) => hexOfHsb({ h: Number(c[0]), s: Number(c[1]), b: Number(c[2]) })
 };
 
 export const channelsOf = (hex: string, format: ColourFormat): Channels => TO_CHANNELS[format](hex);

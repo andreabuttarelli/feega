@@ -72,7 +72,7 @@
   data-testid="side-popover"
   data-anchor={key}
   data-mode={place?.mode ?? SideMode.Side}
-  class={cn('fixed z-[60] flex flex-col overflow-auto border border-ui-divider bg-ui-panel shadow-ui-float', place?.mode === SideMode.Sheet ? 'inset-x-0 bottom-0 max-h-[70vh] rounded-t-lg' : 'max-h-[calc(100vh-16px)] rounded-md')}
+  class={cn('fixed z-[62] flex flex-col overflow-auto border border-ui-divider bg-ui-panel shadow-ui-float', place?.mode === SideMode.Sheet ? 'inset-x-0 bottom-0 max-h-[70vh] rounded-t-lg' : 'max-h-[calc(100vh-16px)] rounded-md')}
   {style}
 >
   <div class="flex h-(--ui-row) shrink-0 items-center gap-2 border-b border-ui-divider px-2">

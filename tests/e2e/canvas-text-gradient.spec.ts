@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { setColour } from './fixtures/colour';
 
 const SHOTS = process.env.FIG_SHOTS ?? `${homedir()}/Documents/feega-videos/e2e`;
 const SETTLE_MS = 2500;
@@ -23,9 +24,9 @@ const doc = {
 };
 
 async function paintStops(page: Page) {
-  const stops = page.getByTestId('range-gradient-stop').locator('input[type="color"]');
-  await stops.nth(0).fill(STOP_FROM);
-  await stops.nth(1).fill(STOP_TO);
+  const stops = page.getByTestId('range-gradient-stop');
+  await setColour(page, stops.nth(0), STOP_FROM);
+  await setColour(page, stops.nth(1), STOP_TO);
 }
 
 type Run = { start: number; end: number; fill?: { type: string; stops: unknown[] } };

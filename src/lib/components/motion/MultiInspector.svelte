@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import Layers from '@lucide/svelte/icons/layers';
   import type { Bounds } from '$lib/motion/scene-select';
   import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -18,7 +20,7 @@
   import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { placeBox, setPropAcross, sharedConstraint, sharedFields, type BoxPatch } from '$lib/motion/selection-props';
-  import { isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
+  import { documentColours, isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
   import { BRAND_COLORS, Control } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import NumberField from './NumberField.svelte';
@@ -173,7 +175,7 @@
           {:else if f.control === Control.Color}
             <label class="line" data-prop={f.key}>
               <span>{f.label}</span>
-              <input type="color" aria-label={f.label} value={colourShown(value)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
+              <ColorField name={f.label} display={ColourDisplay.Chip} value={colourShown(value)} palette={() => documentColours(doc)} onchange={(v) => setStyle(f.key, v)} />
               {#if value === MIXED}<em class="mixed">Mixed</em>{/if}
             </label>
           {:else if f.control === Control.Select}
@@ -210,7 +212,7 @@
                 {#each BRAND_COLORS as token (token)}<option value={token}>{token}</option>{/each}
               </select>
             {:else}
-              <input type="color" aria-label={`Replace ${colour}`} value={colour.slice(0, 7)} onchange={(e) => swapColour(colour, e.currentTarget.value)} />
+              <ColorField name={`Replace ${colour}`} display={ColourDisplay.Chip} value={colour.slice(0, 7)} palette={() => documentColours(doc)} onchange={(v) => swapColour(colour, v)} />
             {/if}
           </label>
         {/each}

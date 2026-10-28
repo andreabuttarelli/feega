@@ -51,7 +51,6 @@ const EDITOR_OPEN_MS = 18_000;
 const EDITOR_STEPS = /timeline scrub|playback|properties sheet|typing in place|colour drag|editor close/;
 const TYPED = 'Fluid';
 const STILL_MODE = 'still';
-const COLOURS = ['#e11d48', '#16a34a', '#2563eb', '#f59e0b', '#9333ea', '#0ea5e9'];
 const KB_PER_MB = 1024;
 const WEBKIT_PROCESS = /WebKit\.(WebContent|GPU)/;
 const NODE = '.svelte-flow__node[data-id]';
@@ -245,7 +244,7 @@ const STEPS: Step[] = [
   { name: 'playback', still: Applies.Animated, drive: async (page) => { await page.keyboard.press('Space'); await page.waitForTimeout(PLAY_MS); await page.keyboard.press('Space'); } },
   { name: 'properties sheet', drive: openProperties },
   { name: 'typing in place', drive: async (page) => { const field = page.getByTestId('motion-inspector').locator('input[type="text"]:visible').first(); const was = await field.inputValue(); await field.tap(); await field.press('End'); await page.keyboard.type(TYPED, { delay: 60 }); await field.fill(was); await field.press('Enter'); } },
-  { name: 'colour drag', drive: async (page) => { await page.getByTestId('motion-inspector').getByTestId('fill-label').first().tap(); await page.getByTestId('fill-editor').locator('.colour .chip').first().tap(); const wheel = page.getByTestId('colour-popover').locator('input[type=color]'); const was = await wheel.inputValue(); for (const hex of [...COLOURS, was]) { await wheel.evaluate((el: HTMLInputElement, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, hex); await page.waitForTimeout(50); } await wheel.evaluate((el: HTMLInputElement) => el.dispatchEvent(new Event('change', { bubbles: true }))); await page.keyboard.press('Escape'); } },
+  { name: 'colour drag', drive: async (page) => { await page.getByTestId('motion-inspector').getByTestId('fill-label').first().tap(); const square = page.getByTestId('fill-editor').getByTestId('colour-square'); const box = (await square.boundingBox())!; await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.5); await page.mouse.down(); for (const along of [0.3, 0.4, 0.5, 0.6, 0.7]) { await page.mouse.move(box.x + box.width * along, box.y + box.height * 0.5, { steps: 3 }); await page.waitForTimeout(50); } await page.mouse.up(); await page.keyboard.press('Escape'); } },
   { name: 'editor close', drive: async (page) => { for (let i = 0; i < 3 && (await page.getByTestId('motion-editor').count()); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); } await expect(page.getByTestId('motion-editor')).toHaveCount(0); } }
 ];
 

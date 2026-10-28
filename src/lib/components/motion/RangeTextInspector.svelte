@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorField from './ColorField.svelte';
+  import { ColourDisplay } from '$lib/motion/colour-field';
   import FontPicker from './FontPicker.svelte';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { BrandTokens } from '@feega/motion-core/motion/brand';
@@ -120,7 +122,7 @@
     {#if paint !== RunPaint.Gradient}
       <label class="row">
         <span>Colour</span>
-        <input type="color" data-testid="range-color" value={colourOf(values.color)} onchange={(e) => set({ color: e.currentTarget.value, fill: null })} />
+        <ColorField name="Colour" display={ColourDisplay.Chip} value={colourOf(values.color)} onchange={(v) => set({ color: v, fill: null })} />
         {#if values.color === MIXED}<span class="mixed">{MIXED_LABEL}</span>{/if}
       </label>
     {:else if gradient}
@@ -132,7 +134,7 @@
       {/if}
       {#each gradient.stops as stop, i (i)}
         <div class="row stop" data-testid="range-gradient-stop">
-          <input type="color" value={colourOf(stop.color)} onchange={(e) => patchStop(i, { color: e.currentTarget.value })} />
+          <ColorField name={`Stop ${i + 1} colour`} display={ColourDisplay.Chip} value={colourOf(stop.color)} onchange={(v) => patchStop(i, { color: v })} />
           <input type="number" min="0" max="100" step="1" value={Math.round(stop.pos * PERCENT)} onchange={(e) => setStopPos(i, e.currentTarget.value)} />
           <button type="button" title="Remove stop" disabled={gradient.stops.length <= 2} onclick={() => patchGradient({ stops: removeStop(gradient.stops, i) })}>×</button>
         </div>
@@ -197,10 +199,6 @@
     font: inherit;
   }
 
-  input[type='color'] {
-    padding: 0;
-    height: 24px;
-  }
 
   .stop {
     grid-template-columns: 1fr 2fr auto;
