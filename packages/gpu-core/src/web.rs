@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Reprojector};
 use crate::retained::{Camera, Lookup, Quality};
-use crate::world::{parse_overlay, parse_patch};
+use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::Skipped;
 
 const CACHE_SIDE: u32 = 4096;
@@ -293,7 +293,12 @@ impl WebCore {
     }
 
     pub fn set_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
-        self.compositor.set_overlay(parse_overlay(items_json).map_err(failed)?, &mut self.library);
+        self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(items_json).map_err(failed)?, &mut self.library);
+        Ok(())
+    }
+
+    pub fn set_live_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Live, parse_overlay(items_json).map_err(failed)?, &mut self.library);
         Ok(())
     }
 

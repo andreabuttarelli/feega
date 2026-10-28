@@ -3,7 +3,7 @@ use vello::kurbo::{Affine as Matrix, Rect};
 use crate::display_list::Item;
 use crate::groups::{Library, Limits, Plan};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
-use crate::world::{Patch, World, OVERLAY_GROUP};
+use crate::world::{OverlayPart, Patch, World};
 use crate::Skipped;
 
 const ROUGH_SCALE: f64 = 0.5;
@@ -62,16 +62,16 @@ impl Compositor {
         self.world.patch(patch, |g| library.size_of(g));
     }
 
-    pub fn set_overlay(&mut self, items: Vec<Item>, library: &mut Library) {
-        self.world.set_overlay(items);
-        match self.world.overlay_group() {
+    pub fn set_overlay(&mut self, part: OverlayPart, items: Vec<Item>, library: &mut Library) {
+        self.world.set_overlay(part, items);
+        match self.world.overlay_group(part) {
             Some((list, placement)) => {
-                library.put_group(OVERLAY_GROUP, &list);
-                self.world.place_overlay(Some(placement));
+                library.put_group(part.group(), &list);
+                self.world.place_overlay(part, Some(placement));
             }
             None => {
-                library.drop_group(OVERLAY_GROUP);
-                self.world.place_overlay(None);
+                library.drop_group(part.group());
+                self.world.place_overlay(part, None);
             }
         }
     }
