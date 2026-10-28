@@ -580,7 +580,7 @@
     }
   });
 
-  const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
+  const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
   $effect(() => {
     void [raster, held, edited, overlay, view.x, view.y, view.zoom, area.width, area.height];
