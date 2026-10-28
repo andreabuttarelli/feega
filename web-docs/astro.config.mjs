@@ -17,6 +17,7 @@ export default defineConfig({
         { label: 'Getting started', autogenerate: { directory: 'getting-started' } },
         { label: 'Canvas', autogenerate: { directory: 'canvas' } },
         { label: 'Motion', autogenerate: { directory: 'motion' } },
+        { label: 'Audio', autogenerate: { directory: 'audio' } },
         { label: 'AI', autogenerate: { directory: 'ai' } },
         { label: 'Integrations', autogenerate: { directory: 'integrations' } },
         { label: 'Reference', autogenerate: { directory: 'reference' } },
