@@ -1,4 +1,4 @@
-import type { MotionClip, MotionDoc, MotionTrack } from '../doc';
+import type { MotionClip, MotionComp, MotionDoc, MotionTrack } from '../doc';
 import type { Box } from '../layout';
 import { pivotBox, type Size } from '../parent';
 import type { ShapeKind } from '../shape/schema';
@@ -68,7 +68,7 @@ function intrinsic(clip: MotionClip, size: Size, content: Content): Size {
 
 function reflowsText(clip: MotionClip): boolean {
   const item = clip.layoutItem ?? DEFAULT_LAYOUT_ITEM;
-  return isText(clip.component) && item.width !== Sizing.Hug && item.height === Sizing.Hug;
+  return isText(clip.component) && item.height === Sizing.Hug;
 }
 
 const NO_INSET: Padding = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -107,16 +107,18 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, cont
   }
   const { order: _order, firstOnTop: _firstOnTop, strokesIncluded, ...rest } = clip.autoLayout;
   const flow = strokesIncluded ? { ...rest, padding: withInset(rest.padding, strokeInset(clip, size)) } : rest;
-  return { ...base, flow, children: childrenInOrder(clips, clip).map((c) => itemOf(c, clips, size, content)) };
+  return { ...base, flow, children: childrenInOrder(clips, clip).filter((c) => !c.hidden).map((c) => itemOf(c, clips, size, content)) };
 }
 
 function isRoot(clip: MotionClip, byId: Clips): boolean {
   return isContainer(clip) && (!isContainer(byId.get(clip.parent ?? '')) || !!clip.layoutItem?.absolute);
 }
 
+const WRAP_TOLERANCE = 0.5;
+
 const ONE_LINE_WHEN_HUGGED: Partial<Record<MotionClip['component'], Record<string, unknown>>> = { Text: { sizing: 'auto' } };
 
-const huggedText = (clip: MotionClip) => ((clip.layoutItem ?? DEFAULT_LAYOUT_ITEM).width === Sizing.Hug ? (ONE_LINE_WHEN_HUGGED[clip.component] ?? {}) : {});
+const huggedText = (clip: MotionClip, box: Box, natural: number) => ((clip.layoutItem ?? DEFAULT_LAYOUT_ITEM).width === Sizing.Hug && box.width >= natural - WRAP_TOLERANCE ? (ONE_LINE_WHEN_HUGGED[clip.component] ?? {}) : {});
 
 const placedProps = (box: Box, size: Size) => ({
   x: (box.left + box.width / 2) / size.width,
@@ -125,19 +127,23 @@ const placedProps = (box: Box, size: Size) => ({
   height: box.height / size.height
 });
 
-function laidOut(tracks: MotionTrack[], size: Size, content: Content = NO_CONTENT): MotionTrack[] {
-  const clips = visualClips(tracks);
+function boxesOf(clips: readonly MotionClip[], size: Size, content: Content): Map<string, Box> {
   const byId: Clips = new Map(clips.map((c) => [c.id, c]));
-  const roots = clips.filter((c) => isRoot(c, byId));
-  if (!roots.length) {
-    return tracks;
-  }
-
   const boxes = new Map<string, Box>();
-  for (const root of roots) {
+  for (const root of clips.filter((c) => isRoot(c, byId))) {
     const { left, top } = pivotBox(root.props, size);
     layoutTree(itemOf(root, clips, size, content), { left, top }).forEach((box, id) => boxes.set(id, box));
   }
+  return boxes;
+}
+
+function laidOut(tracks: MotionTrack[], size: Size, content: Content = NO_CONTENT): MotionTrack[] {
+  const clips = visualClips(tracks);
+  const boxes = boxesOf(clips, size, content);
+  if (!boxes.size) {
+    return tracks;
+  }
+
   const place = (clip: MotionClip): MotionClip => {
     const box = boxes.get(clip.id);
     if (!box) {
@@ -147,10 +153,12 @@ function laidOut(tracks: MotionTrack[], size: Size, content: Content = NO_CONTEN
     if (shown) {
       return { ...clip, transform: { ...clip.transform, x: (box.left - shown.left) / size.width, y: (box.top - shown.top) / size.height } };
     }
-    return { ...clip, props: { ...clip.props, ...huggedText(clip), ...placedProps(box, size) } };
+    return { ...clip, props: { ...clip.props, ...huggedText(clip, box, intrinsic(clip, size, content).width), ...placedProps(box, size) } };
   };
   return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(place) }));
 }
+
+const laidComps = (doc: MotionDoc, size: Size): MotionDoc['comps'] => Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: laidOut(comp.tracks, comp.frame ?? size, instanceContent(doc, comp.frame ?? size)) }]));
 
 export function withAutoLayout(doc: MotionDoc): MotionDoc {
   const all = [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)];
@@ -158,6 +166,81 @@ export function withAutoLayout(doc: MotionDoc): MotionDoc {
     return doc;
   }
   const size = { width: doc.width, height: doc.height };
-  const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: laidOut(comp.tracks, comp.frame ?? size, instanceContent(doc, comp.frame ?? size)) }]));
+  const comps = laidComps(doc, size);
   return { ...doc, tracks: laidOut(doc.tracks, size, instanceContent({ ...doc, comps }, size)), comps };
+}
+
+const RESIZE_TOLERANCE = 0.5;
+const WIDTH_VARIANT = '@w';
+
+function widened(comp: MotionComp, width: number, space: Size): MotionComp | null {
+  const tops = visualClips(comp.tracks).filter((c) => !c.parent && !c.hidden);
+  const root = tops.length === 1 && isContainer(tops[0]) ? tops[0] : null;
+  if (!root) {
+    return null;
+  }
+  const item = { ...(root.layoutItem ?? DEFAULT_LAYOUT_ITEM), width: Sizing.Fixed };
+  const resized = (c: MotionClip): MotionClip => (c.id === root.id ? { ...c, layoutItem: item, props: { ...c.props, width: width / space.width } } : c);
+  return { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(resized) })) as MotionTrack[] };
+}
+
+export function withFittedInstances(doc: MotionDoc): MotionDoc {
+  const size = { width: doc.width, height: doc.height };
+  const content = instanceContent({ ...doc, comps: laidComps(doc, size) }, size);
+  const boxes = boxesOf(visualClips(doc.tracks), size, content);
+  const variants: MotionDoc['comps'] = {};
+
+  const fitted = (clip: MotionClip): MotionClip => {
+    const box = boxes.get(clip.id);
+    const shown = content(clip);
+    if (!box || !shown || Math.abs(box.width - shown.width) < RESIZE_TOLERANCE) {
+      return clip;
+    }
+    const source = String(clip.props.comp);
+    const id = `${source}${WIDTH_VARIANT}${Math.round(box.width)}`;
+    const variant = variants[id] ?? widened(doc.comps[source], box.width, doc.comps[source].frame ?? size);
+    if (!variant) {
+      return clip;
+    }
+    variants[id] = variant;
+    return { ...clip, props: { ...clip.props, comp: id } };
+  };
+
+  const tracks = doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(fitted) })) as MotionTrack[];
+  return Object.keys(variants).length ? { ...doc, tracks, comps: { ...doc.comps, ...variants } } : doc;
+}
+
+function contentBottom(doc: MotionDoc): number {
+  const size = { width: doc.width, height: doc.height };
+  const roots = visualClips(withAutoLayout(doc).tracks).filter((c) => !c.parent && isContainer(c) && !c.hidden && (c.layoutItem ?? DEFAULT_LAYOUT_ITEM).height === Sizing.Hug);
+  const box = boundsOf(roots.map((c) => pivotBox(c.props, size)));
+  return box ? box.top + box.height : 0;
+}
+
+const VERTICAL_PROPS = ['y', 'height'] as const;
+
+function stretchedClip(clip: MotionClip, along: number, unit: number): MotionClip {
+  const props = { ...clip.props };
+  for (const key of VERTICAL_PROPS) {
+    if (typeof props[key] === 'number') {
+      props[key] = (props[key] as number) * along;
+    }
+  }
+  if (typeof props.size === 'number') {
+    props.size = props.size * unit;
+  }
+  return { ...clip, props };
+}
+
+const stretchedTracks = (tracks: MotionTrack[], along: number, unit: number): MotionTrack[] => tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => stretchedClip(c, along, unit)) })) as MotionTrack[];
+
+export function withContentHeight(doc: MotionDoc): MotionDoc {
+  const height = Math.ceil(contentBottom(doc));
+  if (height <= doc.height) {
+    return doc;
+  }
+  const along = doc.height / height;
+  const unit = Math.min(doc.width, doc.height) / Math.min(doc.width, height);
+  const comps = Object.fromEntries(Object.entries(doc.comps ?? {}).map(([id, comp]) => [id, comp.frame ? comp : { ...comp, tracks: stretchedTracks(comp.tracks, along, unit) }])) as MotionDoc['comps'];
+  return { ...doc, height, tracks: stretchedTracks(doc.tracks, along, unit), comps };
 }

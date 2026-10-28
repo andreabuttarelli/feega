@@ -1,11 +1,12 @@
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { viewsOf } from '@feega/motion-core/motion/breakpoints/model';
+import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
 import type { FrameAt } from '$lib/canvas/core/frame-source';
 
 export const VIEW_GAP = 80;
 const SEPARATOR = '@bp:';
 
-export type BreakpointView = { frame: FrameAt; nodeId: string; breakpointId: string; name: string; width: number };
+export type BreakpointView = { frame: FrameAt; nodeId: string; breakpointId: string; name: string; width: number; doc: MotionDoc };
 
 export const viewId = (nodeId: string, breakpointId: string) => `${nodeId}${SEPARATOR}${breakpointId}`;
 
@@ -24,9 +25,10 @@ function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
   return viewsOf(doc)
     .slice(1)
     .map((bp) => {
-      const box = { x, y: frame.box.y, w: bp.width * scale, h: frame.box.h };
+      const view = resolveView(doc, bp.id);
+      const box = { x, y: frame.box.y, w: bp.width * scale, h: view.height * scale };
       x += box.w + VIEW_GAP;
-      return { frame: { id: viewId(frame.id, bp.id), kind: frame.kind, revision: frame.revision, box }, nodeId: frame.id, breakpointId: bp.id, name: bp.name, width: bp.width };
+      return { frame: { id: viewId(frame.id, bp.id), kind: frame.kind, revision: frame.revision, box }, nodeId: frame.id, breakpointId: bp.id, name: bp.name, width: bp.width, doc: view };
     });
 }
 

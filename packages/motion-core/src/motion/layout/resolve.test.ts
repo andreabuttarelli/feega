@@ -82,6 +82,15 @@ describe('withAutoLayout', () => {
     expect(propsOf(out, 'a').x).toBe(0.05);
   });
 
+  it('a hidden child takes no slot', () => {
+    const doc = docOf([
+      shape('h', { x: 0, y: 0, width: 0.3, height: 0.1 }, { parent: 'c', hidden: true }),
+      shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }),
+      shape('c', { x: 0.5, y: 0.5, width: 1, height: 0.1 }, { autoLayout: flow({ justify: Justify.Start }) })
+    ]);
+    expect(propsOf(withAutoLayout(doc), 'a').x).toBe(0.05);
+  });
+
   it('nests: an inner container is placed, then lays out its own children', () => {
     const doc = docOf([
       shape('p', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'i' }),
@@ -195,5 +204,25 @@ describe('text that fills its column', () => {
     const wrapped = textExtent('Text', text, W, 400).height;
     expect(propsOf(laid, 'title').height * H).toBeCloseTo(wrapped);
     expect(propsOf(laid, 'col').height * H).toBeCloseTo(wrapped);
+  });
+});
+
+describe('a child wider than its column', () => {
+  const column = shape('col', { x: 0.25, y: 0.1, width: 0.4, height: 0.05 }, { autoLayout: flow({ direction: Direction.Vertical }), layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fixed, height: Sizing.Hug } });
+  const text = { text: 'Close the month in three days, not three weeks.', size: 0.06, leading: 1.1 };
+
+  it('a hugging text wraps at the column width', () => {
+    const title = newClip({ id: 'title', from: 0, durationInFrames: 30, component: 'Text', parent: 'col', props: { ...text, x: 0.05, y: 0.05, width: 0.1, height: 0.05 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug, height: Sizing.Hug } });
+
+    const laid = withAutoLayout(docOf([column, title]));
+
+    expect(propsOf(laid, 'title').width * W).toBeCloseTo(400);
+    expect(propsOf(laid, 'col').height * H).toBeCloseTo(textExtent('Text', text, W, 400).height);
+  });
+
+  it('a fixed width shrinks to the column, like max-width: 100%', () => {
+    const wide = shape('wide', { x: 0, y: 0, width: 0.7, height: 0.1 }, { parent: 'col', layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fixed, height: Sizing.Fixed } });
+
+    expect(propsOf(withAutoLayout(docOf([column, wide])), 'wide').width * W).toBeCloseTo(400);
   });
 });
