@@ -28,7 +28,7 @@
 </script>
 
 {#if layer}
-  <section class="dev" data-testid="dev-inspector" aria-label="Dev mode">
+  <section class="dev" data-testid="dev-inspector" aria-label="Coder mode">
     <header>
       <strong>{layer.name}</strong>
       <span class="badge">read-only</span>

@@ -249,8 +249,8 @@ describe('outline view key', () => {
   });
 });
 
-describe('dev mode key', () => {
-  it('⇧D switches the frame to dev mode and back', () => {
+describe('coder mode key', () => {
+  it('⇧D switches the frame to coder mode and back', () => {
     expect(press('D', { shift: true, code: 'KeyD' })).toBe(Command.ToggleDevMode);
   });
 });

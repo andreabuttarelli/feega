@@ -70,13 +70,16 @@ describe('frame inspector panel', () => {
     expect(html(['a', 'b'])).toContain('data-testid="frame-inspector"');
   });
 
-  it('carries the Design / Motion switch on the frame and on an element', () => {
-    expect(html([])).toContain('data-testid="frame-mode-switch"');
-    expect(html(['a'])).toContain('data-testid="frame-mode-switch"');
-  });
+  it('carries a Design | Motion segmented control and a Coder mode toggle on one row', () => {
+    for (const selection of [[], ['a']]) {
+      const body = html(selection);
 
-  it('carries the Design / Motion switch on the frame and on an element', () => {
-    expect(html([])).toContain('data-testid="frame-mode-switch"');
-    expect(html(['a'])).toContain('data-testid="frame-mode-switch"');
+      expect(body).toContain('data-testid="frame-mode-row"');
+      expect(body).toContain('role="radiogroup"');
+      expect(body).toContain('>Design<');
+      expect(body).toContain('>Motion<');
+      expect(body).toContain('>Coder mode<');
+      expect(body).not.toContain('Dev mode');
+    }
   });
 });
