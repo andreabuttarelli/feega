@@ -1,5 +1,6 @@
 import { Align, Direction, Justify, Sizing } from '../../layout/auto-layout';
 import type { MotionDoc } from '../../doc';
+import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '../../breakpoints/model';
 import { box, DocKit } from './kit';
 
 const WIDTH = 1440;
@@ -246,7 +247,74 @@ export function landingDoc(): MotionDoc {
   pricing(kit);
   cta(kit);
   footer(kit);
-  return kit.doc();
+  return responsive(kit.doc());
+}
+
+const TABLET = 'tablet';
+const PHONE = 'phone';
+const PHONE_GUTTER = 20;
+
+const sides = (vertical: number, horizontal: number) => ({ top: vertical, right: horizontal, bottom: vertical, left: horizontal });
+const text = (px: number) => px / WIDTH;
+const span = (ids: string[], columns: number): Override[] => ids.map((id) => [id, OverrideKey.ColumnSpan, columns]);
+
+const FEATURE_CARDS = ['feature-1', 'feature-2', 'feature-3', 'feature-4', 'feature-5', 'feature-6'];
+const TIER_CARDS = ['tier-1', 'tier-2', 'tier-3'];
+const FOOTER_COLUMNS = ['col-1', 'col-2', 'col-3'];
+
+type Override = [clip: string, key: OverrideKey, value: unknown];
+
+const OVERRIDES: Record<string, Override[]> = {
+  [TABLET]: [
+    ...span(FEATURE_CARDS, 6),
+    ...span(TIER_CARDS, 12),
+    ['testimonial', OverrideKey.Padding, sides(96, GUTTER)],
+    ['links', OverrideKey.Hidden, true],
+    ['sidebar', OverrideKey.Hidden, true],
+    ['headline', OverrideKey.FontSize, text(60)]
+  ],
+  [PHONE]: [
+    ['nav', OverrideKey.Padding, sides(14, PHONE_GUTTER)],
+    ['hero', OverrideKey.Padding, sides(56, PHONE_GUTTER)],
+    ['headline', OverrideKey.FontSize, text(40)],
+    ['lede', OverrideKey.FontSize, text(17)],
+    ['hero-actions', OverrideKey.Direction, Direction.Vertical],
+    ['stats', OverrideKey.Wrap, true],
+    ['stats', OverrideKey.Gap, 24],
+    ['main', OverrideKey.Padding, sides(24, PHONE_GUTTER)],
+    ['logos', OverrideKey.Padding, sides(24, PHONE_GUTTER)],
+    ['logo-row', OverrideKey.Wrap, true],
+    ['logo-row', OverrideKey.Gap, 24],
+    ['features', OverrideKey.Padding, sides(72, PHONE_GUTTER)],
+    ['features-head', OverrideKey.Width, Sizing.Fill],
+    ['features-title', OverrideKey.FontSize, text(30)],
+    ...span(FEATURE_CARDS, 12),
+    ['testimonial', OverrideKey.Padding, sides(72, PHONE_GUTTER)],
+    ['quote', OverrideKey.FontSize, text(24)],
+    ['pricing', OverrideKey.Padding, sides(72, PHONE_GUTTER)],
+    ['pricing-title', OverrideKey.FontSize, text(30)],
+    ['cta', OverrideKey.Padding, sides(72, PHONE_GUTTER)],
+    ['cta-title', OverrideKey.FontSize, text(32)],
+    ['footer', OverrideKey.Padding, sides(48, PHONE_GUTTER)],
+    ['footer-brand', OverrideKey.ColumnSpan, 12],
+    ...span(FOOTER_COLUMNS, 4)
+  ]
+};
+
+function responsive(doc: MotionDoc): MotionDoc {
+  const views = [
+    [BreakpointPreset.Tablet, TABLET],
+    [BreakpointPreset.Phone, PHONE]
+  ] as const;
+  const withViews = views.reduce((d, [preset, id]) => must(addBreakpoint(d, preset, id)), doc);
+  return Object.entries(OVERRIDES).reduce((d, [view, rows]) => rows.reduce((acc, [clip, key, value]) => must(setOverride(acc, view, clip, key, value)), d), withViews);
+}
+
+function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.doc;
 }
 
 export const LANDING_ASSETS: Record<string, string> = {};

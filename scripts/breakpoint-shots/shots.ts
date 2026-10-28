@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { exportCode, CodeTarget } from '@feega/motion-core/motion/codegen/index';
 import { landingDoc, LANDING_ASSETS } from '@feega/motion-core/motion/codegen/fixtures/landing';
-import { addBreakpoint, BreakpointPreset, resolveAt, viewsOf } from '@feega/motion-core/motion/breakpoints/model';
+import { addBreakpoint, BreakpointPreset, viewsOf } from '@feega/motion-core/motion/breakpoints/model';
 
 const OUT = join(homedir(), 'Documents/feega-videos/breakpoints');
 const SHOT_HEIGHT = 1800;
@@ -23,17 +23,19 @@ const views = viewsOf(doc);
 const browser = await chromium.launch();
 const shots: { file: string; width: number }[] = [];
 
+const dir = join(OUT, 'site');
+for (const file of exportCode(doc, { target: CodeTarget.Html, name: 'Ledgerline', assets: LANDING_ASSETS }).files) {
+  mkdirSync(dirname(join(dir, file.path)), { recursive: true });
+  writeFileSync(join(dir, file.path), file.content);
+}
+
 for (const view of views) {
-  const dir = join(OUT, 'site', view.id);
-  for (const file of exportCode(resolveAt(doc, view.id), { target: CodeTarget.Html, name: 'Ledgerline', assets: LANDING_ASSETS }).files) {
-    mkdirSync(dirname(join(dir, file.path)), { recursive: true });
-    writeFileSync(join(dir, file.path), file.content);
-  }
   const page = await browser.newPage({ viewport: { width: view.width, height: SHOT_HEIGHT } });
   await page.goto(`file://${join(dir, 'index.html')}`);
   await page.waitForTimeout(500);
   const file = join(OUT, `${view.id}.png`);
   await page.screenshot({ path: file });
+  await page.screenshot({ path: join(OUT, `${view.id}-full.png`), fullPage: true });
   shots.push({ file, width: view.width });
   await page.close();
 }

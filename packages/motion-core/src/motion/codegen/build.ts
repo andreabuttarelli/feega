@@ -165,7 +165,7 @@ function element(tag: string, clip: MotionClip, rules: Rule[], scope: Scope, ext
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
   const animation = animated(clip, scope);
-  return { kind: NodeKind.Element, tag, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...(animation ? { animation } : {}), ...extra };
+  return { kind: NodeKind.Element, tag, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...(animation ? { animation } : {}), ...extra };
 }
 
 const animated = (clip: MotionClip, scope: Scope) => animationOf(clip, { timeline: scope.timeline, space: scope.space, notes: scope.shared.notes, label: layerName(clip) });
@@ -305,7 +305,7 @@ function svgNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
   const animation = animated(clip, scope);
-  return { ...(animation ? { animation } : {}), kind: NodeKind.Svg, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
+  return { ...(animation ? { animation } : {}), kind: NodeKind.Svg, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
 }
 
 function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): CodeNode | null {
@@ -324,6 +324,7 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   const shownBy = bound(clip, PropKey.Hidden, scope);
   return {
     kind: NodeKind.Use,
+    clipId: clip.id,
     component: plan.name,
     className: scope.names.unique(kebab(layerName(clip))),
     rules: placement(clip, parent, scope),

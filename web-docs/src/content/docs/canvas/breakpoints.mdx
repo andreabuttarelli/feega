@@ -23,3 +23,7 @@ Ask the motion agent, or call the tools over MCP:
 - `add_breakpoint` with `preset` `tablet` or `phone`, or a `name` and `width`.
 - `set_breakpoint_override` with `breakpoint_id`, `clip_id`, `key` and `value`; `value: null` removes the change; `stack: true` stacks an auto layout row.
 - `remove_breakpoint` removes a view and its changes.
+
+## In exported code
+
+[Export code](/canvas/export-code/) turns each breakpoint into a `max-width` media query (HTML, Svelte) or a `max-[…px]:` Tailwind variant (React), widest first. Each query states only what changes at that width, and a layer hidden at a breakpoint is hidden there.

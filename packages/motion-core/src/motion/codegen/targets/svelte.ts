@@ -1,7 +1,7 @@
 import { isProp, NodeKind, PropType, type Bound, type CodeNode, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode } from '../ir';
 import { kebab } from '../naming';
 import type { CodeFile } from '../model';
-import { BASE_CSS, fontLinks, lookupOf, ruleBlock, tokensCss, type TokenLookup } from './css';
+import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, pad, type Dialect } from './markup';
 import { readme } from './project';
 import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
@@ -54,7 +54,7 @@ function cssBlocks(node: CodeNode, ctx: Ctx): string[] {
     return node.kind === NodeKind.Element ? node.children.flatMap((c) => cssBlocks(c, ctx)) : [];
   }
   const selector = node.kind === NodeKind.Use ? `:global(.${instanceClass(ctx.file, node.className)})` : `.${node.className}`;
-  const own = node.rules.length ? [...ruleBlock(selector, node.rules, ctx.tokens, '  '), ''] : [];
+  const own = node.rules.length ? [...ruleBlock(selector, node.rules, ctx.tokens, '  '), '', ...mediaBlocks(selector, node.media, ctx.tokens, '  ')] : [];
   const motion = node.kind !== NodeKind.Use && node.animation ? animationCss(node.animation, { base: `.${node.className}`, inView: `.${node.className}:global(.${INVIEW_CLASS})` }, node.className, '  ') : [];
   const kids = node.kind === NodeKind.Element ? node.children.flatMap((c) => cssBlocks(c, ctx)) : [];
   return [...own, ...motion, ...kids];
