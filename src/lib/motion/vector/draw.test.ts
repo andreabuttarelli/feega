@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addVertex, connect, fillClosed, moveVertex, setTangent } from './draw';
 import { Tangent } from './edit';
+import { Mirror } from '$lib/motion/shape/pen';
 import { Mirroring, Winding, type VectorNetwork } from '@feega/motion-core/motion/vector/model';
 
 const zero = { x: 0, y: 0 };
@@ -48,5 +49,15 @@ describe('editing a vector network', () => {
   it('a corner vertex keeps the other handle', () => {
     const edited = setTangent(vee(), 0, Tangent.End, { x: -0.2, y: 0 });
     expect(edited.segments[1].tangentStart).toEqual(zero);
+  });
+
+  it('alt-dragging a handle of a mirrored point bends one side only and breaks the mirror', () => {
+    const smooth: VectorNetwork = { ...vee(), vertices: vee().vertices.map((v, i) => (i === 1 ? { ...v, mirroring: Mirroring.AngleAndLength } : v)) };
+    const mirrored = setTangent(smooth, 1, Tangent.Start, { x: 0.2, y: 0 });
+    const broken = setTangent(smooth, 1, Tangent.Start, { x: 0.2, y: 0 }, Mirror.Broken);
+
+    expect(mirrored.segments[0].tangentEnd).toEqual({ x: -0.2, y: 0 });
+    expect(broken.segments[0].tangentEnd).toEqual(zero);
+    expect(broken.vertices[1].mirroring).toBe(Mirroring.None);
   });
 });

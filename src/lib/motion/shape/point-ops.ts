@@ -15,7 +15,7 @@ export enum PointOp {
   Close = 'close'
 }
 
-export type PointEdit = { op: PointOp; contour: number; index: number; to?: Pt; t?: number; handle?: Handle };
+export type PointEdit = { op: PointOp; contour: number; index: number; to?: Pt; t?: number; handle?: Handle; mirror?: Mirror };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -39,7 +39,7 @@ function applyEdit(outline: Outline, edit: PointEdit): Outline | string {
     [PointOp.Insert]: () => insertPoint(outline, { contour: edit.contour, index: edit.index, t: edit.t ?? 0.5 }).outline,
     [PointOp.Smooth]: () => (isCorner(vertex) ? toggleSmooth(outline, edit) : outline),
     [PointOp.Corner]: () => (isCorner(vertex) ? outline : toggleSmooth(outline, edit)),
-    [PointOp.Handle]: () => dragHandle(outline, edit, edit.handle ?? Handle.Out, to, Mirror.Broken),
+    [PointOp.Handle]: () => dragHandle(outline, edit, edit.handle ?? Handle.Out, to, edit.mirror ?? Mirror.Broken),
     [PointOp.Close]: () => toggleClosed(outline, edit.contour)
   };
   return ACTIONS[edit.op]();

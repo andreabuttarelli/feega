@@ -221,5 +221,7 @@ export function toggleSmoothVertex(network: VectorNetwork, vertex: number): Vect
     const mine = handles.filter((h) => h.segmentIndex === i);
     return mine.reduce((out, h) => ({ ...out, [h.tangent]: reached(h) }), s);
   });
-  return { ...network, segments };
+  const mirroring = flat ? Mirroring.AngleAndLength : Mirroring.None;
+  const vertices = network.vertices.map((v, i) => (i === vertex ? { ...v, mirroring } : v));
+  return { ...network, vertices, segments };
 }

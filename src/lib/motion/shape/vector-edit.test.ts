@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { canEditPoints, enterPointEdit, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
+import { canEditPoints, enterPointEdit, landsOn, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -16,12 +16,30 @@ const REACH = 8;
 const withShape = (shape: string) => must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape } }, 's'));
 
 describe('vector edit mode', () => {
-  it('only paths, vectors, polygons, stars and lines enter it', () => {
+  it('every shape kind enters it, other layers do not', () => {
     const can = (shape: string) => canEditPoints(findClip(withShape(shape), 's')!.clip);
 
-    expect([can('path'), can('vector'), can('polygon'), can('star'), can('line')]).toEqual([true, true, true, true, true]);
-    expect([can('rect'), can('ellipse')]).toEqual([false, false]);
+    expect(['path', 'vector', 'polygon', 'star', 'line', 'rect', 'circle', 'ellipse'].map(can)).toEqual([true, true, true, true, true, true, true, true]);
     expect(canEditPoints({ component: 'Text', props: {} })).toBe(false);
+  });
+
+  it('a rectangle and an ellipse become paths with their own corners on entering', () => {
+    const rect = withShape('rect');
+    const ellipse = withShape('ellipse');
+    const rectPath = String(findClip(must(enterPointEdit(rect, findClip(rect, 's')!.clip)), 's')!.clip.props.path);
+    const ellipsePath = findClip(must(enterPointEdit(ellipse, findClip(ellipse, 's')!.clip)), 's')!.clip.props;
+
+    expect(rectPath.match(/[ML]/g)).toHaveLength(4);
+    expect(ellipsePath.shape).toBe('path');
+    expect(String(ellipsePath.path)).toContain('C');
+  });
+
+  it('a double-click enters only when it lands on the shape', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'r'));
+    const side = doc.width;
+
+    expect(landsOn(doc, 'r', 0, [side * 0.5, side * 0.5])).toBe(true);
+    expect(landsOn(doc, 'r', 0, [side * 0.1, side * 0.1])).toBe(false);
   });
 
   it('a polygon becomes a path on entering, a path stays as it is', () => {
