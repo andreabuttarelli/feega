@@ -1,6 +1,14 @@
 <script lang="ts">
   import { signOutForm } from '$lib/auth/sign-out-form';
-  import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
+  import { THEME_CHOICES, PREFERENCE_ITEMS, preferenceShortcut } from '$lib/canvas/main-menu';
+  import { THEME_LABEL, ThemePref, parseThemePref } from '$lib/theme';
+  import { chooseTheme } from '$lib/theme-choice';
+  import Sun from '@lucide/svelte/icons/sun';
+  import Moon from '@lucide/svelte/icons/moon';
+  import Monitor from '@lucide/svelte/icons/monitor';
+  import Palette from '@lucide/svelte/icons/palette';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import Menu from '@lucide/svelte/icons/menu';
@@ -105,6 +113,18 @@
     (item) => item.group === 'help' && !(navigation === 'page' && item.desktopOnly)
   );
 
+  const THEME_ICON = { [ThemePref.Light]: Sun, [ThemePref.Dark]: Moon, [ThemePref.System]: Monitor };
+  let themePref = $state(ThemePref.System);
+
+  function syncTheme() {
+    themePref = parseThemePref(document.documentElement.getAttribute('data-theme-pref'));
+  }
+
+  function pickTheme(next: ThemePref) {
+    themePref = next;
+    chooseTheme(next);
+  }
+
   function hrefOf(item: (typeof CANVAS_MENU_ITEMS)[number]): string | undefined {
     if (item.sheet && navigation === 'page') {
       return `/p/${projectId}${item.sheet}`;
@@ -121,7 +141,7 @@
   }
 </script>
 
-<DropdownMenu.Root>
+<DropdownMenu.Root onOpenChange={(open) => open && syncTheme()}>
   <DropdownMenu.Trigger class="burger-btn" aria-label={$_('app.shell.menu.open')} title={$_('app.shell.menu.open')}>
     <Menu size={16} strokeWidth={1.8} />
   </DropdownMenu.Trigger>
@@ -190,13 +210,22 @@
 
     <DropdownMenu.Separator />
 
-    <DropdownMenu.Group>
-      <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.view')}</DropdownMenu.GroupHeading>
-      <DropdownMenu.CheckboxItem class="menu-row" checked={rulersPref.on} onCheckedChange={flipRulers}>
-        <Ruler size={16} />
-        <span>{$_('app.shell.menu.rulers')}</span>
-      </DropdownMenu.CheckboxItem>
-    </DropdownMenu.Group>
+    <DropdownMenu.Sub>
+      <DropdownMenu.SubTrigger class="menu-row sub-trigger" data-testid="prefs-trigger">
+        <SlidersHorizontal size={16} />
+        <span>Preferences</span>
+        <ChevronRight size={14} class="menu-chevron" />
+      </DropdownMenu.SubTrigger>
+      <DropdownMenu.SubContent class="prefs-content">
+        {#each PREFERENCE_ITEMS as pref (pref.command)}
+          <DropdownMenu.CheckboxItem class="menu-row" checked={rulersPref.on} onCheckedChange={flipRulers}>
+            <Ruler size={16} />
+            <span>{$_(pref.labelKey)}</span>
+            <kbd class="menu-keys">{preferenceShortcut(pref.command)}</kbd>
+          </DropdownMenu.CheckboxItem>
+        {/each}
+      </DropdownMenu.SubContent>
+    </DropdownMenu.Sub>
 
     <DropdownMenu.Separator />
 
@@ -253,7 +282,24 @@
 
     <DropdownMenu.Group>
       <DropdownMenu.GroupHeading class="menu-heading">{$_('app.shell.menu.account')}</DropdownMenu.GroupHeading>
-      <div class="menu-row theme-row"><span>Theme</span><ThemeSwitch /></div>
+      <DropdownMenu.Sub>
+        <DropdownMenu.SubTrigger class="menu-row sub-trigger" data-testid="theme-trigger">
+          <Palette size={16} />
+          <span>Theme</span>
+          <ChevronRight size={14} class="menu-chevron" />
+        </DropdownMenu.SubTrigger>
+        <DropdownMenu.SubContent class="prefs-content">
+          <DropdownMenu.RadioGroup value={themePref} onValueChange={(v) => pickTheme(parseThemePref(v))}>
+            {#each THEME_CHOICES as choice (choice)}
+              {@const Icon = THEME_ICON[choice]}
+              <DropdownMenu.RadioItem class="menu-row" value={choice} data-theme-option={choice}>
+                <Icon size={16} />
+                <span>{THEME_LABEL[choice]}</span>
+              </DropdownMenu.RadioItem>
+            {/each}
+          </DropdownMenu.RadioGroup>
+        </DropdownMenu.SubContent>
+      </DropdownMenu.Sub>
       {#if !isLocalMode(publicEnv)}
       <DropdownMenu.Item class="menu-row is-danger" variant="destructive">
         {#snippet child({ props })}
@@ -271,11 +317,44 @@
 </DropdownMenu.Root>
 
 <style>
-  .theme-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  :global(.menu-keys) {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: var(--ui-text-tertiary);
+    font-family: var(--ui-mono, ui-monospace, monospace);
+    font-size: 11px;
+    letter-spacing: normal;
+  }
+  :global(.menu-chevron) {
+    margin-left: auto;
+    color: var(--ui-text-tertiary);
+  }
+  :global([data-slot='dropdown-menu-sub-content'].prefs-content) {
+    width: 220px;
+    padding: 6px;
+    border: 0;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+  }
+  :global([data-slot='dropdown-menu-checkbox-item'].menu-row),
+  :global([data-slot='dropdown-menu-radio-item'].menu-row) {
+    display: flex !important;
+    align-items: center !important;
     gap: 8px;
+    height: 28px;
+    padding: 0 8px !important;
+    border-radius: var(--ui-radius-sm);
+    font-size: 13px;
+    letter-spacing: normal;
+  }
+  :global([data-slot='dropdown-menu-item'].menu-row:hover),
+  :global([data-slot='dropdown-menu-item'].menu-row[data-highlighted]),
+  :global([data-slot='dropdown-menu-sub-trigger'].menu-row[data-highlighted]),
+  :global([data-slot='dropdown-menu-checkbox-item'].menu-row[data-highlighted]),
+  :global([data-slot='dropdown-menu-radio-item'].menu-row[data-highlighted]) {
+    background: var(--ui-wash);
   }
 
   :global(.burger-btn) {
@@ -382,11 +461,12 @@
   }
   :global(.menu-row a),
   :global(.menu-row button) {
+    border-radius: var(--ui-radius-sm);
     display: flex;
     align-items: center;
     gap: 8px;
     width: 100%;
-    height: 36px;
+    height: 28px;
     padding: 0 8px;
     appearance: none;
     border: 0;
@@ -411,7 +491,7 @@
   }
   :global([data-slot='dropdown-menu-sub-trigger'].menu-row) {
     gap: 8px;
-    height: 36px;
+    height: 28px;
     padding: 0 8px !important;
     box-sizing: border-box;
     font-size: 13px;
@@ -443,7 +523,7 @@
     align-items: center;
     gap: 8px;
     width: 100%;
-    height: 36px;
+    height: 28px;
     padding: 0 8px;
     box-sizing: border-box;
     font-size: 13px;
