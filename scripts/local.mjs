@@ -26,8 +26,8 @@ export function localEnv(file, port, base = process.env, fromFile = dotenv()) {
     FEEGA_LOCAL_FILE: resolve(file),
     HOST: LOOPBACK,
     PORT: port,
-    PUBLIC_APP_URL: `http://localhost:${port}`,
-    ORIGIN: `http://localhost:${port}`,
+    PUBLIC_APP_URL: `http://${LOOPBACK}:${port}`,
+    ORIGIN: `http://${LOOPBACK}:${port}`,
     PUBLIC_FEEGA_LOCAL: '1',
     PUBLIC_SUPABASE_URL: 'http://supabase.invalid',
     PUBLIC_SUPABASE_ANON_KEY: 'local',
@@ -52,7 +52,7 @@ function run() {
     }
   }
 
-  console.log(`feega local: ${resolve(file)} → http://localhost:${port}`);
+  console.log(`feega local: ${resolve(file)} → http://${LOOPBACK}:${port}`);
   const server = spawn(process.execPath, [resolve(ROOT, 'scripts/node-server.mjs')], { cwd: ROOT, stdio: 'inherit', env: localEnv(file, port) });
   const stop = (signal) => server.kill(signal);
   process.on('SIGINT', stop);

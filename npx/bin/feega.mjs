@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, mkdirSync, realpathSync, rmSync } from 'node:fs';
+import { createWriteStream, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { appDir, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from '../launcher.mjs';
+import { USAGE, appDir, bundleSource, boundUrl, cachedVersions, freePort, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
 const WEBSTORAGE_NODE_MAJOR = 25;
@@ -88,14 +88,26 @@ async function main() {
     throw new Error(`Node ${MIN_NODE_MAJOR}+ is required (found ${process.versions.node})`);
   }
 
-  const { file, port, browser } = parseArgs(process.argv.slice(2), process.cwd());
+  const args = parseArgs(process.argv.slice(2), process.cwd());
+  if (args.command === 'help') {
+    console.log(USAGE);
+    return;
+  }
+
+  if (args.command === 'version') {
+    console.log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
+    return;
+  }
+
+  const { file, browser } = args;
+  const port = await freePort(args.port);
   const { version, action } = await chooseVersion(homedir());
   const dir = appDir(homedir(), version);
   if (action === 'download') {
     await install(dir, version);
   }
 
-  const url = `http://localhost:${port}`;
+  const url = boundUrl(port);
   console.log(`feega: saving to ${file}`);
   console.log(`feega: open ${url}`);
 

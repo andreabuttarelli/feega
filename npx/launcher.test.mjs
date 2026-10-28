@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { appDir, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from './launcher.mjs';
+import { createServer } from 'node:net';
+import { appDir, boundUrl, freePort, bundleSource, cachedVersions, isCached, latestAppVersion, markCached, parseArgs, pickVersion } from './launcher.mjs';
 
 describe('parseArgs', () => {
   it('risolve il file contro la cartella di chi lancia, non quella del pacchetto', () => {
@@ -18,8 +19,8 @@ describe('parseArgs', () => {
     expect(parseArgs(['/tmp/x.feega'], '/home/u').file).toBe('/tmp/x.feega');
   });
 
-  it('porta 5173 di default, --port nelle due forme', () => {
-    expect(parseArgs([], '/').port).toBe(5173);
+  it('porta 0 di default, scelta dal sistema, --port nelle due forme', () => {
+    expect(parseArgs([], '/').port).toBe(0);
     expect(parseArgs(['--port=8080'], '/').port).toBe(8080);
     expect(parseArgs(['--port', '9000', 'b.feega'], '/h')).toMatchObject({ port: 9000, file: '/h/b.feega' });
   });
@@ -27,6 +28,17 @@ describe('parseArgs', () => {
   it('--no-open non apre il browser', () => {
     expect(parseArgs([], '/').browser).toBe('open');
     expect(parseArgs(['--no-open'], '/').browser).toBe('skip');
+  });
+
+  it('--help, -h e --version non diventano un file', () => {
+    expect(parseArgs(['--help'], '/').command).toBe('help');
+    expect(parseArgs(['-h'], '/').command).toBe('help');
+    expect(parseArgs(['--version'], '/').command).toBe('version');
+  });
+
+  it('rifiuta ogni altra opzione che inizia con un trattino', () => {
+    expect(() => parseArgs(['--hepl'], '/')).toThrow(/unknown option/);
+    expect(() => parseArgs(['-x'], '/')).toThrow(/unknown option/);
   });
 
   it('rifiuta una porta che non è un numero', () => {
@@ -115,5 +127,20 @@ describe('pickVersion', () => {
 
   it('offline e senza cache non può partire', () => {
     expect(() => pickVersion(null, [])).toThrow(/offline/);
+  });
+});
+
+describe('freePort', () => {
+  it("l'URL aperto è l'indirizzo su cui il server si lega, anche con 5173 occupata su ::1", async () => {
+    const taken = createServer();
+    await new Promise((r) => taken.listen(5173, '::1', r).on('error', r));
+    const port = await freePort(0);
+    const server = createServer();
+    await new Promise((r) => server.listen(port, '127.0.0.1', r));
+    const { address, port: bound } = server.address();
+
+    expect(boundUrl(port)).toBe(`http://${address}:${bound}`);
+    server.close();
+    taken.close();
   });
 });
