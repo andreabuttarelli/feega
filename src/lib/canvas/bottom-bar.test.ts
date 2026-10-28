@@ -20,9 +20,9 @@ describe('one bottom bar, its tools by selection', () => {
     expect(barSlots(BarContext.Frame, BarMode.Generate)).toContain(BarSlot.Generate);
   });
 
-  it('reads a remembered mode, and opens on Generate for anything else', () => {
+  it('reads a remembered mode, and opens on Design for anything else', () => {
     expect(readBarMode('generate')).toBe(BarMode.Generate);
-    expect(readBarMode(null)).toBe(BarMode.Generate);
-    expect(readBarMode('nope')).toBe(BarMode.Generate);
+    expect(readBarMode(null)).toBe(BarMode.Design);
+    expect(readBarMode('nope')).toBe(BarMode.Design);
   });
 });

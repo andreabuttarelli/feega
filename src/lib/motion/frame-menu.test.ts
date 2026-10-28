@@ -6,7 +6,6 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { groupClips } from './group';
 import { Command } from './shortcuts';
 import { Edge } from './space';
-import { Arrange } from './layer-order';
 
 describe('the right-click menu inside a frame', () => {
   it('is the canvas menu table, limited to what a frame can run', () => {
@@ -22,8 +21,8 @@ describe('the right-click menu inside a frame', () => {
   it('each item runs a frame command or an align edge', () => {
     expect(frameMenuRun('group')).toEqual({ command: Command.Group });
     expect(frameMenuRun('align-top')).toEqual({ edge: Edge.Top });
-    expect(frameMenuRun('bring-front')).toEqual({ arrange: Arrange.Front });
-    expect(frameMenuRun('send-back')).toEqual({ arrange: Arrange.Back });
+    expect(frameMenuRun('bring-front')).toEqual({ command: Command.BringToFront });
+    expect(frameMenuRun('send-back')).toEqual({ command: Command.SendToBack });
     expect(frameMenuRun('flip-vertical')).toEqual({ command: Command.FlipVertical });
     expect(frameMenuRun('copy-id')).toBeNull();
   });

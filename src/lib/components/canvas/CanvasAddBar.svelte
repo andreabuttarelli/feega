@@ -12,7 +12,6 @@
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Film from '@lucide/svelte/icons/film';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import FrameIcon from '@lucide/svelte/icons/frame';
   import Shapes from '@lucide/svelte/icons/shapes';
   import { DockPlace, toolsIn } from '$lib/canvas/draw-dock';
   import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
@@ -21,7 +20,8 @@
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { Command } from '$lib/motion/shortcuts';
-  import { ACTIONS, tipText } from '$lib/motion/actions';
+  import { ACTIONS } from '$lib/motion/actions';
+  import { canvasToolKeys } from '$lib/canvas/shortcuts';
   import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
   import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, CLOUD_ADDABLE, AI_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
@@ -138,7 +138,7 @@
     input.value = '';
   }
 
-  const TOOL_COMMAND: Record<Exclude<DrawTool, DrawTool.Frame>, Command> = {
+  const TOOL_COMMAND: Record<DrawTool, Command> = {
     [DrawTool.Select]: Command.ToolSelect,
     [DrawTool.Text]: Command.ToolText,
     [DrawTool.Rectangle]: Command.ToolRectangle,
@@ -149,15 +149,14 @@
     [DrawTool.Arrow]: Command.ToolArrow,
     [DrawTool.Pen]: Command.ToolPen,
     [DrawTool.Pencil]: Command.ToolPencil,
-    [DrawTool.ShapeBuilder]: Command.ToolShapeBuilder
+    [DrawTool.ShapeBuilder]: Command.ToolShapeBuilder,
+    [DrawTool.Frame]: Command.ToolFrame
   };
 
-  const SHAPE_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
-    const tip = tipText(command);
-    return { tool, name: tip.name, keys: tip.keys, hint: ACTIONS[command].gesture ?? '', label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
+  const DRAW_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
+    const tip = { name: ACTIONS[command].name, keys: canvasToolKeys(command) };
+    return { tool, name: tip.name, keys: tip.keys, hint: ACTIONS[command].gesture ?? '', label: tip.keys ? `${tip.name} (${tip.keys})` : tip.name, icon: ACTIONS[command].icon };
   });
-  const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', keys: '', hint: 'Drag to draw a frame', label: 'Frame', icon: FrameIcon };
-  const DRAW_TOOLS = [...SHAPE_TOOLS, FRAME_TOOL];
   const toolOf = (tool: DrawTool) => DRAW_TOOLS.find((t) => t.tool === tool)!;
   const BAR_TOOLS = toolsIn(DockPlace.Bar).map(toolOf);
   const MORE_TOOLS = toolsIn(DockPlace.More).map(toolOf);
@@ -204,7 +203,7 @@
     { mode: BarMode.Generate, label: 'Generate', icon: Sparkles }
   ];
 
-  const SELECT_TOOL = SHAPE_TOOLS.find((t) => t.tool === DrawTool.Select)!;
+  const SELECT_TOOL = DRAW_TOOLS.find((t) => t.tool === DrawTool.Select)!;
 
   let phone = $state(typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches);
 
@@ -215,7 +214,7 @@
     return () => query.removeEventListener('change', follow);
   });
 
-  type Tile = { id: string; label: string; icon: (typeof SHAPE_TOOLS)[number]['icon'] | typeof PenTool; run: () => void };
+  type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof PenTool; run: () => void };
   type Section = { title: string; tiles: Tile[] };
 
   const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what) });

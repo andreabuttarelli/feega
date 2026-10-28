@@ -6,6 +6,7 @@ import { groupLight, ungroupLight } from '$lib/motion/light-group';
 import { addAutoLayout, removeAutoLayout, resizeToFit, wrapInFrame } from '$lib/motion/layout/ops';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
+import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
 import { pasteOverElements, replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
@@ -183,8 +184,14 @@ function pasteOver(ctx: BarCtx): Done | null {
   return over?.ok ? { ok: true, doc: over.doc, summary: 'Pasted over the selection', selection: over.ids } : null;
 }
 
+const arrangeOp = (to: Arrange, summary: string): BarOp => ({ shown: any, run: (ctx) => kept(ctx, arrangeLayers(ctx.doc, ctx.selection, to, ctx.newId), summary) });
+
 const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   ...OPACITY_OPS,
+  [Command.BringToFront]: arrangeOp(Arrange.Front, 'Brought to front'),
+  [Command.BringForward]: arrangeOp(Arrange.Forward, 'Brought forward'),
+  [Command.SendBackward]: arrangeOp(Arrange.Backward, 'Sent backward'),
+  [Command.SendToBack]: arrangeOp(Arrange.Back, 'Sent to back'),
   [Action.TidyUp]: { shown: several, run: (ctx) => kept(ctx, tidySpace(ctx.doc, ctx.selection, ctx.frame, propBoxes(ctx.doc), EditMode.Design), 'Tidied up') },
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
@@ -269,7 +276,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.PasteOver, Command.TidyUp, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.PasteOver, Command.TidyUp, Command.BringToFront, Command.BringForward, Command.SendBackward, Command.SendToBack, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   if (isTyping(e.target as Parameters<typeof isTyping>[0])) {

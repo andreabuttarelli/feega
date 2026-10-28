@@ -45,4 +45,4 @@ export const BAR_MODE_KEY = 'feega:canvas-bar-mode';
 
 const MODES = new Set<string>(Object.values(BarMode));
 
-export const readBarMode = (stored: string | null): BarMode => (stored && MODES.has(stored) ? (stored as BarMode) : BarMode.Generate);
+export const readBarMode = (stored: string | null): BarMode => (stored && MODES.has(stored) ? (stored as BarMode) : BarMode.Design);

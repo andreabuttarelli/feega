@@ -125,6 +125,7 @@ export enum Command {
   ToolPen = 'tool-pen',
   ToolPencil = 'tool-pencil',
   ToolShapeBuilder = 'tool-shape-builder',
+  ToolFrame = 'tool-frame',
   ToolScale = 'tool-scale',
   ToggleEditMode = 'toggle-edit-mode',
   MoveLeft = 'move-left',
@@ -297,6 +298,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'l', shift: true, command: Command.ToolLine, label: '⇧L', does: 'Line tool: drag from end to end', group: ShortcutGroup.Draw },
   { key: 'p', shift: true, command: Command.ToolPen, label: '⇧P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
   { key: 'b', shift: true, command: Command.ToolPencil, label: '⇧B', does: 'Pencil tool: draw freehand, hold Shift for straight segments', group: ShortcutGroup.Draw },
+  { key: 'f', shift: true, command: Command.ToolFrame, label: '⇧F', does: 'Frame tool: drag to draw a frame', group: ShortcutGroup.Draw },
   { key: 'x', shift: true, command: Command.ToolShapeBuilder, label: '⇧X', does: 'Shape builder: merge regions of selected shapes, hold Alt to subtract', group: ShortcutGroup.Draw },
   { key: 'e', command: Command.ToggleEditMode, label: 'E', does: 'Design / Motion: edit the base or key at the playhead', group: ShortcutGroup.View },
   { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard & gestures', group: ShortcutGroup.View }
