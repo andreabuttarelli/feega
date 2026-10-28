@@ -87,7 +87,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
-  import { EditMode, recalledMode, rememberMode, shownMode, startMode } from '$lib/motion/edit-mode';
+  import { EditMode, recalledMode, rememberMode, shownMode, startMode, timelineShown } from '$lib/motion/edit-mode';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
@@ -1392,7 +1392,8 @@
   const timeline = $derived.by(() => {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
-    const shown = nodeId ? frameChrome(kindOfNode(nodeId)).timeline : false;
+    const mode = nodeId && live ? shownMode(toggledModes, nodeId, live.doc, recalledMode(modeStore())) : EditMode.Design;
+    const shown = nodeId ? timelineShown(frameChrome(kindOfNode(nodeId)).timeline, mode) : false;
     return nodeId && live && shown ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
   });
 

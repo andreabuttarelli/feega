@@ -14,7 +14,7 @@
   import { proxySetting } from '$lib/motion/gpu/proxy-setting.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { frameBarActions } from '$lib/canvas/frame-inspector';
-  import { EditMode } from '$lib/motion/edit-mode';
+  import { EditMode, MODE_LABEL } from '$lib/motion/edit-mode';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { Snap } from '$lib/motion/timeline-view';
@@ -38,8 +38,6 @@
     assetUrl,
     onchange
   }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; assetUrl?: (assetId: string) => string; onchange: (doc: MotionDoc, summary: string) => void } = $props();
-
-  const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
 
   const GROUPING: readonly ActionId[] = [Action.Group, Action.Ungroup];
 
