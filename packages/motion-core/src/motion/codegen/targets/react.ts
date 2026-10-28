@@ -1,12 +1,24 @@
-import { isProp, PropType, type Bound, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode } from '../ir';
-import { pascal } from '../naming';
+import { isProp, PropType, type Bound, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode, type Animation } from '../ir';
+import { camel, pascal } from '../naming';
+import { MOTION_IMPORT, MOTION_VERSION, motionFiles } from './react-motion';
 import type { CodeFile } from '../model';
 import { fontLinks, lookupOf, type TokenLookup } from './css';
 import { tailwindOf } from './tailwind';
 import { bindsOf, camelProperty, jsxSvg, nodeLines, pad, type Dialect } from './markup';
 import { readme, themeCss } from './project';
 
-type Ctx = { tokens: TokenLookup; root: ElementNode | null };
+type Ctx = { tokens: TokenLookup; root: ElementNode | null; file: string; anims: Map<string, Animation> };
+
+function spread(node: { animation?: Animation; className: string }, ctx: Ctx): string {
+  if (!node.animation) {
+    return '';
+  }
+  const name = camel(`${ctx.file} ${node.className}`);
+  ctx.anims.set(name, node.animation);
+  return ` {...${name}}`;
+}
+
+const motionTag = (node: { tag: string; animation?: Animation }) => (node.animation ? `motion.${node.tag}` : node.tag);
 
 const JSX_SPECIAL = /[{}<>]/;
 
@@ -49,11 +61,13 @@ function useLines(node: UseNode, depth: number, ctx: Ctx): string[] {
 
 function svgOf(node: SvgNode, ctx: Ctx): string {
   const classes = tailwindOf(node.rules, ctx.tokens);
-  return `<svg${classes ? ` className="${classes}"` : ''} width={${node.width}} height={${node.height}} viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${jsxSvg(node.markup)}</svg>`;
+  const tag = motionTag({ tag: 'svg', animation: node.animation });
+  return `<${tag}${spread(node, ctx)}${classes ? ` className="${classes}"` : ''} width={${node.width}} height={${node.height}} viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${jsxSvg(node.markup)}</${tag}>`;
 }
 
 const dialect: Dialect<Ctx> = {
-  openTag: (node, ctx) => `<${node.tag}${classAttr(tailwindOf(node.rules, ctx.tokens), node === ctx.root)}${attrsOf(node)}${styleAttr(node)}>`,
+  tagOf: motionTag,
+  openTag: (node, ctx) => `<${motionTag(node)}${spread(node, ctx)}${classAttr(tailwindOf(node.rules, ctx.tokens), node === ctx.root)}${attrsOf(node)}${styleAttr(node)}>`,
   text: (value) => (isProp(value) ? `{${value.prop}}` : JSX_SPECIAL.test(value.literal) ? `{${jsString(value.literal)}}` : value.literal),
   lineBreak: '<br />',
   use: useLines,
@@ -64,6 +78,8 @@ const dialect: Dialect<Ctx> = {
 
 const importsOf = (uses: readonly string[], from: string) => uses.map((u) => `import { ${u} } from '${from}${u}';`);
 
+const motionImports = (own: Map<string, Animation>, from: string) => (own.size ? [MOTION_IMPORT, `import { ${[...own.keys()].sort().join(', ')} } from '${from}animations';`] : []);
+
 function propType(spec: ComponentSpec): string[] {
   const fields = spec.props.map((p) => `  ${p.name}?: ${p.type};`);
   return [`export type ${spec.name}Props = {`, ...fields, '  className?: string;', '};'];
@@ -71,10 +87,13 @@ function propType(spec: ComponentSpec): string[] {
 
 const paramOf = (p: PropSpec) => (p.fallback === null ? p.name : `${p.name} = ${p.type === PropType.Flag ? String(p.fallback) : jsString(String(p.fallback))}`);
 
-function componentFile(spec: ComponentSpec, tokens: TokenLookup): CodeFile {
+function componentFile(spec: ComponentSpec, tokens: TokenLookup, anims: Map<string, Animation>): CodeFile {
   const params = [...spec.props.map(paramOf), 'className'].join(', ');
-  const body = nodeLines(spec.root, 2, dialect, { tokens, root: spec.root });
+  const own = new Map<string, Animation>();
+  const body = nodeLines(spec.root, 2, dialect, { tokens, root: spec.root, file: spec.name, anims: own });
+  own.forEach((a, n) => anims.set(n, a));
   const content = [
+    ...motionImports(own, '../'),
     "import { cx } from '../lib/cx';",
     ...importsOf(spec.uses, './'),
     '',
@@ -90,21 +109,24 @@ function componentFile(spec: ComponentSpec, tokens: TokenLookup): CodeFile {
   return { path: `src/components/${spec.name}.tsx`, content };
 }
 
-function pageFile(page: PageSpec, name: string, tokens: TokenLookup): CodeFile {
-  const body = nodeLines(page.root, 2, dialect, { tokens, root: null });
-  const content = [...importsOf(page.uses, '../components/'), ...(page.uses.length ? [''] : []), `export function ${name}() {`, '  return (', ...body, '  );', '}', ''].join('\n');
+function pageFile(page: PageSpec, name: string, tokens: TokenLookup, anims: Map<string, Animation>): CodeFile {
+  const own = new Map<string, Animation>();
+  const body = nodeLines(page.root, 2, dialect, { tokens, root: null, file: name, anims: own });
+  own.forEach((a, n) => anims.set(n, a));
+  const imports = [...motionImports(own, '../'), ...importsOf(page.uses, '../components/')];
+  const content = [...imports, ...(imports.length ? [''] : []), `export function ${name}() {`, '  return (', ...body, '  );', '}', ''].join('\n');
   return { path: `src/pages/${name}.tsx`, content };
 }
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
-const PACKAGE = (name: string) => ({
+const PACKAGE = (name: string, animated: boolean) => ({
   name,
   private: true,
   version: '0.0.0',
   type: 'module',
   scripts: { dev: 'vite', build: 'tsc -b && vite build', preview: 'vite preview' },
-  dependencies: { react: '^19.0.0', 'react-dom': '^19.0.0' },
+  dependencies: { ...(animated ? { motion: MOTION_VERSION } : {}), react: '^19.0.0', 'react-dom': '^19.0.0' },
   devDependencies: { '@tailwindcss/vite': '^4.0.0', '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0', '@vitejs/plugin-react': '^4.3.0', tailwindcss: '^4.0.0', typescript: '^5.6.0', vite: '^6.0.0' }
 });
 
@@ -113,10 +135,12 @@ const TSCONFIG = { compilerOptions: { target: 'ES2022', lib: ['ES2022', 'DOM', '
 export function reactProject(page: PageSpec, slug: string): CodeFile[] {
   const tokens = lookupOf(page.tokens);
   const name = pascal(page.name);
+  const anims = new Map<string, Animation>();
+  const sources = [pageFile(page, name, tokens, anims), ...page.components.map((c) => componentFile(c, tokens, anims))];
   const head = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${page.name}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), '  </head>', '  <body>', '    <div id="root"></div>', '    <script type="module" src="/src/main.tsx"></script>', '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'React + Tailwind CSS', ['npm install', 'npm run dev'], 'src/components/') },
-    { path: 'package.json', content: json(PACKAGE(slug)) },
+    { path: 'package.json', content: json(PACKAGE(slug, anims.size > 0)) },
     { path: 'tsconfig.json', content: json(TSCONFIG) },
     { path: 'vite.config.ts', content: ["import { defineConfig } from 'vite';", "import react from '@vitejs/plugin-react';", "import tailwindcss from '@tailwindcss/vite';", '', 'export default defineConfig({ plugins: [react(), tailwindcss()] });', ''].join('\n') },
     { path: 'index.html', content: head.join('\n') },
@@ -124,7 +148,7 @@ export function reactProject(page: PageSpec, slug: string): CodeFile[] {
     { path: 'src/index.css', content: ['@import "tailwindcss";', '@import "./tokens.css";', ''].join('\n') },
     { path: 'src/tokens.css', content: themeCss(page.tokens) },
     { path: 'src/lib/cx.ts', content: "export const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ');\n" },
-    pageFile(page, name, tokens),
-    ...page.components.map((c) => componentFile(c, tokens))
+    ...sources,
+    ...motionFiles(anims)
   ];
 }

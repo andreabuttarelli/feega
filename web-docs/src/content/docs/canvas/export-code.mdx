@@ -9,7 +9,7 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 <DemoVideo name="export-code" caption="Export a landing page frame as React + Tailwind, switch to Svelte, download the project." />
 
-**Export code** turns a whole frame, with every nested frame, text, image, vector and component instance inside it, into a project a developer can keep. It is static: animation is not exported yet.
+**Export code** turns a whole frame, with every nested frame, text, image, vector and component instance inside it, into a project a developer can keep. Keyframed animation comes along: Motion for React, CSS `@keyframes` for HTML and Svelte.
 
 ## Use it
 
@@ -36,10 +36,27 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 Class names come from layer names (`Feature card` becomes `FeatureCard` and `.feature-card`), and the same frame always gives the same files.
 
+## Animation
+
+| In the design | React (Motion) | HTML and Svelte (CSS) |
+|---|---|---|
+| Keyframes on position, scale, rotation, opacity, text colour | `motion.*` element with keyframe arrays and `times` (`src/animations.ts`) | `@keyframes` per property (`styles/animations.css`, or inside the Svelte component) |
+| A bezier curve | `ease: [x1, y1, x2, y2]` | `cubic-bezier(x1, y1, x2, y2)` |
+| Easing presets and springs (Standard, Ease out, Overshoot, Elastic, Bounce…) | the exact curve sampled into a function (`src/lib/easing.ts`) | the exact curve sampled into `linear(…)` |
+| Hold keyframes | `hold` | `step-end` |
+| Start time | `delay` | `animation-delay` |
+| Loop (interactive settings) | `repeat: Infinity` over the work area | `infinite` over the work area |
+| Playback "when scrolled into view" | `whileInView` | paused until an `IntersectionObserver` adds `is-inview` |
+| A layer with a "While hovering" interaction | `whileHover` | `:hover` |
+
+Position moves are written as `translate` (CSS variables `--tx`/`--ty` registered with `@property`, so x and y keep their own timing).
+
 ## What does not map
 
 - Effects with no CSS equivalent (noise, displacement, chromatic aberration…) are left out and listed under **Not exported**. Drop shadow, inner shadow, layer blur and background blur are kept.
-- Shaders, 3D, particles, video effects and timing are not exported.
+- Shaders, 3D, particles and video effects are not exported.
+- Animation of anything but position, scale, rotation, opacity and text colour (blur, skew, 3D rotation, fills, masks, effect parameters…) is listed under **Not exported**, as is animation on a whole component instance: animate the layers inside it.
+- Scroll-scrubbed and paused playback play on load instead.
 - A frame without auto layout stays absolutely positioned: it does not reflow on a phone. Add auto layout before exporting for responsive code.
 - Image URLs from your project are signed and expire: download the files into the project before shipping.
 
