@@ -51,7 +51,16 @@ function cloudClients(): ConnectClient[] {
 
 function localClients(port: string): ConnectClient[] {
   const args = ['-y', 'feega', 'mcp', '--port', port];
-  const stdio = json({ mcpServers: { [LOCAL_SERVER_NAME]: { command: 'npx', args } } });
+  const stdio = [
+    '{',
+    '  "mcpServers": {',
+    `    "${LOCAL_SERVER_NAME}": {`,
+    '      "command": "npx",',
+    `      "args": [${args.map((a) => `"${a}"`).join(', ')}]`,
+    '    }',
+    '  }',
+    '}'
+  ].join('\n');
   return [
     { id: 'claude-code', name: 'Claude Code', steps: [{ text: 'Run in a terminal:', snippet: `claude mcp add ${LOCAL_SERVER_NAME} -- npx ${args.join(' ')}` }] },
     {
@@ -60,7 +69,7 @@ function localClients(port: string): ConnectClient[] {
       steps: [{ text: 'Add to ~/.codex/config.toml:', snippet: `[mcp_servers.${LOCAL_SERVER_NAME}]\ncommand = "npx"\nargs = [${args.map((a) => `"${a}"`).join(', ')}]` }]
     },
     { id: 'cursor', name: 'Cursor', steps: [{ text: 'Add to ~/.cursor/mcp.json:', snippet: stdio }] },
-    { id: 'claude-desktop', name: 'Claude Desktop', steps: [{ text: 'Add to claude_desktop_config.json (Settings → Developer → Edit Config), then restart:', snippet: stdio }] }
+    { id: 'claude-desktop', name: 'Desktop', steps: [{ text: 'Add to claude_desktop_config.json (Settings → Developer → Edit Config), then restart:', snippet: stdio }] }
   ];
 }
 
