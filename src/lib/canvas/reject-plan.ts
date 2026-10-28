@@ -1,4 +1,5 @@
 import { sameValue } from './node-patch';
+import type { MoveItem } from './move-gesture';
 import type { UndoItem } from './undo-plan';
 
 export enum Keep {
@@ -69,7 +70,7 @@ export type Choice = { eventId: number; path: string; keep: Keep };
 export type EventConflict = FieldConflict & { eventId: number; nodeId: string };
 
 export type RejectResult =
-  | { outcome: RejectOutcome.Rejected; undo: UndoItem[]; reverted: string[] }
+  | { outcome: RejectOutcome.Rejected; undo: UndoItem[]; moves: MoveItem[]; reverted: string[] }
   | { outcome: RejectOutcome.Conflict; conflicts: EventConflict[] }
   | { outcome: RejectOutcome.Confirm; nodeId: string; touchedBy: number[] }
   | { outcome: RejectOutcome.NotFound }

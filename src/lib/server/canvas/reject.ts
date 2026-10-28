@@ -15,6 +15,7 @@ import {
 import { sameValue } from '$lib/canvas/node-patch';
 import { mergeReject, RejectOutcome, type AgentChange, type Choice, type EventConflict, type RejectResult, type Side } from '$lib/canvas/reject-plan';
 import type { UndoItem } from '$lib/canvas/undo-plan';
+import type { MoveItem } from '$lib/canvas/move-gesture';
 import { agentChanges } from '$lib/canvas/undo-last';
 
 export type RejectInput = {
@@ -30,6 +31,7 @@ const SINCE_LIMIT = 2000;
 
 type Edited = { node: CanvasNodeRecord; side: Side };
 type Write = () => Promise<UndoItem | null>;
+type Moves = MoveItem[];
 
 type Plan = {
   db: Db;
@@ -144,13 +146,14 @@ const PLANNERS: Record<CanvasEventKind, (plan: Plan, event: CanvasEvent) => Prom
   'edge.delete': planEdge
 };
 
-async function writeEdited(plan: Plan, { node, side }: Edited): Promise<UndoItem | null | 'stale'> {
+async function writeEdited(plan: Plan, moves: Moves, { node, side }: Edited): Promise<UndoItem | null | 'stale'> {
   if (plan.gone.has(node.id)) {
     return null;
   }
 
   const position = side.position as CanvasNodeRecord['position'];
   if (!sameValue(position, node.position)) {
+    moves.push({ nodeId: node.id, before: { x: node.position.x, y: node.position.y }, after: { x: position.x, y: position.y } });
     await moveNode(plan.db, { ...scope(plan, node.id), x: position.x, y: position.y, z: position.z, actor: plan.input.actor });
   }
 
@@ -204,8 +207,9 @@ export async function rejectChange(db: Db, input: RejectInput): Promise<RejectRe
   }
 
   const undo: UndoItem[] = [];
+  const moves: Moves = [];
   for (const edited of plan.edited.values()) {
-    const item = await writeEdited(plan, edited);
+    const item = await writeEdited(plan, moves, edited);
     if (item === 'stale') {
       return { outcome: RejectOutcome.Stale, nodeId: edited.node.id };
     }
@@ -220,7 +224,7 @@ export async function rejectChange(db: Db, input: RejectInput): Promise<RejectRe
     }
   }
 
-  return { outcome: RejectOutcome.Rejected, undo, reverted: plan.reverted };
+  return { outcome: RejectOutcome.Rejected, undo, moves, reverted: plan.reverted };
 }
 
 const AGENT_CHANGES_SCAN = 200;
