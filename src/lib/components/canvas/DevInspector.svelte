@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { BrandTokens } from '@feega/motion-core/motion/brand';
-  import { cssText, devLayer, tailwindClasses, type DevToken } from '$lib/canvas/dev-css';
+  import { cssText, devLayer, tailwindClasses, type DevToken } from '@feega/motion-core/motion/codegen/dev-css';
 
   let { doc, clipId, brand, onexport = null }: { doc: MotionDoc; clipId: string; brand: BrandTokens | null; onexport?: (() => void) | null } = $props();
 

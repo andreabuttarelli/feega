@@ -1,8 +1,8 @@
-import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
-import { isText } from '@feega/motion-core/motion/layout/text-extent';
-import { pivotBox } from '@feega/motion-core/motion/parent';
-import type { Box } from '@feega/motion-core/motion/layout';
+import { findClip, type MotionClip, type MotionDoc } from '../doc';
+import { resolveColor, type BrandTokens } from '../brand';
+import { isText } from '../layout/text-extent';
+import { pivotBox } from '../parent';
+import type { Box } from '../layout';
 
 export enum TokenRole {
   Colour = 'colour',

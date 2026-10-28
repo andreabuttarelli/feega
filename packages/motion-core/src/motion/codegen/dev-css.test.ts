@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
+import { addClip, type OpResult } from '../timeline';
+import { FEEGA_TOKENS } from '../brand';
 import { TokenRole, cssText, devLayer, tailwindClasses } from './dev-css';
 
 function must(r: OpResult): MotionDoc {
