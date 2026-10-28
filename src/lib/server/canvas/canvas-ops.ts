@@ -79,6 +79,8 @@ import { arrangeNodes } from '$lib/server/canvas/arrange';
 import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileBox, type TileMove } from '$lib/canvas/align';
 import { Axis, Edge } from '$lib/motion/space';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
+import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
+import { Keep } from '$lib/canvas/reject-plan';
 import { lastGesture } from '$lib/canvas/undo-last';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
 import { endOnboarding, runDemo } from '$lib/server/onboarding/first-run';
@@ -446,6 +448,14 @@ const distributeNodesInput = arrangeInput.extend({ axis: z.enum(Object.values(Ax
 const stackNodesInput = arrangeInput.extend({ gap: z.number().min(0).default(STACK_GAP).describe('space between nodes in canvas units') }).strict();
 const undoLastInput = z.object({ canvasId: z.string() }).strict();
 const UNDO_LOOKBACK = 50;
+const rejectChangeInput = z
+  .object({
+    canvasId: z.string(),
+    eventIds: z.array(z.number().int()).min(1).describe('canvas_events ids of one change, from agent_changes or view activity'),
+    choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })).optional().describe('one per conflict: keep mine, or take the reject'),
+    confirm: z.boolean().optional().describe('delete a created node even though someone else connected or edited it')
+  })
+  .strict();
 const NOTHING_TO_UNDO = { outcome: 'nothing_to_undo' };
 const endOnboardingInput = z.object({ status: z.enum([OnboardingStatus.Dismissed, OnboardingStatus.Completed]) }).strict();
 const textCostInput = z
@@ -792,6 +802,28 @@ export const CANVAS_OPS = {
       }
       const result = await undoGesture(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, gesture, actor: ctx.actor });
       return result.outcome === 'refused' ? { outcome: 'refused', reason: result.reason } : { outcome: 'undone', reverted: gesture.items.map((item) => item.kind) };
+    }
+  }),
+
+  agent_changes: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return { changes: await listAgentChanges(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) };
+    }
+  }),
+
+  reject_change: op({
+    access: Access.Write,
+    input: rejectChangeInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return rejectChange(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor });
     }
   }),
 

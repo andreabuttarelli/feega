@@ -76,6 +76,8 @@ import { MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
+import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
+import { Keep } from '$lib/canvas/reject-plan';
 import { writeNodesBatch, type BatchItem } from '$lib/server/canvas/batch-write';
 import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas/paste';
 import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
@@ -235,6 +237,12 @@ function rowsRequest(fd: FormData) {
     .safeParse({ techniqueId: fd.get('technique_id'), rows: jsonField(fd, 'rows'), mapping: jsonField(fd, 'mapping') ?? null });
   return parsed.success ? parsed.data : null;
 }
+
+const rejectFields = z.object({
+  eventIds: z.array(z.number().int()).min(1),
+  choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })),
+  confirm: z.boolean()
+});
 
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
@@ -2005,6 +2013,25 @@ export const actions: Actions<CanvasParams> = {
       return fail(409, { reason: result.reason });
     }
     return { outcome: 'undone', redo: result.redo };
+  },
+
+  agent_changes: async ({ params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    return { changes: await listAgentChanges(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
+  },
+
+  reject_change: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const parsed = rejectFields.safeParse({
+      eventIds: jsonField(fd, 'event_ids'),
+      choices: jsonField(fd, 'choices') ?? [],
+      confirm: fd.get('confirm') === 'true'
+    });
+    if (!parsed.success) {
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid_change' });
+    }
+    return rejectChange(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, ...parsed.data, actor: userActor(scope) });
   },
 
   /**

@@ -2,15 +2,18 @@
   import type { RunListing } from '$lib/canvas/run-graph';
   import History from '@lucide/svelte/icons/history';
   import { tip } from '$lib/motion/tooltip';
+  import type { Snippet } from 'svelte';
 
   let {
     runs,
     staleCount,
-    onrunstale
+    onrunstale,
+    children
   }: {
     runs: RunListing[];
     staleCount: number;
     onrunstale: () => void;
+    children?: Snippet;
   } = $props();
 
   let open = $state(false);
@@ -24,6 +27,7 @@
 
 <div class="runs" data-testid="runs-panel">
   <div class="bar">
+    {@render children?.()}
     {#if staleCount}
       <button type="button" data-testid="run-all-stale" onclick={onrunstale}>Run all out of date ({staleCount})</button>
     {/if}

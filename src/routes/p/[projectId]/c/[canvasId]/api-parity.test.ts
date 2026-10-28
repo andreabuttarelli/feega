@@ -173,6 +173,21 @@ describe('the canvas page action and its /api/v1 op answer the same', () => {
     expect(endpoint.data.error).toBe('invalid_gesture');
   });
 
+  it('reject_change answers an unknown change alike through both doors', async () => {
+    const action = await viaAction('reject_change', { event_ids: '[999]', choices: '[]', confirm: 'false' });
+    const endpoint = await viaEndpoint('reject_change', { canvasId: CANVAS, eventIds: [999] });
+
+    expect(action.data).toEqual({ outcome: 'not_found' });
+    expect(endpoint.data).toEqual(action.data);
+  });
+
+  it('agent_changes lists the same changes through both doors', async () => {
+    const action = await viaAction('agent_changes', {});
+    const endpoint = await viaEndpoint('agent_changes', { canvasId: CANVAS });
+
+    expect(endpoint.data).toEqual(action.data);
+  });
+
   it('demo_run and run_demo refuse an incomplete chain alike', async () => {
     const action = await viaAction('demo_run', {});
     const endpoint = await viaEndpoint('run_demo', { canvasId: CANVAS });

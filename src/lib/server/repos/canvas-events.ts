@@ -129,13 +129,10 @@ export async function recordEvent(db: Db, input: RecordEventInput): Promise<Canv
 /** L'attività recente di una tela, più recente prima — la fonte di un pannello "cosa è successo qui". */
 export async function listCanvasEvents(
   db: Db,
-  scope: { orgId: string; canvasId: string; limit?: number }
+  scope: { orgId: string; canvasId: string; limit?: number; sinceId?: number }
 ): Promise<CanvasEvent[]> {
-  const { data, error } = await db
-    .from('canvas_events')
-    .select(EVENT_COLUMNS)
-    .eq('org_id', scope.orgId)
-    .eq('canvas_id', scope.canvasId)
+  const query = db.from('canvas_events').select(EVENT_COLUMNS).eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId);
+  const { data, error } = await (scope.sinceId === undefined ? query : query.gte('id', scope.sinceId))
     .order('id', { ascending: false })
     .limit(scope.limit ?? 200);
 
