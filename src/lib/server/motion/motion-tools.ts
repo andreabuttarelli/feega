@@ -59,7 +59,7 @@ import { unionBounds } from '$lib/motion/multi-select';
 import { AXES, EDGES, alignSpace, distributeSpace, moveBy, tidySpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { Pt } from '$lib/motion/scene-select';
-import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, renameClip, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '@feega/motion-core/motion/organize';
+import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, renameClip, setClipFlags, setTrackFlags, setWorkArea, staggerClips, closeLoop } from '@feega/motion-core/motion/organize';
 
 const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move', 'scale', 'scale_group', 'rotate_group'] as const;
 
@@ -1140,6 +1140,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Set the work area (seconds) the editor previews and loops, or clear it with clear true.',
       inputSchema: z.object({ start: z.number().min(0).optional(), end: z.number().min(0).optional(), clear: z.boolean().optional() }),
       execute: async (input) => apply(setWorkArea(session.doc, input.clear ? null : { from: frames(input.start ?? 0), to: input.end === undefined ? session.doc.durationInFrames : frames(input.end) }), 'set the work area')
+    }),
+
+    close_loop: tool({
+      description: 'Make the loop seamless: every prop animated across the loop end (the work area out point, else the video end) gets a closing keyframe there with its first keyframe value, and keys past it are dropped, so the last frame flows into the first.',
+      inputSchema: z.object({}),
+      execute: async () => apply(closeLoop(session.doc), 'closed the loop')
     }),
 
     set_visibility: tool({

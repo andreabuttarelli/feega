@@ -8,7 +8,9 @@ import {
   addMarker,
   alignClips,
   distributeClips,
+  closeLoop,
   loopFrame,
+  loopRange,
   markerFrame,
   clipsTo,
   nudgeClips,
@@ -171,5 +173,37 @@ describe('arranging selected clips in time', () => {
   it('a locked clip is not moved', () => {
     const locked = must(setClipFlags(three, 'b', { locked: true }));
     expect(nudgeClips(locked, ['a', 'b'], 3).ok).toBe(false);
+  });
+});
+
+describe('closing the loop', () => {
+  const base = newMotionDoc(MotionFormat.Landscape);
+  const clip = (from: number, keyframes: MotionDoc['tracks'][number]['clips'][number]['keyframes']) => ({ ...base.tracks[0].clips[0], id: 'c1', from, durationInFrames: base.durationInFrames - from, keyframes });
+  const withClip = (c: ReturnType<typeof clip>, workArea: MotionDoc['workArea'] = null): MotionDoc => ({ ...base, workArea, tracks: [{ id: 't1', kind: 'visual', name: 'V', clips: [c] }, ...base.tracks.slice(1)] as MotionDoc['tracks'] });
+  const keys = (doc: MotionDoc) => doc.tracks[0].clips[0].keyframes;
+
+  it('ends every animated prop on its first value at the loop end', () => {
+    const doc = withClip(clip(0, { opacity: [{ frame: 0, value: 0, ease: 'standard' }, { frame: 30, value: 1, ease: 'standard' }] }));
+    const closed = must(closeLoop(doc));
+    expect(keys(closed).opacity.at(-1)).toMatchObject({ frame: doc.durationInFrames, value: 0 });
+  });
+
+  it('closes on the work area out point and drops keys past it', () => {
+    const doc = withClip(clip(0, { opacity: [{ frame: 0, value: 0, ease: 'standard' }, { frame: 30, value: 1, ease: 'standard' }, { frame: 200, value: 0.5, ease: 'standard' }] }), { from: 0, to: 90 });
+    expect(keys(must(closeLoop(doc))).opacity.map((k) => k.frame)).toEqual([0, 30, 90]);
+  });
+
+  it('places the closing key in the clip time of a clip that starts late', () => {
+    const doc = withClip(clip(10, { opacity: [{ frame: 0, value: 0, ease: 'standard' }, { frame: 30, value: 1, ease: 'standard' }] }));
+    expect(keys(must(closeLoop(doc))).opacity.at(-1)!.frame).toBe(doc.durationInFrames - 10);
+  });
+
+  it('says so when nothing is animated', () => {
+    expect(closeLoop(withClip(clip(0, {}))).ok).toBe(false);
+  });
+
+  it('the loop range is the work area, or the whole video', () => {
+    expect(loopRange(base)).toEqual({ from: 0, to: base.durationInFrames });
+    expect(loopRange({ ...base, workArea: { from: 30, to: 90 } })).toEqual({ from: 30, to: 90 });
   });
 });
