@@ -36,8 +36,7 @@
   };
 
   $effect(() => {
-    const picked = frameProperties.session?.selection.join(',');
-    if (!picked) {
+    if (!frameProperties.routed) {
       return;
     }
     untrack(() => {

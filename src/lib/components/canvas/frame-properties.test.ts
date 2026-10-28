@@ -30,6 +30,26 @@ describe('frame properties handed to the right bar', () => {
   });
 });
 
+describe('what the right bar routes to properties', () => {
+  it('a frame selected on its own, with no element picked inside it', () => {
+    const props = new FrameProperties();
+    expect(props.routed).toBeNull();
+
+    props.publish('n1', { selection: [] } as never, {} as never, null);
+    expect(props.routed).toBe('n1');
+  });
+
+  it('changes when an element inside the frame is picked', () => {
+    const props = new FrameProperties();
+    props.publish('n1', { selection: ['c1', 'c2'] } as never, {} as never, null);
+
+    expect(props.routed).toBe('n1:c1,c2');
+
+    props.clear();
+    expect(props.routed).toBeNull();
+  });
+});
+
 describe('typing in the bar', () => {
   const field = (value: string, inBar: boolean) => ({ tagName: 'TEXTAREA', value, closest: () => (inBar ? {} : null) }) as unknown as Element;
 
