@@ -1,5 +1,5 @@
 import { Direction, TransitionKind, type Transition } from '@feega/motion-core/motion/prototype/model';
-import { easeCss } from '$lib/motion/ease-css';
+import { easeCss } from '@feega/motion-core/motion/ease-css';
 
 export type Pose = Record<string, string | number>;
 export type TransitionPlan = { durationMs: number; easing: string; incoming: Pose[]; outgoing: Pose[] };
