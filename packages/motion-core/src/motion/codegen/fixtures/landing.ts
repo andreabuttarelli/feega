@@ -4,7 +4,7 @@ import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '../..
 import { box, DocKit } from './kit';
 
 const WIDTH = 1440;
-const HEIGHT = 6200;
+const HEIGHT = 4480;
 const GUTTER = 80;
 const CONTENT = WIDTH - GUTTER * 2;
 const COLUMNS = 12;
@@ -39,7 +39,8 @@ function components(kit: DocKit) {
   });
 
   kit.component('c-nav-link', 'Nav link', (n) => {
-    n.text('label', 'Product', { name: 'Label', size: 15, weight: 500, color: C.body, leading: 1.5, font: SANS });
+    n.frame('root', { name: 'Nav link', box: box(0, 0, 90, 24), layout: { direction: Direction.Horizontal }, item: hug });
+    n.text('label', 'Product', { parent: 'root', name: 'Label', size: 15, weight: 500, color: C.body, leading: 1.5, font: SANS });
   });
 
   kit.component('c-stat', 'Stat', (s) => {
@@ -50,7 +51,7 @@ function components(kit: DocKit) {
   });
 
   kit.component('c-task', 'Task row', (t) => {
-    t.frame('root', { name: 'Task row', box: box(0, 0, 640, 52), stroke: { color: C.line, width: 1, sides: [0, 0, 1, 0] }, layout: { direction: Direction.Horizontal, align: Align.Center, gap: 16, padding: { top: 14, right: 20, bottom: 14, left: 20 } }, item: { width: Sizing.Fill, height: Sizing.Hug } });
+    t.frame('root', { name: 'Task row', box: box(0, 0, 958, 52), stroke: { color: C.line, width: 1, sides: [0, 0, 1, 0] }, layout: { direction: Direction.Horizontal, align: Align.Center, gap: 16, padding: { top: 14, right: 20, bottom: 14, left: 20 } }, item: { width: Sizing.Fill, height: Sizing.Hug } });
     t.text('task', 'Bank reconciliation — Chase operating', { parent: 'root', name: 'Task', size: 14, weight: 500, color: C.ink, font: SANS, item: { width: Sizing.Fill, height: Sizing.Hug } });
     t.text('owner', 'M. Okafor', { parent: 'root', name: 'Owner', size: 13, color: C.muted, font: SANS });
     t.frame('pill', { name: 'Status pill', parent: 'root', box: box(0, 0, 88, 24), fill: '#e8f8f1', radius: 999, layout: { direction: Direction.Horizontal, align: Align.Center, padding: { top: 4, right: 10, bottom: 4, left: 10 } }, item: hug });
@@ -58,7 +59,8 @@ function components(kit: DocKit) {
   });
 
   kit.component('c-wordmark', 'Customer logo', (w) => {
-    w.text('name', 'Arcadia', { name: 'Name', size: 22, weight: 700, color: '#8a909c', tracking: -0.02, font: SANS });
+    w.frame('root', { name: 'Customer logo', box: box(0, 0, 160, 32), layout: { direction: Direction.Horizontal }, item: hug });
+    w.text('name', 'Arcadia', { parent: 'root', name: 'Name', size: 22, weight: 700, color: '#8a909c', tracking: -0.02, font: SANS });
   });
 
   kit.component('c-feature', 'Feature card', (f) => {
@@ -69,7 +71,8 @@ function components(kit: DocKit) {
   });
 
   kit.component('c-check', 'Check item', (c) => {
-    c.text('label', TIER_LINES[0], { name: 'Label', size: 15, color: C.body, font: SANS });
+    c.frame('root', { name: 'Check item', box: box(0, 0, 338, 22), layout: { direction: Direction.Horizontal }, item: hug });
+    c.text('label', TIER_LINES[0], { parent: 'root', name: 'Label', size: 15, color: C.body, font: SANS });
   });
 
   kit.component('c-tier', 'Pricing tier', (p) => {
@@ -101,7 +104,7 @@ function hero(kit: DocKit) {
   kit.frame('badge', { name: 'Announcement', parent: 'hero', box: box(0, 0, 320, 32), fill: '#eef3ff', radius: 999, layout: { direction: Direction.Horizontal, gap: 8, align: Align.Center, padding: { top: 6, right: 14, bottom: 6, left: 14 } }, item: hug });
   kit.text('badge-new', 'New', { parent: 'badge', name: 'Badge tag', size: 13, weight: 700, color: C.brand, font: SANS });
   kit.text('badge-copy', 'Multi-entity close is live for every plan', { parent: 'badge', name: 'Badge copy', size: 13, weight: 500, color: C.brandDeep, font: SANS });
-  kit.text('headline', 'Close the month in three days,\nnot three weeks.', { parent: 'hero', name: 'Headline', component: 'Title', size: 72, weight: 600, tracking: -0.045, leading: 1.02, align: 'center', color: C.ink, font: SANS });
+  kit.text('headline', 'Close the month in three days,\nnot three weeks.', { parent: 'hero', name: 'Headline', size: 72, weight: 600, tracking: -0.045, leading: 1.02, align: 'center', color: C.ink, font: SANS });
   kit.text('lede', 'Ledgerline runs your close checklist, matches every bank line and flags the accounts that moved — so controllers review instead of chase.', { parent: 'hero', name: 'Lede', size: 20, color: C.body, leading: 1.55, align: 'center', font: SANS, box: box(0, 0, 680, 62), item: { width: Sizing.Fixed, height: Sizing.Hug } });
   kit.frame('hero-actions', { name: 'Hero actions', parent: 'hero', box: box(0, 0, 360, 48), layout: { direction: Direction.Horizontal, gap: 12 }, item: hug });
   kit.instance('hero-primary', 'c-button', { parent: 'hero-actions', name: 'Primary button', box: box(0, 0, 160, 48) });
