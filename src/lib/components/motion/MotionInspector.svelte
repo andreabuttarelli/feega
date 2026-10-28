@@ -783,7 +783,6 @@
   {@const aligns = ['align', 'verticalAlign'].map(textField).filter((f) => f !== undefined)}
   {@const italic = textField('italic')}
   {@const casing = textField('textCase')}
-  {@const colour = textField('fills') ?? textField('color')}
   {@const advanced = textFields.filter((f) => textTier(f.key, decorationNow) === TextTier.Advanced)}
   <div class="text-primary">
     {#if font}{@render fieldRow(font)}{/if}
@@ -801,7 +800,6 @@
       {/if}
       <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={14} /></button>
     </div>
-    {#if colour}{@render fieldRow(colour)}{/if}
   </div>
   {#if advancedOpen && advancedRow && advanced.length}
     <SidePopover anchor={advancedRow} title="Advanced type" onclose={() => (advancedOpen = false)}>

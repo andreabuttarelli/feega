@@ -25,13 +25,13 @@ function inspect(component: ComponentId, mode = EditMode.Motion) {
 const sections = (html: string) => [...html.matchAll(/data-section="([^"]+)"/g)].map((m) => m[1]);
 
 describe('Properties for one clip', () => {
-  it('a title: its name and kind on top, then layout, layer, effects, text, animation in that order', () => {
+  it('a title: its name and kind on top, then layout, layer, fill, effects, text, animation in that order', () => {
     const html = inspect('Title');
 
     expect(html).toMatch(/class="name[^"]*"[^>]*value="Better marketing/);
     expect(html).toMatch(/class="kind[^"]*">Title</);
     const order = sections(html).filter((s) => ['layout', 'layer', 'fill', 'effects', 'text', 'animate'].includes(s));
-    expect(order).toEqual(['layout', 'layer', 'effects', 'text', 'animate']);
+    expect(order).toEqual(['layout', 'layer', 'fill', 'effects', 'text', 'animate']);
   });
 
   it('a title shows each value with an English label and its unit, never a glyph or a bare ratio', () => {
