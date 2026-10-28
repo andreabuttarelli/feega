@@ -150,6 +150,12 @@ describe('hug', () => {
     expect(out.get('t')).toEqual({ left: 0, top: 0, width: 77, height: 12 });
   });
 
+  it('a hugging row is as tall as its fill text at the width the row gives it', () => {
+    const text = leaf('t', 10, 999, { sizing: { width: Sizing.Fill, height: Sizing.Hug }, heightAt: (width) => (width >= 200 ? 20 : 999) });
+    const row = box('r', 300, 0, [text, leaf('b', 50, 10)], { gap: 10 }, { sizing: { width: Sizing.Fixed, height: Sizing.Hug } });
+    expect(measure(row).height).toBe(20);
+  });
+
   it('a fill child inside a hugging container counts at its own size', () => {
     const c = box('c', 0, 0, [leaf('a', 40, 20, { sizing: { width: Sizing.Fill, height: Sizing.Fixed } }), leaf('b', 60, 20)], { gap: 10 }, { sizing: hug });
     expect(measure(c).width).toBe(110);

@@ -169,3 +169,31 @@ describe('the doc model', () => {
     expect(verdict.ok && verdict.doc.tracks[0].clips[0].autoLayout).toEqual({ ...DEFAULT_AUTO_LAYOUT, gap: 12 });
   });
 });
+
+describe('an instance in a stack', () => {
+  it('takes the size its component hugs to, not the size the component was drawn at', () => {
+    const hugging = { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug, height: Sizing.Hug };
+    const root = shape('root', { x: 0.05, y: 0.05, width: 0.1, height: 0.1 }, { autoLayout: flow({ direction: Direction.Vertical }), layoutItem: hugging });
+    const dot = shape('dot', { x: 0.025, y: 0.01, width: 0.05, height: 0.02 }, { parent: 'root' });
+    const column = shape('col', { x: 0.5, y: 0.5, width: 0.2, height: 0.2 }, { autoLayout: flow({ direction: Direction.Vertical }), layoutItem: hugging });
+    const instance = newClip({ id: 'inst', from: 0, durationInFrames: 30, component: 'Precomp', parent: 'col', props: { comp: 'c' } });
+    const doc = docOf([column, instance]);
+    const withComp = { ...doc, comps: { c: { name: 'C', durationInFrames: 30, tracks: [{ id: 'v', kind: TrackKind.Visual, name: '', clips: [root, dot] }] } } } as MotionDoc;
+
+    expect(propsOf(withAutoLayout(withComp), 'col').height * H).toBeCloseTo(20);
+  });
+});
+
+describe('text that fills its column', () => {
+  it('wraps at the width the column gives it, not at the width it was drawn with', () => {
+    const text = { text: 'Every step of month-end in one place your auditors can read.', size: 0.044, leading: 1.1 };
+    const column = shape('col', { x: 0.25, y: 0.1, width: 0.4, height: 0.05 }, { autoLayout: flow({ direction: Direction.Vertical }), layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fixed, height: Sizing.Hug } });
+    const title = newClip({ id: 'title', from: 0, durationInFrames: 30, component: 'Text', parent: 'col', props: { ...text, x: 0.05, y: 0.05, width: 0.1, height: 0.05 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fill, height: Sizing.Hug } });
+
+    const laid = withAutoLayout(docOf([column, title]));
+
+    const wrapped = textExtent('Text', text, W, 400).height;
+    expect(propsOf(laid, 'title').height * H).toBeCloseTo(wrapped);
+    expect(propsOf(laid, 'col').height * H).toBeCloseTo(wrapped);
+  });
+});
