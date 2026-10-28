@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { Handle } from './pen';
+import { Handle, Mirror } from './pen';
 import { PointOp, editPathPoints, type PointEdit } from './point-ops';
 
 const must = (r: OpResult): MotionDoc => {
@@ -45,6 +45,19 @@ describe('edit path points', () => {
     const bent = must(edit(smooth, { op: PointOp.Handle, contour: 0, index: 1, handle: Handle.Out, to: [1, 0.4] }));
 
     expect(pathOf(bent)).toContain('1 0.4');
+  });
+
+  it('a mirrored handle drags its twin to the opposite side, like a plain drag in the editor', () => {
+    const smooth = must(edit(triangle, { op: PointOp.Smooth, contour: 0, index: 1 }));
+    const bent = must(edit(smooth, { op: PointOp.Handle, contour: 0, index: 1, handle: Handle.Out, to: [1.2, 0.4], mirror: Mirror.Mirrored }));
+
+    expect(pathOf(bent)).toContain('0.8 -0.4');
+  });
+
+  it('a rectangle is written as a path first', () => {
+    const result = must(edit(withShape({ shape: 'rect' }), { op: PointOp.Move, contour: 0, index: 0, to: [0.2, 0.2] }));
+
+    expect(findClip(result, 's')!.clip.props.shape).toBe('path');
   });
 
   it('writes a polygon as a path first', () => {

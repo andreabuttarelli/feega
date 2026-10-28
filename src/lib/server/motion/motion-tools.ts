@@ -9,7 +9,7 @@ import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '@feega/motion-core/motion/fill/model';
 import { setNetwork, toVector } from '$lib/motion/vector/ops';
 import { PointOp, editPathPoints } from '$lib/motion/shape/point-ops';
-import { Handle } from '$lib/motion/shape/pen';
+import { Handle, Mirror } from '$lib/motion/shape/pen';
 import { networkSchema } from '@feega/motion-core/motion/vector/model';
 import { BooleanOp, combineShapes, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
@@ -2064,10 +2064,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     edit_path_points: tool({
-      description: `Edit the points of a path, polygon, star or line Shape clip one by one, in order (indices refer to the path after the previous edits; a parametric shape becomes a free path). Coordinates are in the shape box, 0,0 top-left and 1,1 bottom-right. move: point contour.index goes to "to". delete: remove it. insert: add a point on the segment that starts at contour.index, at t 0..1 along it. smooth: give a corner point curved handles; corner: flatten its handles. handle: put the in or out handle of the point at "to". close: close or open the contour.`,
+      description: `Edit the points of any non-vector Shape clip (path, rect, circle, ellipse, polygon, star, line) one by one, in order (indices refer to the path after the previous edits; a parametric shape becomes a free path). Coordinates are in the shape box, 0,0 top-left and 1,1 bottom-right. move: point contour.index goes to "to". delete: remove it. insert: add a point on the segment that starts at contour.index, at t 0..1 along it. smooth: give a corner point curved handles; corner: flatten its handles. handle: put the in or out handle of the point at "to"; mirror "mirrored" also swings the other handle opposite (a smooth curve), "broken" (default) moves only this one. close: close or open the contour.`,
       inputSchema: z.object({
         clip_id: z.string(),
-        edits: z.array(z.object({ op: z.enum(PointOp), contour: z.number().int().min(0), index: z.number().int().min(0), to: z.tuple([z.number(), z.number()]).optional(), t: z.number().min(0).max(1).optional(), handle: z.enum(Handle).optional() })).min(1).max(200)
+        edits: z.array(z.object({ op: z.enum(PointOp), contour: z.number().int().min(0), index: z.number().int().min(0), to: z.tuple([z.number(), z.number()]).optional(), t: z.number().min(0).max(1).optional(), handle: z.enum(Handle).optional(), mirror: z.enum(Mirror).optional() })).min(1).max(200)
       }),
       execute: async (input) => apply(editPathPoints(session.doc, input.clip_id, input.edits), `edited the points of ${input.clip_id}`)
     }),
