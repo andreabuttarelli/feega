@@ -13,6 +13,8 @@ export type CssValue = string | Ref;
 
 export type Rule = [property: string, value: CssValue];
 
+export type MediaRules = { maxWidth: number; rules: Rule[] };
+
 export type Bound = { literal: string } | { prop: string };
 
 export type Attr = { name: string; value: Bound };
@@ -28,6 +30,7 @@ export enum NodeKind {
 export type ElementNode = {
   kind: NodeKind.Element;
   tag: string;
+  clipId?: string;
   className: string;
   rules: Rule[];
   attrs: Attr[];
@@ -35,6 +38,7 @@ export type ElementNode = {
   styleBinds: StyleBind[];
   shownBy?: string;
   animation?: Animation;
+  media?: MediaRules[];
 };
 
 export type StyleBind = { property: string; prop: string };
@@ -43,9 +47,9 @@ export type TextNode = { kind: NodeKind.Text; value: Bound };
 
 export type BreakNode = { kind: NodeKind.Break };
 
-export type UseNode = { kind: NodeKind.Use; component: string; className: string; rules: Rule[]; props: { name: string; value: string | boolean }[]; forwards: { name: string; prop: string }[]; shownBy?: string };
+export type UseNode = { kind: NodeKind.Use; clipId?: string; component: string; className: string; rules: Rule[]; props: { name: string; value: string | boolean }[]; forwards: { name: string; prop: string }[]; shownBy?: string; media?: MediaRules[] };
 
-export type SvgNode = { kind: NodeKind.Svg; className: string; rules: Rule[]; width: number; height: number; markup: string; shownBy?: string; animation?: Animation };
+export type SvgNode = { kind: NodeKind.Svg; clipId?: string; className: string; rules: Rule[]; width: number; height: number; markup: string; shownBy?: string; animation?: Animation; media?: MediaRules[] };
 
 export enum Trigger {
   Load = 'load',

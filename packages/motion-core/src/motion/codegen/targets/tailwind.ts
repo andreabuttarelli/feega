@@ -1,4 +1,4 @@
-import { isRef, type CssValue, type Ref, type Rule } from '../ir';
+import { isRef, type CssValue, type MediaRules, type Ref, type Rule } from '../ir';
 import { tokenKey } from '../tokens';
 import type { TokenLookup } from './css';
 
@@ -105,7 +105,7 @@ const radius: Mapper = (value, tokens) => {
 
 const MAPPERS: Record<string, Mapper> = {
   position: (v) => plain(v),
-  display: (v) => plain(v),
+  display: keyword({ none: 'hidden', flex: 'flex', grid: 'grid', block: 'block', 'inline-flex': 'inline-flex' }, 'display'),
   left: spaced('left'),
   right: spaced('right'),
   top: spaced('top'),
@@ -166,7 +166,10 @@ const MAPPERS: Record<string, Mapper> = {
   transform: (v) => `[transform:${arbitrary(plain(v))}]`
 };
 
-export function tailwindOf(rules: readonly Rule[], tokens: TokenLookup): string {
-  const classes = rules.map(([property, value]) => MAPPERS[property]?.(value, tokens) ?? `[${property}:${arbitrary(plain(value))}]`);
-  return [...new Set(classes.join(' ').split(' ').filter(Boolean))].join(' ');
+const classesOf = (rules: readonly Rule[], tokens: TokenLookup) => rules.flatMap(([property, value]) => (MAPPERS[property]?.(value, tokens) ?? `[${property}:${arbitrary(plain(value))}]`).split(' ')).filter(Boolean);
+
+const variant = ({ maxWidth, rules }: MediaRules, tokens: TokenLookup) => classesOf(rules, tokens).map((c) => `max-[${maxWidth}px]:${c}`);
+
+export function tailwindOf(rules: readonly Rule[], tokens: TokenLookup, media: readonly MediaRules[] = []): string {
+  return [...new Set([...classesOf(rules, tokens), ...media.flatMap((m) => variant(m, tokens))])].join(' ');
 }
