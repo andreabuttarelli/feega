@@ -237,4 +237,19 @@ describe('a Figma frame with no fill', () => {
     expect(item.destination).toBe(Destination.Free);
     expect(item.doc.background).toBe('transparent');
   });
+
+  it('keeps several vectors together as one group, not loose elements', () => {
+    const page = { guid: { sessionID: 0, localID: 1 }, type: 'CANVAS', name: 'Page' };
+    const frame = node('FRAME', 1, { w: 300, h: 100, fillPaints: [], frameMaskDisabled: false });
+    const letters = [0, 1, 2, 3, 4].map((i) => node('ROUNDED_RECTANGLE', frame.id, { x: i * 60, w: 50, h: 50, fillPaints: [solid(0, 0, 0)] }));
+
+    const plan = planOf({ meta: {}, blobs: [], nodes: [page, frame, ...letters] }, newId)!;
+    const [item] = plan.items;
+    const roots = item.doc.tracks.flatMap((t) => t.clips);
+
+    expect(plan.items).toHaveLength(1);
+    expect(item.kind).toBe(FrameKind.Group);
+    expect(roots).toHaveLength(1);
+    expect(item.doc.background).toBe('transparent');
+  });
 });

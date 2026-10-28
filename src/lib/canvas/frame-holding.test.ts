@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameHolding } from './frame-holding';
+import { frameHolding, groupHolding } from './frame-holding';
 import { FrameKind, newMotionData } from './motion-node';
 
 const tile = (id: string, kind: FrameKind, x: number, y: number, w: number, h: number) => ({ id, type: 'motion', data: { ...newMotionData(), kind }, x, y, w, h });
@@ -26,5 +26,17 @@ describe('frameHolding', () => {
 
   it('a node that is not a frame is ignored', () => {
     expect(frameHolding([{ id: 't', type: 'text', data: {}, x: 0, y: 0, w: 400, h: 200 }], BOX)).toBeNull();
+  });
+});
+
+describe('groupHolding', () => {
+  const PATHS = [0, 1, 2, 3, 4].map((i) => ({ left: 100 + i * 20, top: 100, width: 10, height: 20 }));
+
+  it('an svg pasted over a frame lands as one group, held once by its union', () => {
+    expect(groupHolding([tile('f', FrameKind.Frame, 0, 0, 400, 200)], PATHS)).toEqual({ nodeId: 'f', at: { x: 0.3625, y: 0.55 } });
+  });
+
+  it('an svg pasted on bare canvas has no frame', () => {
+    expect(groupHolding([tile('f', FrameKind.Frame, 500, 500, 400, 300)], PATHS)).toBeNull();
   });
 });
