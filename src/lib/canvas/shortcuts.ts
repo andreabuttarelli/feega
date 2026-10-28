@@ -1,7 +1,7 @@
 import { isTypingTarget } from '$lib/shortcuts';
 import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { Command, commandFor } from '$lib/motion/shortcuts';
+import { Command, SHORTCUTS, commandFor } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 
@@ -61,7 +61,8 @@ const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolArrow]: DrawTool.Arrow,
   [Command.ToolPen]: DrawTool.Pen,
   [Command.ToolPencil]: DrawTool.Pencil,
-  [Command.ToolShapeBuilder]: DrawTool.ShapeBuilder
+  [Command.ToolShapeBuilder]: DrawTool.ShapeBuilder,
+  [Command.ToolFrame]: DrawTool.Frame
 };
 
 const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
@@ -93,6 +94,11 @@ function editModeFor(e: KeyboardEvent): boolean {
 function toolFor(e: KeyboardEvent): DrawTool | null {
   const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
   return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
+}
+
+export function canvasToolKeys(command: Command): string {
+  const heard = SHORTCUTS.filter((b) => b.command === command && !b.mod && !b.alt && toolFor({ key: b.key, shiftKey: Boolean(b.shift) } as KeyboardEvent) === TOOL_OF_COMMAND[command]);
+  return [...new Set(heard.map((b) => b.label))].join(' ');
 }
 
 const nudgeBy = (dx: number, dy: number, step: number): CanvasCommand => ({ id: 'nudge', dx: dx * step, dy: dy * step });
@@ -135,6 +141,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.ToolPen]: { id: 'tool', tool: DrawTool.Pen },
   [Command.ToolPencil]: { id: 'tool', tool: DrawTool.Pencil },
   [Command.ToolShapeBuilder]: { id: 'tool', tool: DrawTool.ShapeBuilder },
+  [Command.ToolFrame]: { id: 'tool', tool: DrawTool.Frame },
   [Command.TogglePixelGrid]: { id: 'view', view: FrameView.PixelGrid },
   [Command.ToggleLayoutGuides]: { id: 'view', view: FrameView.Guides },
   [Command.ToggleRulers]: { id: 'view', view: FrameView.Rulers },
@@ -178,11 +185,13 @@ const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'>
 
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
+const MOD_ALT_KEYS: Record<string, CanvasCommand> = { KeyT: { id: 'tidy' }, BracketLeft: { id: 'send-back' }, BracketRight: { id: 'bring-front' } };
+
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
   if (isTypingTarget(e.target)) return null;
   if (e.shiftKey) return e.code === 'KeyR' ? { id: 'view', view: FrameView.Rulers } : null;
   const mod = e.metaKey || e.ctrlKey;
-  if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
+  if (mod) return MOD_ALT_KEYS[e.code] ?? null;
   if (e.code === 'KeyR') return { id: 'view', view: FrameView.Pivot };
   const edge = ALT_ALIGN[e.code];
   return edge ? { id: 'align', edge } : null;
@@ -282,7 +291,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Redo' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
-  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P'], label: 'Select, text, box, ellipse, pen' },
+  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', '⇧F'], label: 'Select, text, box, ellipse, pen, frame' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },

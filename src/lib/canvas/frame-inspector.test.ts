@@ -225,6 +225,20 @@ describe('frameKeyAction', () => {
     expect(frameKeyAction({ ...digit, target: field } as unknown as KeyboardEvent)).toBeNull();
   });
 
+  it('⌥⌘[ sends the picked element to the back and ⌥⌘] brings it to the front', () => {
+    const bracket = (key: string, code: string) => ({ key, code, metaKey: true, ctrlKey: false, shiftKey: false, altKey: true }) as KeyboardEvent;
+    const back = frameKeyAction(bracket('“', 'BracketLeft'))!;
+    const front = frameKeyAction(bracket('‘', 'BracketRight'))!;
+    const visual = (doc: MotionDoc) => doc.tracks.filter((t) => t.kind === TrackKind.Visual);
+
+    const sent = barAction(back, { doc: fixture(), selection: ['a'], frame: 0, newId: fresh() })!;
+    expect(visual(sent.doc).at(-1)?.clips.map((c) => c.id)).toEqual(['a']);
+    expect(sent.selection).toEqual(['a']);
+
+    const brought = barAction(front, { doc: sent.doc, selection: ['a'], frame: 0, newId: fresh() })!;
+    expect(visual(brought.doc)[0].clips.map((c) => c.id)).toEqual(['a']);
+  });
+
   it('⇧⌘R replaces the selection with the copied element, selecting the result', () => {
     const doc = fixture();
     elementClipboard.copyElements('frame', ['a'], copyElements(doc, ['a']));

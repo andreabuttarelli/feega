@@ -4,12 +4,13 @@ import { compOf, findClip, type MotionDoc } from '@feega/motion-core/motion/doc'
 import { elementName } from './element-name';
 import { Command } from './shortcuts';
 import type { Edge } from './space';
-import { Arrange } from './layer-order';
 
 const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   group: Command.Group,
   ungroup: Command.Ungroup,
   duplicate: Command.Duplicate,
+  'bring-front': Command.BringToFront,
+  'send-back': Command.SendToBack,
   'tidy-up': Command.TidyUp,
   'flip-horizontal': Command.FlipHorizontal,
   'flip-vertical': Command.FlipVertical,
@@ -37,16 +38,10 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   delete: Command.Delete
 };
 
-const FRAME_ARRANGE: Partial<Record<SelectionActionId, Arrange>> = {
-  'bring-front': Arrange.Front,
-  'send-back': Arrange.Back
-};
-
-export type FrameMenuRun = { command: Command } | { edge: Edge } | { arrange: Arrange };
+export type FrameMenuRun = { command: Command } | { edge: Edge };
 
 export const FRAME_MENU_IDS: ReadonlySet<SelectionActionId> = new Set([
   ...(Object.keys(FRAME_COMMAND) as SelectionActionId[]),
-  ...(Object.keys(FRAME_ARRANGE) as SelectionActionId[]),
   ...ALIGN_ACTIONS
 ]);
 
@@ -54,10 +49,6 @@ export function frameMenuRun(id: SelectionActionId): FrameMenuRun | null {
   const command = FRAME_COMMAND[id];
   if (command) {
     return { command };
-  }
-  const arrange = FRAME_ARRANGE[id];
-  if (arrange) {
-    return { arrange };
   }
   const edge = (ALIGN_EDGE as Partial<Record<SelectionActionId, Edge>>)[id];
   return edge ? { edge } : null;
