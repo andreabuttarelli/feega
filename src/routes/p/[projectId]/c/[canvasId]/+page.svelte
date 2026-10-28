@@ -242,6 +242,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
+  import AgentChangesPanel from '$lib/components/canvas/AgentChangesPanel.svelte';
+  import { RejectOutcome, type AgentChange, type Choice, type RejectResult } from '$lib/canvas/reject-plan';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
   import { ImageTool } from '$lib/image-tools';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
@@ -3925,6 +3927,27 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * gesto sono già cadute, e rimetterlo in circolo lo farebbe fallire di nuovo nello stesso modo
    * — `failed` dice perché, in chiaro.
    */
+  async function loadAgentChanges(): Promise<AgentChange[]> {
+    const result = await post('agent_changes', {});
+    return (result?.changes ?? []) as AgentChange[];
+  }
+
+  async function rejectAgentChange(eventIds: number[], choices: Choice[], confirm: boolean): Promise<RejectResult | null> {
+    await Promise.all([lines.drain(), places.flush(), saves.flush()]);
+    const result = (await post('reject_change', { event_ids: JSON.stringify(eventIds), choices: JSON.stringify(choices), confirm: String(confirm) })) as RejectResult | null;
+    if (result?.outcome !== RejectOutcome.Rejected) {
+      return result;
+    }
+    await refresh();
+    if (result.undo.length) { pushGesture({ items: result.undo }); }
+    return result;
+  }
+
+  const changedNodeName = (nodeId: string | null) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    return node ? (node.displayName ?? node.type) : 'a node';
+  };
+
   async function applyUndo(gesture: Gesture, onAccepted: (redo: Gesture) => void) {
     await Promise.all([lines.drain(), places.flush(), saves.flush()]);
     const result = await post('undo', { items: JSON.stringify(gesture.items) });
@@ -4123,7 +4146,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
   {/if}
 
-  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
+  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)}>
+    <AgentChangesPanel load={loadAgentChanges} reject={rejectAgentChange} nameOf={changedNodeName} />
+  </RunsPanel>
 
   {#if exportFor}
     <ExportDialog count={exportFor.length} onexport={(rows) => exportFrames(exportFor!, rows)} onclose={() => (exportFor = null)} />

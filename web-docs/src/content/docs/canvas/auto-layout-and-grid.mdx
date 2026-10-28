@@ -46,7 +46,7 @@ feega canvas $PROJECT align_nodes --input '{"canvasId":"<canvas>","nodeIds":["<a
 feega canvas $PROJECT undo_last --input '{"canvasId":"<canvas>"}'
 ```
 
-Over MCP the call is `canvas_tool({ project_id, op: "align_nodes", input })`. `undo_last` reverts what `canvas_events` recorded for the same actor: creates, deletes, data edits. Moves and resizes are not recorded, so undo an arrangement with `move_node`.
+Over MCP the call is `canvas_tool({ project_id, op: "align_nodes", input })`. `undo_last` reverts what `canvas_events` recorded for the same actor: creates, deletes, data edits. `undo_last` does not undo moves or resizes: undo an arrangement with `move_node`, or reject it with [`reject_change`](/canvas/reject-agent-change/).
 
 ## Related
 

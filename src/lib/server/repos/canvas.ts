@@ -2,7 +2,7 @@ import { codeVarsError } from '$lib/server/canvas/code-source';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
 import type { NarrowedDatabase } from '$lib/server/db/typed-database';
-import { actorCols, edgeActorCols, type Actor } from './actor';
+import { actorCols, edgeActorCols, type Actor, type ActorKind } from './actor';
 import { recordEvent } from './canvas-events';
 import { clashingKeys, mergeNodeData } from '$lib/canvas/node-patch';
 import { nestsInItself } from '$lib/canvas/group-cycle';
@@ -410,11 +410,15 @@ export async function createNode(
  * farebbe fallire la scrittura del contenuto di chi sta scrivendo nel pannello mentre un altro
  * muove il nodo, che è esattamente il lavoro che la versione dovrebbe proteggere.
  */
+const LOGGED_MOVERS: ActorKind[] = ['agent'];
+
 export async function moveNode(
   db: Db,
   input: { orgId: string; nodeId: string; x: number; y: number; z?: number; actor?: Actor }
 ): Promise<CanvasNodeRecord | null> {
   const position = input.z === undefined ? { x: input.x, y: input.y } : { x: input.x, y: input.y, z: input.z };
+  const logged = input.actor && LOGGED_MOVERS.includes(input.actor.kind);
+  const before = logged ? await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }) : null;
 
   const { data, error } = await db
     .from('nodes')
@@ -427,7 +431,20 @@ export async function moveNode(
   if (error) {
     throw error;
   }
-  return data ? toNode(data) : null;
+  const node = data ? toNode(data) : null;
+
+  if (node && before) {
+    await recordEvent(db, {
+      orgId: input.orgId,
+      canvasId: node.canvasId,
+      kind: 'node.update',
+      nodeId: node.id,
+      before: { position: before.position },
+      after: { position: node.position },
+      actor: input.actor
+    });
+  }
+  return node;
 }
 
 export async function renameNode(db: Db, input: { orgId: string; nodeId: string; name: string | null }): Promise<void> {
