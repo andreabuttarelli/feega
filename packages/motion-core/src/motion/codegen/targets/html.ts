@@ -36,6 +36,11 @@ function expand(node: UseNode, depth: number, ctx: Ctx): string[] {
   for (const p of node.props) {
     values.set(p.name, p.value);
   }
+  for (const f of node.forwards) {
+    if (ctx.values.has(f.prop)) {
+      values.set(f.name, ctx.values.get(f.prop)!);
+    }
+  }
   return nodeLines(spec.root, depth, dialect, { ...ctx, block: kebab(spec.name), values, extraClass: node.rules.length ? scopedClass(ctx.block, node.className) : null, root: spec.root });
 }
 

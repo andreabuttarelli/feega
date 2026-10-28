@@ -40,7 +40,7 @@ export type TextNode = { kind: NodeKind.Text; value: Bound };
 
 export type BreakNode = { kind: NodeKind.Break };
 
-export type UseNode = { kind: NodeKind.Use; component: string; className: string; rules: Rule[]; props: { name: string; value: string | boolean }[]; shownBy?: string };
+export type UseNode = { kind: NodeKind.Use; component: string; className: string; rules: Rule[]; props: { name: string; value: string | boolean }[]; forwards: { name: string; prop: string }[]; shownBy?: string };
 
 export type SvgNode = { kind: NodeKind.Svg; className: string; rules: Rule[]; width: number; height: number; markup: string; shownBy?: string };
 
