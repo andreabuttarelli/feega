@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Ease } from '@feega/motion-core/motion/design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
-import { EDIT_MODE_KEY, EditMode, designWarning, editIn, nextMode, readMode, recalledMode, rememberMode, shownMode } from './edit-mode';
+import { EDIT_MODE_KEY, EditMode, designWarning, editIn, nextMode, readMode, recalledMode, rememberMode, shownMode, timelineShown, modeSwitchShown } from './edit-mode';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -108,5 +108,41 @@ describe('remembering the mode', () => {
     expect(() => rememberMode(broken, EditMode.Design)).not.toThrow();
     expect(recalledMode(broken)).toBeNull();
     expect(recalledMode(null)).toBeNull();
+  });
+});
+
+describe('the timeline follows the mode', () => {
+  it('shows for a frame in Motion and hides in Design', () => {
+    expect(timelineShown(true, EditMode.Motion)).toBe(true);
+    expect(timelineShown(true, EditMode.Design)).toBe(false);
+  });
+
+  it('stays hidden when the frame kind has no timeline', () => {
+    expect(timelineShown(false, EditMode.Motion)).toBe(false);
+  });
+
+  it('offers the switch for an animated doc and not for a still', () => {
+    const video = newMotionDoc(MotionFormat.Landscape);
+
+    expect(modeSwitchShown(video)).toBe(true);
+    expect(modeSwitchShown({ ...video, still: { frame: 0 } })).toBe(false);
+  });
+});
+
+describe('the timeline follows the mode', () => {
+  it('shows for a frame in Motion and hides in Design', () => {
+    expect(timelineShown(true, EditMode.Motion)).toBe(true);
+    expect(timelineShown(true, EditMode.Design)).toBe(false);
+  });
+
+  it('stays hidden when the frame kind has no timeline', () => {
+    expect(timelineShown(false, EditMode.Motion)).toBe(false);
+  });
+
+  it('offers the switch for an animated doc and not for a still', () => {
+    const video = newMotionDoc(MotionFormat.Landscape);
+
+    expect(modeSwitchShown(video)).toBe(true);
+    expect(modeSwitchShown({ ...video, still: { frame: 0 } })).toBe(false);
   });
 });
