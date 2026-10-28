@@ -127,7 +127,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
-  import { frameHolding, type FrameHold } from '$lib/canvas/frame-holding';
+  import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
@@ -540,13 +540,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const regroups = inOrder();
   let regrouping = 0;
 
-  function regroup(action: string, fields: Record<string, string>) {
+  function regroup(action: string, fields: Record<string, string>, after?: () => Promise<void>) {
     regrouping += 1;
     void regroups(async () => {
       await places.flush();
       const res = await post(action, fields);
       if (res?.outcome === 'done') {
         pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+        await after?.();
       }
     }).finally(() => {
       regrouping -= 1;
@@ -577,13 +578,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return true;
   }
 
-  function groupElements(ids: string[]) {
+  function groupElements(ids: string[], after?: (groupId: string) => Promise<void>) {
     if (ids.length < 2) {
       return;
     }
     const id = crypto.randomUUID();
     nodes = groupedLocally(nodes, ids, id, (record) => toTile(record));
-    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id });
+    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id }, after && (() => after(id)));
   }
 
   function wrapInSection(ids: string[]) {
@@ -3717,16 +3718,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!landedShapes.length) { return; }
     nodes = [...nodes, ...landedShapes.map((m) => toTile(m.node))];
     pushGesture({ items: landedShapes.flatMap((m) => m.undo) });
-    const hold = frameHolding(nodes, { left: at.x, top: at.y, width: 0, height: 0 });
-    if (hold) {
-      for (const m of landedShapes) {
-        await intoFrame(m.node.id, frameHolding(nodes, m.box) ?? hold);
-      }
-      return;
-    }
     const ids = landedShapes.map((m) => m.node.id);
     focusOn(ids, undefined, FocusMode.Select);
-    groupElements(ids);
+    const hold = groupHolding(nodes, landedShapes.map((m) => m.box));
+    groupElements(ids, hold ? (groupId) => intoFrame(groupId, hold) : undefined);
   }
 
   function pasteText(text: string, at: { x: number; y: number }) {
