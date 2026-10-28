@@ -34,7 +34,10 @@
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import type { ActionId } from '$lib/motion/actions';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-    import { mergeScope, scopeView } from '$lib/motion/instance-view';
+  import { mergeScope, scopeView } from '$lib/motion/instance-view';
+  import { inView, liftEdit } from '@feega/motion-core/motion/breakpoints/model';
+  import BreakpointsSection from '$lib/components/motion/BreakpointsSection.svelte';
+  import BreakpointOverrides from '$lib/components/motion/BreakpointOverrides.svelte';
 
   const FIRST_FRAME = 0;
 
@@ -58,9 +61,12 @@
 
   const CLIP_PRESETS: Record<string, typeof DevicePresets | typeof ParticlePresets> = { Device3D: DevicePresets, Particles: ParticlePresets };
 
-  const doc = $derived(session?.history.present ?? null);
+  const source = $derived(session?.history.present ?? null);
+  const doc = $derived(source && session ? inView(source, session.breakpoint) : source);
   const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
-  const edit = (next: NonNullable<typeof doc>, summary: string) => session?.edit(next, summary);
+  const edit = (next: NonNullable<typeof doc>, summary: string) => session && source && session.edit(liftEdit(source, session.breakpoint, next), summary);
+  const editSource = (result: OpResult, summary: string) => session?.apply(result, summary);
+  const pickView = (breakpointId: string) => session && (session.breakpoint = breakpointId);
   const shownDoc = $derived(doc && shown ? scopeView(doc, shown) : doc);
   const editShown = (next: NonNullable<typeof doc>, summary: string) => doc && shown && edit(mergeScope(doc, shown, next), summary);
   const commitShown = (result: OpResult, summary: string) => result.ok && editShown(result.doc, summary);
@@ -74,7 +80,7 @@
     if (!done) {
       return;
     }
-    session.edit(done.doc, done.summary);
+    edit(done.doc, done.summary);
     session.select(done.selection);
   }
 </script>
@@ -101,6 +107,7 @@
     <FramePresetSection {doc} onchange={editGuides} />
     <FrameColoursSection {doc} onchange={editGuides} />
     <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
+    <BreakpointsSection doc={source!} active={session.breakpoint} onchange={editSource} onpick={pickView} />
     <LayoutGuidesSection {doc} onchange={editGuides} />
     <FlowSection {doc} onchange={editGuides} />
     <StyleLibrarySection {tokens} />
@@ -116,6 +123,7 @@
       <TemplateInspector actions={headerBar} gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
+      <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
       <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />

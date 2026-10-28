@@ -1,4 +1,4 @@
-import { isRef, TokenKind, type CssValue, type Rule, type Token } from '../ir';
+import { isRef, TokenKind, type CssValue, type MediaRules, type Rule, type Token } from '../ir';
 import { tokenIndex, tokenKey } from '../tokens';
 
 export const TOKEN_PREFIX: Record<TokenKind, string> = {
@@ -30,6 +30,10 @@ export function ruleBlock(selector: string, rules: readonly Rule[], tokens: Toke
     return [];
   }
   return [`${indent}${selector} {`, ...rules.map(([p, v]) => `${indent}${INDENT}${p}: ${cssValue(v, tokens)};`), `${indent}}`];
+}
+
+export function mediaBlocks(selector: string, media: readonly MediaRules[] | undefined, tokens: TokenLookup, indent = ''): string[] {
+  return (media ?? []).flatMap((m) => [`${indent}@media (max-width: ${m.maxWidth}px) {`, ...ruleBlock(selector, m.rules, tokens, `${indent}${INDENT}`), `${indent}}`, '']);
 }
 
 export function tokensCss(tokens: readonly Token[], selector = ':root'): string {

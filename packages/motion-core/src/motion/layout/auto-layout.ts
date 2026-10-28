@@ -78,6 +78,7 @@ export type Item = {
   absolute?: boolean;
   baseline?: number;
   cell?: Cell;
+  heightAt?: (width: number) => number;
   flow?: Flow;
   children?: Item[];
 };
@@ -173,17 +174,19 @@ function hugCross(item: Item, flow: Flow, main: number): number {
   const room = main - PAD[m](flow.padding);
   const rows = flow.wrap ? lines(kids, (k) => measure(k)[m], room, flow.gap) : [kids];
   const lineCross = (r: Item[]) => {
-    const sizes = r.map((k) => measure(k)[c]);
+    const mains = grow(r, r.map((k) => measure(k)[m]), room - gaps(r.length, flow.gap), m);
+    const sizes = r.map((k, i) => measure(k, { [m]: mains[i] })[c]);
     return byBaseline(flow) ? baselineLine(sizes, r.map((k, i) => baselineOf(k, sizes[i]))).height : Math.max(...sizes);
   };
   const crosses = rows.filter((r) => r.length).map(lineCross);
   return sum(crosses) + gaps(crosses.length, flow.crossGap) + PAD[c](flow.padding);
 }
 
-function hugMain(item: Item, flow: Flow): number {
-  const { main: m } = AXES[flow.direction];
+function hugMain(item: Item, flow: Flow, cross?: number): number {
+  const { main: m, cross: c } = AXES[flow.direction];
   const kids = flowing(item);
-  return sum(kids.map((k) => measure(k)[m])) + gaps(kids.length, flow.gap) + PAD[m](flow.padding);
+  const given = (k: Item): Partial<Size> => (cross !== undefined && !flow.wrap && k.sizing[c] === Sizing.Fill ? { [c]: clamp(k, c, cross - PAD[c](flow.padding)) } : {});
+  return sum(kids.map((k) => measure(k, given(k))[m])) + gaps(kids.length, flow.gap) + PAD[m](flow.padding);
 }
 
 const columnsOf = (flow: Flow) => Math.max(1, Math.round(flow.columns ?? DEFAULT_COLUMNS));
@@ -347,13 +350,16 @@ function placeGrid(item: Item, flow: Flow, inner: Box, out: Map<string, Box>): v
 export function measure(item: Item, given: Partial<Size> = {}): Size {
   const { flow } = item;
   if (!flow) {
-    return { width: clamp(item, 'width', given.width ?? item.width), height: clamp(item, 'height', given.height ?? item.height) };
+    const width = clamp(item, 'width', given.width ?? item.width);
+    const reflowed = given.width !== undefined && item.heightAt ? item.heightAt(width) : item.height;
+    return { width, height: clamp(item, 'height', given.height ?? reflowed) };
   }
   if (flow.direction === Direction.Grid) {
     return measureGrid(item, flow, given);
   }
   const { main: m, cross: c } = AXES[flow.direction];
-  const main = clamp(item, m, given[m] ?? (item.sizing[m] === Sizing.Hug ? hugMain(item, flow) : item[m]));
+  const knownCross = given[c] ?? (item.sizing[c] === Sizing.Hug ? undefined : item[c]);
+  const main = clamp(item, m, given[m] ?? (item.sizing[m] === Sizing.Hug ? hugMain(item, flow, knownCross) : item[m]));
   const cross = clamp(item, c, given[c] ?? (item.sizing[c] === Sizing.Hug ? hugCross(item, flow, main) : item[c]));
   return { [m]: main, [c]: cross } as Size;
 }

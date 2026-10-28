@@ -442,3 +442,24 @@ describe('component variants through the agent', () => {
     expect(session.doc.comps[comp].component?.properties).toBeUndefined();
   });
 });
+
+describe('motion agent breakpoint tools', () => {
+  it('adds a phone view, overrides one prop there and removes it again', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 2 });
+    const clipId = session.doc.tracks[0].clips[0].id;
+
+    const added = await run('add_breakpoint', { preset: 'phone' });
+    const breakpoint_id = added.breakpoint_id as string;
+    expect(session.doc.breakpoints).toEqual([{ id: breakpoint_id, name: 'Phone', width: 390 }]);
+
+    expect((await run('set_breakpoint_override', { breakpoint_id, clip_id: clipId, key: 'hidden', value: true })).ok).toBe(true);
+    expect(findClip(session.doc, clipId)?.clip.overrides).toEqual({ [breakpoint_id]: { hidden: true } });
+
+    await run('set_breakpoint_override', { breakpoint_id, clip_id: clipId, key: 'hidden', value: null });
+    expect(findClip(session.doc, clipId)?.clip.overrides).toBeUndefined();
+
+    await run('remove_breakpoint', { breakpoint_id });
+    expect(session.doc.breakpoints).toBeUndefined();
+  });
+});

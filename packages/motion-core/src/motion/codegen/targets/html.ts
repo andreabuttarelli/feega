@@ -1,7 +1,7 @@
 import { isProp, NodeKind, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type Rule, type SvgNode, type UseNode } from '../ir';
 import { kebab } from '../naming';
 import type { CodeFile } from '../model';
-import { BASE_CSS, fontLinks, lookupOf, ruleBlock, tokensCss, type TokenLookup } from './css';
+import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, type Dialect } from './markup';
 import { readme } from './project';
 import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
@@ -66,7 +66,7 @@ function cssBlocks(node: CodeNode, selector: Selector, tokens: TokenLookup): str
   if (node.kind === NodeKind.Text || node.kind === NodeKind.Break) {
     return [];
   }
-  const own = node.className && node.rules.length ? [...ruleBlock(`.${selector(node)}`, node.rules as Rule[], tokens), ''] : [];
+  const own = node.className && node.rules.length ? [...ruleBlock(`.${selector(node)}`, node.rules as Rule[], tokens), '', ...mediaBlocks(`.${selector(node)}`, node.media, tokens)] : [];
   const kids = node.kind === NodeKind.Element ? node.children.flatMap((c) => cssBlocks(c, selector, tokens)) : [];
   return [...own, ...kids];
 }

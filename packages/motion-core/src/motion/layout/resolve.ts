@@ -66,6 +66,11 @@ function intrinsic(clip: MotionClip, size: Size, content: Content): Size {
   return { width: item.width === Sizing.Hug ? extent.width : box.width, height: item.height === Sizing.Hug ? extent.height : box.height };
 }
 
+function reflowsText(clip: MotionClip): boolean {
+  const item = clip.layoutItem ?? DEFAULT_LAYOUT_ITEM;
+  return isText(clip.component) && item.width !== Sizing.Hug && item.height === Sizing.Hug;
+}
+
 const NO_INSET: Padding = { top: 0, right: 0, bottom: 0, left: 0 };
 
 const widest = (a: Padding, b: Padding): Padding => ({ top: Math.max(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom), left: Math.max(a.left, b.left) });
@@ -94,6 +99,7 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, cont
     max: { width: own.maxWidth, height: own.maxHeight },
     absolute: own.absolute,
     baseline: isText(clip.component) ? textBaseline(clip.component, clip.props, Math.min(size.width, size.height)) : undefined,
+    heightAt: reflowsText(clip) ? (width) => textExtent(clip.component, clip.props, Math.min(size.width, size.height), width).height : undefined,
     cell: { column: own.column, row: own.row, columnSpan: own.columnSpan, rowSpan: own.rowSpan, x: own.cellX, y: own.cellY }
   };
   if (!isContainer(clip)) {
@@ -153,5 +159,5 @@ export function withAutoLayout(doc: MotionDoc): MotionDoc {
   }
   const size = { width: doc.width, height: doc.height };
   const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: laidOut(comp.tracks, comp.frame ?? size, instanceContent(doc, comp.frame ?? size)) }]));
-  return { ...doc, tracks: laidOut(doc.tracks, size, instanceContent(doc, size)), comps };
+  return { ...doc, tracks: laidOut(doc.tracks, size, instanceContent({ ...doc, comps }, size)), comps };
 }

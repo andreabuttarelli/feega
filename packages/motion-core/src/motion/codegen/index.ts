@@ -3,6 +3,8 @@ import { everyClip, type MotionDoc } from '../doc';
 import { FillType, fillsOf } from '../fill/model';
 import { withAutoLayout } from '../layout/resolve';
 import { buildPage } from './build';
+import { withMedia } from './media';
+import { resolveAt, viewsOf } from '../breakpoints/model';
 import type { PageSpec } from './ir';
 import { CodeTarget, type CodeExport, type CodeFile } from './model';
 import { kebab } from './naming';
@@ -31,7 +33,11 @@ const byPath = (a: CodeFile, b: CodeFile) => (a.path < b.path ? -1 : a.path > b.
 export function exportCode(doc: MotionDoc, options: ExportOptions = {}): CodeExport {
   const target = options.target ?? DEFAULT_TARGET;
   const name = options.name?.trim() || DEFAULT_NAME;
-  const page = buildPage({ doc: withAutoLayout(doc), name, assets: options.assets ?? {}, brand: options.brand ?? null });
+  const build = (at: MotionDoc) => buildPage({ doc: withAutoLayout(at), name, assets: options.assets ?? {}, brand: options.brand ?? null });
+  const views = viewsOf(doc)
+    .slice(1)
+    .map((v) => ({ maxWidth: v.width, page: build(resolveAt(doc, v.id)) }));
+  const page = withMedia(build(doc), views);
   const files = TARGETS[target].project(page, kebab(name)).sort(byPath);
   return { target, files, notes: page.notes };
 }
