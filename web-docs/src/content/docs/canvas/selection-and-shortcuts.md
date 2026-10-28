@@ -14,6 +14,13 @@ sidebar:
 
 With several nodes selected, dragging one moves all, and the selection bar shows the shared properties, editable once for all.
 
+## Properties of a frame or a multi-selection
+
+Selecting a frame opens its properties in the right bar.
+
+- **Selection colours** lists every colour used in the frame, nested groups and pasted Figma vectors included, most used first with a count. Changing one swatch recolours every element that uses it, in one step you can undo.
+- With several elements selected inside a frame, the right bar shows the properties they all have: text properties when all are text, plus layout, opacity and their selection colours. Values that differ read **Mixed**; editing one applies it to every selected element at once.
+
 ## Shortcuts
 
 | Key | Action |
