@@ -97,7 +97,7 @@ describe('connectorsFor — un modello uncensored non ha porte, di nessun tipo',
 
 describe('CONNECTOR_TYPES — il vocabolario chiuso', () => {
   it('sono esattamente quelli dichiarati, in un ordine stabile', () => {
-    expect(CONNECTOR_TYPES).toEqual(['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios', 'models3d', 'motions']);
+    expect(CONNECTOR_TYPES).toEqual(['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios', 'models3d', 'motions', 'section']);
   });
 });
 
@@ -235,6 +235,9 @@ describe('connectorsForNode: le porte seguono il modello che il nodo MOSTRA', ()
 
 describe('mentre tiri un filo, restano accese solo le porte dove può entrare', () => {
   it("un'immagine entra in Images e nei due fotogrammi, non in Text", () => {
+    for (const port of ['text', 'images', 'videos', 'audios', 'first_frame'] as const) {
+      expect(portAccepts(port, 'section')).toBe(true);
+    }
     expect(portAccepts('images', 'images')).toBe(true);
     expect(portAccepts('first_frame', 'images')).toBe(true);
     expect(portAccepts('last_frame', 'images')).toBe(true);

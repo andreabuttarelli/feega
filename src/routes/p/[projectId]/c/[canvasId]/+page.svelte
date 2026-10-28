@@ -197,6 +197,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { genNodeSize, startRun, unlockRun, type GenNode as GenNodeState, type GenMedium, type ModelChoice } from '$lib/canvas/gen-node';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
+  import { expandSectionEdges, sectionItemsOf, excludedOf, trimNote, type SectionInputs } from '$lib/canvas/section-source';
+  import { imageModelSpec } from '$lib/image-models';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
   import { snapAspectRatio, snapResolution } from '$lib/canvas/gen-node';
@@ -979,19 +981,47 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return prompt.trim() ? prompt : null;
   }
 
+  const wiredEdges = $derived(
+    expandSectionEdges(
+      nodes,
+      edges.map((e) => ({ id: e.id, sourceNodeId: e.source, targetNodeId: e.target, sourceHandle: e.sourceHandle ?? null, targetHandle: e.targetHandle ?? null }))
+    )
+  );
+
+  function sectionInputsOf(row: Tile): SectionInputs[] {
+    return edges
+      .filter((e) => e.target === row.id && nodes.find((n) => n.id === e.source)?.type === SECTION_TYPE)
+      .map((e) => {
+        const section = nodes.find((n) => n.id === e.source)!;
+        const items = sectionItemsOf(nodes, section.id, row.id).map((item) => ({ id: item.id, label: nodes.find((n) => n.id === item.id)?.displayName ?? item.type, included: item.included, type: item.type }));
+        const images = items.filter((i) => i.included && (i.type === 'image' || i.type === 'video')).length;
+        const maxRefs = row.type === 'image' ? (imageModelSpec(typeof row.data.model === 'string' ? row.data.model : null)?.maxRefs ?? 1) : Infinity;
+        return { id: e.id, name: section.displayName ?? 'Section', items, trimmed: trimNote(images, maxRefs) };
+      });
+  }
+
+  function setSectionItem(row: Tile, itemId: string, included: boolean) {
+    const kept = excludedOf(row.data).filter((id) => id !== itemId);
+    void saveNodeData(row.id, { sectionExcluded: included ? kept : [...kept, itemId] });
+  }
+
+  function hasWiredImage(nodeId: string): boolean {
+    return wiredEdges.some((e) => e.targetNodeId === nodeId && (e.targetHandle === 'images' || nodes.find((n) => n.id === e.sourceNodeId)?.type === 'image'));
+  }
+
   const hasUpstreamTextByNode = $derived.by(() => {
     const upstreamNodes = nodes.map((n) => ({ id: n.id, type: n.type, text: sourceTextOf(n), outputs: selectValuesOf(n) }));
-    const upstreamEdges = edges.map((e) => ({ id: e.id, sourceNodeId: e.source, targetNodeId: e.target, sourceHandle: e.sourceHandle ?? null }));
+    const upstreamEdges = wiredEdges;
     return Object.fromEntries(nodes.map((n) => [n.id, hasUpstreamText(upstreamNodes, upstreamEdges, n.id)]));
   });
 
   function textEstimateRevision(nodeId: string): string {
     return JSON.stringify(
-      edges
-        .filter((edge) => edge.target === nodeId)
+      wiredEdges
+        .filter((edge) => edge.targetNodeId === nodeId)
         .sort((left, right) => left.id.localeCompare(right.id))
         .map((edge) => {
-          const source = nodes.find((node) => node.id === edge.source);
+          const source = nodes.find((node) => node.id === edge.sourceNodeId);
           return [edge, source?.version, source?.data, source ? sourceTextOf(source) : null];
         })
     );
@@ -2349,7 +2379,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       enhanceUnitCredits: catalogueEntry.enhanceUnitCredits,
       estimatedTextInputTokens: estimate?.inputTokens,
       estimatedTextOutputTokens: estimate?.outputTokens,
-      hasUpstreamImage: edges.some((e) => e.target === row.id && e.targetHandle === 'images'),
+      hasUpstreamImage: hasWiredImage(row.id),
       imageChoices: catalogue.image,
       remembered: rememberedVariants
     });
@@ -4319,6 +4349,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
             variableTextInput={textCost?.variableInput ?? (gen.medium === 'text' && estimateRevision !== '[]')}
             {estimateRevision}
             hasUpstreamText={hasUpstreamTextByNode[row.id] ?? false}
+            sectionInputs={sectionInputsOf(row)}
+            onsectionitem={(itemId, included) => setSectionItem(row, itemId, included)}
             loopQueued={loopQueuedByNode[row.id] ?? 0}
             loopVisible={loopAffordanceByNode[row.id]?.visible ?? false}
             loopCombinationCount={loopAffordanceByNode[row.id]?.combinationCount ?? 0}

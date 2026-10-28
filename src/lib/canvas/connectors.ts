@@ -36,7 +36,7 @@ import { effectiveModel } from './default-models';
  * porte con la STESSA funzione che il resolver usa per collegarle.
  */
 
-export const CONNECTOR_TYPES = ['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios', 'models3d', 'motions'] as const;
+export const CONNECTOR_TYPES = ['text', 'images', 'first_frame', 'last_frame', 'videos', 'audios', 'models3d', 'motions', 'section'] as const;
 export type ConnectorType = (typeof CONNECTOR_TYPES)[number];
 
 /** Quanti fili un connettore porta. Il resto è "uno solo": un secondo filo è un conflitto. */
@@ -66,6 +66,7 @@ export const CONNECTOR_STYLE: Record<ConnectorType, { label: string; color: stri
   audios: { label: 'Audio', color: '#d97706' },
   models3d: { label: '3D model', color: '#0f766e' },
   motions: { label: 'Frame', color: '#4f46e5' },
+  section: { label: 'Section', color: '#6b7280' },
   first_frame: { label: 'First frame', color: '#7c3aed' },
   last_frame: { label: 'Last frame', color: '#0891b2' }
 };
@@ -106,7 +107,7 @@ export function modalityBadges(inputModalities: string[]): ModalityBadge[] {
 /** Il minimo che `ai-models-sync.ts::ModelModalities` porta — nessun import di codice server qui. */
 export type Modalities = { input: string[]; uncensored?: boolean };
 
-const CONNECTOR_MODALITY: Record<Exclude<ConnectorType, 'first_frame' | 'last_frame' | 'motions'>, string> = {
+const CONNECTOR_MODALITY: Record<Exclude<ConnectorType, 'first_frame' | 'last_frame' | 'motions' | 'section'>, string> = {
   text: 'text',
   images: 'image',
   videos: 'video',
@@ -186,6 +187,7 @@ const PORTS_ACCEPTING: Record<ConnectorType, readonly ConnectorType[]> = {
   audios: ['audios'],
   models3d: [],
   motions: ['motions'],
+  section: ['text', 'images', 'videos', 'audios', 'first_frame', 'last_frame'],
   first_frame: [],
   last_frame: []
 };

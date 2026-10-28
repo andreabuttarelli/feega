@@ -3420,3 +3420,16 @@ Signal: inpaint keeps the painted area and regenerates the rest; reframe returns
 ## GPU memory on the web is freed by GC, not by Rust's drop
 
 **Signal:** a WebGPU page that runs smoothly and then gets killed on iPhone; on desktop the GPU memory "leaks" but never crashes. Counting `GPUDevice.createTexture` minus `GPUTexture.destroy` shows thousands of live textures (24 GB after 5 min on the heavy canvas). **Move:** wgpu's WebGPU backend makes `Drop` a no-op for textures and buffers; the memory goes only when JS GC collects the wrapper, and Safari's GC does not see GPU pressure. Call `texture.destroy()` / `buffer.destroy()` (after the last submit that uses it) for every short-lived GPU resource. `scripts/perf/mobile-memory.ts` counts them.
+
+## Desktop native canvas
+
+### A render thread that reads the camera, then waits for a drawable, shows a stale frame
+
+**Signal:** native pan intervals at 32 ms while the thread is idle; `get_current_texture` takes ~14 ms per frame. **Move:** acquire the drawable first, then drain the inbox for the latest camera, then paint (`worker.rs`). A timed-out or occluded surface is a skipped frame, never an error: the spike's `?` ended the thread and the canvas froze.
+
+### The bench cannot tell native from wasm on a 60 Hz display
+
+**Signal:** both engines read 57-60 fps. **Move:** compare late-frame percentages and CPU, and say which display refresh the run had; the spike's 120 Hz numbers do not carry over. `screencapture` and `capturePage` do not see the Metal layer: read the retained texture back with the addon `snapshot` (needs `FEEGA_NATIVE_DEBUG=1`).
+
+### Un valore letto da una `Map` non reattiva resta quello del primo render
+Segnale: l'etichetta della modalità (Design/Motion) non cambia al clic e le modifiche si comportano diversamente da ciò che dice. Causa: `savers.get(id)?.mode` in un template, con `savers` una `Map` semplice. Mossa: uno `$state` che riceve le notifiche della sessione, mai la mappa nel template.

@@ -27,6 +27,24 @@ Colour fields accept hex with or without `#` (`f`, `ff` and `fff` all mean white
 
 <DemoVideo name="colour-typing" caption="Type a short hex or rgb value into a colour field." />
 
+## Editing points
+
+Double-click a selected shape, or press `Enter`, to edit its points. Rectangles, ellipses, polygons, stars and lines become free paths when you do.
+
+<DemoVideo name="vector-edit" caption="Double-click a shape, move a point, bend a curve." />
+
+| Action | Result |
+|---|---|
+| Drag a point | Moves it (snaps to the frame and other layers; hold `Cmd` to skip snapping) |
+| Drag a handle | Bends the curve; the opposite handle mirrors it |
+| `Alt`/`Option` + drag a handle | Moves one handle only, breaking the symmetry |
+| Double-click a point (or `Alt`-click) | Toggles it between sharp and smooth |
+| Click the outline | Adds a point |
+| `Delete` | Removes the selected point |
+| `Esc`, `Enter` or click outside | Leaves point editing |
+
+Each change is one undo step. The chat agent edits points the same way with `edit_path_points`.
+
 A shape can morph into any other shape, including hand-drawn paths and shapes with holes.
 
 ## Text

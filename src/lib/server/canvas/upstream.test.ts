@@ -1360,3 +1360,28 @@ describe('upstreamInputsFor — a feed hands its videos to a video input', () =>
     expect(out.referenceImageUrls).toEqual([]);
   });
 });
+
+describe('upstreamInputsFor — una sezione collegata', () => {
+  const SECTION = '12121212-1212-1212-1212-121212121212';
+  const VOICE = '13131313-1313-1313-1313-131313131313';
+  const wire = { id: 'e1', canvas_id: CANVAS, source_node_id: SECTION, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null };
+  const asset = (id: string, over: Record<string, unknown>) => ({ id, project_id: 'p1', type: 'text', url: null, content: null, mime_type: 'text/plain', bytes: null, width: null, height: null, duration_s: null, source: 'generated', source_node_id: null, created_at: 'now', ...over });
+
+  it('hands the node the text and the images the section holds right now', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(SECTION, 'section', {}),
+        nodeRow(VOICE, 'text', { prompt: 'warm and dry', groupId: SECTION }),
+        nodeRow(SOURCE_VIDEO_NODE, 'image', { refId: ASSET, groupId: SECTION }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: '', model: MODEL })
+      ],
+      nodes_connections: [wire],
+      assets: [asset(ASSET, { type: 'image', url: 'https://x/pic.png', mime_type: 'image/png' })]
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: MODEL, medium: 'image' });
+
+    expect(out.text).toEqual(['warm and dry']);
+    expect(out.referenceImageUrls).toEqual(['https://x/pic.png']);
+  });
+});

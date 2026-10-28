@@ -3,14 +3,15 @@ import { installCursor, recordDemo } from '../record';
 import { asset, openCanvas } from './seed';
 
 const GRIP_PX = 20;
+const GENERATION_MS = 240_000;
 
 test('reframe a video, and open the image dialog', async ({ page, session, admin, seedNode }) => {
   const clip = await admin.from('assets').insert({ org_id: session.orgId, project_id: session.projectId, type: 'video', source: 'imported', url: asset('/reframe-demo-clip.mp4') }).select('id').single();
-  const photo = await admin.from('assets').insert({ org_id: session.orgId, project_id: session.projectId, type: 'image', source: 'imported', url: asset('/templates/product-lifestyle.webp') }).select('id').single();
+  const photo = await admin.from('assets').insert({ org_id: session.orgId, project_id: session.projectId, type: 'image', source: 'imported', url: asset('/upscaler/sample-poster.webp') }).select('id').single();
   expect(clip.error).toBeNull();
   expect(photo.error).toBeNull();
   const video = await seedNode({ type: 'video', x: 0, y: 0, data: { prompt: 'Landing page walkthrough', refId: clip.data!.id } });
-  const image = await seedNode({ type: 'image', x: 900, y: 0, data: { prompt: 'Product on the table', refId: photo.data!.id } });
+  const image = await seedNode({ type: 'image', x: 900, y: 0, data: { prompt: 'Burrow under the old tree', refId: photo.data!.id } });
 
   await installCursor(page);
   await openCanvas(page, session);
@@ -22,7 +23,8 @@ test('reframe a video, and open the image dialog', async ({ page, session, admin
   };
   const openReframe = async (d: Parameters<Parameters<typeof recordDemo>[2]>[0], id: string) => {
     await d.click(await grip(id));
-    await d.click(page.getByRole('button', { name: 'Reframe…', exact: true }));
+    await d.click(page.getByTestId('more-actions'));
+    await d.click(page.getByRole('menuitem', { name: 'Reframe…', exact: true }));
     await expect(page.getByTestId('reframe-dialog')).toBeVisible();
   };
 
@@ -35,11 +37,22 @@ test('reframe a video, and open the image dialog', async ({ page, session, admin
     await d.click(page.getByTestId('reframe-apply'));
     await expect(page.locator('[data-testid="gpu-node"]')).toHaveCount(3, { timeout: 90_000 });
     await d.wait(3000);
+    await page.keyboard.press('Shift+Digit1');
+    await d.wait(1500);
 
     await openReframe(d, image.id);
-    await d.click(page.getByTestId('reframe-1:1'));
-    await d.wait(2500);
-    await d.key('Escape', 'Esc');
-    await d.wait(800);
+    await d.click(page.getByTestId('reframe-4:5'));
+    await d.click(page.getByTestId('reframe-apply'));
+    await expect(page.locator('[data-testid="gpu-node"]')).toHaveCount(4, { timeout: 60_000 });
+    const landed = async () => {
+      const { data } = await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).eq('display_name', 'Reframe 4:5').is('deleted_at', null).maybeSingle();
+      const node = data?.data as { refId?: string; running?: boolean } | undefined;
+      return node?.refId && !node.running ? data!.id : null;
+    };
+    await d.skip(() => expect.poll(landed, { timeout: GENERATION_MS, intervals: [3000] }).not.toBeNull().then(() => undefined));
+    await page.keyboard.press('Shift+Digit1');
+    await d.wait(1500);
+    const result = page.locator(`[data-testid="gpu-node"][data-id="${await landed()}"]`);
+    await d.look((await result.boundingBox())!, 4000);
   });
 });

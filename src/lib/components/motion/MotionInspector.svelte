@@ -26,7 +26,7 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { ADVANCED_TEXT_KEYS, DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, TextTier, textTier, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
   import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
@@ -36,6 +36,7 @@
   import ColorField from './ColorField.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
+  import Settings2 from '@lucide/svelte/icons/settings-2';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
@@ -172,7 +173,6 @@
 
   const family = $derived(familyOf(clip.component));
   let sections = $state<SectionState>({});
-  let advancedOpen = $state(false);
 
   onMount(() => {
     sections = readSections(localStore());
@@ -232,6 +232,11 @@
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
   const headKind = $derived(customName ? 'Component' : spec.label);
+  let advancedRow = $state<HTMLElement | null>(null);
+  let advancedOpen = $state(false);
+  const textFields = $derived(fieldsIn(Section.Text));
+  const textField = (key: string) => textFields.find((f) => f.key === key);
+  const decorationNow = $derived(clip.props.decoration);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const roundnessField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'roundness') ?? null);
   const cornersField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'corners') ?? null);
@@ -718,8 +723,7 @@
   {/if}
 {/snippet}
 
-{#snippet groupFields(section: Section, skip: ReadonlySet<string> = NO_SKIP)}
-  {@const list = fieldsIn(section).filter((f) => !skip.has(f.key))}
+{#snippet fieldList(list: Field[])}
   {@const gridded = list.filter(inGrid)}
   {#each list.filter((f) => !inGrid(f) && !segmented(f)) as field (field.key)}{@render fieldRow(field)}{/each}
   {#if gridded.length}
@@ -736,6 +740,29 @@
   {/each}
 {/snippet}
 
+{#snippet groupFields(section: Section, skip: ReadonlySet<string> = NO_SKIP)}
+  {@render fieldList(fieldsIn(section).filter((f) => !skip.has(f.key)))}
+{/snippet}
+
+{#snippet pair(keys: string[])}
+  {#each keys.map(textField).filter((f) => f !== undefined) as field (field.key)}
+    <div class="grid-cell" data-prop={field.key}>{@render rangeField(field)}</div>
+  {/each}
+{/snippet}
+
+{#snippet alignCell(field: Field)}
+  <div class="grid-cell" data-prop={field.key}>
+    <SegmentedField name={field.label} options={segmentsOf(field.key, field.options ?? [])} value={String(value(field))} onchange={(v) => setProp(field, v)} />
+  </div>
+{/snippet}
+
+{#snippet lineToggle(label: string, glyph: string, mode: string)}
+  {@const field = textField('decoration')}
+  {#if field}
+    <button type="button" class="tgl" class:on={value(field) === mode} data-testid={`text-${mode}`} aria-label={label} title={label} aria-pressed={value(field) === mode} onclick={() => setProp(field, value(field) === mode ? 'none' : mode)}>{glyph}</button>
+  {/if}
+{/snippet}
+
 {#snippet contentBody()}
   {@render groupFields(Section.Content)}
 {/snippet}
@@ -750,15 +777,34 @@
 {/snippet}
 
 {#snippet textBody()}
-  {@const advanced = fieldsIn(Section.Text).filter((f) => ADVANCED_TEXT_KEYS.has(f.key))}
-  {@render groupFields(Section.Text, ADVANCED_TEXT_KEYS)}
-  {#if advanced.length}
-    <button type="button" class="advanced" data-testid="text-advanced" aria-expanded={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}>
-      <ChevronRight size={12} class={advancedOpen ? 'turned' : ''} />Advanced
-    </button>
-    {#if advancedOpen}
-      {@render groupFields(Section.Text, new Set(fieldsIn(Section.Text).map((f) => f.key).filter((k) => !ADVANCED_TEXT_KEYS.has(k))))}
-    {/if}
+  {@const font = textField('font')}
+  {@const aligns = ['align', 'verticalAlign'].map(textField).filter((f) => f !== undefined)}
+  {@const italic = textField('italic')}
+  {@const casing = textField('textCase')}
+  {@const colour = textField('fills') ?? textField('color')}
+  {@const advanced = textFields.filter((f) => textTier(f.key, decorationNow) === TextTier.Advanced)}
+  <div class="text-primary">
+    {#if font}{@render fieldRow(font)}{/if}
+    <div class="grid2">{@render pair(['weight', 'fontWeight', 'size'])}</div>
+    <div class="grid2">{@render pair(['leading', 'tracking'])}</div>
+    {#if aligns.length}<div class="grid2">{#each aligns as field (field.key)}{@render alignCell(field)}{/each}</div>{/if}
+    <div class="tgl-row" data-testid="text-styles" bind:this={advancedRow}>
+      {#if italic}<button type="button" class="tgl" class:on={value(italic) === true} data-testid="text-italic" aria-label="Italic" title="Italic" aria-pressed={value(italic) === true} onclick={() => setProp(italic, value(italic) !== true)}><i>I</i></button>{/if}
+      {@render lineToggle('Underline', 'U', 'underline')}
+      {@render lineToggle('Strikethrough', 'S', 'strikethrough')}
+      {#if casing}
+        <select class="case" aria-label="Case" data-testid="text-case" value={String(value(casing))} onchange={(e) => setProp(casing, e.currentTarget.value)}>
+          {#each casing.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
+        </select>
+      {/if}
+      <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={14} /></button>
+    </div>
+    {#if colour}{@render fieldRow(colour)}{/if}
+  </div>
+  {#if advancedOpen && advancedRow && advanced.length}
+    <SidePopover anchor={advancedRow} title="Advanced type" onclose={() => (advancedOpen = false)}>
+      <div class="adv" data-testid="advanced-type">{@render fieldList(advanced)}</div>
+    </SidePopover>
   {/if}
 {/snippet}
 
@@ -1108,20 +1154,6 @@
 {/snippet}
 
 <style>
-  .advanced {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    padding: 4px 0;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--ui-ink-2);
-  }
-
-  .advanced :global(.turned) {
-    transform: rotate(90deg);
-  }
-
   .inspector {
     display: flex;
     flex: 1 0 auto;
@@ -1208,6 +1240,53 @@
     background: var(--ui-panel-raised);
     color: var(--ui-text);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+  }
+
+  .text-primary,
+  .adv {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .tgl-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .tgl {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--ui-radius-sm);
+    border: 1px solid var(--ui-line);
+    background: transparent;
+    color: var(--ui-ink-2);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .tgl.on {
+    background: var(--ui-surface-3, var(--ui-line));
+    color: var(--ui-text);
+  }
+
+  .case {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .adv {
+    padding-top: 6px;
+  }
+
+  .adv :global(.line) {
+    flex-wrap: wrap;
+  }
+
+  .adv :global(.line > label),
+  .adv :global(.line > .label) {
+    width: 100%;
   }
 
   .grid2 {

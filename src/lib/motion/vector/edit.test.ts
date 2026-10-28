@@ -77,4 +77,11 @@ describe('editing a vector network', () => {
     expect(Math.abs(into.x * out.y - into.y * out.x)).toBeCloseTo(0, 6);
     expect(toggleSmoothVertex(smooth, 1).segments[0].tangentEnd).toEqual(zero);
   });
+
+  it('a smoothed point mirrors its handles, a cornered one stops', () => {
+    const smooth = toggleSmoothVertex(square(), 1);
+
+    expect(smooth.vertices[1].mirroring).toBe(Mirroring.AngleAndLength);
+    expect(toggleSmoothVertex(smooth, 1).vertices[1].mirroring).toBe(Mirroring.None);
+  });
 });

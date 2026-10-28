@@ -4,7 +4,6 @@ import { DASHBOARD_PATH, DEFAULT_CANVAS_NAME, DEFAULT_PROJECT_NAME, ENTRY_DEPS, 
 import { chooseOrg, LAST_PROJECT_COOKIE, ORG_COOKIE } from '$lib/server/tenancy/context';
 import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { signedInDb } from '$lib/server/dashboard/app-shell';
-import { DASHBOARD_DEPS, dashboardFor } from '$lib/server/dashboard/dashboard';
 import { listMemberships, setActiveOrg } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
 import { createCanvas } from '$lib/server/repos/canvas';
@@ -30,7 +29,7 @@ export const load = async (event: Parameters<PageServerLoad>[0]) => {
   const { db, user } = await signedInDb(event);
   const { cookies } = event;
   const campaign = takeCampaign(cookies);
-  const { org, projects } = await event.parent();
+  const { projects } = await event.parent();
   const recentProjectId = projects?.[0]?.id ?? null;
 
   if (campaign || !recentProjectId) {
@@ -40,8 +39,8 @@ export const load = async (event: Parameters<PageServerLoad>[0]) => {
     }
   }
 
-  const [dashboard, attachProjectId] = await Promise.all([dashboardFor(db, DASHBOARD_DEPS, org.id), attachTarget(event, recentProjectId)]);
-  return { dashboard, templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
+  const attachProjectId = await attachTarget(event, recentProjectId);
+  return { templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
 };
 
 async function attachTarget(event: Parameters<PageServerLoad>[0], recentProjectId: string | null): Promise<string | null> {

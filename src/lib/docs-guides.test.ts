@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { DOCS_ORIGIN, filterGuides, guideUrl, parseGuides } from './docs-guides';
+import { DOCS_ORIGIN, fetchGuides, filterGuides, guideUrl, parseGuides } from './docs-guides';
 
 const SAMPLE = [
   { path: 'ai/loops', title: 'Loops', section: 'ai' },
@@ -19,5 +19,22 @@ describe('guide dai docs', () => {
 
   test('guideUrl punta alla pagina dei docs', () => {
     expect(guideUrl('ai/loops')).toBe(`${DOCS_ORIGIN}/ai/loops/`);
+  });
+});
+
+describe('fetchGuides', () => {
+  const answer = (body: unknown, ok = true) => (async () => ({ ok, json: async () => body })) as unknown as typeof fetch;
+
+  test('restituisce le guide di una risposta valida', async () => {
+    await expect(fetchGuides(answer(SAMPLE))).resolves.toEqual(SAMPLE);
+  });
+
+  test('una risposta di errore fa fallire, così la tab dice che è offline', async () => {
+    await expect(fetchGuides(answer({ error: 'not found' }, false))).rejects.toThrow();
+  });
+
+  test('un indice vuoto o senza guide valide fa fallire invece di mostrare una tab vuota', async () => {
+    await expect(fetchGuides(answer([]))).rejects.toThrow();
+    await expect(fetchGuides(answer({ not: 'an array' }))).rejects.toThrow();
   });
 });
