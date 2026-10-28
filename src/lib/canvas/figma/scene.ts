@@ -245,13 +245,15 @@ function radiiOf(n: FigmaRawNode): [number, number, number, number] {
 
 const stopsOf = (stops: ColorStop[] = []): Stop[] => stops.map((s) => ({ color: hexOf(s.color), pos: round(s.position) }));
 
-function gradientAngle(t: Matrix | undefined): number {
+const QUARTER_TURN = 90;
+
+function axisAngle(t: Matrix | undefined): number {
   const m = t ?? IDENTITY;
   const det = m.m00 * m.m11 - m.m01 * m.m10 || 1;
-  const dx = m.m11 / det;
-  const dy = -m.m10 / det;
-  return Math.round(((Math.atan2(dy, dx) * 180) / Math.PI + 90 + 360) % 360);
+  return Math.round(((Math.atan2(-m.m10 / det, m.m11 / det) * 180) / Math.PI + 360) % 360);
 }
+
+const sweepAngle = (t: Matrix | undefined) => (axisAngle(t) + QUARTER_TURN) % 360;
 
 const GRADIENT_MIDDLE = 0.5;
 const unitClamp = (n: number) => round(Math.max(0, Math.min(1, n)));
@@ -267,10 +269,10 @@ type Report = (what: string) => void;
 
 const FILLS: Record<string, (p: Paint, report: Report) => Fill | null> = {
   SOLID: (p) => ({ kind: FillKind.Solid, color: hexOf(p.color!), opacity: round((p.opacity ?? 1) * (p.color?.a ?? 1)) }),
-  GRADIENT_LINEAR: (p) => ({ kind: FillKind.Linear, stops: stopsOf(p.stops), angle: gradientAngle(p.transform), opacity: round(p.opacity ?? 1) }),
+  GRADIENT_LINEAR: (p) => ({ kind: FillKind.Linear, stops: stopsOf(p.stops), angle: axisAngle(p.transform), opacity: round(p.opacity ?? 1) }),
   GRADIENT_RADIAL: (p) => ({ kind: FillKind.Radial, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
   GRADIENT_DIAMOND: (p) => ({ kind: FillKind.Diamond, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
-  GRADIENT_ANGULAR: (p) => ({ kind: FillKind.Angular, stops: stopsOf(p.stops), angle: gradientAngle(p.transform), center: gradientCentre(p.transform), opacity: round(p.opacity ?? 1) }),
+  GRADIENT_ANGULAR: (p) => ({ kind: FillKind.Angular, stops: stopsOf(p.stops), angle: sweepAngle(p.transform), center: gradientCentre(p.transform), opacity: round(p.opacity ?? 1) }),
   IMAGE: (p) => ({ kind: FillKind.Image, hash: hashHex(p.image?.hash), opacity: round(p.opacity ?? 1) })
 };
 

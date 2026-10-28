@@ -84,6 +84,18 @@ describe('what the Figma layer looks like', () => {
     expect(rect.kind === LayerKind.Shape && rect.fills.map((f) => f.kind)).toEqual(['solid', 'angular']);
   });
 
+  it('points a linear gradient along its Figma handles, horizontal stays horizontal', () => {
+    const linear = (m00: number) => {
+      const message = elementsOnly();
+      message.nodes[2].fillPaints = [{ ...gradient('GRADIENT_LINEAR'), transform: { m00, m01: 0, m02: m00 < 0 ? 1 : 0, m10: 0, m11: 1, m12: 0 } }];
+      const ellipse = figmaScene(message)!.placements[1].layer;
+      return ellipse.kind === LayerKind.Shape ? ellipse.fills[0] : null;
+    };
+
+    expect(linear(1)).toMatchObject({ kind: 'linear', angle: 0 });
+    expect(linear(-1)).toMatchObject({ kind: 'linear', angle: 180 });
+  });
+
   it('keeps angular and diamond gradients as themselves, not approximated', () => {
     const painted = (type: string) => {
       const message = elementsOnly();
