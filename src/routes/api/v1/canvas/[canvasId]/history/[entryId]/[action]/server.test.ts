@@ -29,12 +29,17 @@ describe('POST /api/v1/canvas/{id}/history/{entry}/{action}', () => {
     await call(POST, CANVAS, 'restore', {});
     await call(POST, CANVAS, 'name', { name: 'Client review' });
     await call(GET, CANVAS, 'preview');
+    await call(POST, CANVAS, 'merge', { keep: 'branch' });
+    await call(POST, CANVAS, 'drop', {});
 
     expect(ran.map((r) => [r.op, r.projectId])).toEqual([
       ['restore_to', 'p-1'],
       ['name_version', 'p-1'],
-      ['preview_at', 'p-1']
+      ['preview_at', 'p-1'],
+      ['merge_branch_at', 'p-1'],
+      ['drop_branch_at', 'p-1']
     ]);
+    expect(ran[3].input).toMatchObject({ keep: 'branch' });
     expect(ran[1].input).toEqual({ canvasId: CANVAS, entryId: 'version:v1', name: 'Client review' });
   });
 

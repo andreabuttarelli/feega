@@ -8,13 +8,17 @@
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Tag from '@lucide/svelte/icons/tag';
   import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
+  import GitMerge from '@lucide/svelte/icons/git-merge';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import { Side } from '$lib/motion/branch-merge';
   import type { Component } from 'svelte';
   import { SegmentedControl } from '$lib/components/ui/shell';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { postPageAction } from '$lib/api/page-action';
   import { LocalOff, isOff } from '$lib/local-user';
-  import { ENTRY_VERBS, HistoryAction, HistoryFilter, LaneIcon, actionsOf, laneSpans, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
+  import { ENTRY_VERBS, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, laneSpans, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
   import type { HistoryPreview } from '$lib/server/canvas/history-actions';
 
   let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
@@ -40,8 +44,15 @@
   const ACTION_UI: Record<HistoryAction, { label: string; icon: Component<{ size?: number }> }> = {
     [HistoryAction.Preview]: { label: 'Preview', icon: Eye },
     [HistoryAction.Restore]: { label: 'Restore to here', icon: RotateCcw },
-    [HistoryAction.Name]: { label: 'Name this version', icon: Tag }
+    [HistoryAction.Name]: { label: 'Name this version', icon: Tag },
+    [HistoryAction.Merge]: { label: 'Merge', icon: GitMerge },
+    [HistoryAction.Drop]: { label: 'Drop', icon: Trash2 }
   };
+
+  const KEEPS = [
+    { side: Side.Branch, label: 'Keep branch' },
+    { side: Side.Main, label: 'Keep main' }
+  ];
 
   const ACTION_FAILED = 'That could not be done: reload and try again.';
 
@@ -55,9 +66,12 @@
   let naming = $state<string | null>(null);
   let saving = $state(false);
   let notice = $state('');
+  let conflicts = $state<string[] | null>(null);
+  let branching = $state(false);
 
   const frameId = $derived(oneFrame ? ($canvasSelection[0] ?? null) : null);
   const spans = $derived(graph ? laneSpans(graph) : []);
+  const forks = $derived(graph ? branchForks(graph) : []);
   const gutter = $derived(Math.max(1, graph?.lanes.length ?? 1) * LANE_PX);
 
   $effect(() => {
@@ -88,12 +102,15 @@
     opened = opened === entry.id ? null : entry.id;
     preview = null;
     naming = null;
+    conflicts = null;
     notice = '';
   }
 
   async function write(entry: HistoryEntry, body: Record<string, string>) {
     const res = await fetch(pointUrl(entry), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    notice = res.ok ? '' : ACTION_FAILED;
+    const read = (await res.json().catch(() => ({}))) as { conflicts?: string[] };
+    conflicts = read.conflicts ?? null;
+    notice = res.ok || conflicts ? '' : ACTION_FAILED;
     reads += 1;
   }
 
@@ -107,8 +124,19 @@
     [HistoryAction.Restore]: (entry) => write(entry, { action: HistoryAction.Restore }),
     [HistoryAction.Name]: (entry) => {
       naming = entry.summary ?? '';
-    }
+    },
+    [HistoryAction.Merge]: (entry) => write(entry, { action: HistoryAction.Merge }),
+    [HistoryAction.Drop]: (entry) => write(entry, { action: HistoryAction.Drop })
   };
+
+  async function branchFrame(name: string) {
+    const form = new FormData();
+    form.set('name', name);
+    const result = await postPageAction(`/p/${projectId}/c/${canvasId}/motion/${frameId}`, 'createBranch', form);
+    notice = result.type === 'success' ? '' : ACTION_FAILED;
+    branching = false;
+    reads += 1;
+  }
 
   async function saveVersion(name: string) {
     const form = new FormData();
@@ -131,6 +159,11 @@
     <button type="button" class="frame-toggle" class:on={oneFrame} aria-pressed={oneFrame} aria-label="One frame" title="Only the selected frame" disabled={!$canvasSelection.length && !oneFrame} onclick={() => (oneFrame = !oneFrame)} data-testid="history-one-frame">
       <Frame size={14} />
     </button>
+    {#if oneFrame && frameId}
+      <button type="button" class="frame-toggle" aria-label="New branch" title="Branch the selected frame" onclick={() => (branching = !branching)} data-testid="history-new-branch">
+        <GitBranch size={14} />
+      </button>
+    {/if}
     {#if !isOff(LocalOff.Versions)}
       <button type="button" class="frame-toggle" aria-label="Save version" title="Save the canvas as a version" onclick={() => (saving = !saving)} data-testid="history-save-version">
         <BookmarkPlus size={14} />
@@ -140,6 +173,10 @@
 
   {#if saving}
     <input class="name-input" aria-label="Version name" placeholder="Name this version" data-testid="history-version-name" onkeydown={(e) => e.key === 'Enter' && void saveVersion(e.currentTarget.value)} />
+  {/if}
+
+  {#if branching}
+    <input class="name-input" aria-label="Branch name" placeholder="Name the branch" data-testid="history-branch-name" onkeydown={(e) => e.key === 'Enter' && void branchFrame(e.currentTarget.value)} />
   {/if}
 
   {#if notice}
@@ -172,6 +209,9 @@
                 <line x1={laneX(l)} x2={laneX(l)} y1={index === span.first ? ROW_PX / 2 : 0} y2={index === span.last ? ROW_PX / 2 : ROW_PX} stroke={graph.lanes[l].colour} stroke-opacity="0.45" stroke-width="1.5" />
               {/if}
             {/each}
+            {#each forks.filter((f) => f.from === index) as fork (fork.to)}
+              <path d={`M ${laneX(row.lane)} ${ROW_PX / 2} Q ${laneX(fork.lane)} ${ROW_PX / 2} ${laneX(fork.lane)} ${ROW_PX}`} fill="none" stroke={lane.colour} stroke-width="1.5" stroke-dasharray="3 2" data-testid="history-fork" />
+            {/each}
             <circle cx={laneX(row.lane)} cy={ROW_PX / 2} r={DOT_R} fill={lane.colour} />
           </svg>
           <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
@@ -188,6 +228,16 @@
             </div>
             {#if naming !== null}
               <input class="name-input" aria-label="Version name" placeholder="Name this version" value={naming} data-testid="history-name-input" onkeydown={(e) => e.key === 'Enter' && void write(row.entry, { action: HistoryAction.Name, name: e.currentTarget.value }).then(() => (naming = null))} />
+            {/if}
+            {#if conflicts}
+              <div class="preview" data-testid="history-conflicts">
+                <span>{conflicts.length} conflicts with the frame</span>
+                <div class="point-actions">
+                  {#each KEEPS as keep (keep.side)}
+                    <button type="button" class="point-action" onclick={() => void write(row.entry, { action: HistoryAction.Merge, keep: keep.side })}>{keep.label}</button>
+                  {/each}
+                </div>
+              </div>
             {/if}
             {#if preview}
               <div class="preview" data-testid="history-preview">

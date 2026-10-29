@@ -6,7 +6,6 @@
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
-  import BranchesMenu from '$lib/components/motion/BranchesMenu.svelte';
   import VarsPanel from '$lib/components/motion/VarsPanel.svelte';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
@@ -37,8 +36,6 @@
   import { loadScenes, type LoadedScenes } from '$lib/canvas/scene-sources';
   import { resolveScenes, sceneNodeIds } from '$lib/motion/scenes';
 
-  type Branch = { id: string; frameId: string; name: string; baseVersion: number };
-  type Conflict = { path: string; branch: unknown; main: unknown };
   type ImagesMade = { url: string; name: string; files: string[] };
 
   const ID_LENGTH = 8;
@@ -58,7 +55,6 @@
     frame,
     onedit,
     onswitch,
-    onfocus,
     onimages,
     onpreview,
     onclose
@@ -73,7 +69,6 @@
     frame: number;
     onedit: (result: OpResult, summary: string) => void;
     onswitch: (next: FrameDialog) => void;
-    onfocus: (nodeId: string) => void;
     onimages: (rows: ExportRow[]) => Promise<ImagesMade | string>;
     onpreview: (doc: MotionDoc | null) => void;
     onclose: () => void;
@@ -195,61 +190,6 @@
   }
 
   let previewVars = $state<VarValues>({});
-
-  const fork = $derived((data?.node as { fork?: Branch | null } | undefined)?.fork ?? null);
-  let branches = $state<Branch[]>([]);
-  let conflicts = $state<Conflict[] | null>(null);
-
-  const act = (name: string, form = new FormData()) => postPageAction(editorUrl, name, form);
-
-  async function loadBranches() {
-    const result = await act('branches');
-    branches = result.type === 'success' ? ((result.data as { branches: Branch[] }).branches ?? []) : [];
-  }
-
-  async function createBranch(name: string) {
-    await session.save();
-    const form = new FormData();
-    form.set('name', name);
-    const result = await act('createBranch', form);
-    if (result.type !== 'success') {
-      session.notice = 'The branch could not be created.';
-      return;
-    }
-    await loadBranches();
-  }
-
-  async function reviewBranch() {
-    await session.save();
-    const result = await act('reviewBranch');
-    conflicts = result.type === 'success' ? (result.data as { conflicts: Conflict[] }).conflicts : [];
-  }
-
-  async function mergeBranch(choices: Record<string, string>) {
-    const form = new FormData();
-    form.set('choices', JSON.stringify(choices));
-    const result = await act('mergeBranch', form);
-    if (result.type !== 'success' || !fork) {
-      session.notice = 'The branch could not be merged.';
-      return;
-    }
-    onclose();
-    onfocus(fork.frameId);
-  }
-
-  async function dropBranch() {
-    const result = await act('dropBranch');
-    if (result.type === 'success' && fork) {
-      onclose();
-      onfocus(fork.frameId);
-    }
-  }
-
-  $effect(() => {
-    if (dialog === FrameDialog.Branches && !fork) {
-      void loadBranches();
-    }
-  });
 </script>
 
 <div class="layer">
@@ -322,10 +262,6 @@
     <InteractivePanel active tilt={false} clipId={selected?.id ?? null} onpreset={(preset) => onedit(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
     <VarsPanel {doc} bind:values={previewVars} clip={selected} onchange={(next, summary) => onedit({ ok: true, doc: next }, summary)} />
     </div>
-  </FrameDialogCard>
-{:else if dialog === FrameDialog.Branches && data}
-  <FrameDialogCard title="Branches" testid="frame-branches" {onclose}>
-    <BranchesMenu {fork} {branches} {conflicts} oncreate={(name) => void createBranch(name)} onopen={(id) => (onclose(), onfocus(id))} onreview={() => void reviewBranch()} onmerge={(c) => void mergeBranch(c)} ondrop={() => void dropBranch()} />
   </FrameDialogCard>
 {:else if dialog === FrameDialog.Chat}
   <FrameDialogCard title="Chat history" testid="frame-chat" {onclose}>

@@ -149,11 +149,7 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   batchStatus: editor('batch_status'),
   cancelRender: canvas('cancel_render'),
   renderStatus: editor('render_status'),
-  branches: editor('list_branches'),
-  createBranch: editor('create_branch'),
-  reviewBranch: editor('review_branch'),
-  mergeBranch: editor('merge_branch'),
-  dropBranch: editor('drop_branch')
+  createBranch: editor('create_branch')
 };
 
 const OPACITY_PARITY = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, motion('set_transform')])) as Record<(typeof OPACITY_KEYS)[number]['command'], Parity>;
@@ -405,7 +401,6 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'frame-interactive': motion('declare_var'),
   'frame-components': motion('add_template'),
   'frame-templates': motion('add_template'),
-  'frame-branches': editor('list_branches'),
   'frame-history': canvas('restore_to'),
   'frame-chat': tool('ask_motion_agent'),
   'frame-save-template': editor('save_template'),

@@ -17,19 +17,21 @@ function query(ask: HistoryAsk, org?: string): string {
 export enum PointAction {
   Preview = 'preview',
   Restore = 'restore',
-  Name = 'name'
+  Name = 'name',
+  Merge = 'merge',
+  Drop = 'drop'
 }
 
-export type PointAsk = { canvasId: string; entryId: string; action: `${PointAction}`; name?: string };
+export type PointAsk = { canvasId: string; entryId: string; action: `${PointAction}`; name?: string; keep?: string };
 
-const POINT_METHOD: Record<PointAction, string> = { [PointAction.Preview]: 'GET', [PointAction.Restore]: 'POST', [PointAction.Name]: 'POST' };
+const POINT_METHOD: Record<PointAction, string> = { [PointAction.Preview]: 'GET', [PointAction.Restore]: 'POST', [PointAction.Name]: 'POST', [PointAction.Merge]: 'POST', [PointAction.Drop]: 'POST' };
 
 export const historyApi = {
   list: (token: string, ask: HistoryAsk, org?: string) => request<History>(`/api/v1/canvas/${encodeURIComponent(ask.canvasId)}/history${query(ask, org)}`, token),
   at: (token: string, ask: PointAsk, org?: string) => {
     const method = POINT_METHOD[ask.action as PointAction];
     const path = `/api/v1/canvas/${encodeURIComponent(ask.canvasId)}/history/${encodeURIComponent(ask.entryId)}/${ask.action}${query({ canvasId: ask.canvasId }, org)}`;
-    return request<Record<string, unknown>>(path, token, method === 'GET' ? undefined : { method, body: JSON.stringify({ name: ask.name }) });
+    return request<Record<string, unknown>>(path, token, method === 'GET' ? undefined : { method, body: JSON.stringify({ name: ask.name, keep: ask.keep }) });
   }
 };
 

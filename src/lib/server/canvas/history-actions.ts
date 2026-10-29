@@ -6,7 +6,10 @@ import { restoreRevision, Restore } from '$lib/server/motion/restore';
 import { nameVersion } from '$lib/server/motion/version-names';
 import { motionOf } from '$lib/canvas/motion-node';
 import { clipsOf } from '@feega/motion-core/motion/doc';
-import { HistorySource, entryRef, type EntryRef } from '$lib/canvas/history/timeline';
+import { HistoryAction, HistorySource, entryRef, type EntryRef } from '$lib/canvas/history/timeline';
+import { branchStore } from '$lib/server/motion/branch-store';
+import { BranchOutcome, dropBranch, mergeBranchBack, reviewBranch } from '$lib/server/motion/branches';
+import { Side } from '$lib/motion/branch-merge';
 import { RestoreOutcome, readCanvasVersion, restoreCanvasVersion } from './canvas-versions';
 
 export enum HistoryOutcome {
@@ -26,7 +29,9 @@ export type HistoryPreview = CanvasPreview | FramePreview;
 
 export type Previewed = { outcome: HistoryOutcome.Done; preview: HistoryPreview } | { outcome: Exclude<HistoryOutcome, HistoryOutcome.Done> };
 
-export type Acted = { outcome: HistoryOutcome };
+export type Acted = { outcome: HistoryOutcome; conflicts?: string[] };
+
+export type Ask = { actor: Actor; name?: string; keep?: Side };
 
 const MISSING = { outcome: HistoryOutcome.Missing } as const;
 const UNSUPPORTED = { outcome: HistoryOutcome.Unsupported } as const;
@@ -57,43 +62,68 @@ async function previewRevision(at: At): Promise<Previewed> {
   return { outcome: HistoryOutcome.Done, preview };
 }
 
-async function restoreVersion(at: At, actor: Actor): Promise<Acted> {
-  const out = await restoreCanvasVersion(at.db, { orgId: at.scope.orgId, canvasId: at.scope.canvasId, versionId: at.ref.key, actor });
+async function restoreVersion(at: At, ask: Ask): Promise<Acted> {
+  const out = await restoreCanvasVersion(at.db, { orgId: at.scope.orgId, canvasId: at.scope.canvasId, versionId: at.ref.key, actor: ask.actor });
   return out.outcome === RestoreOutcome.Restored ? { outcome: HistoryOutcome.Done } : MISSING;
 }
 
 const RESTORED: Record<Restore, HistoryOutcome> = { [Restore.Restored]: HistoryOutcome.Done, [Restore.Missing]: HistoryOutcome.Missing, [Restore.Conflict]: HistoryOutcome.Conflict };
 
-async function restoreFrame(at: At, actor: Actor): Promise<Acted> {
+async function restoreFrame(at: At, ask: Ask): Promise<Acted> {
   const frame = await frameOf(at);
   const node = frame ? motionOf(frame.record) : null;
   if (!frame || !node) {
     return MISSING;
   }
-  const out = await restoreRevision(at.db, { orgId: at.scope.orgId, nodeId: frame.record.id, node, version: frame.version, actor });
+  const out = await restoreRevision(at.db, { orgId: at.scope.orgId, nodeId: frame.record.id, node, version: frame.version, actor: ask.actor });
   return { outcome: RESTORED[out.outcome] };
 }
 
-async function nameFrame(at: At, name: string, actor: Actor): Promise<Acted> {
+async function nameFrame(at: At, ask: Ask): Promise<Acted> {
   const frame = await frameOf(at);
   if (!frame) {
     return MISSING;
   }
-  const out = await nameVersion(at.db, { orgId: at.scope.orgId, nodeId: frame.record.id, version: frame.version, name, actor });
+  const out = await nameVersion(at.db, { orgId: at.scope.orgId, nodeId: frame.record.id, version: frame.version, name: ask.name ?? '', actor: ask.actor });
   return { outcome: out.named ? HistoryOutcome.Done : HistoryOutcome.Missing };
 }
 
-type Handlers = {
-  preview?: (at: At) => Promise<Previewed>;
-  restore?: (at: At, actor: Actor) => Promise<Acted>;
-  name?: (at: At, name: string, actor: Actor) => Promise<Acted>;
-};
+async function mergeFork(at: At, ask: Ask): Promise<Acted> {
+  if (!(await frameOf(at))) {
+    return MISSING;
+  }
+  const store = branchStore(at.db, { orgId: at.scope.orgId, actor: ask.actor });
+  const review = await reviewBranch(store, at.ref.key);
+  if (!review) {
+    return MISSING;
+  }
+
+  const paths = review.conflicts.map((c) => c.path);
+  if (paths.length && !ask.keep) {
+    return { outcome: HistoryOutcome.Conflict, conflicts: paths };
+  }
+  const choices = Object.fromEntries(paths.map((path) => [path, ask.keep!]));
+  const out = await mergeBranchBack(store, at.ref.key, choices);
+  return { outcome: out.outcome === BranchOutcome.Merged ? HistoryOutcome.Done : HistoryOutcome.Missing };
+}
+
+async function dropFork(at: At, ask: Ask): Promise<Acted> {
+  if (!(await frameOf(at))) {
+    return MISSING;
+  }
+  const out = await dropBranch(branchStore(at.db, { orgId: at.scope.orgId, actor: ask.actor }), at.ref.key);
+  return { outcome: out === BranchOutcome.Dropped ? HistoryOutcome.Done : HistoryOutcome.Missing };
+}
+
+type Write = (at: At, ask: Ask) => Promise<Acted>;
+
+type Handlers = { preview?: (at: At) => Promise<Previewed>; writes: Partial<Record<HistoryAction, Write>> };
 
 const HANDLERS: Record<HistorySource, Handlers> = {
-  [HistorySource.Event]: {},
-  [HistorySource.Version]: { preview: previewVersion, restore: restoreVersion },
-  [HistorySource.Revision]: { preview: previewRevision, restore: restoreFrame, name: nameFrame },
-  [HistorySource.Branch]: {}
+  [HistorySource.Event]: { writes: {} },
+  [HistorySource.Version]: { preview: previewVersion, writes: { [HistoryAction.Restore]: restoreVersion } },
+  [HistorySource.Revision]: { preview: previewRevision, writes: { [HistoryAction.Restore]: restoreFrame, [HistoryAction.Name]: nameFrame } },
+  [HistorySource.Branch]: { writes: { [HistoryAction.Merge]: mergeFork, [HistoryAction.Drop]: dropFork } }
 };
 
 function handlersOf(db: Db, scope: Scope): { at: At; handlers: Handlers } | null {
@@ -106,12 +136,8 @@ export async function previewAt(db: Db, scope: Scope): Promise<Previewed> {
   return found?.handlers.preview ? found.handlers.preview(found.at) : UNSUPPORTED;
 }
 
-export async function restoreTo(db: Db, input: Scope & { actor: Actor }): Promise<Acted> {
+export async function actAt(db: Db, input: Scope & Ask & { action: HistoryAction }): Promise<Acted> {
   const found = handlersOf(db, input);
-  return found?.handlers.restore ? found.handlers.restore(found.at, input.actor) : UNSUPPORTED;
-}
-
-export async function nameAt(db: Db, input: Scope & { name: string; actor: Actor }): Promise<Acted> {
-  const found = handlersOf(db, input);
-  return found?.handlers.name ? found.handlers.name(found.at, input.name, input.actor) : UNSUPPORTED;
+  const write = found?.handlers.writes[input.action];
+  return found && write ? write(found.at, input) : UNSUPPORTED;
 }

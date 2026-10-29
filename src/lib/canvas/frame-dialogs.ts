@@ -7,7 +7,6 @@ export enum FrameDialog {
   Interactive = 'interactive',
   Components = 'components',
   Templates = 'templates',
-  Branches = 'branches',
   Chat = 'chat',
   SaveTemplate = 'save-template',
   Publish = 'publish'
@@ -19,7 +18,6 @@ export const FRAME_DIALOG_ACTIONS = {
   'frame-interactive': FrameDialog.Interactive,
   'frame-components': FrameDialog.Components,
   'frame-templates': FrameDialog.Templates,
-  'frame-branches': FrameDialog.Branches,
   'frame-chat': FrameDialog.Chat,
   'frame-save-template': FrameDialog.SaveTemplate,
   'frame-publish': FrameDialog.Publish
