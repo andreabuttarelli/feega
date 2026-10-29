@@ -1,3 +1,8 @@
+import type { Component } from 'svelte';
+import PenTool from '@lucide/svelte/icons/pen-tool';
+import Diamond from '@lucide/svelte/icons/diamond';
+import Play from '@lucide/svelte/icons/play';
+import CodeXml from '@lucide/svelte/icons/code-xml';
 import { EditMode } from '$lib/motion/edit-mode';
 
 export enum EditorMode {
@@ -15,6 +20,7 @@ export enum ModeInspector {
 
 type ModeSpec = {
   label: string;
+  icon: Component;
   edit: EditMode;
   inspector: ModeInspector;
   onMotionKey: EditorMode;
@@ -22,10 +28,10 @@ type ModeSpec = {
 };
 
 export const MODES: Record<EditorMode, ModeSpec> = {
-  [EditorMode.Design]: { label: 'Design', edit: EditMode.Design, inspector: ModeInspector.Properties, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code },
-  [EditorMode.Motion]: { label: 'Motion', edit: EditMode.Motion, inspector: ModeInspector.Properties, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
-  [EditorMode.Play]: { label: 'Play', edit: EditMode.Design, inspector: ModeInspector.Soon, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
-  [EditorMode.Code]: { label: 'Code', edit: EditMode.Design, inspector: ModeInspector.Code, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design }
+  [EditorMode.Design]: { label: 'Design', icon: PenTool, edit: EditMode.Design, inspector: ModeInspector.Properties, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code },
+  [EditorMode.Motion]: { label: 'Motion', icon: Diamond, edit: EditMode.Motion, inspector: ModeInspector.Properties, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
+  [EditorMode.Play]: { label: 'Play', icon: Play, edit: EditMode.Design, inspector: ModeInspector.Soon, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
+  [EditorMode.Code]: { label: 'Code', icon: CodeXml, edit: EditMode.Design, inspector: ModeInspector.Code, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design }
 };
 
 export const EDITOR_MODE_KEY = 'feega.editor-mode';

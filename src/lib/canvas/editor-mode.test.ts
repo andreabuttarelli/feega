@@ -13,6 +13,12 @@ const blocked = () => {
 };
 
 describe('editor mode', () => {
+  it('every mode has an icon for the switch', () => {
+    for (const mode of Object.values(EditorMode)) {
+      expect(MODES[mode].icon).toBeTruthy();
+    }
+  });
+
   it('starts in Design without a remembered mode', () => {
     expect(new EditorModeState(new MemoryStore()).current).toBe(EditorMode.Design);
   });

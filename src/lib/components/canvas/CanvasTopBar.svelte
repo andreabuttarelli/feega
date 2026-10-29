@@ -10,7 +10,6 @@
   import CanvasShare from './CanvasShare.svelte';
   import CanvasConnect from './CanvasConnect.svelte';
   import ConnectionDot from './ConnectionDot.svelte';
-  import EditorModeSwitch from './EditorModeSwitch.svelte';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { LocalOff, isOff } from '$lib/local-user';
@@ -186,7 +185,6 @@
   {/snippet}
 
   <div class="top-slot" data-top-slot></div>
-  <EditorModeSwitch />
   <div class="top-box top-group right">
     <div class="top-peers" data-top-peers></div>
     {#if $canvasLink}

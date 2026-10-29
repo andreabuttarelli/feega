@@ -10,7 +10,7 @@ one hidden place only. Shortcuts collide. "Frame", "Play" and "Present" mean sev
 
 ## Model
 
-Four global modes, segmented control top-center of the canvas header: **Design · Motion · Play ·
+Four global modes, icon segments at the left of the bottom bar: **Design · Motion · Play ·
 Code**. Mobile: bottom pill. One verb per mode.
 
 | Mode | Verb | Edits | Canvas shows |
@@ -99,7 +99,7 @@ keeps only project switcher + burger.
 | Export… (still/scenes) | "…" menu | right bar export section + "…" |
 | Export code… | "…" menu dialog | Code mode right bar (from #1512) |
 | Coder mode ⇧D | frame mode row, ⇧D | Code mode (⇧D switches to it) |
-| Design/Motion switch | frame mode row, `E` | header mode control, `E` |
+| Design/Motion switch | frame mode row, `E` | bottom-bar mode control, `E` |
 | Interactive… | "…" menu dialog | Play mode right bar |
 | Live toggle on frame | frame overlay | Play mode right bar + overlay |
 | Prototype flow + Play | inspector Flow section | Play mode right bar; runs from selection |
