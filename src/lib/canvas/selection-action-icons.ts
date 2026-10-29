@@ -7,7 +7,6 @@ import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import EyeOff from '@lucide/svelte/icons/eye-off';
 import Lock from '@lucide/svelte/icons/lock';
 import ClipboardCopy from '@lucide/svelte/icons/clipboard-copy';
-import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import Globe from '@lucide/svelte/icons/globe';
 import CodeXml from '@lucide/svelte/icons/code-xml';
