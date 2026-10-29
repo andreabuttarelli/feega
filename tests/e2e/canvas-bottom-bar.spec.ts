@@ -1,3 +1,4 @@
+import { openInsert, pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import poster from './fixtures/poster-type-grid.json' with { type: 'json' };
@@ -41,23 +42,19 @@ test.describe('one bottom bar, by context @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
-    await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
-    await expect(bar.getByRole('button', { name: 'Upload file' })).toBeVisible();
-    await expect(page.getByTestId('draw-tools')).toHaveCount(1);
+    await expect((await openInsert(page)).locator('[data-insert="upload"]')).toBeVisible();
+    await page.keyboard.press('Escape');
     await shoot(page, '1-canvas-tools');
 
     await page.getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
     await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
     await expect(bar).toHaveAttribute('data-context', 'frame');
-    await expect(page.getByTestId('draw-tools'), 'one draw toolbar, the one in the bar').toHaveCount(1);
-    await expect(bar.getByTestId('draw-tools')).toBeVisible();
-    await expect(page.getByTestId('editor-stage').getByTestId('draw-tools')).toHaveCount(0);
-    await expect(bar.getByRole('button', { name: 'Upload file' })).toHaveCount(0);
-    await bar.locator('[data-tool="ellipse"]').click();
-    await expect(bar.locator('[data-tool="ellipse"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect((await openInsert(page)).locator('[data-insert="image"]')).toBeVisible();
+    await pickBarTool(page, 'ellipse');
     await expect(page.getByTestId('motion-editor'), 'a bar click keeps the frame open').toBeVisible();
     await page.keyboard.press('Shift+R');
-    await expect(bar.locator('[data-tool="rectangle"]'), 'shortcuts unchanged').toHaveAttribute('aria-pressed', 'true');
+    await expect((await openInsert(page)).locator('[data-tool="rectangle"]'), 'shortcuts unchanged').toHaveClass(/on/);
+    await page.keyboard.press('Escape');
     await shoot(page, '2-frame-tools');
     await page.keyboard.press('v');
     await expect(bar.locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true');
@@ -92,7 +89,7 @@ test.describe('one bottom bar, by context @real', () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(bar).toHaveAttribute('data-context', 'canvas', { timeout: 10_000 });
-    await expect(page.getByTestId('draw-tools')).toHaveCount(1);
+    await expect(bar.getByTestId('insert-open')).toBeVisible();
     await shoot(page, '6-back-to-canvas');
   });
 

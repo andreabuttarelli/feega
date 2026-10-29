@@ -1,3 +1,4 @@
+import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import { SHOT_PREFIX } from './fixtures/shots';
 
@@ -74,7 +75,6 @@ test.describe('frame structure: presets, plus beside, layer menu @real', () => {
     test.setTimeout(120_000);
     await page.addInitScript(() => {
       localStorage.setItem('feega.frame-edit-mode', 'design');
-      localStorage.setItem('feega:canvas-bar-mode', 'design');
     });
     await page.setViewportSize({ width: 1440, height: 900 });
     const node = await seedNode({ type: 'motion', x: 200, y: 150, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
@@ -95,7 +95,7 @@ test.describe('frame structure: presets, plus beside, layer menu @real', () => {
     await page.mouse.click(corner.x, corner.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.dblclick(corner.x, corner.y);
-    await page.getByTestId('draw-tools').locator('[data-tool="frame"]').click();
+    await pickBarTool(page, 'frame');
     const from = { x: r.x + r.width * 0.1, y: r.y + r.height * 0.15 };
     const to = { x: r.x + r.width * 0.4, y: r.y + r.height * 0.45 };
     await page.mouse.move(from.x, from.y);
