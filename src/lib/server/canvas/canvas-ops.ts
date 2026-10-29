@@ -1,4 +1,5 @@
 import { exportCodeNode } from '$lib/server/canvas/code-export-node';
+import { listProjectComponents } from './project-components';
 import { ExportMode } from '$lib/canvas/code-frame';
 import { codeVarsError } from '$lib/server/canvas/code-source';
 import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
@@ -574,6 +575,12 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: listCanvasesInput,
     run: async (ctx) => ({ canvases: await listCanvases(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId }) })
+  }),
+
+  list_project_components: op({
+    access: Access.Read,
+    input: listCanvasesInput,
+    run: async (ctx) => ({ canvases: await listProjectComponents(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId }) })
   }),
 
   export_code_frame: op({

@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers';
+  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers' | 'components';
 </script>
 
 <script lang="ts">
@@ -11,6 +11,7 @@
   import PagesList from './PagesList.svelte';
   import type { ComponentProps } from 'svelte';
   import ComponentsList from './ComponentsList.svelte';
+  import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
   import X from '@lucide/svelte/icons/x';
   import { IconButton, IconSize, Side } from '$lib/components/ui/shell';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
@@ -58,6 +59,8 @@
       {#if kind === 'layers'}
         <PagesList {...pages} />
         <LayersPanel />
+      {:else if kind === 'components'}
+        <ProjectComponentsPanel {projectId} />
       {:else if kind === 'brands'}
         <BrandsPanel {projectId} />
       {:else}

@@ -3,6 +3,7 @@ import type { CANVAS_OPS } from './canvas-ops';
 
 export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   list_canvases: 'The canvases of the project.',
+  list_project_components: 'Main components of every canvas of the project, grouped by canvas, with frame and variant ids.',
   list_nodes: 'Live nodes of a canvas.',
   export_code_frame: 'Export a code frame (or a view of it) as a runnable Vite project without feega: returns the file map.',
   canvas_snapshot: 'Nodes, connections, runs, products, posts, influencers and revision of a canvas in one read.',

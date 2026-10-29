@@ -374,6 +374,14 @@ program
     await cmdCanvases(projectId);
   });
 
+program
+  .command('components <projectId>')
+  .description('List the components of every canvas of a project')
+  .action(async (projectId: string) => {
+    const { cmdComponents } = await import('./commands/projects.ts');
+    await cmdComponents(projectId);
+  });
+
 const orgs = program
   .command('orgs')
   .description('List your organisations; * marks the active one')

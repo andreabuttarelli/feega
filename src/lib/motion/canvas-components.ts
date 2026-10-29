@@ -44,6 +44,11 @@ function copied(target: MotionDoc, source: MotionDoc, compId: string): MotionDoc
   return { ...target, assets, comps: { ...target.comps, ...comps } };
 }
 
+export function componentSlice(source: MotionDoc, compId: string): MotionDoc {
+  const comps = Object.fromEntries(withNested(source, compId));
+  return { ...source, tracks: [], comps };
+}
+
 export function placeInstance(target: MotionDoc, source: MotionDoc, compId: string, newId: NewId, at?: Offset): OpResult {
   const main = source.comps[compId];
   if (!main?.component) {

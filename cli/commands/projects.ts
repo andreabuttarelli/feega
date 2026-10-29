@@ -25,3 +25,13 @@ export async function cmdCanvases(projectId: string) {
     console.log(`  ${c.id}  ${c.name}  ${c.path}`);
   }
 }
+
+export async function cmdComponents(projectId: string) {
+  const { canvases } = await projectsApi.components(await token(), projectId);
+  for (const canvas of canvases) {
+    console.log(`${canvas.canvasName} (${canvas.canvasId})`);
+    for (const c of canvas.components) {
+      console.log(`  ${c.name}  frame ${c.frameId}  ${c.variants.map((v) => v.compId).join(' ')}`);
+    }
+  }
+}

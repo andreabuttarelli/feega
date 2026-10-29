@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, panelForShortcut } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
-  it('il gruppo "panel" è Assets, Brands e Influencers, in quest\'ordine', () => {
-    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers']);
+  it('the "panel" group is Assets, Brands, Influencers and Components, in this order', () => {
+    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers', 'components']);
   });
 
   it('the "canvas" group is Layers: a panel beside the canvas, never a burger link to a page that does not exist', () => {
@@ -18,7 +18,7 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
 
   it('every rail panel has an Alt+digit shortcut, in rail order', () => {
     const rail = [...navEntriesByGroup('canvas'), ...navEntriesByGroup('panel')];
-    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4']);
+    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5']);
   });
 
   it('Alt+digit resolves to the panel that carries it, nothing else does', () => {
