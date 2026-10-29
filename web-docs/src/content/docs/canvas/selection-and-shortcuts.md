@@ -18,7 +18,8 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 
 - The hover outline shows exactly what a click would select.
 - A click selects the frame's top-level element under the pointer. A container that fills the whole frame, like a landing's page, counts as the frame: the click selects the section under the pointer.
-- Double-click enters the selected container and selects its child under the pointer, one level at a time; on text it starts editing, on a shape without children it edits its points.
+- Double-click enters the selected container or component instance and selects its child under the pointer, one level at a time; on text it starts editing, on a shape without children it edits its points.
+- A drag starts only once the pointer has moved a few pixels, so clicks and double-clicks never move anything. An element leaves its frame only when you drag it past the edge of the frame or view you are editing.
 - Once inside a container, hover and click pick among its children. Clicking outside it goes back up.
 - Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it.
 - Esc goes up one level.

@@ -161,7 +161,7 @@
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
-  import { DragPhase, DropVerdict, frameUnderPointer, isOutside, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -221,7 +221,6 @@
   const DOM_CAP = 6;
   const HALF = 2;
   const CORE = 'core';
-  const MOVE_SLOP_PX = 3;
   const LABEL_CLEARANCE = 24;
   const WHEEL_ZOOM = 0.01;
   const STEP_ZOOM = 1.2;
@@ -852,8 +851,8 @@
       return;
     }
     const hit = hitAt(world);
-    const id = hit.kind === HitKind.Node ? hit.nodeId : null;
-    const deeper = id ? framePickAt(world, picks) : null;
+    const deeper = framePickAt(world, picks);
+    const id = hit.kind === HitKind.Node ? hit.nodeId : (deeper?.nodeId ?? null);
     const doc = id ? liveOf(id)?.doc : null;
     const entered = id && deeper && doc && inside?.nodeId === id ? (enteredFrom(deeper.picker.chain(world, deeper.space), picks) ?? (deeper.clip ? childBelow(doc, deeper.clip, picks) : null)) : null;
     if (id && entered) {
@@ -1871,21 +1870,30 @@
     const snapOf = (ev: PointerEvent) => (ev.ctrlKey ? SnapMode.Off : frameViews.isOn(FrameView.PixelGrid) ? SnapMode.Pixels : SnapMode.Guides);
     let result: OpResult | null = null;
     let carried = false;
+    let started = false;
+    const down = local(e);
+    const box = at.frame.box;
+    const edited = { left: box.x, top: box.y, width: box.w, height: box.h };
 
-    const leaving = (ev: PointerEvent): ElementOut | null => {
-      const stage = wrap?.querySelector<HTMLElement>(`[data-motion-node="${nodeId}"] [data-frame-stage]`)?.getBoundingClientRect();
+    const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
+
+    const leaving = (ev: PointerEvent, now: Carry): ElementOut | null => {
       const [clipId] = inScope.ids;
-      const client = { x: ev.clientX, y: ev.clientY };
-      if (grip !== Grip.Move || inScope.ids.length !== 1 || !stage || !isOutside(stage, client)) {
+      if (now !== Carry.Out || grip !== Grip.Move || inScope.ids.length !== 1) {
         return null;
       }
       const b = boxes[clipId];
       const { width, height } = inScope.view;
-      return { clipId, client, box: b ? { left: b.left / width, top: b.top / height, width: b.width / width, height: b.height / height } : null };
+      return { clipId, client: { x: ev.clientX, y: ev.clientY }, box: b ? { left: b.left / width, top: b.top / height, width: b.width / width, height: b.height / height } : null };
     };
 
     const move = (ev: PointerEvent) => {
-      const out = leaving(ev);
+      const now = carry(ev);
+      if (now === Carry.Held) {
+        return;
+      }
+      started = true;
+      const out = leaving(ev, now);
       if (out || carried) {
         props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
         carried = !!out;
@@ -1901,7 +1909,10 @@
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       frameGuides = null;
-      const out = leaving(ev);
+      if (!started) {
+        return;
+      }
+      const out = leaving(ev, carry(ev));
       if (out) {
         liveDocs.clear(nodeId);
         props.onElementOut?.(nodeId, out, DragPhase.Drop);
@@ -2150,7 +2161,7 @@
       }
       return;
     }
-    const far = Math.hypot(p.x - downAt.x, p.y - downAt.y) > MOVE_SLOP_PX;
+    const far = pastSlop(downAt, p);
     if (far && captureId !== null) {
       surface?.setPointerCapture(captureId);
       captureId = null;
@@ -2199,7 +2210,7 @@
         props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
       },
       [GestureKind.Resize]: (a) => {
-        if (a.kind !== GestureKind.Resize) {
+        if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id))) {
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
@@ -2209,7 +2220,7 @@
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
       [GestureKind.Rotate]: (a) => {
-        if (a.kind !== GestureKind.Rotate) {
+        if (a.kind !== GestureKind.Rotate || (!far && a.degrees === a.base)) {
           return;
         }
         const target = a.base + dragAngle(a.centre, a.start, w);
