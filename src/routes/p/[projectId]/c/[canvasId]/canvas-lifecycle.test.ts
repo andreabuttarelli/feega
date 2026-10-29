@@ -45,6 +45,14 @@ describe('canvas lifecycle actions', () => {
     expect(calls.find((c) => c.table === 'canvases' && c.op === 'insert')?.payload).toMatchObject({ name: 'Untitled canvas 2' });
   });
 
+  it('new_canvas stores the id the pages list already shows', async () => {
+    const id = '3f2b7c1e-9a4d-4e6b-8c2f-1d5a6b7c8e9f';
+    const { ev, calls } = eventWith({ canvases: [canvasRow('c-1', 'A')] }, { id });
+
+    await expect(actions.new_canvas(ev)).rejects.toMatchObject({ status: 303 });
+    expect(calls.find((c) => c.table === 'canvases' && c.op === 'insert')?.payload).toMatchObject({ id });
+  });
+
   it('rename_canvas renames the canvas', async () => {
     const { ev, calls } = eventWith({ canvases: [canvasRow('c-1', 'A')] }, { name: 'Moodboard' });
 

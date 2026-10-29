@@ -271,4 +271,53 @@ test.describe('canvas actions are optimistic @real', () => {
     await page.locator(thread(root)).getByTestId('comment-resolve').click();
     await verdict('comment-resolve', page);
   });
+
+  test('a new page shows in the list before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await open(page, session);
+    await page.keyboard.press('Alt+1');
+    await watch(page, { shown: Shown.Present, selector: '.page-row:nth-child(2)' });
+    await page.getByTestId('canvas-new').click();
+    await verdict('page-new', page);
+    await expect.poll(async () => (await admin.from('canvases').select('id').eq('project_id', session.projectId).is('deleted_at', null)).data?.length, { timeout: 15_000 }).toBe(2);
+    await expect.poll(() => page.url(), { message: 'the new page opens once stored', timeout: 15_000 }).not.toContain(session.canvasId);
+  });
+
+  test('a renamed page shows its name before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await open(page, session);
+    await page.keyboard.press('Alt+1');
+    await page.getByTestId('canvas-more').click();
+    await page.getByTestId('canvas-rename').click();
+    await page.getByTestId('canvas-rename-input').fill('Ideas');
+    await watch(page, { shown: Shown.Present, selector: '.page-link[title="Ideas"]' });
+    await page.keyboard.press('Enter');
+    await verdict('page-rename', page);
+    await expect.poll(async () => (await admin.from('canvases').select('name').eq('id', session.canvasId).single()).data?.name, { timeout: 15_000 }).toBe('Ideas');
+  });
+
+  test('a deleted page leaves the list before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    const { error } = await admin.from('canvases').insert({ org_id: session.orgId, project_id: session.projectId, name: 'Second page' });
+    expect(error).toBeNull();
+    await open(page, session);
+    await page.keyboard.press('Alt+1');
+    await page.getByTestId('canvas-more').click();
+    await page.getByTestId('canvas-delete').click();
+    await watch(page, { shown: Shown.Absent, selector: `.page-link[title="${session.canvasName}"]` });
+    await page.locator('.bbtn.danger').click();
+    await verdict('page-delete', page);
+    await expect.poll(async () => (await admin.from('canvases').select('id').eq('id', session.canvasId).is('deleted_at', null)).data?.length, { timeout: 15_000 }).toBe(0);
+  });
+
+  test('sharing a canvas shows the link before the server answers, and that link is the stored one', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await open(page, session);
+    await page.locator('.share-btn').first().click();
+    await watch(page, { shown: Shown.Present, selector: '.share-link' });
+    await page.locator('.share-toggle input').click();
+    await verdict('share-canvas', page);
+    const link = await page.locator('.share-link input').inputValue();
+    await expect.poll(async () => (await admin.from('canvases').select('share_token').eq('id', session.canvasId).single()).data?.share_token, { timeout: 15_000 }).toBe(link.split('/s/')[1]);
+  });
 });

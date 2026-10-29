@@ -66,6 +66,20 @@ describe('setCanvasShare', () => {
     expect(filtersOf(calls, 'update')).toMatchObject({ id: 'canvas-1', org_id: 'org-1' });
   });
 
+  it('keeps a well-formed token the client minted, so the link it shows works', async () => {
+    const { db, calls } = fakeDb({ canvases: [] });
+    const minted = 'a'.repeat(32);
+
+    expect(await setCanvasShare(db, { ...SCOPE, state: ShareState.On, token: minted })).toBe(minted);
+    expect(calls.find((c) => c.op === 'update')!.payload).toMatchObject({ share_token: minted });
+  });
+
+  it('a guessable token from the client is replaced by a minted one', async () => {
+    const { db } = fakeDb({ canvases: [] });
+
+    expect(await setCanvasShare(db, { ...SCOPE, state: ShareState.On, token: 'abc' })).toMatch(/^[A-Za-z0-9_-]{32}$/);
+  });
+
   it('a second share is a new token: the old link dies', async () => {
     const { db } = fakeDb({ canvases: [] });
 

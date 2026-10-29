@@ -13,7 +13,10 @@
   import Upload from '@lucide/svelte/icons/upload';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FeegaFile from './FeegaFile.svelte';
-  import { CanvasAction, submitCanvasAction } from '$lib/canvas/canvas-list';
+  import { canvasPages } from '$lib/canvas/canvas-pages.svelte';
+  import { OpOutcome } from '$lib/canvas/optimistic-ops';
+  import { PageAction } from '$lib/canvas/page-ops';
+  import { canvasRouteOf } from '$lib/canvas/canvas-action-url';
   import { LocalOff, isOff } from '$lib/local-user';
   import { Density } from '$lib/canvas/layer-density';
 
@@ -61,20 +64,37 @@
     handle.addEventListener('pointerup', stop);
   }
 
-  const current = $derived(canvases.find((canvas) => canvas.id === currentId) ?? null);
-  const lastCanvas = $derived(canvases.length <= 1);
+  const rows = $derived(canvasPages.list(canvases));
+  const current = $derived(rows.find((canvas) => canvas.id === currentId) ?? null);
+  const lastCanvas = $derived(rows.length <= 1);
 
   let feegaFile = $state<FeegaFile | null>(null);
   let renaming = $state(false);
   let draftName = $state('');
   let confirmingDelete = $state(false);
 
-  async function run(action: CanvasAction, fields: Record<string, string> = {}) {
-    if (!current) {
+  function addPage() {
+    const projectId = current ? canvasRouteOf(current.href)?.projectId : null;
+    if (!current || !projectId) {
       return;
     }
     onpick();
-    await submitCanvasAction(current.href, action, fields);
+    const id = crypto.randomUUID();
+    void canvasPages.run(PageAction.New, { id, from: current.id, projectId }, canvases, current.href).then((outcome) => {
+      if (outcome === OpOutcome.Landed) {
+        void canvasPages.open(`/p/${projectId}/c/${id}`);
+      }
+    });
+  }
+
+  function deletePage() {
+    const next = rows.find((canvas) => canvas.id !== current?.id);
+    if (!current || !next) {
+      return;
+    }
+    onpick();
+    void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href);
+    void canvasPages.open(next.href);
   }
 
   function startRename() {
@@ -82,10 +102,12 @@
     renaming = true;
   }
 
-  async function saveRename(event: SubmitEvent) {
+  function saveRename(event: SubmitEvent) {
     event.preventDefault();
     renaming = false;
-    await run(CanvasAction.Rename, { name: draftName });
+    if (current) {
+      void canvasPages.run(PageAction.Rename, { id: current.id, name: draftName }, canvases, current.href);
+    }
   }
 
   function askDelete() {
@@ -103,7 +125,7 @@
       <span class="pages-label">{$_('app.shell.pages')}</span>
     </button>
     {#if !isOff(LocalOff.NewCanvas)}
-      <button type="button" class="pages-icon" data-testid="canvas-new" aria-label={$_('app.shell.canvasActions.new')} title={$_('app.shell.canvasActions.new')} onclick={() => run(CanvasAction.New)}>
+      <button type="button" class="pages-icon" data-testid="canvas-new" aria-label={$_('app.shell.canvasActions.new')} title={$_('app.shell.canvasActions.new')} onclick={addPage}>
         <Plus size={ICON} />
       </button>
     {/if}
@@ -127,7 +149,7 @@
   </div>
 
   <ul class="pages-list" hidden={collapsed} style:max-height={density === Density.Pointer ? `${listHeight}px` : undefined}>
-    {#each canvases as canvas (canvas.id)}
+    {#each rows as canvas (canvas.id)}
       {@const isCurrent = canvas.id === currentId}
       <li class="page-row" class:is-current={isCurrent} data-testid={isCurrent ? 'canvas-row-current' : undefined}>
         {#if isCurrent && renaming}
@@ -200,11 +222,29 @@
     body={$_('app.shell.canvasActions.confirmDeleteBody')}
     confirmLabel={$_('app.shell.canvasActions.confirmDeleteCta')}
     cancelLabel={$_('app.shell.canvasActions.confirmDeleteCancel')}
-    onConfirm={() => run(CanvasAction.Delete)}
+    onConfirm={deletePage}
   />
+
+  {#if canvasPages.notice}
+    <p class="pages-notice" role="alert" data-testid="pages-notice">
+      {canvasPages.notice}
+      <button type="button" aria-label="Dismiss" onclick={() => canvasPages.dismiss()}>×</button>
+    </p>
+  {/if}
 </section>
 
 <style>
+  .pages-notice {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 4px 0;
+    font-size: 12px;
+    color: var(--destructive);
+  }
+  .pages-notice button {
+    margin-left: auto;
+  }
   .pages {
     --row-h: 28px;
     flex: 0 0 auto;

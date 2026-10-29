@@ -3495,3 +3495,6 @@ Signal: the selection ring of a drawn or pasted node is there on pointerup, its 
 
 ### Vitest reports "no tests" for a file that has tests
 Signal: `Test Files 1 failed`, `Tests no tests`, `collect 0ms`; the suite file looks fine. Cause: the disk is full and Vitest cannot write its transform cache (`ENOSPC` in the failure detail, easy to miss). Move: `df -h /System/Volumes/Data` first; free space (idle worktrees' `node_modules`, `test-results/`) before touching the test.
+
+### `goto` resolves but the page does not change
+Signal: after an action lands, `goto(newUrl)` resolves without error, no navigation happens, and it worked a day earlier. Cause: an `invalidate(...)` started just before (the runner's idle refresh) is batched on a microtask and supersedes the navigation token, cancelling the `goto` silently. Move: navigate only after that invalidation settles (`canvasPages.run` awaits its re-read before answering), and check the URL after `goto`: a realtime `invalidate` (a new canvas row arriving) can still cancel it, so `canvasPages.open` retries until the path matches.

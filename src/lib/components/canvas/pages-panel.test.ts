@@ -13,7 +13,7 @@ const mobile = read('CanvasMobileSwitcher.svelte');
 
 describe('Pages: the canvases of the project', () => {
   it('lists every canvas as a real link', () => {
-    expect(pages).toMatch(/#each canvases as canvas/);
+    expect(pages).toMatch(/#each rows as canvas/);
     expect(pages).toMatch(/href={canvas\.href}/);
     expect(pages).toMatch(/title={canvas\.name}/);
   });
