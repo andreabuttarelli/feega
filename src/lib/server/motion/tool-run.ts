@@ -20,6 +20,7 @@ import { createMotionTools, type MotionSession, type MotionToolDeps } from './mo
 import { frameMover } from './move-element';
 import { drawFrames, firstFrames } from './server-frames';
 import { fontAdvance } from './font-advance';
+import { letteringOf } from '$lib/motion/text-outline-run';
 import { ffmpegLumas } from './track-frames';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
@@ -157,6 +158,7 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
     exportStill: async (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens: await tokens(), assets }),
     moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId),
     fonts: () => orgFontFamilies(db, scope.orgId),
+    lettering: async (doc) => letteringOf(await tokens(), assetUrls(assets))(doc),
     voiceover: (voice) => withOrgContext(scope.orgId, () => speakVoiceover(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId, userId: scope.userId, actor }, voice)),
     embed: async (action) => embedAction(db, { nodeId: scope.nodeId, doc: session.doc, tokens: await tokens(), assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: saved.project.mode }, action)
   }, frames);

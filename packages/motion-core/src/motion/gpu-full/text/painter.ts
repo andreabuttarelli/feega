@@ -674,6 +674,34 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
   return { inks: inks.filter((i) => i.opacity > 0), frame: rendered };
 }
 
+export type OutlinedGlyph = { face: Face; glyph: number; size: number; skew: number; x: number; y: number };
+
+export type Outlined = { glyphs: OutlinedGlyph[]; bars: number[][] };
+
+export function outlinesOf(plan: TextPlan, fonts: FaceBook): Outlined | TextGap {
+  const { laid, room } = place(plan, fonts);
+  const gap = gapOf(laid);
+  if (gap) {
+    return gap;
+  }
+  const left = plan.frame.left;
+  const top = topOf(plan, laid);
+  const glyphs: OutlinedGlyph[] = [];
+  const bars: number[][] = [];
+  laid.blocks.forEach((block, i) =>
+    block.lines.forEach((line, l) => {
+      const { x, baseline } = lineAt(plan, block, line, room, 0);
+      for (const { g, at, marked } of drawnOf(block, line, l, x)) {
+        const y = baseline - g.dy;
+        const shape = moved(glyphContours(g.face, g.glyph, g.size, g.skew, 0), at + g.x, y);
+        glyphs.push({ face: g.face, glyph: g.glyph, size: g.size, skew: g.skew, x: left + at + g.x, y: top + y });
+        bars.push(...moved([...decorations(marked ? null : runOf(plan, i, g.char), g, at, baseline), ...ruled(plan.typography.rule, g, at, baseline, shape)], left, top));
+      }
+    })
+  );
+  return { glyphs, bars };
+}
+
 export function paintText(env: TextEnv): Painted | TextGap {
   const plan = planOf(env);
   return typeof plan === 'string' ? plan : inksOf(plan, env.fonts, env.output);

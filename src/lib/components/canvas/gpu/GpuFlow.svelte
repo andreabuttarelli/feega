@@ -26,7 +26,7 @@
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
   import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
-  import { loadOutliner } from '$lib/motion/fonts/outliner';
+  import { letteringOf } from '$lib/motion/text-outline-run';
   import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
   import { followDocks } from '$lib/canvas/dock-lift';
   import { frameScreenRect } from '$lib/canvas/frame-screen';
@@ -1207,7 +1207,7 @@
       pickMany(nodeId, at.scene(picked));
       return;
     }
-    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: live.assets });
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets) });
     if (!done) {
       return;
     }
