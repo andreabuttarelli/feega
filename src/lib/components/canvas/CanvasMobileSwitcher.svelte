@@ -1,18 +1,15 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import * as Sheet from '$lib/components/ui/sheet/index.js';
-  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import Check from '@lucide/svelte/icons/check';
-  import Plus from '@lucide/svelte/icons/plus';
   import Pencil from '@lucide/svelte/icons/pencil';
-  import Trash from '@lucide/svelte/icons/trash-2';
   import Search from '@lucide/svelte/icons/search';
-  import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
-  import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
+  import { renameProjectAction } from '$lib/canvas/canvas-list';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
-  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import PagesList from './PagesList.svelte';
+  import { Density } from '$lib/canvas/layer-density';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string };
   type CanvasRow = { id: string; name: string; href: string };
@@ -43,21 +40,10 @@
   const searchable = $derived(needsSearch(projectRows.length));
   const projects = $derived(matching(recentFirst(projectRows), query));
 
-  let renaming = $state(false);
-  let draftName = $state('');
-  let confirmingDelete = $state(false);
-  const lastCanvas = $derived(canvases.length <= 1);
+  const currentId = $derived(canvases.find((canvas) => canvas.href === canvasHref)?.id ?? null);
 
   let renamingProject = $state(false);
   let draftProjectName = $state('');
-
-  async function run(action: CanvasAction, fields: Record<string, string> = {}) {
-    if (!canvasHref) {
-      return;
-    }
-    onOpenChange(false);
-    await submitCanvasAction(canvasHref, action, fields);
-  }
 
   function startRenameProject() {
     draftProjectName = projectName;
@@ -73,27 +59,6 @@
     await renameProjectAction(canvasHref, draftProjectName);
   }
 
-  function startRename() {
-    draftName = canvasName;
-    renaming = true;
-  }
-
-  async function saveRename(event: SubmitEvent) {
-    event.preventDefault();
-    renaming = false;
-    await run(CanvasAction.Rename, { name: draftName });
-  }
-
-  function askDeleteCurrent() {
-    if (lastCanvas) {
-      return;
-    }
-    confirmingDelete = true;
-  }
-
-  async function deleteCurrent() {
-    await run(CanvasAction.Delete);
-  }
 </script>
 
 <Sheet.Root {open} {onOpenChange}>
@@ -114,79 +79,9 @@
       {/if}
     </div>
 
-    <div class="section-label">{$_('app.shell.mobile.canvases')}</div>
-    <div class="list">
-      {#each canvases as canvas (canvas.id)}
-        {@const current = canvas.name === canvasName}
-        {#if current && renaming}
-          <form class="row rename-form" onsubmit={saveRename}>
-            <input
-              class="rename-input"
-              data-testid="canvas-rename-input"
-              bind:value={draftName}
-              {@attach (el) => el.focus()}
-              onkeydown={(e) => e.key === 'Escape' && (renaming = false)}
-            />
-            <button type="submit" class="save">{$_('app.shell.canvasActions.save')}</button>
-          </form>
-        {:else}
-          <div class="row" class:is-current={current}>
-            <a href={canvas.href} class="link" title={canvas.name} onclick={() => onOpenChange(false)}>
-              <span class="lead">{#if current}<Check size={ICON} />{/if}</span>
-              <span class="truncate">{canvas.name}</span>
-            </a>
-            {#if current && canvasHref}
-              <button
-                type="button"
-                class="icon"
-                data-testid="canvas-rename"
-                aria-label={$_('app.shell.canvasActions.rename')}
-                onclick={startRename}
-              >
-                <Pencil size={ICON} />
-              </button>
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger class="icon" data-testid="canvas-more" aria-label={$_('app.shell.canvasActions.more')}>
-                  <Ellipsis size={ICON} />
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content align="end" collisionPadding={8} class="w-44">
-                  <DropdownMenu.Item class="h-11" onSelect={startRename}>
-                    <Pencil size={ICON} />
-                    {$_('app.shell.canvasActions.rename')}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    class="h-11"
-                    variant="destructive"
-                    data-testid="canvas-delete"
-                    disabled={lastCanvas}
-                    title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
-                    onSelect={askDeleteCurrent}
-                  >
-                    <Trash size={ICON} />
-                    {$_('app.shell.canvasActions.delete')}
-                  </DropdownMenu.Item>
-                </DropdownMenu.Content>
-              </DropdownMenu.Root>
-            {/if}
-          </div>
-        {/if}
-      {/each}
-      {#if canvasHref}
-        <button type="button" class="row link new" data-testid="canvas-new" onclick={() => run(CanvasAction.New)}>
-          <span class="lead"><Plus size={ICON} /></span>
-          <span class="truncate">{$_('app.shell.canvasActions.new')}</span>
-        </button>
-      {/if}
+    <div class="pages-section">
+      <PagesList {canvases} {currentId} density={Density.Touch} onpick={() => onOpenChange(false)} />
     </div>
-
-    <ConfirmDialog
-      bind:open={confirmingDelete}
-      title={$_('app.shell.canvasActions.confirmDeleteTitle')}
-      body={$_('app.shell.canvasActions.confirmDeleteBody')}
-      confirmLabel={$_('app.shell.canvasActions.confirmDeleteCta')}
-      cancelLabel={$_('app.shell.canvasActions.confirmDeleteCancel')}
-      onConfirm={deleteCurrent}
-    />
 
     <div class="section-label">{$_('app.shell.mobile.projects')}</div>
     <div class="list list-last">
@@ -323,8 +218,8 @@
     background: var(--paper-3, #f4f4f4);
   }
 
-  .new {
-    color: var(--ink-soft, #6e6e73);
+  .pages-section {
+    padding: 8px 8px 0;
   }
 
   .lead {

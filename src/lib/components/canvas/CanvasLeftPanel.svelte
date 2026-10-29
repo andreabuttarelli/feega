@@ -8,6 +8,8 @@
   import InfluencersPanel from './InfluencersPanel.svelte';
   import BrandsPanel from './BrandsPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
+  import PagesList from './PagesList.svelte';
+  import type { ComponentProps } from 'svelte';
   import ComponentsList from './ComponentsList.svelte';
   import X from '@lucide/svelte/icons/x';
   import { IconButton, IconSize, Side } from '$lib/components/ui/shell';
@@ -26,11 +28,13 @@
     projectId,
     kind,
     labelKey,
+    pages,
     onclose
   }: {
     projectId: string;
     kind: LeftPanelKind;
     labelKey: string;
+    pages: ComponentProps<typeof PagesList>;
     onclose: () => void;
   } = $props();
 
@@ -52,6 +56,7 @@
     </div>
     <div class="left-panel-body">
       {#if kind === 'layers'}
+        <PagesList {...pages} />
         <LayersPanel />
       {:else if kind === 'brands'}
         <BrandsPanel {projectId} />

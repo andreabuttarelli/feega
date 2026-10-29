@@ -125,6 +125,7 @@
     },
     "shell": {
       "rail": "Sections",
+      "pages": "Pages",
       "closePanel": "Close panel",
       "resizeChat": "Resize chat",
       "collapseChat": "Collapse chat",
