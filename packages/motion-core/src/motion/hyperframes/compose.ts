@@ -1,5 +1,6 @@
 import { withAutoLayout } from '../layout/resolve';
 import { perDoc } from '../per-doc';
+import { estimatedText, type TextMeasure } from '../layout/text-extent';
 import { clipRadii, frameFadeAt, unfaded } from '../surface';
 import { withStacking } from '../layout/stacking';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
@@ -119,7 +120,7 @@ export enum Target {
 
 export type Inlined = Partial<Record<Script, string>>;
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues; only?: ReadonlySet<string> };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues; only?: ReadonlySet<string>; measure?: TextMeasure };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -638,9 +639,11 @@ function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): Motio
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
 }
 
-const laidOut = perDoc((doc: MotionDoc, vars: VarValues | undefined): MotionDoc => withStacking(withAutoLayout(withoutHidden(withoutMutedLanes(boundDoc(withVars(doc, vars)))))));
+const bound = perDoc((doc: MotionDoc, vars: VarValues | undefined): MotionDoc => withoutHidden(withoutMutedLanes(boundDoc(withVars(doc, vars)))));
 
-const shownDoc = (raw: ComposeInput): MotionDoc => laidOut(raw.doc, raw.vars);
+const laidOut = perDoc((doc: MotionDoc, measure: TextMeasure): MotionDoc => withStacking(withAutoLayout(doc, measure)));
+
+const shownDoc = (raw: ComposeInput): MotionDoc => laidOut(bound(raw.doc, raw.vars), raw.measure ?? estimatedText);
 
 const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
 
