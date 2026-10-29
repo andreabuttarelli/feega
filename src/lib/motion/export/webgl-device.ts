@@ -349,7 +349,7 @@ const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'light
 type Surface = { texture: WebGLTexture; buffer: WebGLFramebuffer };
 type Program = { program: WebGLProgram; uniform: (name: string) => WebGLUniformLocation | null };
 
-export type Gpu = { device: (sheets: ImageBitmap[], width: number, height: number) => Device<Surface, ImageBitmap> };
+export type Gpu = { device: (sheets: ImageBitmap[], width: number, height: number, margin: number) => Device<Surface, ImageBitmap> };
 
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): Program {
   const shader = (type: number, source: string) => {
@@ -671,7 +671,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       return out;
     };
 
-    const EFFECTS: Record<EffectKind, (s: Surface, e: Effect) => Surface> = {
+    const EFFECTS: { [K in EffectKind]: (s: Surface, e: Extract<Effect, { kind: K }>) => Surface } = {
       [EffectKind.Grain]: grainOn,
       [EffectKind.Blur]: blurOn,
       [EffectKind.Glass]: glassOn
@@ -747,7 +747,7 @@ export function webglGpu(canvas: OffscreenCanvas): Gpu {
       return canvas.transferToImageBitmap();
     };
 
-    return { surface, release, region, fill, paint: draw, effect: (s, e) => EFFECTS[e.kind](s, e), combine, mask: maskBy, blend: blendInto, finish };
+    return { surface, release, region, fill, paint: draw, effect: (s, e) => (EFFECTS[e.kind] as (s: Surface, e: Effect) => Surface)(s, e), combine, mask: maskBy, blend: blendInto, finish };
   };
 
   return { device };

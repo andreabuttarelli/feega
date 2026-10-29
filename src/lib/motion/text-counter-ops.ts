@@ -20,6 +20,6 @@ export function setTextCounter(doc: MotionDoc, clipId: string, input: CounterInp
   if (input === null) {
     return setProps(doc, clipId, { counter: undefined });
   }
-  const parsed = counterSchema.safeParse({ ...found.clip.props.counter, ...input });
+  const parsed = counterSchema.safeParse({ ...(found.clip.props.counter as Record<string, unknown> | undefined), ...input });
   return parsed.success ? setProps(doc, clipId, { counter: parsed.data }) : fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
 }

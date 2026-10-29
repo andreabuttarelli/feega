@@ -1,9 +1,10 @@
 import type { Db } from '$lib/server/db/client';
-import type { Database } from '$lib/database.types';
+import type { z } from 'zod';
+import type { NODE_DATA_SCHEMAS } from '$lib/canvas/node-data';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DocShareRow } from '$lib/canvas/doc-node';
 
-type NodeData = NonNullable<Database['public']['Tables']['nodes']['Update']['data']>;
+type NodeData = z.infer<typeof NODE_DATA_SCHEMAS.doc>;
 
 /**
  * IL LINK PUBBLICO DI UN DOCUMENTO, lato database.

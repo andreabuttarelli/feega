@@ -3,7 +3,7 @@ import { cubicAt, distance, parsePath, segmentsOf, type Contour } from '@feega/m
 import { ClipOp, clipPolygons } from '@feega/motion-core/motion/shape/polygon-clip';
 
 type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number];
-type Pt = [number, number];
+type Pt = readonly [number, number];
 type Segment = { cmd: 'M' | 'L' | 'C' | 'Z'; pts: Pt[] };
 type Attrs = Record<string, string>;
 type Paint = { fill: string | null; stroke: string | null; fillRule: SvgFillRule };
@@ -504,7 +504,7 @@ function angularOf(stops: Stop[], conic: Conic | null, bounds: Box): SvgGradient
   return { type: FillType.Angular, stops, angle: turned(conic.from + spin), center: centre };
 }
 
-const FIGMA_GRADIENTS: Record<string, (stops: Stop[], conic: Conic | null, bounds: Box) => SvgGradient> = {
+const FIGMA_GRADIENTS: Partial<Record<string, (stops: Stop[], conic: Conic | null, bounds: Box) => SvgGradient>> = {
   GRADIENT_ANGULAR: angularOf,
   GRADIENT_DIAMOND: (stops) => ({ type: FillType.Diamond, stops })
 };
