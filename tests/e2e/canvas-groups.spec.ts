@@ -66,9 +66,10 @@ test.describe('groups @real', () => {
     await shoot(page, '2-grouped');
     const groupTile = page.locator(`[data-motion-node="${group.id}"]`);
     await groupTile.click();
-    await expect(page.getByTestId('motion-editor'), 'a click selects the group, it does not enter it').toHaveCount(0);
-    await groupTile.dblclick();
-    await expect(page.getByTestId('motion-editor'), 'a double-click enters the group').toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('frame-selection'), 'a click selects the group, it does not enter it').toHaveCount(0);
+    const groupBox = (await groupTile.boundingBox())!;
+    await page.mouse.dblclick(groupBox.x + groupBox.width * 0.15, groupBox.y + groupBox.height / 2);
+    await expect.poll(() => page.getByTestId('frame-selection').first().getAttribute('data-clip').catch(() => null), { message: 'a double-click enters the group', timeout: 15_000 }).toMatch(/^s[01]$/);
     await shoot(page, '2b-inside-group');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');

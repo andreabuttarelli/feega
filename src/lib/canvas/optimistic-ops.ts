@@ -8,9 +8,9 @@ export enum OpOutcome {
 
 export type Touched = { nodes: readonly string[]; edges: readonly string[] };
 
-export type OptimisticOp<S, A> = {
+export type OptimisticOp<S, A, T = Touched> = {
   apply: (state: S) => S;
-  touched: Touched;
+  touched: T;
   send: () => Promise<A | null>;
   undo: (answer: A) => UndoItem[];
   settle?: (state: S, answer: A) => S;
@@ -26,7 +26,7 @@ export type OptimisticPort<S> = {
   notice: (text: string) => void;
 };
 
-export type Restore<S> = (current: S, before: S, touched: Touched) => S;
+export type Restore<S, T = Touched> = (current: S, before: S, touched: T) => S;
 
 export function restoreRows<T extends { id: string }>(current: readonly T[], before: readonly T[], ids: readonly string[]): T[] {
   const touched = new Set(ids);
@@ -39,11 +39,11 @@ export function restoreRows<T extends { id: string }>(current: readonly T[], bef
   return rows;
 }
 
-export function createOptimistic<S>(port: OptimisticPort<S>, restore: Restore<S>) {
+export function createOptimistic<S, T = Touched>(port: OptimisticPort<S>, restore: Restore<S, T>) {
   const queue = inOrder();
   let inFlight = 0;
 
-  async function land<A>(op: OptimisticOp<S, A>, before: S, reserved: (items: UndoItem[] | null) => void): Promise<OpOutcome> {
+  async function land<A>(op: OptimisticOp<S, A, T>, before: S, reserved: (items: UndoItem[] | null) => void): Promise<OpOutcome> {
     const answer = await op.send().catch(() => null);
     if (answer === null) {
       reserved(null);
@@ -60,7 +60,7 @@ export function createOptimistic<S>(port: OptimisticPort<S>, restore: Restore<S>
     return OpOutcome.Landed;
   }
 
-  return function run<A>(op: OptimisticOp<S, A>): Promise<OpOutcome> {
+  return function run<A>(op: OptimisticOp<S, A, T>): Promise<OpOutcome> {
     const before = port.read();
     port.write(op.apply(before));
     const reserved = port.reserve();

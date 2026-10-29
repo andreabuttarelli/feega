@@ -45,10 +45,12 @@ enum Shown {
   Gone = 'gone',
   Changed = 'changed',
   OnTop = 'on-top',
-  Named = 'named'
+  Named = 'named',
+  Present = 'present',
+  Absent = 'absent'
 }
 
-type Expect = { shown: Shown; id?: string; name?: string };
+type Expect = { shown: Shown; id?: string; name?: string; selector?: string };
 
 async function watch(page: Page, want: Expect) {
   await page.evaluate((w) => {
@@ -61,7 +63,9 @@ async function watch(page: Page, want: Expect) {
       gone: () => !tiles().some((t) => t.dataset.id === w.id),
       changed: () => idsNow() !== initial,
       'on-top': () => tiles().at(-1)?.dataset.id === w.id,
-      named: () => tiles().some((t) => t.dataset.id === w.id && t.getAttribute('aria-label') === w.name)
+      named: () => tiles().some((t) => t.dataset.id === w.id && t.getAttribute('aria-label') === w.name),
+      present: () => !!document.querySelector(w.selector!),
+      absent: () => !document.querySelector(w.selector!)
     };
     const begin = () => {
       if (probe.start) {
@@ -116,6 +120,22 @@ async function open(page: Page, session: { projectId: string; canvasId: string }
   await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
   await slowServer(page);
   await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+}
+
+const thread = (id: string) => `[data-testid="comment-thread"][data-thread="${id}"]`;
+
+async function comment(admin: SupabaseClient, session: Owner & { canvasId: string }, body: string, parentId: string | null = null): Promise<string> {
+  const { data, error } = await admin.from('canvas_comments').insert({ org_id: session.orgId, canvas_id: session.canvasId, author_id: session.userId, parent_id: parentId, body, x: 40, y: 40 }).select('id').single();
+  expect(error).toBeNull();
+  return data!.id as string;
+}
+
+async function openComments(page: Page, session: { projectId: string; canvasId: string }) {
+  await open(page, session);
+  await page.keyboard.press('Alt+1');
+  await page.getByTestId('canvas-more').click();
+  await page.getByTestId('canvas-comments').click();
+  await expect(page.getByTestId('comments-panel')).toBeVisible();
 }
 
 const tile = (page: Page, id: string) => page.locator(`[data-testid="gpu-node"][data-id="${id}"]`);
@@ -200,5 +220,55 @@ test.describe('canvas actions are optimistic @real', () => {
     await page.mouse.move(to.x, to.y, { steps: 20 });
     await page.mouse.up();
     await verdict('move-into-frame', page);
+  });
+
+  test('a new comment shows before the server answers, and is stored under the id it shows', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await openComments(page, session);
+    await page.getByTestId('comment-draft').fill('Tighten the headline');
+    await watch(page, { shown: Shown.Present, selector: '[data-testid="comment-thread"]' });
+    await page.getByTestId('comment-add').click();
+    await verdict('comment-add', page);
+    const shown = await page.getByTestId('comment-thread').getAttribute('data-thread');
+    await expect.poll(async () => (await admin.from('canvas_comments').select('id').eq('id', shown!)).data?.length, { timeout: 15_000 }).toBe(1);
+  });
+
+  test('a comment reply shows before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    const root = await comment(admin, session, 'Move this left');
+    await openComments(page, session);
+    await page.locator(thread(root)).getByTestId('comment-reply-input').fill('Done');
+    await watch(page, { shown: Shown.Present, selector: `${thread(root)} [data-testid="comment-reply"]` });
+    await page.locator(thread(root)).getByTestId('comment-reply-send').click();
+    await verdict('comment-reply', page);
+  });
+
+  test('an edited comment shows before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    const root = await comment(admin, session, 'Fist draft');
+    await openComments(page, session);
+    await page.locator(thread(root)).getByTestId('comment-edit').first().click();
+    await page.getByTestId('comment-edit-input').fill('First draft');
+    await watch(page, { shown: Shown.Present, selector: `${thread(root)} [data-testid="comment-edited"]` });
+    await page.getByTestId('comment-edit-save').click();
+    await verdict('comment-edit', page);
+  });
+
+  test('a deleted comment leaves before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    const root = await comment(admin, session, 'Remove me');
+    await openComments(page, session);
+    await watch(page, { shown: Shown.Absent, selector: thread(root) });
+    await page.locator(thread(root)).getByTestId('comment-delete').first().click();
+    await verdict('comment-delete', page);
+  });
+
+  test('a resolved comment thread folds away before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    const root = await comment(admin, session, 'Fix the kerning');
+    await openComments(page, session);
+    await watch(page, { shown: Shown.Absent, selector: thread(root) });
+    await page.locator(thread(root)).getByTestId('comment-resolve').click();
+    await verdict('comment-resolve', page);
   });
 });

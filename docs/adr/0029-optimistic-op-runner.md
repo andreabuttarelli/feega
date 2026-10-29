@@ -24,7 +24,9 @@ One runner, `createOptimistic` in `src/lib/canvas/optimistic-ops.ts`:
 
 Every action is a row in `REGISTRY` (`src/lib/canvas/optimistic-registry.ts`): local apply,
 server fields, touched rows, landing test (`Moved` = `outcome === 'done'`, `Answered` = any
-success), undo source, refresh. A new action is a row.
+success), undo source, refresh. A new action is a row. State that is not canvas rows gets
+its own registry run by the same runner: comment threads (`src/lib/canvas/comment-ops.ts`),
+where an op touches thread ids instead of nodes/edges.
 
 Optimistic concurrency is unchanged: writes that carry `nodes.version` keep sending it, a
 `conflict` is a refusal (rolled back), and the server records it in `canvas_conflicts` (#1566),

@@ -1706,6 +1706,7 @@ export const actions: Actions<CanvasParams> = {
       orgId: scope.orgId,
       canvasId: scope.canvasId,
       actor: userActor(scope),
+      id: fd.get('id') ? String(fd.get('id')) : undefined,
       body,
       nodeId,
       parentId,
