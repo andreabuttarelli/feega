@@ -169,6 +169,37 @@ export async function listRevisions(db: Db, input: { orgId: string; nodeId: stri
   }));
 }
 
+export type RevisionMark = { nodeId: string; version: number; summary: string | null; actorKind: string; actorId: string | null; agentKey: string | null; createdAt: string };
+
+type MarkRow = { node_id: string; version: number; summary: string | null; actor_kind: string; actor_id: string | null; agent_key: string | null; created_at: string };
+
+export async function listRevisionMarks(db: Db, input: { orgId: string; nodeIds: string[]; limit: number }): Promise<RevisionMark[]> {
+  if (!input.nodeIds.length) {
+    return [];
+  }
+
+  const { data, error } = await db
+    .from('motion_revisions')
+    .select('node_id, version, summary, actor_kind, actor_id, agent_key, created_at')
+    .eq('org_id', input.orgId)
+    .in('node_id', input.nodeIds)
+    .order('created_at', { ascending: false })
+    .limit(input.limit);
+
+  if (error) {
+    throw error;
+  }
+  return ((data ?? []) as MarkRow[]).map((row) => ({
+    nodeId: row.node_id,
+    version: Number(row.version),
+    summary: row.summary,
+    actorKind: row.actor_kind,
+    actorId: row.actor_id,
+    agentKey: row.agent_key,
+    createdAt: row.created_at
+  }));
+}
+
 export enum Checkpoint {
   Coalesce = 'coalesce',
   Cut = 'cut'
