@@ -14,8 +14,6 @@ export class FrameProperties {
   tokens = $state.raw<BrandTokens | null>(null);
   extras = $state.raw<FrameExtras | null>(null);
   part = $state<string | null>(null);
-  dev = $state(false);
-  toggleDev: (() => void) | null = null;
   exportPicks: (() => void) | null = null;
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
@@ -46,7 +44,6 @@ export class FrameProperties {
     this.tokens = null;
     this.extras = null;
     this.part = null;
-    this.toggleDev = null;
     this.exportPicks = null;
   }
 }

@@ -288,7 +288,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'r', alt: true, shift: true, command: Command.ToggleRulers, label: '⌥⇧R', does: 'Show / hide the rulers; drag from a ruler to pull a guide', group: ShortcutGroup.View },
   { key: 'g', shift: true, command: Command.ToggleLayoutGuides, label: '⇧G', does: 'Show / hide layout guides', group: ShortcutGroup.View },
   { key: 'r', alt: true, mode: EditMode.Design, command: Command.TogglePivot, label: '⌥R', does: 'Show the rotation origin to drag it', group: ShortcutGroup.View },
-  { key: 'd', shift: true, command: Command.ToggleDevMode, label: '⇧D', does: 'Coder mode: read the CSS, measures and colours of a layer', group: ShortcutGroup.View },
+  { key: 'd', shift: true, command: Command.ToggleDevMode, label: '⇧D', does: 'Code mode: read the CSS, measures and colours of a layer', group: ShortcutGroup.View },
   { key: 'y', mod: true, command: Command.ToggleOutlines, label: '⌘Y', does: 'Outline view: every layer as a thin line', group: ShortcutGroup.View },
   { key: 'j', mod: true, command: Command.ToggleTimeline, label: '⌘J', does: 'Show / hide the timeline', group: ShortcutGroup.View },
   { key: 'v', command: Command.ToolSelect, label: 'V', does: 'Select tool', group: ShortcutGroup.Draw },
