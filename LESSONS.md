@@ -3489,3 +3489,6 @@ Signal: a `@real` spec waits for `frame-hover-box`, `selection-overlay`, `part-b
 ## An instance in auto layout lands far off, the same instance free on the frame is fine
 
 **Signal:** a component instance whose main contains only another instance is pushed by the size of the whole frame. **Move:** `compBounds` measured top clips by their own box; a Precomp host has none. Ask the instance content (`instanceContent`) for nested hosts. Same family: content past `MAX_COMP_DEPTH` silently disappears from renders.
+
+### Vitest reports "no tests" for a file that has tests
+Signal: `Test Files 1 failed`, `Tests no tests`, `collect 0ms`; the suite file looks fine. Cause: the disk is full and Vitest cannot write its transform cache (`ENOSPC` in the failure detail, easy to miss). Move: `df -h /System/Volumes/Data` first; free space (idle worktrees' `node_modules`, `test-results/`) before touching the test.
