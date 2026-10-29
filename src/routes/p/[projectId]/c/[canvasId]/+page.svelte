@@ -26,7 +26,7 @@
   import { svgDrawings } from '$lib/canvas/svg-drawings';
 import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { DeleteMode, SECTION_TYPE, membershipAfter, withMembers } from '$lib/canvas/section';
-  import { stackedLocally, Stack } from '$lib/canvas/stacking';
+  import { Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
@@ -123,7 +123,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
-  import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
+  import { OpOutcome, createOptimistic } from '$lib/canvas/optimistic-ops';
+  import { OptimisticAction, Refresh, optimisticOp, refreshOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, Landing, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
@@ -207,7 +208,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
   import { nodeSize } from '$lib/canvas/node-size';
-  import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
@@ -544,11 +544,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!id || !frame) {
       return DropVerdict.Ignored;
     }
-    void landed(post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frame.frameId, at: frame.at }) })).then((ok) => {
-      if (ok) {
-        nodes = nodes.filter((n) => n.id !== id);
-      }
-    });
+    void optimistic(OptimisticAction.MoveFree, { id, frameId: frame.frameId, at: frame.at });
     return DropVerdict.Taken;
   }
 
@@ -559,28 +555,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     await landed(post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), ...(out.box ? { box: JSON.stringify(out.box) } : {}) }));
-  }
-
-  const regroups = inOrder();
-  let regrouping = 0;
-
-  function regroup(action: string, fields: Record<string, string>, after?: () => Promise<void>) {
-    regrouping += 1;
-    const land = holdGesture();
-    void regroups(async () => {
-      await places.flush();
-      const res = await post(action, fields);
-      if (res?.outcome === 'done') {
-        land((res.undo ?? []) as UndoItem[]);
-        await after?.();
-      }
-    }).finally(() => {
-      land(null);
-      regrouping -= 1;
-      if (!regrouping) {
-        void refresh();
-      }
-    });
   }
 
   function rotateGroupBy(id: string, degrees: number) {
@@ -609,31 +583,25 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     const id = crypto.randomUUID();
-    nodes = groupedLocally(nodes, ids, id, (record) => toTile(record));
-    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id }, after && (() => after(id)));
+    void optimistic(OptimisticAction.Group, { ids, id }).then((outcome) => (outcome === OpOutcome.Landed ? after?.(id) : undefined));
   }
 
   function wrapWithStack(ids: string[]) {
-    regroup('stackElements', { ids: JSON.stringify(ids), node_id: crypto.randomUUID() });
+    void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
   function wrapInSection(ids: string[]) {
-    const id = crypto.randomUUID();
-    regroup('wrapSection', { ids: JSON.stringify(ids), node_id: id });
+    void optimistic(OptimisticAction.Section, { ids, id: crypto.randomUUID() });
   }
 
   function ungroupElements(ids: string[]) {
     for (const id of ids) {
-      nodes = ungroupedLocally(nodes, id);
-      regroup('ungroupElement', { id });
+      void optimistic(OptimisticAction.Ungroup, { id });
     }
   }
 
   async function restack(ids: string[], to: Stack) {
-    nodes = stackedLocally(nodes, ids, to);
-    if (!(await post('restack', { ids: JSON.stringify(ids), to }))) {
-      await refresh();
-    }
+    await optimistic(OptimisticAction.Restack, { ids, to });
   }
 
   function drawElement(drawn: DrawnWire): Drawing {
@@ -1643,6 +1611,38 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     let land: (entry: StackEntry | null) => void = () => {};
     undoStack.pushPending(new Promise((resolve) => (land = resolve)));
     return (items) => land(items?.length ? { source: 'server', gesture: { items } } : null);
+  }
+
+  let refreshDue = false;
+
+  const runOptimistic = createOptimistic<CanvasRows<Tile, FlowEdge>>(
+    {
+      read: () => ({ nodes, edges }),
+      write: (rows) => { nodes = rows.nodes; edges = rows.edges; },
+      reserve: holdGesture,
+      hold: () => {
+        pending += 1;
+        snapshotVersion += 1;
+        return () => { pending -= 1; snapshotVersion += 1; retryMissed(); };
+      },
+      idle: () => {
+        if (refreshDue) {
+          refreshDue = false;
+          void refresh();
+        }
+      },
+      notice: (text) => { failed = text; }
+    },
+    restoreCanvas
+  );
+
+  function optimistic<K extends OptimisticAction>(action: K, input: Parameters<typeof optimisticOp<K, Tile, FlowEdge>>[1]): Promise<OpOutcome> {
+    refreshDue ||= refreshOf(action) === Refresh.AfterIdle;
+    const before = { nodes, edges };
+    return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record) }, async (name, fields) => {
+      await places.flush();
+      return post(name, fields);
+    }));
   }
 
   let productsOverride = $state<Record<string, Product[]> | null>(null);
@@ -2815,8 +2815,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function renameNode(id: string, name: string) {
-    nodes = nodes.map((n) => (n.id === id ? { ...n, displayName: cleanNodeName(name) } : n));
-    void post('rename', { node_id: id, name });
+    void optimistic(OptimisticAction.Rename, { id, name });
   }
 
   async function resize(id: string, width: number, height: number) {
@@ -3477,13 +3476,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   /** Fisso o iterate — ottimista come ogni altro campo della linea: subito sullo schermo, e
    *  ripristinato se il server rifiuta (l'arco è caduto nel frattempo, o non è più di quest'org). */
   async function setEdgeMode(connectionId: string, mode: WireMode) {
-    const before = edges.find((e) => e.id === connectionId)?.mode;
-    edges = edges.map((e) => (e.id === connectionId ? { ...e, mode } : e));
-
-    const done = await post('set_edge_mode', { connection_id: connectionId, mode });
-    if (!done) {
-      edges = edges.map((e) => (e.id === connectionId ? { ...e, mode: before } : e));
-    }
+    await optimistic(OptimisticAction.EdgeMode, { connectionId, mode });
   }
 
   /**
@@ -3499,32 +3492,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    const goneNodes = nodes.filter((n) => plan.itemIds.includes(n.id));
-    const goneEdges = edges.filter((e) => plan.edgeIds.includes(e.id));
-
-    nodes = nodes.filter((n) => !plan.itemIds.includes(n.id));
-    edges = edges.filter((e) => !plan.edgeIds.includes(e.id));
-
-    const done = await post('remove', {
-      node_ids: plan.itemIds.join(','),
-      connection_ids: plan.edgeIds.join(',')
-    });
-    if (!done) {
-      nodes = [...nodes, ...goneNodes];
-      edges = [...edges, ...goneEdges];
-      return;
-    }
-
-    pushGesture({
-      items: [
-        ...goneEdges.map((e): UndoItem => ({ kind: 'edge.delete', edgeId: e.id, sourceNodeId: e.source, targetNodeId: e.target })),
-        ...goneNodes.map((n): UndoItem => ({
-          kind: 'node.delete',
-          nodeId: n.id,
-          before: { type: n.type, position: { x: n.x, y: n.y, z: 0 }, size: { width: n.w, height: n.h }, data: n.data, version: n.version }
-        }))
-      ]
-    });
+    await optimistic(OptimisticAction.Remove, { nodeIds: plan.itemIds, edgeIds: plan.edgeIds });
   }
 
   /**

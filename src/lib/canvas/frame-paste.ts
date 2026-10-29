@@ -1,3 +1,4 @@
+import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
 import { Background, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { CANVAS_INK, CanvasTheme, drawClip, penClip, penPaint } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
@@ -28,8 +29,8 @@ export function svgTextBox(t: SvgText): { left: number; top: number; width: numb
 }
 
 
-const BRAND_TEXT = 'brand.text';
-const INK: Record<Background, string> = { [Background.Brand]: BRAND_TEXT, [Background.Transparent]: CANVAS_INK[CanvasTheme.Light] };
+
+const INK: Record<Background, string> = { [Background.Brand]: DEFAULT_COLOUR.inkOnDark, [Background.Transparent]: CANVAS_INK[CanvasTheme.Light] };
 
 const topIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => (t.clips as MotionClip[]).map((c) => c.id));
 

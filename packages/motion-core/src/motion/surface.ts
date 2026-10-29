@@ -1,3 +1,4 @@
+import { DEFAULT_COLOUR } from './default-colours';
 import { TrackKind, defaultProps } from './components';
 import { Background, findClip, newClip, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import { FillType } from './fill/model';
@@ -15,7 +16,7 @@ const surfaceProps = () => ({
   y: 0.5,
   width: 1,
   height: 1,
-  fills: [{ type: FillType.Solid, color: 'brand.background', opacity: 1, visible: true }],
+  fills: [{ type: FillType.Solid, color: DEFAULT_COLOUR.surface, opacity: 1, visible: true }],
   strokes: []
 });
 

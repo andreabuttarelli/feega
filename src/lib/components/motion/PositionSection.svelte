@@ -25,8 +25,10 @@
   import { Flip, QUARTER_TURN, flipClips, turnClips } from '$lib/motion/layer-props';
   import { pivotBox } from '@feega/motion-core/motion/parent';
   import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
+  import { Placement } from '@feega/motion-core/motion/layout/stack';
+  import { positionShown } from '$lib/motion/properties-view';
 
-  let { doc, clip, part, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
+  let { doc, clip, part, placement = Placement.Free, within = null, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
 
   const ICON = 15;
   const PIVOT_STOPS = [0, 0.5, 1] as const;
@@ -55,7 +57,8 @@
   };
 
   const box = $derived(pivotBox(clip.props, doc));
-  const placed = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number');
+  const placed = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && positionShown(placement));
+  const origin = $derived(within ? pivotBox(within.props, doc) : { left: 0, top: 0 });
   const pinnable = $derived(placed && !clip.parent);
   const horizontal = $derived(clip.constraints?.horizontal ?? Horizontal.Scale);
   const vertical = $derived(clip.constraints?.vertical ?? Vertical.Scale);
@@ -66,8 +69,8 @@
   const rotation = $derived(clip.transform.rotateZ ?? 0);
 
   const numberOf = (e: Event) => Number((e.currentTarget as HTMLInputElement).value);
-  const moveX = (e: Event) => onchange(setProps(doc, clip.id, { x: (numberOf(e) + box.width / 2) / doc.width }), 'Moved horizontally');
-  const moveY = (e: Event) => onchange(setProps(doc, clip.id, { y: (numberOf(e) + box.height / 2) / doc.height }), 'Moved vertically');
+  const moveX = (e: Event) => onchange(setProps(doc, clip.id, { x: (numberOf(e) + origin.left + box.width / 2) / doc.width }), 'Moved horizontally');
+  const moveY = (e: Event) => onchange(setProps(doc, clip.id, { y: (numberOf(e) + origin.top + box.height / 2) / doc.height }), 'Moved vertically');
   const pinH = (h: Horizontal) => onchange(setConstraints(doc, [clip.id], { horizontal: h }), 'Changed the horizontal constraint');
   const pinV = (v: Vertical) => onchange(setConstraints(doc, [clip.id], { vertical: v }), 'Changed the vertical constraint');
   const tickH = (side: Side, e: MouseEvent) => pinH(toggleHorizontal(horizontal, side, e.shiftKey ? Toggle.Both : Toggle.One));
@@ -95,8 +98,8 @@
 
   {#if part === PositionPart.Position && placed}
     <div class="row xy">
-      <label class="field"><span>X</span><input type="number" step="1" value={Math.round(box.left)} data-testid="position-x" onchange={moveX} /></label>
-      <label class="field"><span>Y</span><input type="number" step="1" value={Math.round(box.top)} data-testid="position-y" onchange={moveY} /></label>
+      <label class="field"><span>X</span><input type="number" step="1" value={Math.round(box.left - origin.left)} data-testid="position-x" onchange={moveX} /></label>
+      <label class="field"><span>Y</span><input type="number" step="1" value={Math.round(box.top - origin.top)} data-testid="position-y" onchange={moveY} /></label>
       {#if sized}
         <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={ICON} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={toggleRatio} />
       {/if}

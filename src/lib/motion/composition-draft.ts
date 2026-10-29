@@ -1,3 +1,4 @@
+import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
 import { CAMERA_PRESETS, type CameraPresetId } from '@feega/motion-core/canvas/composition/camera';
 import { CUSTOM_LAYOUT, layoutOf, type CompositionLayout } from '@feega/motion-core/canvas/composition';
 import type { LayoutSpec } from '@feega/motion-core/canvas/composition/spec';
@@ -37,7 +38,7 @@ export const MIN_SECONDS = 0.5;
 export const MAX_COMPOSE_SECONDS = 60;
 const DEFAULT_SECONDS = 6;
 const DEFAULT_BACKGROUND = '#000000';
-const DEFAULT_HEADLINE_COLOR = 'brand.text';
+const DEFAULT_HEADLINE_COLOR = DEFAULT_COLOUR.inkOnDark;
 const MOVING_CAMERA: CameraPresetId = 'slow-orbit';
 const STILL_CAMERA: CameraPresetId = 'static';
 

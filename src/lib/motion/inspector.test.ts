@@ -26,7 +26,7 @@ describe('properties inspector from the component schema', () => {
   it('a colour is a colour picker with its default', () => {
     const color = fieldsOf('Title').find((f) => f.key === 'color');
 
-    expect(color).toMatchObject({ control: Control.Color, fallback: 'brand.text', group: Group.Style });
+    expect(color).toMatchObject({ control: Control.Color, fallback: '#000000', group: Group.Style });
   });
 
   it('a range carries its bounds and step', () => {

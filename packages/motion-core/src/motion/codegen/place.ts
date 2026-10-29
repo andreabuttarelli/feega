@@ -65,12 +65,24 @@ function fixedRules(axis: Axis, size: number, main: Axis | null, shape: Shape): 
   return [[shape === Shape.Leaf ? 'height' : 'min-height', px(size)]];
 }
 
-function fillRules(axis: Axis, main: Axis | null): Rule[] {
+function fillRules(axis: Axis, main: Axis | null, grow: number): Rule[] {
   if (axis !== main) {
     return [['align-self', 'stretch']];
   }
-  return axis === 'width' ? [['flex', '1 1 0'], ['min-width', '0']] : [['flex', '1 1 0']];
+  return axis === 'width' ? [['flex', `${grow} 1 0`], ['min-width', '0']] : [['flex', `${grow} 1 0`]];
 }
+
+const GROW_KEY = { width: 'widthGrow', height: 'heightGrow' } as const;
+const PERCENT_KEY = { width: 'widthPercent', height: 'heightPercent' } as const;
+
+function percentRules(axis: Axis, main: Axis | null, share: number | undefined): Rule[] {
+  if (share === undefined) {
+    return [];
+  }
+  return axis === main ? [[axis, `${share}%`], ['flex-shrink', '0']] : [[axis, `${share}%`]];
+}
+
+const selfAlign = (item: LayoutItem): Rule[] => (item.alignSelf ? [['align-self', ALIGN_CSS[item.alignSelf]]] : []);
 
 function gridCell(item: LayoutItem): Rule[] {
   const span = (start: number | undefined, count: number) => (start === undefined ? `span ${count}` : `${start + 1} / span ${count}`);
@@ -113,12 +125,17 @@ export function flowItemRules(placed: Placed, flow: AutoLayout): Rule[] {
   const sized = AXES.flatMap((axis) => {
     const sizing = item[axis];
     if (sizing === Sizing.Fill) {
-      return fillRules(axis, main);
+      return fillRules(axis, main, item[GROW_KEY[axis]] ?? 1);
+    }
+    if (sizing === Sizing.Percent) {
+      return percentRules(axis, main, item[PERCENT_KEY[axis]]);
     }
     return sizing === Sizing.Fixed ? fixedRules(axis, box[axis], main, placed.shape) : [];
   });
   const capped = new Set(limits(item).map(([p]) => p));
-  return [...sized.filter(([p]) => !capped.has(p)), ...limits(item)];
+  const aligned = selfAlign(item);
+  const own = new Set([...capped, ...aligned.map(([p]) => p)]);
+  return [...sized.filter(([p]) => !own.has(p)), ...limits(item), ...aligned];
 }
 
 type Edge = (box: Box, parent: Box) => Rule[];

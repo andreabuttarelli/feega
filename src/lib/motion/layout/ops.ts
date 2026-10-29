@@ -3,11 +3,13 @@ import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/mo
 import { pivotBox } from '@feega/motion-core/motion/parent';
 import { KeepWorld, setParent } from '../parent-ops';
 import { layerOrder } from '../siblings';
-import { addClip, moveClip, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, moveClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import type { SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
 import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
 import { childrenInOrder, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
+import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -62,6 +64,67 @@ export function setLayoutItem(doc: MotionDoc, clipId: string, patch: Partial<Lay
     return fail(invalid);
   }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, layoutItem: parsed.data })) };
+}
+
+type Axis = 'width' | 'height';
+
+const GROW_KEY = { width: 'widthGrow', height: 'heightGrow' } as const;
+const PERCENT_KEY = { width: 'widthPercent', height: 'heightPercent' } as const;
+const DOC_SIDE = { width: 'width', height: 'height' } as const;
+
+const SIZE_PATCH: Record<Sizing, (axis: Axis, value: number | undefined) => Partial<LayoutItem>> = {
+  [Sizing.Fixed]: (axis) => ({ [axis]: Sizing.Fixed }),
+  [Sizing.Hug]: (axis) => ({ [axis]: Sizing.Hug }),
+  [Sizing.Fill]: (axis, value) => ({ [axis]: Sizing.Fill, [GROW_KEY[axis]]: value ?? 1 }),
+  [Sizing.Percent]: (axis, value) => ({ [axis]: Sizing.Percent, [PERCENT_KEY[axis]]: value })
+};
+
+export function setChildSize(doc: MotionDoc, clipId: string, axis: Axis, entry: SizeEntry): OpResult {
+  const sized = setLayoutItem(doc, clipId, SIZE_PATCH[entry.sizing](axis, entry.value));
+  if (!sized.ok || entry.sizing !== Sizing.Fixed || entry.value === undefined) {
+    return sized;
+  }
+  return setProps(sized.doc, clipId, { [axis]: entry.value / doc[DOC_SIDE[axis]] });
+}
+
+const ALONG: Record<Direction, (by: readonly [number, number]) => number> = {
+  [Direction.Horizontal]: ([dx]) => Math.sign(dx),
+  [Direction.Vertical]: ([, dy]) => Math.sign(dy),
+  [Direction.Grid]: ([dx, dy]) => Math.sign(dx || dy)
+};
+
+export function stackPlaced(doc: MotionDoc, clipId: string): boolean {
+  const child = findClip(doc, clipId)?.clip as MotionClip | undefined;
+  return !!child && placementOf(child, layoutParent(doc, child)) === Placement.Flow;
+}
+
+const PLACED_BY_STACK: ReadonlySet<string> = new Set(['x', 'y']);
+
+export function stackPositionProblem(doc: MotionDoc, clipId: string, keys: readonly string[]): string | null {
+  if (!stackPlaced(doc, clipId) || !keys.some((k) => PLACED_BY_STACK.has(k))) {
+    return null;
+  }
+  return `${clipId} is placed by its stack: reorder it with reorder_stack, or set_layout_item absolute true to position it by x/y relative to the stack`;
+}
+
+export function arrowStep(doc: MotionDoc, clipId: string, by: readonly [number, number]): number {
+  const child = findClip(doc, clipId)?.clip as MotionClip | undefined;
+  const parent = child ? layoutParent(doc, child) : null;
+  return parent ? ALONG[parent.autoLayout.direction](by) : 0;
+}
+
+export function stepInStack(doc: MotionDoc, clipId: string, step: number): OpResult {
+  const child = findClip(doc, clipId)?.clip;
+  const parent = child ? layoutParent(doc, child as MotionClip) : null;
+  if (!parent) {
+    return fail(`${clipId} is not in a stack`);
+  }
+  const ids = childrenInOrder(doc.tracks.flatMap((t) => t.clips as MotionClip[]), parent).map((c) => c.id);
+  const at = ids.indexOf(clipId) + step;
+  if (at < 0 || at >= ids.length) {
+    return fail(`${clipId} is already at the ${step < 0 ? 'start' : 'end'} of the stack`);
+  }
+  return reorderChild(doc, parent.id, clipId, at);
 }
 
 export function reorderChild(doc: MotionDoc, containerId: string, childId: string, index: number): OpResult {

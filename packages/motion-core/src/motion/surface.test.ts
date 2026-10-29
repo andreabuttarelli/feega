@@ -15,13 +15,13 @@ describe('the frame surface', () => {
     expect(frameSurface(newMotionDoc(MotionFormat.Landscape))).toBeNull();
   });
 
-  it('is a locked full-frame rectangle under every layer, painted in the brand background', () => {
+  it('is a locked full-frame rectangle under every layer, painted plain white', () => {
     const doc = withSurface(newMotionDoc(MotionFormat.Landscape), SURFACE);
     const clip = frameSurface(doc)!;
 
     expect(clip.id).toBe(SURFACE);
     expect(clip.locked).toBe(true);
-    expect(clip.props).toMatchObject({ shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1, fills: [{ type: 'solid', color: 'brand.background' }] });
+    expect(clip.props).toMatchObject({ shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1, fills: [{ type: 'solid', color: '#FFFFFF' }] });
     expect(clip.durationInFrames).toBe(doc.durationInFrames);
     expect(doc.background).toBe(Background.Transparent);
     expect(parseMotionDoc(doc).ok).toBe(true);

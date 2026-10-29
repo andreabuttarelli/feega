@@ -31,7 +31,8 @@ export enum AlignContent {
 export enum Sizing {
   Fixed = 'fixed',
   Hug = 'hug',
-  Fill = 'fill'
+  Fill = 'fill',
+  Percent = 'percent'
 }
 
 export enum TrackType {
@@ -77,6 +78,9 @@ export type Item = {
   min?: Partial<Size>;
   max?: Partial<Size>;
   absolute?: boolean;
+  grow?: Partial<Size>;
+  percent?: Partial<Size>;
+  alignSelf?: Align;
   baseline?: number;
   cell?: Cell;
   heightAt?: (width: number) => number;
@@ -115,7 +119,23 @@ const ALIGNED: Record<Align, (free: number) => number> = {
   [Align.Stretch]: () => 0
 };
 
-const takesLine = (k: Item, align: Align, dim: Dim) => k.sizing[dim] === Sizing.Fill || (align === Align.Stretch && k.sizing[dim] === Sizing.Hug);
+const takesLine = (k: Item, align: Align, dim: Dim) => k.sizing[dim] === Sizing.Fill || ((k.alignSelf ?? align) === Align.Stretch && k.sizing[dim] === Sizing.Hug);
+
+const DIMS: readonly Dim[] = ['width', 'height'];
+
+const weightOf = (k: Item, dim: Dim) => k.grow?.[dim] ?? 1;
+
+function percented(k: Item, room: Size): Partial<Size> {
+  const out: Partial<Size> = {};
+  for (const dim of DIMS) {
+    const share = k.percent?.[dim];
+    if (k.sizing[dim] !== Sizing.Percent || share === undefined) {
+      continue;
+    }
+    out[dim] = clamp(k, dim, (room[dim] * share) / 100);
+  }
+  return out;
+}
 
 const JUSTIFIED: Record<Justify, (free: number, gap: number, count: number) => { offset: number; gap: number }> = {
   [Justify.Start]: (_free, gap) => ({ offset: 0, gap }),
@@ -385,10 +405,11 @@ function grow(kids: Item[], base: number[], room: number, dim: Dim): number[] {
   let left = room - sum(kids.map((k, i) => (k.sizing[dim] === Sizing.Fill ? 0 : base[i])));
 
   while (open.length) {
-    const share = left / open.length;
-    const pinned = open.filter((i) => clamp(kids[i], dim, share) !== share);
+    const unit = left / sum(open.map((i) => weightOf(kids[i], dim)));
+    const share = (i: number) => unit * weightOf(kids[i], dim);
+    const pinned = open.filter((i) => clamp(kids[i], dim, share(i)) !== share(i));
     for (const i of open) {
-      sizes[i] = clamp(kids[i], dim, share);
+      sizes[i] = clamp(kids[i], dim, share(i));
     }
     if (!pinned.length) {
       break;
@@ -414,7 +435,7 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
     return;
   }
   const kids = flowing(item);
-  const given = new Map(kids.map((k) => [k, fitted(k, flow, inner[c])]));
+  const given = new Map(kids.map((k) => [k, { ...fitted(k, flow, inner[c]), ...percented(k, inner) }]));
   const natural = new Map(kids.map((k) => [k, measure(k, given.get(k))[m]]));
   const rows = flow.wrap ? lines(kids, (k) => natural.get(k)!, inner[m], flow.gap) : [kids];
   const stripes = rows.map((row) => {
@@ -430,7 +451,7 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
 
   for (const { row, mains, lineCross, crosses } of stripes) {
     const line = baselineLine(crosses, row.map((k, i) => baselineOf(k, crosses[i])));
-    const crossOffset = (i: number) => (byBaseline(flow) ? line.baseline - baselineOf(row[i], crosses[i]) : ALIGNED[flow.align](lineCross - crosses[i]));
+    const crossOffset = (i: number) => (byBaseline(flow) && !row[i].alignSelf ? line.baseline - baselineOf(row[i], crosses[i]) : ALIGNED[row[i].alignSelf ?? flow.align](lineCross - crosses[i]));
     const { offset, gap } = JUSTIFIED[flow.justify](inner[m] - sum(mains) - gaps(row.length, flow.gap), flow.gap, row.length);
     let mainAt = inner[ax.mainStart] + offset;
 

@@ -1,3 +1,5 @@
+import { withSurface } from '@feega/motion-core/motion/surface';
+import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
 import { COMPONENTS, TYPE_SIZE, type ComponentId } from '@feega/motion-core/motion/components';
 import { NEW_TEXT_SIZING, TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -221,11 +223,11 @@ export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
 }
 
+const SURFACE_ID = 'surface';
+
 function sizedFrame(box: CanvasBox, format: MotionFormat): MotionDoc {
-  if (format !== MotionFormat.Custom) {
-    return newMotionDoc(format);
-  }
-  return { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) };
+  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) } : newMotionDoc(format);
+  return withSurface(doc, SURFACE_ID);
 }
 
 export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.Custom, stillSeconds?: number): MotionDoc {
@@ -265,7 +267,7 @@ export function drawnElement(drawn: Drawn, id: string): DrawnElement {
 }
 
 export const CANVAS_INK: Record<CanvasTheme, string> = { [CanvasTheme.Light]: '#111111', [CanvasTheme.Dark]: '#f5f5f5' };
-const BRAND_TEXT = 'brand.text';
+
 
 function defaultColor(component: string): unknown {
   const parsed = COMPONENTS[component as ComponentId]?.schema.safeParse({});
@@ -273,7 +275,7 @@ function defaultColor(component: string): unknown {
 }
 
 function inked(doc: MotionDoc, ink: string): MotionDoc {
-  const brandInk = (c: MotionDoc['tracks'][number]['clips'][number]) => (c.props.color ?? defaultColor(c.component)) === BRAND_TEXT;
+  const brandInk = (c: MotionDoc['tracks'][number]['clips'][number]) => (c.props.color ?? defaultColor(c.component)) === DEFAULT_COLOUR.ink;
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (brandInk(c) ? { ...c, props: { ...c.props, color: ink } } : c)) })) };
 }
 

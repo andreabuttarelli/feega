@@ -10,6 +10,7 @@ const canvasPage = (name: string) =>
 
 const flow = readFileSync(join(dir, '..', 'components', 'canvas', 'gpu', 'GpuFlow.svelte'), 'utf8');
 const page = canvasPage('+page.svelte');
+const registry = readFileSync(join(dir, 'optimistic-registry.ts'), 'utf8');
 const server = readFileSync(join(dir, '..', 'server', 'canvas', 'canvas-page.ts'), 'utf8');
 
 describe('il gesto di cancellare arriva fino alla riga', () => {
@@ -19,7 +20,8 @@ describe('il gesto di cancellare arriva fino alla riga', () => {
 
   it('la pagina toglie le tile dal PROPRIO stato, o la riconciliazione le riporta', () => {
     expect(page).toMatch(/onDelete=\{/);
-    expect(page).toMatch(/post\('remove'/);
+    expect(page).toMatch(/optimistic\(OptimisticAction\.Remove,/);
+    expect(registry).toMatch(/Remove = 'remove'/);
   });
 
   it('e le linee della tela le può togliere davvero', () => {

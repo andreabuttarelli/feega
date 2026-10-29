@@ -35,7 +35,23 @@ Select a Stack and the right bar shows **Stack** under **Layout**, above the sha
 - **Width / Height**: fixed or fit (hug); a child can also fill.
 - **First on top** and **Strokes included**.
 
-A child of a Stack shows its own sizing (fixed, fit, fill, min and max), absolute position, and moves earlier or later in the order. Fills, per-side strokes, corner radius, opacity, blend, shadows, blur and clip content are the usual sections.
+## Stack children are flex items
+
+The Stack places its children, like flexbox. Select a child and the right bar drops **X / Y**, frame alignment and constraints, and shows instead:
+
+- **Width / Height**: a value with a unit, from the dropdown or typed:
+  - `120` or `120px`: fixed pixels;
+  - `50%`: a share of the Stack;
+  - `Fill`, `fill 2`, `2fr`: shares the space left by weight, so `1fr` and `2fr` split it 1:2;
+  - `hug`: fits its content.
+- **Min / max** width and height.
+- **Align self**: overrides the Stack's align for this child (start, center, end, stretch).
+- **Absolute position**: takes the child out of the flow (Figma's *ignore auto layout*). X and Y come back, measured from the Stack's top-left corner.
+- **Move earlier / later** and **Take out of the stack**.
+
+On the canvas, dragging a child reorders it: a line shows where it lands between its siblings. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it.
+
+Fills, per-side strokes, corner radius, opacity, blend, shadows, blur and clip content are the usual sections.
 
 In **Layers** a Stack has its own icon.
 
@@ -50,6 +66,7 @@ Direction **Grid** gives fixed, fractional and hug columns and rows, spans, per-
 | `wrap_in_stack` (motion) | wraps clips in a Stack |
 | `set_stack` (motion) | direction, gap, padding, justify, align (`start`, `center`, `end`, `baseline`, `stretch`), wrap |
 | `reorder_stack`, `leave_stack` (motion) | move a child, take a child out |
+| `set_layout_item` (motion) | a child's sizing: `fixed`, `hug`, `fill` with `widthGrow`/`heightGrow` weight, `percent` with `widthPercent`/`heightPercent`; `alignSelf`; `absolute` |
 | `remove_stack` (motion) | unwraps a Stack |
 | `stack_elements` (canvas op) | wraps free elements on the canvas in one free Stack |
 
@@ -57,7 +74,9 @@ The old names `add_auto_layout`, `set_auto_layout`, `reorder_auto_layout` and `l
 
 ## Export as code
 
-A Stack exports as a `div` with `display: flex`, its direction, gap, padding, `justify-content` and `align-items` ([Export code](/canvas/export-code/)).
+A Stack exports as a `div` with `display: flex`, its direction, gap, padding, `justify-content` and `align-items` ([Export code](/canvas/export-code/)). A fill child exports as `flex: <weight> 1 0`, a percent child as `width: 50%`, its own align as `align-self`, and an absolute child as `position: absolute` inside a `position: relative` Stack.
+
+`set_props` with `x` or `y` on a child in the flow is refused with a hint: reorder it, or make it absolute first.
 
 ## Arrange a selection
 

@@ -72,7 +72,7 @@
   import TextPresetGallery from './TextPresetGallery.svelte';
   import StackSection from './StackSection.svelte';
   import { layoutParent, removeStack } from '$lib/motion/layout/ops';
-  import { LAYOUT_KIND_LABEL, layoutKind } from '@feega/motion-core/motion/layout/stack';
+  import { LAYOUT_KIND_LABEL, layoutKind, placementOf } from '@feega/motion-core/motion/layout/stack';
   import Minus from '@lucide/svelte/icons/minus';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
@@ -229,6 +229,8 @@
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
   const positioned = $derived(transformProps.length > 0);
   const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
+  const stackParent = $derived(layoutParent(doc, clip));
+  const placement = $derived(placementOf(clip, stackParent));
   const PLACED_KEYS: ReadonlySet<string> = new Set(['x', 'y']);
   const NO_SKIP: ReadonlySet<string> = new Set();
   const RADIUS_KEYS: ReadonlySet<string> = new Set(['roundness', 'corners']);
@@ -541,7 +543,7 @@
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
     {@render lead?.()}
-    {#each sectionsFor(family, view, mode).filter((s) => has[s]) as section (section)}
+    {#each sectionsFor(family, view, mode, placement).filter((s) => has[s]) as section (section)}
       <InspectorSection actions={SECTION_ACTIONS[section]} title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && (fieldsIn(section).length > 0 || (section === Section.Fill && !!partFill)))} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
@@ -819,7 +821,7 @@
 {/snippet}
 
 {#snippet layoutBody()}
-  {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
   {@render groupFields(Section.Layout, positioned ? PLACED_KEYS : NO_SKIP)}
   {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
 {/snippet}

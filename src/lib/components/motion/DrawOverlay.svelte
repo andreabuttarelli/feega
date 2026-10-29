@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
   import { hostFraction, hostWidth } from '$lib/motion/overlay-point';
   import { DRAGGED_TEXT_SIZING, NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -25,7 +26,7 @@
 
   const CLOSE_REACH_PX = 8;
   const TEXT_BOX = { width: 0.4, height: 0.12 };
-  const LINE_INK = 'brand.text';
+  const LINE_INK = DEFAULT_COLOUR.ink;
   const LINE_TOOLS: ReadonlySet<DrawTool> = new Set([DrawTool.Line, DrawTool.Arrow]);
   const MIN_LINE_PX = 2;
   const MIN_TEXT_DRAG_PX = 10;

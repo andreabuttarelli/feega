@@ -25,7 +25,7 @@ function must(r: OpResult): MotionDoc {
 }
 
 const blank = newMotionDoc(MotionFormat.Landscape);
-const withBg = must(addClip(blank, { component: 'BrandBackground', from: 0, durationInFrames: 90 }, 'bg'));
+const withBg = must(addClip(blank, { component: 'BrandBackground', from: 0, durationInFrames: 90, props: { fill: 'brand.background' } }, 'bg'));
 const square = { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.1, fill: '#ff0000' };
 const withCard = must(addClip(withBg, { component: 'Shape', from: 0, durationInFrames: 90, props: square }, 'card'));
 

@@ -119,6 +119,9 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, cont
     min: { width: own.minWidth, height: own.minHeight },
     max: { width: own.maxWidth, height: own.maxHeight },
     absolute: own.absolute,
+    grow: { width: own.widthGrow, height: own.heightGrow },
+    percent: { width: own.widthPercent, height: own.heightPercent },
+    alignSelf: own.alignSelf,
     baseline: isText(clip.component) ? textBaseline(clip.component, clip.props, Math.min(size.width, size.height)) : undefined,
     heightAt: reflowsText(clip) ? (width) => measure(clip.component, clip.props, Math.min(size.width, size.height), width).height : undefined,
     cell: { column: own.column, row: own.row, columnSpan: own.columnSpan, rowSpan: own.rowSpan, x: own.cellX, y: own.cellY }

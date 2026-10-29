@@ -1,3 +1,4 @@
+import { DEFAULT_COLOUR } from '../default-colours';
 import { shaderProps, type ClipShader, type ShaderDefs } from '../shaders/model';
 import { modifierProps } from '../shape/model';
 import type { Modifier } from '../shape/schema';
@@ -33,7 +34,7 @@ const PARAM_TYPES: Record<string, (fallback: unknown, o: Options) => PropSpec> =
   text: (d, o) => spec({ type: 'string', default: String(d ?? '') }, o),
   textarea: (d, o) => spec({ type: 'string', format: PropFormat.Textarea, default: String(d ?? '') }, o),
   number: (d, o) => spec({ type: 'number', default: Number(d ?? 0), minimum: o.min, maximum: o.max, step: o.step }, o),
-  color: (d, o) => spec({ type: 'string', format: PropFormat.Color, default: String(d ?? 'brand.accent') }, o),
+  color: (d, o) => spec({ type: 'string', format: PropFormat.Color, default: String(d ?? DEFAULT_COLOUR.fill) }, o),
   boolean: (d, o) => spec({ type: 'boolean', default: Boolean(d) }, o),
   select: (d, o) => spec({ type: 'string', enum: o.options, default: String(d ?? o.options?.[0] ?? '') }, o),
   asset: (_, o) => spec({ type: 'string', format: PropFormat.Asset, assetKind: (o.kind ?? 'image') as PropSpec['assetKind'], default: null }, o),

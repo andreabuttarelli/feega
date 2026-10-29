@@ -26,7 +26,7 @@ vi.mock('$lib/server/repos/assets', () => ({
   listProjectAssets: vi.fn(async () => [{ id: 'a1', projectId: 'p1', type: 'image', url: 'https://cdn.test/a1.png', source: 'upload', createdAt: '2026-10-04T00:00:00Z', durationS: null }])
 }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ signAssetPaths: vi.fn(async () => new Map()), createAssetSigningDb: vi.fn() }));
-vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: vi.fn(async () => null) }));
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: vi.fn(async () => null), findFirstBrandLook: vi.fn(async () => null) }));
 vi.mock('$lib/server/repos/projects', () => ({ listProjects: vi.fn(async () => [{ id: 'p1', name: 'Launch', brandId: null, mode: ProjectMode.Standard }]) }));
 vi.mock('$lib/server/repos/node-runs', () => ({ listNodeRuns: vi.fn(async () => []) }));
 

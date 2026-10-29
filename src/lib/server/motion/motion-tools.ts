@@ -180,7 +180,7 @@ import { ParentOpacity } from '@feega/motion-core/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
 import { FRAME_PRESETS, PRESET_SIZE } from '$lib/motion/frame-presets';
-import { leaveStack, freezeLayout, removeStack, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from '$lib/motion/layout/ops';
+import { leaveStack, stackPositionProblem, freezeLayout, removeStack, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
 import { expressionToKeys, setCameraExpression, setExpression } from '@feega/motion-core/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -1058,6 +1058,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!assetKnown(input.props.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
+        const placed = stackPositionProblem(session.doc, input.clip_id, Object.keys(input.props));
+        if (placed) {
+          return { ok: false, error: placed };
+        }
         const component = findClip(session.doc, input.clip_id)?.clip.component;
         const outside = component ? shownProblem(session.doc, component, input.props) : null;
         if (outside) {
@@ -1923,7 +1927,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_layout_item: tool({
-      description: 'How a clip sizes inside its auto layout, per axis (in a grid also: column/row 0-based anchor cell, columnSpan/rowSpan, cellX/cellY start|center|end align it in its cell over the grid justify/align; a fill child takes the spanned area): fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default for older clips; clips added since are left/top); vertical top, bottom, top_bottom, center or scale. Not the pivot (anchorX/anchorY), which is the rotation origin.',
+      description: 'How a clip sizes inside its auto layout, per axis (in a grid also: column/row 0-based anchor cell, columnSpan/rowSpan, cellX/cellY start|center|end align it in its cell over the grid justify/align; a fill child takes the spanned area): fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left by widthGrow/heightGrow weight, default 1: weights 1 and 2 split it 1:2; on a clip not yet in a container it applies once it is parented), percent (widthPercent/heightPercent 1..100 of the container). alignSelf start|center|end|stretch overrides the stack align for this child. minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A child in the flow is placed by its stack: set_props x/y on it is refused, reorder it with reorder_stack. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default for older clips; clips added since are left/top); vertical top, bottom, top_bottom, center or scale. Not the pivot (anchorX/anchorY), which is the rotation origin.',
       inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string(), constraints: z.object({ horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }).optional() }),
       execute: async ({ clip_id, constraints, ...patch }) => {
         const pinned = constraints ? setConstraints(session.doc, [clip_id], constraints) : ({ ok: true, doc: session.doc } as OpResult);
