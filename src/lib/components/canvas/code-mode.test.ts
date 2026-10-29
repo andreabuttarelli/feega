@@ -6,6 +6,7 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { EditorMode } from '$lib/canvas/editor-mode.svelte';
 import { FRAME_MODE_ACTIONS, FrameDialog } from '$lib/canvas/frame-dialogs';
 import { CodeTarget, exportCode } from '@feega/motion-core/motion/codegen/index';
+import { entryFile } from '$lib/components/motion/code-files';
 import DevCode from './DevCode.svelte';
 
 const panel = readFileSync('src/lib/components/canvas/FrameInspectorPanel.svelte', 'utf8');
@@ -13,14 +14,25 @@ const flow = readFileSync('src/lib/components/canvas/gpu/GpuFlow.svelte', 'utf8'
 const segmented = readFileSync('src/lib/components/ui/shell/SegmentedControl.svelte', 'utf8');
 
 describe('code mode', () => {
-  it('shows the targets, the code, copy and the full export inline', () => {
+  it('picks framework and file from two dropdowns on one row', () => {
     const body = render(DevCode, { props: { doc: newMotionDoc(MotionFormat.Landscape), name: 'Hero', assets: {}, tokens: FEEGA_TOKENS } }).body;
 
+    expect(body).toContain('data-testid="dev-code-target"');
+    expect(body).toContain('data-testid="dev-code-file"');
     for (const label of ['React', 'HTML', 'Svelte']) {
-      expect(body).toContain(`>${label}</button>`);
+      expect(body).toContain(`>${label}</option>`);
     }
-    expect(body).toContain('data-testid="dev-code-copy"');
+    expect(body).not.toContain('role="tablist"');
+    expect(body).not.toContain('data-slot="segmented-control"');
     expect(body).toContain('data-testid="dev-code-download"');
+  });
+
+  it('opens on the main entry file', () => {
+    const react = ['index.html', 'package.json', 'src/main.tsx', 'src/pages/Hero.tsx'].map((path) => ({ path, content: '' }));
+    const svelte = ['package.json', 'src/routes/+page.svelte'].map((path) => ({ path, content: '' }));
+
+    expect(entryFile(react).path).toBe('src/pages/Hero.tsx');
+    expect(entryFile(svelte).path).toBe('src/routes/+page.svelte');
   });
 
   it('keeps the frame export under the picked layer CSS', () => {
