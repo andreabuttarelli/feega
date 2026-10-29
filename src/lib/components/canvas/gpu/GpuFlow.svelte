@@ -1384,7 +1384,7 @@
   }
 
   $effect(() => {
-    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks[0]?.clips[0])] as const] : []))));
+    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
   });
 
   $effect(() => {

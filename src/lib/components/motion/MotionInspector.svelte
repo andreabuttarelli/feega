@@ -72,6 +72,7 @@
   import TextPresetGallery from './TextPresetGallery.svelte';
   import StackSection from './StackSection.svelte';
   import { layoutParent, removeStack } from '$lib/motion/layout/ops';
+  import { LAYOUT_KIND_LABEL, layoutKind } from '@feega/motion-core/motion/layout/stack';
   import Minus from '@lucide/svelte/icons/minus';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
@@ -237,7 +238,8 @@
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
-  const headKind = $derived(customName ? 'Component' : spec.label);
+  const stackKind = $derived(layoutKind(clip));
+  const headKind = $derived(customName ? 'Component' : stackKind ? LAYOUT_KIND_LABEL[stackKind] : spec.label);
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);

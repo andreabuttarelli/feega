@@ -134,13 +134,15 @@
         </Field>
       {/if}
       <Field label="Align">
-        <div class="grid grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
+        <div class="grid shrink-0 grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
           {#each SPOTS as row (row)}
             {#each SPOTS as column (column)}
               <button type="button" class={SPOT} aria-label={`Align ${row} ${column}`} aria-pressed={spotPressed(layout, column, row)} onclick={() => pickSpot(layout, column, row)}></button>
             {/each}
           {/each}
         </div>
+      </Field>
+      <Field label="Distribute">
         <IconButton label="Stretch children" size={IconSize.Sm} pressed={layout.align === Align.Stretch} data-testid="auto-layout-stretch" onclick={() => set({ align: layout.align === Align.Stretch ? Align.Start : Align.Stretch }, 'Changed the alignment')}><StretchVertical /></IconButton>
         {#if layout.direction === Direction.Horizontal}
           <IconButton label="Align baselines" size={IconSize.Sm} pressed={layout.align === Align.Baseline} data-testid="auto-layout-baseline" onclick={() => set({ align: layout.align === Align.Baseline ? Align.Start : Align.Baseline }, 'Changed the alignment')}><Baseline /></IconButton>
