@@ -9,7 +9,7 @@ import { FillType } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { groupClips } from '$lib/motion/group';
-import { createComponent } from '$lib/motion/main-component';
+import { createComponent, innerClips } from '$lib/motion/main-component';
 import { precompose } from '@feega/motion-core/motion/precomp';
 import { instanceOverrides } from './instance-diff';
 import { Align, Direction, Justify as MotionJustify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
@@ -28,7 +28,7 @@ type Root = { id: string; layer: Layer };
 type Built = { doc: MotionDoc; ids: string[]; roots: Root[] };
 export type FigmaImage = { clipId: string; hash: string; at: number; innerId?: string };
 type Main = { compId: string; at: Unit; images: FigmaImage[] };
-type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[]; mains: Map<string, Main> };
+type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[]; mains: Map<string, Main>; texts: Map<Layer, string> };
 
 export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind; images: FigmaImage[] };
 export type FigmaPlan = { items: PlanItem[]; skipped: string[]; fileKey: string | null };
@@ -179,6 +179,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
     p.report(`${layer.name}: ${made.error}`);
     return { doc, ids: [], roots: [] };
   }
+  p.texts.set(layer, id);
   return { doc: made.doc, ids: [id], roots: [{ id, layer }] };
 }
 
@@ -302,6 +303,21 @@ function clipIdsIn(doc: MotionDoc, compId: string): string[] {
   return clips.flatMap((c) => [c.id, ...(compOf(c) ? clipIdsIn(doc, compOf(c)!) : [])]);
 }
 
+const textsIn = (layer: Layer): TextLayer[] => (layer.kind === LayerKind.Text ? [layer] : layer.kind === LayerKind.Frame ? layer.children.flatMap(textsIn) : []);
+
+const MAX_PROPERTY = 40;
+
+function propertiesOf(doc: MotionDoc, compId: string, layer: FrameLayer, component: ComponentRef, p: Place) {
+  const direct = new Set(innerClips(doc.comps[compId]).map((c) => c.id));
+  const texts = textsIn(layer);
+  const found = Object.entries(component.texts ?? {}).flatMap(([prop, value]) => {
+    const text = texts.find((t) => t.text.trim() === value.trim());
+    const target = text ? p.texts.get(text) : undefined;
+    return target && direct.has(target) && prop.length <= MAX_PROPERTY ? [[prop, { kind: 'text' as const, target, default: value }]] : [];
+  });
+  return found.length ? { properties: Object.fromEntries(found) } : {};
+}
+
 function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: Place): Built {
   const ids = { comp: p.newId(), clip: p.newId() };
   let n = 0;
@@ -312,14 +328,15 @@ function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: P
   const inside = new Set(clipIdsIn(made.doc, ids.comp));
   p.mains.set(component.key, { compId: ids.comp, at: { x: layer.box.x, y: layer.box.y }, images: p.images.filter((i) => inside.has(i.clipId)) });
   const comp = made.doc.comps[ids.comp];
-  const varied = component.variant ? { ...made.doc, comps: { ...made.doc.comps, [ids.comp]: { ...comp, component: { ...comp.component!, set: component.name, variant: component.variant } } } } : made.doc;
+  const marks = { ...(component.variant ? { set: component.name, variant: component.variant } : {}), ...propertiesOf(made.doc, ids.comp, layer, component, p) };
+  const varied = Object.keys(marks).length ? { ...made.doc, comps: { ...made.doc.comps, [ids.comp]: { ...comp, component: { ...comp.component!, ...marks } } } } : made.doc;
   const named = editClip(varied, ids.clip, (clip) => ({ ...clip, name: component.name.slice(0, MAX_NAME) }));
   return { doc: named.ok ? named.doc : varied, ids: [ids.clip], roots: [{ id: ids.clip, layer }] };
 }
 
 function ownOverrides(doc: MotionDoc, layer: FrameLayer, main: Main, shift: Unit, p: Place) {
   const images: FigmaImage[] = [];
-  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, report: () => undefined });
+  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(p.mains), report: () => undefined });
   const ids = { comp: p.newId(), clip: p.newId() };
   const made = own.ids.length ? precompose(own.doc, own.ids, ids, layer.name) : null;
   return made?.ok ? instanceOverrides(made.doc, ids.comp, main.compId, { own: images, main: main.images }) : null;
@@ -373,7 +390,7 @@ function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<s
   const size = wholeSize(layer.box);
   const blank = drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0);
   const images: FigmaImage[] = [];
-  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map() };
+  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map(), texts: new Map() };
   const built = layersOf(blank, layer, place);
   return { destination: Destination.Frame, doc: built.doc, size, centre, name: layer.name, kind: FrameKind.Frame, images };
 }
@@ -386,7 +403,7 @@ function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped:
     return null;
   }
   const images: FigmaImage[] = [];
-  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images, mains: new Map() };
+  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images, mains: new Map(), texts: new Map() };
   const built = BUILD[layer.kind](blank.doc, layer, place);
   const one = layer.kind === LayerKind.Frame ? grouped(built, layer, place) : built;
   const first = one.doc.tracks.flatMap((t) => t.clips)[0];
@@ -425,7 +442,7 @@ export function figmaIntoFrame(doc: MotionDoc, html: string, at: Unit, scale: nu
   const { scene, fileKey } = found;
   const skipped = new Set(scene.skipped);
   const images: FigmaImage[] = [];
-  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box, images, mains: new Map() };
+  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box, images, mains: new Map(), texts: new Map() };
   const built = grouped(layersOf(doc, scene.combined, place), scene.combined, place);
   return built.ids.length ? { doc: built.doc, selection: built.ids, skipped: [...skipped], images, fileKey } : null;
 }

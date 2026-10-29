@@ -3442,6 +3442,7 @@
       onframes={props.onFrameTemplates ? () => props.onFrameTemplates?.(viewCentre()) : undefined}
       onfigma={props.onFigmaImport ? () => props.onFigmaImport?.(viewCentre()) : undefined}
       onurl={props.onUrlImport ? () => props.onUrlImport?.(viewCentre()) : undefined}
+      oncode={props.onCodeImport ? () => props.onCodeImport?.(viewCentre()) : undefined}
       ontrailer={panelNodeId ? startTrailer : undefined}
       onimage={insertImageInFrame}
       oncomment={props.onCommenting ? () => props.onCommenting?.(!props.commenting) : undefined}

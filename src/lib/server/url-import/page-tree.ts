@@ -1,9 +1,9 @@
 import { MAX_SIDE } from '@feega/motion-core/motion/doc';
 import type { RestNode } from '$lib/server/figma/rest-message';
 
-export type TreeLimits = { nodes: number; height: number; text: number; samples: number };
+export type TreeLimits = { nodes: number; height: number; text: number; samples: number; useAttr: string };
 
-export const TREE_LIMITS: TreeLimits = { nodes: 1_500, height: MAX_SIDE, text: 2_000, samples: 160 };
+export const TREE_LIMITS: TreeLimits = { nodes: 1_500, height: MAX_SIDE, text: 2_000, samples: 160, useAttr: 'data-feega-use' };
 
 export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean };
 
@@ -215,7 +215,17 @@ export function pageTreeOf(limits: TreeLimits): PageTree {
     return children.length ? { id: id(), type: 'GROUP', name: 'icon', absoluteBoundingBox: box(r), children } : null;
   };
 
-  const walk = (el: Element): RestNode | null => {
+  const marked = (el: Element, made: RestNode | null): RestNode | null => {
+    const use = el.getAttribute(limits.useAttr);
+    if (!made || use === null) {
+      return made;
+    }
+    return made.use === undefined ? { ...made, use: Number(use) } : { id: id(), type: 'GROUP', name: made.name, absoluteBoundingBox: made.absoluteBoundingBox, use: Number(use), children: [made] };
+  };
+
+  const walk = (el: Element): RestNode | null => marked(el, shape(el));
+
+  const shape = (el: Element): RestNode | null => {
     const css = getComputedStyle(el);
     if (hiddenCss(css)) {
       return null;

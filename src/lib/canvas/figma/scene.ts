@@ -78,7 +78,7 @@ export type TextRun = { start: number; end: number; font?: string; weight?: numb
 
 type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem };
 
-export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string> };
+export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
 
 const VARIANT_NAME = /^(.+?) \/ ([^=,/]+=[^=,/]+(?:, [^=,/]+=[^=,/]+)*)$/;
 
@@ -533,6 +533,10 @@ function placeholderOf(n: FigmaRawNode, m: Matrix, ctx: Ctx, note: string): Laye
 }
 
 function componentOf(n: FigmaRawNode, ctx: Ctx): ComponentRef | null {
+  if (n.codeComponent) {
+    const { key, name, variant, texts } = n.codeComponent;
+    return { key, name, inPaste: true, ...(Object.keys(variant).length ? { variant } : {}), texts };
+  }
   const id = n.symbolData?.symbolID;
   if (n.type !== 'INSTANCE' || !id) {
     return null;

@@ -6,7 +6,7 @@ import type { UndoItem } from '$lib/canvas/undo-plan';
 import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
 import { dismissOverlays } from '$lib/server/web/overlays';
 import type { PageTree } from './page-tree';
-import { urlPlan } from './url-doc';
+import { urlPlan, type UrlPlan } from './url-doc';
 
 export enum UrlImportOutcome {
   Ok = 'ok',
@@ -29,6 +29,10 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
 
 export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
 
+export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string) => UrlPlan | null };
+
+const PLAIN: Planner = { prepare: async () => undefined, plan: urlPlan };
+
 export type PageAsk = {
   url: string;
   at: { x: number; y: number };
@@ -39,6 +43,7 @@ export type PageAsk = {
   importImage: (url: string) => Promise<string | null>;
   newId: () => string;
   settleMs?: number;
+  planner?: Planner;
 };
 
 const SETTLE_MS = 1_200;
@@ -65,7 +70,7 @@ async function publicUrl(raw: string, guard: PageAsk['guard']): Promise<URL | nu
   );
 }
 
-async function read(tab: AppTab, url: URL, settleMs: number): Promise<PageTree | UrlImported> {
+async function read(tab: AppTab, url: URL, settleMs: number, planner: Planner): Promise<PageTree | UrlImported> {
   const status = await tab.goto(url.toString()).catch(() => null);
   if (status !== null && status >= HTTP_ERROR) {
     return refused(UrlImportOutcome.Failed, `the page answered ${status}`);
@@ -77,6 +82,7 @@ async function read(tab: AppTab, url: URL, settleMs: number): Promise<PageTree |
   await pause(settleMs);
   await tab.scroll({ to: 'top' }).catch(() => undefined);
   await dismissOverlays(tab).catch(() => []);
+  await planner.prepare(tab).catch(() => undefined);
   const parsed = TREE_SHAPE.safeParse(await tab.tree().catch(() => null));
   return parsed.success ? (parsed.data as unknown as PageTree) : refused(UrlImportOutcome.Unreadable);
 }
@@ -96,12 +102,13 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   }
 
   const tab = await ask.open();
-  const tree = await read(tab, url, ask.settleMs ?? SETTLE_MS).finally(() => tab.close());
+  const planner = ask.planner ?? PLAIN;
+  const tree = await read(tab, url, ask.settleMs ?? SETTLE_MS, planner).finally(() => tab.close());
   if ('outcome' in tree) {
     return tree;
   }
 
-  const made = urlPlan(tree, ask.newId);
+  const made = planner.plan(tree, ask.newId);
   if (!made?.plan.items.length) {
     return refused(UrlImportOutcome.Unreadable);
   }

@@ -235,6 +235,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
   import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
   import UrlImportDialog from '$lib/components/canvas/UrlImportDialog.svelte';
+  import CodeImportDialog from '$lib/components/canvas/CodeImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
   import ReframeDialog from '$lib/components/canvas/ReframeDialog.svelte';
@@ -3707,6 +3708,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let figmaImportAt = $state<{ x: number; y: number } | null>(null);
   let urlImportAt = $state<{ x: number; y: number } | null>(null);
+  let codeImportAt = $state<{ x: number; y: number } | null>(null);
 
   function landImported(landed: { nodes: unknown[]; undo: unknown[] }) {
     const landedNodes = landed.nodes as CanvasNodeRecord[];
@@ -4181,6 +4183,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(sourceAssetIdOf(nodes.find((n) => n.id === inpaintFor)?.data ?? {}) ?? '') ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
+  {#if codeImportAt}
+    <CodeImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={codeImportAt} onimported={landImported} onclose={() => (codeImportAt = null)} />
+  {/if}
   {#if urlImportAt}
     <UrlImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={urlImportAt} onimported={landImported} onclose={() => (urlImportAt = null)} />
   {/if}
@@ -4282,6 +4287,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onFigmaImport={(at) => (figmaImportAt = at)}
     onUrlImport={(at) => (urlImportAt = at)}
+    onCodeImport={(at) => (codeImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onRedo={() => inTurn(redo)}

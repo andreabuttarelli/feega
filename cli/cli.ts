@@ -598,6 +598,19 @@ canvas
   });
 
 canvas
+  .command('import-code <projectId> <repo>')
+  .description('Run a public GitHub React app in a sandbox and draw a page as a frame: components become main components, usages instances, props variants')
+  .requiredOption('--canvas <id>', 'The canvas')
+  .option('--route <path>', 'The page of the app to import', '/')
+  .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, repo: string, opts) => {
+    const { cmdCanvasImportCode } = await import('./commands/canvas.ts');
+    await cmdCanvasImportCode(projectId, repo, opts);
+  });
+
+canvas
   .command('frame <projectId>')
   .description('Draw an empty frame on a canvas, like the frame tool: a box in canvas units, or a width and a preset format')
   .requiredOption('--canvas <id>', 'The canvas')
