@@ -47,11 +47,12 @@ export type CanvasEvent = {
   actorKind: 'user' | 'agent' | 'system';
   actorId: string | null;
   agentKey: string | null;
+  sessionId: string | null;
   createdAt: string;
 };
 
 const EVENT_COLUMNS =
-  'id, org_id, canvas_id, kind, node_id, edge_id, before, after, actor_kind, actor_id, agent_key, created_at';
+  'id, org_id, canvas_id, kind, node_id, edge_id, before, after, actor_kind, actor_id, agent_key, session_id, created_at';
 
 type EventRow = {
   id: number;
@@ -65,6 +66,7 @@ type EventRow = {
   actor_kind: string;
   actor_id: string | null;
   agent_key: string | null;
+  session_id?: string | null;
   created_at: string;
 };
 
@@ -81,6 +83,7 @@ function toEvent(row: EventRow): CanvasEvent {
     actorKind: row.actor_kind as CanvasEvent['actorKind'],
     actorId: row.actor_id,
     agentKey: row.agent_key,
+    sessionId: row.session_id ?? null,
     createdAt: row.created_at
   };
 }
@@ -96,14 +99,14 @@ export type RecordEventInput = {
   actor?: Actor;
 };
 
-const SYSTEM_ACTOR = { actor_kind: 'system' as const, actor_id: null, agent_key: null };
+const SYSTEM_ACTOR = { actor_kind: 'system' as const, actor_id: null, agent_key: null, session_id: null };
 
 /** La stessa tripla di `actorCols` — assente = `system`, mai un `null` muto sul kind. */
 function eventActorCols(actor: Actor | undefined): Record<string, unknown> {
   if (!actor) {
     return SYSTEM_ACTOR;
   }
-  return { actor_kind: actor.kind, actor_id: actor.id, agent_key: actor.agentKey ?? null };
+  return { actor_kind: actor.kind, actor_id: actor.id, agent_key: actor.agentKey ?? null, session_id: actor.sessionId ?? null };
 }
 
 export async function recordEvent(db: Db, input: RecordEventInput): Promise<CanvasEvent> {

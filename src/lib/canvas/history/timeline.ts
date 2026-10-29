@@ -67,13 +67,19 @@ export type HistoryEntry = {
   nodeId: string | null;
   frameId: string | null;
   summary: string | null;
+  sessionId: string | null;
+  subject: string | null;
 };
 
 export type Lane = { key: string; kind: LaneKind; label: string; colour: string; icon: LaneIcon };
 
 export type HistoryRow = { entry: HistoryEntry; lane: number };
 
-export type HistoryGraph = { lanes: Lane[]; rows: HistoryRow[] };
+export type HistorySession = { key: string; lane: number; rows: HistoryRow[] };
+
+export type HistoryGraph = { lanes: Lane[]; rows: HistoryRow[]; sessions: HistorySession[] };
+
+export const IDLE_SESSION_MS = 10 * 60_000;
 
 export type Names = Record<string, string>;
 
@@ -145,7 +151,45 @@ export function historyGraph(entries: HistoryEntry[], query: HistoryQuery): Hist
     rows.push({ entry, lane: known === -1 ? lanes.push(lane) - 1 : known });
   }
 
-  return { lanes, rows };
+  return { lanes, rows, sessions: sessionsOf(rows) };
+}
+
+function sessionsOf(rows: HistoryRow[]): HistorySession[] {
+  const sessions = new Map<string, HistorySession>();
+  const idle = new Map<number, { key: string; at: number }>();
+
+  for (const row of rows) {
+    const at = Date.parse(row.entry.at);
+    const open = idle.get(row.lane);
+    const fresh = !open || open.at - at > IDLE_SESSION_MS;
+    const idleKey = fresh ? `idle:${row.lane}:${row.entry.id}` : open.key;
+    const key = row.entry.sessionId ? `session:${row.entry.sessionId}` : idleKey;
+    if (!row.entry.sessionId) {
+      idle.set(row.lane, { key, at });
+    }
+
+    const session = sessions.get(key) ?? { key, lane: row.lane, rows: [] };
+    session.rows.push(row);
+    sessions.set(key, session);
+  }
+
+  return [...sessions.values()];
+}
+
+export function entryLabel(entry: HistoryEntry): string {
+  const verb = ENTRY_VERBS[entry.kind];
+  return entry.subject ? `${verb} ${entry.subject}` : verb;
+}
+
+export function sessionLabel(session: HistorySession): string {
+  if (session.rows.length === 1) {
+    return entryLabel(session.rows[0].entry);
+  }
+
+  const subjects = new Set(session.rows.map((r) => r.entry.subject));
+  const [subject] = subjects;
+  const count = `${session.rows.length} changes`;
+  return subjects.size === 1 && subject ? `${count} to ${subject}` : count;
 }
 
 export enum HistoryAction {
@@ -184,7 +228,7 @@ export type LaneSpan = { first: number; last: number };
 
 export function laneSpans(graph: HistoryGraph): LaneSpan[] {
   const spans = graph.lanes.map(() => ({ first: Number.POSITIVE_INFINITY, last: -1 }));
-  graph.rows.forEach((row, index) => {
+  graph.sessions.forEach((row, index) => {
     const span = spans[row.lane];
     span.first = Math.min(span.first, index);
     span.last = Math.max(span.last, index);
@@ -195,11 +239,12 @@ export function laneSpans(graph: HistoryGraph): LaneSpan[] {
 export type BranchFork = { from: number; to: number; lane: number };
 
 export function branchForks(graph: HistoryGraph): BranchFork[] {
-  return graph.rows.flatMap((row, from) => {
+  const heads = graph.sessions.map((session) => session.rows[0]);
+  return heads.flatMap((row, from) => {
     if (row.entry.source !== HistorySource.Branch) {
       return [];
     }
-    const to = graph.rows.findIndex((r, i) => i > from && r.entry.source === HistorySource.Revision && r.entry.nodeId === row.entry.frameId);
-    return to === -1 ? [] : [{ from, to, lane: graph.rows[to].lane }];
+    const to = heads.findIndex((r, i) => i > from && r.entry.source === HistorySource.Revision && r.entry.nodeId === row.entry.frameId);
+    return to === -1 ? [] : [{ from, to, lane: heads[to].lane }];
   });
 }

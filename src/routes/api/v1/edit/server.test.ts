@@ -6,7 +6,7 @@ import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
 const ORG = 'org-1';
 const NODE = 'node-1';
 
-const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown }));
+const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown, rows: [] as Record<string, unknown>[] }));
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: state.db, orgId: ORG, userId: 'u-1', writeAllowed: state.writeAllowed } }) }));
 vi.mock('$lib/server/org-data/reach', () => ({ callerReach: async () => null }));
@@ -25,9 +25,11 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 
 const { POST } = await import('./+server');
 
-const post = (body: unknown) => {
+const SESSION = '6f1c2a9e-1b7d-4c3e-9a51-2f0e8d7c6b5a';
+
+const post = (body: unknown, headers: Record<string, string> = {}) => {
   const url = new URL('https://feega.test/api/v1/edit');
-  return POST({ request: new Request(url, { method: 'POST', headers: { authorization: 'Bearer t' }, body: JSON.stringify(body) }), url } as never);
+  return POST({ request: new Request(url, { method: 'POST', headers: { authorization: 'Bearer t', ...headers }, body: JSON.stringify(body) }), url } as never);
 };
 
 const head = async () => (await readHead(state.db as never, { orgId: ORG, nodeId: NODE }))?.doc as MotionDoc;
@@ -37,6 +39,7 @@ const clipsOf = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips);
 beforeEach(async () => {
   const fake = revisionsDb();
   state.db = fake.db;
+  state.rows = fake.rows;
   state.writeAllowed = true;
   await appendRevision(fake.db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Portrait), actor: { kind: 'user', id: 'u-1' }, summary: 'start' });
 });
@@ -48,6 +51,12 @@ describe('POST /api/v1/edit routes one op or a batch to the registry that owns i
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ tool: 'add_shape', version: 2 });
     expect(clipsOf(await head())).toHaveLength(1);
+  });
+
+  it('the session the agent sends lands on the revision it wrote', async () => {
+    await post({ op: 'add_shape', target: NODE, input: { kind: 'rect', start: 0 } }, { 'x-feega-session': SESSION });
+
+    expect(state.rows.at(-1)?.session_id).toBe(SESSION);
   });
 
   it('an element is addressed by frame and element id', async () => {

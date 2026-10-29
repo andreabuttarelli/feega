@@ -98,6 +98,15 @@ describe('le scritture firmano agent per conto della persona', () => {
     });
   });
 
+  it('every change of one chat turn carries the turn session', async () => {
+    const { db, calls } = fakeDb({ nodes: [nodeRow] });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER, sessionId: 's-turn' });
+
+    await run(tools.create_node, { canvasId: CANVAS, type: 'text', x: 1, y: 2, data: { prompt: 'p' } });
+
+    expect(calls.find((c) => c.op === 'insert' && c.table === 'canvas_events')?.payload).toMatchObject({ session_id: 's-turn' });
+  });
+
   it('run_node scrive la run come agente, col user id', async () => {
     // findNode trova il nodo; writeNodeData non scrive (updateRows vuoto) → conflict dopo createRun.
     const { db, calls } = fakeDb(

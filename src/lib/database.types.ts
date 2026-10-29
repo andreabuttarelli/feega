@@ -916,6 +916,7 @@ export type Database = {
           kind: string
           node_id: string | null
           org_id: string
+          session_id: string | null
         }
         Insert: {
           actor_id?: string | null
@@ -930,6 +931,7 @@ export type Database = {
           kind: string
           node_id?: string | null
           org_id: string
+          session_id?: string | null
         }
         Update: {
           actor_id?: string | null
@@ -944,6 +946,7 @@ export type Database = {
           kind?: string
           node_id?: string | null
           org_id?: string
+          session_id?: string | null
         }
         Relationships: [
           {
@@ -1970,6 +1973,7 @@ export type Database = {
           id: string
           node_id: string
           org_id: string
+          session_id: string | null
           summary: string | null
           version: number
         }
@@ -1982,6 +1986,7 @@ export type Database = {
           id?: string
           node_id: string
           org_id: string
+          session_id?: string | null
           summary?: string | null
           version: number
         }
@@ -1994,6 +1999,7 @@ export type Database = {
           id?: string
           node_id?: string
           org_id?: string
+          session_id?: string | null
           summary?: string | null
           version?: number
         }

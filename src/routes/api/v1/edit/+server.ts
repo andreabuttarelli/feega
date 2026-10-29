@@ -7,6 +7,7 @@ import { editPorts } from '$lib/server/edit/edit-ports';
 import { runEdit } from '$lib/server/edit/run-edit';
 import { RESERVED_OPS } from '$lib/server/edit/edit-catalogue';
 import { Detail } from '$lib/server/edit/compact-result';
+import { SESSION_HEADER, sessionFromHeader } from '@feega/api-contracts';
 
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
@@ -45,6 +46,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return json({ error: 'invalid_input', fix: 'Pass `op` (or op "batch" with `ops`). Call op "describe" for the list.' }, { status: HTTP_BAD_REQUEST });
   }
 
-  const answer = await runEdit(editPorts(resolved.caller), { projectId: ask.project_id, target: ask.op === BATCH_OP ? ask.target : undefined, steps, batch: ask.op === BATCH_OP, detail: ask.verbose ? Detail.Verbose : Detail.Compact });
+  const caller = { ...resolved.caller, sessionId: sessionFromHeader(request.headers.get(SESSION_HEADER)) };
+  const answer = await runEdit(editPorts(caller), { projectId: ask.project_id, target: ask.op === BATCH_OP ? ask.target : undefined, steps, batch: ask.op === BATCH_OP, detail: ask.verbose ? Detail.Verbose : Detail.Compact });
   return json(answer.body, { status: answer.status });
 };

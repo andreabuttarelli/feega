@@ -9,7 +9,7 @@ import { listCanvasEvents } from '$lib/server/repos/canvas-events';
 import { runningRuns } from '$lib/server/repos/node-runs';
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { readHistory } from '$lib/server/canvas/history';
-import { HistoryFilter, type HistoryGraph } from '$lib/canvas/history/timeline';
+import { HistoryFilter, sessionLabel, type HistoryGraph } from '$lib/canvas/history/timeline';
 import { FramesFailure, motionFrames } from '$lib/server/motion/agent-frames';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { remoteFramesWhenClosed } from './frames-source';
@@ -118,7 +118,8 @@ async function activity(caller: OrgCaller, input: { canvas_id: string; since?: s
 const historyBody = (canvasId: string, graph: HistoryGraph) => ({
   canvas_id: canvasId,
   lanes: graph.lanes,
-  entries: graph.rows.map(({ entry, lane }) => ({ id: entry.id, source: entry.source, kind: entry.kind, at: entry.at, lane, node_id: entry.nodeId, frame_id: entry.frameId, summary: entry.summary, author: { kind: entry.author.kind, id: entry.author.id, agent: entry.author.agentKey } }))
+  sessions: graph.sessions.map((s) => ({ key: s.key, lane: s.lane, label: sessionLabel(s), entries: s.rows.map((r) => r.entry.id) })),
+  entries: graph.rows.map(({ entry, lane }) => ({ id: entry.id, source: entry.source, kind: entry.kind, at: entry.at, lane, node_id: entry.nodeId, frame_id: entry.frameId, subject: entry.subject, session_id: entry.sessionId, summary: entry.summary, author: { kind: entry.author.kind, id: entry.author.id, agent: entry.author.agentKey } }))
 });
 
 async function listHistory(caller: OrgCaller, input: z.infer<(typeof VIEW_OPS)[ViewOp.ListHistory]['input']>): Promise<Answer> {

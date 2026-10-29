@@ -66,3 +66,38 @@ describe('readHistory merges the canvas logs into one timeline', () => {
     ]);
   });
 });
+
+describe('readHistory names what each change touched and keeps its session', () => {
+  const event = (id: number, kind: string, extra: Record<string, unknown>) => ({ id, org_id: ORG, canvas_id: CANVAS, kind, node_id: null, edge_id: null, before: null, after: null, actor_kind: 'agent', actor_id: MARCO, agent_key: 'claude-code', session_id: 's-1', created_at: `2026-10-29T10:0${id}:00Z`, ...extra });
+
+  it('a node by its name, a removed one by its type, an edge by both ends', async () => {
+    const named = { ...node('text-1', 'text'), display_name: 'Hero title' };
+    const { db } = fakeDb(
+      {
+        nodes: [named, node('image-1', 'image')],
+        canvas_events: [
+          event(1, 'node.update', { node_id: 'text-1' }),
+          event(2, 'node.delete', { node_id: 'gone-1', before: { type: 'image' } }),
+          event(3, 'edge.create', { edge_id: 'e-1', after: { sourceNodeId: 'text-1', targetNodeId: 'image-1' } })
+        ],
+        canvas_versions: [],
+        motion_revisions: [],
+        profiles: []
+      },
+      { filter: true }
+    );
+
+    const graph = await readHistory(db, { orgId: ORG, canvasId: CANVAS, filter: HistoryFilter.All });
+
+    expect(graph.rows.map((r) => r.entry.subject)).toEqual(['Hero title → Generate image', 'Generate image', 'Hero title']);
+    expect(graph.sessions).toHaveLength(1);
+  });
+
+  it('a frame revision names its frame and carries its session', async () => {
+    const { db } = fakeDb({ ...rows(), nodes: [{ ...node(FRAME, 'motion'), display_name: 'Landing' }], motion_revisions: [{ ...rows().motion_revisions[0], session_id: 's-9' }] }, { filter: true });
+
+    const graph = await readHistory(db, { orgId: ORG, canvasId: CANVAS, filter: HistoryFilter.All, frameId: FRAME });
+
+    expect(graph.rows[0].entry).toMatchObject({ subject: 'Landing', sessionId: 's-9' });
+  });
+});

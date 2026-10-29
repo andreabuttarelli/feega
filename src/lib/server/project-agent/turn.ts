@@ -59,7 +59,8 @@ export type BriefBrand = { id: string; name: string; slug: string };
 
 export async function startProjectTurn(input: ProjectTurnInput): Promise<Response> {
   const { db, userId, accessToken, origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick } = input;
-  const actor = agentActor(userId, SIDEBAR_AGENT_KEY);
+  const sessionId = crypto.randomUUID();
+  const actor = agentActor(userId, SIDEBAR_AGENT_KEY, sessionId);
   const userActor = { kind: 'user' as const, id: userId };
   await saveTurn(db, { orgId, threadId, role: 'user', content: text, attachments, actor: userActor });
   const opening = await userContent(db, { orgId, text, attachments, hint: canvasPlaceHint(project.id), breakdown: breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }) });
@@ -82,11 +83,11 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     delete webTools[ASK_REFERENCE_PICK];
   }
   const core: Record<string, Tool> = {
-    ...createProjectTools({ db, orgId, projectId: project.id, userId: userId, brandId: brand?.id ?? null }),
-    ...createMotionDelegation({ db, orgId, projectId: project.id, userId: userId, origin, model, canvasId }),
+    ...createProjectTools({ db, orgId, projectId: project.id, userId: userId, brandId: brand?.id ?? null, sessionId }),
+    ...createMotionDelegation({ db, orgId, projectId: project.id, userId: userId, sessionId, origin, model, canvasId }),
     ...webTools
   };
-  const frameDeps = { db, orgId, projectId: project.id, userId: userId, open: frame, editor: frame ? editorFrames(db, db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket, { orgId, projectId: project.id, nodeId: frame.nodeId, userId: userId }, (request) => askEditor(request)) : null };
+  const frameDeps = { db, orgId, projectId: project.id, userId: userId, sessionId, open: frame, editor: frame ? editorFrames(db, db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket, { orgId, projectId: project.id, nodeId: frame.nodeId, userId: userId }, (request) => askEditor(request)) : null };
   Object.assign(core, {
     [SPAWN_AGENT]: spawnAgentTool(
       spawnOffers(),
