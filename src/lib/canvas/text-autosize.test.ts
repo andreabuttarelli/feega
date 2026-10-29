@@ -70,4 +70,18 @@ describe('a free stack follows the box it hugs', () => {
     expect(fit?.node).toEqual({ w: 200, h: 100 });
     expect({ width: fit?.doc?.width, height: fit?.doc?.height }).toEqual({ width: 400, height: 200 });
   });
+
+  it('a small node rounded to whole pixels off its stage shape still resizes', () => {
+    const boxed = addClip(element(274, 53), { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }, 'box');
+    const wrapped = boxed.ok ? wrapInStack(boxed.doc, ['box'], 'stack', 'lane') : boxed;
+    const padded = wrapped.ok ? setAutoLayout(wrapped.doc, 'stack', { padding: { top: 10, right: 22, bottom: 10, left: 22 } }) : wrapped;
+    if (!padded.ok) {
+      throw new Error(padded.error);
+    }
+
+    const fit = textAutosize(padded.doc, {}, FrameKind.Element, { w: 137, h: 27 });
+
+    expect({ width: fit?.doc?.width, height: fit?.doc?.height }).toEqual({ width: 318, height: 73 });
+    expect(fit?.node).toEqual({ w: 159, h: 37 });
+  });
 });

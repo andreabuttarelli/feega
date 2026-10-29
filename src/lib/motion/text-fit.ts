@@ -30,9 +30,11 @@ export function fitTexts(doc: MotionDoc, boxes: Record<string, PxBox>): MotionDo
 export type HostShare = { width: number; height: number; stage: { width: number; height: number } };
 
 const SHAPE_SLACK = 0.01;
+const ROUNDING_PX = 1;
 
 export function hostFit(node: { w: number; h: number }, share: HostShare): { w: number; h: number } | null {
-  const reshaped = Math.abs((node.w / node.h) / (share.stage.width / share.stage.height) - 1) > SHAPE_SLACK;
+  const shapedHeight = (node.w * share.stage.height) / share.stage.width;
+  const reshaped = Math.abs(node.h - shapedHeight) > Math.max(shapedHeight * SHAPE_SLACK, ROUNDING_PX);
   const next = { w: Math.round(node.w * share.width), h: Math.round(node.h * share.height) };
   return reshaped || (next.w === node.w && next.h === node.h) ? null : next;
 }
