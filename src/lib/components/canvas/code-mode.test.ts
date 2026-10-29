@@ -22,8 +22,23 @@ describe('code mode', () => {
     expect(body).toContain('data-testid="dev-code-download"');
   });
 
-  it('shows the frame code when no layer is picked', () => {
-    expect(panel).toMatch(/<DevInspector[\s\S]*\{:else if tokens\}[\s\S]*<DevCode/);
+  it('keeps the frame export under the picked layer CSS', () => {
+    const code = panel.slice(panel.indexOf('aria-label="Code mode"'), panel.indexOf('{:else if session && doc && tokens && !session.selection.length}'));
+
+    expect(code).toMatch(/<DevInspector[\s\S]*<DevCode/);
+    expect(code).not.toMatch(/\{:else if tokens\}/);
+  });
+
+  it('exports under the real frame name', () => {
+    expect(panel).toContain('name={frameProperties.name}');
+    expect(panel).not.toContain('name="Frame"');
+  });
+
+  it('titles the exported page and the zip folder after the frame', () => {
+    const doc = newMotionDoc(MotionFormat.Landscape);
+    const body = render(DevCode, { props: { doc, name: 'Landing page', assets: {}, tokens: FEEGA_TOKENS } }).body;
+
+    expect(body).toContain('&lt;title>Landing page&lt;/title>');
   });
 
   it('Export code… opens Code mode instead of a dialog', () => {

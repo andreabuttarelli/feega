@@ -13,10 +13,10 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 ## Use it
 
-1. Select a frame on the canvas by its title. A click inside it selects the layer under the pointer, and Code mode then shows that layer's CSS instead of the frame's code.
+1. Select a frame, or any layer inside it. Code mode always exports the frame that contains the selection.
 2. Switch to **Code** in the mode switch at the left end of the bottom bar (`Shift+D`), or open the **…** menu and choose **Export code…**: both open Code mode.
-3. With no layer picked, the right bar shows the frame's code. Pick a target: **React + Tailwind** (default), **HTML + CSS** or **SvelteKit**.
-4. **Copy** copies the main file, **Download .zip** downloads the whole project.
+3. With a layer picked, its CSS sits at the top of the right bar and the frame's code below it. Pick a target: **React + Tailwind** (default), **HTML + CSS** or **SvelteKit**.
+4. **Copy** copies the main file, **Download .zip** downloads the whole project. The page title and the zip are named after the frame (`Landing page` gives `landing-page-react.zip`).
 
 ## What you get
 

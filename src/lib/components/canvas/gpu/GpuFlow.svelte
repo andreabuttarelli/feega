@@ -61,7 +61,7 @@
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
-  import { frameProperties } from '../frame-properties.svelte';
+  import { frameProperties, UNNAMED_FRAME } from '../frame-properties.svelte';
   import { selectionProperties } from '../selection-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
@@ -1365,6 +1365,7 @@
       return;
     }
     frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
+    frameProperties.name = placed.find((t) => t.id === panelNodeId)?.displayName?.trim() || UNNAMED_FRAME;
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     frameProperties.runAction = runSelectionAction;
