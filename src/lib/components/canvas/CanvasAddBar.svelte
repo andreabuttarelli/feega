@@ -5,6 +5,7 @@
   import Upload from '@lucide/svelte/icons/upload';
   import Cloud from '@lucide/svelte/icons/cloud';
   import Frame from '@lucide/svelte/icons/frame';
+  import Link from '@lucide/svelte/icons/link';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
@@ -38,6 +39,7 @@
     onupload,
     oncloud,
     onfigma,
+    onurl,
     ontemplate,
     techniques = [],
     ontechnique,
@@ -56,6 +58,7 @@
     onupload?: (file: File) => void;
     oncloud?: () => void;
     onfigma?: () => void;
+    onurl?: () => void;
     ontemplate?: (id: string) => void;
     techniques?: { id: string; name: string; nodes: number }[];
     ontechnique?: (id: string) => void;
@@ -217,7 +220,8 @@
     [InsertSection.Import]: () => [
       { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile },
       ...optional({ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: () => oncloud?.() }, oncloud),
-      ...optional({ id: 'figma', label: 'Import from Figma', icon: Frame, run: () => onfigma?.() }, onfigma)
+      ...optional({ id: 'figma', label: 'Import from Figma', icon: Frame, run: () => onfigma?.() }, onfigma),
+      ...optional({ id: 'url', label: 'From URL…', icon: Link, run: () => onurl?.() }, onurl)
     ],
     [InsertSection.Templates]: () => [
       ...optional({ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }, ontemplate),

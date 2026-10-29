@@ -234,6 +234,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
   import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
+  import UrlImportDialog from '$lib/components/canvas/UrlImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
   import ReframeDialog from '$lib/components/canvas/ReframeDialog.svelte';
@@ -3684,12 +3685,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let figmaImportAt = $state<{ x: number; y: number } | null>(null);
+  let urlImportAt = $state<{ x: number; y: number } | null>(null);
 
-  function figmaImported(landed: { nodes: unknown[]; undo: unknown[]; skipped: string[] }) {
+  function landImported(landed: { nodes: unknown[]; undo: unknown[] }) {
     const landedNodes = landed.nodes as CanvasNodeRecord[];
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: landed.undo as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+  }
+
+  function figmaImported(landed: { nodes: unknown[]; undo: unknown[]; skipped: string[] }) {
+    landImported(landed);
     figmaPasted({ skipped: landed.skipped, images: 0, loading: false });
   }
 
@@ -4154,6 +4160,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(sourceAssetIdOf(nodes.find((n) => n.id === inpaintFor)?.data ?? {}) ?? '') ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
   {/if}
+  {#if urlImportAt}
+    <UrlImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={urlImportAt} onimported={landImported} onclose={() => (urlImportAt = null)} />
+  {/if}
   {#if figmaImportAt}
     <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
   {/if}
@@ -4250,6 +4259,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onFigmaImport={(at) => (figmaImportAt = at)}
+    onUrlImport={(at) => (urlImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onRedo={() => inTurn(redo)}
