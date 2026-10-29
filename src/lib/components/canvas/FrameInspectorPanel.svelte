@@ -107,9 +107,10 @@
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Code mode">
     {#if shown?.clip}
       <DevInspector doc={shownDoc!} clipId={shown.clip.id} brand={tokens} onexport={frameProperties.exportPicks} />
-    {:else if tokens}
-      <DevCode {doc} name="Frame" assets={frameProperties.extras?.assetUrls ?? {}} {tokens} />
-    {:else}
+    {/if}
+    {#if tokens}
+      <DevCode {doc} name={frameProperties.name} assets={frameProperties.extras?.assetUrls ?? {}} {tokens} />
+    {:else if !shown?.clip}
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}
   </aside>

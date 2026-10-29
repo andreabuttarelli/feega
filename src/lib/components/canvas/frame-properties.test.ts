@@ -16,6 +16,18 @@ describe('frame properties handed to the right bar', () => {
     expect(props.extras).toBeNull();
   });
 
+  it('names the frame being edited, and forgets the name when cleared', () => {
+    const props = new FrameProperties();
+
+    expect(props.name).toBe('Frame');
+
+    props.name = 'Landing page';
+    expect(props.name).toBe('Landing page');
+
+    props.clear();
+    expect(props.name).toBe('Frame');
+  });
+
   it('tells the chat agent which frame is open, so it can ask this tab to draw it', () => {
     const props = new FrameProperties();
     const session = { selection: ['c1'], history: { present: { still: null } } } as never;

@@ -5,6 +5,7 @@ import { docMode, type DocMode } from '@feega/motion-core/motion/doc';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
+export const UNNAMED_FRAME = 'Frame';
 const TEXT_FIELDS = new Set(['TEXTAREA', 'INPUT']);
 
 export type OpenFrame = { nodeId: string; selection: string[]; playhead: number; mode: DocMode };
@@ -14,6 +15,7 @@ export class FrameProperties {
   session = $state.raw<FrameEditSession | null>(null);
   tokens = $state.raw<BrandTokens | null>(null);
   extras = $state.raw<FrameExtras | null>(null);
+  name = $state(UNNAMED_FRAME);
   part = $state<string | null>(null);
   exportPicks: (() => void) | null = null;
   runAction = $state.raw<((id: SelectionActionId) => void) | null>(null);
@@ -45,6 +47,7 @@ export class FrameProperties {
     this.session = null;
     this.tokens = null;
     this.extras = null;
+    this.name = UNNAMED_FRAME;
     this.part = null;
     this.exportPicks = null;
     this.runAction = null;
