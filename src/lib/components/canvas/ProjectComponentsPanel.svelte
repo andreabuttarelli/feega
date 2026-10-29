@@ -28,7 +28,7 @@
   {/if}
 
   {#each shown as canvas (canvas.canvasId)}
-    <ComponentsList groups={canvas.components} title={canvas.canvasName} />
+    <ComponentsList groups={canvas.components} title={canvas.canvasName} {projectId} canvasId={canvas.canvasId} />
   {/each}
 </div>
 
