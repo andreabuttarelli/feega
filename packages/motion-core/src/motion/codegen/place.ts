@@ -33,9 +33,9 @@ const JUSTIFY_CSS: Record<Justify, string | null> = {
   [Justify.SpaceEvenly]: 'space-evenly'
 };
 
-const ALIGN_CSS: Record<Align, string> = { [Align.Start]: 'flex-start', [Align.Center]: 'center', [Align.End]: 'flex-end', [Align.Baseline]: 'baseline' };
+const ALIGN_CSS: Record<Align, string> = { [Align.Start]: 'flex-start', [Align.Center]: 'center', [Align.End]: 'flex-end', [Align.Baseline]: 'baseline', [Align.Stretch]: 'stretch' };
 
-const GRID_ALIGN_CSS: Record<Align, string> = { [Align.Start]: 'start', [Align.Center]: 'center', [Align.End]: 'end', [Align.Baseline]: 'baseline' };
+const GRID_ALIGN_CSS: Record<Align, string> = { [Align.Start]: 'start', [Align.Center]: 'center', [Align.End]: 'end', [Align.Baseline]: 'baseline', [Align.Stretch]: 'stretch' };
 
 export enum Shape {
   Text = 'text',

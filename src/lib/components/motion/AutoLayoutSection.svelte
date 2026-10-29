@@ -63,7 +63,7 @@
   ];
   const CELL_ALIGNS = ['', Align.Start, Align.Center, Align.End] as const;
   const CELL_ALIGN_LABEL: Record<(typeof CELL_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End' };
-  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End, [Align.Baseline]: Justify.Start };
+  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End, [Align.Baseline]: Justify.Start, [Align.Stretch]: Justify.Start };
 
   const layout = $derived(clip.autoLayout ?? null);
   let splitPadding = $state(false);
