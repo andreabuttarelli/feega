@@ -20,7 +20,7 @@
   import { EditMode } from '$lib/motion/edit-mode';
   import { drawStart } from '$lib/motion/draw-create';
   import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
-  import { canEditPoints, enterPointEdit, landsOn } from '$lib/motion/shape/vector-edit';
+  import { editsPoints, enterPointEdit, landsOn } from '$lib/motion/shape/vector-edit';
   import type { Pt } from '@feega/motion-core/motion/shape/geometry';
   import { isTyping } from '$lib/motion/shortcuts';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -98,7 +98,7 @@
     pointEdit = clip.id;
   }
 
-  const editable = (e: Event) => (tool === DrawTool.Select && !pointEdit && only && canEditPoints(only) && !isTyping(e.target as HTMLElement | null) ? only : null);
+  const editable = (e: Event) => (tool === DrawTool.Select && !pointEdit && only && editsPoints(doc, only) && !isTyping(e.target as HTMLElement | null) ? only : null);
 
   function enter(e: KeyboardEvent) {
     const clip = e.key === 'Enter' ? editable(e) : null;

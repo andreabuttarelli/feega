@@ -77,7 +77,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Reach, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Reach, childBelow, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
@@ -853,7 +853,8 @@
     const hit = hitAt(world);
     const id = hit.kind === HitKind.Node ? hit.nodeId : null;
     const deeper = id ? framePickAt(world, picks) : null;
-    const entered = id && deeper && inside?.nodeId === id ? enteredFrom(deeper.picker.chain(world, deeper.space), picks) : null;
+    const doc = id ? liveOf(id)?.doc : null;
+    const entered = id && deeper && doc && inside?.nodeId === id ? (enteredFrom(deeper.picker.chain(world, deeper.space), picks) ?? (deeper.clip ? childBelow(doc, deeper.clip, picks) : null)) : null;
     if (id && entered) {
       pickMany(id, [entered]);
       return;
@@ -1461,7 +1462,8 @@
     const shown = viewOf(overlayId);
     const nodeId = shown?.nodeId ?? overlayId;
     const breakpointId = shown?.breakpointId ?? BASE_BREAKPOINT;
-    return (savers.get(nodeId)?.breakpoint ?? BASE_BREAKPOINT) === breakpointId ? selectionMarks(nodeId) : [];
+    const picked = selectionMarks(nodeId);
+    return (savers.get(nodeId)?.breakpoint ?? BASE_BREAKPOINT) === breakpointId ? picked : [];
   }
 
   let timed: string | null = null;
