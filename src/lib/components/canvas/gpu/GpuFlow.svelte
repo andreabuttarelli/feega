@@ -30,8 +30,8 @@
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
-  import { flipRulers, rulersPref } from '$lib/canvas/rulers-pref.svelte';
-  import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
+  import { FrameView } from '$lib/canvas/frame-view';
+  import { frameViews } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
@@ -1573,10 +1573,9 @@
     ];
   }
 
-  let frameViews = $state<FrameViews>(FRAME_VIEW_DEFAULT);
 
   function outlineBoxes(nodeId: string, doc: MotionDoc): Boxes {
-    const at = shows(frameViews, FrameView.Outlines) ? pickerOf(nodeId) : null;
+    const at = frameViews.isOn(FrameView.Outlines) ? pickerOf(nodeId) : null;
     if (!at) {
       return {};
     }
@@ -1796,7 +1795,7 @@
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
-    const snapOf = (ev: PointerEvent) => (ev.ctrlKey ? SnapMode.Off : shows(frameViews, FrameView.PixelGrid) ? SnapMode.Pixels : SnapMode.Guides);
+    const snapOf = (ev: PointerEvent) => (ev.ctrlKey ? SnapMode.Off : frameViews.isOn(FrameView.PixelGrid) ? SnapMode.Pixels : SnapMode.Guides);
     let result: OpResult | null = null;
     let carried = false;
 
@@ -2589,10 +2588,8 @@
     'send-back': () => props.onRestack?.(selected, Stack.Back),
     help: () => (shortcutHelp.open = true),
     view: (c) => {
-      if (c.id === 'view' && c.view === FrameView.Rulers) {
-        flipRulers();
-      } else if (c.id === 'view') {
-        frameViews = flipView(frameViews, c.view);
+      if (c.id === 'view') {
+        frameViews.flip(c.view);
       }
     }
   };
@@ -3091,7 +3088,7 @@
           <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={shows(frameViews, FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
@@ -3120,7 +3117,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
