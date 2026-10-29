@@ -160,6 +160,23 @@ describe('Design and Animate mode', () => {
     expect(next[1][1]).toBeCloseTo(0.7);
   });
 
+  it('Motion keys an element that was not animated: its start stays, the move lands at the playhead', () => {
+    const moved = must(dragClips(drag({ frame: 20, reach: 0, from: [0, 0], to: [192, 0] })).result);
+    const keys = keysOf(moved);
+
+    expect(keys.map(([frame]) => frame)).toEqual([0, 20]);
+    expect(keys[0][1]).toBeCloseTo(transformAt(findClip(DOC, 'card')!.clip, 'x', 0));
+    expect(keys[1][1]).toBeGreaterThan(Number(keys[0][1]));
+  });
+
+  it('Motion at the start of an element keys only that frame', () => {
+    expect(keysOf(must(dragClips(drag({ frame: 0, reach: 0, from: [0, 0], to: [192, 0] })).result)).map(([frame]) => frame)).toEqual([0]);
+  });
+
+  it('Design moves an element that was not animated without keying it', () => {
+    expect(findClip(must(dragClips(drag({ frame: 20, mode: EditMode.Design, reach: 0, from: [0, 0], to: [192, 0] })).result), 'card')!.clip.keyframes.x).toBeUndefined();
+  });
+
   it('Design nudges an animated element without keying it', () => {
     const next = must(nudgeClips(slide, ['card'], 20, [19.2, 0], EditMode.Design));
 

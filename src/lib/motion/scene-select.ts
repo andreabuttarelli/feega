@@ -341,9 +341,19 @@ export function writePatch(doc: MotionDoc, clipId: string, frame: number, patch:
     if (!result.ok) {
       return result;
     }
-    result = clip.keyframes[key]?.length ? setKeyframe(result.doc, clipId, key, frame - clip.from, value) : setTransform(result.doc, clipId, { [key]: value });
+    result = clip.keyframes[key]?.length ? setKeyframe(result.doc, clipId, key, frame - clip.from, value) : startTrack(result.doc, clip, key, frame - clip.from, value);
   }
   return result;
+}
+
+const PINNED: ReadonlySet<TransformKey> = new Set(['anchorX', 'anchorY']);
+
+function startTrack(doc: MotionDoc, clip: MotionClip, key: TransformKey, local: number, value: number): OpResult {
+  if (PINNED.has(key)) {
+    return setTransform(doc, clip.id, { [key]: value });
+  }
+  const held = local > 0 ? setKeyframe(doc, clip.id, key, 0, transformAt(clip, key, clip.from)) : { ok: true as const, doc };
+  return held.ok ? setKeyframe(held.doc, clip.id, key, local, value) : held;
 }
 
 export function readout(component: ComponentId, patch: Transform, frame: Size): string {

@@ -75,6 +75,11 @@ describe('creating an element by drawing inside a frame', () => {
     expect(animated.from).toBe(54);
   });
 
+  it('drawing in Motion creates base values, never keyframes', () => {
+    const drawn = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, drawStart(EditMode.Motion, 54), 'r1')), 'r1')!.clip;
+    expect(drawn.keyframes).toEqual({});
+  });
+
   it('the select and pen tools draw no box', () => {
     expect(drawClip(video(), DrawTool.Select, BOX, 0, 'x').ok).toBe(false);
     expect(drawClip(video(), DrawTool.Pen, BOX, 0, 'x').ok).toBe(false);
