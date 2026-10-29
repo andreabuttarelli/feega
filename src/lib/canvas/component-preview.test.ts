@@ -4,6 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@fe
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { createComponent } from '$lib/motion/main-component';
+import { precompose } from '@feega/motion-core/motion/precomp';
 import { Tone, fitInTile, inkBounds, padded, toneOf, previewCache, previewDoc, previewKey, previewSide, shownBox } from './component-preview';
 import { Device } from './gpu/memory-budget';
 
@@ -32,6 +33,17 @@ describe('the preview of a component', () => {
     const { doc, compId } = frameWithCard();
 
     const clips = drawFrame(prepare(previewDoc(doc, compId), tokens), 0).items.map((i) => i.clip);
+
+    expect(clips.length).toBeGreaterThan(0);
+    expect(clips.some((c) => c.includes('backdrop'))).toBe(false);
+  });
+
+  it('draws a main that sits inside a group, as an imported page puts it', () => {
+    const { doc, compId } = frameWithCard();
+    const host = doc.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.component === 'Precomp')!;
+    const nested = must(precompose(doc, [host.id], { comp: 'section', clip: 'section-clip' }, 'Section'));
+
+    const clips = drawFrame(prepare(previewDoc(nested, compId), tokens), 0).items.map((i) => i.clip);
 
     expect(clips.length).toBeGreaterThan(0);
     expect(clips.some((c) => c.includes('backdrop'))).toBe(false);
