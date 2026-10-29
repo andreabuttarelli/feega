@@ -123,7 +123,8 @@ const HANDLERS: Record<HistorySource, Handlers> = {
   [HistorySource.Event]: { writes: {} },
   [HistorySource.Version]: { preview: previewVersion, writes: { [HistoryAction.Restore]: restoreVersion } },
   [HistorySource.Revision]: { preview: previewRevision, writes: { [HistoryAction.Restore]: restoreFrame, [HistoryAction.Name]: nameFrame } },
-  [HistorySource.Branch]: { writes: { [HistoryAction.Merge]: mergeFork, [HistoryAction.Drop]: dropFork } }
+  [HistorySource.Branch]: { writes: { [HistoryAction.Merge]: mergeFork, [HistoryAction.Drop]: dropFork } },
+  [HistorySource.Conflict]: { writes: {} }
 };
 
 function handlersOf(db: Db, scope: Scope): { at: At; handlers: Handlers } | null {
