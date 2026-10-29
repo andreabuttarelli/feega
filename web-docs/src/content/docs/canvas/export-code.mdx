@@ -30,6 +30,7 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 | Components and instances | one file per component; text, images, colours and visibility that differ between instances become typed props; an override on an instance nested inside another component becomes a prop of the outer one (`feature1LabelColor`) forwarded to the inner one |
 | Text | `h1` for the largest heading on the page, then `h2`/`h3` by size and weight, `p` for body copy, `a` for linked text |
 | Layers named Nav, Header, Footer, Hero, Features, Pricing, Card… | `nav`, `header`, `footer`, `section`, `article` |
+| Component sets with variants | one component named after the set with a prop per variant (`variant?: 'outline'`, `disabled?: boolean`), picking one file per variant (`ButtonOutline`); instances write `<Button variant="outline" />` and leave out `Default` values (React and Svelte; HTML writes each variant inline) |
 | Components named Button or Link | `button type="button"` and `a href` |
 | Colours, fonts, radii, spacing | a tokens file (`@theme` for Tailwind, CSS variables otherwise); colour variables keep their names |
 | Images | `img` pointing at the image URL at export time |
