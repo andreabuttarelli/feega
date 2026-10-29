@@ -59,13 +59,13 @@ describe('repeatedOf', () => {
     expect(found.root.children!.every((c) => c.type !== 'INSTANCE')).toBe(true);
   });
 
-  it('una riga in auto layout con un gruppo dentro non diventa componente, perché il gruppo annidato non si disegna', () => {
+  it('una riga in auto layout con un gruppo dentro diventa componente', () => {
     const row = (x: number): RestNode => {
       const icon: RestNode = { id: id(), type: 'GROUP', name: 'icon', absoluteBoundingBox: { x, y: 0, width: 16, height: 16 }, children: [{ id: id(), type: 'VECTOR', absoluteBoundingBox: { x, y: 0, width: 16, height: 16 }, fills: [{ type: 'SOLID', color: BLACK }] }, { id: id(), type: 'VECTOR', absoluteBoundingBox: { x, y: 0, width: 8, height: 8 }, fills: [{ type: 'SOLID', color: BLACK }] }] };
       return { id: id(), type: 'FRAME', name: 'a', layoutMode: 'HORIZONTAL', absoluteBoundingBox: { x, y: 0, width: 160, height: 28 }, fills: [{ type: 'SOLID', color: WHITE }], children: [icon, text('Inbox', x + 24, 4)] };
     };
 
-    expect(repeatedOf(page([row(0), row(200)])).components).toHaveLength(0);
+    expect(repeatedOf(page([row(0), row(200)])).components).toHaveLength(1);
   });
 
   it('un componente dentro un altro non diventa un secondo componente', () => {

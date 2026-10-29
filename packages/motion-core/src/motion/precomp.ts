@@ -10,7 +10,7 @@ import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './
 import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
 import { facesOf, screenCompOf, screenHostId } from './device-screen';
 import type { Device } from './devices';
-import { overridden } from './instance-overrides';
+import { instanceTracks } from './layout/resolve';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
@@ -159,7 +159,8 @@ function combinedInside(doc: MotionDoc, tracks: MotionTrack[], op: unknown): Mot
 
 function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
   const comp = doc.comps[compOf(host)!];
-  const inner = combinedInside(doc, expand(doc, withoutHidden({ ...doc, tracks: overridden(comp.tracks, host, comp.component) }).tracks, depth + 1), host.props.boolean);
+  const own = instanceTracks(doc, host, comp, { width: doc.width, height: doc.height });
+  const inner = combinedInside(doc, expand(doc, withoutHidden({ ...doc, tracks: own }).tracks, depth + 1), host.props.boolean);
   const laid = placed(host, comp, inner);
   const group: MotionClip = { ...host, props: { ...host.props, span: laid.length } };
   return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...laid];

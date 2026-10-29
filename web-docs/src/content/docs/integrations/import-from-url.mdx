@@ -23,7 +23,7 @@ Open the insert menu (**+**), go to **Import**, choose **From URL…**, paste th
 
 Blocks the page repeats (cards, logos, buttons, list items) become one main component and linked instances. Each instance keeps its own text, pictures and colours as overrides, so editing the main updates every copy and **Reset** brings one back to the main. Blocks with the same structure but a different background, border or shadow become variants of one component (`Style=Primary`, `Style=Secondary`). Names come from what the block is: button, card, feature card, nav link, logo. Find them in the **Components** panel.
 
-A block is turned into a component only when it repeats at least twice, is at least 16 px on each side, has a background, a picture or an icon, keeps the same size across copies, and does not sit directly inside an auto layout row or column. Anything else stays as plain layers.
+A block is turned into a component when it repeats at least twice, is at least 16 px on each side and has a background, a picture or an icon. Sidebar rows, nav links and buttons inside auto layout rows count too. Copies of a different size, or with a different icon or spacing, stay linked: the difference is an override on that instance, as in Figma. Each component shows a preview of itself in the **Components** panel.
 
 ## CLI
 
