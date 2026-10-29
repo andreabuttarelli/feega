@@ -1,6 +1,6 @@
 import type { MotionClip, MotionDoc } from '../doc';
-import { withContentHeight, withFittedInstances } from '../layout/resolve';
-import { resolveAt } from './model';
+import { restretched, withContentHeight, withFittedInstances } from '../layout/resolve';
+import { carryChanges, liftEdit, resolveAt } from './model';
 
 function withHiddenSubtrees(doc: MotionDoc): MotionDoc {
   const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
@@ -12,3 +12,9 @@ function withHiddenSubtrees(doc: MotionDoc): MotionDoc {
 }
 
 export const resolveView = (doc: MotionDoc, breakpointId: string): MotionDoc => withContentHeight(withFittedInstances(withHiddenSubtrees(resolveAt(doc, breakpointId))));
+
+export function liftViewEdit(source: MotionDoc, breakpointId: string, before: MotionDoc, after: MotionDoc): MotionDoc {
+  const resolved = resolveAt(source, breakpointId);
+  const edited = carryChanges(resolved, restretched(before, resolved.height), restretched(after, resolved.height));
+  return liftEdit(source, breakpointId, edited);
+}

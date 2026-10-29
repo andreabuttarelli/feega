@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { MotionDoc } from '../doc';
 import { landingDoc } from '../codegen/fixtures/landing';
 import { compBounds, withAutoLayout } from '../layout/resolve';
-import { resolveView } from './view';
+import { liftViewEdit, resolveView } from './view';
+import { OverrideKey } from './model';
 
 type Px = { left: number; top: number; width: number; height: number };
 
@@ -94,5 +95,28 @@ describe('the landing page on a breakpoint view', () => {
     const tablet = resolveView(landingDoc(), TABLET);
     const size = (doc: MotionDoc) => Number(doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'lede')!.props.size) * Math.min(doc.width, doc.height);
     expect(size(tablet)).toBeCloseTo(size(landingDoc()));
+  });
+});
+
+describe('an edit made on the drawn view', () => {
+  const page = landingDoc();
+  const clipIn = (doc: MotionDoc, id: string) => doc.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
+  const sizePx = (doc: MotionDoc, id: string) => Number(clipIn(doc, id).props.size) * Math.min(doc.width, doc.height);
+  const withSize = (doc: MotionDoc, id: string, px: number): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, props: { ...c.props, size: px / Math.min(doc.width, doc.height) } } : c)) })) }) as MotionDoc;
+
+  it('a font size set on the phone view is that pixel size on the phone only', () => {
+    const before = resolveView(page, PHONE);
+    const lifted = liftViewEdit(page, PHONE, before, withSize(before, 'headline', 30));
+
+    expect(sizePx(resolveView(lifted, PHONE), 'headline')).toBeCloseTo(30);
+    expect(clipIn(lifted, 'headline').props.size).toBe(clipIn(page, 'headline').props.size);
+    expect(Object.keys(clipIn(lifted, 'headline').overrides?.[PHONE] ?? {})).toContain(OverrideKey.FontSize);
+    expect(sizePx(resolveView(lifted, TABLET), 'headline')).toBeCloseTo(sizePx(resolveView(page, TABLET), 'headline'));
+  });
+
+  it('an untouched view writes nothing', () => {
+    const before = resolveView(page, PHONE);
+
+    expect(liftViewEdit(page, PHONE, before, before).tracks).toEqual(page.tracks);
   });
 });

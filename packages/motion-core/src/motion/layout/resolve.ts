@@ -239,13 +239,14 @@ function stretchedClip(clip: MotionClip, along: number, unit: number): MotionCli
 
 const stretchedTracks = (tracks: MotionTrack[], along: number, unit: number): MotionTrack[] => tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => stretchedClip(c, along, unit)) })) as MotionTrack[];
 
-export function withContentHeight(doc: MotionDoc): MotionDoc {
-  const height = Math.ceil(contentBottom(doc));
-  if (height <= doc.height) {
-    return doc;
-  }
+export function restretched(doc: MotionDoc, height: number): MotionDoc {
   const along = doc.height / height;
   const unit = Math.min(doc.width, doc.height) / Math.min(doc.width, height);
   const comps = Object.fromEntries(Object.entries(doc.comps ?? {}).map(([id, comp]) => [id, comp.frame ? comp : { ...comp, tracks: stretchedTracks(comp.tracks, along, unit) }])) as MotionDoc['comps'];
   return { ...doc, height, tracks: stretchedTracks(doc.tracks, along, unit), comps };
+}
+
+export function withContentHeight(doc: MotionDoc): MotionDoc {
+  const height = Math.ceil(contentBottom(doc));
+  return height <= doc.height ? doc : restretched(doc, height);
 }

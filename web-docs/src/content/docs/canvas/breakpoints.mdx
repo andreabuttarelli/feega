@@ -8,7 +8,8 @@ sidebar:
 A frame can have **breakpoints**: narrower views of the same design, such as Tablet (810 px) and Phone (390 px). The frame itself is the widest view (Desktop).
 
 - **Add a breakpoint** from the frame's Properties (nothing selected): **Breakpoints → +**, then Tablet 810, Phone 390 or a custom width. Each view appears to the right of the frame, labelled with its name and width.
-- **Click an element in a view** to edit it there. The inspector says which view you are editing; changed properties show "overridden in Phone" with **Reset**.
+- **Click an element in a view** to edit it there: the same element, with the view's layout. The inspector shows an **Editing: Phone** badge; changed properties show "overridden in Phone" with **Reset**. Dragging and resizing in the view, and inspector changes, apply to that view only. Properties that cannot vary per breakpoint (text, colours, media) are not changed from a view: edit them on the frame. Undo works as usual.
+- **Click an element in the frame** to edit the Desktop design, as before.
 - **A new breakpoint inherits everything.** Nothing stacks, scales or hides by itself.
 - **A change made at a breakpoint applies there and at every smaller one**, until a smaller breakpoint changes it again.
 - **Removing a change** makes the element inherit from the next wider view.
