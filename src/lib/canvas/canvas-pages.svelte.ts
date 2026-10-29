@@ -1,4 +1,5 @@
-import { invalidate } from '$app/navigation';
+import { goto, invalidate } from '$app/navigation';
+import { page } from '$app/state';
 import { postCanvasAction } from './canvas-api';
 import { canvasRouteOf } from './canvas-action-url';
 import { CANVAS_LIST_DEPENDENCY } from './canvas-list';
@@ -6,6 +7,7 @@ import { OpOutcome, createOptimistic } from './optimistic-ops';
 import { pageOp, restoreShell, runnablePage, type PageAction, type PageOp, type PageRow, type Shell, type ShellTouched, type ShareWritten } from './page-ops';
 
 const LANDED = new Set(['success', 'redirect']);
+const OPEN_TRIES = 3;
 
 let pages = $state<PageRow[] | null>(null);
 let share = $state<ShareWritten | null>(null);
@@ -61,6 +63,11 @@ export const canvasPages = {
   },
   dismiss() {
     notice = null;
+  },
+  async open(href: string) {
+    for (let tried = 0; tried < OPEN_TRIES && page.url.pathname !== href; tried++) {
+      await goto(href);
+    }
   },
   async run<K extends PageAction>(action: K, input: Parameters<typeof pageOp<K>>[1], loaded: PageRow[], href: string): Promise<OpOutcome> {
     const route = canvasRouteOf(href);

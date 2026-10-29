@@ -13,7 +13,6 @@
   import Upload from '@lucide/svelte/icons/upload';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FeegaFile from './FeegaFile.svelte';
-  import { goto } from '$app/navigation';
   import { canvasPages } from '$lib/canvas/canvas-pages.svelte';
   import { OpOutcome } from '$lib/canvas/optimistic-ops';
   import { PageAction } from '$lib/canvas/page-ops';
@@ -83,7 +82,7 @@
     const id = crypto.randomUUID();
     void canvasPages.run(PageAction.New, { id, from: current.id, projectId }, canvases, current.href).then((outcome) => {
       if (outcome === OpOutcome.Landed) {
-        void goto(`/p/${projectId}/c/${id}`);
+        void canvasPages.open(`/p/${projectId}/c/${id}`);
       }
     });
   }
@@ -95,7 +94,7 @@
     }
     onpick();
     void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href);
-    void goto(next.href);
+    void canvasPages.open(next.href);
   }
 
   function startRename() {
