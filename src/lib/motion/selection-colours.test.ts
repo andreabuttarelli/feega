@@ -67,6 +67,15 @@ describe('selection colours', () => {
   });
 });
 
+describe('a new element', () => {
+  it('lists only the colour it paints, not its unused defaults', () => {
+    const d = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect' } }, 'r'));
+
+    expect(selectionColours(d, ['r'])).toEqual([{ colour: '#d9d9d9', count: 1 }]);
+    expect(documentColours(d)).toEqual(['#d9d9d9']);
+  });
+});
+
 describe('frame colours', () => {
   const white = (d: MotionDoc, id: string) => ok(addClip(d, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', fills: [{ type: 'solid', color: '#FFFFFF' }] } }, id));
 

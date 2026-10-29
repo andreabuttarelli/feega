@@ -67,16 +67,23 @@ function scopeOf(doc: MotionDoc, ids: readonly string[]) {
   return { top, comps, clips: [...top, ...nested] };
 }
 
-const legacyUnpainted = (clip: MotionClip, stack: unknown, painted: (component: string, props: Record<string, unknown>) => unknown[]) => stack !== undefined || painted(clip.component, clip.props).length === 0;
+type Paint = { stack: string; replaces: (component: string, key: string) => boolean; legacy: (component: string, props: Record<string, unknown>) => unknown[] };
 
-function shadowed(clip: MotionClip, key: string): boolean {
-  if (fillReplaces(clip.component, key)) {
-    return legacyUnpainted(clip, clip.props.fills, elementFills);
+const PAINTS: readonly Paint[] = [
+  { stack: 'fills', replaces: fillReplaces, legacy: elementFills },
+  { stack: 'strokes', replaces: strokeReplaces, legacy: elementStrokes }
+];
+
+function painted(clip: MotionClip, key: string): boolean {
+  const paint = PAINTS.find((p) => p.replaces(clip.component, key));
+  if (!paint) {
+    return true;
   }
-  return strokeReplaces(clip.component, key) && legacyUnpainted(clip, clip.props.strokes, elementStrokes);
+  const value = clip.props[key];
+  return clip.props[paint.stack] === undefined && typeof value === 'string' && coloursIn(paint.legacy(clip.component, clip.props), []).includes(value.toLowerCase());
 }
 
-const paintedProps = (clip: MotionClip) => Object.fromEntries(Object.entries(clip.props).filter(([key]) => !shadowed(clip, key)));
+const paintedProps = (clip: MotionClip) => Object.fromEntries(Object.entries(clip.props).filter(([key]) => painted(clip, key)));
 
 export type ColourUse = { colour: string; count: number };
 
