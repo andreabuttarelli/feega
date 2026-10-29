@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { landingDoc } from '@feega/motion-core/motion/codegen/fixtures/landing';
 import { FrameKind } from '$lib/canvas/motion-node';
-import { breakpointViews, VIEW_GAP, viewAt, viewOf } from './breakpoint-views';
+import { baseNodeId, breakpointViews, VIEW_GAP, viewAt, viewId, viewOf, withoutViews } from './breakpoint-views';
 
 const doc = { width: 1440, height: 900, tracks: [], breakpoints: [{ id: 'ph', name: 'Phone', width: 390 }, { id: 'tab', name: 'Tablet', width: 810 }] } as unknown as MotionDoc;
 const frame = { id: 'n1', kind: FrameKind.Frame, revision: 4, box: { x: 100, y: 50, w: 720, h: 450 } };
@@ -44,5 +44,18 @@ describe('breakpoint views on the canvas', () => {
 
     expect(viewAt(views, { x: 900, y: 100 })?.breakpointId).toBe('tab');
     expect(viewAt(views, { x: 300, y: 100 })).toBeNull();
+  });
+});
+
+describe('a view tile id never reaches the network', () => {
+  it('maps a view tile to the frame it derives from, and a frame to itself', () => {
+    expect(baseNodeId(viewId('n1', 'ph'))).toBe('n1');
+    expect(baseNodeId('n1')).toBe('n1');
+  });
+
+  it('keeps only saved frames among those loaded by url', () => {
+    const views = breakpointViews([frame], () => doc).map((v) => v.frame);
+
+    expect(withoutViews([frame, ...views]).map((f) => f.id)).toEqual(['n1']);
   });
 });

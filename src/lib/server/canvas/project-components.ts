@@ -23,7 +23,7 @@ export async function listProjectComponents(db: Db, scope: Scope): Promise<Canva
     const components = docs
       .filter(({ frame, head }) => frame.canvasId === canvas.id && head)
       .flatMap(({ frame, head }) =>
-        componentGroups([{ id: frame.id, doc: head!.doc }]).map((group) => ({ ...group, thumb: posterOf(scope.projectId, canvas.id, frame.data), frameName: frame.displayName ?? FRAME_NAME }))
+        componentGroups([{ id: frame.id, doc: head!.doc }]).map((group) => ({ ...group, thumb: posterOf(scope.projectId, canvas.id, frame.data), frameName: frame.displayName ?? FRAME_NAME, revision: head!.version }))
       );
     return components.length ? [{ canvasId: canvas.id, canvasName: canvas.name, components }] : [];
   });

@@ -46,7 +46,7 @@ describe('components across the canvases of a project', () => {
 
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ canvasId: 'c1', canvasName: 'Home' });
-    expect(found[0].components[0]).toMatchObject({ frameId: 'f1', name: 'Button', thumb: '/p/p/c/c1/assets/a1' });
+    expect(found[0].components[0]).toMatchObject({ frameId: 'f1', name: 'Button', thumb: '/p/p/c/c1/assets/a1', revision: 1 });
   });
 
   it('hands over the main alone, ready to place on another canvas', async () => {

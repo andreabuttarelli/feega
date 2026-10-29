@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { breakpointViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
+  import { baseNodeId, breakpointViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
   import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
@@ -434,7 +434,7 @@
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
-  const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
+  const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${baseNodeId(id)}/source`;
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (!holdsDoc(t.kind ?? '') || domShows.has(t.id));
   $effect(() => {
@@ -3195,7 +3195,7 @@
     </FrameOverlays>
     <FrameOverlays {view} frames={viewOverlays}>
       {#snippet children(frame)}
-        {@const nodeId = viewOf(frame.id)?.nodeId ?? frame.id}
+        {@const nodeId = baseNodeId(frame.id)}
         {#each typing || cropping?.nodeId === nodeId ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={null} turn={0} ongrab={(grip, handle, e) => grab(nodeId, mark.clip, grip, handle, e)} />
         {/each}

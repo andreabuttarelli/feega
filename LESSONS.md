@@ -3455,3 +3455,6 @@ Signal: outlined box, no caret; it works with the playhead at 0. Cause: the text
 
 ### A whole frame is blank, other frames draw
 Signal: one frame renders nothing on the canvas, no error on screen. Cause: a stored clip prop a `.strict()` component schema refuses (e.g. `radius` on Shape) made `parseMotionDoc` reject the whole doc. Move: run `parseMotionDoc(doc)` on the stored doc and read `error`; load is Lenient and must drop bad props (`salvageProps`), never refuse the doc.
+
+### A settings error on `/settings/*` that clicking through the routes never reproduces
+Signal: telemetry shows one settings page reading another page's fields (`data.models` on spend), but the route nav is clean. Cause: the URL is the canvas sheet's shallow route; `CanvasSheet.svelte` renders the section page itself. Move: read the session's clicks in PostHog (`elements_chain`) to see which UI was used, then repro from the canvas rail.

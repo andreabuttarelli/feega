@@ -33,3 +33,13 @@ export function settingsPageLoader(path: string): (() => Promise<PageModule>) | 
   const key = `/src/routes/p/[projectId]/settings/${settingsSubpathOf(path)}/+page.svelte`;
   return SETTINGS_PAGE_MODULES[key] ?? null;
 }
+
+export type SheetSection = { Page: PageModule['default']; data: unknown };
+
+export function settingsSheetSection(path: string, data: unknown): Promise<SheetSection> | null {
+  const loader = settingsPageLoader(path);
+  if (!loader) {
+    return null;
+  }
+  return loader().then((module) => ({ Page: module.default, data }));
+}

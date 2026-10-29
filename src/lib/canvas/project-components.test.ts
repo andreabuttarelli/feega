@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mainLocation, matchingComponents, type CanvasComponents } from './project-components';
 
-const component = (name: string, frameId = 'f') => ({ key: name, frameId, home: frameId, frameName: `Frame ${frameId}`, name, variants: [], thumb: null });
+const component = (name: string, frameId = 'f') => ({ key: name, frameId, home: frameId, frameName: `Frame ${frameId}`, name, variants: [], thumb: null, revision: 1 });
 const canvases: CanvasComponents[] = [
   { canvasId: 'c1', canvasName: 'Home', components: [component('Button'), component('Card')] },
   { canvasId: 'c2', canvasName: 'Checkout', components: [component('Price', 'f2')] }

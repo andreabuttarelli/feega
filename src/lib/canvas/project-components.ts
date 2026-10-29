@@ -2,7 +2,7 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { ComponentGroup } from '$lib/motion/canvas-components';
 import type { ComponentDrag } from './component-drag';
 
-export type ProjectComponent = ComponentGroup & { thumb: string | null; frameName: string };
+export type ProjectComponent = ComponentGroup & { thumb: string | null; frameName: string; revision: number };
 export type CanvasComponents = { canvasId: string; canvasName: string; components: ProjectComponent[] };
 
 const base = (projectId: string) => `/api/v1/projects/${encodeURIComponent(projectId)}/components`;
