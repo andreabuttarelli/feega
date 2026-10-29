@@ -14,7 +14,7 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 Copy layers in Figma and paste on the canvas.
 
 - Shapes, text and groups land as free elements. Frames and sections land as frames. Pasting over a frame puts everything inside it.
-- Rotation, stacked fills and strokes, gradients (including angular and diamond), and auto layout (direction, spacing, padding, alignment, sizing) come across.
+- Rotation, stacked fills and strokes, gradients (including angular and diamond), and auto layout as stacks (direction, spacing, padding, alignment, sizing) come across.
 - Small text keeps its real size, even in a very large frame.
 - Component instances stay instances of one main component when the main is in the paste and the instance is untouched. An instance with overrides lands as a plain group that shows its own text, fills, hidden layers and swapped icons.
 - Every text is kept, however small its size or long its paragraph.
@@ -45,7 +45,7 @@ Bring whole frames in without copying anything.
 3. Paste a figma.com design link and choose **Find frames**. If the link has a `node-id`, that frame is already ticked.
 4. Tick the frames you want (up to 20) and choose **Import**.
 
-Each frame lands as a frame on the canvas, in the same arrangement it has in Figma, at the middle of your view. Layers, text, vectors, gradients, shadows, auto layout and images come across, the same as a paste. Anything that cannot be carried over is listed. If the images cannot be fetched, the frame still lands with grey placeholders.
+Each frame lands as a frame on the canvas, in the same arrangement it has in Figma, at the middle of your view. Layers, text, vectors, gradients, shadows, auto layout (as stacks) and images come across, the same as a paste. Anything that cannot be carried over is listed. If the images cannot be fetched, the frame still lands with grey placeholders.
 
 The token is stored encrypted, per person, and is never sent back to the browser. It needs access to the file: a file you cannot open in Figma cannot be imported.
 

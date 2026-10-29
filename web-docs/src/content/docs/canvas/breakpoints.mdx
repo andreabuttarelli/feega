@@ -13,16 +13,16 @@ A frame can have **breakpoints**: narrower views of the same design, such as Tab
 - **A new breakpoint inherits everything.** Nothing stacks, scales or hides by itself.
 - **A change made at a breakpoint applies there and at every smaller one**, until a smaller breakpoint changes it again.
 - **Removing a change** makes the element inherit from the next wider view.
-- **Stack on this breakpoint** turns an auto layout row into a column at that width and makes its children fill the width. It is written as ordinary changes you can see and reset.
+- **Stack on this breakpoint** turns a stack row into a column at that width and makes its children fill the width. It is written as ordinary changes you can see and reset.
 
-What can change per breakpoint: auto layout direction, wrap, gap, padding and columns; width and height sizing; column span; visibility; font size and text alignment; position and size; constraints. Text, colours and media are the same at every width.
+What can change per breakpoint: stack direction, wrap, gap, padding and columns; width and height sizing; column span; visibility; font size and text alignment; position and size; constraints. Text, colours and media are the same at every width.
 
 ## With the agent
 
 Ask the motion agent, or call the tools over MCP:
 
 - `add_breakpoint` with `preset` `tablet` or `phone`, or a `name` and `width`.
-- `set_breakpoint_override` with `breakpoint_id`, `clip_id`, `key` and `value`; `value: null` removes the change; `stack: true` stacks an auto layout row.
+- `set_breakpoint_override` with `breakpoint_id`, `clip_id`, `key` and `value`; `value: null` removes the change; `stack: true` stacks a stack row.
 - `remove_breakpoint` removes a view and its changes.
 
 ## In exported code

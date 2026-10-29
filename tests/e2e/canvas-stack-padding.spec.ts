@@ -26,7 +26,7 @@ async function shot(page: Page, name: string) {
 test.describe('stack and padding shorthand @real', () => {
   test.skip(!REAL_STACK, 'needs E2E_REAL_STACK=1');
 
-  test('Shift+A stacks three selected tiles into a row', async ({ page, session, admin, seedNode }) => {
+  test('Shift+A wraps three free elements in one free Stack', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(150_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     const ids: string[] = [];
@@ -36,7 +36,7 @@ test.describe('stack and padding shorthand @real', () => {
       await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: sheet(color), actor_kind: 'user', actor_id: session.userId });
       ids.push(node.id);
     }
-    const rowOf = async (id: string) => (await admin.from('nodes').select('x, y').eq('id', id).single()).data!;
+    const live = async () => (await admin.from('nodes').select('id, display_name').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? [];
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.waitForTimeout(SETTLE_MS);
@@ -45,11 +45,8 @@ test.describe('stack and padding shorthand @real', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Shift+A');
 
-    await expect.poll(async () => (await rowOf(ids[1])).y, { timeout: 10_000 }).toBe((await rowOf(ids[0])).y);
-    const [a, b, c] = await Promise.all(ids.map(rowOf));
-    expect(a.y).toBe(c.y);
-    expect(b.x - a.x).toBe(144);
-    expect(c.x - b.x).toBe(144);
+    await expect.poll(async () => (await live()).map((n) => n.display_name), { timeout: 10_000 }).toEqual(['Stack']);
+    expect((await live()).some((n) => ids.includes(n.id))).toBe(false);
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, 'stack-after');
   });
