@@ -1,12 +1,14 @@
 <script lang="ts">
   import Diamond from '@lucide/svelte/icons/diamond';
   import { componentPreview, type PreviewAsk } from '$lib/canvas/component-previews';
+  import type { Tone } from '$lib/canvas/component-preview';
 
   let { ask }: { ask: PreviewAsk } = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let seen = $state(false);
   let drawn = $state(false);
+  let tone = $state<Tone | null>(null);
 
   $effect(() => {
     if (!canvas || seen) {
@@ -29,13 +31,14 @@
       return;
     }
     let live = true;
-    void componentPreview(wanted).then((bitmap) => {
-      if (!live || !bitmap) {
+    void componentPreview(wanted).then((preview) => {
+      if (!live || !preview) {
         return;
       }
-      target.width = bitmap.width;
-      target.height = bitmap.height;
-      target.getContext('2d')?.drawImage(bitmap, 0, 0);
+      target.width = preview.width;
+      target.height = preview.height;
+      target.getContext('2d')?.drawImage(preview.bitmap, 0, 0);
+      tone = preview.tone;
       drawn = true;
     });
     return () => {
@@ -44,7 +47,7 @@
   });
 </script>
 
-<div class="preview" data-testid="component-preview">
+<div class="preview" data-testid="component-preview" data-tone={tone}>
   <canvas bind:this={canvas} class:drawn></canvas>
   {#if !drawn}<Diamond size={16} />{/if}
 </div>
@@ -61,14 +64,22 @@
     overflow: hidden;
   }
 
+  .preview[data-tone='dark'] {
+    background: #1e1e1e;
+  }
+
+  .preview[data-tone='light'] {
+    background: #f5f5f5;
+  }
+
   .preview :global(svg) {
     position: absolute;
     opacity: 0.6;
   }
 
   canvas {
-    max-width: 84%;
-    max-height: 84%;
+    max-width: 100%;
+    max-height: 100%;
     visibility: hidden;
   }
 

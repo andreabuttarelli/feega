@@ -45,8 +45,9 @@ test.describe('the components grid @real', () => {
 
       await expect(page.getByTestId('component-row')).toHaveCount(3, { timeout: 20_000 });
       await expect(page.locator('[data-testid="component-preview"] canvas.drawn')).toHaveCount(3, { timeout: 30_000 });
-      await page.screenshot({ path: `${SHOTS}/components-grid-${scheme}.png` });
-      await page.getByTestId('project-components').screenshot({ path: `${SHOTS}/components-grid-${scheme}-panel.png` });
+      await expect(page.locator('[data-testid="component-row"]', { hasText: 'Headline' }).getByTestId('component-preview')).toHaveAttribute('data-tone', 'dark');
+      await page.screenshot({ path: `${SHOTS}/components-grid2-${scheme}.png` });
+      await page.getByTestId('project-components').screenshot({ path: `${SHOTS}/components-grid2-${scheme}-panel.png` });
     }
   });
 });

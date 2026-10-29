@@ -75,7 +75,49 @@ export function previewCache<T extends Held>(maxBytes: number) {
   return { get, put };
 }
 
-export type TileFit ={ scale: number; width: number; height: number };
+const INK_ALPHA = 8;
+const ALPHA = 3;
+
+export function inkBounds(rgba: Uint8ClampedArray, width: number, height: number): Crop | null {
+  let [left, top, right, bottom] = [width, height, -1, -1];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (rgba[(y * width + x) * RGBA_BYTES + ALPHA] < INK_ALPHA) {
+        continue;
+      }
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+    }
+  }
+  return right < 0 ? null : { left, top, width: right - left + 1, height: bottom - top + 1 };
+}
+
+export function padded(crop: Crop, share: number): Crop {
+  const pad = Math.max(crop.width, crop.height) * share;
+  return { left: crop.left - pad, top: crop.top - pad, width: crop.width + 2 * pad, height: crop.height + 2 * pad };
+}
+
+export enum Tone {
+  Light = 'light',
+  Dark = 'dark'
+}
+
+const LUMA = [0.2126, 0.7152, 0.0722];
+const LIGHT_INK = 0.6;
+
+export function toneOf(rgba: Uint8ClampedArray): Tone {
+  let [sum, weight] = [0, 0];
+  for (let i = 0; i < rgba.length; i += RGBA_BYTES) {
+    const alpha = rgba[i + ALPHA] / 255;
+    sum += alpha * LUMA.reduce((l, k, c) => l + (k * rgba[i + c]) / 255, 0);
+    weight += alpha;
+  }
+  return weight && sum / weight > LIGHT_INK ? Tone.Dark : Tone.Light;
+}
+
+export type TileFit = { scale: number; width: number; height: number };
 
 export function fitInTile(crop: Crop, side: number): TileFit {
   const scale = side / Math.max(crop.width, crop.height);
