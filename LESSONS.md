@@ -3429,7 +3429,7 @@ Signal: inpaint keeps the painted area and regenerates the rest; reframe returns
 
 ## A new column written before its migration breaks every write, silently in Vercel
 
-**Signal:** every save shows "The server failed to save this change", Vercel logs are empty, `schema-drift-check` lists an unapplied migration. **Move:** new optional columns/RPC args are written with a fallback (retry without on PGRST202/PGRST204/42703), and `handleError` must `console.error` — Sentry's wrapper alone shows nothing in Vercel.
+**Signal:** every save shows "The server failed to save this change", Vercel logs are empty, `schema-drift-check` lists an unapplied migration. **Move:** new optional columns/RPC args are written with a fallback (retry without on PGRST202/PGRST204/42703), and `handleError` must `console.error` — Sentry's wrapper alone shows nothing in Vercel. Migrations merged to `dev` are applied to production (which `dev` uses) before the user tests `dev`.
 
 ## Desktop native canvas
 

@@ -3,7 +3,7 @@ import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from './save-
 
 type Sent = { id: string; patch: Record<string, unknown>; resolve: (result: SendResult) => void };
 
-function harness(opts: { debounceMs?: number; maxWaitMs?: number } = {}) {
+function harness(opts: { debounceMs?: number; maxWaitMs?: number; maxFailures?: number } = {}) {
   const sent: Sent[] = [];
   const statuses: SaveStatus[] = [];
   const saves = createSaveScheduler({
@@ -11,6 +11,7 @@ function harness(opts: { debounceMs?: number; maxWaitMs?: number } = {}) {
     debounceMs: opts.debounceMs ?? 400,
     maxWaitMs: opts.maxWaitMs ?? 2000,
     backoffMs: (attempt) => 1000 * attempt,
+    maxFailures: opts.maxFailures,
     onStatus: (status) => statuses.push(status)
   });
   return { saves, sent, statuses };
@@ -124,6 +125,21 @@ describe('save scheduler', () => {
     await expect(saved).resolves.toBe(true);
     expect(saves.status()).toBe(SaveStatus.Saved);
     expect(statuses).toContain(SaveStatus.Saving);
+  });
+
+  it('a save that keeps failing gives up after the retry limit instead of staying pending forever', async () => {
+    const { saves, sent } = harness({ maxFailures: 2 });
+    const saved = saves.schedule('a', { prompt: '1' }, SaveTiming.Now);
+    await settle();
+    sent[0].resolve(SendResult.Retry);
+    await vi.advanceTimersByTimeAsync(1000);
+    sent[1].resolve(SendResult.Retry);
+    await settle();
+
+    await expect(saved).resolves.toBe(false);
+    expect(saves.status()).toBe(SaveStatus.Saved);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sent).toHaveLength(2);
   });
 
   it('a refused save resolves false and frees the node', async () => {

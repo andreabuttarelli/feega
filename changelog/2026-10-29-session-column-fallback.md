@@ -12,3 +12,6 @@ returned 500. Sentry's `handleError` logged nothing to Vercel.
 - `hooks.server.ts`: `handleError` now `console.error`s route, url, status and error.
 - Discarded: applying the migration from the agent (prod migrations are applied by a person).
   Apply it; the fallback stays so the next column lag degrades instead of breaking writes.
+- The save banner never went away: the scheduler retried a failing save forever. `save-scheduler.ts`
+  now gives up after `SAVE_MAX_FAILURES` (waiters get `false`, `onGaveUp` reloads); the banner
+  has a close button and clears after 8 s (not the credits one).
