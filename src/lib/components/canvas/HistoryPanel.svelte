@@ -12,7 +12,7 @@
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import { Side } from '$lib/motion/branch-merge';
-  import type { Component } from 'svelte';
+  import { untrack, type Component } from 'svelte';
   import { SegmentedControl } from '$lib/components/ui/shell';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
@@ -20,6 +20,9 @@
   import { LocalOff, isOff } from '$lib/local-user';
   import { ENTRY_VERBS, EntryKind, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, laneSpans, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
   import type { HistoryPreview } from '$lib/server/canvas/history-actions';
+  import { liveRefresh, mergeGraph } from '$lib/canvas/history/live';
+  import { watchHistory } from '$lib/realtime/history-channel';
+  import { createSupabaseBrowserClient } from '$lib/supabase/client';
 
   let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
 
@@ -95,13 +98,35 @@
     failed = false;
     fetch(`/p/${projectId}/c/${canvasId}/history?${params}`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((read: HistoryGraph) => (graph = read))
+      .then((read: HistoryGraph) => (graph = mergeGraph(untrack(() => graph), read)))
       .catch((e: Error) => {
         if (e.name !== 'AbortError') {
           failed = true;
         }
       });
     return () => controller.abort();
+  });
+
+  $effect(() => {
+    const live = liveRefresh(() => {
+      if (document.visibilityState === 'visible') {
+        reads += 1;
+      }
+    });
+    const unwatch = watchHistory(createSupabaseBrowserClient(), canvasId, live.changed, live.feed);
+    const focused = () => {
+      if (document.visibilityState === 'visible') {
+        live.focused();
+      }
+    };
+    window.addEventListener('focus', focused);
+    document.addEventListener('visibilitychange', focused);
+    return () => {
+      live.stop();
+      unwatch();
+      window.removeEventListener('focus', focused);
+      document.removeEventListener('visibilitychange', focused);
+    };
   });
 
   const pointUrl = (entry: HistoryEntry) => `/p/${projectId}/c/${canvasId}/history/${encodeURIComponent(entry.id)}`;

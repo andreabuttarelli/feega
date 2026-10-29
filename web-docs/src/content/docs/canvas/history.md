@@ -18,6 +18,10 @@ newest first, in one place.
 
 Moves are not recorded.
 
+The list updates live: changes by teammates, the chat or outside agents appear within a
+second. If the live connection drops, the panel rereads every 15 seconds and whenever you
+return to the tab.
+
 ## Lanes
 
 Each author has its own lane, colour and icon, drawn as a graph beside the list:
