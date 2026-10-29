@@ -40,7 +40,9 @@
   import { layerMenuActions } from '$lib/canvas/frame-inspector';
   import type { ActionId } from '$lib/motion/actions';
   import Pencil from '@lucide/svelte/icons/pencil';
-  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
+  import type { DrawTool } from '$lib/motion/draw-tool';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -162,7 +164,8 @@
   let landing = $state<{ key: string; place: Place } | null>(null);
 
   function over(row: LayerRow, e: DragEvent) {
-    if (!dragged || !editable(row) || block.includes(row.id)) {
+    const tool = e.dataTransfer?.types.includes(CANVAS_DRAG_TOOL);
+    if ((!dragged && !tool) || !editable(row) || block.includes(row.id)) {
       landing = null;
       return;
     }
@@ -260,13 +263,23 @@
     }
   }
 
-  function drop(row: LayerRow) {
+  function dropFromMenu(row: LayerRow, tool: DrawTool, place: Place) {
+    const result = dropTool(video!.doc, tool, row.id, place, crypto.randomUUID().slice(0, 8));
+    video!.edit(result, 'Added a layer');
+  }
+
+  function drop(row: LayerRow, e: DragEvent) {
     const from = dragged;
     const place = landing?.place;
     const moving = block;
+    const tool = e.dataTransfer?.getData(CANVAS_DRAG_TOOL) as DrawTool | undefined;
     dragged = null;
     block = [];
     landing = null;
+    if (video && tool && place) {
+      dropFromMenu(row, tool, place);
+      return;
+    }
     if (!video || !from || !place || moving.includes(row.id)) {
       return;
     }
@@ -337,7 +350,7 @@
       ondragover={(e) => over(row, e)}
       ondragleave={() => landing?.key === row.key && (landing = null)}
       ondragend={() => ((dragged = null), (block = []), (landing = null))}
-      ondrop={() => drop(row)}
+      ondrop={(e) => drop(row, e)}
       oncontextmenu={(e) => openMenu(row, e)}
     >
       {#if (row.kind === LayerKind.Node && frames.has(row.id)) || row.foldable}

@@ -5,7 +5,9 @@ import { wrapInStack } from '$lib/motion/layout/ops';
 import { LayoutKind } from '@feega/motion-core/motion/layout/stack';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
-import { LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { findClip } from '@feega/motion-core/motion/doc';
+import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -603,5 +605,25 @@ describe('the frame ring while the pointer is on one of its elements', () => {
   it('still rings for a layer row hovered elsewhere, or for the frame itself', () => {
     expect(frameRinged({ nodeId: 'm1', id: 't1' }, 'm1', null, null)).toBe(true);
     expect(frameRinged({ nodeId: 'm1', id: 'm1' }, 'm1', null, 'm1')).toBe(true);
+  });
+});
+
+describe('dropTool: a tile dragged from the add menu into the layers', () => {
+  const DROP_BOX = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
+
+  it('lands a new element next to the row it is dropped on', () => {
+    const doc = ok(dropTool(video(), DrawTool.Rectangle, 't1', Place.Above, 'new1', DROP_BOX));
+
+    expect(findClip(doc, 'new1')!.clip.component).toBe('Shape');
+  });
+
+  it('draws a stack with its auto layout', () => {
+    const doc = ok(dropTool(video(), DrawTool.Stack, 't1', Place.Below, 'new1', DROP_BOX));
+
+    expect(findClip(doc, 'new1')!.clip.autoLayout).toBeTruthy();
+  });
+
+  it('refuses a tool that draws no box', () => {
+    expect(dropTool(video(), DrawTool.Pen, 't1', Place.Above, 'new1', DROP_BOX).ok).toBe(false);
   });
 });

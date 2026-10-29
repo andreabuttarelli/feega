@@ -18,6 +18,8 @@ import { genNodeSize, type GenMedium } from './gen-node';
  */
 export const CANVAS_DRAG_MEDIUM = 'application/x-feega-medium';
 
+export const CANVAS_DRAG_TOOL = 'application/x-feega-tool';
+
 export type NewGenTile = {
   id: string;
   medium: GenMedium;
