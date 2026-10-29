@@ -2,7 +2,9 @@ import { planOf, type FigmaPlan } from '$lib/canvas/figma/figma-doc';
 import { familyFor } from '$lib/motion/vector-ui/piece';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { restMessage, type RestNode, type RestPaint } from '$lib/server/figma/rest-message';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { PageTree } from './page-tree';
+import { repeatedOf } from './repeated';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 60;
@@ -10,7 +12,8 @@ const MAX_NAME = 80;
 const HEX_WIDTH = 8;
 
 export type ImageRefs = Record<string, string>;
-export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string };
+export type ComponentCount = { components: number; instances: number };
+export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string; components: ComponentCount };
 
 const FAMILIES = GOOGLE_FONTS.map((f) => f.f);
 
@@ -36,11 +39,18 @@ function mapped(n: RestNode, keyOf: Map<string, string>): RestNode {
   return { ...n, fills, style, children: n.children?.map((c) => mapped(c, keyOf)) };
 }
 
+function countOf(doc: MotionDoc): ComponentCount {
+  const mains = new Set(Object.entries(doc.comps).flatMap(([id, c]) => (c.component ? [id] : [])));
+  const clips = [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips);
+  const uses = clips.filter((c) => mains.has(String(c.props.comp))).length;
+  return { components: mains.size, instances: uses - mains.size };
+}
+
 export function urlPlan(tree: PageTree, newId: () => string): UrlPlan | null {
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
   const images = refsOf(tree.root);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
-  const root = mapped({ ...tree.root, name }, keyOf);
+  const root = mapped({ ...repeatedOf(tree.root).root, name }, keyOf);
   const plan = planOf(restMessage([root], FILE_KEY), newId);
-  return plan ? { plan: { ...plan, items: plan.items.map((item) => ({ ...item, name })) }, images, name } : null;
+  return plan ? { plan: { ...plan, items: plan.items.map((item) => ({ ...item, name })) }, images, name, components: countOf(plan.items[0].doc) } : null;
 }

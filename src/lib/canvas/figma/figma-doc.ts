@@ -10,6 +10,8 @@ import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { groupClips } from '$lib/motion/group';
 import { createComponent } from '$lib/motion/main-component';
+import { precompose } from '@feega/motion-core/motion/precomp';
+import { instanceOverrides } from './instance-diff';
 import { Align, Direction, Justify as MotionJustify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
 import { setParent } from '$lib/motion/parent-ops';
@@ -24,8 +26,8 @@ type Unit = { x: number; y: number };
 type Size = { width: number; height: number };
 type Root = { id: string; layer: Layer };
 type Built = { doc: MotionDoc; ids: string[]; roots: Root[] };
-export type FigmaImage = { clipId: string; hash: string; at: number };
-type Main = { compId: string; at: Unit };
+export type FigmaImage = { clipId: string; hash: string; at: number; innerId?: string };
+type Main = { compId: string; at: Unit; images: FigmaImage[] };
 type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[]; mains: Map<string, Main> };
 
 export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind; images: FigmaImage[] };
@@ -295,6 +297,11 @@ function grouped(built: Built, layer: FrameLayer, p: Place): Built {
   return { doc: named.ok ? named.doc : made.doc, ids: [groupId], roots: [{ id: groupId, layer }] };
 }
 
+function clipIdsIn(doc: MotionDoc, compId: string): string[] {
+  const clips = (doc.comps[compId]?.tracks ?? []).flatMap((t) => t.clips);
+  return clips.flatMap((c) => [c.id, ...(compOf(c) ? clipIdsIn(doc, compOf(c)!) : [])]);
+}
+
 function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: Place): Built {
   const ids = { comp: p.newId(), clip: p.newId() };
   let n = 0;
@@ -302,22 +309,45 @@ function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: P
   if (!made.ok) {
     return grouped(built, layer, p);
   }
-  p.mains.set(component.key, { compId: ids.comp, at: { x: layer.box.x, y: layer.box.y } });
-  const named = editClip(made.doc, ids.clip, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME) }));
-  return { doc: named.ok ? named.doc : made.doc, ids: [ids.clip], roots: [{ id: ids.clip, layer }] };
+  const inside = new Set(clipIdsIn(made.doc, ids.comp));
+  p.mains.set(component.key, { compId: ids.comp, at: { x: layer.box.x, y: layer.box.y }, images: p.images.filter((i) => inside.has(i.clipId)) });
+  const comp = made.doc.comps[ids.comp];
+  const varied = component.variant ? { ...made.doc, comps: { ...made.doc.comps, [ids.comp]: { ...comp, component: { ...comp.component!, set: component.name, variant: component.variant } } } } : made.doc;
+  const named = editClip(varied, ids.clip, (clip) => ({ ...clip, name: component.name.slice(0, MAX_NAME) }));
+  return { doc: named.ok ? named.doc : varied, ids: [ids.clip], roots: [{ id: ids.clip, layer }] };
+}
+
+function ownOverrides(doc: MotionDoc, layer: FrameLayer, main: Main, shift: Unit, p: Place) {
+  const images: FigmaImage[] = [];
+  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, report: () => undefined });
+  const ids = { comp: p.newId(), clip: p.newId() };
+  const made = own.ids.length ? precompose(own.doc, own.ids, ids, layer.name) : null;
+  return made?.ok ? instanceOverrides(made.doc, ids.comp, main.compId, { own: images, main: main.images }) : null;
 }
 
 function instanceOfMain(doc: MotionDoc, layer: FrameLayer, main: Main, p: Place): Built {
+  const shift = { x: ((layer.box.x - main.at.x) * p.scale) / doc.width, y: ((layer.box.y - main.at.y) * p.scale) / doc.height };
+  const linked = ownOverrides(doc, layer, main, shift, p);
+  if (!linked) {
+    return plainFrame(doc, layer, p);
+  }
   const id = p.newId();
   const comp = doc.comps[main.compId];
-  const added = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(comp.durationInFrames, doc.durationInFrames), props: { comp: main.compId } }, id);
-  const moved = added.ok ? setTransform(added.doc, id, { x: ((layer.box.x - main.at.x) * p.scale) / doc.width, y: ((layer.box.y - main.at.y) * p.scale) / doc.height }) : added;
+  const overrides = Object.keys(linked.overrides).length ? { overrides: linked.overrides } : {};
+  const added = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(comp.durationInFrames, doc.durationInFrames), props: { comp: main.compId, ...overrides } }, id);
+  const moved = added.ok ? setTransform(added.doc, id, shift) : added;
   const named = moved.ok ? editClip(moved.doc, id, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME) })) : moved;
   if (!named.ok) {
     p.report(`${layer.name}: ${named.error}`);
     return { doc, ids: [], roots: [] };
   }
+  p.images.push(...linked.images.map((i) => ({ ...i, clipId: id })));
   return { doc: named.doc, ids: [id], roots: [{ id, layer }] };
+}
+
+function plainFrame(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
+  const built = layersOf(doc, layer, p);
+  return layer.autoLayout ? built : grouped(built, layer, p);
 }
 
 function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
@@ -325,11 +355,10 @@ function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
   if (main) {
     return instanceOfMain(doc, layer, main, p);
   }
-  const built = layersOf(doc, layer, p);
   if (layer.component?.inPaste) {
-    return mainFrom(built, layer, layer.component, p);
+    return mainFrom(layersOf(doc, layer, p), layer, layer.component, p);
   }
-  return layer.autoLayout ? built : grouped(built, layer, p);
+  return plainFrame(doc, layer, p);
 }
 
 function sceneOf(html: string) {

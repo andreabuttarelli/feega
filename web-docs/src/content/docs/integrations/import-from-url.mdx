@@ -17,7 +17,13 @@ Open the insert menu (**+**), go to **Import**, choose **From URL…**, paste th
 - The page is read at desktop width (1280 px), down to 3840 px from the top, up to 1500 layers.
 - Fonts that Google Fonts does not have fall back to Inter.
 - Four imports a minute per person.
-- Not yet: tablet and phone layouts as breakpoints, repeated blocks as components, gradients.
+- Not yet: tablet and phone layouts as breakpoints, gradients.
+
+## Components
+
+Blocks the page repeats (cards, logos, buttons, list items) become one main component and linked instances. Each instance keeps its own text, pictures and colours as overrides, so editing the main updates every copy and **Reset** brings one back to the main. Blocks with the same structure but a different background, border or shadow become variants of one component (`Style=Primary`, `Style=Secondary`). Names come from what the block is: button, card, feature card, nav link, logo. Find them in the **Components** panel.
+
+A block is turned into a component only when it repeats at least twice, is at least 16 px on each side, has a background, a picture or an icon, keeps the same size across copies, and does not sit directly inside an auto layout row or column. Anything else stays as plain layers.
 
 ## CLI
 

@@ -78,7 +78,17 @@ export type TextRun = { start: number; end: number; font?: string; weight?: numb
 
 type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem };
 
-export type ComponentRef = { key: string; name: string; inPaste: boolean };
+export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string> };
+
+const VARIANT_NAME = /^(.+?) \/ ([^=,/]+=[^=,/]+(?:, [^=,/]+=[^=,/]+)*)$/;
+
+function namedRef(name: string): Pick<ComponentRef, 'name' | 'variant'> {
+  const found = name.match(VARIANT_NAME);
+  if (!found) {
+    return { name };
+  }
+  return { name: found[1], variant: Object.fromEntries(found[2].split(', ').map((pair) => pair.split('='))) };
+}
 export type FrameLayer = Common & { kind: LayerKind.Frame; component: ComponentRef | null; fills: Fill[]; strokes: Stroke[]; radii: [number, number, number, number]; outline: string; clip: Clip; autoLayout: AutoLayout | null; children: Layer[] };
 export type ShapeLayer = Common & { kind: LayerKind.Shape; path: string; fillRule: FillRule; fills: Fill[]; strokes: Stroke[] };
 export type TextLayer = Common & {
@@ -529,7 +539,7 @@ function componentOf(n: FigmaRawNode, ctx: Ctx): ComponentRef | null {
   }
   const main = ctx.byKey.get(keyOf(id));
   const linked = Boolean(main) && !hasOverrides(n, main!);
-  return { key: keyOf(id), name: main?.name ?? n.name ?? 'Component', inPaste: linked };
+  return { key: keyOf(id), ...namedRef(main?.name ?? n.name ?? 'Component'), inPaste: linked };
 }
 
 function layerOf(raw: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {

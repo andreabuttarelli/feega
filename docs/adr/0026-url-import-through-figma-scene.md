@@ -28,4 +28,4 @@ effects, vectors and image fills.
 
 - Fidelity gains in the Figma scene help both importers.
 - The doc size limit applies: pages are cut at 3 840 px.
-- Breakpoints and components need a second pass on the tree; not in the MVP.
+- Breakpoints need a second pass on the tree; not in the MVP. Repeated subtrees become components (spec, Components).

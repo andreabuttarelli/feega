@@ -38,8 +38,26 @@ doc.
 
 Fonts not in the Google Fonts catalogue fall back to Inter.
 
+## Components
+
+`repeatedOf` (`src/lib/server/url-import/repeated.ts`) runs on the tree before `restMessage`.
+
+- Skeleton signature: type, auto layout direction, text size/weight, image fill presence, recursively; text,
+  image src and colours ignored.
+- Candidate: FRAME/GROUP, ≥2 nodes, ≥16 px per side, painted or with image/icon, no GROUP inside an auto
+  layout, parent not in auto layout (an instance inside a flow inside a comp is drawn wrong by the
+  renderer).
+- Same skeleton → one set; root style (fills, strokes, radius, effects, opacity) → variant
+  (`Style=Primary|Secondary|…`); within a variant copies must share the rounded size. Kept when ≥2 copies.
+- Outermost wins: nothing nested inside an occurrence becomes a component.
+- Occurrences become `INSTANCE` nodes whose `componentId` is the first copy; that copy is the main, placed
+  where it was. Names from a rule table (logo, button, nav link, link, list item, card, feature card).
+- Figma scene: an instance builds its own layers at the main's position and diffs them with the main
+  (`instance-diff.ts`). Differences on top-level clips become overrides (text, fills, geometry; no
+  geometry when the main has auto layout); images that differ become per-instance image slots. Anything
+  else leaves the copy unlinked.
+
 ## Not in the MVP
 
 - Tablet/phone captures as breakpoint overrides (ADR 0022).
-- Repeated subtrees as components + instances.
 - Gradients, `object-fit`, text split mid-line by inline elements, pages taller than 3 840 px.
