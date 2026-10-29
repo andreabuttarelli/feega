@@ -10,7 +10,7 @@ import { Edge } from './space';
 describe('the right-click menu inside a frame', () => {
   it('is the canvas menu table, limited to what a frame can run', () => {
     const ids = CANVAS_MENU.map((a) => a.id).filter((id) => FRAME_MENU_IDS.has(id));
-    expect(ids).toEqual(['group', 'ungroup', 'duplicate', 'copy-properties', 'paste-properties', 'bring-front', 'send-back', 'align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'tidy-up', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'delete']);
+    expect(ids).toEqual(['group', 'ungroup', 'duplicate', 'copy-properties', 'paste-properties', 'bring-front', 'send-back', 'align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'tidy-up', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'wrap-stack', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'delete']);
   });
 
   it('aligns a single element to the frame', () => {

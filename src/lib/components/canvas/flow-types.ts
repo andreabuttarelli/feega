@@ -122,6 +122,7 @@ export type FlowProps = {
   onRotate?: (id: string, degrees: number) => void;
   onAddBeside?: (id: string) => void;
   onGroup?: (ids: string[]) => void;
+  onWrapStack?: (ids: string[]) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;
   onUndo?: () => void;

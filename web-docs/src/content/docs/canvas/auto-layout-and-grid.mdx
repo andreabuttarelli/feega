@@ -1,32 +1,68 @@
 ---
-title: Auto layout and grid
-description: Let a container place its children.
+title: Stack and grid
+description: Wrap elements in a Stack that places them like flexbox.
 sidebar:
   order: 6
 ---
 
 import DemoVideo from '../../../components/DemoVideo.astro';
 
-`Shift+A` adds auto layout to the selection, or removes it from an auto layout. Auto layout is a field on a parent that is resolved into plain boxes at render time ([ADR 0008](/architecture/adr/0008-auto-layout-is-resolved-at-render/)).
+A **Stack** is an element that lays its children out in a row or a column, like a flexbox `div`. It works inside a frame and free on the canvas. A Stack is the container clip with auto layout, read as a kind; every auto layout made before is a Stack ([ADR 0027](/architecture/adr/0027-stack-is-the-auto-layout-container/), [ADR 0008](/architecture/adr/0008-auto-layout-is-resolved-at-render/)).
 
-## Stack
+## Wrap with stack
 
-- Direction horizontal or vertical, wrap, gap, cross gap, padding per side.
-- Padding takes CSS shorthand: `8`, `8 16`, `8 16 24`, `8 16 24 32`.
-- Wrapped layouts can spread lines over the full height, draw the first child on top, and count inside strokes as padding.
-- Children size fixed, hug or fill, with min and max.
+1. Select one or more elements: a text, a shape, an image, inside a frame or free on the canvas.
+2. Press `Shift+A`, or pick **Wrap with stack** from any of these:
+   - right-click on the element on the canvas;
+   - right-click on its row in **Layers**;
+   - the **…** menu of the floating selection toolbar;
+   - the **…** menu in the header of the right bar.
+3. A new Stack holds the selection. Its direction and gap are guessed from where the elements were; text hugs its words and the Stack hugs its children.
+
+Wrapping elements that already sit in a Stack nests the new Stack in their place. Wrapping free elements merges them into one free Stack element on the canvas, which grows and shrinks with its content.
+
+**Remove stack** (`Alt+Shift+A`, same four menus, or the **−** in the Stack section) unwraps: the children stay where the layout put them and the Stack goes.
+
+## The Stack section
+
+Select a Stack and the right bar shows **Stack** under **Layout**, above the shared **Fill**, **Stroke**, **Appearance** and **Effects**:
+
+- **Direction**: horizontal, vertical, wrap, or grid.
+- **Align**: a 3×3 grid sets the main and cross alignment at once.
+- **Distribute**: stretch children across the cross axis, align text baselines (rows), space between, around or evenly.
+- **Gap**, and the gap between lines when the Stack wraps.
+- **Padding**: one value, or CSS shorthand `8`, `8 16`, `8 16 24`, `8 16 24 32`, or per side.
+- **Width / Height**: fixed or fit (hug); a child can also fill.
+- **First on top** and **Strokes included**.
+
+A child of a Stack shows its own sizing (fixed, fit, fill, min and max), absolute position, and moves earlier or later in the order. Fills, per-side strokes, corner radius, opacity, blend, shadows, blur and clip content are the usual sections.
+
+In **Layers** a Stack has its own icon.
 
 ## Grid
 
-Grid auto layout has fixed, fractional and hug columns and rows, spans, per-cell alignment and column-first fill.
+Direction **Grid** gives fixed, fractional and hug columns and rows, spans, per-cell alignment and column-first fill.
+
+## From an agent, MCP or CLI
+
+| Tool | What it does |
+|---|---|
+| `add_auto_layout` (motion) | wraps clips in a Stack |
+| `set_auto_layout` (motion) | direction, gap, padding, justify, align (`start`, `center`, `end`, `baseline`, `stretch`), wrap |
+| `remove_stack` (motion) | unwraps a Stack |
+| `stack_elements` (canvas op) | wraps free elements on the canvas in one free Stack |
+
+## Export as code
+
+A Stack exports as a `div` with `display: flex`, its direction, gap, padding, `justify-content` and `align-items` ([Export code](/canvas/export-code/)).
 
 ## Arrange a selection
 
 <DemoVideo name="arrange-selection" caption="Tidy up and stack four image nodes from the context menu, then the same ops from the CLI, and undo_last." />
 
 1. Select two or more nodes: click one, hold `Shift` and click the others, or drag a box around them.
-2. Right-click one of the selected nodes. With two or more selected, the menu lists **Align left / horizontal centres / right / top / vertical centres / bottom**, **Tidy up** and **Stack**.
-3. **Tidy up** untangles overlaps, **Stack** puts the selection in a row or column, the align items line up the edges. Distribute is in the toolbar when three or more are selected.
+2. Right-click one of the selected nodes. With two or more selected, the menu lists **Align left / horizontal centres / right / top / vertical centres / bottom**, **Tidy up** and **Stack tiles**.
+3. **Tidy up** untangles overlaps, **Stack tiles** puts the selection in a row or column, the align items line up the edges. Distribute is in the toolbar when three or more are selected.
 4. `Cmd+Z` undoes the arrangement.
 
 ### From an agent, MCP or CLI
@@ -50,7 +86,6 @@ Over MCP the call is `canvas_tool({ project_id, op: "align_nodes", input })`. `u
 
 ## Related
 
-- `Shift+A` on selected tiles on the canvas stacks them into a row or column.
 - Tidy up: `Ctrl+Alt+T`. Distribute with an exact gap by typing it next to the distribute buttons.
 - Layout guides take an auto count, min, max or centre alignment, a colour and an opacity; elements snap to their edges.
 - Lock the aspect ratio of an element from the inspector; hold `Ctrl` to resize freely.

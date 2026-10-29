@@ -22,6 +22,9 @@
   import Diamond from '@lucide/svelte/icons/diamond';
   import Rows3 from '@lucide/svelte/icons/rows-3';
   import Contrast from '@lucide/svelte/icons/contrast';
+  import StretchHorizontal from '@lucide/svelte/icons/stretch-horizontal';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import { LayoutKind } from '@feega/motion-core/motion/layout/stack';
   import { ACTIONS, shortcutOf } from '$lib/motion/actions';
   import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -34,7 +37,10 @@
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import { Density, ROW_STEP_PX } from '$lib/canvas/layer-density';
-  import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { layerMenuActions } from '$lib/canvas/frame-inspector';
+  import type { ActionId } from '$lib/motion/actions';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -165,7 +171,7 @@
     landing = { key: row.key, place: dropPlace(row.kind, (e.clientY - box.top) / box.height) };
   }
 
-  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard };
+  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard, [LayoutKind.Stack]: StretchHorizontal, [LayoutKind.Grid]: LayoutGrid };
   const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3, [LayerKind.Mask]: Contrast };
   const EYE_LABEL: Record<'mask' | 'layer', [string, string]> = { mask: ['Turn mask off', 'Turn mask on'], layer: ['Hide', 'Show'] };
   const eyeLabel = (row: LayerRow) => EYE_LABEL[row.kind === LayerKind.Mask ? 'mask' : 'layer'][row.hidden ? 1 : 0];
@@ -280,11 +286,15 @@
     menu = { x: e.clientX, y: e.clientY };
   }
 
-  function runMenu(item: (typeof LAYER_MENU)[number]) {
+  function runMenu(id: ActionId) {
     menu = null;
-    if (video) {
-      video.edit(item.op(video.doc, video.selection), item.summary);
-    }
+    video?.run(id);
+  }
+
+  function renameFromMenu() {
+    const [id] = video?.selection ?? [];
+    menu = null;
+    renaming = id ?? null;
   }
 </script>
 
@@ -369,13 +379,18 @@
 
 {#if menu && video}
   <div class={MENU_CONTENT} role="menu" data-testid="layer-menu" style={`position: fixed; left: ${menu.x}px; top: ${menu.y}px`}>
-    {#each LAYER_MENU as item (item.command)}
-      {@const Icon = ACTIONS[item.command].icon}
-      {@const allowed = item.op(video.doc, video.selection).ok}
-      <button type="button" role="menuitem" class={MENU_ITEM} disabled={!allowed} data-disabled={allowed ? undefined : ''} onclick={() => runMenu(item)}>
+    {#if video.selection.length === 1}
+      <button type="button" role="menuitem" class={MENU_ITEM} data-action="rename" onclick={renameFromMenu}>
+        <Pencil aria-hidden="true" />
+        <span class="min-w-0 flex-1 truncate">Rename</span>
+      </button>
+    {/if}
+    {#each layerMenuActions(video.doc, video.selection) as id (id)}
+      {@const Icon = ACTIONS[id].icon}
+      <button type="button" role="menuitem" class={MENU_ITEM} data-action={id} onclick={() => runMenu(id)}>
         <Icon aria-hidden="true" />
-        <span class="min-w-0 flex-1 truncate">{ACTIONS[item.command].name}</span>
-        {#if shortcutOf(item.command)}<Kbd shortcut={shortcutOf(item.command)} class="text-ui-text-3" />{/if}
+        <span class="min-w-0 flex-1 truncate">{ACTIONS[id].name}</span>
+        {#if shortcutOf(id)}<Kbd shortcut={shortcutOf(id)} class="text-ui-text-3" />{/if}
       </button>
     {/each}
   </div>

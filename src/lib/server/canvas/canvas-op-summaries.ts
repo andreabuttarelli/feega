@@ -41,6 +41,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   import_figma: 'Draw Figma frames from a link onto the canvas at x,y, with their layers, auto layout and images.',
   group_elements: 'Group 2 or more free elements, or wrap any nodes in a Section.',
   ungroup_element: 'Dissolve a Group.',
+  stack_elements: 'Wrap 1 or more free elements in one free Stack element that lays them out in a row; edit it with motion_tool set_auto_layout.',
   rotate_group: 'Turn a Group and its members around its centre.',
   scale_group: 'Resize a Group and scale its members.',
   move_group: 'Move a Group and its members.',

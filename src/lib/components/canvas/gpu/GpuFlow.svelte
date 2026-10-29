@@ -24,7 +24,7 @@
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
-  import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
+  import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
   import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
@@ -173,7 +173,7 @@
   import { focusEdges } from '$lib/canvas/edge-focus';
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
-  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, shownFor, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
   import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
@@ -1383,7 +1383,7 @@
   }
 
   $effect(() => {
-    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks[0]?.clips[0])] as const] : []))));
+    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
   });
 
   $effect(() => {
@@ -1960,7 +1960,8 @@
           pickMany(nodeId, [clipId]);
           pickedPart = part;
         },
-        edit: (result, summary) => commit(nodeId, result, summary)
+        edit: (result, summary) => commit(nodeId, result, summary),
+        run: (id) => void runFrameAction(id)
       })
     );
   });
@@ -2621,7 +2622,7 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    stack: () => placeTiles(stackTiles(placedBoxes(selected), STACK_GAP)),
+    'wrap-stack': () => shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected),
     'edit-mode': () => editorMode.toggleMotion(),
     'code-mode': () => editorMode.toggleCode(),
     timeline: () => editorMode.toggleTimeline(),
@@ -2915,6 +2916,7 @@
   const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
     'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
     stack: (ids) => placeTiles(stackTiles(placedBoxes(ids), STACK_GAP)),
+    'wrap-stack': (ids) => props.onWrapStack?.(ids),
     'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => props.onDuplicate?.(ids),
@@ -2958,6 +2960,10 @@
   };
 
   function runSelectionAction(id: SelectionActionId) {
+    if (pickedToolbarActions.includes(id)) {
+      runElementMenu(id);
+      return;
+    }
     if (selected.length === 1 && isFrameModeAction(id)) {
       editorMode.set(FRAME_MODE_ACTIONS[id]);
       return;
@@ -2972,6 +2978,10 @@
   }
 
   const selectedSummaries = $derived((props.nodeSummaries ?? []).filter((n) => selected.includes(n.id)));
+  const pickedToolbarActions = $derived.by(() => {
+    const doc = inside && picks.length ? liveOf(inside.nodeId)?.doc : null;
+    return doc ? elementToolbarActions(doc, picks) : [];
+  });
   const selectionEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
   const selectionMedium = $derived(
     selectedSummaries.length && selectedSummaries.every((n) => n.type === selectedSummaries[0].type) ? (selectedSummaries[0].type as GenPropertyType) : null
@@ -3407,6 +3417,7 @@
       history={selected.length === 1 ? (props.historyFor?.(selected[0]) ?? null) : null}
       onstop={() => props.onCancelRun?.(selected[0])}
       onaction={runSelectionAction}
+      elementActions={pickedToolbarActions}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
       oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
@@ -3446,7 +3457,7 @@
 
   {#if elementMenu && inside && spec.chrome}
     {@const doc = liveOf(inside.nodeId)?.doc}
-    {#if doc}<CanvasContextMenu at={elementMenu} summaries={frameSummaries(doc, picks)} available={FRAME_ELEMENT_MENU} layers={elementLayers} onlayer={(id) => inside && pickMany(inside.nodeId, [id])} onpick={runElementMenu} onclose={() => (elementMenu = null)} />{/if}
+    {#if doc}<CanvasContextMenu at={elementMenu} summaries={frameSummaries(doc, picks)} available={elementMenuIds(doc, picks)} layers={elementLayers} onlayer={(id) => inside && pickMany(inside.nodeId, [id])} onpick={runElementMenu} onclose={() => (elementMenu = null)} />{/if}
   {/if}
 
   {#if spec.chrome}

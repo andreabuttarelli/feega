@@ -59,7 +59,8 @@ import Frame from '@lucide/svelte/icons/frame';
 import Shrink from '@lucide/svelte/icons/shrink';
 import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 import Rows3 from '@lucide/svelte/icons/rows-3';
-import Columns2 from '@lucide/svelte/icons/columns-2';
+import StretchHorizontal from '@lucide/svelte/icons/stretch-horizontal';
+import SquareSplitVertical from '@lucide/svelte/icons/square-split-vertical';
 import SquaresUnite from '@lucide/svelte/icons/squares-unite';
 import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
 import SquaresIntersect from '@lucide/svelte/icons/squares-intersect';
@@ -122,7 +123,8 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'resize-to-fit': Shrink,
   'section-selection': LayoutDashboard,
   stack: Rows3,
-  'auto-layout': Columns2,
+  'wrap-stack': StretchHorizontal,
+  'remove-stack': SquareSplitVertical,
   'union': SquaresUnite,
   'subtract': SquaresSubtract,
   'intersect': SquaresIntersect,

@@ -141,12 +141,21 @@ describe('barAction', () => {
     expect(findClip(done!.doc, 's1')?.clip.parent).toBe(done?.selection[0]);
   });
 
-  it('adds auto layout around the selection, and a second run removes it', () => {
-    const added = barAction(Action.AutoLayout, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
-    const container = added.selection[0];
+  it('wraps the selection with a stack, and Remove stack unwraps it', () => {
+    const added = barAction(Action.WrapStack, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const stack = added.selection[0];
 
-    expect(findClip(added.doc, container)?.clip.autoLayout).toBeTruthy();
-    expect(findClip(barAction(Action.AutoLayout, { doc: added.doc, selection: [container], frame: 0, newId: fresh() })!.doc, container)?.clip.autoLayout).toBeFalsy();
+    expect(findClip(added.doc, stack)?.clip.autoLayout).toBeTruthy();
+    const removed = barAction(Action.RemoveStack, { doc: added.doc, selection: [stack], frame: 0, newId: fresh() })!;
+    expect(findClip(removed.doc, stack)).toBeNull();
+    expect([...removed.selection].sort()).toEqual(['bottom', 'top']);
+  });
+
+  it('wraps a stack in another stack on a second run', () => {
+    const added = barAction(Action.WrapStack, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const again = barAction(Action.WrapStack, { doc: added.doc, selection: added.selection, frame: 0, newId: () => `w${added.doc.tracks.length}${Math.random().toString(36).slice(2, 6)}` })!;
+
+    expect(findClip(again.doc, added.selection[0])?.clip.parent).toBe(again.selection[0]);
   });
 
   it('unites two shapes into a live group that keeps both editable', () => {

@@ -3,8 +3,7 @@
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import WrapText from '@lucide/svelte/icons/wrap-text';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-  import Plus from '@lucide/svelte/icons/plus';
-  import Minus from '@lucide/svelte/icons/minus';
+  import StretchVertical from '@lucide/svelte/icons/stretch-vertical';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import LogOut from '@lucide/svelte/icons/log-out';
@@ -12,7 +11,7 @@
   import Baseline from '@lucide/svelte/icons/baseline';
   import SpaceAround from '@lucide/svelte/icons/align-horizontal-space-around';
   import SpaceEvenly from '@lucide/svelte/icons/align-horizontal-distribute-center';
-  import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, Section, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
+  import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -20,7 +19,7 @@
   import { formatPadding, parsePadding } from '$lib/motion/layout/padding-text';
   import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
   import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '@feega/motion-core/motion/layout/model';
-  import { hasBox, layoutParent, leaveStack, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
+  import { layoutParent, leaveStack, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
   import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
   import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
@@ -109,22 +108,13 @@
 
   function pickSpot(layout: AutoLayout, column: Align, row: Align) {
     const [main, cross] = layout.direction === Direction.Horizontal ? [column, row] : [row, column];
-    set({ justify: AS_JUSTIFY[main], align: cross }, 'Aligned the auto layout');
+    set({ justify: AS_JUSTIFY[main], align: cross }, 'Aligned the stack');
   }
 
   const SPOT = cn('size-4 rounded-full bg-ui-input transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover aria-pressed:bg-ui-accent-solid', FOCUS_RING);
 </script>
 
-<div data-testid="auto-layout-section">
-  <Section title="Auto layout">
-    {#snippet actions()}
-      {#if layout}
-        <IconButton label="Remove auto layout" size={IconSize.Sm} data-testid="auto-layout-remove" onclick={() => commit(setAutoLayout(doc, clip.id, null), 'Removed auto layout')}><Minus /></IconButton>
-      {:else if hasBox(clip)}
-        <IconButton label="Add auto layout" shortcut="⇧A" size={IconSize.Sm} data-testid="auto-layout-add" onclick={() => set({}, 'Added auto layout')}><Plus /></IconButton>
-      {/if}
-    {/snippet}
-
+<div data-testid="stack-section">
     {#if layout}
       <Field label="Direction">
         <SegmentedControl label="Direction" options={FLOWS} value={flow} onchange={(v) => set(FLOW_PATCH[v as Flow], 'Changed the direction')} />
@@ -144,13 +134,16 @@
         </Field>
       {/if}
       <Field label="Align">
-        <div class="grid grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
+        <div class="grid shrink-0 grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
           {#each SPOTS as row (row)}
             {#each SPOTS as column (column)}
               <button type="button" class={SPOT} aria-label={`Align ${row} ${column}`} aria-pressed={spotPressed(layout, column, row)} onclick={() => pickSpot(layout, column, row)}></button>
             {/each}
           {/each}
         </div>
+      </Field>
+      <Field label="Distribute">
+        <IconButton label="Stretch children" size={IconSize.Sm} pressed={layout.align === Align.Stretch} data-testid="auto-layout-stretch" onclick={() => set({ align: layout.align === Align.Stretch ? Align.Start : Align.Stretch }, 'Changed the alignment')}><StretchVertical /></IconButton>
         {#if layout.direction === Direction.Horizontal}
           <IconButton label="Align baselines" size={IconSize.Sm} pressed={layout.align === Align.Baseline} data-testid="auto-layout-baseline" onclick={() => set({ align: layout.align === Align.Baseline ? Align.Start : Align.Baseline }, 'Changed the alignment')}><Baseline /></IconButton>
         {/if}
@@ -225,10 +218,9 @@
     {#if parent}
       <Field label="In layout">
         <div class="flex min-w-0 flex-1" data-testid="auto-layout-absolute"><SegmentedField name="Absolute" options={YES_NO} value={answerOf(item.absolute)} onchange={(v) => size({ absolute: v === Answer.Yes }, 'Changed absolute position')} /></div>
-        <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the auto layout')}><ChevronUp /></IconButton>
-        <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the auto layout')}><ChevronDown /></IconButton>
-        <IconButton label="Take out of the auto layout" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the auto layout')}><LogOut /></IconButton>
+        <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the stack')}><ChevronUp /></IconButton>
+        <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the stack')}><ChevronDown /></IconButton>
+        <IconButton label="Take out of the stack" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the stack')}><LogOut /></IconButton>
       </Field>
     {/if}
-  </Section>
 </div>

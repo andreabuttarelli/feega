@@ -21,7 +21,7 @@ export type CanvasCommandId =
   | 'nudge'
   | 'align'
   | 'tidy'
-  | 'stack'
+  | 'wrap-stack'
   | 'edit-mode'
   | 'timeline'
   | 'code-mode'
@@ -85,7 +85,7 @@ function sectionFor(e: KeyboardEvent): boolean {
 }
 
 function stackFor(e: KeyboardEvent): boolean {
-  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.AutoLayout;
+  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.WrapStack;
 }
 
 function editModeFor(e: KeyboardEvent): boolean {
@@ -130,7 +130,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.PreviewSelection]: { id: 'zoom-selection' },
   [Command.Help]: { id: 'help' },
   [Command.TidyUp]: { id: 'tidy' },
-  [Command.AutoLayout]: { id: 'stack' },
+  [Command.WrapStack]: { id: 'wrap-stack' },
   [Command.ToggleEditMode]: { id: 'edit-mode' },
   [Command.Section]: { id: 'section' },
   [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
@@ -245,7 +245,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (key === HELP_KEY) return { id: 'help' };
   if (key === COMMENT_KEY) return { id: 'comment' };
 
-  if (stackFor(e)) return { id: 'stack' };
+  if (stackFor(e)) return { id: 'wrap-stack' };
   if (editModeFor(e)) return { id: 'edit-mode' };
   if (sectionFor(e)) return { id: 'section' };
 
@@ -307,7 +307,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'paste', keys: ['mod', 'V'], label: 'Paste' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
-  { id: 'stack', keys: ['⇧A'], label: 'Stack the selected tiles' },
+  { id: 'wrap-stack', keys: ['⇧A'], label: 'Wrap with stack' },
   { id: 'edit-mode', keys: ['E'], label: 'Design or Motion: edit the resting state or key at the playhead' },
   { id: 'timeline', keys: ['mod', 'J'], label: 'Timeline: scrub in Design, key in Motion' },
   { id: 'code-mode', keys: ['⇧D'], label: 'Code: read and export a layer' },
@@ -354,7 +354,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'send-back': GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
-  stack: GuideGroup.Edit,
+  'wrap-stack': GuideGroup.Edit,
   'edit-mode': GuideGroup.Edit,
   timeline: GuideGroup.Edit,
   'code-mode': GuideGroup.View,

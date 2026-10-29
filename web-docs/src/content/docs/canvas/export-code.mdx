@@ -26,7 +26,7 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 | Auto layout (horizontal, vertical) | `display: flex` with `gap`, padding, alignment and wrap |
 | Auto layout grid | `display: grid` with its columns (`grid-cols-12`) and column/row spans |
 | Fill, hug, fixed sizing | `flex: 1`, `align-self: stretch`, no size, or a width (fluid with `max-width` from 320 px) |
-| A frame without auto layout | `position: relative`, its layers `position: absolute`, pinned by their constraints |
+| A frame without a stack | `position: relative`, its layers `position: absolute`, pinned by their constraints |
 | Components and instances | one file per component; text, images, colours and visibility that differ between instances become typed props; an override on an instance nested inside another component becomes a prop of the outer one (`feature1LabelColor`) forwarded to the inner one |
 | Text | `h1` for the largest heading on the page, then `h2`/`h3` by size and weight, `p` for body copy, `a` for linked text |
 | Layers named Nav, Header, Footer, Hero, Features, Pricing, Card… | `nav`, `header`, `footer`, `section`, `article` |
@@ -58,7 +58,7 @@ Position moves are written as `translate` (CSS variables `--tx`/`--ty` registere
 - Shaders, 3D, particles and video effects are not exported.
 - Animation of anything but position, scale, rotation, opacity and text colour (blur, skew, 3D rotation, fills, masks, effect parameters…) is listed under **Not exported**, as is animation on a whole component instance: animate the layers inside it.
 - Scroll-scrubbed and paused playback play on load instead.
-- A frame without auto layout stays absolutely positioned: it does not reflow on a phone. Add auto layout before exporting for responsive code.
+- A frame without a stack stays absolutely positioned: it does not reflow on a phone. Wrap the layers with a stack (`Shift+A`) before exporting for responsive code.
 - Image URLs from your project are signed and expire: download the files into the project before shipping.
 
 ## From the CLI and agents

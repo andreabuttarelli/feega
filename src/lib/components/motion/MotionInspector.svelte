@@ -70,7 +70,10 @@
   import InOutPresetsSection from './InOutPresetsSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
-  import AutoLayoutSection from './AutoLayoutSection.svelte';
+  import StackSection from './StackSection.svelte';
+  import { layoutParent, removeStack } from '$lib/motion/layout/ops';
+  import { LAYOUT_KIND_LABEL, layoutKind } from '@feega/motion-core/motion/layout/stack';
+  import Minus from '@lucide/svelte/icons/minus';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
   import BindChip from './BindChip.svelte';
@@ -235,7 +238,8 @@
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
-  const headKind = $derived(customName ? 'Component' : spec.label);
+  const stackKind = $derived(layoutKind(clip));
+  const headKind = $derived(customName ? 'Component' : stackKind ? LAYOUT_KIND_LABEL[stackKind] : spec.label);
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
@@ -478,6 +482,7 @@
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
     [Section.Layout]: positioned || fieldsIn(Section.Layout).length > 0,
+    [Section.Stack]: layerExtras && (!!clip.autoLayout || layoutParent(doc, clip) !== null),
     [Section.Align]: positioned && visual,
     [Section.Constraints]: pinnable,
     [Section.Transform]: layoutProps.length > 0,
@@ -493,11 +498,12 @@
     [Section.Parent]: visual || maskProps.length > 0
   });
 
-  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
+  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(clip.autoLayout ? { [Section.Stack]: removeStackButton } : {}), ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
 
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
     [Section.Layout]: layoutBody,
+    [Section.Stack]: stackBody,
     [Section.Align]: alignBody,
     [Section.Constraints]: constraintsBody,
     [Section.Transform]: transformBody,
@@ -548,7 +554,6 @@
     {/if}
     {#if layerExtras}<StyleSection {doc} {clip} {commit} />{/if}
     {#if layerExtras}<VariablesSection {doc} {clip} {commit} />{/if}
-    {#if layerExtras}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -1022,6 +1027,14 @@
       {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type) }), 'Add fill')} />{/each}
     </MenuContent>
   </Menu>
+{/snippet}
+
+{#snippet stackBody()}
+  <StackSection {doc} {clip} {commit} />
+{/snippet}
+
+{#snippet removeStackButton()}
+  <ShellIconButton label="Remove stack" shortcut="⌥⇧A" data-testid="auto-layout-remove" onclick={() => commit(removeStack(doc, clip.id), 'Removed the stack')}><Minus /></ShellIconButton>
 {/snippet}
 
 {#snippet addStrokeButton()}

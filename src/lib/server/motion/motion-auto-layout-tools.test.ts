@@ -50,6 +50,18 @@ describe('motion agent auto layout tools', () => {
     expect(findClip(session.doc, container)!.clip.autoLayout).toMatchObject({ alignContent: 'space-between', firstOnTop: true, strokesIncluded: false });
   });
 
+  it('removes a stack, keeping its children', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    await run('add_clip', { component: 'Kicker', start: 0, duration: 4 });
+    const stack = String((await run('add_auto_layout', { clip_ids: ['id1', 'id2'] })).container_id);
+
+    expect((await run('remove_stack', { clip_id: stack })).ok).toBe(true);
+
+    expect(findClip(session.doc, stack)).toBeNull();
+    expect(findClip(session.doc, 'id2')!.clip.parent ?? null).toBeNull();
+  });
+
   it('keeps fill outside a container and refuses auto layout on a clip without a box', async () => {
     const { run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 4 });

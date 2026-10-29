@@ -606,6 +606,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     regroup('groupElements', { ids: JSON.stringify(ids), node_id: id }, after && (() => after(id)));
   }
 
+  function wrapWithStack(ids: string[]) {
+    regroup('stackElements', { ids: JSON.stringify(ids), node_id: crypto.randomUUID() });
+  }
+
   function wrapInSection(ids: string[]) {
     const id = crypto.randomUUID();
     regroup('wrapSection', { ids: JSON.stringify(ids), node_id: id });
@@ -4233,6 +4237,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCloud={openCloud}
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
+    onWrapStack={wrapWithStack}
     onUngroup={ungroupElements}
     onRestack={restack}
     onTileDragOver={tileDragOver}

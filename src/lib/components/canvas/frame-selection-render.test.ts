@@ -101,7 +101,7 @@ describe('Layers for a frame drawn by the core', () => {
       throw new Error(added.error);
     }
     const canvas = layersSource.publishCanvas({ nodes: [{ id: 'm1', type: 'motion', name: 'Teaser' }], selected: ['m1'], outlinesUrl: '', previewUrl: () => '', select: () => {}, open: () => {}, rename: () => {} });
-    const video = layersSource.publishVideo(videoSide({ nodeId: 'm1', doc: () => added.doc, selection: () => ['card'], select: () => {}, edit: () => {} }));
+    const video = layersSource.publishVideo(videoSide({ nodeId: 'm1', doc: () => added.doc, selection: () => ['card'], select: () => {}, edit: () => {}, run: () => {} }));
     unpublish = () => (canvas(), video());
 
     expect(render(LayersPanel).body).toContain('card');

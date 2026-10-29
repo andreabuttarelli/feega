@@ -6,6 +6,7 @@ import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
 import { isLayer } from '@feega/motion-core/motion/surface';
 import { TrackKind } from '@feega/motion-core/motion/components';
 import type { VideoSide } from './layers-source.svelte';
+import type { ActionId } from '$lib/motion/actions';
 
 export type Inside = { nodeId: string; level: Level };
 
@@ -23,6 +24,7 @@ type Hooks = {
   select: (ids: string[]) => void;
   selectPart?: (clipId: string, part: string) => void;
   edit: (result: OpResult, summary: string) => void;
+  run: (id: ActionId) => void;
 };
 
 export function videoSide(hooks: Hooks): VideoSide {
@@ -44,6 +46,7 @@ export function videoSide(hooks: Hooks): VideoSide {
     select: hooks.select,
     selectPart: hooks.selectPart ?? ((clipId) => hooks.select([clipId])),
     edit: hooks.edit,
+    run: hooks.run,
     preview: () => {}
   };
 }

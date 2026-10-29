@@ -23,6 +23,17 @@ describe('what Properties shows for the selection', () => {
 });
 
 describe('which sections each selection kind gets', () => {
+  it('a shape gets the Stack section right under layout, above the shared fill, stroke and effects', () => {
+    const sections = sectionsFor(ClipFamily.Shape, PropertiesView.Clip, EditMode.Design);
+    expect(sections.indexOf(Section.Stack)).toBe(sections.indexOf(Section.Layout) + 1);
+    expect(sections.indexOf(Section.Stack)).toBeLessThan(sections.indexOf(Section.Fill));
+  });
+
+  it('the frame itself and a poster part get no Stack section', () => {
+    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).not.toContain(Section.Stack);
+    expect(sectionsFor(ClipFamily.Text, PropertiesView.Part, EditMode.Design)).not.toContain(Section.Stack);
+  });
+
   it('the frame itself: layer (opacity, corners), fill, stroke and effects, never a shape kind', () => {
     expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toEqual([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
   });

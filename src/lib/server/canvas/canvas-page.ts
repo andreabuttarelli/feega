@@ -95,7 +95,7 @@ import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
-import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupAskSchema, groupElements, stackAskSchema, stackElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { INSERT_STATUS, InsertOutcome, insertAskSchema, insertScene } from '$lib/server/motion/insert-scene';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
@@ -1418,6 +1418,16 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid group' });
     }
     return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
+  },
+
+  stackElements: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const form = await request.formData();
+    const ask = stackAskSchema.safeParse({ ids: jsonField(form, 'ids'), id: String(form.get('node_id') ?? '') || undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid stack' });
+    }
+    return movedAnswer(await stackElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
   },
 
   wrapSection: async ({ request, params, locals }) => {
