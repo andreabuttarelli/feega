@@ -64,6 +64,20 @@ describe('duplicare una selezione', () => {
     expect(fake.calls.some((c) => c.table === 'nodes_connections' && c.op === 'insert')).toBe(false);
   });
 
+  it('writes each copy under the id the canvas already drew it with', async () => {
+    const fake = fakeDb({
+      nodes: [
+        { id: 'a', canvas_id: 'canvas', project_id: 'project', type: 'text', display_name: null, x: 10, y: 20, z: 0, width: null, height: null, data: {}, version: 1 }
+      ],
+      nodes_connections: []
+    });
+
+    await duplicateNodes(fake.db, { ...scope, nodeIds: ['a'], copyIds: { a: 'a-copy' }, actor: { kind: 'user', id: 'user' } });
+
+    const insert = fake.calls.find((c) => c.table === 'nodes' && c.op === 'insert');
+    expect(insert?.payload).toMatchObject({ id: 'a-copy' });
+  });
+
   it('senza id da duplicare non scrive niente', async () => {
     const fake = fakeDb({ nodes: [], nodes_connections: [] });
 

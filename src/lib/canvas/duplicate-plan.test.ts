@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planDuplicate, DUPLICATE_OFFSET, offsetFrom, dragOffset, repeatOffset } from './duplicate-plan';
+import { copyPlan, planDuplicate, DUPLICATE_OFFSET, offsetFrom, dragOffset, repeatOffset } from './duplicate-plan';
 
 const node = (id: string, type: string, data: Record<string, unknown>, x = 0, y = 0) => ({ id, type, data, x, y });
 const edge = (id: string, source: string, target: string, sourceHandle: string | null = null, targetHandle: string | null = null) => ({
@@ -108,5 +108,22 @@ describe('repeatOffset', () => {
   it('uses the small step for any other selection', () => {
     expect(repeatOffset(last, ['c1'])).toBeUndefined();
     expect(repeatOffset(null, ['c1', 'c2'])).toBeUndefined();
+  });
+});
+
+describe('copyPlan', () => {
+  it('a frame copy keeps the size of its source and starts at its first revision', () => {
+    const frame = { ...node('f', 'motion', { format: '16:9', docHeadRevision: 7, posterRevision: 7 }, 10, 10), width: 400, height: 300 };
+
+    const plan = copyPlan({ ids: ['f'], nodes: [frame], edges: [], offset: DUPLICATE_OFFSET });
+
+    expect(plan.nodes).toEqual([expect.objectContaining({ x: 42, y: 42, width: 400, height: 300, data: expect.objectContaining({ docHeadRevision: 1 }) })]);
+    expect(plan.nodes[0].data.posterRevision).toBeUndefined();
+  });
+
+  it('a copy takes the id the canvas already shows it under', () => {
+    const plan = copyPlan({ ids: ['a', 'b'], nodes: [node('a', 'text', {}), node('b', 'image', {})], edges: [], offset: DUPLICATE_OFFSET, copyIds: { a: 'a2', b: 'b2' } });
+
+    expect(plan.nodes.map((n) => n.id)).toEqual(['a2', 'b2']);
   });
 });

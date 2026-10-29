@@ -10,6 +10,8 @@ import type { UndoItem } from './undo-plan';
 const tile = (id: string, x = 0): OptTile => ({ id, type: 'motion', displayName: id, x, y: 0, w: 100, h: 100, data: { kind: 'element' }, version: 1 });
 const edge = (id: string): OptEdge => ({ id, source: 'a', target: 'b', mode: 'fixed' });
 const ctx = { toTile: (r: CanvasNodeRecord): OptTile => ({ id: r.id, type: r.type, displayName: r.displayName, x: r.position.x, y: r.position.y, w: r.size.width ?? 0, h: r.size.height ?? 0, data: r.data, version: r.version }) };
+const copy = (id: string, version = 0): CanvasNodeRecord => ({ id, canvasId: 'c', projectId: 'p', type: 'motion', displayName: null, position: { x: 32, y: 32, z: 0 }, size: { width: 100, height: 100 }, data: { docHeadRevision: 1 }, version });
+const duplicated = { ids: ['a'], copies: [copy('a2')], copyIds: { a: 'a2' } };
 const start = (): CanvasRows<OptTile, OptEdge> => ({ nodes: [tile('a'), tile('b', 200)], edges: [edge('e')] });
 
 type Sent = { action: string; fields: Record<string, string> };
@@ -61,6 +63,11 @@ describe('optimistic registry: every action says how it looks before the server 
     expect(optimisticOp(OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }, start(), ctx, async () => null).apply(start()).edges[0].mode).toBe('iterate');
   });
 
+  it('duplicate shows the copies, picked, under the ids the server will give them', () => {
+    const shown = optimisticOp(OptimisticAction.Duplicate, duplicated, start(), ctx, async () => null).apply(start());
+    expect(shown.nodes.map((n) => [n.id, n.select ?? false])).toEqual([['a', false], ['b', false], ['a2', true]]);
+  });
+
   it('delete takes nodes and wires away', () => {
     const shown = optimisticOp(OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }, start(), ctx, async () => null).apply(start());
     expect(shown).toEqual({ nodes: [tile('b', 200)], edges: [] });
@@ -76,7 +83,8 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
     [OptimisticAction.Restack, { ids: ['a'], to: Stack.Front }],
     [OptimisticAction.Rename, { id: 'a', name: 'x' }],
     [OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }],
-    [OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }]
+    [OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }],
+    [OptimisticAction.Duplicate, duplicated]
   ] as const) {
     it(`${action} rolls back`, async () => {
       const t = runner(null);
@@ -86,6 +94,12 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
       expect(t.undo).toEqual([null]);
     });
   }
+
+  it('a duplicate the server wrote nothing for is a refusal', async () => {
+    const t = runner({ nodes: [], connections: [] });
+    expect(await t.run(optimisticOp(OptimisticAction.Duplicate, duplicated, t.rows(), ctx, t.post))).toBe(OpOutcome.RolledBack);
+    expect(t.rows()).toEqual(start());
+  });
 
   it('a moved answer that is not done is a refusal', async () => {
     const t = runner({ outcome: 'invalid' });
@@ -108,5 +122,19 @@ describe('optimistic registry: a landing records the gesture', () => {
     await t.run(optimisticOp(OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }, t.rows(), ctx, t.post));
     expect(t.sent).toEqual([{ action: 'remove', fields: { node_ids: 'a', connection_ids: 'e' } }]);
     expect(t.undo[0]?.map((i) => i.kind)).toEqual(['edge.delete', 'node.delete']);
+  });
+
+  it('a duplicate lands its copies as created, and takes the saved rows in their place', async () => {
+    const t = runner({ nodes: [copy('a2', 1)], connections: [] });
+    await t.run(optimisticOp(OptimisticAction.Duplicate, { ...duplicated, offset: { dx: 32, dy: 32 } }, t.rows(), ctx, t.post));
+    expect(t.sent).toEqual([{ action: 'duplicate', fields: { node_ids: 'a', copy_ids: '{"a":"a2"}', dx: '32', dy: '32' } }]);
+    expect(t.undo[0]?.map((i) => i.kind)).toEqual(['node.create']);
+    expect(t.rows().nodes.find((n) => n.id === 'a2')?.version).toBe(1);
+  });
+
+  it('a duplicate shown only once saved appears when the server answers', async () => {
+    const t = runner({ nodes: [copy('a2', 1)], connections: [] });
+    await t.run(optimisticOp(OptimisticAction.Duplicate, { ...duplicated, copies: [] }, t.rows(), ctx, t.post));
+    expect(t.rows().nodes.map((n) => n.id)).toEqual(['a', 'b', 'a2']);
   });
 });

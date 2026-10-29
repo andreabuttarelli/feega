@@ -106,6 +106,10 @@
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
+  import { CopyShown, type Drawing } from '$lib/canvas/optimistic-insert';
+  import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
+  import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
@@ -183,7 +187,7 @@
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
-  import { dragOffset } from '$lib/canvas/duplicate-plan';
+  import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
@@ -1317,6 +1321,10 @@
       }
     );
     session.access = editorMode.spec.access;
+    const drawing = drawSaves.get(nodeId);
+    if (drawing) {
+      session.holdSave(drawing);
+    }
     savers.set(nodeId, session);
     return session;
   }
@@ -1787,17 +1795,100 @@
     liveDocs.set(nodeId, { ...at.live, doc: hideText(doc, clip) });
   }
 
-  let typeOnArrival = $state<string | null>(null);
+  let typeOnArrival = $state<{ nodeId: string; clip: string | null } | null>(null);
+
+  const drawSaves = new Map<string, Promise<boolean>>();
+
+  const heldTokens = (): LiveDoc['tokens'] | null => [...liveDocs.map.values()][0]?.tokens ?? [...fetched.values()][0]?.live.tokens ?? null;
+
+  async function adoptTokens(id: string) {
+    const res = await fetch(coreSource(id), { cache: 'no-store' }).catch(() => null);
+    const body = res?.ok ? ((await res.json().catch(() => null)) as { tokens: LiveDoc['tokens']; assets?: LiveDoc['assets'] } | null) : null;
+    const live = liveOf(id);
+    if (body && live) {
+      liveDocs.set(id, { ...live, tokens: body.tokens, assets: { ...body.assets, ...live.assets } });
+    }
+  }
+
+  function holdLive(id: string, live: LiveDoc, saved: Promise<boolean>, after?: () => void) {
+    liveDocs.set(id, live);
+    drawSaves.set(id, saved);
+    savers.get(id)?.holdSave(saved);
+    void saved.then((landed) => {
+      drawSaves.delete(id);
+      if (!landed) {
+        liveDocs.clear(id);
+        return;
+      }
+      after?.();
+    });
+  }
+
+  function seed(drawing: Drawing | null | undefined) {
+    if (!drawing?.doc) {
+      return;
+    }
+    const tokens = heldTokens();
+    holdLive(drawing.id, { doc: drawing.doc, tokens: tokens ?? FEEGA_TOKENS, assets: {} }, drawing.saved, tokens ? undefined : () => void adoptTokens(drawing.id));
+  }
+
+  function duplicateTiles(ids: string[], offset?: Offset) {
+    const docs = new Map(ids.flatMap((id) => (liveOf(id) ? [[id, liveOf(id)!] as const] : [])));
+    const ready = ids.every((id) => !holdsDoc(byId.get(id)?.kind ?? '') || docs.has(id));
+    const made = props.onDuplicate?.(ids, offset, ready ? CopyShown.Now : CopyShown.OnSave);
+    for (const { from, to } of ready && made ? made.copies : []) {
+      const live = docs.get(from);
+      if (live) {
+        holdLive(to, { ...live, playhead: undefined }, made!.saved);
+      }
+    }
+  }
+
+  function frameUnderDrawing(drawn: DrawnWire) {
+    const centre = drawnCentre(drawn);
+    const id = centre ? topNodeAt(centre) : null;
+    const frame = id && !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation ? coreFrames.find((f) => f.id === id && !f.linked) : null;
+    const live = frame ? liveOf(frame.id) : null;
+    return frame && live && saverOf(frame.id) ? { frame, live } : null;
+  }
+
+  function drawIntoFrame(drawn: DrawnWire): boolean {
+    const under = frameUnderDrawing(drawn);
+    if (!under) {
+      return false;
+    }
+    const { frame, live } = under;
+    const clip = crypto.randomUUID().slice(0, 8);
+    const made = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode(live.doc), frameOfLive(live)), clip);
+    if (!made.ok) {
+      return false;
+    }
+    commit(frame.id, made, DRAW_SUMMARY[drawn.tool]);
+    select([frame.id]);
+    goInside(frame.id, Gesture.Click, clip);
+    typeOnArrival = drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null;
+    return true;
+  }
+
+  function drawOnCanvas(drawn: DrawnWire) {
+    frameBar.tool = DrawTool.Select;
+    if (drawIntoFrame(drawn)) {
+      return;
+    }
+    const drawing = props.onDraw?.(drawn);
+    seed(drawing);
+    typeOnArrival = drawn.tool === DrawTool.Text && drawing ? { nodeId: drawing.id, clip: null } : null;
+  }
 
   $effect(() => {
-    const id = typeOnArrival;
-    const saver = id ? saverOf(id) : null;
-    const clip = saver?.history.present.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Text');
-    if (!id || !clip || !pickerOf(id)) {
+    const wanted = typeOnArrival;
+    const saver = wanted ? saverOf(wanted.nodeId) : null;
+    const clip = saver?.history.present.tracks.flatMap((t) => t.clips).find((c) => (wanted?.clip ? c.id === wanted.clip : c.component === 'Text'));
+    if (!wanted || !clip || !pickerOf(wanted.nodeId)) {
       return;
     }
     typeOnArrival = null;
-    untrack(() => void startTyping(id, clip.id));
+    untrack(() => void startTyping(wanted.nodeId, clip.id));
   });
 
   function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
@@ -2473,7 +2564,7 @@
     const copyOffset = e.altKey && grabbed ? dragOffset(new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }])), { id: ids[0], position: grabbed }) : undefined;
     if (copyOffset && props.onDuplicate) {
       settleOverrides();
-      props.onDuplicate(ids, copyOffset);
+      duplicateTiles(ids, copyOffset);
       return;
     }
     const moves = ids.flatMap((id) => (overrides.get(id) ? [{ id, x: overrides.get(id)!.x, y: overrides.get(id)!.y }] : []));
@@ -2723,7 +2814,7 @@
     'zoom-selection': zoomToSelection,
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
-    duplicate: () => selected.length && props.onDuplicate?.(selected),
+    duplicate: () => selected.length && duplicateTiles(selected),
     copy: () => void copySystem(),
     paste: () => undefined,
     undo: () => props.onUndo?.(),
@@ -2991,7 +3082,7 @@
     'wrap-stack': (ids) => props.onWrapStack?.(ids),
     'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
-    duplicate: (ids) => props.onDuplicate?.(ids),
+    duplicate: (ids) => duplicateTiles(ids),
     'connect-new': () => {
       if (selection.box) {
         connectPickerAt = { x: selection.box.x + selection.box.width + 24, y: selection.box.y };
@@ -3368,7 +3459,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px;--bar-h:${holdsDoc(t.kind ?? '') && frameChrome(kindOfNode(t.id)).bar ? MOTION_NODE_BAR_H : 0}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={addsBeside(t) ? props.onAddBeside : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onaddbeside={addsBeside(t) && props.onAddBeside ? (id) => seed(props.onAddBeside?.(id)) : undefined} showAdd={on || hovered === t.id || addLinger === t.id} />
           {#if !domIds.has(t.id) && holdsDoc(t.kind ?? '')}
             {@const kind = kindOfNode(t.id)}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
@@ -3430,13 +3521,9 @@
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
-      ondraw={async (drawn) => {
-        const id = await props.onDraw?.(drawn);
-        typeOnArrival = drawn.tool === DrawTool.Text && id ? id : null;
-        frameBar.tool = DrawTool.Select;
-      }}
-      onframe={async (target) => {
-        await props.onDrawFrame?.(target);
+      ondraw={drawOnCanvas}
+      onframe={(target) => {
+        seed(props.onDrawFrame?.(target));
         frameBar.tool = DrawTool.Select;
       }}
     />

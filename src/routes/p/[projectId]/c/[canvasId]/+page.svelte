@@ -61,7 +61,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
-  import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
+  import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
@@ -126,7 +126,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { OpOutcome, createOptimistic } from '$lib/canvas/optimistic-ops';
   import { OptimisticAction, Refresh, optimisticOp, refreshOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, CopyShown, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
@@ -149,7 +149,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
-  import { decoded, painted } from '$lib/canvas/paint-wait';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
@@ -605,55 +604,52 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await optimistic(OptimisticAction.Restack, { ids, to });
   }
 
-  async function drawElement(drawn: DrawnWire): Promise<string> {
+  function drawElement(drawn: DrawnWire): Drawing {
     const id = crypto.randomUUID();
     const ghost = drawnTile(id, drawn);
     if (!ghost) {
-      void saveDrawn(id, drawn).then(() => focusOn([id], undefined, FocusMode.Select));
-      return id;
+      const saved = saveDrawn(id, drawn);
+      void saved.then(() => focusOn([id], undefined, FocusMode.Select));
+      return { id, doc: null, saved };
     }
-    await decoded(ghost.look);
     catalogPosters.set(id, ghost.look);
     nodes = [...nodes, toTile(ghost.node)];
     focusOn([id], undefined, FocusMode.Select);
-    void saveDrawn(id, drawn);
-    await painted();
-    return id;
+    return { id, doc: ghost.doc, saved: saveDrawn(id, drawn) };
   }
 
   let lastFrameSide: { width: number; height: number } | null = null;
 
-  async function addFrameBeside(id: string) {
+  function addFrameBeside(id: string): Drawing | null {
     const tile = nodes.find((n) => n.id === id);
-    if (tile) {
-      await drawFrame({ box: besideBox(tile) });
-    }
+    return tile ? drawFrame({ box: besideBox(tile) }) : null;
   }
 
-  async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
+  function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }): Drawing {
     const box = 'box' in target ? target.box : defaultFrameBox(target.at, lastFrameSide);
     lastFrameSide = { width: box.width, height: box.height };
     const id = crypto.randomUUID();
-    nodes = [...nodes, toTile(drawnFrameTile(id, box))];
-    void saveFrame(id, box);
-    await painted();
+    const drawn = drawnFrameTile(id, box);
+    nodes = [...nodes, toTile(drawn.node)];
+    return { id, doc: drawn.doc, saved: saveFrame(id, box) };
   }
 
-  async function saveFrame(id: string, box: CanvasBox) {
+  async function saveFrame(id: string, box: CanvasBox): Promise<boolean> {
     const land = holdGesture();
     const res = await post('drawFrame', { box: JSON.stringify(box), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
       land(null);
       nodes = settle(nodes, id, null);
-      return;
+      return false;
     }
     land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     focusOn([id], undefined, FocusMode.Select);
+    return true;
   }
 
-  async function saveDrawn(id: string, drawn: DrawnWire) {
+  async function saveDrawn(id: string, drawn: DrawnWire): Promise<boolean> {
     const land = holdGesture();
     const res = await post('drawElement', { drawn: JSON.stringify(drawn), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
@@ -661,7 +657,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       land(null);
       catalogPosters.delete(id);
       nodes = settle(nodes, id, null);
-      return;
+      return false;
     }
     land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
@@ -669,6 +665,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (hold) {
       intoFrame(id, hold);
     }
+    return true;
   }
 
   async function intoFrame(id: string, hold: FrameHold) {
@@ -1642,7 +1639,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function optimistic<K extends OptimisticAction>(action: K, input: Parameters<typeof optimisticOp<K, Tile, FlowEdge>>[1]): Promise<OpOutcome> {
     refreshDue ||= refreshOf(action) === Refresh.AfterIdle;
     const before = { nodes, edges };
-    return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record) }, async (name, fields) => {
+    return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record), toEdge }, async (name, fields) => {
       await places.flush();
       return post(name, fields);
     }));
@@ -3583,16 +3580,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let lastDuplicate: LastDuplicate | null = null;
 
-  async function duplicate(ids: string[], dragged?: Offset) {
+  function duplicate(ids: string[], dragged: Offset | undefined, shown: CopyShown): Duplication | null {
     const offset = dragged ?? repeatOffset(lastDuplicate, ids);
-    const fields: Fields = offset ? { node_ids: ids.join(','), dx: offset.dx, dy: offset.dy } : { node_ids: ids.join(',') };
-    const result = await post('duplicate', fields);
-    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
-    const connected = (result?.connections ?? []) as Connection[];
-    lastDuplicate = offset && created.length ? { ids: created.map((n) => n.id), offset } : null;
-    if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
-    if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
-    if (created.length) { pushGesture(createManyGesture(created, connected)); }
+    const sources = nodes.filter((n) => ids.includes(n.id));
+    if (!sources.length) {
+      return null;
+    }
+    const copyIds = Object.fromEntries(sources.map((n) => [n.id, crypto.randomUUID()]));
+    const copies = sources.map((n) => ({ from: n.id, to: copyIds[n.id] }));
+    const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
+    lastDuplicate = offset ? { ids: copies.map((c) => c.to), offset } : null;
+    const outcome = optimistic(OptimisticAction.Duplicate, { ids: sources.map((n) => n.id), copies: shown === CopyShown.Now ? copiedNodes(plan) : [], copyIds, offset });
+    return { copies, saved: outcome.then((o) => o === OpOutcome.Landed) };
   }
 
   /**

@@ -51,6 +51,22 @@ const DRAW_START: Record<EditMode, (playhead: number) => number> = {
   [EditMode.Motion]: (playhead) => playhead
 };
 
+export const DRAW_SUMMARY: Record<DrawTool, string> = {
+  [DrawTool.Select]: '',
+  [DrawTool.Text]: 'Drew a text',
+  [DrawTool.Rectangle]: 'Drew a rectangle',
+  [DrawTool.Ellipse]: 'Drew an ellipse',
+  [DrawTool.Polygon]: 'Drew a polygon',
+  [DrawTool.Star]: 'Drew a star',
+  [DrawTool.Line]: 'Drew a line',
+  [DrawTool.Arrow]: 'Drew an arrow',
+  [DrawTool.Pen]: 'Drew a path',
+  [DrawTool.Pencil]: 'Drew a path',
+  [DrawTool.ShapeBuilder]: '',
+  [DrawTool.Frame]: 'Drew a frame',
+  [DrawTool.Stack]: 'Drew a stack'
+};
+
 export const drawStart = (mode: EditMode, playhead: number): number => DRAW_START[mode](playhead);
 
 const fail = (error: string): OpResult => ({ ok: false, error });

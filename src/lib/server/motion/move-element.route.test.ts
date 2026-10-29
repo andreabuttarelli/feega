@@ -6,6 +6,8 @@ import { listConnections, listNodes } from '$lib/server/repos/canvas';
 import { canvasFrameInputs } from './move-element';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { drawnTile } from '$lib/canvas/optimistic-insert';
 import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 
 const SOURCE = '44444444-4444-4444-4444-444444444444';
@@ -315,6 +317,17 @@ describe('drawElement action', () => {
 
     expect(await actions.drawElement(input as never)).toMatchObject({ outcome: 'done' });
     expect(inserted(input)).toMatchObject([{ id }]);
+  });
+
+  it('stores the very doc the canvas already drew, so its own edits need no refetch', async () => {
+    const id = '7b0c2f0e-8a51-4d0e-9a8e-2f2f6c1b9a10';
+    const wire = { tool: DrawTool.Rectangle, box: { left: 120, top: 40, width: 300, height: 100 } } as const;
+    const input = event({ drawn: JSON.stringify(wire), node_id: id });
+
+    await actions.drawElement(input as never);
+
+    const stored = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => (c.payload as { doc: MotionDoc }).doc);
+    expect(stored).toEqual([drawnTile(id, wire)?.doc]);
   });
 
   it('a text drawn on a dark canvas is written in light ink', async () => {

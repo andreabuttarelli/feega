@@ -22,6 +22,8 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 | Add bar, Stack | Draw an empty stack: a transparent rectangle with vertical auto layout that hugs what you drop in |
 | `K` | Scale tool: scales size, text, strokes and effects together |
 
+A shape drawn over a frame lands inside that frame; drawn on empty canvas it stays free. Either way it shows the moment you release, and saves in the background.
+
 Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. Gradients can be linear, radial, angular or diamond.
 
 Colour fields accept hex with or without `#` (`f`, `ff` and `fff` all mean white; 4 and 8 digits carry opacity), `rgb()`/`rgba()`, or bare numbers such as `255, 0, 0` or `255 0 0 50%`. Opacity typed this way sets the fill's opacity. Anything else leaves the colour unchanged.

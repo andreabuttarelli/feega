@@ -45,7 +45,7 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Key | Action |
 |---|---|
 | Backspace / Delete | Delete the selection |
-| Cmd/Ctrl+D | Duplicate |
+| Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
 | Cmd/Ctrl+C | Copy |
 | Cmd/Ctrl+V | Paste at the centre of the view |
 | Cmd/Ctrl+Z | Undo |

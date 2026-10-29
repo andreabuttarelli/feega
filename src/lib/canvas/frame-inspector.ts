@@ -307,7 +307,7 @@ export const FRAME_ELEMENT_MENU: ReadonlySet<SelectionActionId> = new Set(
   })
 );
 
-const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.PasteOver, Command.TidyUp, Command.BringToFront, Command.BringForward, Command.SendBackward, Command.SendToBack, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll]);
+const FRAME_KEYS: ReadonlySet<ActionId> = new Set([...STRUCTURE_ORDER, ...OPACITY_KEYS.map((o) => o.command), Command.CopyProperties, Command.PasteProperties, Command.PasteReplace, Command.PasteOver, Command.TidyUp, Command.BringToFront, Command.BringForward, Command.SendBackward, Command.SendToBack, Command.ToggleHidden, Command.ToggleLocked, Command.SelectMatching, Command.SelectAll, Command.Duplicate]);
 
 export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   if (isTyping(e.target as Parameters<typeof isTyping>[0])) {
