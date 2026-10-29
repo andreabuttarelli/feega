@@ -57,3 +57,15 @@ describe('a free stack element follows its stack', () => {
     expect(freeStackFit(must(addClip(fit.doc, { component: 'Shape', from: 0, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.1 } }, 'loose')))).toBeNull();
   });
 });
+
+describe('a free stack hugs the text it measures', () => {
+  it('sizes the stage from the measure the renderer shapes with', () => {
+    const lone = must(wrapInStack(must(addClip({ ...newMotionDoc(MotionFormat.Landscape), width: 400, height: 100 }, { component: 'Text', from: 0, props: { text: 'Get started', sizing: 'auto', x: 0.25, y: 0.25, width: 0.5, height: 0.5 } }, 't')), ['t'], 'stack', 'lane'));
+    const shaped = { width: 321, height: 40 };
+
+    const fit = freeStackFit(lone, () => shaped)!;
+
+    expect(fit.doc.width).toBe(shaped.width);
+    expect(fit.doc.height).toBe(shaped.height);
+  });
+});

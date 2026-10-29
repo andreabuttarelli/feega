@@ -3,6 +3,7 @@ import { pivotBox } from '@feega/motion-core/motion/parent';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { strokesOf } from '@feega/motion-core/motion/stroke/model';
 import { keepTextSize } from '../text-fit';
+import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 
 const SLACK_PX = 0.5;
 
@@ -36,13 +37,13 @@ function holdPixels(doc: MotionDoc, to: Size): MotionDoc {
 
 const roots = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => !c.parent);
 
-export function freeStackFit(doc: MotionDoc): StackFit | null {
+export function freeStackFit(doc: MotionDoc, measure: TextMeasure = estimatedText): StackFit | null {
   const [root, ...rest] = roots(doc);
   if (!root?.autoLayout || rest.length) {
     return null;
   }
   const stage = { width: doc.width, height: doc.height };
-  const laid = withAutoLayout(doc).tracks.flatMap((t) => t.clips).find((c) => c.id === root.id)!;
+  const laid = withAutoLayout(doc, measure).tracks.flatMap((t) => t.clips).find((c) => c.id === root.id)!;
   const box = pivotBox(laid.props, stage);
   const size = { width: Math.round(box.left + box.width), height: Math.round(box.top + box.height) };
   if (Math.abs(size.width - stage.width) <= SLACK_PX && Math.abs(size.height - stage.height) <= SLACK_PX) {

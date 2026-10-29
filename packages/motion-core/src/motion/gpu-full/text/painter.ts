@@ -672,6 +672,12 @@ function spaceOf(laid: Laid, paragraphs: string[], size: number): number {
   return glyphs[0]?.advance ?? size * SPACE_EM;
 }
 
+export function laidExtent(plan: TextPlan, fonts: FaceBook): { width: number; height: number } | null {
+  const { laid } = place(plan, fonts);
+  const empty = !laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0;
+  return empty || laid.missing ? null : { width: laid.width, height: laid.height };
+}
+
 export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number; size: number; vertical: number };
 
 export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {

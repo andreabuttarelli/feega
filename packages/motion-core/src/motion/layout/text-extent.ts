@@ -59,3 +59,7 @@ export function textBaseline(component: ComponentId, props: TextProps, unit: num
   const leading = Number(props.leading ?? 1);
   return (inset.down * em) / 2 + (em * (leading - 1)) / 2 + em * ASCENT;
 }
+
+export type TextMeasure = (component: ComponentId, props: TextProps, unit: number, width?: number) => Size;
+
+export const estimatedText: TextMeasure = textExtent;

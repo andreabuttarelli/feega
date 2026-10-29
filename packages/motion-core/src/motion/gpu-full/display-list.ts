@@ -10,6 +10,7 @@ import { apply2d } from '../affine';
 import { boxOf } from '../layout';
 import type { AudioAnalysis } from '../audio-analysis';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
+import { shapedText } from './text/measure';
 import type { JunctionMove } from '../junctions';
 import { renderAt } from '../effects/render';
 import { effectOfKey } from '../effects/model';
@@ -474,7 +475,7 @@ const dimmed = (filters: Filter[], pose: Pose): Filter[] => (pose.dim < 1 ? [...
 const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
 
 export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<string, string> = {}, typeset: Typeset = NO_TYPESET, analyses?: Record<string, AudioAnalysis>): Prepared {
-  return { doc: preparedDoc({ doc, tokens, assets, analyses }), tokens, assets, typeset, moves: junctionMovesOf({ doc, tokens, assets }) };
+  return { doc: preparedDoc({ doc, tokens, assets, analyses, measure: shapedText(typeset) }), tokens, assets, typeset, moves: junctionMovesOf({ doc, tokens, assets, measure: shapedText(typeset) }) };
 }
 
 const NO_READS: DomReads = new Map();
