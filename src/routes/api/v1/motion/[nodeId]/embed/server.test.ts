@@ -26,6 +26,7 @@ const bucket = {
   list: async () => ({ data: [...store.files.keys()].map((name) => ({ name })) })
 };
 
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
   const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
   return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
