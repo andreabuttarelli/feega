@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ProjectMode } from '$lib/project-mode';
 import {
   ARRIVAL_LANDING,
   Arrival,
@@ -25,13 +26,13 @@ const CANVAS = '44444444-4444-4444-4444-444444444444';
 const user = { id: USER, email: 'chi@esempio.it', user_metadata: {} } as unknown as User;
 
 const membership: Membership = { org: { id: ORG, name: 'chi', slug: 'chi-abcd' }, role: 'owner' };
-const project = { id: PROJECT, name: DEFAULT_PROJECT_NAME, slug: 'untitled', brandId: null, archivedAt: null, lastActiveAt: '2026-09-21T00:00:00Z' };
+const project = { id: PROJECT, name: DEFAULT_PROJECT_NAME, slug: 'untitled', brandId: null, archivedAt: null, lastActiveAt: '2026-09-21T00:00:00Z', mode: ProjectMode.Standard };
 const canvas = { id: CANVAS, projectId: PROJECT, name: DEFAULT_CANVAS_NAME, viewport: null };
 
 /** I collaboratori del bootstrap, sostituiti uno per uno: il test guarda QUANTE volte si crea. */
 function deps(overrides: Partial<Parameters<typeof enterApp>[1]>) {
   return {
-    ensureProfile: vi.fn(async () => ({ id: USER, email: 'chi@esempio.it', name: null, avatarUrl: null })),
+    ensureProfile: vi.fn(async () => ({ id: USER, email: 'chi@esempio.it', name: null, avatarUrl: null, termsAcceptedAt: null, termsVersion: null })),
     listMemberships: vi.fn(async () => [membership]),
     createFirstOrg: vi.fn(async () => ({ orgId: ORG, slug: 'chi-abcd', role: 'owner' as const })),
     listProjects: vi.fn(async () => [project]),
@@ -152,7 +153,8 @@ describe('con più progetti, atterra su quello usato per ultimo', () => {
     slug: 'untitled',
     brandId: null,
     archivedAt: null,
-    lastActiveAt: '2026-09-24T10:00:00Z'
+    lastActiveAt: '2026-09-24T10:00:00Z',
+    mode: ProjectMode.Standard
   };
 
   it('con un cookie di ultimo progetto, lo riapre anche se non è il più recente', async () => {

@@ -195,7 +195,7 @@ describe('the shot library', () => {
 
   it('add_shot with sound on lays a click and key taps on an SFX track, under the cursor, uploading each sound once', async () => {
     const sfx = vi.fn(async (kind: string) => ({ ok: true as const, assetId: `asset-${kind}`, url: null, seconds: 0.08 }));
-    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })), { sfx });
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })), { sfx });
     await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
 
     const made = await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0', type_text: 'abc' }, at: 1, sound: 'on' });
@@ -212,7 +212,7 @@ describe('the shot library', () => {
 
   it('add_shot lays no sound by default', async () => {
     const sfx = vi.fn();
-    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })), { sfx });
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })), { sfx });
     await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
 
     await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0' }, at: 0 });

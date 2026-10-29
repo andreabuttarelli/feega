@@ -53,6 +53,7 @@ function noisyJpeg(spec: { width: number; height: number; quality: number }): Pr
       width: spec.width,
       height: spec.height,
       channels: 3,
+      background: '#808080',
       noise: { type: 'gaussian', mean: 128, sigma: 90 }
     }
   })
