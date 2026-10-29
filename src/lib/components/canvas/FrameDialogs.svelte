@@ -15,7 +15,6 @@
   import PublishDialog, { type Listed } from '$lib/components/gallery/PublishDialog.svelte';
   import FrameDialogCard from './FrameDialogCard.svelte';
   import { CardWidth } from './frame-dialog-card';
-  import CodeExport from '$lib/components/motion/CodeExport.svelte';
   import { postPageAction } from '$lib/api/page-action';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { FrameDialog } from '$lib/canvas/frame-dialogs';
@@ -373,10 +372,6 @@
     {:else}
       <span class="empty">No saved versions yet</span>
     {/each}
-  </FrameDialogCard>
-{:else if dialog === FrameDialog.Code}
-  <FrameDialogCard title="Export code" testid="frame-code" width={CardWidth.Wide} {onclose}>
-    <CodeExport doc={played(doc)} name={data?.node.name || 'Frame'} assets={assetUrls} {tokens} />
   </FrameDialogCard>
 {:else if dialog === FrameDialog.Chat}
   <FrameDialogCard title="Chat history" testid="frame-chat" {onclose}>

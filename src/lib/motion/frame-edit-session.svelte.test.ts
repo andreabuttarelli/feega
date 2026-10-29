@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
-import { FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
+import { DocAccess, FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
 import { outgoing } from './frame-sync';
 
 const base = newMotionDoc(MotionFormat.Landscape);
@@ -58,6 +58,18 @@ describe('telling the host about a new undo step', () => {
     session.apply({ ok: true, doc: longer(80) }, 'Other');
 
     expect(port.stepped).toHaveBeenCalledTimes(2);
+  });
+
+  it('a read-only session ignores edits, undo and redo', () => {
+    const { session, port } = open();
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    session.access = DocAccess.Read;
+
+    session.apply({ ok: true, doc: longer(90) }, 'Longest');
+    session.undo();
+
+    expect(session.history.present.durationInFrames).toBe(60);
+    expect(port.stepped).toHaveBeenCalledTimes(1);
   });
 
   it('undo and redo are not new steps', () => {

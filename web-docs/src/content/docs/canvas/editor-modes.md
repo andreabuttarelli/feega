@@ -12,7 +12,7 @@ The switch at the left of the bottom bar sets one mode for the whole editor. Fee
 | **Design** | Edits set the resting state of a layer. Editing an animated property shifts its whole animation. | `E` toggles with Motion |
 | **Motion** | Edits create or move a keyframe at the playhead. The timeline opens on video frames. | `E` |
 | **Play** | Connect and try: [prototype links](/canvas/prototype-links/) drawn as arrows, node lines hidden. The right panel holds the link, Prototype flow (Play, Copy play link), Play on canvas and Interactive. | — |
-| **Code** | Read a layer as CSS or Tailwind and export it. Nothing changes. See [Code mode](/canvas/dev-mode/). | `Shift+D` |
+| **Code** | Read a layer as CSS or Tailwind, export the frame as React, HTML or Svelte. Nothing can be edited. See [Code mode](/canvas/dev-mode/). | `Shift+D` |
 
 - `E` switches between Design and Motion; from Play or Code it goes back to Design.
 - `Shift+D` enters Code; pressed again it goes back to Design.

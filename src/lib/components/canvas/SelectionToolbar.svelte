@@ -5,7 +5,7 @@
   import Columns2 from '@lucide/svelte/icons/columns-2';
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import Square from '@lucide/svelte/icons/square';
-  import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
+  import { isFrameAction } from '$lib/canvas/frame-dialogs';
   import { actionsIn, enabledFor, shownFor, toolbarSlots, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
@@ -139,7 +139,7 @@
 
   const primary = $derived(actionsIn('primary', count));
   const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
-  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameDialogAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
+  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
   const danger = $derived(actionsIn('danger', count));
   const fixed = $derived(actionsIn('fixed', count).filter((a) => !withheld.includes(a.id)));
   const slots = $derived(toolbarSlots([...fixed, ...secondary, ...overflow, ...danger]));

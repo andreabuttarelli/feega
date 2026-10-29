@@ -4,6 +4,7 @@
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import DevInspector from '$lib/components/canvas/DevInspector.svelte';
+  import DevCode from '$lib/components/canvas/DevCode.svelte';
   import { frameProperties } from './frame-properties.svelte';
   import HeaderActions from '$lib/components/motion/HeaderActions.svelte';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
@@ -96,6 +97,8 @@
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Code mode">
     {#if shown?.clip}
       <DevInspector doc={shownDoc!} clipId={shown.clip.id} brand={tokens} onexport={frameProperties.exportPicks} />
+    {:else if tokens}
+      <DevCode {doc} name="Frame" assets={frameProperties.extras?.assetUrls ?? {}} {tokens} />
     {:else}
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}

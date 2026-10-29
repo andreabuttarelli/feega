@@ -26,6 +26,11 @@ export type SessionPort = {
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
 };
 
+export enum DocAccess {
+  Write = 'write',
+  Read = 'read'
+}
+
 export type SessionStart = { head: Revision; selection: string[]; mode?: EditMode };
 
 export class FrameEditSession {
@@ -34,6 +39,7 @@ export class FrameEditSession {
   selection = $state<string[]>([]);
   breakpoint = $state<string>(BASE_BREAKPOINT);
   mode = $state<EditMode>(EditMode.Design);
+  access = $state<DocAccess>(DocAccess.Write);
   saveState = $state<SaveState>(SaveState.Saved);
   notice = $state('');
   readonly live: LiveEdits<MotionDoc>;
@@ -70,6 +76,9 @@ export class FrameEditSession {
   }
 
   edit(next: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.live.edit(next, summary);
   }
 
@@ -83,6 +92,9 @@ export class FrameEditSession {
   }
 
   recordEdit(next: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.port.recorded();
     const now = Date.now();
     const root = settleGroups(mergeView(this.history.present, this.port.viewPath(), next));
@@ -101,22 +113,34 @@ export class FrameEditSession {
   }
 
   amendRoot(root: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = amend(this.history, root);
     this.scheduleSave(summary);
   }
 
   recordRoot(root: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = record(this.history, root);
     this.port.stepped();
     this.scheduleSave(summary);
   }
 
   undo() {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = undo(this.history);
     this.scheduleSave('Undo');
   }
 
   redo() {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = redo(this.history);
     this.scheduleSave('Redo');
   }
