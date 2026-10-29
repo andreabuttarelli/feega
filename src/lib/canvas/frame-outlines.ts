@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CUSTOM_CLIP, partBoxes } from '@feega/motion-core/motion/poster-parts';
 import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
 import { LayerKind, type FrameOutlines, type LayerRow } from './layers';
+import { DocNodeType } from './motion-node';
 
 export const HEADS_PARAM = 'heads';
 export const PARTS_PARAM = 'parts';
@@ -54,11 +55,11 @@ export function outlinesFor(heads: readonly FrameHead[], cache: OutlineCache): F
   return Object.fromEntries(heads.flatMap((h) => (headKey(h) in cache ? [[h.nodeId, cache[headKey(h)]]] : [])));
 }
 
-const FRAME_TYPE = 'motion';
+const DOC_TYPES: ReadonlySet<string> = new Set(Object.values(DocNodeType));
 
 export function frameHead(type: string, data: Record<string, unknown>): number | null {
   const version = Number(data.docHeadRevision);
-  return type === FRAME_TYPE && Number.isInteger(version) && version > 0 ? version : null;
+  return DOC_TYPES.has(type) && Number.isInteger(version) && version > 0 ? version : null;
 }
 
 export const canvasHeads = (nodes: readonly { id: string; head?: number | null }[]): FrameHead[] => nodes.flatMap((n) => (n.head ? [{ nodeId: n.id, version: n.head }] : []));
