@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { newMotionDoc, MotionFormat } from '@feega/motion-core/motion/doc';
-import { scenesLeftToRight, sequenceScenes } from '$lib/motion/scenes';
+import { planCombine } from '$lib/motion/scenes';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { created, type FrameStore, type StoredFrame } from './move-element';
 
@@ -14,7 +13,6 @@ export const COMBINE_STATUS: Record<Exclude<CombineOutcome, CombineOutcome.Done>
 };
 
 export const MAX_SCENES = 40;
-const FRAME_SPACING = 80;
 
 export const combineAskSchema = z.object({ frameIds: z.array(z.string().uuid()).min(2).max(MAX_SCENES) }).strict();
 
@@ -22,7 +20,7 @@ export type CombineAsk = z.infer<typeof combineAskSchema>;
 
 export type Combined = { outcome: CombineOutcome.Done; frameId: string; undo: UndoItem[] } | { outcome: Exclude<CombineOutcome, CombineOutcome.Done> };
 
-const bottomOf = (f: StoredFrame) => (f.at?.y ?? 0) + Number((f.row?.size as { height?: number } | undefined)?.height ?? f.doc.height);
+const heightOf = (f: StoredFrame) => Number((f.row?.size as { height?: number } | undefined)?.height ?? f.doc.height);
 
 export async function combineScenes(store: FrameStore, ask: CombineAsk): Promise<Combined> {
   const read = await Promise.all(ask.frameIds.map((id) => store.read(id)));
@@ -31,13 +29,9 @@ export async function combineScenes(store: FrameStore, ask: CombineAsk): Promise
     return { outcome: CombineOutcome.NotFound };
   }
 
-  const byId = new Map(frames.map((f) => [f.nodeId, f]));
-  const order = scenesLeftToRight(frames.map((f) => ({ id: f.nodeId, x: f.at?.x ?? 0, y: f.at?.y ?? 0 })));
-  const first = byId.get(order[0])!;
-  const host = { ...newMotionDoc(MotionFormat.Landscape), width: first.doc.width, height: first.doc.height, fps: first.doc.fps };
-  const doc = sequenceScenes(host, order.map((id) => ({ nodeId: id, durationInFrames: byId.get(id)!.doc.durationInFrames })));
-
-  const place = { projectId: first.projectId, canvasId: first.canvasId, x: Math.min(...frames.map((f) => f.at?.x ?? 0)), y: Math.max(...frames.map(bottomOf)) + FRAME_SPACING };
+  const first = frames[0];
+  const { doc, at } = planCombine(frames.map((f) => ({ nodeId: f.nodeId, doc: f.doc, at: f.at ?? { x: 0, y: 0 }, height: heightOf(f) })));
+  const place = { projectId: first.projectId, canvasId: first.canvasId, ...at };
   const frameId = await store.create(place, doc);
   return { outcome: CombineOutcome.Done, frameId, undo: [created(frameId, place)] };
 }
