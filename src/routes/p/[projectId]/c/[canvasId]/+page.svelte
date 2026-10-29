@@ -125,7 +125,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, type Drawing } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
@@ -148,7 +148,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
-  import { decoded, painted } from '$lib/canvas/paint-wait';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
@@ -637,55 +636,52 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  async function drawElement(drawn: DrawnWire): Promise<string> {
+  function drawElement(drawn: DrawnWire): Drawing {
     const id = crypto.randomUUID();
     const ghost = drawnTile(id, drawn);
     if (!ghost) {
-      void saveDrawn(id, drawn).then(() => focusOn([id], undefined, FocusMode.Select));
-      return id;
+      const saved = saveDrawn(id, drawn);
+      void saved.then(() => focusOn([id], undefined, FocusMode.Select));
+      return { id, doc: null, saved };
     }
-    await decoded(ghost.look);
     catalogPosters.set(id, ghost.look);
     nodes = [...nodes, toTile(ghost.node)];
     focusOn([id], undefined, FocusMode.Select);
-    void saveDrawn(id, drawn);
-    await painted();
-    return id;
+    return { id, doc: ghost.doc, saved: saveDrawn(id, drawn) };
   }
 
   let lastFrameSide: { width: number; height: number } | null = null;
 
-  async function addFrameBeside(id: string) {
+  function addFrameBeside(id: string): Drawing | null {
     const tile = nodes.find((n) => n.id === id);
-    if (tile) {
-      await drawFrame({ box: besideBox(tile) });
-    }
+    return tile ? drawFrame({ box: besideBox(tile) }) : null;
   }
 
-  async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
+  function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }): Drawing {
     const box = 'box' in target ? target.box : defaultFrameBox(target.at, lastFrameSide);
     lastFrameSide = { width: box.width, height: box.height };
     const id = crypto.randomUUID();
-    nodes = [...nodes, toTile(drawnFrameTile(id, box))];
-    void saveFrame(id, box);
-    await painted();
+    const drawn = drawnFrameTile(id, box);
+    nodes = [...nodes, toTile(drawn.node)];
+    return { id, doc: drawn.doc, saved: saveFrame(id, box) };
   }
 
-  async function saveFrame(id: string, box: CanvasBox) {
+  async function saveFrame(id: string, box: CanvasBox): Promise<boolean> {
     const land = holdGesture();
     const res = await post('drawFrame', { box: JSON.stringify(box), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
       land(null);
       nodes = settle(nodes, id, null);
-      return;
+      return false;
     }
     land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     focusOn([id], undefined, FocusMode.Select);
+    return true;
   }
 
-  async function saveDrawn(id: string, drawn: DrawnWire) {
+  async function saveDrawn(id: string, drawn: DrawnWire): Promise<boolean> {
     const land = holdGesture();
     const res = await post('drawElement', { drawn: JSON.stringify(drawn), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
@@ -693,7 +689,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       land(null);
       catalogPosters.delete(id);
       nodes = settle(nodes, id, null);
-      return;
+      return false;
     }
     land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
@@ -701,6 +697,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (hold) {
       intoFrame(id, hold);
     }
+    return true;
   }
 
   async function intoFrame(id: string, hold: FrameHold) {

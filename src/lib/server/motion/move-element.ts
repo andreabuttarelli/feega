@@ -573,7 +573,7 @@ export async function drawElement(store: FrameStore, place: Place & { id?: strin
   if (typeof drawn === 'string') {
     return refused(MoveOutcome.Invalid, drawn);
   }
-  const made = drawnElement(drawn, newId());
+  const made = drawnElement(drawn, place.id ?? newId());
   if (!made.ok) {
     return refused(MoveOutcome.Invalid, made.error);
   }

@@ -3489,3 +3489,6 @@ Signal: a `@real` spec waits for `frame-hover-box`, `selection-overlay`, `part-b
 ## An instance in auto layout lands far off, the same instance free on the frame is fine
 
 **Signal:** a component instance whose main contains only another instance is pushed by the size of the whole frame. **Move:** `compBounds` measured top clips by their own box; a Precomp host has none. Ask the instance content (`instanceContent`) for nested hosts. Same family: content past `MAX_COMP_DEPTH` silently disappears from renders.
+
+### A new tile shows its outline at once and its content a second later
+Signal: the selection ring of a drawn or pasted node is there on pointerup, its fill lands 0.5–3 s later and the delay varies run to run. Cause: the tile is in `nodes` but nothing holds its doc, so CoreFrames fetches `/motion/<id>/source` and races the node's own insert (404, worker fallback, second fetch). Move: give the doc to `liveDocs` on the gesture and hold the session's saves until the insert lands; measure with a screenshot-diff loop from pointerup (`page.screenshot({ clip })` every ~30 ms), never with a fixed wait.

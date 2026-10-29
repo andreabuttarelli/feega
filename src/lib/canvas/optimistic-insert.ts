@@ -2,7 +2,7 @@ import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { MOTION_NODE_BAR_H, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameNodeOf } from './motion-node';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { drawnElement, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
+import { drawnElement, drawnFrame, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { PENDING_FRAME_TYPE } from './pending-frame';
 
 const OUTPUT_SIDE = 320;
@@ -92,7 +92,11 @@ function ghostSvg(ghost: Ghost): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${ghost.box.width} ${ghost.box.height}" overflow="visible">${GHOST_SHAPE[ghost.wire.tool](ghost)}</svg>`;
 }
 
-export function drawnTile(id: string, wire: DrawnWire): { node: CanvasNodeRecord; look: string } | null {
+export type Drawn = { node: CanvasNodeRecord; doc: MotionDoc };
+
+export type Drawing = { id: string; doc: MotionDoc | null; saved: Promise<boolean> };
+
+export function drawnTile(id: string, wire: DrawnWire): (Drawn & { look: string }) | null {
   const drawn = drawnOf(wire);
   const made = typeof drawn === 'string' ? null : drawnElement(drawn, id);
   if (!made?.ok) {
@@ -110,12 +114,12 @@ export function drawnTile(id: string, wire: DrawnWire): { node: CanvasNodeRecord
     data: atFirstRevision(shaped.data),
     version: 0
   };
-  return { node, look: `data:image/svg+xml,${encodeURIComponent(ghostSvg({ wire, box: made.box, doc: made.doc }))}` };
+  return { node, doc: made.doc, look: `data:image/svg+xml,${encodeURIComponent(ghostSvg({ wire, box: made.box, doc: made.doc }))}` };
 }
 
-export function drawnFrameTile(id: string, box: CanvasBox): CanvasNodeRecord {
+export function drawnFrameTile(id: string, box: CanvasBox): Drawn {
   const shaped = drawnFrameNodeOf(box);
-  return {
+  const node: CanvasNodeRecord = {
     id,
     canvasId: '',
     projectId: '',
@@ -126,6 +130,7 @@ export function drawnFrameTile(id: string, box: CanvasBox): CanvasNodeRecord {
     data: atFirstRevision(shaped.data),
     version: 0
   };
+  return { node, doc: drawnFrame(box) };
 }
 
 export const FIRST_FRAME_SIDE = 100;
