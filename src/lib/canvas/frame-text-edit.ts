@@ -41,7 +41,7 @@ export function editsText(doc: MotionDoc, clipId: string): boolean {
 }
 
 export const hideText = (doc: MotionDoc, clipId: string): MotionDoc => {
-  const hidden = setProps(doc, clipId, { text: '' });
+  const hidden = setProps(doc, clipId, { opacity: 0 });
   return hidden.ok ? hidden.doc : doc;
 };
 
