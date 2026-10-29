@@ -417,7 +417,8 @@ export const LAYER_PANEL: Record<LayerAction, Parity> = {
 export const CANVAS_LIST: Record<CanvasAction, Parity> = {
   [CanvasAction.New]: canvas('create_canvas'),
   [CanvasAction.Rename]: canvas('rename_canvas'),
-  [CanvasAction.Delete]: canvas('delete_canvas')
+  [CanvasAction.Delete]: canvas('delete_canvas'),
+  [CanvasAction.RenameProject]: canvas('rename_project')
 };
 
 export const CLIP_BUTTONS: Record<ClipOp, Parity> = {

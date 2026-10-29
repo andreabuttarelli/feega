@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import PageHead from '$lib/components/PageHead.svelte';
   import PreviewCard from '$lib/components/compose/PreviewCard.svelte';
-  import { LAYOUTS } from '@feega/motion-core/canvas/composition';
+  import { CUSTOM_LAYOUT, LAYOUTS, type CompositionLayout } from '@feega/motion-core/canvas/composition';
   import { COMPOSITION_LAYOUTS } from '@feega/motion-core/motion/components';
   import { FORMATS, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
@@ -13,6 +13,8 @@
   let { data, form } = $props();
 
   let format = $state<MotionFormat>(MotionFormat.Vertical);
+  const CUSTOM_LABEL = 'Custom';
+  const layoutLabel = (layout: CompositionLayout) => (layout === CUSTOM_LAYOUT ? CUSTOM_LABEL : LAYOUTS[layout].label);
   const ratio = $derived(`${FORMATS[format].width} / ${FORMATS[format].height}`);
   const POSTER = { width: 270, height: 480 };
   const sample = (layout: string, ext: string) => `/compose-templates/${layout}.${ext}`;
@@ -99,7 +101,7 @@
               </span>
               <span class="template-text">
                 <span class="template-name">{item.name}</span>
-                <span class="muted">{LAYOUTS[item.layout].label} · {formatLastEdited(item.updatedAt)}</span>
+                <span class="muted">{layoutLabel(item.layout)} · {formatLastEdited(item.updatedAt)}</span>
               </span>
             </a>
           </li>
