@@ -43,7 +43,8 @@
     [DrawTool.Pen]: 'Drew a path',
     [DrawTool.Pencil]: 'Drew a path',
     [DrawTool.ShapeBuilder]: '',
-    [DrawTool.Frame]: 'Drew a frame'
+    [DrawTool.Frame]: 'Drew a frame',
+    [DrawTool.Stack]: 'Drew a stack'
   };
 
   let host = $state<HTMLDivElement | null>(null);

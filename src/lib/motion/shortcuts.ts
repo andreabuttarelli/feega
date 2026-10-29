@@ -128,6 +128,7 @@ export enum Command {
   ToolPencil = 'tool-pencil',
   ToolShapeBuilder = 'tool-shape-builder',
   ToolFrame = 'tool-frame',
+  ToolStack = 'tool-stack',
   ToolScale = 'tool-scale',
   ToggleEditMode = 'toggle-edit-mode',
   MoveLeft = 'move-left',

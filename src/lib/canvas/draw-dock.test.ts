@@ -11,7 +11,8 @@ describe('the draw dock: core tools on the bar, the rest in More', () => {
     expect(toolsIn(DockPlace.Bar)).toEqual([DrawTool.Select, DrawTool.Frame, DrawTool.Rectangle, DrawTool.Ellipse, DrawTool.Text, DrawTool.Pen]);
   });
 
-  it('sends shape builder and the rarer shapes to More', () => {
-    expect(toolsIn(DockPlace.More)).toEqual([DrawTool.Line, DrawTool.Arrow, DrawTool.Polygon, DrawTool.Star, DrawTool.Pencil, DrawTool.ShapeBuilder]);
+  it('sends the stack and the rarer shapes to More, shape builder stays out of every menu', () => {
+    expect(toolsIn(DockPlace.More)).toEqual([DrawTool.Stack, DrawTool.Line, DrawTool.Arrow, DrawTool.Polygon, DrawTool.Star, DrawTool.Pencil]);
+    expect(toolsIn(DockPlace.Palette)).toEqual([DrawTool.ShapeBuilder]);
   });
 });

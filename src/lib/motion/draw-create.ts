@@ -7,11 +7,13 @@ import { FillKind, ShapeKind, StrokeKind } from '@feega/motion-core/motion/shape
 import type { SvgFillRule, SvgGradient } from './shape/svg-import';
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { setClipFlags } from '@feega/motion-core/motion/organize';
+import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { setAutoLayout, setLayoutItem } from './layout/ops';
 import { EditMode } from './edit-mode';
 import { DocMode, docMode, setStill, settledStill } from '@feega/motion-core/motion/still';
 import { TOP_LEFT_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
-type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame;
+type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame | DrawTool.Stack;
 
 const FRAME_FILL = '#ffffff';
 
@@ -25,7 +27,8 @@ const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, 
   [DrawTool.Ellipse]: { component: 'Shape', props: { shape: ShapeKind.Ellipse } },
   [DrawTool.Polygon]: { component: 'Shape', props: { shape: ShapeKind.Polygon, sides: 3 } },
   [DrawTool.Star]: { component: 'Shape', props: { shape: ShapeKind.Star, points: 5 } },
-  [DrawTool.Frame]: { component: 'Shape', props: { shape: ShapeKind.Rect, fills: [{ type: FillType.Solid, color: FRAME_FILL }] } }
+  [DrawTool.Frame]: { component: 'Shape', props: { shape: ShapeKind.Rect, fills: [{ type: FillType.Solid, color: FRAME_FILL }] } },
+  [DrawTool.Stack]: { component: 'Shape', props: { shape: ShapeKind.Rect, fill: 'transparent' } }
 };
 
 const MIN_PEN_POINTS = 2;
@@ -66,7 +69,20 @@ const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizi
   [DrawTool.Ellipse]: () => ({}),
   [DrawTool.Polygon]: () => ({}),
   [DrawTool.Star]: () => ({}),
-  [DrawTool.Frame]: () => ({})
+  [DrawTool.Frame]: () => ({}),
+  [DrawTool.Stack]: () => ({})
+};
+
+const STACK_LAYOUT = { direction: Direction.Vertical, gap: 8, padding: { top: 16, right: 16, bottom: 16, left: 16 } };
+
+function finishStack(doc: MotionDoc, id: string): OpResult {
+  const laid = setAutoLayout(doc, id, STACK_LAYOUT);
+  return laid.ok ? setLayoutItem(laid.doc, id, { width: Sizing.Hug, height: Sizing.Hug }) : laid;
+}
+
+const FINISH: Partial<Record<BoxTool, (doc: MotionDoc, id: string) => OpResult>> = {
+  [DrawTool.Frame]: (doc, id) => setClipFlags(doc, id, { clipContent: true }),
+  [DrawTool.Stack]: finishStack
 };
 
 export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = NEW_TEXT_SIZING, extra: Record<string, unknown> = {}): OpResult {
@@ -75,7 +91,7 @@ export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: nu
     return fail(`${tool} does not draw a box`);
   }
   const placed = place(doc, made.component, { ...made.props, ...extra, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
-  return placed.ok && tool === DrawTool.Frame ? setClipFlags(placed.doc, id, { clipContent: true }) : placed;
+  return placed.ok ? FINISH[tool as BoxTool]?.(placed.doc, id) ?? placed : placed;
 }
 
 const ARROW_HEAD = { length: 0.2, minLength: 12, maxLength: 80, spread: Math.PI / 7 };
