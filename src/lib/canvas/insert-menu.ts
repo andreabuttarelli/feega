@@ -26,3 +26,11 @@ const SECTIONS: Record<BarContext, readonly InsertSection[]> = {
 };
 
 export const insertSections = (context: BarContext): readonly InsertSection[] => SECTIONS[context];
+
+const MENU_EDGE_MARGIN_PX = 12;
+const MENU_GAP_PX = 10;
+const MENU_MAX_PX = 560;
+const MENU_MIN_PX = 120;
+
+export const insertMenuMaxHeight = (barTop: number, topInset = 0): number =>
+  Math.min(MENU_MAX_PX, Math.max(MENU_MIN_PX, barTop - topInset - MENU_GAP_PX - MENU_EDGE_MARGIN_PX));

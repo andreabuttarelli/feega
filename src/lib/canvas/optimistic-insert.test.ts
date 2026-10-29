@@ -59,6 +59,12 @@ describe('a shape drawn on the canvas before the server answers', () => {
     expect(drawn?.look).toMatch(/^data:image\/svg\+xml,/);
   });
 
+  it('a stack stands at once on the drawn box', () => {
+    const drawn = drawnTile('s1', { tool: DrawTool.Stack, box: { left: 5, top: 6, width: 200, height: 80 } });
+
+    expect(drawn?.node).toMatchObject({ id: 's1', position: { x: 5, y: 6 }, size: { width: 200, height: 80 } });
+  });
+
   it('a line stands as the stroke that was drawn', () => {
     const look = decodeURIComponent(drawnTile('l1', { tool: DrawTool.Line, from: { x: 0, y: 0 }, to: { x: 200, y: 80 } })?.look ?? '');
 

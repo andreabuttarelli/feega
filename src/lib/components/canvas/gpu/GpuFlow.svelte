@@ -24,7 +24,7 @@
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
-  import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
+  import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
   import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
@@ -1200,6 +1200,10 @@
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
     if (!nodeId || !live || !picks.length) {
+      return;
+    }
+    if (frameChrome(kindOfNode(nodeId)).selectsOwnClip && stacksWholeElement(id, live.doc, picks)) {
+      props.onWrapStack?.([nodeId]);
       return;
     }
     const at = scoped(live.doc, picks, frameOfLive(live));

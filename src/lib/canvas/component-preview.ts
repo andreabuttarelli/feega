@@ -1,6 +1,7 @@
-import { Background, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Background, newClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
 import type { DisplayList, TextBox } from '@feega/motion-core/motion/gpu-full/display-list';
-import { componentSlice, mainClipOf } from '$lib/motion/canvas-components';
+import { componentSlice } from '$lib/motion/canvas-components';
 import { boundsOfClips } from '$lib/motion/export-svg';
 import type { Crop } from '$lib/motion/export-vector';
 import { BUDGET, Device } from './gpu/memory-budget';
@@ -11,10 +12,13 @@ export const previewKey = (compId: string, revision: number): string => `${compI
 
 export const previewSide = (device: Device, dpr: number): number => Math.round(TILE_CSS_SIDE * Math.min(dpr, BUDGET[device].resolution));
 
+const PREVIEW_HOST = 'preview';
+
 export function previewDoc(frame: MotionDoc, compId: string): MotionDoc {
-  const main = mainClipOf(frame, compId);
-  const tracks = frame.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id === main) })).filter((t) => t.clips.length);
-  return { ...componentSlice(frame, compId), tracks, background: Background.Transparent };
+  const slice = componentSlice(frame, compId);
+  const durationInFrames = slice.comps[compId]?.durationInFrames ?? frame.durationInFrames;
+  const host = newClip({ id: PREVIEW_HOST, from: 0, durationInFrames, component: 'Precomp', props: { comp: compId } });
+  return { ...slice, tracks: [{ id: PREVIEW_HOST, kind: TrackKind.Visual, name: PREVIEW_HOST, clips: [host] }], background: Background.Transparent };
 }
 
 function union(boxes: readonly Crop[]): Crop | null {

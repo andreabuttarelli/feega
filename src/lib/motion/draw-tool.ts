@@ -12,7 +12,8 @@ export enum DrawTool {
   Pen = 'pen',
   Pencil = 'pencil',
   ShapeBuilder = 'shape-builder',
-  Frame = 'frame'
+  Frame = 'frame',
+  Stack = 'stack'
 }
 
 export type DragPoint = { x: number; y: number };

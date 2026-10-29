@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { frameRows, layerRows } from '$lib/canvas/layers';
 import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -154,6 +155,21 @@ describe('wrapping free elements with a stack', () => {
 
     expect(await actions.stackElements(input as never)).toMatchObject({ outcome: 'done' });
     expect(clipsOf(revisions(input)[0].doc).find((c) => c.id === 'a')!.parent).toBeTruthy();
+  });
+
+  it('lists the new stack in Layers with the wrapped element indented under it', async () => {
+    const id = '99999999-9999-4999-8999-999999999999';
+    const input = event({ ids: JSON.stringify([A]), node_id: id }, { nodes: [elementRow(A, AT_A)], motion_revisions: [revisionRow(A, box('a', AT_A))] });
+    await actions.stackElements(input as never);
+    const [node] = inserted(input);
+    const doc = revisions(input)[0].doc;
+
+    const rows = layerRows([{ id, type: 'motion', name: node.display_name, element: true }], null, { [id]: frameRows(doc, id) });
+
+    expect(rows.map((r) => [r.label, r.depth])).toEqual([
+      ['Stack', 0],
+      ['Box', 1]
+    ]);
   });
 
   it('refuses a frame', async () => {

@@ -47,13 +47,21 @@ function instanceContent(doc: MotionDoc, size: Size, measure: TextMeasure): Cont
     const own = { overrides: clip.props.overrides, values: clip.props.propValues };
     const key = own.overrides || own.values ? `${id}${JSON.stringify(own)}` : id;
     if (!cache.has(key)) {
-      const tracks = key === id ? comp.tracks : laidOut(overridden(comp.tracks, clip, comp.component), space, measure, instanceContent(doc, space, measure));
       cache.set(key, null);
-      cache.set(key, compBounds({ ...comp, tracks }, space, content));
+      cache.set(key, compBounds({ ...comp, tracks: instanceTracks(doc, clip, comp, size, measure) }, space, content));
     }
     return cache.get(key) ?? null;
   };
   return content;
+}
+
+export function instanceTracks(doc: MotionDoc, host: MotionClip, comp: MotionComp, size: Size, measure: TextMeasure = estimatedText): MotionTrack[] {
+  const tracks = overridden(comp.tracks, host, comp.component);
+  if (tracks === comp.tracks) {
+    return tracks;
+  }
+  const space = comp.frame ?? size;
+  return laidOut(tracks, space, measure, instanceContent(doc, space, measure));
 }
 
 const visualClips = (tracks: readonly MotionTrack[]): MotionClip[] => tracks.flatMap((t) => t.clips as MotionClip[]);

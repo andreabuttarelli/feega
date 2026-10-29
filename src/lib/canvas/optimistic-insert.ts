@@ -86,7 +86,8 @@ const GHOST_SHAPE: Record<DrawnWire['tool'], (ghost: Ghost) => string> = {
   [DrawTool.Text]: ghostText,
   [DrawTool.Line]: ghostLine,
   [DrawTool.Arrow]: ghostLine,
-  [DrawTool.Frame]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`
+  [DrawTool.Frame]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`,
+  [DrawTool.Stack]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`
 };
 
 function ghostSvg(ghost: Ghost): string {

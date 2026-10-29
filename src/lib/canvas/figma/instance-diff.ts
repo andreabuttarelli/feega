@@ -12,10 +12,6 @@ export type ImagesOf = { own: FigmaImage[]; main: FigmaImage[] };
 const IGNORED = new Set(['id', 'name', 'parent', 'props', ...CLIP_LEVEL_OVERRIDES]);
 
 const PRECISION = 1e6;
-const GEOMETRY = new Set(['x', 'y', 'width', 'height', 'path', 'transform']);
-const NESTED = new Set(['text', 'overrides']);
-
-const reflows = (clip: MotionClip) => Boolean(clip.autoLayout) || clip.component === 'Text';
 
 const rounded = (_key: string, value: unknown) => (typeof value === 'number' ? Math.round(value * PRECISION) / PRECISION : value);
 
@@ -64,24 +60,18 @@ export function instanceOverrides(doc: MotionDoc, ownId: string, mainId: string,
     return null;
   }
 
-  const laidOut = pairs.some((p) => p.main.autoLayout);
   const overrides: Overrides = {};
   const nested: PathChange[] = [];
   for (const pair of pairs) {
     const diff = changed(pair);
-    const keys = Object.keys(diff);
-    if (!keys.length) {
+    if (!Object.keys(diff).length) {
       continue;
     }
-    const path = pair.top ? null : pathTo(doc, mainId, pair.main.id);
-    if (path && keys.every((k) => NESTED.has(k) || (pair.main.component === 'Text' && GEOMETRY.has(k)))) {
-      nested.push({ path, props: diff });
+    if (pair.top) {
+      overrides[pair.main.id] = diff;
       continue;
     }
-    if (!pair.top || (laidOut && !reflows(pair.main) && keys.some((k) => GEOMETRY.has(k)))) {
-      return null;
-    }
-    overrides[pair.main.id] = diff;
+    nested.push({ path: pathTo(doc, mainId, pair.main.id)!, props: diff });
   }
   const deep = nestedOverrides(doc, mainId, nested);
   for (const [id, props] of Object.entries(deep)) {
@@ -98,7 +88,7 @@ export function instanceOverrides(doc: MotionDoc, ownId: string, mainId: string,
     if (slot(images.main, pair.main.id, image.at) === image.hash) {
       continue;
     }
-    if (!pair.top || 1) {
+    if (!pair.top) {
       return null;
     }
     slots.push({ innerId: pair.main.id, hash: image.hash, at: image.at });

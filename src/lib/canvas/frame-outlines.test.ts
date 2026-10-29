@@ -29,6 +29,7 @@ describe('frame outlines on the client', () => {
     expect(frameHead('motion', { docHeadRevision: 5 })).toBe(5);
     expect(frameHead('motion', { docHeadRevision: 0 })).toBeNull();
     expect(frameHead('text', { docHeadRevision: 5 })).toBeNull();
+    expect(frameHead('element', { docHeadRevision: 2 })).toBe(2);
     expect(canvasHeads([{ id: 'm1', head: 5 }, { id: 'n1', head: null }, { id: 'n2' }])).toEqual([{ nodeId: 'm1', version: 5 }]);
   });
 });

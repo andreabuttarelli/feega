@@ -106,6 +106,27 @@ describe('layer rows', () => {
     expect(frameRows(doc, 'm1').find((r) => r.id === 'st')).toMatchObject({ type: LayoutKind.Stack, label: 'Stack' });
   });
 
+  const stackedText = () => ok(wrapInStack(ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 't')), ['t'], 'st', 'lane'));
+
+  it('nests a wrapped text under its new stack in a frame, and the text keeps its own icon', () => {
+    const rows = frameRows(stackedText(), 'm1');
+
+    expect(rows.map((r) => [r.id, r.label, r.type, r.depth])).toEqual([
+      ['st', 'Stack', LayoutKind.Stack, 1],
+      ['t', 'Text', 'Text', 2]
+    ]);
+  });
+
+  it('shows a free stack as the Stack row with its text indented under it', () => {
+    const doc = stackedText();
+    const rows = layerRows([{ id: 'e1', type: 'motion', name: 'Stack', element: true, glyph: LayoutKind.Stack }], { nodeId: 'e1', doc }, { e1: frameRows(doc, 'e1') });
+
+    expect(rows.map((r) => [r.id, r.label, r.type, r.depth])).toEqual([
+      ['e1', 'Stack', LayoutKind.Stack, 0],
+      ['t', 'Text', 'Text', 1]
+    ]);
+  });
+
   it('picks the one element row while its shape is selected inside it', () => {
     const doc = video();
     const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], { nodeId: 'e1', doc });

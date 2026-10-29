@@ -204,7 +204,12 @@ function frameBackground(doc: MotionDoc, layer: FrameLayer, p: Place, need: Back
 const BUILD: Record<LayerKind, (doc: MotionDoc, layer: Layer, p: Place) => Built> = {
   [LayerKind.Shape]: (doc, layer, p) => shapeClip(doc, layer as ShapeLayer, p),
   [LayerKind.Text]: (doc, layer, p) => textClip(doc, layer as TextLayer, p),
-  [LayerKind.Frame]: (doc, layer, p) => nestedFrame(doc, layer as FrameLayer, p)
+  [LayerKind.Frame]: (doc, layer, p) => nestedFrame(doc, layer as FrameLayer, p, Background.IfPainted)
+};
+
+const BUILD_IN_FLOW: Record<LayerKind, (doc: MotionDoc, layer: Layer, p: Place) => Built> = {
+  ...BUILD,
+  [LayerKind.Frame]: (doc, layer, p) => nestedFrame(doc, layer as FrameLayer, p, Background.Always)
 };
 
 const DIRECTION: Record<Flow, Direction> = { [Flow.Row]: Direction.Horizontal, [Flow.Column]: Direction.Vertical };
@@ -272,12 +277,13 @@ function laidOut(built: Built, container: Root, layer: FrameLayer, flow: AutoLay
   return { ...built, doc: applied(built.doc, [...own, ...children, ...clipped], p, `auto layout of ${layer.name}`), roots: [container] };
 }
 
-function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
+function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background.IfPainted): Built {
   const flow = layer.autoLayout;
-  const background = frameBackground(doc, layer, p, flow ? Background.Always : Background.IfPainted);
+  const background = frameBackground(doc, layer, p, flow ? Background.Always : need);
+  const build = flow ? BUILD_IN_FLOW : BUILD;
   let built: Built = { ...background, roots: flow ? [] : background.roots };
   for (const child of layer.children) {
-    const next = BUILD[child.kind](built.doc, child, p);
+    const next = build[child.kind](built.doc, child, p);
     built = { doc: next.doc, ids: [...built.ids, ...next.ids], roots: [...built.roots, ...next.roots] };
   }
   const [container] = background.roots;
@@ -336,17 +342,17 @@ function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: P
 
 function ownOverrides(doc: MotionDoc, layer: FrameLayer, main: Main, shift: Unit, p: Place) {
   const images: FigmaImage[] = [];
-  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(p.mains), report: () => undefined });
+  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(p.mains), report: () => undefined }, Background.Always);
   const ids = { comp: p.newId(), clip: p.newId() };
   const made = own.ids.length ? precompose(own.doc, own.ids, ids, layer.name) : null;
   return made?.ok ? instanceOverrides(made.doc, ids.comp, main.compId, { own: images, main: main.images }) : null;
 }
 
-function instanceOfMain(doc: MotionDoc, layer: FrameLayer, main: Main, p: Place): Built {
+function instanceOfMain(doc: MotionDoc, layer: FrameLayer, main: Main, p: Place, need: Background): Built {
   const shift = { x: ((layer.box.x - main.at.x) * p.scale) / doc.width, y: ((layer.box.y - main.at.y) * p.scale) / doc.height };
   const linked = ownOverrides(doc, layer, main, shift, p);
   if (!linked) {
-    return plainFrame(doc, layer, p);
+    return plainFrame(doc, layer, p, need);
   }
   const id = p.newId();
   const comp = doc.comps[main.compId];
@@ -362,20 +368,20 @@ function instanceOfMain(doc: MotionDoc, layer: FrameLayer, main: Main, p: Place)
   return { doc: named.doc, ids: [id], roots: [{ id, layer }] };
 }
 
-function plainFrame(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
-  const built = layersOf(doc, layer, p);
+function plainFrame(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {
+  const built = layersOf(doc, layer, p, need);
   return layer.autoLayout ? built : grouped(built, layer, p);
 }
 
-function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place): Built {
+function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {
   const main = layer.component?.inPaste ? p.mains.get(layer.component.key) : undefined;
   if (main) {
-    return instanceOfMain(doc, layer, main, p);
+    return instanceOfMain(doc, layer, main, p, need);
   }
   if (layer.component?.inPaste) {
-    return mainFrom(layersOf(doc, layer, p), layer, layer.component, p);
+    return mainFrom(layersOf(doc, layer, p, Background.Always), layer, layer.component, p);
   }
-  return plainFrame(doc, layer, p);
+  return plainFrame(doc, layer, p, need);
 }
 
 function sceneOf(html: string) {

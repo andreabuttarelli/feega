@@ -353,6 +353,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToolArrow]: { name: 'Arrow tool', icon: MoveUpRight, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from tail to head' },
   [Command.ToolPencil]: { name: 'Pencil tool', icon: Pencil, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw, hold Shift for straight segments' },
   [Command.ToolShapeBuilder]: { name: 'Shape builder', icon: Combine, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click regions to merge, Alt-click to subtract, Enter to apply' },
+  [Command.ToolStack]: { name: 'Stack tool', icon: StretchHorizontal, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click or drag to add an empty stack' },
   [Command.ToolFrame]: { name: 'Frame tool', icon: FrameIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw a frame' },
   [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },

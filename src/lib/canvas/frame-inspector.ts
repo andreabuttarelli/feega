@@ -291,6 +291,10 @@ const runs = (id: ActionId) => id in BAR_OPS || id in LATER_OPS || id in PICKS;
 
 export const canRunInFrame = runs;
 
+const rootIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips.filter((c) => !c.parent).map((c) => c.id));
+
+export const stacksWholeElement = (id: ActionId, doc: MotionDoc, picks: readonly string[]): boolean => id === Action.WrapStack && rootIds(doc).every((root) => picks.includes(root));
+
 export const frameMenuAction = (id: SelectionActionId): ActionId | null => {
   const run = frameMenuRun(id);
   return run && 'command' in run ? run.command : null;
