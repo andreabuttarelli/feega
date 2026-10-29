@@ -148,8 +148,7 @@
         "properties": "Properties",
         "backToCanvas": "Back to canvas",
         "switchView": "Canvas, properties or chat",
-        "projects": "Projects",
-        "canvases": "Canvases"
+        "projects": "Projects"
       },
       "canvasActions": {
         "new": "New canvas",
