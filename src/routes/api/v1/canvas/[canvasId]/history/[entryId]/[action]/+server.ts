@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { SESSION_HEADER, sessionFromHeader } from '@feega/api-contracts';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
 import { runCanvasOp } from '$lib/server/edit/runners';
 import { canvasProject } from '$lib/server/repos/canvas';
@@ -8,7 +9,7 @@ import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
 
 const HTTP_NOT_FOUND = 404;
 
-type Body = { name?: string; keep?: string };
+type Body = { name?: string; keep?: string; choices?: unknown; confirm?: unknown };
 
 type Route = { op: CanvasOpName; input: (body: Body) => Record<string, unknown> };
 
@@ -20,7 +21,8 @@ const WRITES: Partial<Record<string, Route>> = {
   [HistoryAction.Restore]: { op: 'restore_to', input: () => ({}) },
   [HistoryAction.Name]: { op: 'name_version', input: (body) => ({ name: String(body.name ?? '') }) },
   [HistoryAction.Merge]: { op: 'merge_branch_at', input: (body) => (body.keep ? { keep: body.keep } : {}) },
-  [HistoryAction.Drop]: { op: 'drop_branch_at', input: () => ({}) }
+  [HistoryAction.Drop]: { op: 'drop_branch_at', input: () => ({}) },
+  [HistoryAction.Revert]: { op: 'revert_change', input: (body) => ({ choices: body.choices, confirm: body.confirm }) }
 };
 
 async function run(request: Request, url: URL, params: { canvasId: string; entryId: string; action: string }, route: Route | undefined, body: Body) {
@@ -34,7 +36,7 @@ async function run(request: Request, url: URL, params: { canvasId: string; entry
     return json(resolved.error.body, { status: resolved.error.status });
   }
 
-  const { caller } = resolved;
+  const caller = { ...resolved.caller, sessionId: sessionFromHeader(request.headers.get(SESSION_HEADER)) };
   const projectId = await canvasProject(caller.db, { orgId: caller.orgId, canvasId: params.canvasId });
   if (!projectId) {
     return json({ error: 'canvas_not_found' }, { status: HTTP_NOT_FOUND });

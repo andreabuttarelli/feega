@@ -19,12 +19,33 @@ export enum PointAction {
   Restore = 'restore',
   Name = 'name',
   Merge = 'merge',
-  Drop = 'drop'
+  Drop = 'drop',
+  Revert = 'revert'
 }
 
-export type PointAsk = { canvasId: string; entryId: string; action: `${PointAction}`; name?: string; keep?: string };
+export enum Keep {
+  Mine = 'mine',
+  Reject = 'reject'
+}
 
-const POINT_METHOD: Record<PointAction, string> = { [PointAction.Preview]: 'GET', [PointAction.Restore]: 'POST', [PointAction.Name]: 'POST', [PointAction.Merge]: 'POST', [PointAction.Drop]: 'POST' };
+export type KeepChoice = { path: string; keep: Keep };
+
+export type PointAsk = { canvasId: string; entryId: string; action: `${PointAction}`; name?: string; keep?: string; choices?: KeepChoice[]; confirm?: boolean };
+
+const POINT_METHOD: Record<PointAction, string> = { [PointAction.Preview]: 'GET', [PointAction.Restore]: 'POST', [PointAction.Name]: 'POST', [PointAction.Merge]: 'POST', [PointAction.Drop]: 'POST', [PointAction.Revert]: 'POST' };
+
+const KEEPS = new Set<string>(Object.values(Keep));
+
+export function keepChoices(pairs: string[]): KeepChoice[] {
+  return pairs.map((pair) => {
+    const at = pair.lastIndexOf('=');
+    const keep = pair.slice(at + 1);
+    if (at < 1 || !KEEPS.has(keep)) {
+      throw new Error(`--keep ${pair}: write <field>=mine or <field>=reject`);
+    }
+    return { path: pair.slice(0, at), keep: keep as Keep };
+  });
+}
 
 export type ResolveAsk = { canvasId: string; conflictId: string; keep: string };
 
@@ -35,7 +56,7 @@ export const historyApi = {
   at: (token: string, ask: PointAsk, org?: string) => {
     const method = POINT_METHOD[ask.action as PointAction];
     const path = `/api/v1/canvas/${encodeURIComponent(ask.canvasId)}/history/${encodeURIComponent(ask.entryId)}/${ask.action}${query({ canvasId: ask.canvasId }, org)}`;
-    return request<Record<string, unknown>>(path, token, method === 'GET' ? undefined : { method, body: JSON.stringify({ name: ask.name, keep: ask.keep }) });
+    return request<Record<string, unknown>>(path, token, method === 'GET' ? undefined : { method, body: JSON.stringify({ name: ask.name, keep: ask.keep, choices: ask.choices, confirm: ask.confirm }) });
   },
   resolve: (token: string, ask: ResolveAsk, org?: string) =>
     request<ResolveAnswer>(`/api/v1/canvas/${encodeURIComponent(ask.canvasId)}/conflicts/${encodeURIComponent(ask.conflictId)}/resolve${query({ canvasId: ask.canvasId }, org)}`, token, { method: 'POST', body: JSON.stringify({ keep: ask.keep }) })

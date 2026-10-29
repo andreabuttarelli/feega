@@ -91,8 +91,8 @@ describe('actionsOf says what a point in history can do', () => {
     expect(actionsOf(entry('branch:b:1', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Branch }))).toEqual([HistoryAction.Merge, HistoryAction.Drop]);
   });
 
-  it('a single structural event offers none of them', () => {
-    expect(actionsOf(entry('event:7', '2026-10-29T10:00:00Z', marco))).toEqual([]);
+  it('a structural event can only be reverted', () => {
+    expect(actionsOf(entry('event:7', '2026-10-29T10:00:00Z', marco))).toEqual([HistoryAction.Revert]);
   });
 });
 
@@ -151,6 +151,17 @@ describe('historyGraph groups rows into sessions', () => {
     );
 
     expect(graph.sessions.map((s) => s.rows.map((r) => r.entry.id))).toEqual([['a', 'c'], ['b'], ['d']]);
+  });
+});
+
+describe('a session key names the same session whatever the filter', () => {
+  it('a person session keeps its key under All and People', () => {
+    const entries = [entry('a', '2026-10-29T12:00:00Z', claude), entry('b', '2026-10-29T11:00:00Z', marco)];
+
+    const all = historyGraph(entries, { filter: HistoryFilter.All, names: {} });
+    const people = historyGraph(entries, { filter: HistoryFilter.People, names: {} });
+
+    expect(people.sessions[0].key).toBe(all.sessions[1].key);
   });
 });
 

@@ -56,7 +56,7 @@ export async function runCanvasOp(caller: OrgCaller, ask: CanvasAsk): Promise<An
     return denied;
   }
 
-  const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId, sessionId: caller.sessionId });
+  const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId, agentKey: MCP_AGENT_KEY, sessionId: caller.sessionId });
   return { status: HTTP_OK, body: await op.run(ctx, input.data as never) };
 }
 

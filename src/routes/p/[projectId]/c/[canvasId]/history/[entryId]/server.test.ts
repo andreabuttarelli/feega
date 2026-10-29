@@ -41,6 +41,21 @@ describe('one point of the History panel', () => {
     expect(fake.calls.some((c) => c.table === 'canvas_versions' && c.op === 'insert')).toBe(true);
   });
 
+  it('Revert answers a change that is not there as not found', async () => {
+    const { event: e } = event('event:7', { action: 'revert' });
+
+    const res = await POST(e);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ outcome: 'not_found' });
+  });
+
+  it('Revert refuses a saved version: that is Restore', async () => {
+    const { event: e } = event('version:v1', { action: 'revert' });
+
+    expect((await POST(e)).status).toBe(422);
+  });
+
   it('a point that cannot do the action is refused', async () => {
     const { event: e } = event('event:7', { action: 'restore' });
 

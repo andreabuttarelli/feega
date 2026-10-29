@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { historyApi, historyRows, type History } from './history.ts';
+import { historyApi, historyRows, keepChoices, type History } from './history.ts';
 
 const seen: string[] = [];
 const bodies: string[] = [];
@@ -64,6 +64,19 @@ describe('historyApi.resolve', () => {
 
     expect([methods.at(-1), seen.at(-1)]).toEqual(['POST', '/api/v1/canvas/c-1/conflicts/k-1/resolve?org=org-1']);
     expect(JSON.parse(bodies.at(-1) ?? '{}')).toEqual({ keep: 'mine' });
+  });
+});
+
+describe('revert', () => {
+  it('posts the change with its choices and confirm', async () => {
+    await historyApi.at('t', { canvasId: 'c-1', entryId: 'event:7', action: 'revert', choices: keepChoices(['data.prompt=reject']), confirm: true });
+
+    expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history/event%3A7/revert');
+    expect(JSON.parse(bodies.at(-1) ?? '{}')).toEqual({ choices: [{ path: 'data.prompt', keep: 'reject' }], confirm: true });
+  });
+
+  it('a keep that is neither mine nor reject is refused', () => {
+    expect(() => keepChoices(['data.prompt=theirs'])).toThrow();
   });
 });
 

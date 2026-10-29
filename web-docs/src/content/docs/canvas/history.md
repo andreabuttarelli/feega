@@ -63,6 +63,22 @@ A branch of a frame is drawn off the frame's lane with a dashed fork. Click it f
 the frame changed the same thing, Merge asks which side to keep: **Keep branch** or **Keep main**.
 With **One frame** on, the branch button at the top makes a new branch of that frame.
 
+## Revert a change
+
+Any change, by anyone (you, a teammate, the chat or an outside agent), can be reverted: click a
+step and choose **Revert this change**, or press the revert button on a session row to revert the
+whole session. Later edits stay:
+
+- **Edited node**: only the fields that change touched go back, and its position if it moved
+  the node.
+- **Same field edited since**: nothing is written yet. For each field pick **Now** (keep the
+  value there today) or **Before** (the value before the change), then **Revert**.
+- **Created node**: deleted. If someone else connected or edited it since, you are asked first.
+- **Deleted node or line**: restored. **New line**: removed.
+
+The revert is a change on your lane, so it can be reverted too. Saved versions and frame
+revisions use **Restore to here** instead.
+
 The bookmark button at the top saves the whole canvas as a named version. **History** is also in
 the page menu of the Pages panel and in the **More** menu of a selected frame, which opens the
 panel on that frame.
@@ -93,6 +109,7 @@ feega history <canvasId> --frame <frameId>          # a frame's revisions and br
 feega history <canvasId> --merge <entryId> [--keep branch|main]
 feega history <canvasId> --drop <entryId>
 feega resolve-conflict <canvasId> <conflictId> mine|theirs
+feega history <canvasId> --revert <entryId|sessionKey> [--choose data.prompt=mine|reject] [--confirm]
 ```
 
 ## From the API and MCP
@@ -104,12 +121,18 @@ feega resolve-conflict <canvasId> <conflictId> mine|theirs
 - `POST /api/v1/canvas/{canvasId}/history/{entryId}/merge` `{keep?: branch|main}` and `…/drop`
 - MCP: `view` op `list_history` `{canvas_id, author?, frame_id?, limit?}`; `edit` ops
   `preview_at`, `restore_to`, `name_version` `{canvasId, entryId, name?}`, `merge_branch_at`
-  `{canvasId, entryId, keep?}` and `drop_branch_at`.
+  `{canvasId, entryId, keep?}`, `drop_branch_at` and `revert_change` `{canvasId, entryId, choices?, confirm?}`.
 - `POST /api/v1/canvas/{canvasId}/conflicts/{conflictId}/resolve` `{keep: mine|theirs}`; MCP `edit` op
   `resolve_conflict` `{canvasId, conflictId, keep}`.
 
 A conflict entry has `kind` `conflict.open` (or `conflict.resolved`, with the side kept as
 `summary`) and `id` `conflict:<conflictId>`.
+- `POST /api/v1/canvas/{canvasId}/history/{entryId}/revert` `{choices?: [{path, keep: "mine"|"reject", eventId?}], confirm?}`
+  (`entryId` may also be a session `key`)
+
+`revert` answers `outcome`: `rejected` (done; `reverted` lists the paths), `conflict` (per field
+`path`, `mine`, `original`: resend with `choices`), `confirm` (resend with `confirm: true`),
+`stale` (retry), `not_found`, or `not_revertable` (a version or revision: use restore).
 
 Each entry carries `id` (the `entryId` above), `kind`, `at`, `lane` (index into `lanes`), `node_id`, `frame_id`, `subject`
 (the name of what it touched), `session_id`, `summary` and its `author`. `sessions` lists the
