@@ -69,6 +69,7 @@ export type FigmaRawNode = {
   lineHeight?: { value: number; units: string };
   letterSpacing?: { value: number; units: string };
   textAlignHorizontal?: string;
+  textAutoResize?: string;
   textData?: { characters: string; styleOverrideTable?: FigmaRawNode[]; characterStyleIDs?: number[] };
   styleID?: number;
   symbolData?: { symbolID?: Guid; symbolOverrides?: NodePatch[] };

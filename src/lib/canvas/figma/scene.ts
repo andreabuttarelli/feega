@@ -93,6 +93,7 @@ export type TextLayer = Common & {
   align: 'left' | 'center' | 'right' | 'justify';
   color: string;
   runs: TextRun[];
+  wraps: boolean;
   fills: Fill[];
   strokes: Stroke[];
 };
@@ -488,6 +489,7 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
     letterSpacing: unitOf(n.letterSpacing, '0%'),
     align: ALIGN[n.textAlignHorizontal ?? 'LEFT'] ?? 'left',
     runs: runsOf(n, base, ctx.report),
+    wraps: n.textAutoResize === 'HEIGHT',
     fills,
     strokes: strokesOf(n, ctx.report)
   };

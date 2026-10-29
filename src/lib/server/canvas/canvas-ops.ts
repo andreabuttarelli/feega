@@ -76,6 +76,7 @@ import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
 import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
+import { importUrlInto } from '$lib/server/url-import/canvas-import';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
@@ -250,6 +251,8 @@ const importFigmaInput = z
     y: z.number().finite()
   })
   .strict();
+
+const importUrlInput = z.object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const drawFrameInput = z
   .object({
@@ -976,6 +979,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importFigmaInput,
     run: async (ctx, input) => importFigmaInto(figmaScope(ctx), input.canvasId, { url: input.url, nodeIds: input.frameIds ?? null, at: { x: input.x, y: input.y } })
+  }),
+
+  import_url: op({
+    access: Access.Write,
+    input: importUrlInput,
+    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y } })
   }),
 
   draw_frame: op({

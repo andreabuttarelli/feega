@@ -60,6 +60,7 @@ export type RestNode = {
   fillGeometry?: { path: string; windingRule?: string }[];
   strokeGeometry?: { path: string; windingRule?: string }[];
   characters?: string;
+  textAutoResize?: string;
   style?: RestStyle;
   characterStyleOverrides?: number[];
   styleOverrideTable?: Record<string, RestStyle>;
@@ -192,6 +193,7 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     lineHeight: lineHeightOf(style),
     letterSpacing: style?.letterSpacing ? { value: style.letterSpacing, units: 'PIXELS' } : undefined,
     textAlignHorizontal: style?.textAlignHorizontal,
+    textAutoResize: n.textAutoResize,
     textData: { characters: n.characters ?? '', characterStyleIDs: n.characterStyleOverrides, styleOverrideTable: overrides }
   };
 }
