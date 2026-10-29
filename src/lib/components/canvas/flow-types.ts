@@ -1,6 +1,7 @@
 import type { ActionResult } from '@sveltejs/kit';
 import type { Snippet } from 'svelte';
 import type { Offset } from '$lib/canvas/duplicate-plan';
+import type { ComponentDrag } from '$lib/canvas/component-drag';
 import type { FocusRequest } from '$lib/canvas/free-area';
 import type { GenPropertyType } from '$lib/canvas/common-properties';
 import type { ColourTag } from '$lib/canvas/node-colour';
@@ -97,6 +98,7 @@ export type FlowProps = {
     client: PointerPoint,
     at: { x: number; y: number },
   ) => void;
+  onDropComponent?: (drag: ComponentDrag, at: { x: number; y: number }) => void;
   onFlow?: (
     toFlow: (p: { x: number; y: number }) => { x: number; y: number },
   ) => void;

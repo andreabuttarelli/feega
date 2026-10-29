@@ -16,6 +16,9 @@
   function drag(e: DragEvent, item: ComponentDrag) {
     e.dataTransfer?.setData(CANVAS_DRAG_COMPONENT, serializeComponentDrag(item));
     e.dataTransfer!.effectAllowed = 'copy';
+    const row = e.currentTarget as HTMLElement;
+    const preview = row.closest('.group')?.querySelector<HTMLImageElement>('img.thumb') ?? row;
+    e.dataTransfer?.setDragImage(preview, preview.clientWidth / 2, preview.clientHeight / 2);
   }
 
   function copy(item: ComponentDrag) {

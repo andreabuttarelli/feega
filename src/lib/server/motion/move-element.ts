@@ -8,6 +8,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize, type DocNodeShape } from '$lib/canvas/motion-node';
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
+import { placeInstance } from '$lib/motion/canvas-components';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { gradientFillSchema } from '@feega/motion-core/motion/fill/model';
 import { FILL_RULES } from '@feega/motion-core/motion/shape/schema';
@@ -286,6 +287,29 @@ export async function copyElement(store: FrameStore, ask: MoveAsk): Promise<Move
   if (!isLanding(landing)) {
     return landing;
   }
+  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+}
+
+export const componentAskSchema = z.object({ sourceNodeId: z.string().min(1), compId: z.string().min(1), drop: z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict() }).strict();
+
+export type ComponentAsk = z.infer<typeof componentAskSchema> & { canvasId: string };
+
+export async function placeComponent(store: FrameStore, ask: ComponentAsk): Promise<Moved> {
+  const source = await store.read(ask.sourceNodeId);
+  if (!source) {
+    return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
+  }
+  const instanceId = newId();
+  const placed = placeInstance(source.doc, source.doc, ask.compId, () => instanceId);
+  if (!placed.ok) {
+    return refused(MoveOutcome.Invalid, placed.error);
+  }
+  const lifted = liftElement(placed.doc, instanceId);
+  if (!lifted.ok) {
+    return refused(MoveOutcome.NoElement, lifted.error);
+  }
+
+  const landing = await landOut(store, { ...source, canvasId: ask.canvasId }, lifted.element, ask.drop, null);
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 

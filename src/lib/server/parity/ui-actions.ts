@@ -69,6 +69,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   connect: canvas('connect_nodes'),
   moveElement: canvas('move_frame_element'),
   copyElement: canvas('copy_frame_element'),
+  placeComponent: canvas('place_component'),
   frameSize: motion('set_canvas'),
   exportSelection: canvas('export_selection'),
   saveCanvasVersion: canvas('save_canvas_version'),

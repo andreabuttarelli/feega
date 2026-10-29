@@ -121,6 +121,7 @@
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
+  import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
   import { fetchComponentSource } from '$lib/canvas/project-components';
   import { placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
@@ -2962,19 +2963,33 @@
     if (types.includes(CANVAS_DRAG_FEED_IMAGE)) {
       props.onFeedImageOver?.({ x: e.clientX, y: e.clientY });
     }
+    componentOver = types.includes(CANVAS_DRAG_COMPONENT) ? framedDrop(toFlow({ x: e.clientX, y: e.clientY })) : null;
   }
 
   function onDragLeave(e: DragEvent) {
     if (!wrap?.contains(e.relatedTarget as Node | null)) {
       props.onFeedImageOver?.(null);
+      componentOver = null;
     }
   }
 
+  let componentOver = $state<string | null>(null);
+  const componentOverBox = $derived(componentOver ? (coreFrames.find((f) => f.id === componentOver)?.box ?? null) : null);
+
+  const dropFrames = () => coreFrames.map((f) => ({ id: f.id, takesDrops: frameChrome(kindOfNode(f.id)).takesDrops }));
+
+  function framedDrop(world: Point, fallbackFrame: string | null = null): string | null {
+    const target = componentDropTarget(topNodeAt(world), dropFrames(), fallbackFrame);
+    return target.on === ComponentDropOn.Frame ? target.frameId : null;
+  }
+
   async function dropComponent(dragged: ComponentDrag, world: Point, fallbackFrame: string | null = null) {
-    const targetId = topNodeAt(world);
-    const frame = coreFrames.find((f) => f.id === targetId) ?? coreFrames.find((f) => f.id === fallbackFrame);
+    componentOver = null;
+    const frameId = framedDrop(world, fallbackFrame);
+    const frame = frameId ? coreFrames.find((f) => f.id === frameId) : null;
     const saver = frame ? saverOf(frame.id) : null;
     if (!frame || !saver) {
+      props.onDropComponent?.(dragged, world);
       return;
     }
     const source = liveOf(dragged.frameId)?.doc ?? (await fetchComponentSource(page.params.projectId ?? '', dragged));
@@ -3304,6 +3319,10 @@
       context={barContextFor(soleFrame)}
       zoom={view.zoom}
     />
+  {/if}
+
+  {#if componentOverBox}
+    <div class="component-drop" data-testid="component-drop-target" style={`left:${componentOverBox.x * view.zoom + view.x}px;top:${componentOverBox.y * view.zoom + view.y}px;width:${componentOverBox.w * view.zoom}px;height:${componentOverBox.h * view.zoom}px`}></div>
   {/if}
 
   {#if spec.chrome}
@@ -3639,5 +3658,12 @@
     border-radius: 999px;
     box-shadow: 0 4px 14px rgb(0 0 0 / 0.1);
     pointer-events: none;
+  }
+
+  .component-drop {
+    position: absolute;
+    pointer-events: none;
+    box-shadow: 0 0 0 2px #9747ff;
+    background: color-mix(in srgb, #9747ff 8%, transparent);
   }
 </style>
