@@ -4,7 +4,7 @@
   import { _ } from 'svelte-i18n';
   import * as Sheet from '$lib/components/ui/sheet/index.js';
   import { openSheet, closeSheet } from '$lib/canvas/sheet-nav';
-  import { SHEET_PAGE_LOADERS, settingsPageLoader } from '$lib/canvas/sheet-pages';
+  import { SHEET_PAGE_LOADERS, settingsSheetSection } from '$lib/canvas/sheet-pages';
   import { sheetEntryForPath } from '$lib/shell-nav';
   import { SETTINGS_GROUPS, SETTINGS_HOME } from '$lib/components/settings/platforms';
   import { cn } from '$lib/utils';
@@ -28,7 +28,7 @@
   const sheet = $derived(page.state.sheet ?? null);
   const entry = $derived(sheet ? sheetEntryForPath(sheet.path) : null);
   const settingsSubpath = $derived(sheet ? sheet.path.replace(/^\/settings\/?/, '') || SETTINGS_HOME : '');
-  const settingsLoader = $derived(sheet && entry?.id === 'settings' ? settingsPageLoader(sheet.path) : null);
+  const settingsSection = $derived(sheet && entry?.id === 'settings' ? settingsSheetSection(sheet.path, sheet.data) : null);
 
   function onOpenChange(open: boolean) {
     if (!open) closeSheet();
@@ -72,9 +72,9 @@
               {#await SHEET_PAGE_LOADERS.settingsLayout() then { default: SettingsLayout }}
                 <SettingsLayout data={sheet.data as never}>
                   {#snippet children()}
-                    {#if settingsLoader}
-                      {#await settingsLoader() then { default: SettingsSectionPage }}
-                        <SettingsSectionPage data={sheet.data as never} form={page.form} />
+                    {#if settingsSection}
+                      {#await settingsSection then { Page: SettingsSectionPage, data }}
+                        <SettingsSectionPage data={data as never} form={page.form} />
                       {/await}
                     {/if}
                   {/snippet}
