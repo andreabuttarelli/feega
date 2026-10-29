@@ -1,6 +1,8 @@
 import { clipsOf, compsOf, everyClip, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { BRAND_COLORS } from '@feega/motion-core/motion/components';
 import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { elementFills, fillReplaces } from '@feega/motion-core/motion/fill/elements';
+import { elementStrokes, strokeReplaces } from '@feega/motion-core/motion/stroke/elements';
 
 const HEX = /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
@@ -65,11 +67,22 @@ function scopeOf(doc: MotionDoc, ids: readonly string[]) {
   return { top, comps, clips: [...top, ...nested] };
 }
 
+const legacyUnpainted = (clip: MotionClip, stack: unknown, painted: (component: string, props: Record<string, unknown>) => unknown[]) => stack !== undefined || painted(clip.component, clip.props).length === 0;
+
+function shadowed(clip: MotionClip, key: string): boolean {
+  if (fillReplaces(clip.component, key)) {
+    return legacyUnpainted(clip, clip.props.fills, elementFills);
+  }
+  return strokeReplaces(clip.component, key) && legacyUnpainted(clip, clip.props.strokes, elementStrokes);
+}
+
+const paintedProps = (clip: MotionClip) => Object.fromEntries(Object.entries(clip.props).filter(([key]) => !shadowed(clip, key)));
+
 export type ColourUse = { colour: string; count: number };
 
 export function selectionColours(doc: MotionDoc, ids: readonly string[]): ColourUse[] {
   const counts = new Map<string, number>();
-  for (const colour of scopeOf(doc, ids).clips.flatMap((clip) => coloursIn(clip.props, []))) {
+  for (const colour of scopeOf(doc, ids).clips.flatMap((clip) => coloursIn(paintedProps(clip), []))) {
     counts.set(colour, (counts.get(colour) ?? 0) + 1);
   }
   return [...counts].map(([colour, count]) => ({ colour, count })).sort((a, b) => b.count - a.count);
@@ -100,7 +113,7 @@ const BASE_LENGTH = 7;
 export function documentColours(doc: MotionDoc): string[] {
   const uses = new Map<string, number>();
   for (const clip of everyClip(doc)) {
-    for (const colour of coloursIn(clip.props, []).filter((c) => !TOKENS.has(c))) {
+    for (const colour of coloursIn(paintedProps(clip), []).filter((c) => !TOKENS.has(c))) {
       const base = colour.slice(0, BASE_LENGTH);
       uses.set(base, (uses.get(base) ?? 0) + 1);
     }

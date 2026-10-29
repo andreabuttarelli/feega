@@ -35,9 +35,10 @@ describe('selection colours', () => {
 
   it('lists brand colour tokens beside hex colours', () => {
     let d = doc();
-    d = ok(addClip(d, { component: 'Text', from: 0, durationInFrames: 60, props: { text: 'tok', color: 'brand.text', fills: [{ type: 'solid', color: 'brand.accent' }] } }, 'k'));
+    d = ok(addClip(d, { component: 'Text', from: 0, durationInFrames: 60, props: { text: 'tok', color: 'brand.text' } }, 'k'));
+    d = ok(addClip(d, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', fills: [{ type: 'solid', color: 'brand.accent' }] } }, 's'));
 
-    expect(selectionColours(d, ['k']).map((c) => c.colour)).toEqual(expect.arrayContaining(['brand.text', 'brand.accent']));
+    expect(selectionColours(d, ['k', 's']).map((c) => c.colour)).toEqual(expect.arrayContaining(['brand.text', 'brand.accent']));
   });
 
   it('recolours a token to another token and keeps it a token binding', () => {

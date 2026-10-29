@@ -274,6 +274,13 @@ describe('drawing a frame in a chosen format', () => {
   it('a still second makes it a still graphic holding that frame', () => {
     expect(drawnFrame(box, MotionFormat.Square, 1).still).toEqual({ frame: 30 });
   });
+
+  it('a new frame is filled plain white, not with the brand background', () => {
+    const doc = drawnFrame(box);
+    const surface = doc.surface ? findClip(doc, doc.surface)?.clip : undefined;
+
+    expect(surface?.props.fills).toEqual([expect.objectContaining({ color: '#FFFFFF' })]);
+  });
 });
 
 describe('shape tools', () => {

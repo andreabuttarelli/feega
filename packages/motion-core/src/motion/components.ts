@@ -28,6 +28,7 @@ import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
 import { BooleanOp } from './shape/boolean-op';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
+import { DEFAULT_COLOUR } from './default-colours';
 
 export enum Control {
   Text = 'text',
@@ -313,7 +314,7 @@ export const COMPONENTS = {
     description: 'Large headline, lines reveal one after another. Use \\n for line breaks.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.11, 'brand.text', { ...TITLE_LOOK, leading: 0.95 }), ...layout({ height: 0.4 }) }).strict()
+    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.11, DEFAULT_COLOUR.ink, { ...TITLE_LOOK, leading: 0.95 }), ...layout({ height: 0.4 }) }).strict()
   },
   Text: {
     label: 'Text',
@@ -321,7 +322,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, DEFAULT_COLOUR.ink, { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {
@@ -329,7 +330,7 @@ export const COMPONENTS = {
     description: 'Small monospaced uppercase label above a title.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('( feega )', 'Text'), fills: fillStack(), strokes: strokeStack(), ...typography(0.025, 'brand.accent', { tracking: 0.02, leading: 1.2 }), ...layout({ y: 0.3, height: 0.06 }) }).strict()
+    schema: z.object({ text: text('( feega )', 'Text'), fills: fillStack(), strokes: strokeStack(), ...typography(0.025, DEFAULT_COLOUR.ink, { tracking: 0.02, leading: 1.2 }), ...layout({ y: 0.3, height: 0.06 }) }).strict()
   },
   Caption: {
     label: 'Caption',
@@ -400,12 +401,12 @@ export const COMPONENTS = {
         fills: fillStack(),
         strokes: strokeStack(),
         fillKind: choice(FILL_KINDS, FillKind.Solid, 'Fill type', Group.Style),
-        fill: color('brand.accent', 'Fill'),
-        fill2: color('brand.primary', 'Gradient end'),
+        fill: color(DEFAULT_COLOUR.fill, 'Fill'),
+        fill2: color(DEFAULT_COLOUR.fillEnd, 'Gradient end'),
         gradientAngle: range(-360, 360, 1, 90, 'Gradient angle', Group.Style),
         fillRule: choice(FILL_RULES, 'nonzero', 'Fill rule', Group.Style),
         strokeKind: choice(STROKE_KINDS, StrokeKind.None, 'Stroke', Group.Style),
-        stroke: color('brand.text', 'Stroke colour'),
+        stroke: color(DEFAULT_COLOUR.ink, 'Stroke colour'),
         strokeWidth: range(0, 0.2, 0.001, 0.01, 'Stroke width', Group.Style),
         dash: range(0, 0.5, 0.001, 0, 'Dash', Group.Style),
         gap: range(0, 0.5, 0.001, 0, 'Gap', Group.Style),
@@ -438,9 +439,9 @@ export const COMPONENTS = {
     durationInFrames: seconds(5),
     schema: z
       .object({
-        fill: color('brand.background', 'Fill'),
+        fill: color(DEFAULT_COLOUR.surface, 'Fill'),
         pattern: choice(['solid', 'dots', 'grid', 'gradient'] as const, 'solid', 'Pattern', Group.Style),
-        accent: color('brand.accent', 'Accent'),
+        accent: color(DEFAULT_COLOUR.fill, 'Accent'),
         opacity: range(0, 1, 0.01, 1, 'Opacity', Group.Layout)
       })
       .strict()
@@ -503,7 +504,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ shape: choice(SHAPES_3D, 'torus', 'Shape', Group.Content), fill: color('brand.accent', 'Colour'), ...surface, ...camera, ...position3d })
+      .object({ shape: choice(SHAPES_3D, 'torus', 'Shape', Group.Content), fill: color(DEFAULT_COLOUR.fill, 'Colour'), ...surface, ...camera, ...position3d })
       .strict()
   },
   Text3D: {
@@ -512,7 +513,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Hello', 'Text'), font: font(), weight: range(100, 900, 100, 700, 'Weight', Group.Style), fill: color('brand.accent', 'Colour'), ...extrusion, material: choice(MATERIALS, Material.Plastic, 'Material', Group.Style), ...camera, ...position3d })
+      .object({ text: text('Hello', 'Text'), font: font(), weight: range(100, 900, 100, 700, 'Weight', Group.Style), fill: color(DEFAULT_COLOUR.fill, 'Colour'), ...extrusion, material: choice(MATERIALS, Material.Plastic, 'Material', Group.Style), ...camera, ...position3d })
       .strict()
   },
   Logo3D: {
@@ -521,7 +522,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ assetId: asset(AssetKind.Image, 'SVG logo'), fill: color('brand.primary', 'Colour'), ...extrusion, material: choice(MATERIALS, Material.Metal, 'Material', Group.Style), ...camera, ...position3d })
+      .object({ assetId: asset(AssetKind.Image, 'SVG logo'), fill: color(DEFAULT_COLOUR.fill, 'Colour'), ...extrusion, material: choice(MATERIALS, Material.Metal, 'Material', Group.Style), ...camera, ...position3d })
       .strict()
   },
   Device3D: {
