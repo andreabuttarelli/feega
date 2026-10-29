@@ -40,8 +40,10 @@ copied the whole frame.
 
 - `copyPlan` (pure, moved out of `server/canvas/duplicate.ts`) plans copies on both sides; the
   client generates the copy ids and sends them as `copy_ids`, the server writes under them.
-- The page adds the copies at once (`copiedNodes`) and settles them with the saved rows; a failed
-  save removes them with a notice. Saves run in order, so ⌘D on a copy still saving waits for it.
+- Duplicate is a row in the optimistic `REGISTRY` (ADR 0029): copies applied at once
+  (`copiedNodes`), `Landing.Created` (the server wrote at least one node), `settle` swaps in the
+  saved rows and adds the copied wires, a refusal removes the copies with a notice. The runner's
+  queue keeps ⌘D on a copy still saving behind it.
 - GpuFlow gives each doc copy its source's live doc (`holdLive`), so the copy draws without a
   fetch. A doc node whose source doc is not held yet falls back to adding after the save
   (`Landing.OnSave`).

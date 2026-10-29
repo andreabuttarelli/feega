@@ -106,7 +106,7 @@
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
-  import { Landing, type Drawing } from '$lib/canvas/optimistic-insert';
+  import { CopyShown, type Drawing } from '$lib/canvas/optimistic-insert';
   import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -1835,7 +1835,7 @@
   function duplicateTiles(ids: string[], offset?: Offset) {
     const docs = new Map(ids.flatMap((id) => (liveOf(id) ? [[id, liveOf(id)!] as const] : [])));
     const ready = ids.every((id) => !holdsDoc(byId.get(id)?.kind ?? '') || docs.has(id));
-    const made = props.onDuplicate?.(ids, offset, ready ? Landing.Now : Landing.OnSave);
+    const made = props.onDuplicate?.(ids, offset, ready ? CopyShown.Now : CopyShown.OnSave);
     for (const { from, to } of ready && made ? made.copies : []) {
       const live = docs.get(from);
       if (live) {

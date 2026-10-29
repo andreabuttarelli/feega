@@ -1,4 +1,6 @@
-import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
+import type { CanvasNodeRecord, Connection } from '$lib/server/repos/canvas';
+import type { CopyIds, Offset } from './duplicate-plan';
+import { settle as settled } from './optimistic-insert';
 import { DropOn } from '$lib/motion/move-element';
 import { SECTION_DEFAULT_FILL } from './node-data';
 import { layoutOf } from './node-layout';
@@ -12,7 +14,7 @@ import type { UndoItem } from './undo-plan';
 export type OptTile = { id: string; type: string; displayName: string | null; x: number; y: number; w: number; h: number; data: Record<string, unknown>; version: number; select?: boolean };
 export type OptEdge = { id: string; source: string; target: string; mode?: string };
 export type CanvasRows<N extends OptTile, E extends OptEdge> = { nodes: N[]; edges: E[] };
-export type RowContext<N> = { toTile: (record: CanvasNodeRecord) => N };
+export type RowContext<N, E = OptEdge> = { toTile: (record: CanvasNodeRecord) => N; toEdge?: (connection: Connection) => E };
 export type Answer = Record<string, unknown>;
 export type Post = (action: string, fields: Record<string, string>) => Promise<Answer | null>;
 
@@ -25,12 +27,14 @@ export enum OptimisticAction {
   Restack = 'restack',
   Rename = 'rename',
   EdgeMode = 'set_edge_mode',
-  Remove = 'remove'
+  Remove = 'remove',
+  Duplicate = 'duplicate'
 }
 
 export enum Landing {
   Moved = 'moved',
-  Answered = 'answered'
+  Answered = 'answered',
+  Created = 'created'
 }
 
 export enum Refresh {
@@ -48,13 +52,15 @@ type Inputs = {
   [OptimisticAction.Rename]: { id: string; name: string };
   [OptimisticAction.EdgeMode]: { connectionId: string; mode: string };
   [OptimisticAction.Remove]: { nodeIds: string[]; edgeIds: string[] };
+  [OptimisticAction.Duplicate]: { ids: string[]; copies: CanvasNodeRecord[]; copyIds: CopyIds; offset?: Offset };
 };
 
 type Rows = CanvasRows<OptTile, OptEdge>;
 
 type Row<I> = {
   fields: (input: I) => Record<string, string>;
-  apply: <N extends OptTile, E extends OptEdge>(rows: CanvasRows<N, E>, input: I, ctx: RowContext<N>) => CanvasRows<N, E>;
+  apply: <N extends OptTile, E extends OptEdge>(rows: CanvasRows<N, E>, input: I, ctx: RowContext<N, E>) => CanvasRows<N, E>;
+  settle?: <N extends OptTile, E extends OptEdge>(rows: CanvasRows<N, E>, answer: Answer, ctx: RowContext<N, E>, input: I) => CanvasRows<N, E>;
   touched: (input: I, rows: Rows) => Touched;
   landing: Landing;
   undo: (answer: Answer, before: Rows, input: I) => UndoItem[];
@@ -101,6 +107,20 @@ function removedUndo(before: Rows, input: Inputs[OptimisticAction.Remove]): Undo
       before: { type: n.type, position: { x: n.x, y: n.y, z: 0 }, size: { width: n.w, height: n.h }, data: n.data, version: n.version }
     }))
   ];
+}
+
+const createdOf = (answer: Answer) => ({ nodes: (answer.nodes ?? []) as CanvasNodeRecord[], connections: (answer.connections ?? []) as Connection[] });
+
+function createdUndo(answer: Answer): UndoItem[] {
+  const { nodes, connections } = createdOf(answer);
+  return [
+    ...nodes.map((n): UndoItem => ({ kind: 'node.create', nodeId: n.id, after: { type: n.type, position: n.position, data: n.data } })),
+    ...connections.map((c): UndoItem => ({ kind: 'edge.create', edgeId: c.id, sourceNodeId: c.sourceNodeId, targetNodeId: c.targetNodeId }))
+  ];
+}
+
+function offsetFields(offset: Offset | undefined): Record<string, string> {
+  return offset ? { dx: String(offset.dx), dy: String(offset.dy) } : {};
 }
 
 const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
@@ -187,12 +207,29 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
     undo: (_, before, i) => removedUndo(before, i),
     refresh: Refresh.None,
     notice: 'Delete did not save; the items are back.'
+  },
+  [OptimisticAction.Duplicate]: {
+    fields: (i) => ({ node_ids: i.ids.join(','), copy_ids: JSON.stringify(i.copyIds), ...offsetFields(i.offset) }),
+    apply: (rows, i, ctx) => ({ ...rows, nodes: [...rows.nodes, ...i.copies.map((c) => ({ ...ctx.toTile(c), select: true }))] }),
+    settle: (rows, answer, ctx, i) => {
+      const { nodes, connections } = createdOf(answer);
+      const shown = new Set(i.copies.map((c) => c.id));
+      const unshown = nodes.filter((n) => !shown.has(n.id)).map((n) => ({ ...ctx.toTile(n), select: true }));
+      const toEdge = ctx.toEdge;
+      return { nodes: [...nodes.reduce((all, n) => settled(all, n.id, ctx.toTile(n)), rows.nodes), ...unshown], edges: toEdge ? [...rows.edges, ...connections.map(toEdge)] : rows.edges };
+    },
+    touched: (i) => nodesOnly(i.copies.map((c) => c.id)),
+    landing: Landing.Created,
+    undo: createdUndo,
+    refresh: Refresh.None,
+    notice: 'The copy did not save and was removed.'
   }
 };
 
 const LANDED: Record<Landing, (answer: Answer) => boolean> = {
   [Landing.Moved]: (answer) => answer.outcome === MOVED_DONE,
-  [Landing.Answered]: () => true
+  [Landing.Answered]: () => true,
+  [Landing.Created]: (answer) => createdOf(answer).nodes.length > 0
 };
 
 export const refreshOf = (action: OptimisticAction): Refresh => REGISTRY[action].refresh;
@@ -205,7 +242,7 @@ export function optimisticOp<K extends OptimisticAction, N extends OptTile, E ex
   action: K,
   input: Inputs[K],
   before: CanvasRows<N, E>,
-  ctx: RowContext<N>,
+  ctx: RowContext<N, E>,
   post: Post
 ): OptimisticOp<CanvasRows<N, E>, Answer> {
   const row = REGISTRY[action] as Row<Inputs[K]>;
@@ -217,6 +254,7 @@ export function optimisticOp<K extends OptimisticAction, N extends OptTile, E ex
       return answer && LANDED[row.landing](answer) ? answer : null;
     },
     undo: (answer) => row.undo(answer, before, input),
+    ...(row.settle ? { settle: (rows: CanvasRows<N, E>, answer: Answer) => row.settle!(rows, answer, ctx, input) } : {}),
     notice: row.notice
   };
 }

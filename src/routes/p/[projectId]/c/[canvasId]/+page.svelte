@@ -126,7 +126,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { OpOutcome, createOptimistic } from '$lib/canvas/optimistic-ops';
   import { OptimisticAction, Refresh, optimisticOp, refreshOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, Landing, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, CopyShown, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
@@ -1639,7 +1639,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function optimistic<K extends OptimisticAction>(action: K, input: Parameters<typeof optimisticOp<K, Tile, FlowEdge>>[1]): Promise<OpOutcome> {
     refreshDue ||= refreshOf(action) === Refresh.AfterIdle;
     const before = { nodes, edges };
-    return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record) }, async (name, fields) => {
+    return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record), toEdge }, async (name, fields) => {
       await places.flush();
       return post(name, fields);
     }));
@@ -3580,10 +3580,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let lastDuplicate: LastDuplicate | null = null;
 
-  const duplicates = inOrder();
-  const DUPLICATE_FAILED_NOTICE = 'The copy could not be saved and was removed.';
-
-  function duplicate(ids: string[], dragged: Offset | undefined, landing: Landing): Duplication | null {
+  function duplicate(ids: string[], dragged: Offset | undefined, shown: CopyShown): Duplication | null {
     const offset = dragged ?? repeatOffset(lastDuplicate, ids);
     const sources = nodes.filter((n) => ids.includes(n.id));
     if (!sources.length) {
@@ -3592,27 +3589,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const copyIds = Object.fromEntries(sources.map((n) => [n.id, crypto.randomUUID()]));
     const copies = sources.map((n) => ({ from: n.id, to: copyIds[n.id] }));
     const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
-    const shown = landing === Landing.Now ? copiedNodes(plan) : [];
-    nodes = [...nodes, ...shown.map((n) => toTile(n, { select: true }))];
     lastDuplicate = offset ? { ids: copies.map((c) => c.to), offset } : null;
-    const fields: Fields = { node_ids: ids.join(','), copy_ids: JSON.stringify(copyIds), ...(offset ? { dx: offset.dx, dy: offset.dy } : {}) };
-    return { copies, saved: duplicates(() => saveDuplicate(fields, copies.map((c) => c.to))) };
-  }
-
-  async function saveDuplicate(fields: Fields, copyIds: string[]): Promise<boolean> {
-    const result = await post('duplicate', fields);
-    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
-    const connected = (result?.connections ?? []) as Connection[];
-    if (!created.length) {
-      nodes = nodes.filter((n) => !copyIds.includes(n.id));
-      failed = DUPLICATE_FAILED_NOTICE;
-      return false;
-    }
-    const shown = new Set(nodes.map((n) => n.id));
-    nodes = [...created.reduce((all, n) => settle(all, n.id, toTile(n)), nodes), ...created.filter((n) => !shown.has(n.id)).map((n) => toTile(n, { select: true }))];
-    if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
-    pushGesture(createManyGesture(created, connected));
-    return true;
+    const outcome = optimistic(OptimisticAction.Duplicate, { ids: sources.map((n) => n.id), copies: shown === CopyShown.Now ? copiedNodes(plan) : [], copyIds, offset });
+    return { copies, saved: outcome.then((o) => o === OpOutcome.Landed) };
   }
 
   /**

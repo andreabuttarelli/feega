@@ -147,7 +147,7 @@ export function defaultFrameBox(at: { x: number; y: number }, last: Side | null)
 
 export const besideBox = (tile: { x: number; y: number; w: number; h: number }): CanvasBox => ({ left: tile.x + tile.w + FRAME_GAP, top: tile.y, width: tile.w, height: tile.h - MOTION_NODE_BAR_H });
 
-export enum Landing {
+export enum CopyShown {
   Now = 'now',
   OnSave = 'on-save'
 }
