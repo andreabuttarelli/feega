@@ -11,7 +11,7 @@ A **free element** is a shape, text, image or SVG placed directly on the canvas.
 
 ## Moving things
 
-- Drag an element out of a frame into another frame or onto the canvas.
+- Drag an element out of a frame into another frame or onto the canvas. Both frames, and the new element, change at once; saving continues in the background, and a move that cannot be saved is put back with a notice.
 - Drag a generated image or video from its node into a frame.
 - `Delete` or `Backspace` on a free shape removes it entirely; no empty frame is left behind.
 - Paste an element into several selected frames at once.
