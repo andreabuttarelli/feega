@@ -64,6 +64,7 @@ export type RestNode = {
   style?: RestStyle;
   characterStyleOverrides?: number[];
   styleOverrideTable?: Record<string, RestStyle>;
+  componentId?: string;
   children?: RestNode[];
 };
 
@@ -239,7 +240,7 @@ const sizeOf = (n: RestNode): Vec => n.size ?? { x: n.absoluteBoundingBox?.width
 
 const positionOf = (index: number) => String(index).padStart(POSITION_DIGITS, '0');
 
-type Build = { nodes: FigmaRawNode[]; blobs: Uint8Array[]; next: () => Guid };
+type Build = { nodes: FigmaRawNode[]; blobs: Uint8Array[]; next: () => Guid; guids: Map<string, Guid> };
 
 function geometryOf(list: { path: string; windingRule?: string }[] | undefined, build: Build): { commandsBlob: number }[] | undefined {
   if (!list?.length) {
@@ -251,6 +252,8 @@ function geometryOf(list: { path: string; windingRule?: string }[] | undefined, 
 
 function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: number, build: Build) {
   const guid = build.next();
+  build.guids.set(n.id, guid);
+  const symbolID = n.componentId ? build.guids.get(n.componentId) : undefined;
   build.nodes.push({
     guid,
     type: n.type,
@@ -270,7 +273,8 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     strokeGeometry: geometryOf(n.strokeGeometry, build),
     ...cornersOf(n),
     ...layoutOf(n),
-    ...(n.type === 'TEXT' ? textOf(n) : {})
+    ...(n.type === 'TEXT' ? textOf(n) : {}),
+    ...(symbolID ? { symbolData: { symbolID } } : {})
   });
   (n.children ?? []).forEach((child, i) => add(child, { rest: n, guid }, i, build));
 }
@@ -278,7 +282,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
 export function restMessage(frames: RestNode[], fileKey: string): FigmaMessage {
   let counter = PAGE_ID;
   const page: Guid = { sessionID: 0, localID: PAGE_ID };
-  const build: Build = { nodes: [{ guid: page, type: 'CANVAS', name: 'Page' }], blobs: [], next: () => ({ sessionID: 0, localID: ++counter }) };
+  const build: Build = { nodes: [{ guid: page, type: 'CANVAS', name: 'Page' }], blobs: [], next: () => ({ sessionID: 0, localID: ++counter }), guids: new Map() };
   frames.forEach((frame, i) => add(frame, { rest: null, guid: page }, i, build));
   return { meta: { fileKey }, nodes: build.nodes, blobs: build.blobs };
 }

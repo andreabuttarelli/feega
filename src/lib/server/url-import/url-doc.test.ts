@@ -67,6 +67,42 @@ describe('urlPlan', () => {
     expect(text).not.toContain('SöhneSecret');
   });
 
+  it('card ripetute diventano un main e istanze collegate, col testo diverso come override', () => {
+    const black = { r: 0, g: 0, b: 0, a: 1 };
+    const card = (n: number, title: string): NonNullable<PageTree['root']['children']>[number] => ({
+      id: `c${n}`,
+      type: 'FRAME',
+      name: 'article',
+      absoluteBoundingBox: { x: 40 + n * 240, y: 40, width: 200, height: 120 },
+      fills: [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }],
+      cornerRadius: 8,
+      children: [
+        { id: `t${n}`, type: 'TEXT', characters: title, absoluteBoundingBox: { x: 56 + n * 240, y: 56, width: 120, height: 24 }, fills: [{ type: 'SOLID', color: black }], style: { fontFamily: 'Inter', fontSize: 20, fontWeight: 600 } },
+        { id: `s${n}`, type: 'TEXT', characters: 'Learn more', absoluteBoundingBox: { x: 56 + n * 240, y: 100, width: 90, height: 20 }, fills: [{ type: 'SOLID', color: black }], style: { fontFamily: 'Inter', fontSize: 14, fontWeight: 400 } }
+      ]
+    });
+    const tree: PageTree = { title: 'Cards', url: 'https://example.com', width: 800, height: 200, truncated: false, root: { id: '1', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 800, height: 200 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], children: [card(0, 'Fast'), card(1, 'Secure'), card(2, 'Open')] } };
+
+    const made = urlPlan(tree, newId)!;
+    const doc = made.plan.items[0].doc;
+    const mains = Object.entries(doc.comps).filter(([, c]) => c.component);
+    const instances = doc.tracks.flatMap((t) => t.clips).filter((c) => c.props.comp === mains[0]?.[0]);
+    const overridden = instances.flatMap((c) => Object.values((c.props.overrides as Record<string, { text?: string }>) ?? {})).map((o) => o.text);
+
+    expect(mains).toHaveLength(1);
+    expect(mains[0][1].component?.name).toBe('Card');
+    expect(instances).toHaveLength(3);
+    expect(overridden.sort()).toEqual(['Open', 'Secure']);
+    expect(made.components).toEqual({ components: 1, instances: 2 });
+  });
+
+  it.each(FIXTURES)('le strutture ripetute di %s diventano componenti con istanze', (name) => {
+    const made = urlPlan(treeOf(name), newId)!;
+
+    expect(made.components.components).toBeGreaterThan(0);
+    expect(made.components.instances).toBeGreaterThan(0);
+  });
+
   it('un paragrafo che nella pagina va a capo resta largo come nella pagina', () => {
     const tree: PageTree = {
       title: 'Wrap',
