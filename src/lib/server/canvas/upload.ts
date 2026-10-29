@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
-import { createNode } from '$lib/server/repos/canvas';
+import { createNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
 import { deleteAsset, insertAsset, type AssetType } from '$lib/server/repos/assets';
 import { removeAssetFile } from '$lib/server/repos/asset-storage';
@@ -210,6 +210,7 @@ type CanvasBytes = { orgId: string; projectId: string; fileName: string; mime: s
 
 export async function importCanvasBytes(db: Db, input: CanvasBytes & { place: CanvasPlace }): Promise<Awaited<ReturnType<typeof registerCanvasUpload>> & { kind: UploadKind }>;
 export async function importCanvasBytes(db: Db, input: CanvasBytes): Promise<Awaited<ReturnType<typeof registerUploadedAsset>>>;
+export async function importCanvasBytes(db: Db, input: CanvasBytes & { place?: CanvasPlace }): Promise<Awaited<ReturnType<typeof registerUploadedAsset>> & { node?: CanvasNodeRecord }>;
 export async function importCanvasBytes(db: Db, input: CanvasBytes & { place?: CanvasPlace }) {
   const fileName = input.fileName.replace(UNSAFE_NAME, '_');
   const verdict = verdictForUpload(input.mime, fileName, input.bytes.length);

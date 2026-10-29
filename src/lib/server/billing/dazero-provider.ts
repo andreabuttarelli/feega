@@ -19,7 +19,7 @@ async function planForQuota(ctx: { brandId?: string; plan?: string | null }): Pr
 }
 
 export const dazeroBillingProvider: BillingProvider = {
-  kind: 'dazero',
+  kind: 'feega',
 
   async gate(kind, ctx) {
     if (kind !== 'credits') return;
