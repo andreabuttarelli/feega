@@ -3458,3 +3458,9 @@ Signal: one frame renders nothing on the canvas, no error on screen. Cause: a st
 
 ### A settings error on `/settings/*` that clicking through the routes never reproduces
 Signal: telemetry shows one settings page reading another page's fields (`data.models` on spend), but the route nav is clean. Cause: the URL is the canvas sheet's shallow route; `CanvasSheet.svelte` renders the section page itself. Move: read the session's clicks in PostHog (`elements_chain`) to see which UI was used, then repro from the canvas rail.
+
+### Frame pick always lands on the whole frame
+Signal: hover and click inside a frame outline the entire frame; double-click turns it into a path. Cause: the doc's only layer is a full-frame container (`page`), the top-level element for every point. Move: check `framePage(doc)`; the pick rule must skip it, never select it.
+
+### A worktree's dev server stops seeing edits after `git checkout`
+Signal: a fix green in vitest changes nothing in the browser; a `console.warn` added to a component never prints. Cause: the Vite watcher in a worktree drops after switching commits and keeps serving old modules. Move: restart `vite dev` after every checkout or edit you test in e2e; a bisect on a live server measures only the first commit.
