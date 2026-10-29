@@ -7,7 +7,8 @@ export enum MergeRule {
 
 const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
   params: MergeRule.Deep,
-  filters: MergeRule.Deep
+  filters: MergeRule.Deep,
+  linked: MergeRule.Deep
 };
 
 const DEEP = () => MergeRule.Deep;

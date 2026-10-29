@@ -1,4 +1,5 @@
 import { readHead } from '$lib/server/repos/motion-revisions';
+import { linkedHead } from './linked-mains';
 import { assetUrls, motionAssets, namedAssets, type AssetSigner, type MotionScope } from './editor';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { mayUseAssets, mentionedIds, referencedAssets } from '$lib/motion/doc-assets';
@@ -16,9 +17,10 @@ export async function sourceAssets(scope: SourceScope, doc: MotionDoc): Promise<
 }
 
 export async function motionSource(scope: MotionScope): Promise<MotionSource | null> {
-  const head = await readHead(scope.db, { orgId: scope.orgId, nodeId: scope.nodeId });
-  if (!head) {
+  const saved = await readHead(scope.db, { orgId: scope.orgId, nodeId: scope.nodeId });
+  if (!saved) {
     return null;
   }
+  const head = await linkedHead(scope.db, { orgId: scope.orgId, nodeId: scope.nodeId, head: saved });
   return { revision: head.version, doc: head.doc, assets: await sourceAssets(scope, head.doc) };
 }

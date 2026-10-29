@@ -15,7 +15,9 @@ Create a component from the selection with `⌥⌘K`. The **Components** panel l
 
 Select an instance and click the target icon in the Instance inspector header, or right-click it and pick **Go to main component**. Feega switches canvas if the main lives on another one, pans to it and selects it. Hover the icon to see where the main is (`canvas › frame`). In the Components panel, the same icon on a row is **Show main**.
 
-An instance placed in another frame carries a copy of its main: edits to the main reach instances in the same frame, not those in other frames or canvases.
+## Instances follow their main everywhere
+
+Every instance depends on its main, in any frame and on any canvas of the project. Edit the main and every instance shows the change, keeping its own overrides; open canvases update on their own. Delete the main, or the frame that holds it, and its instances detach: they keep the look they last had.
 
 ## Components across canvases
 

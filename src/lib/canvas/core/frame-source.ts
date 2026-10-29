@@ -7,8 +7,8 @@ import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 
 export type FrameTile = { id: string; kind?: string | null; x: number; y: number; w: number; h: number; rotation?: number };
-export type FrameData = { kind?: unknown; docHeadRevision?: unknown };
-export type FrameAt = { id: string; kind: FrameKind; revision: number; scenes?: string; box: Box; turn?: { degrees: number; about: { x: number; y: number } } };
+export type FrameData = { kind?: unknown; docHeadRevision?: unknown; linked?: unknown };
+export type FrameAt = { id: string; kind: FrameKind; revision: number; linked?: string; scenes?: string; box: Box; turn?: { degrees: number; about: { x: number; y: number } } };
 
 export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string) => FrameData): FrameAt[] {
   return tiles.flatMap((t) => {
@@ -25,7 +25,8 @@ export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string)
     const bar = frameChrome(kind).bar ? MOTION_NODE_BAR_H : 0;
     const box = { x: t.x, y: t.y, w: t.w, h: t.h - bar };
     const turn = t.rotation ? { turn: { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } } : {};
-    return [{ id: t.id, kind, revision, box, ...turn }];
+    const linked = data.linked ? { linked: JSON.stringify(data.linked) } : {};
+    return [{ id: t.id, kind, revision, box, ...linked, ...turn }];
   });
 }
 
