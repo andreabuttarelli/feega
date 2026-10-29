@@ -698,4 +698,24 @@ export function parseProps(id: ComponentId, props: unknown): PropsVerdict {
   return { ok: true, props: parsed.data as Record<string, unknown> };
 }
 
+function offendingKeys(issues: readonly z.core.$ZodIssue[]): string[] {
+  return issues.flatMap((i) => (i.code === 'unrecognized_keys' && !i.path.length ? i.keys : i.path.length ? [String(i.path[0])] : []));
+}
+
+export function salvageProps(id: ComponentId, props: unknown): PropsVerdict {
+  const given = typeof props === 'object' && props ? { ...(props as Record<string, unknown>) } : props;
+  for (;;) {
+    const parsed = COMPONENTS[id].schema.safeParse(titleLook(id, given));
+    if (parsed.success) {
+      return { ok: true, props: parsed.data as Record<string, unknown> };
+    }
+    const kept = given as Record<string, unknown>;
+    const bad = typeof given === 'object' && given ? offendingKeys(parsed.error.issues).filter((k) => k in kept) : [];
+    if (!bad.length) {
+      return parseProps(id, given);
+    }
+    bad.forEach((k) => delete kept[k]);
+  }
+}
+
 export const TRANSITION_DEFAULT = DURATION.base;

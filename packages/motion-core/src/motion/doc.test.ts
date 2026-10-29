@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DOC_VERSION, FORMATS, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc } from './doc';
 import { maxFrames } from './design';
+import { defaultProps } from './components';
 import { PropFormat } from './custom/component';
 import { FieldType } from './template/field-model';
 
@@ -51,11 +52,12 @@ describe('MotionDoc', () => {
     expect(parsed.ok && parsed.doc.tracks[0].clips[0].props.text).toBeTypeOf('string');
   });
 
-  it('refuses props the component does not take', () => {
+  it('drops a prop the component does not take instead of refusing the doc', () => {
     const doc = newMotionDoc(MotionFormat.Square);
     const tracks = [{ ...doc.tracks[0], clips: [{ ...clip('Title'), props: { size: 'huge' } }] }, doc.tracks[1]];
+    const verdict = parseMotionDoc({ ...doc, tracks });
 
-    expect(parseMotionDoc({ ...doc, tracks }).ok).toBe(false);
+    expect(verdict.ok && verdict.doc.tracks[0].clips[0].props.size).toBe(defaultProps('Title').size);
   });
 
   it('takes a 4K frame and refuses anything above', () => {
