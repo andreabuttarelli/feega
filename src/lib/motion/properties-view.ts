@@ -41,6 +41,9 @@ const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
 };
 
 const PART_SECTIONS: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Transform, Section.Layer, Section.Fill, Section.Stroke, Section.Text]);
+const FRAME_SECTIONS: ReadonlySet<Section> = new Set([Section.Layer, Section.Fill, Section.Stroke, Section.Shape, Section.Effects]);
+
+const VIEW_KEEPS: Partial<Record<PropertiesView, ReadonlySet<Section>>> = { [PropertiesView.Part]: PART_SECTIONS, [PropertiesView.Frame]: FRAME_SECTIONS };
 
 const MODE_HIDES: Record<EditMode, ReadonlySet<Section>> = {
   [EditMode.Motion]: new Set(),
@@ -49,5 +52,5 @@ const MODE_HIDES: Record<EditMode, ReadonlySet<Section>> = {
 
 export function sectionsFor(family: ClipFamily, view: PropertiesView, mode: EditMode): Section[] {
   const allowed = new Set(FAMILY_SECTIONS[family]);
-  return SECTION_ORDER.filter((s) => allowed.has(s) && !MODE_HIDES[mode].has(s) && (view !== PropertiesView.Part || PART_SECTIONS.has(s)));
+  return SECTION_ORDER.filter((s) => allowed.has(s) && !MODE_HIDES[mode].has(s) && (VIEW_KEEPS[view]?.has(s) ?? true));
 }

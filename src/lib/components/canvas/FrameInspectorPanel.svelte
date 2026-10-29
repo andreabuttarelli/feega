@@ -46,9 +46,12 @@
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import { selectionProperties } from './selection-properties.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
+  import { frameSurface, withSurface } from '@feega/motion-core/motion/surface';
+  import { EditMode } from '$lib/motion/edit-mode';
   import { alignSpace, distributeSpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
 
   const FIRST_FRAME = 0;
+  const SURFACE_ID = 'frame-surface';
 
   let {
     session,
@@ -72,6 +75,8 @@
 
   const source = $derived(session?.history.present ?? null);
   const doc = $derived(source && session ? inView(source, session.breakpoint) : source);
+  const surfaced = $derived(doc ? withSurface(doc, SURFACE_ID) : null);
+  const surface = $derived(surfaced ? frameSurface(surfaced) : null);
   const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session && source && session.edit(liftEdit(source, session.breakpoint, next), summary);
   const editSource = (result: OpResult, summary: string) => session?.apply(result, summary);
@@ -116,16 +121,24 @@
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     {#if editorMode.spec.sounds === SoundEntries.Shown && frameProperties.runAction}<SoundSection onrun={frameProperties.runAction} />{/if}
-    <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
-    <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />
-    <FrameColoursSection {doc} onchange={editGuides} />
-    <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
-    <BreakpointsSection doc={source!} active={session.breakpoint} onchange={editSource} onpick={pickView} />
+    {#if surfaced && surface}
+      <div class="frame-look" data-testid="frame-look">
+        <MotionInspector as={PropertiesView.Frame} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} onchange={edit} />
+      </div>
+    {/if}
     <LayoutGuidesSection {doc} onchange={editGuides} />
-    <FlowSection {doc} onchange={editGuides} />
-    <StyleLibrarySection {tokens} />
-    <VariablesLibrarySection {doc} onchange={editGuides} />
+    <details class="frame-settings" data-testid="frame-settings">
+      <summary>Frame settings</summary>
+      <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
+      <ScenesSection {doc} onchange={editGuides} />
+      <FrameColoursSection {doc} onchange={editGuides} />
+      <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
+      <BreakpointsSection doc={source!} active={session.breakpoint} onchange={editSource} onpick={pickView} />
+      <FlowSection {doc} onchange={editGuides} />
+      <StyleLibrarySection {tokens} />
+      <VariablesLibrarySection {doc} onchange={editGuides} />
+    </details>
     {#if frameProperties.runAction}
       {@const run = frameProperties.runAction}
       <section class="frame-actions" aria-label="Frame actions" data-testid="frame-actions">
@@ -171,6 +184,17 @@
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  .frame-settings > summary {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 var(--ui-space-3);
+    font-size: var(--ui-type-caption);
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 1px solid var(--ui-line);
   }
 
   .frame-actions {

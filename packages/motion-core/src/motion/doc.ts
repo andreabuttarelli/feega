@@ -233,6 +233,7 @@ export const motionDocSchema = z
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
+    surface: z.string().min(1).optional(),
     breakpoints: breakpointsSchema,
     layoutGuides: layoutGuidesSchema,
     userGuides: userGuidesSchema,

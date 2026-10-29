@@ -131,6 +131,7 @@
     lead,
     actions,
     mode = EditMode.Motion,
+    as = null,
     onalign
   }: {
     doc: MotionDoc;
@@ -154,6 +155,7 @@
     lead?: Snippet;
     actions?: Snippet;
     mode?: EditMode;
+    as?: PropertiesView | null;
     onalign?: (edge: AlignEdge) => void;
   } = $props();
 
@@ -471,7 +473,8 @@
   const pulseShown = $derived(pulsable.length > 0 && shows(Part.Pulse, family) && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio')));
   const visual = $derived(spec.track === TrackKind.Visual);
 
-  const view = $derived(focus ? PropertiesView.Part : PropertiesView.Clip);
+  const view = $derived(as ?? (focus ? PropertiesView.Part : PropertiesView.Clip));
+  const layerExtras = $derived(visual && view !== PropertiesView.Frame);
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
     [Section.Layout]: positioned || fieldsIn(Section.Layout).length > 0,
@@ -543,9 +546,9 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
-    {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
-    {#if visual}<VariablesSection {doc} {clip} {commit} />{/if}
-    {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<VariablesSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}
