@@ -4,7 +4,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { StripKind, dragStrip, layoutStrips, reorderAt } from './guides';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
-import { setAutoLayout, wrapInAutoLayout } from './ops';
+import { setAutoLayout, wrapInStack } from './ops';
 
 function must(r: OpResult | null): MotionDoc {
   if (!r?.ok) {
@@ -18,7 +18,7 @@ const row = (() => {
   for (const [id, x] of [['a', 0.2], ['b', 0.5], ['c', 0.8]] as const) {
     doc = must(addClip(doc, { component: 'Shape', from: 0, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } }, id));
   }
-  doc = must(wrapInAutoLayout(doc, ['a', 'b', 'c'], 'box', 'lane'));
+  doc = must(wrapInStack(doc, ['a', 'b', 'c'], 'box', 'lane'));
   return must(setAutoLayout(doc, 'box', { gap: 20, padding: { top: 10, right: 10, bottom: 10, left: 10 } }));
 })();
 

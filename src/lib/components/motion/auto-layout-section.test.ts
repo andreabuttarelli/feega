@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Align, Direction, Justify, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
-import { setAutoLayout, wrapInAutoLayout } from '$lib/motion/layout/ops';
+import { setAutoLayout, wrapInStack } from '$lib/motion/layout/ops';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import AutoLayoutSection from './AutoLayoutSection.svelte';
 
@@ -19,7 +19,7 @@ const row = (() => {
   doc = must(addClip(doc, { component: 'Shape', from: 0, props: { shape: 'rect', x: 0.2, y: 0.5, width: 0.1, height: 0.1 } }, 'a'));
   doc = must(addClip(doc, { component: 'Shape', from: 0, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.1 } }, 'b'));
   doc = must(addClip(doc, { component: 'Shape', from: 0, props: { shape: 'rect' } }, 'plain'));
-  return must(wrapInAutoLayout(doc, ['a', 'b'], 'box', 'lane'));
+  return must(wrapInStack(doc, ['a', 'b'], 'box', 'lane'));
 })();
 
 const clip = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip;

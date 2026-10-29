@@ -78,7 +78,7 @@ export function reorderChild(doc: MotionDoc, containerId: string, childId: strin
   return setAutoLayout(doc, containerId, { order: [...rest.slice(0, at), childId, ...rest.slice(at)] });
 }
 
-export function leaveAutoLayout(doc: MotionDoc, clipId: string): OpResult {
+export function leaveStack(doc: MotionDoc, clipId: string): OpResult {
   const found = findClip(doc, clipId);
   const container = found ? layoutParent(doc, found.clip) : null;
   if (!found || !container) {
@@ -124,13 +124,13 @@ function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string):
 
 enum Container {
   Frame = 'frame',
-  AutoLayout = 'auto-layout',
+  Stack = 'stack',
   Group = 'group'
 }
 
-const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.AutoLayout]: 'Auto layout', [Container.Group]: 'Group' };
+const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.Stack]: 'Auto layout', [Container.Group]: 'Group' };
 
-export const wrapInAutoLayout = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.AutoLayout);
+export const wrapInStack = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Stack);
 
 export const wrapInGroup = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Group);
 
@@ -159,7 +159,7 @@ export function boxAround(doc: MotionDoc, children: readonly MotionClip[]) {
   return { x: (left + right) / 2 / size.width, y: (top + bottom) / 2 / size.height, width: (right - left) / size.width, height: (bottom - top) / size.height };
 }
 
-export function removeAutoLayout(doc: MotionDoc, containerId: string): OpResult {
+export function freezeLayout(doc: MotionDoc, containerId: string): OpResult {
   const container = findClip(doc, containerId)?.clip;
   if (!container?.autoLayout) {
     return fail(`${containerId} is not an auto layout`);
@@ -201,25 +201,25 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
   if (!result.ok) {
     return result;
   }
-  result = container === Container.AutoLayout ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
+  result = container === Container.Stack ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
   result = container === Container.Group && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, group: true })) } : result;
   for (const p of placed) {
     if (!result.ok) {
       return result;
     }
     result = setParent(result.doc, p.clip.id, id, { at: p.clip.from });
-    if (result.ok && container === Container.AutoLayout && isText(p.clip.component) && !p.clip.layoutItem) {
+    if (result.ok && container === Container.Stack && isText(p.clip.component) && !p.clip.layoutItem) {
       result = setLayoutItem(result.doc, p.clip.id, HUG);
     }
   }
-  return result.ok && container === Container.AutoLayout ? setLayoutItem(result.doc, id, HUG) : result;
+  return result.ok && container === Container.Stack ? setLayoutItem(result.doc, id, HUG) : result;
 }
 
-export function addAutoLayout(doc: MotionDoc, clipIds: readonly string[], newId: () => string): { result: OpResult; containerId: string } {
+export function wrapWithStack(doc: MotionDoc, clipIds: readonly string[], newId: () => string): { result: OpResult; containerId: string } {
   const [lone] = clipIds;
   if (clipIds.length === 1 && doc.tracks.some((t) => t.clips.some((c) => c.parent === lone))) {
     return { result: setAutoLayout(doc, lone, {}), containerId: lone };
   }
   const containerId = newId();
-  return { result: wrapInAutoLayout(doc, clipIds, containerId, newId()), containerId };
+  return { result: wrapInStack(doc, clipIds, containerId, newId()), containerId };
 }
