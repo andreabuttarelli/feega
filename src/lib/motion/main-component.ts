@@ -1,5 +1,6 @@
 import { compOf, findClip, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { precompose, withOverride } from '@feega/motion-core/motion/precomp';
+import { nestedOnly } from '@feega/motion-core/motion/instance-overrides';
 import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type NewId = () => string;
@@ -89,7 +90,7 @@ export function pushOverrides(doc: MotionDoc, instanceId: string): OpResult {
   }
   const main = { ...instance.comp, tracks: baked(instance.comp, instance.overrides) };
   const withMain = { ...doc, comps: { ...doc.comps, [instance.compId]: main } };
-  return setProps(withMain, instanceId, { overrides: undefined });
+  return setProps(withMain, instanceId, { overrides: nestedOnly(instance.overrides, innerClips(instance.comp)) });
 }
 
 export function detachInstance(doc: MotionDoc, instanceId: string, newId: NewId): OpResult {
@@ -101,7 +102,7 @@ export function detachInstance(doc: MotionDoc, instanceId: string, newId: NewId)
   const tracks = baked(plain, instance.overrides);
   const compId = newId();
   const withComp = { ...doc, comps: { ...doc.comps, [compId]: { ...plain, tracks } } };
-  return setProps(withComp, instanceId, { comp: compId, overrides: undefined });
+  return setProps(withComp, instanceId, { comp: compId, overrides: nestedOnly(instance.overrides, innerClips(instance.comp)) });
 }
 
 export type InstanceText = { innerId: string; value: string; main: string; overridden: boolean };

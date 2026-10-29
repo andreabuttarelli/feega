@@ -151,6 +151,16 @@ describe('a precomp in the rendered timeline', () => {
     expect(byId(outer, 'po__0__pc__0__title').from).toBe(30);
   });
 
+  it('a group nested as deep as an imported web page still draws its clips', () => {
+    const LEVELS = 16;
+    let doc = precomposed;
+    for (let level = 1; level < LEVELS; level++) {
+      doc = must(precompose(doc, [level === 1 ? 'pc' : `p${level - 1}`], { comp: `k${level}`, clip: `p${level}` }, `Level ${level}`));
+    }
+
+    expect(placed(doc).some((c) => c.id.endsWith('__title'))).toBe(true);
+  });
+
   it('a doc without precomps is left as it was', () => {
     expect(flattenComps(base)).toEqual(base);
   });

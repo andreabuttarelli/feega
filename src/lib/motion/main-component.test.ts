@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
-import { flattenComps } from '@feega/motion-core/motion/precomp';
+import { flattenComps, precompose } from '@feega/motion-core/motion/precomp';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
 
@@ -87,6 +87,25 @@ describe('overrides beyond text', () => {
     return { doc, id: doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!.id };
   };
   const flat = (doc: MotionDoc) => flattenComps(doc).tracks.flatMap((t) => t.clips as MotionClip[]);
+
+  it('an override reaches an element inside a group of the main', () => {
+    const grouped = must(precompose(button(), ['label'], { comp: 'group', clip: 'g' }, 'Group'));
+    const doc = must(createComponent(grouped, ['bg', 'g'], newId, 'Button'));
+    const instance = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+    const changed = must(setProps(doc, instance.id, { overrides: { label: { text: 'Sold out' } } }));
+
+    expect(flatText(changed)).toEqual(['Sold out']);
+  });
+
+  it('detaching or pushing keeps an override inside a group of the main', () => {
+    const grouped = must(precompose(button(), ['label'], { comp: 'group', clip: 'g' }, 'Group'));
+    const doc = must(createComponent(grouped, ['bg', 'g'], newId, 'Button'));
+    const instance = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+    const changed = must(setProps(doc, instance.id, { overrides: { label: { text: 'Sold out' } } }));
+
+    expect(flatText(must(detachInstance(changed, instance.id, newId)))).toEqual(['Sold out']);
+    expect(flatText(must(pushOverrides(changed, instance.id)))).toEqual(['Sold out']);
+  });
 
   it('hiding an element in one instance removes it from both renderers', () => {
     const { doc, id } = made();
