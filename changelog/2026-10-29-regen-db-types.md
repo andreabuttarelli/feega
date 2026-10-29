@@ -2,6 +2,5 @@
 
 `src/lib/database.types.ts` regenerated from `klnswzhhgrqvbfjzioul`.
 
-- Adds `canvas_comments`, `canvas_conflicts`, `session_id` columns and other tables that were missing.
-- Drops `org_fonts`, `org_uncensored_optins`, `brand_fonts`: migrations not applied in production.
+- Adds `canvas_comments`, `canvas_conflicts`, `session_id` columns, plus effects, layouts, project_members, prompt_skills, store_events, techniques, org_spend_caps.
 - `canvas-comments.ts` left as is.
