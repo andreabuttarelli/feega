@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { actorCols, type Actor } from './actor';
+import { Attempt, recordConflict } from './canvas-conflicts';
 
 export type MotionHead = { version: number; doc: MotionDoc; summary: string | null; actorKind: string };
 
@@ -252,6 +253,24 @@ async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
   return data !== null;
 }
 
+async function noteStaleHead(db: Db, input: { orgId: string; nodeId: string; expectedVersion: number; doc: MotionDoc; actor: Actor }): Promise<void> {
+  const { data: node } = await db.from('nodes').select('canvas_id').eq('org_id', input.orgId).eq('id', input.nodeId).maybeSingle();
+  if (!node) {
+    return;
+  }
+  await recordConflict(db, {
+    orgId: input.orgId,
+    canvasId: node.canvas_id,
+    nodeId: input.nodeId,
+    expectedVersion: input.expectedVersion,
+    actualVersion: await headVersion(db, input),
+    attempt: Attempt.MotionHead,
+    attempted: { doc: input.doc },
+    winningEventId: null,
+    actor: input.actor
+  });
+}
+
 export async function appendRevision(
   db: Db,
   input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; checkpoint?: Checkpoint }
@@ -264,6 +283,7 @@ export async function appendRevision(
   const summary = input.summary?.slice(0, SUMMARY_MAX) ?? null;
   const written = await commitRevision(db, { ...input, doc: parsed.doc, summary, checkpoint: input.checkpoint ?? Checkpoint.Cut });
   if (!written) {
+    await noteStaleHead(db, { ...input, doc: parsed.doc });
     return { outcome: RevisionOutcome.Conflict };
   }
   return { outcome: RevisionOutcome.Written, head: { version: input.expectedVersion + 1, doc: parsed.doc, summary, actorKind: input.actor.kind } };

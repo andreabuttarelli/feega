@@ -2,6 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { listBranchNodes, listNodes } from '$lib/server/repos/canvas';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
+import { listConflicts } from '$lib/server/repos/canvas-conflicts';
 import { listRevisionMarks, type RevisionMark } from '$lib/server/repos/motion-revisions';
 import { listProfileNames } from '$lib/server/repos/profiles';
 import { listCanvasVersions } from './canvas-versions';
@@ -76,7 +77,21 @@ async function frameEntries(db: Db, scope: Scope): Promise<HistoryEntry[]> {
   return marks.map((mark) => revisionEntry(mark, forks.get(mark.nodeId)));
 }
 
-const READERS: ((db: Db, scope: Scope) => Promise<HistoryEntry[]>)[] = [eventEntries, versionEntries, frameEntries];
+async function conflictEntries(db: Db, scope: Scope): Promise<HistoryEntry[]> {
+  const conflicts = await listConflicts(db, { ...scope, limit: PER_SOURCE });
+  return conflicts.map((c) => ({
+    id: `${HistorySource.Conflict}:${c.id}`,
+    source: HistorySource.Conflict,
+    kind: c.resolution ? EntryKind.ConflictResolved : EntryKind.ConflictOpen,
+    at: c.createdAt,
+    author: actorAuthor(c.refused),
+    nodeId: c.nodeId,
+    frameId: null,
+    summary: c.resolution
+  }));
+}
+
+const READERS: ((db: Db, scope: Scope) => Promise<HistoryEntry[]>)[] = [eventEntries, versionEntries, frameEntries, conflictEntries];
 
 const peopleOf = (entries: HistoryEntry[]) => [...new Set(entries.flatMap((e) => (e.author.kind === 'user' && e.author.id ? [e.author.id] : [])))];
 

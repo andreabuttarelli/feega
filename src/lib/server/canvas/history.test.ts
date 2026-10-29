@@ -53,4 +53,16 @@ describe('readHistory merges the canvas logs into one timeline', () => {
 
     expect(calls.filter((c) => c.table !== 'profiles').every((c) => c.filters.some(([col, v]) => col === 'org_id' && v === ORG))).toBe(true);
   });
+
+  it('a refused write is a conflict row on the lane of who was refused, closed ones say which side won', async () => {
+    const conflict = (id: string, at: string, resolution: string | null) => ({ id, org_id: ORG, canvas_id: CANVAS, node_id: 'text-1', expected_version: 3, actual_version: 5, attempt: 'replace', attempted: {}, winning_event_id: 7, actor_kind: 'user', actor_id: MARCO, agent_key: null, resolution, resolved_at: resolution ? at : null, created_at: at });
+    const { db } = fakeDb({ ...rows(), canvas_conflicts: [conflict('k-1', '2026-10-29T14:00:00Z', null), conflict('k-2', '2026-10-29T13:30:00Z', 'mine')] }, { filter: true });
+
+    const graph = await readHistory(db, { orgId: ORG, canvasId: CANVAS, filter: HistoryFilter.People });
+
+    expect(graph.rows.slice(0, 2).map((r) => [r.entry.id, r.entry.kind, r.entry.nodeId, r.entry.summary])).toEqual([
+      ['conflict:k-1', 'conflict.open', 'text-1', null],
+      ['conflict:k-2', 'conflict.resolved', 'text-1', 'mine']
+    ]);
+  });
 });

@@ -3,7 +3,8 @@ import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
 import type { NarrowedDatabase } from '$lib/server/db/typed-database';
 import { actorCols, edgeActorCols, type Actor, type ActorKind } from './actor';
-import { recordEvent } from './canvas-events';
+import { lastNodeEventId, recordEvent } from './canvas-events';
+import { Attempt, recordConflict } from './canvas-conflicts';
 import { clashingKeys, mergeNodeData } from '$lib/canvas/node-patch';
 import { nestsInItself } from '$lib/canvas/group-cycle';
 import { layoutOf } from '$lib/canvas/node-layout';
@@ -494,7 +495,32 @@ export async function writeNodeData(
   }
 ): Promise<DataWrite> {
   const before = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
-  return commitNodeData(db, { ...input, before });
+  const written = await commitNodeData(db, { ...input, before });
+  if (written.outcome === 'conflict') {
+    await noteRefusal(db, { orgId: input.orgId, nodeId: input.nodeId, expectedVersion: input.expectedVersion, attempt: Attempt.Replace, attempted: input.data, actor: input.actor });
+  }
+  return written;
+}
+
+async function noteRefusal(
+  db: Db,
+  input: { orgId: string; nodeId: string; expectedVersion: number | null; attempt: Attempt; attempted: Record<string, unknown>; actor?: Actor; current?: CanvasNodeRecord }
+): Promise<void> {
+  const current = input.current ?? (await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }));
+  if (!current) {
+    return;
+  }
+  await recordConflict(db, {
+    orgId: input.orgId,
+    canvasId: current.canvasId,
+    nodeId: input.nodeId,
+    expectedVersion: input.expectedVersion,
+    actualVersion: current.version,
+    attempt: input.attempt,
+    attempted: input.attempted,
+    winningEventId: await lastNodeEventId(db, { orgId: input.orgId, nodeId: input.nodeId }),
+    actor: input.actor
+  });
 }
 
 async function commitNodeData(
@@ -592,6 +618,7 @@ export async function patchNodeData(
 
     const keys = input.base ? clashingKeys(before.data, input.base, input.patch) : [];
     if (keys.length) {
+      await noteRefusal(db, { orgId: input.orgId, nodeId: input.nodeId, expectedVersion: null, attempt: Attempt.Patch, attempted: input.patch, actor: input.actor, current: before });
       return { outcome: 'conflict', keys };
     }
 

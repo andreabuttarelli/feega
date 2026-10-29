@@ -395,6 +395,15 @@ program
   });
 
 program
+  .command('resolve-conflict <canvasId> <conflictId> <keep>')
+  .description('Resolve a refused write from `feega history`: keep mine re-applies it, keep theirs closes it (free)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (canvasId: string, conflictId: string, keep: string, opts) => {
+    const { cmdResolveConflict } = await import('./commands/history.ts');
+    await cmdResolveConflict(canvasId, conflictId, keep, opts);
+  });
+
+program
   .command('components <projectId>')
   .description('List the components of every canvas of a project')
   .action(async (projectId: string) => {

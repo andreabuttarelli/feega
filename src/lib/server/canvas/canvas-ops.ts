@@ -60,6 +60,8 @@ import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
 import { actAt, previewAt } from '$lib/server/canvas/history-actions';
 import { HistoryAction } from '$lib/canvas/history/timeline';
 import { Side } from '$lib/motion/branch-merge';
+import { ResolveOutcome, resolveConflict } from '$lib/server/canvas/conflicts';
+import { Resolution } from '$lib/server/repos/canvas-conflicts';
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
@@ -1345,6 +1347,18 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ canvasId: z.string(), name: z.string().max(60).describe('e.g. "Client review"') }).strict(),
     run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? saveCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, name: input.name, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  resolve_conflict: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), conflictId: z.string().describe('the id after `conflict:` in list_history'), keep: z.enum(Resolution) }).strict(),
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const out = await resolveConflict(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, conflictId: input.conflictId, resolution: input.keep, actor: ctx.actor });
+      return out.outcome === ResolveOutcome.Resolved ? { resolved: true, keep: input.keep } : { error: out.outcome, ...(out.error ? { message: out.error } : {}) };
+    }
   }),
 
   export_canvas_file: op({

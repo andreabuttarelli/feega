@@ -76,6 +76,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   name_version: 'Give a frame revision of list_history a name.',
   merge_branch_at: 'Merge a branch of list_history back into its frame, then remove the branch.',
   drop_branch_at: 'Remove a branch of list_history without merging it.',
+  resolve_conflict: 'Resolve a refused write from list_history: keep mine re-applies it on the current version, keep theirs closes it.',
   list_canvas_comments: 'Comment threads of a canvas, with replies and where each is pinned, and the teammates that can be mentioned.',
   add_canvas_comment: 'Start a comment thread on the canvas or on a node, or reply to one.',
   resolve_canvas_comment: 'Resolve or reopen a comment thread.',

@@ -18,7 +18,7 @@
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { postPageAction } from '$lib/api/page-action';
   import { LocalOff, isOff } from '$lib/local-user';
-  import { ENTRY_VERBS, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, laneSpans, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
+  import { ENTRY_VERBS, EntryKind, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, laneSpans, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
   import type { HistoryPreview } from '$lib/server/canvas/history-actions';
 
   let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
@@ -68,6 +68,14 @@
   let notice = $state('');
   let conflicts = $state<string[] | null>(null);
   let branching = $state(false);
+
+  let resolving = $state<string | null>(null);
+
+  const CONFLICT_PREFIX = 'conflict:';
+  const SIDES = [
+    { keep: 'mine', label: 'Keep mine' },
+    { keep: 'theirs', label: 'Keep theirs' }
+  ];
 
   const frameId = $derived(oneFrame ? ($canvasSelection[0] ?? null) : null);
   const spans = $derived(graph ? laneSpans(graph) : []);
@@ -149,6 +157,14 @@
 
   const isFrame = (p: HistoryPreview): p is Extract<HistoryPreview, { frameId: string }> => 'frameId' in p;
 
+  async function resolve(entryId: string, keep: string) {
+    resolving = entryId;
+    const conflictId = entryId.slice(CONFLICT_PREFIX.length);
+    await fetch(`/p/${projectId}/c/${canvasId}/history`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ conflictId, keep }) }).catch(() => null);
+    resolving = null;
+    reads += 1;
+  }
+
   const timeOf = (at: string) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   const laneX = (lane: number) => lane * LANE_PX + LANE_PX / 2;
 </script>
@@ -201,8 +217,9 @@
       {#each graph.rows as row, index (row.entry.id)}
         {@const lane = graph.lanes[row.lane]}
         {@const Icon = LANE_ICONS[lane.icon]}
+        {@const open = row.entry.kind === EntryKind.ConflictOpen}
         {@const actions = actionsOf(row.entry)}
-        <li class="row" class:open={opened === row.entry.id} data-testid="history-row" data-lane={lane.kind} onclick={() => actions.length && toggle(row.entry)} onkeydown={(e) => e.key === 'Enter' && actions.length && toggle(row.entry)} role={actions.length ? 'button' : undefined} tabindex={actions.length ? 0 : undefined}>
+        <li class="row" class:conflict={open} class:open={opened === row.entry.id} data-testid="history-row" data-lane={lane.kind} onclick={() => actions.length && toggle(row.entry)} onkeydown={(e) => e.key === 'Enter' && actions.length && toggle(row.entry)} role={actions.length ? 'button' : undefined} tabindex={actions.length ? 0 : undefined}>
           <svg class="graph" width={gutter} height={ROW_PX} aria-hidden="true">
             {#each spans as span, l (l)}
               {#if index >= span.first && index <= span.last}
@@ -216,7 +233,15 @@
           </svg>
           <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
           <span class="what">{ENTRY_VERBS[row.entry.kind]}{#if row.entry.summary}<span class="summary"> · {row.entry.summary}</span>{/if}</span>
-          <time class="when" datetime={row.entry.at}>{timeOf(row.entry.at)}</time>
+          {#if open}
+            <span class="sides">
+              {#each SIDES as side (side.keep)}
+                <button type="button" class="side" disabled={resolving === row.entry.id} onclick={(e) => { e.stopPropagation(); void resolve(row.entry.id, side.keep); }} data-testid="history-keep-{side.keep}">{side.label}</button>
+              {/each}
+            </span>
+          {:else}
+            <time class="when" datetime={row.entry.at}>{timeOf(row.entry.at)}</time>
+          {/if}
         </li>
         {#if opened === row.entry.id}
           <li class="point" data-testid="history-point">
@@ -408,6 +433,35 @@
     list-style: none;
     color: var(--ui-text-secondary);
     font-size: 11px;
+  }
+
+  .row.conflict {
+    background: color-mix(in srgb, var(--ui-danger) 10%, transparent);
+    color: var(--ui-danger);
+  }
+
+  .sides {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 2px;
+  }
+
+  .side {
+    height: 20px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+  }
+
+  .side:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+  }
+
+  .side:disabled {
+    opacity: 0.4;
   }
 
   .graph {

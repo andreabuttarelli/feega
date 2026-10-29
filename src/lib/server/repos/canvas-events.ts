@@ -141,3 +141,11 @@ export async function listCanvasEvents(
   }
   return (data ?? []).map((row) => toEvent(row as EventRow));
 }
+
+export async function lastNodeEventId(db: Db, scope: { orgId: string; nodeId: string }): Promise<number | null> {
+  const { data, error } = await db.from('canvas_events').select('id').eq('org_id', scope.orgId).eq('node_id', scope.nodeId).order('id', { ascending: false }).limit(1);
+  if (error) {
+    throw error;
+  }
+  return data?.[0]?.id ?? null;
+}
