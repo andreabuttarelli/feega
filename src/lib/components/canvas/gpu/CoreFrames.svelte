@@ -19,7 +19,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -38,7 +38,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -132,10 +132,29 @@
     onRuns(ram.runs(range));
   }
 
-  async function load(f: FrameAt) {
+  async function fetchAndBuild(f: FrameAt) {
     const url = new URL(`${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`, location.href).href;
     const away = f.scenes ? null : await buildAway(url, smoothing).catch(() => null);
-    const built = away ? { list: away, custom: null } : await buildHere(f, url);
+    return away ? { list: away, custom: null } : buildHere(f, url);
+  }
+
+  const STEP_WAIT_MS = 300;
+  const STEP_POLL_MS = 50;
+
+  async function awaitKnown(f: FrameAt): Promise<FrameDoc | null> {
+    for (let waited = 0; waited < STEP_WAIT_MS; waited += STEP_POLL_MS) {
+      await new Promise((resolve) => setTimeout(resolve, STEP_POLL_MS));
+      const given = known(f);
+      if (given) {
+        return given;
+      }
+    }
+    return null;
+  }
+
+  async function load(f: FrameAt) {
+    const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
+    const built = given ? await buildSource(f, given) : await fetchAndBuild(f);
     if (!built || (await media.ready(built.list)) === Readiness.Partial) {
       return;
     }
@@ -143,6 +162,7 @@
       customPictures.set(keyOf(f), built.custom.picture);
     }
     logGaps(f.id, built.list);
+    loaded.set(f.id, keyOf(f));
     lists = new Map(lists).set(keyOf(f), onStage(built.list, f.kind));
   }
 
@@ -152,6 +172,8 @@
   const liveGeneration = new Map<string, number>();
   const liveAtRevision = new Map<string, number>();
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
+  const loaded = new Map<string, string>();
+  const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
     const generation = (liveGeneration.get(f.id) ?? 0) + 1;
@@ -214,8 +236,9 @@
 
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
-      const list = lists.get(groupOf(f));
-      return list && drawsAny(list) ? [{ id: f.id, group: groupOf(f), box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
+      const group = shownOf(f);
+      const list = group ? lists.get(group) : undefined;
+      return group && list && drawsAny(list) ? [{ id: f.id, group, box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
@@ -269,7 +292,7 @@
   };
   const chains = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
-    const holding = new Set([...rebuilding, ...retained(Date.now())]);
+    const holding = new Set([...rebuilding, ...retained(Date.now()), ...real.filter((f) => !pictured.has(f.group)).map((f) => f.id)]);
     for (const id of [...drawnLast.keys()].filter((id) => !holding.has(id))) {
       drawnLast.delete(id);
     }

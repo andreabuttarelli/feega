@@ -22,7 +22,7 @@ function sessionOf(selection: string[]) {
   const doc = must(addClip(device, { component: 'Particles', from: 0, durationInFrames: 30, props: {} }, 'sparks'));
   return new FrameEditSession(
     { head: { version: 1, doc }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
   );
 }
 
