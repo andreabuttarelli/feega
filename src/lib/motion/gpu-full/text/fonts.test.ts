@@ -105,5 +105,21 @@ describe('faceBook', () => {
     const gone = withSans({ family: 'Deleted Upload', weight: 400, italic: false, size: 20, axes: {} }, 0x41);
     expect(gone?.face.key?.font).toBe('https://x.test/dm-sans.woff2');
   });
+
+  it('resolves a character once per look, so laying the same text out again reads no rules', () => {
+    let checks = 0;
+    const counted = new Map([...sources].map(([url, s]) => [url, { ...s, covers: () => (checks++, true) }]));
+    const once = faceBook(rules, counted, registry);
+    const look = { family: 'Inter', weight: 400, italic: false, size: 20, axes: {} };
+
+    const first = once(look, 65);
+    const checked = checks;
+    const again = once({ ...look }, 65);
+
+    expect(again).toEqual(first);
+    expect(checks).toBe(checked);
+    expect(once({ ...look, weight: 700 }, 65)).not.toBeNull();
+    expect(checks).toBeGreaterThan(checked);
+  });
 });
 

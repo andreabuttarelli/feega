@@ -192,7 +192,8 @@ altro worktree. Mossa: un dev server tuo su una porta tua e `E2E_BASE_URL`.
 `vite.config.ts` esclude `**/.claude/worktrees/**` dal watcher: un dev server lanciato DENTRO un
 worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallisce su
 un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
-Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright.
+Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright. Vale anche per una misura di
+performance: numeri identici prima e dopo un fix vogliono dire codice vecchio servito, non un fix inutile.
 
 ### Il canvas core diventa vuoto o nero dopo un clic, senza errori
 Segnale: nessun `pageerror`, nessun `liveDocs.set`, `data-painted` aumenta di un `full` e poi il

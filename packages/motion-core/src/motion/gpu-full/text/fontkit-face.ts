@@ -2,6 +2,7 @@ import { create } from 'fontkit';
 import { Ligatures, Op, type Command, type Face, type Shaped } from './face';
 import type { Axes, Source } from './fonts';
 import { quadraticPath, type TruePoint } from './quadratic';
+import { memoOutline, memoShape } from './shape-memo';
 
 type KitPoint = TruePoint & { copy: () => KitPoint };
 type Component = { glyphID: number; dx: number; dy: number; scaleX: number; scaleY: number; scale01: number; scale10: number };
@@ -92,11 +93,11 @@ function faceOf(base: KitFont, inst: KitFont): Face {
   return {
     unitsPerEm: base.unitsPerEm,
     ...metricsOf(base),
-    shape: (text, ligatures, features = {}): Shaped[] => {
+    shape: memoShape((text, ligatures, features = {}): Shaped[] => {
       const run = inst.layout(text, { ...FEATURES[ligatures], ...features });
       return run.glyphs.map((g, i) => ({ glyph: g.id, advance: run.positions[i].xAdvance, dx: run.positions[i].xOffset, dy: run.positions[i].yOffset, chars: Math.max(1, g.codePoints.length) }));
-    },
-    outline: (glyph): Command[] => (glyf ? quadraticPath(outlinePoints(base, glyph, processor)) : inst.getGlyph(glyph).path.commands.map((c) => ({ op: KIT_OP[c.command], at: c.args })))
+    }),
+    outline: memoOutline((glyph): Command[] => (glyf ? quadraticPath(outlinePoints(base, glyph, processor)) : inst.getGlyph(glyph).path.commands.map((c) => ({ op: KIT_OP[c.command], at: c.args }))))
   };
 }
 

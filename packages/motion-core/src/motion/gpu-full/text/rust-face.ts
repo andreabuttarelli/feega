@@ -1,5 +1,6 @@
 import { Ligatures, Op, type Command, type Face, type Shaped } from './face';
 import type { Axes, Source } from './fonts';
+import { memoOutline, memoShape } from './shape-memo';
 
 export type TextCore = {
   addFont: (family: string, bytes: Uint8Array) => number;
@@ -48,8 +49,8 @@ function faceOf(core: TextCore, font: number, coords: Record<string, number>): F
     unitsPerEm,
     ascent,
     descent,
-    shape: (text, ligatures) => shapedOf(core.shape(font, tags, values, text, LIGATURE_CODE[ligatures])),
-    outline: (glyph) => commandsOf(core.outline(font, tags, values, glyph))
+    shape: memoShape((text, ligatures) => shapedOf(core.shape(font, tags, values, text, LIGATURE_CODE[ligatures]))),
+    outline: memoOutline((glyph) => commandsOf(core.outline(font, tags, values, glyph)))
   };
 }
 

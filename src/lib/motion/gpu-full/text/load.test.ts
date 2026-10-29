@@ -43,6 +43,15 @@ describe('loadFonts', () => {
     expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face.shape).toBe(boxFace.shape);
   });
 
+  it('hands back the same face book while the fonts a frame needs stay the same', async () => {
+    const load = fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array([1]) }, async () => () => ({ axes: {}, covers: () => true, at: () => boxFace }));
+    const first = await load(titled, {}, FEEGA_TOKENS);
+    const recoloured = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Hi' } }, 't2'));
+
+    expect(await load(recoloured, {}, FEEGA_TOKENS)).toBe(first);
+    expect(await load(must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Ā' } }, 't3')), {}, FEEGA_TOKENS)).not.toBe(first);
+  });
+
   it('starts the face engine only once a file is read', () => {
     let started = 0;
     fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array() }, async () => (started++, () => ({ axes: {}, covers: () => true, at: () => boxFace })));
