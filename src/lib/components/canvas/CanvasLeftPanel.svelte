@@ -10,7 +10,6 @@
   import LayersPanel from './LayersPanel.svelte';
   import PagesList from './PagesList.svelte';
   import type { ComponentProps } from 'svelte';
-  import ComponentsList from './ComponentsList.svelte';
   import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
   import X from '@lucide/svelte/icons/x';
   import Search from '@lucide/svelte/icons/search';
@@ -66,19 +65,18 @@
   </div>
 {:else}
   <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
-    <div class="left-panel-head">
-      <h3>{$_(labelKey)}</h3>
-      <IconButton label={$_('app.shell.closePanel')} shortcut="Escape" size={IconSize.Md} side={Side.Bottom} onclick={onclose}>
+    <div class="section-head is-first">
+      <span class="section-label">{$_(labelKey)}</span>
+      <IconButton label={$_('app.shell.closePanel')} shortcut="Escape" size={IconSize.Sm} side={Side.Bottom} onclick={onclose} data-testid="panel-close">
         <X />
       </IconButton>
     </div>
-    <div class="left-panel-body">
+    <div class="left-panel-body is-flush">
       {#if kind === 'components'}
         <ProjectComponentsPanel {projectId} />
       {:else if kind === 'brands'}
         <BrandsPanel {projectId} />
       {:else}
-        <ComponentsList />
         <ProjectDragPanel {projectId} />
       {/if}
     </div>
@@ -107,22 +105,6 @@
     }
   }
 
-  .left-panel-head {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: var(--ui-header-h);
-    padding: 0 6px 0 12px;
-  }
-  .left-panel-head h3 {
-    margin: 0;
-    font-size: var(--ui-type-title);
-    font-weight: var(--ui-weight-semibold);
-    letter-spacing: var(--ui-tracking-title);
-    color: var(--ui-text);
-  }
-
   .left-panel-body {
     flex: 1;
     min-height: 0;
@@ -130,7 +112,8 @@
     padding: 6px;
   }
 
-  .is-tree .left-panel-body {
+  .is-tree .left-panel-body,
+  .left-panel-body.is-flush {
     padding: 0 6px 6px;
   }
 
@@ -141,6 +124,11 @@
     height: var(--ui-row-sm);
     margin-top: 4px;
     padding: 0 6px 0 14px;
+  }
+
+  .section-head.is-first {
+    margin-top: 0;
+    height: var(--ui-header-h);
   }
 
   .section-label {
