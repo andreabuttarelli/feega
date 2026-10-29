@@ -1340,6 +1340,7 @@
     frameProperties.part = pickedPart;
     frameProperties.toggleDev = () => (frameViews = flipView(frameViews, FrameView.Dev));
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
+    frameProperties.openCode = () => (frameDialog = { nodeId: panelNodeId, dialog: FrameDialog.Code });
     return () => frameProperties.clear();
   });
 

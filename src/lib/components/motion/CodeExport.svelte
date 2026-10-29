@@ -6,6 +6,7 @@
   import { CODE_TARGETS, CodeTarget, TARGETS, exportCode } from '@feega/motion-core/motion/codegen/index';
   import { kebab } from '@feega/motion-core/motion/codegen/naming';
   import { CodeLanguage, type CodeView } from './code-editor';
+  import { entryFile } from './code-files';
 
   let { doc, name, assets, tokens }: { doc: MotionDoc; name: string; assets: Record<string, string>; tokens: BrandTokens } = $props();
 
@@ -20,7 +21,7 @@
   let view = $state<CodeView | null>(null);
 
   const out = $derived(exportCode(doc, { target, name, assets, brand: tokens }));
-  const shown = $derived(out.files.find((f) => f.path === picked) ?? out.files.find((f) => f.path.includes('/pages/') || f.path.endsWith('+page.svelte') || f.path === 'index.html') ?? out.files[0]);
+  const shown = $derived(entryFile(out.files, picked));
   const languageOf = (path: string) => LANGUAGE_OF[path.split('.').at(-1) ?? ''] ?? CodeLanguage.Js;
 
   onMount(() => {
