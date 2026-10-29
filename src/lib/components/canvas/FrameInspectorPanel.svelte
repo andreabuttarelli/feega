@@ -40,6 +40,12 @@
   import BreakpointOverrides from '$lib/components/motion/BreakpointOverrides.svelte';
   import { ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
   import PlayInspector from './PlayInspector.svelte';
+  import NodeInspector from './NodeInspector.svelte';
+  import { FRAME_PANEL_ACTIONS } from '$lib/canvas/selection-actions';
+  import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
+  import { selectionProperties } from './selection-properties.svelte';
+  import AlignBar from '$lib/components/motion/AlignBar.svelte';
+  import { alignSpace, distributeSpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
 
   const FIRST_FRAME = 0;
 
@@ -73,6 +79,9 @@
   const editShown = (next: NonNullable<typeof doc>, summary: string) => doc && shown && edit(mergeScope(doc, shown, next), summary);
   const commitShown = (result: OpResult, summary: string) => result.ok && editShown(result.doc, summary);
   const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
+
+  const alignPicks = (edge: Edge) => doc && session && editGuides(alignSpace(doc, session.selection, session.playhead, propBoxes(doc), edge, session.mode), `Aligned ${edge}`);
+  const distributePicks = (axis: Axis, spacing?: number) => doc && session && editGuides(distributeSpace(doc, session.selection, session.playhead, propBoxes(doc), axis, session.mode, spacing), `Distributed along ${axis}`);
 
   async function runBar(id: ActionId) {
     if (!session || !doc) {
@@ -115,11 +124,21 @@
     <FlowSection {doc} onchange={editGuides} />
     <StyleLibrarySection {tokens} />
     <VariablesLibrarySection {doc} onchange={editGuides} />
+    {#if frameProperties.runAction}
+      {@const run = frameProperties.runAction}
+      <section class="frame-actions" aria-label="Frame actions" data-testid="frame-actions">
+        {#each FRAME_PANEL_ACTIONS as action (action.id)}
+          {@const Icon = SELECTION_ACTION_ICON[action.id]}
+          <button type="button" data-testid={`frame-action-${action.id}`} onclick={() => run(action.id)}><Icon size={14} />{action.label}</button>
+        {/each}
+      </section>
+    {/if}
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
+      <AlignBar count={session.selection.length} onalign={alignPicks} ondistribute={distributePicks} />
       <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}
       <TemplateInspector actions={headerBar} gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
@@ -134,6 +153,8 @@
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}
     {/if}
   </aside>
+{:else if !session && selectionProperties.panel}
+  <NodeInspector panel={selectionProperties.panel} />
 {:else}
   <p class="empty" data-testid="properties-empty">Select an element in a frame to edit its properties.</p>
 {/if}
@@ -148,6 +169,27 @@
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  .frame-actions {
+    display: flex;
+    flex-direction: column;
+    padding: var(--ui-space-2) var(--ui-space-3);
+  }
+
+  .frame-actions button {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+    min-height: 32px;
+    padding: 0 var(--ui-space-2);
+    border-radius: var(--ui-radius-sm);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text);
+  }
+
+  .frame-actions button:hover {
+    background: var(--ui-wash);
   }
 
   .empty {

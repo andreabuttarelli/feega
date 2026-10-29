@@ -339,3 +339,24 @@ describe('editor modes: no layer op lives only in a key', () => {
     }
   });
 });
+
+describe('use as mask inside a canvas frame', () => {
+  const members = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips).filter((c) => c.matteFrom && c.matte !== 'none');
+
+  it('the frame context menu and the right bar offer it', () => {
+    expect(FRAME_ELEMENT_MENU.has('use-as-mask')).toBe(true);
+    expect(FRAME_ELEMENT_MENU.has('release-mask')).toBe(true);
+    expect(frameBarActions(fixture(), ['a', 'b'])).toContain(Command.UseAsMask);
+    expect(frameBarActions(fixture(), ['a'])).not.toContain(Command.UseAsMask);
+  });
+
+  it('masks the layers above the bottom-most pick, then releases them', () => {
+    const masked = barAction(Command.UseAsMask, { doc: fixture(), selection: ['a', 'b'], frame: 0, newId: ids() });
+
+    expect(members(masked!.doc)).toHaveLength(1);
+    expect(frameBarActions(masked!.doc, ['a'])).toContain(Command.RemoveMask);
+
+    const released = barAction(Command.RemoveMask, { doc: masked!.doc, selection: ['a', 'b'], frame: 0, newId: ids() });
+    expect(members(released!.doc)).toEqual([]);
+  });
+});

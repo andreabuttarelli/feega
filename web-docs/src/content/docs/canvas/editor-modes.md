@@ -20,3 +20,14 @@ The switch at the left of the bottom bar sets one mode for the whole editor. Fee
 - Stills always edit in Design: Motion applies to frames that have a timeline.
 
 The mode used to live in a row at the top of each frame's properties. That row is gone: the bottom-bar switch replaces it, for every frame at once.
+
+## The properties panel
+
+The right panel follows the selection, whatever is selected:
+
+- **A generated image or video:** its model and settings (the same pickers as the selection toolbar), View output, and the tools: Remove background, Upscale, Inpaint, Outpaint, Reframe, Split into layers, Layers to frame.
+- **Several free elements or nodes:** Align (left, centre, right, top, middle, bottom) and Distribute horizontally or vertically, plus Duplicate, Group, Tidy up.
+- **Several layers inside a frame:** the same Align and Distribute bar, and **Use as mask**: the bottom-most selected layer cuts the layers above it. **Remove mask** undoes it. Both are in the right-click menu too.
+- **A frame with nothing inside picked:** Export, Components, Templates, Version history, Branches, Interactive, Chat history, Save as template, Publish, Copy id, Report — the same entries as the frame's "…" menu.
+
+On a phone or tablet, press and hold a node or a layer to open the same menu a right click opens.

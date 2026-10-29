@@ -29,6 +29,7 @@ import { scopeView } from '$lib/motion/instance-view';
 import { scopeOf } from './frame-scope';
 import { isLockedComp } from '$lib/motion/template/library';
 import { createComponent, detachInstance, instanceOf, pushOverrides, resetOverrides } from '$lib/motion/main-component';
+import { maskMembers, maskOf, releaseMasks, useAsMask } from '$lib/motion/mask-group';
 
 export type InspectorShown = { view: PropertiesView.Clip | PropertiesView.Template; clip: MotionClip; path: CompPath; hosts: readonly string[] } | { view: PropertiesView.Multiple; clip: null; path: CompPath; hosts: readonly string[] };
 
@@ -141,6 +142,11 @@ const flattenOp: BarOp = {
   }
 };
 
+const inMask = (doc: MotionDoc, selection: readonly string[]) => {
+  const masks = maskMembers(doc);
+  return selection.some((id) => masks.has(id) || maskOf(doc, id) !== null);
+};
+
 const flip = (way: Flip, summary: string): BarOp => ({ shown: any, run: (ctx) => kept(ctx, flipClips(ctx.doc, ctx.selection, way), summary) });
 
 const oneInstance = (doc: MotionDoc, selection: readonly string[]) => selection.length === 1 && instanceOf(doc, selection[0]) !== null;
@@ -211,6 +217,8 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.Exclude]: combine(BooleanOp.Exclude),
   [Action.Flatten]: flattenOp,
   [Action.OutlineStroke]: { shown: someShape, run: (ctx) => kept(ctx, outlineStrokes(ctx.doc, ctx.selection, ctx.frame, ctx.newId), 'Outlined the stroke') },
+  [Command.UseAsMask]: { shown: several, run: (ctx) => kept(ctx, useAsMask(ctx.doc, ctx.selection), 'Used as mask') },
+  [Command.RemoveMask]: { shown: inMask, run: (ctx) => kept(ctx, releaseMasks(ctx.doc, ctx.selection), 'Removed a mask') },
   [Action.FlipHorizontal]: flip(Flip.Horizontal, 'Flipped horizontally'),
   [Action.FlipVertical]: flip(Flip.Vertical, 'Flipped vertically'),
   [Action.CopyProperties]: { shown: any, run: copyProperties },
@@ -229,7 +237,7 @@ const LATER_OPS: Partial<Record<ActionId, LaterOp>> = {
   [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load, ctx.assets), 'Outlined text') }
 };
 
-const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.AutoLayout, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Action.FlipHorizontal, Action.FlipVertical];
+const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.AutoLayout, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
 
 export const FRAME_STRUCTURE_ACTIONS: ReadonlySet<ActionId> = new Set(STRUCTURE_ORDER);
 
