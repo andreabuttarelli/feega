@@ -13,7 +13,7 @@ describe('right bar of a canvas selection', () => {
   });
 
   it('offers reframe on a generated video', () => {
-    expect(panelActionsFor([{ id: 'v', type: 'video', data: { refId: 'r1' } }]).map((a) => a.id)).toContain('reframe');
+    expect(panelActionsFor([{ type: 'video', data: { refId: 'r1' } }]).map((a) => a.id)).toContain('reframe');
   });
 
   it('gives every frame "…" entry a home in the frame right bar', () => {
@@ -26,7 +26,7 @@ describe('right bar of a canvas selection', () => {
   });
 
   it('offers no media tool on a node without output', () => {
-    expect(panelActionsFor([{ id: 't', type: 'text', data: {} }]).map((a) => a.id)).not.toContain('upscale-image');
+    expect(panelActionsFor([{ type: 'text', data: {} }]).map((a) => a.id)).not.toContain('upscale-image');
   });
 });
 

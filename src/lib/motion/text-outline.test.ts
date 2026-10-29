@@ -1,3 +1,4 @@
+import { Ease } from '@feega/motion-core/motion/design';
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
@@ -96,7 +97,7 @@ describe('text to path', () => {
   });
 
   it('drops keyframes of props a shape does not have, and keeps the rest', () => {
-    const key = (value: number) => [{ frame: 0, value, ease: 'standard' }];
+    const key = (value: number) => [{ frame: 0, value, ease: Ease.Standard }];
     const doc = must(setKeyframes(must(setKeyframes(withText({ text: 'A' }), 't', 'tracking', key(0.1))), 't', 'x', key(0.5)));
     const after = findClip(must(textToPath(doc, 't', blocks)), 't')!.clip;
 

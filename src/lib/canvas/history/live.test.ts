@@ -3,7 +3,7 @@ import { LIVE_DEBOUNCE_MS, LiveFeed, POLL_MS, liveRefresh, mergeGraph } from './
 import type { HistoryGraph, HistoryRow } from './timeline';
 
 const row = (id: string, lane = 0, summary: string | null = null) => ({ entry: { id, summary }, lane }) as unknown as HistoryRow;
-const graph = (...rows: HistoryRow[]): HistoryGraph => ({ lanes: [], rows });
+const graph = (...rows: HistoryRow[]): HistoryGraph => ({ lanes: [], rows, sessions: [] });
 
 describe('liveRefresh', () => {
   beforeEach(() => {

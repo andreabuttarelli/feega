@@ -7,7 +7,7 @@ import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { BlendMode } from '@feega/motion-core/motion/blend';
 import { IDENTITY } from '@feega/motion-core/motion/affine';
-import { ItemKind, PaintKind, displayListAt, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { ItemKind, PaintKind, displayListAt, type DisplayList, type GroupItem, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { boxBook } from './gpu-full/text/test-face';
@@ -35,7 +35,7 @@ const lottie = (doc: MotionDoc, frames?: number) => lottieOf(lists(doc, frames),
 type Layer = { nm: string; ip: number; op: number; ks: Record<string, { a: number; k: unknown }>; shapes: { it: { ty: string; [key: string]: unknown }[] }[]; masksProperties?: unknown[] };
 const layersOf = (json: unknown) => (json as { layers: Layer[] }).layers;
 const layerOf = (json: unknown, clip: string) => layersOf(json).find((l) => l.nm.startsWith(`${clip}:`))!;
-const itemOf = (layer: Layer, ty: string) => layer.shapes[0].it.find((i) => i.ty === ty)!;
+const itemOf = (layer: Layer, ty: string): unknown => layer.shapes[0].it.find((i) => i.ty === ty)!;
 
 describe('lottieOf', () => {
   it('describes the comp: size, rate and length', () => {
@@ -145,7 +145,7 @@ describe('lottieOf', () => {
 
   it('nests a group so its opacity multiplies into its children', () => {
     const child: PathItem = { kind: ItemKind.Path, clip: 'g', contours: [[0, 0, 10, 0, 10, 10]], rule: FillRule.EvenOdd, paint: { kind: PaintKind.Solid, color: [1, 1, 1, 1] }, opacity: 0.5, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal };
-    const group = { kind: ItemKind.Group, clip: 'g', items: [child], opacity: 0.5, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal } as const;
+    const group: GroupItem = { kind: ItemKind.Group, clip: 'g', items: [child], opacity: 0.5, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal };
     const list: DisplayList = { width: 100, height: 100, background: null, items: [group], unsupported: [] };
     const layer = layerOf(lottieOf([list], { width: 100, height: 100, fps: 30 }).json, 'g');
 

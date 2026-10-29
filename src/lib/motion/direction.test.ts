@@ -11,7 +11,6 @@ import { builtinTemplate } from './template/builtins';
 import { insertTemplate } from './template/library';
 import { MOTION_STYLES, MotionStyle } from '@feega/motion-core/motion/style-model';
 import { UI_KIT, UiKind } from './ui-kit/kit';
-import { writeComponent } from './custom/ops';
 import { ComponentMode } from '@feega/motion-core/motion/custom/component';
 import { Isolate, focusUi } from './ui-focus';
 import { JunctionKind } from '@feega/motion-core/motion/junctions';

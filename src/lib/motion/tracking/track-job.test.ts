@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
+import type { TrackOutcome } from '@feega/motion-core/motion/tracking/track-clip';
 import { movingSquare } from '@feega/motion-core/motion/tracking/scene';
 import { handleTrackJob, runTrackJob, type TrackJob, type TrackWorker } from './track-job';
 
@@ -17,7 +18,7 @@ function job(): TrackJob {
 
 const reader = async (seconds: number[]) => seconds.map((s) => movingSquare(W, H, 20 + Math.round(s * 30) * 2, 20));
 
-function fakeWorker(reply: (job: TrackJob) => unknown, mode: 'message' | 'error' = 'message') {
+function fakeWorker(reply: (job: TrackJob) => TrackOutcome, mode: 'message' | 'error' = 'message') {
   const worker: TrackWorker & { terminate: ReturnType<typeof vi.fn> } = {
     onmessage: null,
     onerror: null,
@@ -49,7 +50,7 @@ describe('track job', () => {
   });
 
   it('turns a worker crash into an error the panel can show', async () => {
-    const worker = fakeWorker(() => null, 'error');
+    const worker = fakeWorker(() => { throw new Error('a failing worker never replies'); }, 'error');
 
     expect(await runTrackJob(job(), () => worker)).toEqual({ ok: false, error: 'boom' });
     expect(worker.terminate).toHaveBeenCalled();
