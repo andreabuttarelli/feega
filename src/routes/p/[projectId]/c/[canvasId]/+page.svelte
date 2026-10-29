@@ -124,6 +124,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { OpOutcome, createOptimistic } from '$lib/canvas/optimistic-ops';
+  import { CommentAction, commentOp, restoreThreads, runnable } from '$lib/canvas/comment-ops';
   import { OptimisticAction, Refresh, optimisticOp, refreshOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, CopyShown, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
@@ -1707,10 +1708,34 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let commentTeam = $state<Teammate[]>([]);
   const me = $derived(data.session?.user?.id ?? '');
 
+  let commentsInFlight = 0;
+
   async function loadComments() {
     const res = await post('canvasComments', {});
-    commentThreads = (res?.threads as CommentThread[] | undefined) ?? [];
     commentTeam = (res?.teammates as Teammate[] | undefined) ?? [];
+    if (commentsInFlight) {
+      return;
+    }
+    commentThreads = (res?.threads as CommentThread[] | undefined) ?? [];
+  }
+
+  const runComment = createOptimistic<CommentThread[], readonly string[]>(
+    {
+      read: () => commentThreads ?? [],
+      write: (threads) => { commentThreads = threads; },
+      reserve: () => () => {},
+      hold: () => {
+        commentsInFlight += 1;
+        return () => { commentsInFlight -= 1; };
+      },
+      idle: () => { void loadComments(); },
+      notice: (text) => { failed = text; }
+    },
+    restoreThreads
+  );
+
+  function comment<K extends CommentAction>(action: K, input: Parameters<typeof commentOp<K>>[1]) {
+    void runComment(runnable(commentOp(action, input, commentThreads ?? [], { me, now: () => new Date().toISOString() }), post));
   }
 
   onMount(() => {
@@ -1758,29 +1783,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function addThread(body: string) {
     const at = pinTarget;
-    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}), ...(at.timeMs === undefined ? {} : { time_ms: at.timeMs }), mention: mentionedIds(body, commentTeam) });
+    comment(CommentAction.Add, { id: crypto.randomUUID(), body, at: { nodeId: at.nodeId, x: at.x, y: at.y, timeMs: at.timeMs }, mentions: mentionedIds(body, commentTeam) });
     commentsPanel.settle();
-    await loadComments();
   }
 
   async function replyTo(threadId: string, body: string) {
-    await post('addComment', { body, parent_id: threadId, mention: mentionedIds(body, commentTeam) });
-    await loadComments();
+    comment(CommentAction.Reply, { id: crypto.randomUUID(), threadId, body, mentions: mentionedIds(body, commentTeam) });
   }
 
   async function editCommentBody(commentId: string, body: string) {
-    await post('editComment', { comment_id: commentId, body, mention: mentionedIds(body, commentTeam) });
-    await loadComments();
+    comment(CommentAction.Edit, { commentId, body, mentions: mentionedIds(body, commentTeam) });
   }
 
   async function deleteCommentById(commentId: string) {
-    await post('deleteComment', { comment_id: commentId });
-    await loadComments();
+    comment(CommentAction.Delete, { commentId });
   }
 
-  async function resolveThread(thread: CommentThread) {
-    await post('resolveComment', { comment_id: thread.id, resolved: thread.resolved ? '0' : '1' });
-    await loadComments();
+  function resolveThread(thread: CommentThread) {
+    comment(CommentAction.Resolve, { threadId: thread.id, resolved: !thread.resolved });
   }
 
   const livePins = (nodeId: string | null) => (commentThreads ?? []).filter((t) => t.nodeId === nodeId && !t.resolved);

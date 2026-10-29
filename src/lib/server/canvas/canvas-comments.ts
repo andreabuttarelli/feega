@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { listMembers } from '$lib/server/repos/orgs';
 import type { Actor } from '$lib/server/repos/actor';
@@ -43,7 +44,7 @@ export enum CommentOutcome {
   Missing = 'missing'
 }
 
-export type NewComment = Scope & { body: string; actor: Actor; nodeId?: string | null; parentId?: string | null; x?: number; y?: number; timeMs?: number | null; mentions?: string[]; byAgent?: boolean };
+export type NewComment = Scope & { id?: string; body: string; actor: Actor; nodeId?: string | null; parentId?: string | null; x?: number; y?: number; timeMs?: number | null; mentions?: string[]; byAgent?: boolean };
 
 export type Teammate = { id: string; name: string };
 
@@ -82,8 +83,10 @@ async function pinTarget(db: Db, input: NewComment): Promise<boolean> {
   return true;
 }
 
+const clientId = z.string().uuid().optional();
+
 export async function addComment(db: Db, input: NewComment): Promise<{ outcome: CommentOutcome; id?: string }> {
-  if (commentBodyError(input.body) || !input.actor.id) {
+  if (commentBodyError(input.body) || !input.actor.id || !clientId.safeParse(input.id).success) {
     return { outcome: CommentOutcome.Invalid };
   }
   if (!(await pinTarget(db, input))) {
@@ -91,7 +94,7 @@ export async function addComment(db: Db, input: NewComment): Promise<{ outcome: 
   }
 
   const { data, error } = await comments(db)
-    .insert({ org_id: input.orgId, canvas_id: input.canvasId, node_id: input.parentId ? null : (input.nodeId ?? null), parent_id: input.parentId ?? null, author_id: input.actor.id, x: input.x ?? 0, y: input.y ?? 0, time_ms: input.parentId ? null : momentOf(input.timeMs), mentions: input.byAgent ? [AGENT_MENTION_ID] : await mentionable(db, input.orgId, input.mentions), body: input.body.trim() })
+    .insert({ ...(input.id ? { id: input.id } : {}), org_id: input.orgId, canvas_id: input.canvasId, node_id: input.parentId ? null : (input.nodeId ?? null), parent_id: input.parentId ?? null, author_id: input.actor.id, x: input.x ?? 0, y: input.y ?? 0, time_ms: input.parentId ? null : momentOf(input.timeMs), mentions: input.byAgent ? [AGENT_MENTION_ID] : await mentionable(db, input.orgId, input.mentions), body: input.body.trim() })
     .select('id')
     .single();
   if (error || !data) {
