@@ -24,7 +24,7 @@ A **free element** is a shape, text, image or SVG placed directly on the canvas.
 With nothing inside the frame selected, the right bar shows the frame's own look, with the same controls as a layer:
 
 - **Frame size** preset, **W** and **H**, and **Layout grid**.
-- **Appearance**: opacity, blend mode, corner radius (uniform or per corner) and **Clip content**.
+- **Appearance**: opacity (fades the frame and every layer in it; at 0% the canvas shows through), blend mode, corner radius (uniform or per corner) and **Clip content**.
 - **Fill**: several fills, each a colour, gradient or image.
 - **Stroke**: colour, width, inside/center/outside, per side.
 - **Effects**: drop and inner shadows, layer and background blur.

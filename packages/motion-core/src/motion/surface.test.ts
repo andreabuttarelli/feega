@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Background, MotionFormat, newMotionDoc, parseMotionDoc } from './doc';
 import { FEEGA_TOKENS } from './brand';
 import { displayListAt } from './gpu-full/display-list';
-import { setProps } from './timeline';
+import { setProps, setTransform } from './timeline';
 import { exportCode } from './codegen/index';
 import { addClip } from './timeline';
 import { composeHtml } from './hyperframes/compose';
@@ -107,5 +107,45 @@ describe('clip content on the frame surface', () => {
 
     expect(main(roundedWithCard())).toContain('overflow-hidden');
     expect(main(roundedWithCard(false))).not.toContain('overflow-hidden');
+  });
+});
+
+function fadedTo(opacity: number) {
+  const faded = setTransform(roundedWithCard(), SURFACE, { opacity });
+  if (!faded.ok) {
+    throw new Error(faded.error);
+  }
+  return displayListAt(faded.doc, 0, FEEGA_TOKENS);
+}
+
+type Faded = { opacity: number; items?: unknown };
+
+const shownAlpha = (items: readonly Faded[]): number[] => items.flatMap((i) => (Array.isArray(i.items) ? shownAlpha(i.items as Faded[]).map((a) => a * i.opacity) : [i.opacity]));
+
+describe('the frame opacity', () => {
+  it('at zero hides the frame and every layer in it, as layer opacity does in Figma', () => {
+    expect(shownAlpha(fadedTo(0).items).every((a) => a === 0)).toBe(true);
+  });
+
+  it('at zero leaves the frame see-through, never on a black ground', () => {
+    expect(fadedTo(0).background).toEqual([0, 0, 0, 0]);
+  });
+
+  it('fades the whole HTML root once, not the surface twice', () => {
+    const faded = setTransform(roundedWithCard(), SURFACE, { opacity: 0.5 });
+    if (!faded.ok) {
+      throw new Error(faded.error);
+    }
+    const html = composeHtml({ doc: faded.doc, tokens: FEEGA_TOKENS, assets: {}, origin: 'https://feega.app' });
+
+    expect(html).toMatch(/#root\{opacity:0\.5\}/);
+    expect(html.match(/opacity:\s*0\.5/g)).toHaveLength(1);
+  });
+
+  it('fades the surface and the layers once each', () => {
+    const half = fadedTo(0.5);
+
+    expect(half.items.find((i) => i.kind === 'group' && i.clip === SURFACE)?.opacity).toBe(0.5);
+    expect(half.items.filter((i) => i.clip === SURFACE && i.kind === 'path').every((i) => i.opacity === 0.5)).toBe(true);
   });
 });
