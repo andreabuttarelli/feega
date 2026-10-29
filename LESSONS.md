@@ -3471,3 +3471,6 @@ Signal: a click throws `ReferenceError: x is not defined` in a component; the su
 
 ### Clicks inside a breakpoint view move elements out of the frame
 Signal: `motion_revisions` fill with "Moved an element to another frame", one new `element` node per click, then "This node no longer exists". Cause: the element drag tested "outside" against the base frame's DOM stage while the pointer sat on the Tablet/Phone view drawn beside it, and nothing gated a press without movement. Move: a frame drag measures the frame being edited (`at.frame.box`) and starts only past `DRAG_SLOP_PX` (`carryOf` in `canvas-drop.ts`); `canvas-double-click-stays.spec.ts` replays double-clicks with jitter on the frame and its views.
+
+### A canvas e2e fails at its first hover on untouched dev
+Signal: a `@real` spec waits for `frame-hover-box`, `selection-overlay`, `part-box`, `motion-editor` or `.svelte-flow__node` and times out. Cause: those belong to the DOM editor removed when the canvas became the editor; the GPU canvas draws `frame-pick-box`, `frame-selection` (with `data-clip`) and `gpu-node`. Move: grep `src` for the testid before diagnosing a regression; port the spec to the GPU testids (`canvas-nested-pick.spec.ts` is the pattern). `page.mouse.click` takes no `modifiers`: hold ⌘ with `keyboard.down('ControlOrMeta')`.

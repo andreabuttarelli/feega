@@ -512,14 +512,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return at ? { on: DropOn.Canvas, x: at.x, y: at.y } : null;
   }
 
-  function landed(res: Record<string, unknown> | null): boolean {
+  async function landed(answer: Promise<Record<string, unknown> | null>): Promise<boolean> {
+    const land = holdGesture();
+    const res = await answer.catch(() => null);
     if (res?.outcome !== 'done') {
+      land(null);
       return false;
     }
-    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    land((res.undo ?? []) as UndoItem[]);
     void refresh();
     return true;
   }
+
+  const generated = (res: Record<string, unknown> | null) => landed(Promise.resolve(res));
 
   const freeElement = (ids: string[]): string | null => {
     const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : null;
@@ -539,8 +544,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!id || !frame) {
       return DropVerdict.Ignored;
     }
-    void post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frame.frameId, at: frame.at }) }).then((res) => {
-      if (landed(res)) {
+    void landed(post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frame.frameId, at: frame.at }) })).then((ok) => {
+      if (ok) {
         nodes = nodes.filter((n) => n.id !== id);
       }
     });
@@ -553,7 +558,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!drop) {
       return;
     }
-    landed(await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), ...(out.box ? { box: JSON.stringify(out.box) } : {}) }));
+    await landed(post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), ...(out.box ? { box: JSON.stringify(out.box) } : {}) }));
   }
 
   const regroups = inOrder();
@@ -561,14 +566,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function regroup(action: string, fields: Record<string, string>, after?: () => Promise<void>) {
     regrouping += 1;
+    const land = holdGesture();
     void regroups(async () => {
       await places.flush();
       const res = await post(action, fields);
       if (res?.outcome === 'done') {
-        pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+        land((res.undo ?? []) as UndoItem[]);
         await after?.();
       }
     }).finally(() => {
+      land(null);
       regrouping -= 1;
       if (!regrouping) {
         void refresh();
@@ -664,26 +671,30 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function saveFrame(id: string, box: CanvasBox) {
+    const land = holdGesture();
     const res = await post('drawFrame', { box: JSON.stringify(box), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
+      land(null);
       nodes = settle(nodes, id, null);
       return;
     }
-    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     focusOn([id], undefined, FocusMode.Select);
   }
 
   async function saveDrawn(id: string, drawn: DrawnWire) {
+    const land = holdGesture();
     const res = await post('drawElement', { drawn: JSON.stringify(drawn), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
+      land(null);
       catalogPosters.delete(id);
       nodes = settle(nodes, id, null);
       return;
     }
-    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     const hold = 'box' in drawn ? frameHolding(nodes, drawn.box) : null;
     if (hold) {
@@ -692,8 +703,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function intoFrame(id: string, hold: FrameHold) {
-    const res = await post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }) });
-    if (!landed(res)) {
+    if (!(await landed(post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }) })))) {
       focusOn([id], undefined, FocusMode.Select);
       return;
     }
@@ -701,7 +711,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function dropComponent(drag: ComponentDrag, at: { x: number; y: number }) {
-    landed(await post('placeComponent', { source: drag.frameId, comp: drag.compId, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x, y: at.y }) }));
+    await landed(post('placeComponent', { source: drag.frameId, comp: drag.compId, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x, y: at.y }) }));
   }
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
@@ -710,7 +720,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     if (drop.on !== DropOn.Canvas) {
-      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+      await landed(post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
       return;
     }
 
@@ -722,14 +732,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       catalogPosters.set(id, picture);
     }
     nodes = [...nodes, toTile(pendingOutput(id, drop))];
+    const land = holdGesture();
     const res = await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     nodes = settle(nodes, id, node ? toTile(node) : null);
     if (!node) {
+      land(null);
       catalogPosters.delete(id);
       return;
     }
-    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    land((res?.undo ?? []) as UndoItem[]);
   }
 
   function feedImageOver(client: PointerPoint | null) {
@@ -747,20 +759,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     const ask = { source: drag.nodeId, item_id: drag.itemId, image_index: drag.imageIndex, drop: JSON.stringify(drop) };
     if (drop.on !== DropOn.Canvas) {
-      landed(await post('importFeedImage', ask));
+      await landed(post('importFeedImage', ask));
       return;
     }
 
     const id = crypto.randomUUID();
     catalogPosters.set(id, drag.thumb);
     nodes = [...nodes, toTile(pendingPicture(id, drop, feedImageSize(drag)))];
+    const land = holdGesture();
     const res = await post('importFeedImage', { ...ask, node_id: id });
     const created = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     catalogPosters.delete(id);
     nodes = settle(nodes, id, created ? toTile(created, { select: true }) : null);
-    if (created) {
-      pushGesture(createGesture(created));
-    }
+    land(created ? createGesture(created).items : null);
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -1630,6 +1641,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     undoStack.push({ source: 'server', gesture });
   }
 
+  function holdGesture(): (items: UndoItem[] | null) => void {
+    let land: (entry: StackEntry | null) => void = () => {};
+    undoStack.pushPending(new Promise((resolve) => (land = resolve)));
+    return (items) => land(items?.length ? { source: 'server', gesture: { items } } : null);
+  }
+
   let productsOverride = $state<Record<string, Product[]> | null>(null);
   let socialPostsOverride = $state<Record<string, SocialPost[]> | null>(null);
   const products = $derived(productsOverride ?? productsByNode);
@@ -2067,7 +2084,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     if (hold) {
       const size = await pictureSize(file);
-      landed(await post('upload', {
+      await landed(post('upload', {
         path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
         drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
       }));
@@ -3555,44 +3572,44 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function insertSceneDrop(drop: SceneDrop) {
     await Promise.all([saves.flush(drop.targetId), saves.flush(drop.sourceId)]);
-    landed(await post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
+    await landed(post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
   }
 
   async function combineScenes(frameIds: string[]) {
-    landed(await post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
+    await landed(post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
   }
 
   async function imageTool(nodeId: string, tool: ImageTool) {
-    landed(await post('imageTool', { node_id: nodeId, tool }));
+    generated(await post('imageTool', { node_id: nodeId, tool }));
     void invalidate('app:credits');
   }
 
   async function inpaint(nodeId: string, prompt: string, mask: Mask) {
-    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
+    generated(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
     void invalidate('app:credits');
   }
 
   async function outpaint(nodeId: string, prompt: string, extend: Extend) {
-    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
+    generated(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
     void invalidate('app:credits');
   }
 
   async function reframe(nodeId: string, aspect: string, focus: Focus) {
     const isVideo = nodes.find((n) => n.id === nodeId)?.type === 'video';
     if (isVideo) {
-      landed(await post('videoReframe', { node_id: nodeId, aspect, focus: JSON.stringify(focus) }));
+      generated(await post('videoReframe', { node_id: nodeId, aspect, focus: JSON.stringify(focus) }));
       return;
     }
-    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Reframe, aspect }));
+    generated(await post('imageTool', { node_id: nodeId, tool: ImageTool.Reframe, aspect }));
     void invalidate('app:credits');
   }
 
   async function layersToFrame(nodeId: string) {
-    landed(await post('layersToFrame', { node_id: nodeId }));
+    await landed(post('layersToFrame', { node_id: nodeId }));
   }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
-    landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
+    generated(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
   }
 
   let lastDuplicate: LastDuplicate | null = null;
@@ -3781,7 +3798,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
     for (const [i, clip] of copied.clipIds.entries()) {
-      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify(pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER })) }));
+      await landed(post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify(pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER })) }));
     }
   }
 
@@ -3790,14 +3807,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function pasteElementsIntoEach(frameIds: string[], copied: CopiedElements) {
     for (const nodeId of frameIds) {
       for (const clip of copied.clipIds) {
-        landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Frame, nodeId, at: FRAME_CENTRE }) }));
+        await landed(post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Frame, nodeId, at: FRAME_CENTRE }) }));
       }
     }
   }
 
   async function pasteFreeInto(frameId: string, freeIds: string[]) {
     for (const source of freeIds) {
-      landed(await post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
+      await landed(post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
     }
   }
 
@@ -3987,7 +4004,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const inTurn = (step: () => Promise<void>) => (historyTurn = historyTurn.then(step, step));
 
   async function undo() {
-    const entry = undoStack.popUndo();
+    const entry = await undoStack.popUndo();
     if (!entry) { return; }
     if (entry.source === 'frame') {
       entry.step.back();
