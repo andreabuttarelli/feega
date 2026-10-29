@@ -43,6 +43,25 @@ export function frameUnderPointer(at: PointerPoint, exceptId: string | null = nu
 
 export const isOutside = (stage: StageRect, at: PointerPoint) => at.x < stage.left || at.y < stage.top || at.x > stage.left + stage.width || at.y > stage.top + stage.height;
 
+export const DRAG_SLOP_PX = 4;
+
+export enum Carry {
+  Held = 'held',
+  Within = 'within',
+  Out = 'out'
+}
+
+export type CarryAt = { down: PointerPoint; now: PointerPoint; started: boolean; frame: StageRect; world: PointerPoint };
+
+export const pastSlop = (down: PointerPoint, now: PointerPoint) => Math.hypot(now.x - down.x, now.y - down.y) >= DRAG_SLOP_PX;
+
+export function carryOf({ down, now, started, frame, world }: CarryAt): Carry {
+  if (!started && !pastSlop(down, now)) {
+    return Carry.Held;
+  }
+  return isOutside(frame, world) ? Carry.Out : Carry.Within;
+}
+
 export enum DragPhase {
   Over = 'over',
   Back = 'back',
