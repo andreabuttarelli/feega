@@ -143,6 +143,35 @@ export function historyGraph(entries: HistoryEntry[], query: HistoryQuery): Hist
   return { lanes, rows };
 }
 
+export enum HistoryAction {
+  Preview = 'preview',
+  Restore = 'restore',
+  Name = 'name'
+}
+
+const SOURCE_ACTIONS: Record<HistorySource, readonly HistoryAction[]> = {
+  [HistorySource.Event]: [],
+  [HistorySource.Version]: [HistoryAction.Preview, HistoryAction.Restore],
+  [HistorySource.Revision]: [HistoryAction.Preview, HistoryAction.Restore, HistoryAction.Name],
+  [HistorySource.Branch]: []
+};
+
+export const actionsOf = (entry: Pick<HistoryEntry, 'source'>): readonly HistoryAction[] => SOURCE_ACTIONS[entry.source];
+
+export type EntryRef = { source: HistorySource; key: string; version: number | null };
+
+export function entryRef(id: string): EntryRef | null {
+  const [source, key, version] = id.split(':');
+  if (!key || !(Object.values(HistorySource) as string[]).includes(source)) {
+    return null;
+  }
+  const number = version === undefined ? null : Number(version);
+  if (number !== null && !Number.isInteger(number)) {
+    return null;
+  }
+  return { source: source as HistorySource, key, version: number };
+}
+
 export type LaneSpan = { first: number; last: number };
 
 export function laneSpans(graph: HistoryGraph): LaneSpan[] {

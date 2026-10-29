@@ -75,16 +75,23 @@ export enum RestoreOutcome {
   Missing = 'missing'
 }
 
-export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: string; actor: Actor }): Promise<{ outcome: RestoreOutcome; changed?: number }> {
+export type SavedSnapshot = { name: string; snapshot: CanvasSnapshot };
+
+export async function readCanvasVersion(db: Db, input: Scope & { versionId: string }): Promise<SavedSnapshot | null> {
   const { data } = await versions(db).from('canvas_versions').select('id, name, created_at, snapshot').eq('org_id', input.orgId).eq('id', input.versionId).maybeSingle();
-  const target = data ? snapshotSchema.safeParse(data.snapshot) : null;
-  if (!data || !target?.success) {
+  const parsed = data ? snapshotSchema.safeParse(data.snapshot) : null;
+  return data && parsed?.success ? { name: data.name, snapshot: parsed.data } : null;
+}
+
+export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: string; actor: Actor }): Promise<{ outcome: RestoreOutcome; changed?: number }> {
+  const saved = await readCanvasVersion(db, input);
+  if (!saved) {
     return { outcome: RestoreOutcome.Missing };
   }
 
-  await saveCanvasVersion(db, { ...input, name: `${BEFORE_RESTORE} ${data.name}` });
+  await saveCanvasVersion(db, { ...input, name: `${BEFORE_RESTORE} ${saved.name}` });
   const current = await versionSnapshot(db, input);
-  const plan = planCanvasRestore(current, target.data);
+  const plan = planCanvasRestore(current, saved.snapshot);
   const actor = input.actor;
 
   for (const id of plan.disconnect) {
@@ -101,7 +108,7 @@ export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: s
   }
   for (const d of plan.docs) {
     const head = await readHead(db, { orgId: input.orgId, nodeId: d.nodeId });
-    await saveMotionDoc(db, { orgId: input.orgId, nodeId: d.nodeId, expectedVersion: head?.version ?? 0, doc: d.doc, actor, summary: `Restored canvas version ${data.name}` });
+    await saveMotionDoc(db, { orgId: input.orgId, nodeId: d.nodeId, expectedVersion: head?.version ?? 0, doc: d.doc, actor, summary: `Restored canvas version ${saved.name}` });
   }
   return { outcome: RestoreOutcome.Restored, changed: plan.put.length + plan.remove.length + plan.reconnect.length + plan.disconnect.length + plan.docs.length };
 }

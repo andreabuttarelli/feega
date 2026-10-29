@@ -19,10 +19,7 @@
   import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
   import TechniqueRowsDialog from '$lib/components/canvas/TechniqueRowsDialog.svelte';
-  import CanvasVersionsDialog from '$lib/components/canvas/CanvasVersionsDialog.svelte';
-  import type { CanvasVersion } from '$lib/server/canvas/canvas-versions';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
@@ -1667,30 +1664,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (dropped.length) {
       failed = DROPPED_EDIT_NOTICE;
     }
-  }
-
-  let canvasVersions = $state<CanvasVersion[] | null>(null);
-
-  $effect(() => {
-    if (versionsPanel.open) {
-      void loadVersions();
-    }
-  });
-
-  async function loadVersions() {
-    const res = await post('canvasVersions', {});
-    canvasVersions = (res?.versions as CanvasVersion[] | undefined) ?? [];
-  }
-
-  async function saveVersion(name: string) {
-    await post('saveCanvasVersion', { name });
-    await loadVersions();
-  }
-
-  async function restoreVersion(version: CanvasVersion) {
-    await post('restoreCanvasVersion', { version_id: version.id });
-    versionsPanel.hide();
-    await refresh();
   }
 
   let commentThreads = $state<CommentThread[] | null>(null);
@@ -4187,9 +4160,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       oncancel={cancelTechniqueRows}
       onclose={() => (rowsTechnique = null)}
     />
-  {/if}
-  {#if versionsPanel.open}
-    <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
   {/if}
   {#if outpaintFor}
     <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />

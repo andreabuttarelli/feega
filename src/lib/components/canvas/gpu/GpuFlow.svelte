@@ -73,6 +73,7 @@
   import { BRAND_REMIX_PROMPT } from '$lib/gallery/model';
   import { goto } from '$app/navigation';
   import { FrameExtras } from '$lib/canvas/frame-extras.svelte';
+  import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
@@ -2910,6 +2911,7 @@
     'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
     'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
     export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
+    'frame-history': (ids) => historyPanel.show(ids[0]),
     delete: (ids) => props.onDelete?.(ids)
   };
 

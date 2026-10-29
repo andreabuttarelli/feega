@@ -39,7 +39,6 @@
 
   type Branch = { id: string; frameId: string; name: string; baseVersion: number };
   type Conflict = { path: string; branch: unknown; main: unknown };
-  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number; name: string | null };
   type ImagesMade = { url: string; name: string; files: string[] };
 
   const ID_LENGTH = 8;
@@ -200,7 +199,6 @@
   const fork = $derived((data?.node as { fork?: Branch | null } | undefined)?.fork ?? null);
   let branches = $state<Branch[]>([]);
   let conflicts = $state<Conflict[] | null>(null);
-  let revisions = $state<Revision[]>([]);
 
   const act = (name: string, form = new FormData()) => postPageAction(editorUrl, name, form);
 
@@ -247,41 +245,9 @@
     }
   }
 
-  async function loadRevisions() {
-    const result = await act('revisions');
-    revisions = result.type === 'success' ? ((result.data?.revisions as Revision[]) ?? []) : [];
-  }
-
-  async function nameCurrent(name: string) {
-    const form = new FormData();
-    form.set('version', String(session.version));
-    form.set('name', name);
-    const result = await act('nameVersion', form);
-    session.notice = result.type === 'success' ? '' : 'The version could not be named: reload and try again.';
-    await loadRevisions();
-  }
-
-  async function restoreTo(target: number) {
-    await session.flushScheduled();
-    const form = new FormData();
-    form.set('version', String(target));
-    const result = await act('restore', form);
-    if (result.type !== 'success') {
-      session.notice = `Version ${target} could not be restored: reload and try again.`;
-      return;
-    }
-    const head = result.data?.head as { version: number; doc: MotionDoc };
-    session.adopt(head);
-    onedit({ ok: true, doc: head.doc }, `Restored version ${target}`);
-    onclose();
-  }
-
   $effect(() => {
     if (dialog === FrameDialog.Branches && !fork) {
       void loadBranches();
-    }
-    if (dialog === FrameDialog.History) {
-      void loadRevisions();
     }
   });
 </script>
@@ -361,18 +327,6 @@
   <FrameDialogCard title="Branches" testid="frame-branches" {onclose}>
     <BranchesMenu {fork} {branches} {conflicts} oncreate={(name) => void createBranch(name)} onopen={(id) => (onclose(), onfocus(id))} onreview={() => void reviewBranch()} onmerge={(c) => void mergeBranch(c)} ondrop={() => void dropBranch()} />
   </FrameDialogCard>
-{:else if dialog === FrameDialog.History}
-  <FrameDialogCard title="Version history" testid="frame-revisions" {onclose}>
-    <input class="version-name" aria-label="Name the current version" placeholder="Name the current version" data-testid="version-name" onkeydown={(e) => e.key === 'Enter' && void nameCurrent(e.currentTarget.value)} />
-    {#each revisions as r (r.version)}
-      <button type="button" class="revision" data-testid="revision" disabled={r.version === session.version} onclick={() => void restoreTo(r.version)}>
-        <span>{r.name ? `${r.name} · v${r.version}` : `v${r.version}`} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span>
-        <kbd>{r.version === session.version ? 'Current' : 'Restore'}</kbd>
-      </button>
-    {:else}
-      <span class="empty">No saved versions yet</span>
-    {/each}
-  </FrameDialogCard>
 {:else if dialog === FrameDialog.Chat}
   <FrameDialogCard title="Chat history" testid="frame-chat" {onclose}>
     <FrameChatHistory historyUrl={`/api/v1/projects/${projectId}/motion/${nodeId}/agent`} {projectId} open />
@@ -435,37 +389,4 @@
     gap: 6px;
   }
 
-  .version-name {
-    font: inherit;
-    padding: 6px 8px;
-    border: 1px solid var(--ui-divider);
-    background: transparent;
-    color: inherit;
-  }
-
-  .revision {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: var(--ui-row);
-    padding: 0 8px;
-    text-align: left;
-    border-radius: var(--ui-radius-sm);
-    color: var(--ui-text);
-  }
-
-  .revision:hover:not(:disabled) {
-    background: var(--ui-wash);
-  }
-
-  .revision kbd {
-    margin-left: auto;
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
-  }
-
-  .empty {
-    opacity: 0.6;
-  }
 </style>

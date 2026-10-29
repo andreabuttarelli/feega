@@ -90,6 +90,7 @@ export type SelectionActionId =
   | 'combine-video'
   | 'export'
   | 'delete'
+  | 'frame-history'
   | FrameDialogActionId
   | FrameModeActionId;
 
@@ -175,7 +176,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'frame-components', label: 'Components…', group: 'overflow', minNodes: 1 },
   { id: 'frame-templates', label: 'Templates…', group: 'overflow', minNodes: 1 },
   { id: 'frame-branches', label: 'Branches…', group: 'overflow', minNodes: 1 },
-  { id: 'frame-history', label: 'Version history…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-history', label: 'History', group: 'overflow', minNodes: 1 },
   { id: 'frame-chat', label: 'Chat history…', group: 'overflow', minNodes: 1 },
   { id: 'frame-save-template', label: 'Save as template…', group: 'overflow', minNodes: 1 },
   { id: 'frame-publish', label: 'Publish to gallery…', group: 'overflow', minNodes: 1 },
@@ -224,6 +225,7 @@ const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1
 
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ...FRAME_DIALOG_SHOWN,
+  'frame-history': isOneFrame,
   'run-technique': isOneTechnique,
   'run-technique-rows': isOneTechnique,
   'edit-technique': isOneTechnique,

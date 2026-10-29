@@ -27,6 +27,14 @@ describe('historyApi', () => {
     expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history?author=ai&frame=f-1&org=org-1');
   });
 
+  it('previews, restores and names one point of the timeline', async () => {
+    await historyApi.at('t', { canvasId: 'c-1', entryId: 'revision:f-1:4', action: 'preview' });
+    expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history/revision%3Af-1%3A4/preview');
+
+    await historyApi.at('t', { canvasId: 'c-1', entryId: 'version:v1', action: 'restore' }, 'org-1');
+    expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history/version%3Av1/restore?org=org-1');
+  });
+
   it('sends no filter it was not given', async () => {
     await historyApi.list('t', { canvasId: 'c-1' });
 

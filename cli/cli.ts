@@ -380,6 +380,10 @@ program
   .option('--ai', 'Only the sidebar chat and outside agents')
   .option('--people', 'Only people')
   .option('--frame <id>', 'Only changes to this frame')
+  .option('--preview <entryId>', 'The canvas or frame as it was at this entry, read-only')
+  .option('--restore <entryId>', 'Put the canvas or frame back to this entry; the present is kept first')
+  .option('--name <entryId>', 'Name the frame revision at this entry (with --as)')
+  .option('--as <name>', 'The name for --name; empty removes it')
   .option('--json', 'Print the raw answer, lanes included')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (canvasId: string, opts) => {

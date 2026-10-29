@@ -56,7 +56,7 @@ import { parseVariantsAsk } from '$lib/canvas/variants';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
-import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 import { answerMention } from '$lib/server/canvas/comment-agent';
@@ -1687,18 +1687,6 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: FEEGA_REFUSAL_MESSAGE[out.refusal] });
     }
     throw redirect(303, canvasPath(projectId, out.canvas.id));
-  },
-
-  canvasVersions: async ({ params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
-    return { versions: await listCanvasVersions(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
-  },
-
-  restoreCanvasVersion: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
-    const fd = await request.formData();
-    const out = await restoreCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, versionId: String(fd.get('version_id') ?? ''), actor: userActor(scope) });
-    return out.outcome === RestoreOutcome.Restored ? out : fail(404, { error: out.outcome });
   },
 
   canvasComments: async ({ params, locals }) => {

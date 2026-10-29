@@ -56,7 +56,8 @@ import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motio
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
-import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { nameAt, previewAt, restoreTo } from '$lib/server/canvas/history-actions';
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
@@ -519,6 +520,8 @@ const cloneVoiceInput = z
   })
   .strict();
 const voiceIdInput = z.object({ id: z.string().describe('a custom voice id from list_voices') }).strict();
+
+const historyPoint = z.object({ canvasId: z.string(), entryId: z.string().describe('an entry id from list_history, e.g. "version:<id>" or "revision:<frameId>:<n>"') }).strict();
 
 const NOT_IN_PROJECT = { error: 'canvas_not_found', message: 'No canvas with that id in this project.' };
 const LAST_CANVAS = { error: 'last_canvas', message: 'A project keeps at least one canvas.' };
@@ -1370,16 +1373,22 @@ export const CANVAS_OPS = {
     }
   }),
 
-  list_canvas_versions: op({
+  preview_at: op({
     access: Access.Read,
-    input: z.object({ canvasId: z.string() }).strict(),
-    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { versions: await listCanvasVersions(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) } : NOT_IN_PROJECT)
+    input: historyPoint,
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? previewAt(ctx.db, { orgId: ctx.orgId, ...input }) : NOT_IN_PROJECT)
   }),
 
-  restore_canvas_version: op({
+  restore_to: op({
     access: Access.Write,
-    input: z.object({ canvasId: z.string(), versionId: z.string().describe('from list_canvas_versions') }).strict(),
-    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? restoreCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, versionId: input.versionId, actor: ctx.actor }) : NOT_IN_PROJECT)
+    input: historyPoint,
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? restoreTo(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  name_version: op({
+    access: Access.Write,
+    input: historyPoint.extend({ name: z.string().max(200).describe('empty removes the name') }),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? nameAt(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor }) : NOT_IN_PROJECT)
   }),
 
   list_canvas_comments: op({

@@ -22,7 +22,7 @@
   let {
     canvases,
     currentId,
-    onVersions = null,
+    onHistory = null,
     onComments = null,
     commentsUnseen = false,
     onpick = () => {},
@@ -30,7 +30,7 @@
   }: {
     canvases: CanvasRow[];
     currentId: string | null;
-    onVersions?: (() => void) | null;
+    onHistory?: (() => void) | null;
     onComments?: (() => void) | null;
     commentsUnseen?: boolean;
     onpick?: () => void;
@@ -156,10 +156,10 @@
                 <Pencil size={ICON} />
                 {$_('app.shell.canvasActions.rename')}
               </DropdownMenu.Item>
-              {#if onVersions}
-                <DropdownMenu.Item data-testid="canvas-versions" onSelect={onVersions}>
+              {#if onHistory}
+                <DropdownMenu.Item data-testid="canvas-history" onSelect={onHistory}>
                   <History size={ICON} />
-                  Versions…
+                  History
                 </DropdownMenu.Item>
               {/if}
               {#if onComments}

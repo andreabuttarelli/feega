@@ -45,3 +45,16 @@ describe('frame dialog entry points', () => {
     }
   });
 });
+
+describe('History of a frame', () => {
+  it('opens the History panel on that frame, not a dialog of its own', () => {
+    expect(Object.keys(FRAME_DIALOG_ACTIONS)).not.toContain('frame-history');
+    expect(SELECTION_ACTIONS.find((a) => a.id === 'frame-history')?.label).toBe('History');
+    expect(isCanvasAction('frame-history')).toBe(true);
+  });
+
+  it('shows for one frame only', () => {
+    expect(shownFor('frame-history', [frame])).toBe(true);
+    expect(shownFor('frame-history', [image])).toBe(false);
+  });
+});
