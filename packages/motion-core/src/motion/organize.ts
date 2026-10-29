@@ -1,4 +1,5 @@
 import { COMPONENTS } from './components';
+import { LAYOUT_KIND_LABEL, layoutKind } from './layout/stack';
 import { findClip, type Marker, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import type { Keyframe } from './keyframes';
 import { ClipEdge, moveClip, trimClip, type OpResult } from './timeline';
@@ -143,9 +144,10 @@ export function isLocked(doc: MotionDoc, clipId: string): boolean {
 
 export type TrackView = { solo: readonly string[]; shy: readonly string[]; hideShy: boolean; filter: string };
 
-export function clipName(clip: Pick<MotionClip, 'component' | 'props'>): string {
+export function clipName(clip: Pick<MotionClip, 'component' | 'props'> & Partial<Pick<MotionClip, 'autoLayout'>>): string {
   const p = clip.props as { text?: string; title?: string; name?: string };
-  return (clip.component === 'Custom' ? p.name : undefined) ?? p.text?.split('\n')[0] ?? p.title ?? COMPONENTS[clip.component].label;
+  const kind = layoutKind(clip);
+  return (clip.component === 'Custom' ? p.name : undefined) ?? p.text?.split('\n')[0] ?? p.title ?? (kind ? LAYOUT_KIND_LABEL[kind] : COMPONENTS[clip.component].label);
 }
 
 export function shownTracks(doc: MotionDoc, view: TrackView): MotionTrack[] {

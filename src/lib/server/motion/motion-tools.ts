@@ -180,7 +180,7 @@ import { ParentOpacity } from '@feega/motion-core/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
 import { FRAME_PRESETS, PRESET_SIZE } from '$lib/motion/frame-presets';
-import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
+import { leaveStack, freezeLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
 import { expressionToKeys, setCameraExpression, setExpression } from '@feega/motion-core/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -1894,7 +1894,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const ids = children?.map((c) => c.clip_id) ?? clip_ids ?? [];
         const sized = (children ?? []).reduce<OpResult>((r, { clip_id: child, ...item }) => (r.ok ? setLayoutItem(r.doc, child, item) : r), { ok: true, doc: session.doc });
         const id = deps.newId();
-        const out = apply(styled(sized.ok ? wrapInAutoLayout(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in an auto layout`);
+        const out = apply(styled(sized.ok ? wrapInStack(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in an auto layout`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -1919,7 +1919,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     set_auto_layout: tool({
       description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge), order (child ids, first to last), alignContent auto|space-between (wrap: space-between spreads the lines over the container height, needs a fixed cross size), firstOnTop true draws the first child of the order above the others (visual only, default false keeps the track order), strokesIncluded true (default on a new container) counts the inside strokes of the container as padding so children sit inside them. Only the fields given change. off true removes the auto layout (children keep their parent and the boxes the layout gave them).',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
-      execute: async ({ clip_id, off, ...patch }) => apply(off ? removeAutoLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
+      execute: async ({ clip_id, off, ...patch }) => apply(off ? freezeLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
 
     set_layout_item: tool({
@@ -1985,7 +1985,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     leave_auto_layout: tool({
       description: 'Take a clip out of its auto layout: it is unparented and keeps the box it was laid out in.',
       inputSchema: z.object({ clip_id: z.string() }),
-      execute: async (input) => apply(leaveAutoLayout(session.doc, input.clip_id), `took ${input.clip_id} out of its auto layout`)
+      execute: async (input) => apply(leaveStack(session.doc, input.clip_id), `took ${input.clip_id} out of its auto layout`)
     }),
 
     set_expression: tool({

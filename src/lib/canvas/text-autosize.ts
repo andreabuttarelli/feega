@@ -7,18 +7,27 @@ import { fitTexts, freeTextFit, hostFit } from '$lib/motion/text-fit';
 import { FrameKind } from './motion-node';
 import { ResizeMode, fitToNode } from '$lib/motion/custom-size';
 import { stillFrame } from './core/frame-source';
+import { freeStackFit } from '$lib/motion/layout/stack-fit';
 
 type NodeSize = { w: number; h: number };
 export type TextFit = { doc?: MotionDoc; node?: NodeSize };
 type Boxes = Record<string, TextBox>;
 
+function freeTextBox(doc: MotionDoc, boxes: Boxes, node: NodeSize): TextFit | null {
+  const share = freeTextFit(doc, boxes);
+  const next = share ? hostFit(node, share) : null;
+  const fitted = share && next ? fitToNode(doc, { width: share.width * doc.width, height: share.height * doc.height }, ResizeMode.Element) : null;
+  return next && fitted?.ok ? { node: next, doc: fitted.doc } : null;
+}
+
+function freeStackBox(doc: MotionDoc, node: NodeSize): TextFit | null {
+  const fit = freeStackFit(doc);
+  const next = fit ? hostFit(node, { ...fit.share, stage: { width: doc.width, height: doc.height } }) : null;
+  return fit && next ? { node: next, doc: fit.doc } : null;
+}
+
 const FIT_BY_KIND: Record<FrameKind, (doc: MotionDoc, boxes: Boxes, node: NodeSize) => TextFit | null> = {
-  [FrameKind.Element]: (doc, boxes, node) => {
-    const share = freeTextFit(doc, boxes);
-    const next = share ? hostFit(node, share) : null;
-    const fitted = share && next ? fitToNode(doc, { width: share.width * doc.width, height: share.height * doc.height }, ResizeMode.Element) : null;
-    return next && fitted?.ok ? { node: next, doc: fitted.doc } : null;
-  },
+  [FrameKind.Element]: (doc, boxes, node) => freeTextBox(doc, boxes, node) ?? freeStackBox(doc, node),
   [FrameKind.Frame]: (doc, boxes) => {
     const next = fitTexts(doc, boxes);
     return next ? { doc: next } : null;

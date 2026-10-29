@@ -19,7 +19,8 @@ export enum Align {
   Start = 'start',
   Center = 'center',
   End = 'end',
-  Baseline = 'baseline'
+  Baseline = 'baseline',
+  Stretch = 'stretch'
 }
 
 export enum AlignContent {
@@ -110,8 +111,11 @@ const ALIGNED: Record<Align, (free: number) => number> = {
   [Align.Start]: () => 0,
   [Align.Center]: (free) => free / 2,
   [Align.End]: (free) => free,
-  [Align.Baseline]: () => 0
+  [Align.Baseline]: () => 0,
+  [Align.Stretch]: () => 0
 };
+
+const takesLine = (k: Item, align: Align, dim: Dim) => k.sizing[dim] === Sizing.Fill || (align === Align.Stretch && k.sizing[dim] === Sizing.Hug);
 
 const JUSTIFIED: Record<Justify, (free: number, gap: number, count: number) => { offset: number; gap: number }> = {
   [Justify.Start]: (_free, gap) => ({ offset: 0, gap }),
@@ -173,7 +177,7 @@ function fitted(k: Item, flow: Flow, room: number | undefined): Partial<Size> {
   if (room === undefined || flow.wrap) {
     return {};
   }
-  if (k.sizing[c] === Sizing.Fill) {
+  if (takesLine(k, flow.align, c)) {
     return { [c]: clamp(k, c, room) };
   }
   return c === 'width' && measure(k).width > room ? { width: clamp(k, 'width', room) } : {};
@@ -351,7 +355,7 @@ function placeGrid(item: Item, flow: Flow, inner: Box, out: Map<string, Box>): v
     const height = spanned(rows, row, rowSpan, flow.crossGap);
     const own = measure(k, k.sizing.width === Sizing.Fill ? { width } : {});
     const w = k.sizing.width === Sizing.Fill ? clamp(k, 'width', width) : own.width;
-    const h = k.sizing.height === Sizing.Fill ? clamp(k, 'height', height) : own.height;
+    const h = takesLine(k, k.cell?.y ?? flow.align, 'height') ? clamp(k, 'height', height) : own.height;
     const dx = k.cell?.x ? ALIGNED[k.cell.x](width - w) : JUSTIFIED_IN_CELL[flow.justify](width - w);
     const dy = ALIGNED[k.cell?.y ?? flow.align](height - h);
     place(k, { left: inner.left + lefts[column] + dx, top: inner.top + tops[row] + dy, width: w, height: h }, out);
@@ -418,7 +422,7 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
     const mains = grow(row, row.map((k) => natural.get(k)!), room, m);
     const crossOf = (k: Item, i: number) => measure(k, { ...given.get(k), [m]: mains[i] })[c];
     const lineCross = flow.wrap ? Math.max(...row.map(crossOf)) : inner[c];
-    const crosses = row.map((k, i) => (k.sizing[c] === Sizing.Fill ? clamp(k, c, lineCross) : crossOf(k, i)));
+    const crosses = row.map((k, i) => (takesLine(k, flow.align, c) ? clamp(k, c, lineCross) : crossOf(k, i)));
     return { row, mains, lineCross, crosses };
   });
   const lineGap = LINE_GAP[flow.alignContent ?? AlignContent.Auto](inner[c] - sum(stripes.map((l) => l.lineCross)) - gaps(stripes.length, flow.crossGap), flow.crossGap, stripes.length);

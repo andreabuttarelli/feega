@@ -4,7 +4,7 @@ import { mainNav } from './main-nav.svelte';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
 import { ungroupClip } from '$lib/motion/group';
 import { groupLight, ungroupLight } from '$lib/motion/light-group';
-import { addAutoLayout, removeAutoLayout, resizeToFit, wrapInFrame } from '$lib/motion/layout/ops';
+import { wrapWithStack, freezeLayout, resizeToFit, wrapInFrame } from '$lib/motion/layout/ops';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
@@ -105,9 +105,9 @@ function framed(ctx: BarCtx): Done | null {
 function autoLayout(ctx: BarCtx): Done | null {
   const lone = ctx.selection.length === 1 ? findClip(ctx.doc, ctx.selection[0])?.clip : null;
   if (lone?.autoLayout) {
-    return done(removeAutoLayout(ctx.doc, lone.id), 'Removed auto layout', [lone.id]);
+    return done(freezeLayout(ctx.doc, lone.id), 'Removed auto layout', [lone.id]);
   }
-  const { result, containerId } = addAutoLayout(ctx.doc, ctx.selection, ctx.newId);
+  const { result, containerId } = wrapWithStack(ctx.doc, ctx.selection, ctx.newId);
   return done(result, 'Added auto layout', [containerId]);
 }
 

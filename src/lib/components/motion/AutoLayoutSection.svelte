@@ -20,7 +20,7 @@
   import { formatPadding, parsePadding } from '$lib/motion/layout/padding-text';
   import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
   import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '@feega/motion-core/motion/layout/model';
-  import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
+  import { hasBox, layoutParent, leaveStack, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
   import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
   import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
@@ -63,7 +63,7 @@
   ];
   const CELL_ALIGNS = ['', Align.Start, Align.Center, Align.End] as const;
   const CELL_ALIGN_LABEL: Record<(typeof CELL_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End' };
-  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End, [Align.Baseline]: Justify.Start };
+  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End, [Align.Baseline]: Justify.Start, [Align.Stretch]: Justify.Start };
 
   const layout = $derived(clip.autoLayout ?? null);
   let splitPadding = $state(false);
@@ -227,7 +227,7 @@
         <div class="flex min-w-0 flex-1" data-testid="auto-layout-absolute"><SegmentedField name="Absolute" options={YES_NO} value={answerOf(item.absolute)} onchange={(v) => size({ absolute: v === Answer.Yes }, 'Changed absolute position')} /></div>
         <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the auto layout')}><ChevronUp /></IconButton>
         <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the auto layout')}><ChevronDown /></IconButton>
-        <IconButton label="Take out of the auto layout" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveAutoLayout(doc, clip.id), 'Took the clip out of the auto layout')}><LogOut /></IconButton>
+        <IconButton label="Take out of the auto layout" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the auto layout')}><LogOut /></IconButton>
       </Field>
     {/if}
   </Section>
