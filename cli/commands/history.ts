@@ -33,3 +33,12 @@ export async function cmdHistory(canvasId: string, opts: HistoryFlags) {
   }
   console.table(historyRows(history));
 }
+
+export async function cmdResolveConflict(canvasId: string, conflictId: string, keep: string, opts: { org?: string }) {
+  const answer = await historyApi.resolve(await token(), { canvasId, conflictId: conflictId.replace(/^conflict:/, ''), keep }, opts.org);
+  if (answer.error) {
+    console.error(answer.message ? `${answer.error}: ${answer.message}` : answer.error);
+    process.exit(1);
+  }
+  console.log(`Resolved: kept ${answer.keep}`);
+}

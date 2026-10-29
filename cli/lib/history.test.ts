@@ -4,13 +4,21 @@ import type { AddressInfo } from 'node:net';
 import { historyApi, historyRows, type History } from './history.ts';
 
 const seen: string[] = [];
+const bodies: string[] = [];
+const methods: string[] = [];
 let server: Server;
 
 beforeAll(async () => {
   server = createServer((req, res) => {
     seen.push(req.url ?? '');
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ canvas_id: 'c-1', lanes: [], entries: [] }));
+    methods.push(req.method ?? '');
+    let text = '';
+    req.on('data', (chunk) => (text += chunk));
+    req.on('end', () => {
+      bodies.push(text);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ canvas_id: 'c-1', lanes: [], entries: [] }));
+    });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   process.env.PUBLIC_APP_URL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -47,6 +55,15 @@ describe('historyApi', () => {
     await historyApi.list('t', { canvasId: 'c-1' });
 
     expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history');
+  });
+});
+
+describe('historyApi.resolve', () => {
+  it('posts the side to keep for one recorded conflict', async () => {
+    await historyApi.resolve('t', { canvasId: 'c-1', conflictId: 'k-1', keep: 'mine' }, 'org-1');
+
+    expect([methods.at(-1), seen.at(-1)]).toEqual(['POST', '/api/v1/canvas/c-1/conflicts/k-1/resolve?org=org-1']);
+    expect(JSON.parse(bodies.at(-1) ?? '{}')).toEqual({ keep: 'mine' });
   });
 });
 

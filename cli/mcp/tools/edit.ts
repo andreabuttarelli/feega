@@ -84,7 +84,7 @@ export function registerEditTools(server: McpServer, surface: ToolSurface) {
         'canvas_summary {canvas_id}: every node (id, type, title, x/y, size, inputs/outputs, last run status) and, per frame, its element tree (id, kind, name, bounds in px, text, start/duration seconds). ' +
         'get {id} one node in full, or {id, frame_id} one element of a frame with props, transform, keyframes. ' +
         'activity {canvas_id, since?}: recent structural events (who/what/when), runs still working; presence is not readable from the server and is reported as unavailable. ' +
-        'list_history {canvas_id, author?: all|ai|people, frame_id?, limit?}: one timeline of the canvas, newest first (events, named versions, frame revisions, branches), each entry on its author lane. ' +
+        'list_history {canvas_id, author?: all|ai|people, frame_id?, limit?}: one timeline of the canvas, newest first (events, named versions, frame revisions, branches, refused writes as conflict.open), each entry on its author lane; resolve a conflict with `edit` resolve_conflict {canvasId, conflictId, keep: mine|theirs}. ' +
         'snapshot {node_id, time?, width?}: the frame as an IMAGE you can see, with the quality gate; drawn by the server renderer, or by the renderer of the deployed app when the server has none (answers server_frames_unavailable, 503, only when neither is reachable); a whole canvas, a region or one element cannot be drawn alone, snapshot its frame. About 10 snapshots a minute per workspace. ' +
         'Also reads: list_nodes / canvas_snapshot (raw) via `edit`; the saved doc via `edit` get_motion_doc; tables via `query`.',
       inputSchema: z.object({ org, op: z.string(), input: z.record(z.string(), z.unknown()).optional() }),

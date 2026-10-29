@@ -14,6 +14,7 @@ newest first, in one place.
 - **Named canvas versions** ([Versions](/canvas/versions/)).
 - **Frame revisions**: each saved edit inside a motion frame.
 - **Branches** of a frame.
+- **Conflicts**, in red: a write refused because someone else changed the same node or frame first.
 
 Moves are not recorded.
 
@@ -52,6 +53,17 @@ The bookmark button at the top saves the whole canvas as a named version. **Hist
 the page menu of the Pages panel and in the **More** menu of a selected frame, which opens the
 panel on that frame.
 
+## Conflicts
+
+When two authors change the same node or frame at once, the later write is refused instead of
+overwriting the first. The refused change is kept and shows in red on the lane of whoever was
+refused, with two choices:
+
+- **Keep mine** applies the refused change on top of what is there now, as a new change.
+- **Keep theirs** leaves it as it is and closes the conflict.
+
+A resolved conflict stays in the timeline as *Resolved conflict · mine* or *· theirs*.
+
 ## From the CLI
 
 ```bash
@@ -66,6 +78,7 @@ feega history <canvasId> --name <entryId> --as "Client review"
 feega history <canvasId> --frame <frameId>          # a frame's revisions and branches
 feega history <canvasId> --merge <entryId> [--keep branch|main]
 feega history <canvasId> --drop <entryId>
+feega resolve-conflict <canvasId> <conflictId> mine|theirs
 ```
 
 ## From the API and MCP
@@ -78,6 +91,11 @@ feega history <canvasId> --drop <entryId>
 - MCP: `view` op `list_history` `{canvas_id, author?, frame_id?, limit?}`; `edit` ops
   `preview_at`, `restore_to`, `name_version` `{canvasId, entryId, name?}`, `merge_branch_at`
   `{canvasId, entryId, keep?}` and `drop_branch_at`.
+- `POST /api/v1/canvas/{canvasId}/conflicts/{conflictId}/resolve` `{keep: mine|theirs}`; MCP `edit` op
+  `resolve_conflict` `{canvasId, conflictId, keep}`.
+
+A conflict entry has `kind` `conflict.open` (or `conflict.resolved`, with the side kept as
+`summary`) and `id` `conflict:<conflictId>`.
 
 Each entry carries `id` (the `entryId` above), `kind`, `at`, `lane` (index into `lanes`), `node_id`, `frame_id`, `summary`
 and its `author`.

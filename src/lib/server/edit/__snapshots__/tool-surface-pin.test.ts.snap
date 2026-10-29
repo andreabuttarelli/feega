@@ -8,7 +8,7 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool cancel_node_loop 1`] = `"f92dcb4ab3229951252b7ca1976793be73be4eb5c58d91f4d0cd6639efc9318f"`;
 
-exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"290e80a1e0ac63c8f63ee794a107c1fc5647f7439450259a40f7d954f2c8f09c"`;
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool canvas_tool 1`] = `"2951025d841342e77b390fdf6b7eaea26d83a977ec608c1200387f96fa9e065d"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the chat tool definitions are byte-identical > chat tool connect_nodes 1`] = `"c750f821558c17d14b967ffcb1709f66491241d2eec28037415d46fd856ccb96"`;
 
@@ -582,6 +582,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op resolve_canvas_comment 1`] = `"82b071aac485f694ff785e3e516af1fa4eb887433734a384145d453cea90ace9"`;
 
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op resolve_conflict 1`] = `"59da36a9e9be8eeb739dd7a0851e4287134a8ea1775851acf0c607aa66f49fc1"`;
+
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op restore_revision 1`] = `"fc6d6cef9eedc082e7fd3283e00f22552ba62bddb03a6637ac1240d1874ffc55"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op restore_to 1`] = `"d2d0508016f621aa937fb6c8496fe945101535c4476fb52c4b7327f0b6680b09"`;
@@ -1097,6 +1099,8 @@ exports[`the tool surfaces do not move while their code is reorganised (changed 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema resize_to_fit 1`] = `"6e6304f7e73326db78cf3cfc5aa01f958a369fc6dd03df57cf3fdbf57aebb1d4"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema resolve_canvas_comment 1`] = `"696fdb06479c959b2b88eb7550bf3e12c260b8791170a5a0079d89188e178257"`;
+
+exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema resolve_conflict 1`] = `"759a384478d1e1f4d328ebd352e2d8a5206bc0a547e6cfcd5f6152a2ed703aae"`;
 
 exports[`the tool surfaces do not move while their code is reorganised (changed a tool on purpose? run npx vitest run -u on this file and commit the snapshot) > the edit catalogue lists the same ops, summaries and schemas > edit op schema restore_revision 1`] = `"3a40cdd6e130c7516c9b3b1c520c9c8d177dd02e7de2910e77bc7e749c831046"`;
 

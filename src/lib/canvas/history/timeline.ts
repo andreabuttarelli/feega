@@ -4,7 +4,8 @@ export enum HistorySource {
   Event = 'event',
   Version = 'version',
   Revision = 'revision',
-  Branch = 'branch'
+  Branch = 'branch',
+  Conflict = 'conflict'
 }
 
 export enum EntryKind {
@@ -15,7 +16,9 @@ export enum EntryKind {
   EdgeDelete = 'edge.delete',
   VersionSave = 'version.save',
   RevisionCommit = 'revision.commit',
-  BranchCreate = 'branch.create'
+  BranchCreate = 'branch.create',
+  ConflictOpen = 'conflict.open',
+  ConflictResolved = 'conflict.resolved'
 }
 
 export const ENTRY_VERBS: Record<EntryKind, string> = {
@@ -26,7 +29,9 @@ export const ENTRY_VERBS: Record<EntryKind, string> = {
   [EntryKind.EdgeDelete]: 'Disconnected',
   [EntryKind.VersionSave]: 'Saved version',
   [EntryKind.RevisionCommit]: 'Edited frame',
-  [EntryKind.BranchCreate]: 'Branched'
+  [EntryKind.BranchCreate]: 'Branched',
+  [EntryKind.ConflictOpen]: 'Write refused',
+  [EntryKind.ConflictResolved]: 'Resolved conflict'
 };
 
 export enum LaneKind {
@@ -155,7 +160,8 @@ const SOURCE_ACTIONS: Record<HistorySource, readonly HistoryAction[]> = {
   [HistorySource.Event]: [],
   [HistorySource.Version]: [HistoryAction.Preview, HistoryAction.Restore],
   [HistorySource.Revision]: [HistoryAction.Preview, HistoryAction.Restore, HistoryAction.Name],
-  [HistorySource.Branch]: [HistoryAction.Merge, HistoryAction.Drop]
+  [HistorySource.Branch]: [HistoryAction.Merge, HistoryAction.Drop],
+  [HistorySource.Conflict]: []
 };
 
 export const actionsOf = (entry: Pick<HistoryEntry, 'source'>): readonly HistoryAction[] => SOURCE_ACTIONS[entry.source];
