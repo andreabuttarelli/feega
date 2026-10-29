@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import CoreTextEdit from './CoreTextEdit.svelte';
 
-const LOOK = { fontPx: 54, family: "'DM Sans', sans-serif", weight: 600, italic: false, trackingEm: -0.02, leading: 1.2, color: '#f0eee9', upper: false, align: 'center' };
+const LOOK = { fontPx: 54, family: "'DM Sans', sans-serif", weight: 600, italic: false, trackingEm: -0.02, leading: 1.2, color: '#f0eee9', textTransform: 'none', align: 'center', wrap: 'pre-wrap', trim: 'none', decoration: 'none' };
 
 describe('the caret over core-drawn text', () => {
   it('sits at the clip box with the font the core draws', () => {
-    const body = render(CoreTextEdit, { props: { layout: { transform: 'matrix(1,0,0,1,10,20)', width: 300, height: 60, fontPx: 54, wraps: true, centred: true }, look: LOOK, text: 'Hello', body: () => '', oncommit: () => {} } }).body;
+    const body = render(CoreTextEdit, { props: { layout: { transform: 'matrix(1,0,0,1,10,20)', width: 300, height: 60, fontPx: 54, wraps: true, vertical: 0 }, look: LOOK, text: 'Hello', body: () => '', oncommit: () => {} } }).body;
 
     expect(body).toContain('data-testid="core-text-edit"');
     expect(body).toContain('transform:matrix(1,0,0,1,10,20);white-space:pre-wrap;width:300px;height:60px');

@@ -207,11 +207,11 @@ describe('failedCallCount', () => {
   });
 
   it('legge anche lo status quando il turno è ancora in streaming', () => {
-    expect(failedCallCount([{ toolName: 'x', status: 'error' }, { toolName: 'y', status: 'done' }])).toBe(1);
+    expect(failedCallCount([{ status: 'error' }, { status: 'done' }])).toBe(1);
   });
 
   it('un turno tutto riuscito non conta niente', () => {
-    expect(failedCallCount([{ toolName: 'x', output: { ok: 1 } }])).toBe(0);
+    expect(failedCallCount([{ output: { ok: 1 } }])).toBe(0);
   });
 });
 

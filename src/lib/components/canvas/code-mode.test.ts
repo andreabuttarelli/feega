@@ -31,8 +31,8 @@ describe('code mode', () => {
     const react = ['index.html', 'package.json', 'src/main.tsx', 'src/pages/Hero.tsx'].map((path) => ({ path, content: '' }));
     const svelte = ['package.json', 'src/routes/+page.svelte'].map((path) => ({ path, content: '' }));
 
-    expect(entryFile(react).path).toBe('src/pages/Hero.tsx');
-    expect(entryFile(svelte).path).toBe('src/routes/+page.svelte');
+    expect(entryFile(react)?.path).toBe('src/pages/Hero.tsx');
+    expect(entryFile(svelte)?.path).toBe('src/routes/+page.svelte');
   });
 
   it('keeps the frame export under the picked layer CSS', () => {

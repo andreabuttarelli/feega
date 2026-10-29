@@ -14,8 +14,7 @@ const STUDIO_PAGE = 'src/lib/server/dashboard/pages/studio.ts';
 const BATCH_PAGE = 'src/lib/server/studio/batch-page.ts';
 const MCP_DOCS = 'docs/mcp-tools.md';
 
-const KNOWN_GAPS = [
-];
+const KNOWN_GAPS: string[] = [];
 
 function formActions(file: string): string[] {
   const source = readFileSync(file, 'utf8');

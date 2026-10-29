@@ -23,7 +23,7 @@ function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>, termsAc
     order,
     ensureProfile: vi.fn(async () => {
       order.push('profile');
-      return { id: USER.id, email: USER.email, name: null, avatarUrl: null, termsAcceptedAt, termsVersion: null };
+      return { id: USER.id, email: USER.email ?? '', name: null, avatarUrl: null, termsAcceptedAt, termsVersion: null };
     }),
     recordTermsAcceptance: vi.fn(async () => {
       order.push('terms');
@@ -32,8 +32,8 @@ function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>, termsAc
       order.push('accept');
       return outcome;
     }),
-    homePathFor: vi.fn(async () => '/p/proj/c/canvas')
-  } satisfies LandingDeps;
+    homePathFor: vi.fn(async (..._args: Parameters<LandingDeps['homePathFor']>) => '/p/proj/c/canvas')
+  };
 }
 
 describe('dove atterra chi è appena entrato', () => {

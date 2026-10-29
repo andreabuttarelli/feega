@@ -19,7 +19,7 @@ const shape = (id: string, x: number, color: string) => ({ id, from: 0, duration
 const video = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, background: 'brand', tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [shape('first', 0.3, '#ff5a1f')] }], comps: {}, assets: [] };
 const still = { ...video, still: { frame: 0 } };
 
-async function seedFrame(seedNode: (s: { type: string; x: number; y: number; data: object }) => Promise<{ id: string }>, admin: SupabaseClient, session: { orgId: string; userId: string }, doc: object) {
+async function seedFrame(seedNode: (s: { type: string; x: number; y: number; data: Record<string, unknown> }) => Promise<{ id: string }>, admin: SupabaseClient, session: { orgId: string; userId: string }, doc: object) {
   const node = await seedNode({ type: 'motion', x: TILE_AT.x, y: TILE_AT.y, data: LANDSCAPE });
   const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
   expect(error).toBeNull();

@@ -17,7 +17,7 @@ describe('orgCreditsUsage reads spend from ai_calls (no RPC)', () => {
   it('sums cost_usd for the org within the period, ignoring rows outside it', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-25T00:00:00Z'));
-    onTestFinished(() => vi.useRealTimers());
+    onTestFinished(() => { vi.useRealTimers(); });
     const { client } = createTestSupabase({
       ai_calls: [
         { id: '1', org_id: 'org-1', cost_usd: 1.5, created_at: '2026-09-10T00:00:00Z' },

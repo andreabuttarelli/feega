@@ -20,7 +20,7 @@ const doc = {
 test.describe('sections @real', () => {
   test.skip(!REAL_STACK, 'needs E2E_REAL_STACK=1');
 
-  async function setup(page: import('@playwright/test').Page, session: { orgId: string; userId: string; projectId: string; canvasId: string }, admin: import('@supabase/supabase-js').SupabaseClient, seedNode: (n: Record<string, unknown>) => Promise<{ id: string }>) {
+  async function setup(page: import('@playwright/test').Page, session: { orgId: string; userId: string; projectId: string; canvasId: string }, admin: import('@supabase/supabase-js').SupabaseClient, seedNode: (n: { type: string } & Record<string, unknown>) => Promise<{ id: string }>) {
     await page.setViewportSize({ width: 1440, height: 900 });
     const first = await seedNode({ type: 'motion', x: 0, y: 0, data: DATA });
     const second = await seedNode({ type: 'motion', x: 460, y: 0, data: DATA });

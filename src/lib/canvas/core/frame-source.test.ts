@@ -49,7 +49,7 @@ describe('handing a frame to the core', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     logGaps('f1', list(0));
-    logGaps('f1', { ...list(0), unsupported: [{ clip: 'c', component: 'Custom', reason: 'dom', detail: 'mask div.x ×2' }] } as never);
+    logGaps('f1', { ...(list(0) as object), unsupported: [{ clip: 'c', component: 'Custom', reason: 'dom', detail: 'mask div.x ×2' }] } as never);
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0].join(' ')).toContain('c (Custom): mask div.x ×2');

@@ -1,3 +1,4 @@
+import { ProjectMode } from '$lib/project-mode';
 import { describe, expect, it, vi } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
@@ -53,7 +54,7 @@ const { startMotionTurn, Browser } = await import('./turn');
 async function turn() {
   const db = { storage: { from: () => ({}) } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null, mode: ProjectMode.Standard }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }

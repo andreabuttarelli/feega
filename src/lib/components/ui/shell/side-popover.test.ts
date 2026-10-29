@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { PHONE_MAX, SIDE_GAP, SIDE_WIDTH, SideMode, sidePlacement } from './side-popover';
+import { PHONE_MAX, SIDE_GAP, SIDE_WIDTH, SideMode, sidePlacement, type SidePlace } from './side-popover';
 
 const DESKTOP = { width: 1440, height: 900 };
 const row = (top: number) => ({ top, bottom: top + 28 });
+const topOf = (at: SidePlace) => (at.mode === SideMode.Side ? at.top : null);
 
 describe('side popover placement', () => {
   it('sits left of the panel, its right edge a gap before the panel edge', () => {
@@ -11,16 +12,16 @@ describe('side popover placement', () => {
   });
 
   it('aligns its top with the clicked row', () => {
-    expect(sidePlacement({ row: row(120), edge: 1180, height: 200, viewport: DESKTOP }).top).toBe(120);
+    expect(topOf(sidePlacement({ row: row(120), edge: 1180, height: 200, viewport: DESKTOP }))).toBe(120);
   });
 
   it('is clamped inside the viewport when the row is near the bottom', () => {
     const at = sidePlacement({ row: row(820), edge: 1180, height: 320, viewport: DESKTOP });
-    expect(at.top).toBe(DESKTOP.height - SIDE_GAP - 320);
+    expect(topOf(at)).toBe(DESKTOP.height - SIDE_GAP - 320);
   });
 
   it('never leaves the top of the viewport', () => {
-    expect(sidePlacement({ row: row(-50), edge: 1180, height: 200, viewport: DESKTOP }).top).toBe(SIDE_GAP);
+    expect(topOf(sidePlacement({ row: row(-50), edge: 1180, height: 200, viewport: DESKTOP }))).toBe(SIDE_GAP);
   });
 
   it('becomes a bottom sheet on a phone', () => {

@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
 export const HERO_ID = 'lumen-hero';
 export const LUMEN_PATH = '/__lumen';
 
-export function serveLumen(page: Page, origin: string, dir: string): Promise<void[]> {
+export function serveLumen(page: Page, origin: string, dir: string): Promise<unknown[]> {
   const read = (file: string) => readFileSync(join(dir, file), 'utf8');
   return Promise.all([
     page.route(`${origin}/e/${HERO_ID}.json`, (route) => route.fulfill({ contentType: 'application/json', body: read('hero.json') })),

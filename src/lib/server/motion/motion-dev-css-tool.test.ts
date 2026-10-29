@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { addClip } from '@feega/motion-core/motion/timeline';
+import { addClip, type NewClip } from '@feega/motion-core/motion/timeline';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
@@ -13,7 +13,7 @@ function setup() {
   return { session, run };
 }
 
-const CARD = { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.25, height: 0.1, fill: 'brand.accent' } };
+const CARD: NewClip = { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.25, height: 0.1, fill: 'brand.accent' } };
 
 describe('read_layer_css', () => {
   it('returns the CSS, the Tailwind classes, the box and the variable names of a layer', async () => {

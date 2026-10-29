@@ -158,7 +158,7 @@ describe.each(TEXT_PRESETS)('preset %s', (preset) => {
     const { values } = PRESETS[preset].animator;
 
     expect(PRESETS[preset].about.length).toBeGreaterThan(10);
-    expect(startLook(values)).not.toEqual(restLook());
+    expect(startLook(values!)).not.toEqual(restLook());
   });
 });
 
