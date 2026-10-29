@@ -6,47 +6,38 @@ const gestureFor = (nodeId: string): Gesture => ({
   items: [{ kind: 'node.create', nodeId, after: { type: 'text' } }]
 });
 
-describe('createUndoStack: uno stack per scheda, undo e redo', () => {
-  it('non ha niente da annullare o rifare appena creato', () => {
+describe('createUndoStack: uno stack per scheda, undo e redo', async () => {
+  it('non ha niente da annullare o rifare appena creato', async () => {
     const stack = createUndoStack<Gesture>();
     expect(stack.canUndo()).toBe(false);
     expect(stack.canRedo()).toBe(false);
-    expect(stack.popUndo()).toBeNull();
+    expect(await stack.popUndo()).toBeNull();
     expect(stack.popRedo()).toBeNull();
   });
 
-  it('the next undo can be read without taking it', () => {
-    const stack = createUndoStack<string>();
-    expect(stack.nextUndo()).toBeNull();
-    stack.push('a');
-    stack.push('b');
-    expect(stack.nextUndo()).toBe('b');
-    expect(stack.popUndo()).toBe('b');
-  });
-
-  it('un push rende il gesto disponibile a popUndo, in ordine LIFO', () => {
+  it('un push rende il gesto disponibile a popUndo, in ordine LIFO', async () => {
     const stack = createUndoStack<Gesture>();
     stack.push(gestureFor('a'));
     stack.push(gestureFor('b'));
 
-    expect(stack.popUndo()).toEqual(gestureFor('b'));
-    expect(stack.popUndo()).toEqual(gestureFor('a'));
+    expect(await stack.popUndo()).toEqual(gestureFor('b'));
+    expect(await stack.popUndo()).toEqual(gestureFor('a'));
     expect(stack.canUndo()).toBe(false);
   });
 
-  it('popUndo NON sposta da solo nel redo: tocca a chi chiama, dopo la conferma del server', () => {
+  it('popUndo NON sposta da solo nel redo: tocca a chi chiama, dopo la conferma del server', async () => {
     const stack = createUndoStack<Gesture>();
     stack.push(gestureFor('a'));
 
-    stack.popUndo();
+    await stack.popUndo();
     expect(stack.canRedo()).toBe(false);
   });
 
-  it('pushRedo mette a disposizione di ⇧⌘Z il gesto che il SERVER ha restituito, non quello tolto', () => {
+  it('pushRedo mette a disposizione di ⇧⌘Z il gesto che il SERVER ha restituito, non quello tolto', async () => {
     const stack = createUndoStack<Gesture>();
     stack.push(gestureFor('a'));
 
-    const popped = stack.popUndo()!;
+    const popped = (await stack.popUndo())!;
     const fromServer: Gesture = { items: [{ kind: 'node.delete', nodeId: 'a', before: popped.items[0] }] };
     stack.pushRedo(fromServer);
 
@@ -54,28 +45,58 @@ describe('createUndoStack: uno stack per scheda, undo e redo', () => {
     expect(stack.popRedo()).toEqual(fromServer);
   });
 
-  it('pushUndo, il simmetrico dopo un redo riuscito', () => {
+  it('pushUndo, il simmetrico dopo un redo riuscito', async () => {
     const stack = createUndoStack<Gesture>();
     stack.push(gestureFor('a'));
-    stack.popUndo();
+    await stack.popUndo();
     stack.pushRedo(gestureFor('a'));
 
     const popped = stack.popRedo()!;
     stack.pushUndo(popped);
 
     expect(stack.canUndo()).toBe(true);
-    expect(stack.popUndo()).toEqual(popped);
+    expect(await stack.popUndo()).toEqual(popped);
   });
 
-  it('un gesto nuovo svuota il redo: quel che era stato annullato non torna più con ⇧⌘Z', () => {
+  it('un gesto nuovo svuota il redo: quel che era stato annullato non torna più con ⇧⌘Z', async () => {
     const stack = createUndoStack<Gesture>();
     stack.push(gestureFor('a'));
-    stack.popUndo();
+    await stack.popUndo();
     stack.pushRedo(gestureFor('a'));
     expect(stack.canRedo()).toBe(true);
 
     stack.push(gestureFor('b'));
     expect(stack.canRedo()).toBe(false);
     expect(stack.popRedo()).toBeNull();
+  });
+
+  it('a gesture still waiting for the server is undone as soon as it lands, not skipped', async () => {
+    const stack = createUndoStack<string>();
+    let land: (entry: string | null) => void = () => {};
+    stack.push('before');
+    stack.pushPending(new Promise((resolve) => (land = resolve)));
+
+    expect(stack.canUndo()).toBe(true);
+    const undone = stack.popUndo();
+    land('moved out');
+
+    expect(await undone).toBe('moved out');
+    expect(await stack.popUndo()).toBe('before');
+  });
+
+  it('a gesture the server refused leaves nothing to undo in its place', async () => {
+    const stack = createUndoStack<string>();
+    stack.push('before');
+    stack.pushPending(Promise.resolve(null));
+
+    expect(await stack.popUndo()).toBe('before');
+    expect(stack.canUndo()).toBe(false);
+  });
+
+  it('a pending gesture empties the redo like any new gesture', async () => {
+    const stack = createUndoStack<string>();
+    stack.pushRedo('a');
+    stack.pushPending(Promise.resolve('b'));
+    expect(stack.canRedo()).toBe(false);
   });
 });
