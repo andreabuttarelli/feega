@@ -1,6 +1,6 @@
 import { withAutoLayout } from '../layout/resolve';
 import { perDoc } from '../per-doc';
-import { clipRadii } from '../surface';
+import { clipRadii, frameFadeAt, unfaded } from '../surface';
 import { withStacking } from '../layout/stacking';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
@@ -619,6 +619,11 @@ function rootCorners(doc: MotionDoc): string {
   return radii ? `#root{border-radius:${radii.map((r) => pxOf(r * side)).join(' ')}}` : '';
 }
 
+function rootFade(doc: MotionDoc): string {
+  const fade = frameFadeAt(doc, 0);
+  return fade < 1 ? `#root{opacity:${fade}}` : '';
+}
+
 function zoomed(doc: MotionDoc, scale: number): string {
   return `#root{width:${doc.width}px;height:${doc.height}px${scale === 1 ? '' : `;zoom:${scale}`}}`;
 }
@@ -657,7 +662,7 @@ export const junctionMovesOf = (raw: ComposeInput): JunctionMove[] => {
 export function composeHtml(raw: ComposeInput): string {
   const shown = shownDoc(raw);
   const junctions = junctionTweens(shown, junctionPairs(shown));
-  const prepared = liveDoc(raw, shown);
+  const prepared = liveDoc(raw, unfaded(shown));
   const input = { ...raw, doc: bakedDoc(raw, prepared) };
   const { doc, tokens } = input;
   const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {}, runtime: raw.runtime ?? RuntimeDelivery.Inline };
@@ -783,7 +788,7 @@ export function composeHtml(raw: ComposeInput): string {
     fitScript(),
     hotRuntime(),
     fontLinks(doc, input.assets),
-    `<style>${BASE_CSS}#root{background:${esc(background)}}${rootCorners(doc)}${zoomed(doc, scale)}${stage ? STAGE_CSS : ''}</style>`,
+    `<style>${BASE_CSS}#root{background:${esc(background)}}${rootCorners(doc)}${rootFade(raw.doc)}${zoomed(doc, scale)}${stage ? STAGE_CSS : ''}</style>`,
     '</head><body>',
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${frame.width}" data-height="${frame.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     HOT_OPEN,

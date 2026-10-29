@@ -16,7 +16,7 @@ import { effectOfKey } from '../effects/model';
 import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linear } from './filters';
 import { BlendMode } from '../blend';
 import { MASK_KEYS, MaskMode } from '../mask';
-import { clipRadii } from '../surface';
+import { clipRadii, frameFadeAt } from '../surface';
 import { mattePairs, MATTE_READ } from '../matte';
 import { CoverKind, maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
 import { FillType, cropOf, fillsOf, type Fill, type FillOf } from '../fill/model';
@@ -576,10 +576,21 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     }
     unsupported.push({ clip: clip.id, component: clip.component, reason: drawn });
   }
-  const background = doc.background === Background.Transparent ? null : colour('brand.background');
+  const background = doc.surface ? CLEAR : doc.background === Background.Transparent ? null : colour('brand.background');
   const cut = frameCut(doc);
   const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;
-  return { ...size, background, items: framed, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+  return { ...size, background, items: faded(doc, framed, frameFadeAt(doc, frame)), unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+}
+
+const CLEAR: Rgba = [0, 0, 0, 0];
+
+function faded(doc: MotionDoc, items: Item[], fade: number): Item[] {
+  if (!doc.surface || fade >= 1) {
+    return items;
+  }
+  const surface = items.filter((i) => i.clip === doc.surface);
+  const layers = items.filter((i) => i.clip !== doc.surface);
+  return [...surface, { kind: ItemKind.Group, clip: doc.surface, items: layers, opacity: fade, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal }];
 }
 
 function frameCut(doc: MotionDoc): MaskLayer | null {

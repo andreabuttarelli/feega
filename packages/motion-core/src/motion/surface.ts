@@ -1,6 +1,7 @@
 import { TrackKind, defaultProps } from './components';
 import { Background, findClip, newClip, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import { FillType } from './fill/model';
+import { transformAt } from './parent';
 import { ShapeKind } from './shape/schema';
 import { cornerRadii, type Corners } from './shape/geometry';
 
@@ -20,6 +21,25 @@ const surfaceProps = () => ({
 
 export function frameSurface(doc: MotionDoc): MotionClip | null {
   return doc.surface ? (findClip(doc, doc.surface)?.clip ?? null) : null;
+}
+
+export function frameFadeAt(doc: MotionDoc, frame: number): number {
+  const surface = frameSurface(doc);
+  return surface ? transformAt(surface, 'opacity', frame) : 1;
+}
+
+export function unfaded(doc: MotionDoc): MotionDoc {
+  if (!frameSurface(doc)) {
+    return doc;
+  }
+
+  const plain = (c: MotionClip): MotionClip => {
+    const { opacity: _o, ...transform } = c.transform;
+    const { opacity: _k, ...keyframes } = c.keyframes;
+    return { ...c, transform, keyframes };
+  };
+
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === doc.surface ? plain(c) : c)) })) };
 }
 
 export const clipsContent = (doc: MotionDoc): boolean => frameSurface(doc)?.clipContent !== false;
