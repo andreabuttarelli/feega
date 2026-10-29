@@ -80,6 +80,16 @@ Chat, Share, credits, comments, saved versions and Drive/Dropbox import are not 
 
 To open a different file, stop the server and start it again with that file.
 
+## Telemetry
+
+On start, `npx feega` sends one anonymous event to PostHog (EU): `npx_feega_started`, plus
+`npx_feega_active_day` on the first start of each day. Each carries the feega version, OS, CPU
+architecture, Node version and a random install id stored in `~/.feega/telemetry-id`. No IP or
+location is kept, and no canvas content, file names, paths or project names are sent. The first
+run prints a one-line notice. A failed send is ignored and never delays startup.
+
+Turn it off with `FEEGA_TELEMETRY=0` or `DO_NOT_TRACK=1`; it is also off when `CI` is set.
+
 ## Safety
 
 There is no login, so the server listens on 127.0.0.1 only and refuses to start on any other
