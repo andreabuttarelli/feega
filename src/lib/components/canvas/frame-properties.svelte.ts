@@ -2,7 +2,7 @@ import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { FrameExtras } from '$lib/canvas/frame-extras.svelte';
 import { docMode, type DocMode } from '@feega/motion-core/motion/doc';
-import type { FrameDialog } from '$lib/canvas/frame-dialogs';
+import type { SelectionActionId } from '$lib/canvas/selection-actions';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
 const TEXT_FIELDS = new Set(['TEXTAREA', 'INPUT']);
@@ -16,7 +16,7 @@ export class FrameProperties {
   extras = $state.raw<FrameExtras | null>(null);
   part = $state<string | null>(null);
   exportPicks: (() => void) | null = null;
-  openDialog: ((dialog: FrameDialog) => void) | null = null;
+  runAction = $state.raw<((id: SelectionActionId) => void) | null>(null);
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
     this.nodeId = nodeId;
@@ -47,7 +47,7 @@ export class FrameProperties {
     this.extras = null;
     this.part = null;
     this.exportPicks = null;
-    this.openDialog = null;
+    this.runAction = null;
   }
 }
 

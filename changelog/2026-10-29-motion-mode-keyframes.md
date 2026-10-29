@@ -12,5 +12,5 @@ Issue #1517, after #1536.
   nearest previous/next keyframe. Toggle `onionSetting` in the timeline bar, Motion only. No new
   renderer.
 - Voice-over/music: `ModeSpec.sounds`; `SoundSection` in the frame panel (no selection) opens the
-  same `FrameDialogs` via `frameProperties.openDialog`. The "…" entries stay.
+  same `FrameDialogs` via `frameProperties.runAction` (`frame-voice`, `frame-music`). The "…" entries stay.
 - Drawing in Motion already created base values; a test now pins it.

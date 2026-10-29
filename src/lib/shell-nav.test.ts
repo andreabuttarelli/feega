@@ -11,8 +11,8 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(BURGER_ENTRIES.map((e) => e.id)).not.toContain('layers');
   });
 
-  it('the rail toggles panels and sheets only: the photo studio, a page of its own, lives in the burger', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['settings']);
+  it('the desktop rail reaches the photo studio next to settings', () => {
+    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['studio', 'settings']);
     expect(BURGER_ENTRIES.map((e) => e.id)).toContain('studio');
   });
 
@@ -73,7 +73,7 @@ describe('sheetEntryForPath: quale voce apre il foglio', () => {
 describe('il burger mobile legge la stessa tabella della rail', () => {
   it('offre ogni voce della rail, nello stesso ordine', () => {
     const rail = [...navEntriesByGroup('panel'), ...navEntriesByGroup('workbench')];
-    expect(BURGER_ENTRIES.map((e) => e.id)).toEqual([...rail.map((e) => e.id), 'studio']);
+    expect(BURGER_ENTRIES.map((e) => e.id)).toEqual(rail.map((e) => e.id));
   });
 });
 

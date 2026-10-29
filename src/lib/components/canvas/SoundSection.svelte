@@ -1,18 +1,19 @@
 <script lang="ts">
-  import { FrameDialog } from '$lib/canvas/frame-dialogs';
+  import { FRAME_DIALOG_ACTIONS } from '$lib/canvas/frame-dialogs';
+  import type { SelectionActionId } from '$lib/canvas/selection-actions';
 
-  let { onopen }: { onopen: (dialog: FrameDialog) => void } = $props();
+  let { onrun }: { onrun: (id: SelectionActionId) => void } = $props();
 
   const ENTRIES = [
-    { dialog: FrameDialog.Voice, label: 'Voice-over…' },
-    { dialog: FrameDialog.Music, label: 'Music…' }
-  ] as const;
+    { id: 'frame-voice', label: 'Voice-over…' },
+    { id: 'frame-music', label: 'Music…' }
+  ] as const satisfies readonly { id: SelectionActionId & keyof typeof FRAME_DIALOG_ACTIONS; label: string }[];
 </script>
 
 <div class="sound" data-testid="frame-sound-section">
   <span>Sound</span>
-  {#each ENTRIES as entry (entry.dialog)}
-    <button type="button" data-testid={`frame-sound-${entry.dialog}`} onclick={() => onopen(entry.dialog)}>{entry.label}</button>
+  {#each ENTRIES as entry (entry.id)}
+    <button type="button" data-testid={`frame-sound-${FRAME_DIALOG_ACTIONS[entry.id]}`} onclick={() => onrun(entry.id)}>{entry.label}</button>
   {/each}
 </div>
 

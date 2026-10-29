@@ -1,6 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { FRAME_DIALOG_ACTIONS } from './frame-dialogs';
-import { CANVAS_MENU, SELECTION_ACTIONS, actionsIn, enabledFor, menuFor, shownFor, toolbarSlots } from './selection-actions';
+import { CANVAS_MENU, FRAME_PANEL_ACTIONS, SELECTION_ACTIONS, actionsIn, enabledFor, menuFor, panelActionsFor, shownFor, toolbarSlots } from './selection-actions';
+
+describe('right bar of a canvas selection', () => {
+  const image = { id: 'i', type: 'image', data: { refId: 'r1' } };
+
+  it('offers the generated-image tools of the toolbar', () => {
+    const ids = panelActionsFor([image]).map((a) => a.id);
+
+    expect(ids).toEqual(expect.arrayContaining(['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers']));
+    expect(ids).not.toContain('layers-to-frame');
+  });
+
+  it('offers reframe on a generated video', () => {
+    expect(panelActionsFor([{ id: 'v', type: 'video', data: { refId: 'r1' } }]).map((a) => a.id)).toContain('reframe');
+  });
+
+  it('gives every frame "…" entry a home in the frame right bar', () => {
+    const home = new Set(FRAME_PANEL_ACTIONS.map((a) => a.id));
+    const motionPanel = new Set(['frame-voice', 'frame-music', 'frame-code']);
+    const elsewhere = new Set(['copy-link']);
+    const overflow = SELECTION_ACTIONS.filter((a) => (a.group === 'overflow' || a.group === 'fixed') && !motionPanel.has(a.id) && !elsewhere.has(a.id));
+
+    expect(overflow.filter((a) => !home.has(a.id)).map((a) => a.id)).toEqual([]);
+  });
+
+  it('offers no media tool on a node without output', () => {
+    expect(panelActionsFor([{ id: 't', type: 'text', data: {} }]).map((a) => a.id)).not.toContain('upscale-image');
+  });
+});
 
 describe('group and ungroup', () => {
   const box = { id: '1', type: 'motion', data: { kind: 'element' } };

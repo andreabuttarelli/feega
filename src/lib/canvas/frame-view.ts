@@ -13,3 +13,5 @@ export const FRAME_VIEW_DEFAULT: FrameViews = { [FrameView.PixelGrid]: true, [Fr
 export const shows = (views: FrameViews, view: FrameView): boolean => views[view];
 
 export const flipView = (views: FrameViews, view: FrameView): FrameViews => ({ ...views, [view]: !views[view] });
+
+export const contentViews = (views: FrameViews): FrameViews => ({ ...views, [FrameView.Rulers]: false, [FrameView.Pivot]: false });

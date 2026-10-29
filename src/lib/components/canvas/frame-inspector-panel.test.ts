@@ -6,6 +6,7 @@ import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { EditorMode, editorMode } from '$lib/canvas/editor-mode.svelte';
+import { frameProperties } from './frame-properties.svelte';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -28,6 +29,28 @@ function sessionOf(selection: string[]) {
 const html = (selection: string[], part: string | null = null) => render(FrameInspectorPanel, { props: { session: sessionOf(selection), tokens: FEEGA_TOKENS, part } }).body;
 
 describe('frame inspector panel', () => {
+  it('lists the frame "…" entries in the right bar', () => {
+    frameProperties.runAction = () => undefined;
+    const body = html([]);
+    frameProperties.clear();
+
+    expect(body).toContain('data-testid="frame-action-frame-history"');
+    expect(body).toContain('data-testid="frame-action-export"');
+  });
+
+  it('offers voice-over and music in Motion only', () => {
+    frameProperties.runAction = () => undefined;
+    editorMode.set(EditorMode.Motion);
+    const motion = html([]);
+    editorMode.set(EditorMode.Design);
+    const design = html([]);
+    frameProperties.clear();
+
+    expect(motion).toContain('data-testid="frame-sound-voice"');
+    expect(motion).toContain('data-testid="frame-sound-music"');
+    expect(design).not.toContain('data-testid="frame-sound-section"');
+  });
+
   it('shows the frame itself, with its camera, when no element is selected', () => {
     const body = html([]);
 

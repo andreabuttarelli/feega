@@ -3,6 +3,7 @@
   import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
+  import { pressMenu } from '$lib/motion/press-menu';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
@@ -10,6 +11,7 @@
   import { Depth, Gesture } from '$lib/motion/drill';
   import { FrameFit, FramePickers, type WorldRect } from '$lib/canvas/frame-pick';
   import { onDestroy, onMount, untrack } from 'svelte';
+  import { lockOverscroll } from './overscroll-lock';
   import { TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
@@ -20,7 +22,7 @@
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
-  import { alignSide } from '$lib/canvas/frame-tools';
+  import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
   import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
@@ -30,8 +32,8 @@
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
-  import { flipRulers, rulersPref } from '$lib/canvas/rulers-pref.svelte';
-  import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from '$lib/canvas/frame-view';
+  import { FrameView, contentViews } from '$lib/canvas/frame-view';
+  import { frameViews } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
@@ -60,6 +62,7 @@
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
   import { frameProperties } from '../frame-properties.svelte';
+  import { selectionProperties } from '../selection-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
@@ -169,7 +172,7 @@
   import { GraphScope } from '$lib/canvas/run-graph';
   import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
-  import { STACK_GAP, alignTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
@@ -216,7 +219,6 @@
   const HALF = 2;
   const CORE = 'core';
   const MOVE_SLOP_PX = 3;
-  const LONG_PRESS_MS = 500;
   const LABEL_CLEARANCE = 24;
   const WHEEL_ZOOM = 0.01;
   const STEP_ZOOM = 1.2;
@@ -742,7 +744,6 @@
   let downAt: Point = { x: 0, y: 0 };
   const touches = new Map<number, Point>();
   let pinch: { dist: number; mid: Point } | null = null;
-  let press: ReturnType<typeof setTimeout> | null = null;
   let suppressMenu = false;
   let captureId: number | null = null;
 
@@ -1137,7 +1138,7 @@
   let elementMenu = $state<Point | null>(null);
   let elementLayers = $state<{ id: string; label: string }[]>([]);
 
-  function openElementMenu(e: MouseEvent): boolean {
+  function openElementMenu(e: { clientX: number; clientY: number }): boolean {
     const hit = elementAt(toWorld(view, local(e)), Reach.Top);
     if (!hit) {
       return false;
@@ -1278,6 +1279,7 @@
   const onCanvas = $derived(new Set((props.peers ?? []).filter((p) => p.cursor).map((p) => p.userId)));
 
   onMount(() => peering?.start());
+  onMount(lockOverscroll);
 
   $effect(() => {
     styleLibrary.styles = libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
@@ -1364,8 +1366,26 @@
     frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
-    frameProperties.openDialog = (dialog) => (frameDialog = { nodeId: panelNodeId, dialog });
+    frameProperties.runAction = runSelectionAction;
     return () => frameProperties.clear();
+  });
+
+  $effect(() => {
+    if (!selected.length || !spec.chrome) {
+      return;
+    }
+    const ids = [...selected];
+    selectionProperties.publish({
+      summaries: selectedSummaries,
+      choicesFor: props.modelChoicesFor,
+      runQuote: props.runQuoteFor?.(ids) ?? null,
+      onaction: runSelectionAction,
+      onpropertychange: (patch) => props.onPropertyChange?.(ids, patch),
+      onview: () => props.onViewOutput?.(ids[0]),
+      onalign: (edge) => alignSelection(ids, edge),
+      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis))
+    });
+    return () => selectionProperties.clear();
   });
 
   const Step = { Back: 'back', Forward: 'forward' } as const;
@@ -1424,6 +1444,12 @@
     }
     const picker = pickers.of(shown.frame.id, live, () => liveOf(nodeId)?.playhead);
     return { picker, space: picker.spaceOf(shown.frame.box, 0), frame: shown.frame, live };
+  }
+
+  function viewPickerOf(overlayId: string) {
+    const live = viewLives.get(overlayId);
+    const shown = viewOf(overlayId);
+    return live && shown ? { picker: pickers.of(overlayId, live, () => liveOf(shown.nodeId)?.playhead) } : null;
   }
 
   function marksIn(overlayId: string) {
@@ -1586,10 +1612,9 @@
     ];
   }
 
-  let frameViews = $state<FrameViews>(FRAME_VIEW_DEFAULT);
 
-  function outlineBoxes(nodeId: string, doc: MotionDoc): Boxes {
-    const at = shows(frameViews, FrameView.Outlines) ? pickerOf(nodeId) : null;
+  function outlineBoxes(overlayId: string, doc: MotionDoc): Boxes {
+    const at = frameViews.isOn(FrameView.Outlines) ? (viewOf(overlayId) ? viewPickerOf(overlayId) : pickerOf(overlayId)) : null;
     if (!at) {
       return {};
     }
@@ -1809,7 +1834,7 @@
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
-    const snapOf = (ev: PointerEvent) => (ev.ctrlKey ? SnapMode.Off : shows(frameViews, FrameView.PixelGrid) ? SnapMode.Pixels : SnapMode.Guides);
+    const snapOf = (ev: PointerEvent) => (ev.ctrlKey ? SnapMode.Off : frameViews.isOn(FrameView.PixelGrid) ? SnapMode.Pixels : SnapMode.Guides);
     let result: OpResult | null = null;
     let carried = false;
 
@@ -2001,10 +2026,6 @@
     menuAt = null;
     picked = null;
     startGesture(kind, hit, w, e);
-    if (e.pointerType === 'touch' && hit.kind === HitKind.Node) {
-      const at = { x: e.clientX, y: e.clientY };
-      press = setTimeout(() => openMenu(hit.nodeId, at), LONG_PRESS_MS);
-    }
   }
 
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
@@ -2096,10 +2117,6 @@
       return;
     }
     const far = Math.hypot(p.x - downAt.x, p.y - downAt.y) > MOVE_SLOP_PX;
-    if (far && press) {
-      clearTimeout(press);
-      press = null;
-    }
     if (far && captureId !== null) {
       surface?.setPointerCapture(captureId);
       captureId = null;
@@ -2200,10 +2217,6 @@
     captureId = null;
     if (touches.size < 2) {
       pinch = null;
-    }
-    if (press) {
-      clearTimeout(press);
-      press = null;
     }
     const a = active;
     active = null;
@@ -2481,18 +2494,18 @@
     menuAt = at;
   }
 
-  function onContextMenu(e: MouseEvent) {
-    e.preventDefault();
+  function openMenuAt(at: Point) {
+    const e = { clientX: at.x, clientY: at.y };
     if (suppressMenu || !spec.chrome || openElementMenu(e)) {
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
     if (node) {
-      openMenu(node, { x: e.clientX, y: e.clientY });
+      openMenu(node, at);
       return;
     }
     if (selected.length) {
-      menuAt = { x: e.clientX, y: e.clientY };
+      menuAt = at;
       menuLayers = layersAt(menuAt);
     }
   }
@@ -2603,10 +2616,8 @@
     'send-back': () => props.onRestack?.(selected, Stack.Back),
     help: () => (shortcutHelp.open = true),
     view: (c) => {
-      if (c.id === 'view' && c.view === FrameView.Rulers) {
-        flipRulers();
-      } else if (c.id === 'view') {
-        frameViews = flipView(frameViews, c.view);
+      if (c.id === 'view') {
+        frameViews.flip(c.view);
       }
     }
   };
@@ -3088,7 +3099,7 @@
     onpointerenter={measureSurface}
     onclick={onClickInside}
     ondblclick={onDouble}
-    oncontextmenu={onContextMenu}
+    use:pressMenu={openMenuAt}
     onpointerleave={() => {
       props.onPointer?.(null);
       pickHover = null;
@@ -3109,7 +3120,7 @@
           <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={shows(frameViews, FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
@@ -3138,7 +3149,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
@@ -3154,6 +3165,10 @@
         {/each}
         {#if pickHover?.at === frame.id}
           <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {/if}
+        {@const viewLive = inside?.nodeId === nodeId ? viewLives.get(frame.id) : null}
+        {#if viewLive}
+          <FrameTools doc={viewLive.doc} frame={frameOfLive(viewLive)} views={contentViews(frameViews.all)} boxes={outlineBoxes(frame.id, viewLive.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} picks={[]} tool={DrawTool.Select} side={AlignSide.Below} apply={() => {}} ondrawn={() => {}} onleave={() => {}} />
         {/if}
       {/snippet}
     </FrameOverlays>
@@ -3449,6 +3464,7 @@
     position: absolute;
     inset: 0;
     touch-action: none;
+    overscroll-behavior: none;
     user-select: none;
   }
 

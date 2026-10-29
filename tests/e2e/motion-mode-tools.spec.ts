@@ -38,7 +38,7 @@ test.describe('Motion mode tools @real', () => {
     const node = await seedNode({ type: 'motion', x: 200, y: 150, data: LANDSCAPE });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: docOf([slide, still]), actor_kind: 'user', actor_id: session.userId });
     expect(error).toBeNull();
-    const headDoc = async () => (await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1).single()).data.doc;
+    const headDoc = async () => (await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1).single()).data!.doc;
     const clipIn = (doc: any, id: string) => doc.tracks.flatMap((t: any) => t.clips).find((c: any) => c.id === id);
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
