@@ -80,12 +80,19 @@ describe('frame inspector panel', () => {
     }
   });
 
-  it('reads the layer code in Code mode and shows a placeholder in Play', () => {
+  it('reads the layer code in Code mode and the prototype in Play', () => {
     editorMode.set(EditorMode.Code);
     expect(html(['a'])).toContain('aria-label="Code mode"');
 
     editorMode.set(EditorMode.Play);
-    expect(html(['a'])).toContain('data-testid="play-soon"');
+    const element = html(['a']);
+    expect(element).toContain('data-testid="play-inspector"');
+    expect(element).toContain('data-testid="prototype-section"');
+    expect(element).toContain('data-testid="flow-section"');
+    expect(element).toContain('data-testid="interactive-panel"');
+    expect(element).toContain('data-testid="play-frame-live"');
+    expect(element).toContain('data-testid="prototype-copy-link"');
+    expect(html([])).not.toContain('data-testid="prototype-section"');
 
     editorMode.set(EditorMode.Design);
     expect(html(['a'])).toContain('data-testid="header-actions"');

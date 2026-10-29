@@ -285,7 +285,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import FigmaNotice from '$lib/components/canvas/FigmaNotice.svelte';
   import { connectionMessage } from '$lib/canvas/connection-messages';
 
-  const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
   const techniqueShelf = techniquesOf(untrack(() => data.projectId));
@@ -316,8 +315,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       focusOn(ids, undefined, FocusMode.Select);
     }
   }
-
-  let linkCopied = $state(false);
 
   let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
 
@@ -396,10 +393,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     cloud = null;
   }
 
-  async function copySelectionLink() {
-    await navigator.clipboard.writeText(selectionLink(page.url, selectedIds));
-    linkCopied = true;
-    setTimeout(() => (linkCopied = false), LINK_COPIED_MS);
+  async function copySelectionLink(ids: string[]) {
+    await navigator.clipboard.writeText(selectionLink(page.url, ids));
   }
 
   function openLinkedFrame() {
@@ -4214,6 +4209,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onNodeDoubled={openOutput}
     onConnect={connect}
     onDelete={remove}
+    onCopyLink={isOff(LocalOff.PublicLinks) ? undefined : copySelectionLink}
     onCreateFormats={(id) => (formatsFor = id)}
     onCombineScenes={combineScenes}
     onInsertScene={insertSceneDrop}
@@ -4630,10 +4626,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />
   {/if}
 
-  {#if selectedIds.length && !isOff(LocalOff.PublicLinks)}
-    <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>
-  {/if}
-
   {#if coachOpen}
     <OnboardingCoach
       step={coachStep}
@@ -4876,20 +4868,4 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     border: 1px solid var(--color-destructive);
   }
 
-  .copy-link {
-    position: absolute;
-    top: var(--chrome-top, 12px);
-    left: 50%;
-    z-index: 5;
-    transform: translateX(-50%);
-    height: 28px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: var(--ui-radius-full);
-    background: var(--ui-panel-raised);
-    box-shadow: var(--ui-shadow-float);
-    color: var(--ui-ink);
-    font-size: var(--ui-text-xs);
-    cursor: pointer;
-  }
 </style>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EditMode } from '$lib/motion/edit-mode';
-import { EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeInspector, MODES, readEditorMode } from './editor-mode.svelte';
+import { CanvasLines, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeInspector, MODES, readEditorMode } from './editor-mode.svelte';
 
 class MemoryStore {
   kept = new Map<string, string>();
@@ -66,9 +66,14 @@ describe('editor mode', () => {
     expect([EditorMode.Design, EditorMode.Play, EditorMode.Code].map((m) => MODES[m].edit)).toEqual([EditMode.Design, EditMode.Design, EditMode.Design]);
   });
 
-  it('Code reads the dev inspector, Play shows a placeholder', () => {
+  it('Code reads the dev inspector, Play the prototype inspector', () => {
     expect(MODES[EditorMode.Code].inspector).toBe(ModeInspector.Code);
-    expect(MODES[EditorMode.Play].inspector).toBe(ModeInspector.Soon);
+    expect(MODES[EditorMode.Play].inspector).toBe(ModeInspector.Play);
     expect(MODES[EditorMode.Design].inspector).toBe(ModeInspector.Properties);
+  });
+
+  it('Play draws prototype arrows instead of node lines', () => {
+    expect(MODES[EditorMode.Play].lines).toBe(CanvasLines.Prototype);
+    expect([EditorMode.Design, EditorMode.Motion, EditorMode.Code].map((m) => MODES[m].lines)).toEqual([CanvasLines.Nodes, CanvasLines.Nodes, CanvasLines.Nodes]);
   });
 });

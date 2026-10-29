@@ -27,9 +27,14 @@
   import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
   import PhoneSheet from './PhoneSheet.svelte';
   import { EditorMode, MODES, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import ProviderIcon from './ProviderIcon.svelte';
+  import { hotDrag, type HotModel } from '$lib/canvas/hot-models';
+  import { CANVAS_DRAG_FILLED_NODE } from '$lib/canvas/drag-payload';
 
   let {
     onpick,
+    models = [],
+    onmodel,
     onupload,
     oncloud,
     onfigma,
@@ -46,6 +51,8 @@
     zoom
   }: {
     onpick?: (what: Addable) => void;
+    models?: HotModel[];
+    onmodel?: (model: HotModel) => void;
     onupload?: (file: File) => void;
     oncloud?: () => void;
     onfigma?: () => void;
@@ -196,15 +203,17 @@
     return () => query.removeEventListener('change', follow);
   });
 
-  type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof Plus; run: () => void; hint?: string; drag?: Addable; tool?: DrawTool };
+  type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof Plus; run: () => void; hint?: string; drag?: Addable; tool?: DrawTool; model?: HotModel };
 
   const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], hint: `${ADDABLE_LABEL[what]} (${slot(what)})`, icon: ADDABLE_ICON[what], run: () => onpick?.(what), drag: what });
   const toolTile = (t: (typeof DRAW_TOOLS)[number]): Tile => ({ id: `draw-${t.tool}`, label: t.name, hint: t.label, icon: t.icon, run: () => (frameBar.tool = t.tool), tool: t.tool });
+  const modelTile = (m: HotModel): Tile => ({ id: `model-${m.id}`, label: m.label, hint: m.label, icon: Plus, run: () => onmodel?.(m), model: m });
   const optional = (tile: Tile, shown: unknown): Tile[] => (shown ? [tile] : []);
 
   const SECTION_TILES: Record<InsertSection, () => Tile[]> = {
     [InsertSection.Tools]: () => MENU_TOOLS.map(toolTile),
     [InsertSection.Generate]: () => CANVAS_ADD_BAR.filter(offered).map(addTile),
+    [InsertSection.Models]: () => models.map(modelTile),
     [InsertSection.Import]: () => [
       { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile },
       ...optional({ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: () => oncloud?.() }, oncloud),
@@ -234,6 +243,10 @@
   }
 
   function startDrag(e: DragEvent, tile: Tile) {
+    if (tile.model) {
+      e.dataTransfer?.setData(CANVAS_DRAG_FILLED_NODE, JSON.stringify(hotDrag(tile.model)));
+      return;
+    }
     if (!tile.drag) {
       return;
     }
@@ -304,12 +317,16 @@
           data-insert={tile.id}
           data-tool={tile.tool}
           title={tile.hint ?? tile.label}
-          draggable={tile.drag ? 'true' : undefined}
+          draggable={tile.drag || tile.model ? 'true' : undefined}
           ondragstart={(e) => startDrag(e, tile)}
           ondragend={() => (menuOpen = false)}
           onclick={() => insert(tile)}
         >
-          <tile.icon size={20} strokeWidth={1.6} />
+          {#if tile.model}
+            <ProviderIcon provider={tile.model.logo} size={20} />
+          {:else}
+            <tile.icon size={20} strokeWidth={1.6} />
+          {/if}
           <span>{tile.label}</span>
         </button>
       {/each}

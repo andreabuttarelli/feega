@@ -41,6 +41,7 @@ export type SelectionActionId =
   | 'split-layers'
   | 'layers-to-frame'
   | 'copy-id'
+  | 'copy-link'
   | 'report'
   | 'group'
   | 'ungroup'
@@ -86,7 +87,7 @@ export type SelectionActionId =
   | 'delete'
   | FrameDialogActionId;
 
-export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
+export type SelectionActionGroup = 'fixed' | 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
 
 export type SelectionAction = {
   id: SelectionActionId;
@@ -167,6 +168,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'frame-chat', label: 'Chat history…', group: 'overflow', minNodes: 1 },
   { id: 'frame-save-template', label: 'Save as template…', group: 'overflow', minNodes: 1 },
   { id: 'frame-publish', label: 'Publish to gallery…', group: 'overflow', minNodes: 1 },
+  { id: 'copy-link', label: 'Copy link to selection', group: 'fixed', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }
@@ -318,13 +320,16 @@ const rankOf = (id: SelectionActionId) => {
   return at === -1 ? TOOLBAR_PRIORITY.length : at;
 };
 
-export type ToolbarSlots = { pinned: SelectionAction[]; overflow: SelectionAction[]; danger: SelectionAction[] };
+export type ToolbarSlots = { fixed: SelectionAction[]; pinned: SelectionAction[]; overflow: SelectionAction[]; danger: SelectionAction[] };
 
 export function toolbarSlots(actions: readonly SelectionAction[]): ToolbarSlots {
   const ranked = actions.filter((a) => a.group === 'secondary').sort((a, b) => rankOf(a.id) - rankOf(b.id));
+  const fixed = actions.filter((a) => a.group === 'fixed');
+
   return {
+    fixed,
     pinned: ranked.slice(0, PINNED_LIMIT),
-    overflow: [...ranked.slice(PINNED_LIMIT), ...actions.filter((a) => a.group === 'overflow')],
+    overflow: [...fixed, ...ranked.slice(PINNED_LIMIT), ...actions.filter((a) => a.group === 'overflow')],
     danger: actions.filter((a) => a.group === 'danger')
   };
 }
