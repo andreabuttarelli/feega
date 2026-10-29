@@ -167,3 +167,15 @@ describe('createCoreNative', () => {
     expect(document.querySelector('#outer')!.hasAttribute('data-native-hole')).toBe(false);
   });
 });
+
+describe('the live overlay on the native engine', () => {
+  it('is drawn together with the fixed overlay', () => {
+    const { bridge, calls } = fakeBridge();
+    const core = attachedOf(bridge, rgba);
+
+    core.set_overlay('[{"a":1}]');
+    core.set_live_overlay('[{"b":2}]');
+
+    expect(calls.filter(([name]) => name === 'setOverlay').at(-1)).toEqual(['setOverlay', '[{"a":1},{"b":2}]']);
+  });
+});
