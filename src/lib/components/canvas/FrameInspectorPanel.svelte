@@ -38,6 +38,7 @@
   import BreakpointsSection from '$lib/components/motion/BreakpointsSection.svelte';
   import BreakpointOverrides from '$lib/components/motion/BreakpointOverrides.svelte';
   import { ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import PlayInspector from './PlayInspector.svelte';
 
   const FIRST_FRAME = 0;
 
@@ -89,8 +90,8 @@
 
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
-{#if editorMode.spec.inspector === ModeInspector.Soon}
-  <p class="empty" data-testid="play-soon">Play mode is coming: prototype links and playback will live here.</p>
+{#if editorMode.spec.inspector === ModeInspector.Play && session && doc}
+  <PlayInspector doc={shownDoc!} clip={shown?.clip ?? null} commit={commitShown} />
 {:else if editorMode.spec.inspector === ModeInspector.Code && session && doc}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Code mode">
     {#if shown?.clip}
