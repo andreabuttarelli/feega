@@ -1,5 +1,6 @@
 import type { NodeData } from './node-patch';
 import type { Op } from './op-queue';
+import type { SentOp } from './sent-ops';
 
 export type Shelf = {
   read: (key: string) => Promise<unknown>;
@@ -8,9 +9,9 @@ export type Shelf = {
 
 export type PlaceEntry = { action: string; id: string; fields: Record<string, number> };
 
-export type OutboxParts = { ops: Op[]; nodes: Record<string, NodeData>; places: PlaceEntry[] };
+export type OutboxParts = { ops: Op[]; nodes: Record<string, NodeData>; places: PlaceEntry[]; sent: SentOp[] };
 
-const EMPTY: OutboxParts = { ops: [], nodes: {}, places: [] };
+const EMPTY: OutboxParts = { ops: [], nodes: {}, places: [], sent: [] };
 
 const DB_NAME = 'feega-outbox';
 const STORE = 'outbox';

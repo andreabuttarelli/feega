@@ -152,6 +152,11 @@ function jsonField(fd: FormData, key: string): unknown {
   }
 }
 
+const chosenNode = (fd: FormData): string | undefined => {
+  const id = z.string().uuid().safeParse(fd.get('node_id') ?? undefined);
+  return id.success ? id.data : undefined;
+};
+
 const chosenIds = (fd: FormData) => ({ id: fd.get('node_id') ?? undefined, ids: jsonField(fd, 'ids') });
 
 function canvasFrames(scope: Scope) {
@@ -570,7 +575,8 @@ export const actions: Actions<CanvasParams> = {
       return await registerCanvasUpload(scope.db, {
         orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId,
         path, fileName, mimeType, bytes,
-        x: coord(fd.get('x')) ?? 0, y: coord(fd.get('y')) ?? 0
+        x: coord(fd.get('x')) ?? 0, y: coord(fd.get('y')) ?? 0,
+        nodeId: chosenNode(fd)
       });
     } catch (cause) {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }

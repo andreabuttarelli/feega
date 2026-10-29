@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
@@ -91,6 +92,7 @@ async function watch(page: Page, want: Expect) {
     };
     window.addEventListener('keydown', begin, { capture: true, once: true });
     window.addEventListener('pointerup', begin, { capture: true, once: true });
+    window.addEventListener('drop', begin, { capture: true, once: true });
   }, want);
 }
 
@@ -441,5 +443,35 @@ test.describe('canvas actions are optimistic @real', () => {
     await item.click();
     await verdict('combine-scenes', page);
     await expect.poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.length, { timeout: 15_000 }).toBe(3);
+  });
+
+  test('an uploaded picture shows from the local file before the server answers', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await open(page, session);
+    await watch(page, { shown: Shown.Changed });
+    const png = readFileSync('tests/e2e/fixtures/blue-square.png').toString('base64');
+    await page.evaluate((b64) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const files = new DataTransfer();
+      files.items.add(new File([bytes], 'blue-square.png', { type: 'image/png' }));
+      document.querySelector('[data-canvas-surface]')!.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: files, clientX: 700, clientY: 400 }));
+    }, png);
+    await verdict('upload', page);
+    await expect(page.locator('[data-testid="motion-node-pending"] img')).toHaveCount(1);
+    await expect.poll(async () => (await admin.from('nodes').select('type').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.map((n) => n.type), { timeout: 20_000 }).toEqual(['image']);
+    await expect(page.getByTestId('motion-node-pending')).toHaveCount(0, { timeout: 20_000 });
+  });
+
+  test('a delete still in flight is sent again after a reload', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    test.skip(MEASURING, 'needs the slow server');
+    const id = await element(admin, seedNode, session, 0);
+    await open(page, session);
+    await pick(page, id);
+    await page.keyboard.press('Delete');
+    await expect(tile(page, id)).toHaveCount(0);
+    await page.waitForTimeout(500);
+    await page.reload();
+    await expect.poll(async () => (await admin.from('nodes').select('id').eq('id', id).is('deleted_at', null)).data?.length, { timeout: 20_000 }).toBe(0);
   });
 });

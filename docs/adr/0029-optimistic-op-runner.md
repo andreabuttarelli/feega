@@ -44,4 +44,5 @@ so History can still offer "keep mine".
 - **Per-action hand-written optimism**: that is what existed; it diverged action by action.
 - **Folding the line queue (`op-queue.ts`) and the place/save schedulers in**: they already
   apply locally and retry offline from IndexedDB; the runner covers single-shot writes that
-  do not retry. Persisting runner ops across reloads is not done yet.
+  do not retry. Runner ops are kept in the outbox `sent` list from the gesture to the answer and
+  sent again after a reload (`src/lib/canvas/sent-ops.ts`); client-chosen ids make that safe.

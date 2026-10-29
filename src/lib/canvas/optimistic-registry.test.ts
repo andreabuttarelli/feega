@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OptimisticAction, optimisticOp, restoreCanvas, type CanvasRows, type OptEdge, type OptTile } from './optimistic-registry';
+import { OptimisticAction, optimisticOp, requestOf, restoreCanvas, type CanvasRows, type OptEdge, type OptTile } from './optimistic-registry';
 import { OpOutcome, createOptimistic } from './optimistic-ops';
 import { Stack } from './stacking';
 import { SECTION_TYPE } from './section';
@@ -12,6 +12,7 @@ const edge = (id: string): OptEdge => ({ id, source: 'a', target: 'b', mode: 'fi
 const ctx = { toTile: (r: CanvasNodeRecord): OptTile => ({ id: r.id, type: r.type, displayName: r.displayName, x: r.position.x, y: r.position.y, w: r.size.width ?? 0, h: r.size.height ?? 0, data: r.data, version: r.version }) };
 const copy = (id: string, version = 0): CanvasNodeRecord => ({ id, canvasId: 'c', projectId: 'p', type: 'motion', displayName: null, position: { x: 32, y: 32, z: 0 }, size: { width: 100, height: 100 }, data: { docHeadRevision: 1 }, version });
 const duplicated = { ids: ['a'], copies: [copy('a2')], copyIds: { a: 'a2' } };
+const uploaded = { record: { ...copy('up'), type: 'pending' }, fields: { path: 'p/up.png', node_id: 'up' } };
 const carried = { fields: { source: 'a', clip: 'txt', ids: '["k1"]' }, made: copy('m'), gone: 'a' };
 const start = (): CanvasRows<OptTile, OptEdge> => ({ nodes: [tile('a'), tile('b', 200)], edges: [edge('e')] });
 
@@ -96,6 +97,20 @@ describe('optimistic registry: every action says how it looks before the server 
     expect(t.sent).toEqual([{ action: 'copyElement', fields: carried.fields }]);
   });
 
+  it('an upload shows its tile at once and becomes the stored node when it lands', async () => {
+    const t = runner({ asset: { id: 'as' }, node: { ...copy('up'), type: 'image', version: 1 } });
+    const op = optimisticOp(OptimisticAction.Upload, uploaded, t.rows(), ctx, t.post);
+
+    expect(op.apply(t.rows()).nodes.map((n) => [n.id, n.type, n.select ?? false])).toEqual([['a', 'motion', false], ['b', 'motion', false], ['up', 'pending', true]]);
+    await t.run(op);
+    expect(t.rows().nodes.at(-1)).toMatchObject({ id: 'up', type: 'image', version: 1 });
+    expect(t.undo[0]?.map((i) => i.kind)).toEqual(['node.create']);
+  });
+
+  it('names the request an op will send before it is sent, so it can be kept for a reload', () => {
+    expect(requestOf(OptimisticAction.Rename, { id: 'a', name: 'Hero' })).toEqual({ action: 'rename', fields: { node_id: 'a', name: 'Hero' } });
+  });
+
   it('delete takes nodes and wires away', () => {
     const shown = optimisticOp(OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }, start(), ctx, async () => null).apply(start());
     expect(shown).toEqual({ nodes: [tile('b', 200)], edges: [] });
@@ -119,6 +134,7 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
     [OptimisticAction.InsertScene, carried],
     [OptimisticAction.CombineScenes, carried],
     [OptimisticAction.LayersToFrame, carried],
+    [OptimisticAction.Upload, uploaded],
     [OptimisticAction.ScaleGroup, { id: 'a', width: 300, height: 300 }],
     [OptimisticAction.RestoreRun, { id: 'a', runId: 'r', mediaId: 'm' }]
   ] as const) {
