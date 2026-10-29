@@ -3,7 +3,7 @@ import { LIVE_DEBOUNCE_MS, LiveFeed, POLL_MS, liveRefresh, mergeGraph } from './
 import type { HistoryGraph, HistoryRow } from './timeline';
 
 const row = (id: string, lane = 0, summary: string | null = null) => ({ entry: { id, summary }, lane }) as unknown as HistoryRow;
-const graph = (...rows: HistoryRow[]): HistoryGraph => ({ lanes: [], rows });
+const graph = (...rows: HistoryRow[]): HistoryGraph => ({ lanes: [], rows, sessions: [] });
 
 describe('liveRefresh', () => {
   beforeEach(() => {
@@ -102,5 +102,13 @@ describe('mergeGraph', () => {
     const next = graph(row('a'));
 
     expect(mergeGraph(null, next)).toBe(next);
+  });
+});
+
+describe('mergeGraph keeps the sessions of the new read', () => {
+  it('a refresh that adds a session shows it', () => {
+    const next = { ...graph(row('a'), row('b')), sessions: [{ key: 's1', lane: 0, rows: [] }] };
+
+    expect(mergeGraph(graph(row('a')), next).sessions).toEqual(next.sessions);
   });
 });
