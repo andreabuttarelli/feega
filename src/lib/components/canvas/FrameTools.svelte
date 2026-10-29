@@ -10,6 +10,8 @@
   import LayoutGuidesOverlay from '$lib/components/motion/LayoutGuidesOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
+  import OnionOverlay from '$lib/components/motion/OnionOverlay.svelte';
+  import { onionSetting } from '$lib/canvas/onion-skin.svelte';
   import OutlineOverlay from '$lib/components/motion/OutlineOverlay.svelte';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
@@ -64,7 +66,7 @@
 
   const only = $derived(picks.length === 1 ? (findClip(doc, picks[0])?.clip ?? null) : null);
   const fit = $derived(containFit(size, { width: doc.width, height: doc.height }));
-  const shown = $derived(shownOverlays({ doc, clip: only, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views }));
+  const shown = $derived(shownOverlays({ doc, clip: only, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views, mode, onion: onionSetting.skin }));
   const laidOut = $derived(only && shown.has(FrameOverlay.Corners) ? (findClip(withAutoLayout(doc), only.id)?.clip ?? only) : null);
 
   $effect(() => {
@@ -131,6 +133,7 @@
   {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
   {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}
+  {#if only && shown.has(FrameOverlay.Onion)}<OnionOverlay {doc} clip={only} {frame} {boxes} />{/if}
   {#if only && shown.has(FrameOverlay.MotionPath)}<MotionPathOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if shown.has(FrameOverlay.ShapeBuilder)}<ShapeBuilderOverlay {doc} {frame} {picks} onchange={apply} onexit={onleave} />{/if}
   {#if shown.has(FrameOverlay.Draw)}

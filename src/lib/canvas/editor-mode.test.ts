@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditMode } from '$lib/motion/edit-mode';
 import { DocAccess } from '$lib/motion/frame-edit-session.svelte';
-import { CanvasLines, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeChrome, ModeInspector, MODES, frameTimeline, readEditorMode, TimelineAccess } from './editor-mode.svelte';
+import { CanvasLines, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeChrome, ModeInspector, MODES, SoundEntries, frameTimeline, readEditorMode, TimelineAccess } from './editor-mode.svelte';
 
 class MemoryStore {
   kept = new Map<string, string>();
@@ -65,6 +65,11 @@ describe('editor mode', () => {
   it('only Motion keys edits at the playhead', () => {
     expect(MODES[EditorMode.Motion].edit).toBe(EditMode.Motion);
     expect([EditorMode.Design, EditorMode.Play, EditorMode.Code].map((m) => MODES[m].edit)).toEqual([EditMode.Design, EditMode.Design, EditMode.Design]);
+  });
+
+  it('only Motion offers voice-over and music in the right bar', () => {
+    expect(MODES[EditorMode.Motion].sounds).toBe(SoundEntries.Shown);
+    expect([EditorMode.Design, EditorMode.Play, EditorMode.Code].map((m) => MODES[m].sounds)).toEqual([SoundEntries.Hidden, SoundEntries.Hidden, SoundEntries.Hidden]);
   });
 
   it('Code reads the dev inspector, Play the prototype inspector', () => {

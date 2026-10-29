@@ -1364,6 +1364,7 @@
     frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
+    frameProperties.openDialog = (dialog) => (frameDialog = { nodeId: panelNodeId, dialog });
     return () => frameProperties.clear();
   });
 

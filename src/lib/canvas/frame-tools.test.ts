@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { EditMode } from '$lib/motion/edit-mode';
+import { OnionSkin } from './onion-skin.svelte';
 import { FRAME_VIEW_DEFAULT, FrameView, flipView } from './frame-view';
 import { AlignSide, FrameOverlay, activeAt, alignSide, shownOverlays } from './frame-tools';
 
 const clip = (patch: Partial<MotionClip> & { props?: Record<string, unknown> }): MotionClip => ({ id: 'c', from: 10, durationInFrames: 20, component: 'Shape', props: { shape: 'rect' }, ...patch }) as MotionClip;
 const doc = { layoutGuides: [{ id: 'g' }] } as unknown as MotionDoc;
-const plain = { doc: { layoutGuides: [] } as unknown as MotionDoc, clip: null, picks: 0, tool: DrawTool.Select, pointEdit: null, active: false, views: FRAME_VIEW_DEFAULT };
+const plain = { doc: { layoutGuides: [] } as unknown as MotionDoc, clip: null, picks: 0, tool: DrawTool.Select, pointEdit: null, active: false, views: FRAME_VIEW_DEFAULT, mode: EditMode.Design, onion: OnionSkin.Off };
 
 describe('shownOverlays', () => {
   it('shows nothing for an empty selection with the select tool', () => {
@@ -45,9 +47,30 @@ describe('shownOverlays', () => {
     expect(shownOverlays({ ...plain, clip: clip({ props: { shape: 'ellipse' } }), picks: 1, active: true }).has(FrameOverlay.Corners)).toBe(false);
   });
 
-  it('shows the motion path of a clip that moves along one', () => {
-    expect(shownOverlays({ ...plain, clip: clip({ path: { autoOrient: false, tangents: [] } as never }), picks: 1 }).has(FrameOverlay.MotionPath)).toBe(true);
-    expect(shownOverlays({ ...plain, clip: clip({}), picks: 1 }).has(FrameOverlay.MotionPath)).toBe(false);
+  describe('in Motion', () => {
+    const motion = { ...plain, mode: EditMode.Motion, picks: 1 };
+    const slides = clip({ keyframes: { x: [{ frame: 0, value: 0 }, { frame: 10, value: 0.5 }] } as never });
+
+    it('shows the motion path of a clip that moves along one', () => {
+      expect(shownOverlays({ ...motion, clip: clip({ path: { autoOrient: false, tangents: [] } as never }) }).has(FrameOverlay.MotionPath)).toBe(true);
+      expect(shownOverlays({ ...motion, clip: clip({ keyframes: {} }) }).has(FrameOverlay.MotionPath)).toBe(false);
+    });
+
+    it('shows the motion path of an animated position', () => {
+      expect(shownOverlays({ ...motion, clip: slides }).has(FrameOverlay.MotionPath)).toBe(true);
+    });
+
+    it('shows the onion skin of a keyed element only once it is turned on', () => {
+      expect(shownOverlays({ ...motion, clip: slides }).has(FrameOverlay.Onion)).toBe(false);
+      expect(shownOverlays({ ...motion, clip: slides, onion: OnionSkin.On }).has(FrameOverlay.Onion)).toBe(true);
+      expect(shownOverlays({ ...motion, clip: clip({ keyframes: {} }), onion: OnionSkin.On }).has(FrameOverlay.Onion)).toBe(false);
+    });
+
+    it('Design shows neither motion paths nor onion skin', () => {
+      const design = { ...motion, mode: EditMode.Design, clip: slides, onion: OnionSkin.On };
+      expect(shownOverlays(design).has(FrameOverlay.MotionPath)).toBe(false);
+      expect(shownOverlays(design).has(FrameOverlay.Onion)).toBe(false);
+    });
   });
 
   it('shows align from two picks', () => {
