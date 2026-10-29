@@ -62,6 +62,12 @@ export async function cmdCanvasImportUrl(project: string, url: string, opts: { c
   console.log(JSON.stringify(result, null, 2));
 }
 
+export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string; x: number; y: number; org?: string }) {
+  const input = { canvasId: opts.canvas, repo, route: opts.route, x: opts.x, y: opts.y };
+  const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
+  console.log(JSON.stringify(result, null, 2));
+}
+
 type FrameOpts = { canvas: string; x: number; y: number; w: number; h?: number; format?: string; org?: string };
 
 export async function cmdCanvasFrame(project: string, opts: FrameOpts) {

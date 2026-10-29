@@ -112,6 +112,7 @@ export type FlowProps = {
   onFrameTemplates?: (at: { x: number; y: number }) => void;
   onFigmaImport?: (at: { x: number; y: number }) => void;
   onUrlImport?: (at: { x: number; y: number }) => void;
+  onCodeImport?: (at: { x: number; y: number }) => void;
   onNodeClicked?: (id: string) => void;
   onNodeDoubled?: (id: string) => void;
   barContext?: BarContext;

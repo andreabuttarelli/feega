@@ -77,6 +77,7 @@ import { pasteNodes } from '$lib/server/canvas/paste';
 import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
+import { importCodeInto } from '$lib/server/code-import/canvas-import';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
@@ -251,6 +252,8 @@ const importFigmaInput = z
     y: z.number().finite()
   })
   .strict();
+
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).describe('a public https://github.com/<owner>/<repo> link, optionally /tree/<ref>'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const importUrlInput = z.object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite() }).strict();
 
@@ -986,6 +989,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importUrlInput,
     run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y } })
+  }),
+
+  import_code: op({
+    access: Access.Write,
+    input: importCodeInput,
+    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, route: input.route, at: { x: input.x, y: input.y } })
   }),
 
   draw_frame: op({
