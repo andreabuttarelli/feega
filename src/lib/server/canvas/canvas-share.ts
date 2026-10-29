@@ -20,10 +20,9 @@ import { calendarOf } from '$lib/canvas/calendar-node';
 import { saleLabel } from '$lib/canvas/product-discount';
 import { Capability, modeAllows, modeOf } from '$lib/project-mode';
 import { audioOutputIds } from '$lib/canvas/node-media';
+import { mintShareToken } from '$lib/canvas/share-token';
 
 export { ShareState };
-
-const TOKEN_BYTES = 24;
 
 type SharedPaths = { generated: string[]; uploaded: string[]; influencer: string[] };
 
@@ -32,16 +31,11 @@ export type SignPaths = (paths: SharedPaths, preset?: ThumbnailPreset) => Promis
 const SHARED_IMAGE_PRESET: ThumbnailPreset = 'canvas1024';
 const SHARED_FACE_PRESET: ThumbnailPreset = 'canvas512';
 
-function mintToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(TOKEN_BYTES));
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
 export async function setCanvasShare(
   db: Db,
   input: { orgId: string; canvasId: string; state: ShareState }
 ): Promise<string | null> {
-  const token = input.state === ShareState.On ? mintToken() : null;
+  const token = input.state === ShareState.On ? mintShareToken() : null;
 
   const { error } = await db
     .from('canvases')
