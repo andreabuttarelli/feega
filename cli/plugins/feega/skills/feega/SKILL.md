@@ -244,7 +244,7 @@ answers `closed` / "frames unavailable".
 real font file; `approximate: true` when the font could not be read) to place things next to it.
 
 A frame becomes a code project with `export_code` ({node_id, target?}): react (React + Tailwind,
-default), html or svelte. Auto layout becomes flex/grid, each component one file with typed props
+default), html or svelte. Stacks (auto layout) become flex/grid, each component one file with typed props
 for what differs between instances, colours and fonts a tokens file. Static only, free, no AI.
 CLI: `feega motion code <nodeId> [--target svelte] [--out ./site]`.
 

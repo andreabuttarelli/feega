@@ -1876,8 +1876,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    add_auto_layout: tool({
-      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+    wrap_in_stack: tool({
+      description: 'Wrap with stack, like the editor ⇧A: a Stack is a flexbox-style container (auto layout). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
       inputSchema: z.object({
         clip_ids: z.array(z.string()).min(1).optional(),
         children: z.array(layoutItemPatchSchema.extend({ clip_id: z.string() })).min(1).optional().describe('in place of clip_ids: each child with its sizing, as set_layout_item takes it'),
@@ -1894,7 +1894,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const ids = children?.map((c) => c.clip_id) ?? clip_ids ?? [];
         const sized = (children ?? []).reduce<OpResult>((r, { clip_id: child, ...item }) => (r.ok ? setLayoutItem(r.doc, child, item) : r), { ok: true, doc: session.doc });
         const id = deps.newId();
-        const out = apply(styled(sized.ok ? wrapInStack(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in an auto layout`);
+        const out = apply(styled(sized.ok ? wrapInStack(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in a stack`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -1916,8 +1916,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async ({ clip_id }) => apply(resizeToFit(session.doc, clip_id), `fitted ${clip_id} to its children`)
     }),
 
-    set_auto_layout: tool({
-      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge), order (child ids, first to last), alignContent auto|space-between (wrap: space-between spreads the lines over the container height, needs a fixed cross size), firstOnTop true draws the first child of the order above the others (visual only, default false keeps the track order), strokesIncluded true (default on a new container) counts the inside strokes of the container as padding so children sit inside them. Only the fields given change. off true removes the auto layout (children keep their parent and the boxes the layout gave them).',
+    set_stack: tool({
+      description: 'Change a Stack (an auto layout container): direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline|stretch on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge; stretch: children that hug the cross axis take the whole line, fixed ones keep their size), order (child ids, first to last), alignContent auto|space-between (wrap: space-between spreads the lines over the container height, needs a fixed cross size), firstOnTop true draws the first child of the order above the others (visual only, default false keeps the track order), strokesIncluded true (default on a new container) counts the inside strokes of the container as padding so children sit inside them. Only the fields given change. off true turns the layout off and keeps the container (children keep their parent and the boxes the layout gave them); remove_stack unwraps instead.',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
       execute: async ({ clip_id, off, ...patch }) => apply(off ? freezeLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
@@ -1976,22 +1976,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async ({ clip_id, part, fills }) => apply(fills ? setPartFills(session.doc, clip_id, part, fills) : setPartStyle(session.doc, clip_id, part, null), `coloured ${part} of ${clip_id}`)
     }),
 
-    reorder_auto_layout: tool({
-      description: 'Move a child of an auto layout to position index (0 = first) in its container.',
+    reorder_stack: tool({
+      description: 'Move a child of a Stack to position index (0 = first) in it.',
       inputSchema: z.object({ container_id: z.string(), clip_id: z.string(), index: z.number().int().min(0) }),
       execute: async (input) => apply(reorderChild(session.doc, input.container_id, input.clip_id, input.index), `moved ${input.clip_id} to ${input.index}`)
     }),
 
     remove_stack: tool({
-      description: 'Remove a stack (an auto layout container), like the editor Remove stack (⌥⇧A): its children keep the boxes the layout gave them and move to the stack\'s parent, in its place when that parent is a stack too; the stack itself is deleted. To keep the container and only turn its layout off use set_auto_layout off.',
+      description: 'Remove a stack (an auto layout container), like the editor Remove stack (⌥⇧A): its children keep the boxes the layout gave them and move to the stack\'s parent, in its place when that parent is a stack too; the stack itself is deleted. To keep the container and only turn its layout off use set_stack off.',
       inputSchema: z.object({ clip_id: z.string() }),
       execute: async ({ clip_id }) => apply(removeStack(session.doc, clip_id), `removed the stack ${clip_id}`)
     }),
 
-    leave_auto_layout: tool({
-      description: 'Take a clip out of its auto layout: it is unparented and keeps the box it was laid out in.',
+    leave_stack: tool({
+      description: 'Take a clip out of its Stack: it is unparented and keeps the box it was laid out in.',
       inputSchema: z.object({ clip_id: z.string() }),
-      execute: async (input) => apply(leaveStack(session.doc, input.clip_id), `took ${input.clip_id} out of its auto layout`)
+      execute: async (input) => apply(leaveStack(session.doc, input.clip_id), `took ${input.clip_id} out of its stack`)
     }),
 
     set_expression: tool({
@@ -3343,7 +3343,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return { ...withFrames(oneAtATime(lookFirst(tools, session)), session), ...(deps.web ? createWebTools(deps.web) : {}) };
+  return { ...withFrames(oneAtATime(lookFirst(withRenamed(tools), session)), session), ...(deps.web ? createWebTools(deps.web) : {}) };
+}
+
+const RENAMED_TOOLS: Record<string, string> = {
+  add_auto_layout: 'wrap_in_stack',
+  set_auto_layout: 'set_stack',
+  reorder_auto_layout: 'reorder_stack',
+  leave_auto_layout: 'leave_stack'
+};
+
+function withRenamed(tools: Record<string, Tool>): Record<string, Tool> {
+  const aliases = Object.entries(RENAMED_TOOLS).map(([old, now]) => [old, { ...tools[now], description: `Deprecated: use ${now}, this name goes in the next release. ${tools[now].description}` }]);
+  return { ...tools, ...Object.fromEntries(aliases) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;

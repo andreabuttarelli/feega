@@ -47,10 +47,13 @@ Direction **Grid** gives fixed, fractional and hug columns and rows, spans, per-
 
 | Tool | What it does |
 |---|---|
-| `add_auto_layout` (motion) | wraps clips in a Stack |
-| `set_auto_layout` (motion) | direction, gap, padding, justify, align (`start`, `center`, `end`, `baseline`, `stretch`), wrap |
+| `wrap_in_stack` (motion) | wraps clips in a Stack |
+| `set_stack` (motion) | direction, gap, padding, justify, align (`start`, `center`, `end`, `baseline`, `stretch`), wrap |
+| `reorder_stack`, `leave_stack` (motion) | move a child, take a child out |
 | `remove_stack` (motion) | unwraps a Stack |
 | `stack_elements` (canvas op) | wraps free elements on the canvas in one free Stack |
+
+The old names `add_auto_layout`, `set_auto_layout`, `reorder_auto_layout` and `leave_auto_layout` still work until the next release.
 
 ## Export as code
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseMotionDoc } from '../doc';
 import { CodeTarget, exportCode, type CodeExport } from './index';
+import { Align } from '../layout/auto-layout';
 import { absoluteDoc, featureGridDoc, heroDoc } from './fixtures/small';
 import { landingDoc, LANDING_ASSETS } from './fixtures/landing';
 
@@ -164,5 +165,30 @@ describe('an override on an instance nested inside another component', () => {
   it('forwards in Svelte too', () => {
     const tier = file(exportCode(landingDoc(), { name: 'Landing', target: CodeTarget.Svelte }), 'src/lib/components/PricingTier.svelte');
     expect(tier).toContain('labelColor={feature1LabelColor}');
+  });
+});
+
+describe('a Stack exports as a flex div', () => {
+  const stretched = () => {
+    const doc = heroDoc();
+    return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.autoLayout ? { ...c, autoLayout: { ...c.autoLayout, align: Align.Stretch } } : c)) })) };
+  };
+  const all = (out: CodeExport) => out.files.map((f) => f.content).join('\n');
+
+  it.each([
+    [CodeTarget.React, 'items-stretch'],
+    [CodeTarget.Html, 'align-items: stretch'],
+    [CodeTarget.Svelte, 'align-items: stretch']
+  ])('%s keeps the cross-axis stretch', (target, rule) => {
+    const out = all(exportCode(stretched(), { name: 'Landing', target }));
+    expect(out).toContain(rule);
+    expect(out).not.toContain('[align-items:stretch]');
+  });
+
+  it.each([CodeTarget.Html, CodeTarget.Svelte])('%s writes display flex, direction and gap', (target) => {
+    const out = all(exportCode(heroDoc(), { name: 'Landing', target }));
+    expect(out).toContain('display: flex');
+    expect(out).toContain('flex-direction: column');
+    expect(out).toMatch(/gap: (var\(--space-\d+\)|\d+px)/);
   });
 });
