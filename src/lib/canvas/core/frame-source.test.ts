@@ -19,6 +19,14 @@ describe('frames on canvas', () => {
     expect(f.turn).toEqual({ degrees: 20, about: { x: 160, y: 120 } });
   });
 
+  it('a frame holding instances is fetched again when one of their mains changes', () => {
+    const before = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Frame, docHeadRevision: 4, linked: { home: 'x1' } }))[0];
+    const after = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Frame, docHeadRevision: 4, linked: { home: 'x2' } }))[0];
+
+    expect(before.linked).toBeTruthy();
+    expect(after.linked).not.toBe(before.linked);
+  });
+
   it('elements and groups have no bar', () => {
     const [f] = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Element, docHeadRevision: 1 }));
     expect(f.box.h).toBe(200);

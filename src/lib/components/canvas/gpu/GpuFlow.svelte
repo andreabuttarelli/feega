@@ -909,8 +909,10 @@
   const PICK_DOC_RETRIES = 4;
   const PICK_DOC_RETRY_MS = 1000;
 
+  const pickKey = (f: { id: string; revision: number; linked?: string }) => `${f.id}:${f.revision}:${f.linked ?? ''}`;
+
   async function fetchPickDoc(id: string, revision: number, attempt = 0) {
-    const res = await fetch(`${coreSource(id)}?revision=${revision}`).catch(() => null);
+    const res = await fetch(`${coreSource(id)}?revision=${revision}`, { cache: 'no-store' }).catch(() => null);
     const body = res?.ok ? ((await res.json().catch(() => null)) as { doc: LiveDoc['doc']; tokens: LiveDoc['tokens']; assets: LiveDoc['assets'] } | null) : null;
     if (body?.doc) {
       fetched = new Map(fetched).set(id, { revision, live: { doc: body.doc, tokens: body.tokens, assets: body.assets ?? {} } });
@@ -923,11 +925,11 @@
   }
 
   $effect(() => {
-    const due = coreFrames.filter((f) => !asked.has(`${f.id}:${f.revision}`));
+    const due = coreFrames.filter((f) => !asked.has(pickKey(f)));
     if (!due.length) {
       return;
     }
-    due.forEach((f) => asked.add(`${f.id}:${f.revision}`));
+    due.forEach((f) => asked.add(pickKey(f)));
     void (async () => {
       for (const f of due) {
         await quiet();

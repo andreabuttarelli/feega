@@ -321,6 +321,15 @@ export async function listMotionNodes(
   return (data ?? []).map(toNode);
 }
 
+export async function listMainDependents(db: Db, scope: { orgId: string; homeId: string }): Promise<CanvasNodeRecord[]> {
+  const { data, error } = await db.from('nodes').select(NODE_COLUMNS).eq('org_id', scope.orgId).is('deleted_at', null).contains('data', { mainHomes: [scope.homeId] });
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toNode);
+}
+
 export async function nodeRowExists(db: Db, input: { orgId: string; nodeId: string }): Promise<boolean> {
   const { data, error } = await db.from('nodes').select('id').eq('org_id', input.orgId).eq('id', input.nodeId).maybeSingle();
   if (error) {

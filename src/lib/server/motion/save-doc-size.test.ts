@@ -5,6 +5,8 @@ const patchNodeData = vi.fn();
 const resizeNode = vi.fn();
 
 vi.mock('$lib/server/repos/motion-revisions', () => ({ appendRevision, readHead: vi.fn(), RevisionOutcome: { Written: 'written', Conflict: 'conflict', Invalid: 'invalid' } }));
+vi.mock('./linked-mains', () => ({ nudgeInstances: async () => undefined, linkedHead: async (_db: unknown, input: { head: unknown }) => input.head }));
+vi.mock('$lib/motion/linked-mains', () => ({ mainHomesOf: () => [] }));
 vi.mock('$lib/server/repos/canvas', () => ({ patchNodeData, resizeNode, findNode: vi.fn(), DataCheck: { Schema: 'schema', None: 'none' } }));
 
 const { saveMotionDoc } = await import('./editor');
