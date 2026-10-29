@@ -9,13 +9,14 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 <DemoVideo name="component-variants" caption="Add variants to a component." />
 
-Create a component from the selection with `⌥⌘K`. The Assets panel lists the components and variants on your canvas; drag one onto any frame to add an instance.
+Create a component from the selection with `⌥⌘K`. The **Components** panel lists them; drag one onto the canvas to add an instance.
 
 ## Components across canvases
 
 The **Components** panel in the rail (`Alt+5`) lists the components of every canvas in the project, grouped by canvas, with the poster of the frame that holds them. Search by component or canvas name.
 
-- **Drag** a component onto a frame of the current canvas to add an instance. The main is copied into that frame.
+- **Drag** a component onto a frame of the current canvas to add an instance at the drop point. The frame under the pointer is highlighted while you drag; the main is copied into that frame.
+- **Drop on empty canvas** to place the instance as a free element at the drop point.
 - **Copy** with the copy button or `⌘C` on a row, then paste with `⌘V` over a frame, or with a frame selected.
 - **CLI:** `feega components <projectId>`. **MCP:** `list_project_components`. **API:** `GET /api/v1/projects/{projectId}/components`, and `GET /api/v1/projects/{projectId}/components/{frameId}/{compId}` for one main.
 

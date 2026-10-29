@@ -113,7 +113,7 @@ import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-exp
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { importLottieAt } from '$lib/server/motion/lottie-at';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, componentAskSchema, copyElement, placeComponent, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
 import { DropOn, OutputKind } from '$lib/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -1386,6 +1386,16 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid paste' });
     }
     return movedAnswer(await copyElement(canvasFrames(scope), ask.data));
+  },
+
+  placeComponent: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = componentAskSchema.safeParse({ sourceNodeId: fd.get('source'), compId: fd.get('comp'), drop: jsonField(fd, 'drop') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid component drop' });
+    }
+    return movedAnswer(await placeComponent(canvasFrames(scope), { ...ask.data, canvasId: scope.canvasId }));
   },
 
   moveFree: async ({ request, params, locals }) => {

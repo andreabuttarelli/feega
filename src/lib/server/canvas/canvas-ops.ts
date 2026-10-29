@@ -44,7 +44,7 @@ import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-v
 import { importLottieAt } from '$lib/server/motion/lottie-at';
 import { lottieSource } from '$lib/motion/import-lottie';
 import { SafeFetchError, safeFetchBytes } from '$lib/server/tool-guard';
-import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
+import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeComponent, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { NODE_NAME_MAX } from '$lib/canvas/node-name';
@@ -226,7 +226,8 @@ const frameTarget = {
   canvasY: z.number().optional()
 };
 const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame node the element is in'), elementId: z.string().describe('the clip id inside that frame'), ...frameTarget }).strict();
-const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
+const placeComponentInput = z.object({ canvasId: z.string(), frameId: z.string().describe('the Frame node holding the main component'), compId: z.string().describe('the main component id'), x: z.number().finite(), y: z.number().finite() }).strict();
+const placeInFrameInput =z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
 const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, {tool:line|arrow, from:{x,y}, to:{x,y}, stroke?:#hex}, or {tool:pen, path:SVG d}, in canvas units') })
@@ -953,6 +954,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: moveFrameElementInput,
     run: async (ctx, input) => frameAnswer(await copyElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
+  }),
+
+  place_component: op({
+    access: Access.Write,
+    input: placeComponentInput,
+    run: async (ctx, input) => frameAnswer(await placeComponent(framesOf(ctx), { sourceNodeId: input.frameId, compId: input.compId, canvasId: input.canvasId, drop: { on: DropOn.Canvas, x: input.x, y: input.y } }))
   }),
 
   draw_element: op({

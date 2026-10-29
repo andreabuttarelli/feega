@@ -33,6 +33,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   variables: 'Variable collections shared by the frames: list, define a value (synced to every frame that has the collection), switch a mode per frame, bind an element.',
   move_frame_element: 'Move an element inside its frame, to another frame, or out onto the canvas.',
   copy_frame_element: 'Copy an element the same way move_frame_element moves it; the source keeps it.',
+  place_component: 'Place an instance of a main component, from any frame of the project, free on a canvas at x,y.',
   draw_element: 'Draw a free Text, Box, Ellipse or Path on the canvas, outside any frame.',
   draw_frame: 'Draw an empty frame at x,y with a width and a preset format or a height.',
   import_lottie: 'Import a Lottie animation (JSON or an https URL of a .json or .lottie) as an editable frame at x,y; answers what it could not carry over.',

@@ -163,6 +163,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
+  import type { ComponentDrag } from '$lib/canvas/component-drag';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
@@ -672,6 +673,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     nodes = nodes.filter((n) => n.id !== id);
+  }
+
+  async function dropComponent(drag: ComponentDrag, at: { x: number; y: number }) {
+    landed(await post('placeComponent', { source: drag.frameId, comp: drag.compId, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x, y: at.y }) }));
   }
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
@@ -4225,6 +4230,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
+    onDropComponent={dropComponent}
     onDropFeedImage={dropFeedImage}
     onFeedImageOver={feedImageOver}
     onDraw={drawElement}

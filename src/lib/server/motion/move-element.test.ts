@@ -4,7 +4,8 @@ import { addClip } from '@feega/motion-core/motion/timeline';
 import { setStill } from '@feega/motion-core/motion/still';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
-import { DropOn, MoveOutcome, copyElement, moveElement, pastedSchema, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
+import { createComponent } from '$lib/motion/main-component';
+import { DropOn, MoveOutcome, copyElement, moveElement, placeComponent, pastedSchema, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '33333333-2222-4333-8444-555555555555';
@@ -319,5 +320,36 @@ describe('pastedSchema', () => {
 
     expect(pastedSchema.safeParse({ tool: 'text', box, text: 'hi', color: '#336699', weight: 700 }).success).toBe(true);
     expect(pastedSchema.safeParse({ tool: 'text', box, text: 'hi', color: 'red' }).success).toBe(false);
+  });
+});
+
+describe('placing a component on the bare canvas', () => {
+  let n = 0;
+  const newId = () => `k${++n}`;
+
+  it('makes a free element holding an instance of the main, on the canvas it was dropped on', async () => {
+    const m = memory();
+    const base = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Buy now' } }, 'label'));
+    const source = must(createComponent(base, ['label'], newId, 'Button'));
+    const compId = String(clipsOf(source)[0].props.comp);
+    seed(m, 'a', source);
+
+    const placed = await placeComponent(m.store, { sourceNodeId: 'a', compId, canvasId: 'c2', drop: { on: DropOn.Canvas, x: 400, y: 120 } });
+
+    expect(placed).toMatchObject({ outcome: MoveOutcome.Done, created: true });
+    const free = headOf(m, placed.outcome === MoveOutcome.Done ? placed.frameId : '');
+    expect(free.canvasId).toBe('c2');
+    expect(clipsOf(free.doc).map((c) => [c.component, c.props.comp])).toEqual([['Precomp', compId]]);
+    expect(free.doc.comps[compId]?.component?.name).toBe('Button');
+    expect(headOf(m, 'a').version).toBe(1);
+  });
+
+  it('refuses a comp that is not a main component', async () => {
+    const m = memory();
+    seed(m, 'a', withText());
+
+    const placed = await placeComponent(m.store, { sourceNodeId: 'a', compId: 'nope', canvasId: 'c1', drop: { on: DropOn.Canvas, x: 0, y: 0 } });
+
+    expect(placed.outcome).toBe(MoveOutcome.Invalid);
   });
 });
