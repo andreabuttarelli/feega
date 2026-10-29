@@ -22,7 +22,7 @@
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
-  import { alignSide } from '$lib/canvas/frame-tools';
+  import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
   import { FRAME_ELEMENT_MENU, canRunInFrame, barAction, barActionLater, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { loadOutliner } from '$lib/motion/fonts/outliner';
@@ -32,7 +32,7 @@
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
-  import { FrameView } from '$lib/canvas/frame-view';
+  import { FrameView, contentViews } from '$lib/canvas/frame-view';
   import { frameViews } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -1446,6 +1446,12 @@
     return { picker, space: picker.spaceOf(shown.frame.box, 0), frame: shown.frame, live };
   }
 
+  function viewPickerOf(overlayId: string) {
+    const live = viewLives.get(overlayId);
+    const shown = viewOf(overlayId);
+    return live && shown ? { picker: pickers.of(overlayId, live, () => liveOf(shown.nodeId)?.playhead) } : null;
+  }
+
   function marksIn(overlayId: string) {
     const shown = viewOf(overlayId);
     const nodeId = shown?.nodeId ?? overlayId;
@@ -1607,8 +1613,8 @@
   }
 
 
-  function outlineBoxes(nodeId: string, doc: MotionDoc): Boxes {
-    const at = frameViews.isOn(FrameView.Outlines) ? pickerOf(nodeId) : null;
+  function outlineBoxes(overlayId: string, doc: MotionDoc): Boxes {
+    const at = frameViews.isOn(FrameView.Outlines) ? (viewOf(overlayId) ? viewPickerOf(overlayId) : pickerOf(overlayId)) : null;
     if (!at) {
       return {};
     }
@@ -3159,6 +3165,10 @@
         {/each}
         {#if pickHover?.at === frame.id}
           <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {/if}
+        {@const viewLive = inside?.nodeId === nodeId ? viewLives.get(frame.id) : null}
+        {#if viewLive}
+          <FrameTools doc={viewLive.doc} frame={frameOfLive(viewLive)} views={contentViews(frameViews.all)} boxes={outlineBoxes(frame.id, viewLive.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} picks={[]} tool={DrawTool.Select} side={AlignSide.Below} apply={() => {}} ondrawn={() => {}} onleave={() => {}} />
         {/if}
       {/snippet}
     </FrameOverlays>
