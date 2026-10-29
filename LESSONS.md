@@ -3477,3 +3477,8 @@ Signal: `motion_revisions` fill with "Moved an element to another frame", one ne
 
 ### A canvas e2e fails at its first hover on untouched dev
 Signal: a `@real` spec waits for `frame-hover-box`, `selection-overlay`, `part-box`, `motion-editor` or `.svelte-flow__node` and times out. Cause: those belong to the DOM editor removed when the canvas became the editor; the GPU canvas draws `frame-pick-box`, `frame-selection` (with `data-clip`) and `gpu-node`. Move: grep `src` for the testid before diagnosing a regression; port the spec to the GPU testids (`canvas-nested-pick.spec.ts` is the pattern). `page.mouse.click` takes no `modifiers`: hold ⌘ with `keyboard.down('ControlOrMeta')`.
+
+## An imported page comes out blank but its texts and boxes are in the tree count
+
+**Signal:** URL import of a Tailwind 4 site draws almost nothing; the tree has nodes but no fills and no TEXT. **Move:** Chrome computes Tailwind 4 colours as `oklch()`; a reader that parses only `rgb()` drops them. Paint unknown colour syntax on a 1×1 canvas and read the pixel back (`pageTreeOf`). Check a page with `CHROMIUM_PATH=… npx vitest run src/lib/server/url-import/page-tree.browser.test.ts`.
+

@@ -20,7 +20,23 @@ export function pageTreeOf(limits: TreeLimits): PageTree {
     return Number.isFinite(n) ? n : 0;
   };
 
-  const colourOf = (value: string): { r: number; g: number; b: number; a: number } | null => {
+  const pixel = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const painted = new Map<string, string>();
+
+  const asRgb = (value: string): string => {
+    if (!pixel || /^rgba?\(/.test(value) || painted.has(value)) {
+      return painted.get(value) ?? value;
+    }
+    pixel.clearRect(0, 0, 1, 1);
+    pixel.fillStyle = value;
+    pixel.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = pixel.getImageData(0, 0, 1, 1).data;
+    painted.set(value, `rgba(${r}, ${g}, ${b}, ${a / 255})`);
+    return painted.get(value)!;
+  };
+
+  const colourOf = (raw: string): { r: number; g: number; b: number; a: number } | null => {
+    const value = /\b(oklch|oklab|lab|lch|color|hwb|hsla?)\(/.test(raw) ? raw.replace(/\b(?:oklch|oklab|lab|lch|color|hwb|hsla?)\([^()]*(?:\([^()]*\)[^()]*)*\)/g, asRgb) : raw;
     const m = value.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/);
     if (!m) {
       return null;
