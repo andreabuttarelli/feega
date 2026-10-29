@@ -33,7 +33,8 @@
   let place = $state<SidePlace | null>(null);
 
   let swatches = $state<readonly string[]>([]);
-  const raw = $derived(typeof value === 'string' ? value : '');
+  let picked = $state<string | null>(null);
+  const raw = $derived(picked ?? (typeof value === 'string' ? value : ''));
   const shown = $derived(resolveColor(raw || undefined, tokens));
   const hasAlpha = $derived(alpha !== null || !!onalpha);
 
@@ -59,7 +60,13 @@
     }
   });
 
+  $effect(() => {
+    void value;
+    picked = null;
+  });
+
   function pick(next: string, nextAlpha?: number) {
+    picked = next;
     if (nextAlpha !== undefined && onalpha) {
       onalpha(nextAlpha);
       return;

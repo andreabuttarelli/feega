@@ -102,6 +102,38 @@ describe('colour picker', () => {
     expect(gesture.release).toHaveBeenCalledTimes(1);
   });
 
+  it('the square thumb follows the pointer while the value prop is held', () => {
+    show();
+    const square = byId('colour-square');
+    sized(square);
+    const thumb = () => square.querySelector<HTMLElement>('.thumb')!.style.left;
+
+    pointer(square, 'pointerdown', 0, 0);
+    pointer(square, 'pointermove', 50, 50);
+    frames.forEach((cb) => cb(0));
+    flushSync();
+
+    expect(thumb()).toBe('50%');
+  });
+
+  it('the hue and opacity thumbs follow the pointer while the value prop is held', () => {
+    show();
+    const hue = byId('colour-hue');
+    const alpha = byId('colour-alpha');
+    sized(hue);
+    sized(alpha);
+
+    pointer(hue, 'pointerdown', 25, 0);
+    frames.forEach((cb) => cb(0));
+    flushSync();
+    pointer(alpha, 'pointerdown', 40, 0);
+    frames.forEach((cb) => cb(0));
+    flushSync();
+
+    expect(hue.querySelector<HTMLElement>('.thumb')!.style.left).toBe('25%');
+    expect(alpha.querySelector<HTMLElement>('.thumb')!.style.left).toBe('40%');
+  });
+
   it('arrows nudge saturation and brightness, shift by ten', () => {
     const { onchange } = show({ value: '#808080' });
     const square = byId('colour-square');
