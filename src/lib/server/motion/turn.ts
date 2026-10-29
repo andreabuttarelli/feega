@@ -120,7 +120,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     return blockedPrompt(screened.error);
   }
 
-  const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id });
+  const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId });
   const turns = await loadTurns(db, { orgId, threadId });
   const history = promptHistory(turns);
   const pick = readAnswer(message) ?? latestAnswer(turns);
@@ -264,7 +264,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };
       }
-      const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id }, SIGNED_URL_TTL_S.render);
+      const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId }, SIGNED_URL_TTL_S.render);
       const made = rowRequests(head, rows, { tokens, assets: assetUrls(renderAssets) }, settingsOf(Preset.Social));
       if (!made.ok) {
         return made;

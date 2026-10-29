@@ -201,7 +201,7 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
       return;
     }
     warnedIds.add(id);
-    win.console.warn(`feega: video ${id} is embedded more than once on this page. Paste its snippet once.`);
+    (win as unknown as typeof globalThis).console.warn(`feega: video ${id} is embedded more than once on this page. Paste its snippet once.`);
   };
 
   const mount = async (el: HTMLElement) => {
@@ -243,5 +243,5 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
 
   scan();
   doc.addEventListener('DOMContentLoaded', scan);
-  new (win as typeof globalThis).MutationObserver(scan).observe(doc.documentElement, { childList: true, subtree: true });
+  new (win as unknown as typeof globalThis).MutationObserver(scan).observe(doc.documentElement, { childList: true, subtree: true });
 }

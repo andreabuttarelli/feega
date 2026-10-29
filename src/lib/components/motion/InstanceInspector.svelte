@@ -20,7 +20,7 @@
   const texts = $derived(instanceTexts(doc, clipId));
   const elements = $derived(instanceElements(doc, clipId));
   const images = $derived(doc.assets.filter((a) => a.kind === 'image'));
-  const props = $derived(instance ? variantProps(doc, instance.compId) : {});
+  const variantValues = $derived(instance ? variantProps(doc, instance.compId) : {});
   const mains = $derived(Object.entries(doc.comps).filter(([, c]) => c.component));
   const VARIANT_KEY = 'Variant';
 
@@ -34,8 +34,8 @@
     if (!instance) {
       return;
     }
-    const key = Object.keys(props)[0] ?? VARIANT_KEY;
-    const count = (props[key]?.length ?? 1) + 1;
+    const key = Object.keys(variantValues)[0] ?? VARIANT_KEY;
+    const count = (variantValues[key]?.length ?? 1) + 1;
     applied(addVariant(doc, instance.compId, { [key]: `${VARIANT_KEY} ${count}` }, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
   }
 
@@ -144,7 +144,7 @@
           <label class="field">
             <span class:overridden={el.overridden.includes('assetId')}>Image</span>
             <select value={el.assetId} data-testid="instance-image" onchange={(e) => override(el.innerId, { assetId: e.currentTarget.value })}>
-              {#each images as a (a.id)}<option value={a.id}>{a.label ?? a.id}</option>{/each}
+              {#each images as a (a.id)}<option value={a.id}>{a.name || a.id}</option>{/each}
             </select>
             {#if el.overridden.includes('assetId')}<button type="button" class="reset" data-testid="instance-reset-assetId" onclick={() => reset(el.innerId, 'assetId')}>Reset</button>{/if}
           </label>
@@ -168,7 +168,7 @@
         {/if}
       </div>
     {/each}
-    {#each Object.entries(props) as [key, values] (key)}
+    {#each Object.entries(variantValues) as [key, values] (key)}
       <label class="field">
         <span>{key}</span>
         <select data-testid="instance-variant" value={instance.comp.component?.variant?.[key]} onchange={(e) => applied(pickVariant(doc, clipId, key, e.currentTarget.value), 'Changed variant')}>

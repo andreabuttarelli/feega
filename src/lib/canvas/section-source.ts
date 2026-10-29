@@ -12,6 +12,11 @@ export function excludedOf(data: Record<string, unknown>): string[] {
   return Array.isArray(data.sectionExcluded) ? data.sectionExcluded.filter((id): id is string => typeof id === 'string') : [];
 }
 
+export function sectionItemPatch(data: Record<string, unknown>, itemId: string, included: boolean): { sectionExcluded: string[] } {
+  const kept = excludedOf(data).filter((id) => id !== itemId);
+  return { sectionExcluded: included ? kept : [...kept, itemId] };
+}
+
 function contentsOf(nodes: readonly Held[], sectionId: string, consumerId: string): Held[] {
   return nodes.filter((n) => n.id !== consumerId && n.type !== SECTION_TYPE && layoutOf(n.data).groupId === sectionId);
 }

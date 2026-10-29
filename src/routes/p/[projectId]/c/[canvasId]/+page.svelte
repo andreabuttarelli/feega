@@ -197,7 +197,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { genNodeSize, startRun, unlockRun, type GenNode as GenNodeState, type GenMedium, type ModelChoice } from '$lib/canvas/gen-node';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
-  import { expandSectionEdges, sectionItemsOf, excludedOf, trimNote, type SectionInputs } from '$lib/canvas/section-source';
+  import { expandSectionEdges, sectionItemsOf, sectionItemPatch, trimNote, type SectionInputs } from '$lib/canvas/section-source';
   import { imageModelSpec } from '$lib/image-models';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
@@ -1024,8 +1024,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function setSectionItem(row: Tile, itemId: string, included: boolean) {
-    const kept = excludedOf(row.data).filter((id) => id !== itemId);
-    void saveNodeData(row.id, { sectionExcluded: included ? kept : [...kept, itemId] });
+    void write(row.id, sectionItemPatch(row.data, itemId, included), SaveTiming.Now);
   }
 
   function hasWiredImage(nodeId: string): boolean {

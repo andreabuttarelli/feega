@@ -3,7 +3,7 @@ import type { ChangelogEntry } from './index';
 // Storia fino all'introduzione dei file per-entry: nuova storia in un file per entry (2026-MM-DD-slug.ts).
 const entries: ChangelogEntry[] = [
     {
-      date: 'August 27, 2026',
+      date: '2026-08-27',
       title: 'Your project setup is a conversation with the Analyst',
       items: [
         'When an agent hands work to a teammate and that work needs a decision or an answer from you, the teammate now opens their own conversation with you — instead of the exchange staying hidden between the two agents.',
@@ -24,7 +24,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 26, 2026',
+      date: '2026-08-26',
       title: 'Your agent has a real desktop',
       items: [
         'Reopening a chat while an answer is still being written no longer shows scrambled text: the reply picks up exactly where it was.',
@@ -50,28 +50,28 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 26, 2026',
+      date: '2026-08-26',
       title: 'Optional repo skills for agents',
       items: [
         'Agent runs can now load the repository’s markdown skill packs on demand, opt-in via the HARNESS_SKILLS setting (off by default).'
       ]
     },
     {
-      date: 'August 25, 2026',
+      date: '2026-08-25',
       title: 'Agents can delegate again',
       items: [
         'Specialist agents in the new engine can now hand sub-tasks to helper agents (research, execution, verification) — the same delegation that already worked in standard chat, with no helpers spawning further helpers.'
       ]
     },
     {
-      date: 'August 25, 2026',
+      date: '2026-08-25',
       title: 'Motion, edited in place',
       items: [
         'Motion compositions can now be edited with targeted search-and-replace instead of full rewrites.'
       ]
     },
     {
-      date: 'August 25, 2026',
+      date: '2026-08-25',
       title: 'Agent faces move again',
       items: [
         'The sidebar now has a proper edge, and its top row lines up with the page header above the content.',
@@ -87,7 +87,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 25, 2026',
+      date: '2026-08-25',
       title: 'Self-hosting, for real',
       items: [
         'Self-hosted instances can now run a real production build — start the app from Docker Compose or a Node server instead of the dev server.',
@@ -97,14 +97,14 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 25, 2026',
+      date: '2026-08-25',
       title: 'Smoother start for every workspace',
       items: [
         'Creating a workspace no longer fails when your brand name uses a non-Latin alphabet — the web address is picked automatically if it is already taken.'
       ]
     },
     {
-      date: 'August 25, 2026',
+      date: '2026-08-25',
       title: 'One engine under the hood',
       items: [
         'Specialist agents now run on a single, shared engine — same behaviour in chat, far less machinery to keep alive.',
@@ -112,7 +112,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 24, 2026',
+      date: '2026-08-24',
       title: 'Nothing lost on a refresh',
       items: [
         'A correction sent while an agent is working now changes the answer it is still writing, not the next one.',
@@ -183,7 +183,7 @@ const entries: ChangelogEntry[] = [
       ],
     },
     {
-      date: 'August 23, 2026',
+      date: '2026-08-23',
       title: 'Agents can find what they were given',
       items: [
         'Reload a page mid-turn and the reply keeps streaming in — it used to just say "still working" until you refreshed again.',
@@ -230,7 +230,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 22, 2026',
+      date: '2026-08-22',
       title: 'Your agents, working together',
       items: [
         'Type /clear in a chat to give the agent a clean slate \u2014 it starts fresh from that point, while every message you have exchanged stays in the conversation.',
@@ -370,7 +370,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 22, 2026',
+      date: '2026-08-22',
       title: 'A chat that never goes quiet',
       items: [
         'Replies generated in the background now show their live progress — the text and the tools as they happen — instead of a silent "Thinking".',
@@ -382,7 +382,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 21, 2026',
+      date: '2026-08-21',
       title: 'A clearer chat while agents work',
       items: [
         'Goal updates at the end of a turn are now a proper card — a progress ring, what is done, what is still open, and whether the agent is picking it back up — instead of a wall of raw text. Older conversations get the card too.',
@@ -393,7 +393,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 21, 2026',
+      date: '2026-08-21',
       title: 'Your AI team, faster chat, and a one-field start',
       items: [
         'Meet your AI team: every recurring agent now has its own chat and its own on/off switch.',
@@ -412,7 +412,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 21, 2026',
+      date: '2026-08-21',
       title: "The agent's computer",
       items: [
         'Every agent chat now has a side panel: who the agent is, what it is working on right now, and its routines.',
@@ -423,7 +423,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 21, 2026',
+      date: '2026-08-21',
       title: 'Agent colors, balanced audio, and real video review',
       items: [
         'Background music in motion videos works again, on a new music engine — beds arrive as 30-second clips that repeat under longer videos.',
@@ -436,7 +436,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 21, 2026',
+      date: '2026-08-21',
       title: 'Idea bank, bold ideas, and video quality upgrades',
       items: [
         'UGC videos now keep the same person and product across every shot.',
@@ -460,7 +460,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 20, 2026',
+      date: '2026-08-20',
       title: 'Goals: work continues until it is done',
       items: [
         'Long tasks now start with a visible checklist that updates live.',
@@ -472,7 +472,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 19, 2026',
+      date: '2026-08-19',
       title: 'More honest content, more hook variety',
       items: [
         'Posts are now checked for AI-sounding phrasing, not just accuracy.',
@@ -483,7 +483,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'August 19, 2026',
+      date: '2026-08-19',
       title: 'Clearer limits on what analytics can prove',
       items: [
         'Weekly recaps no longer declare winners when the sample size is too small.',
@@ -494,7 +494,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 21, 2026',
+      date: '2026-07-21',
       title: 'Carousels and in-chat previews',
       items: [
         'The AI assistant can now create multi-slide carousels, not just single images.',
@@ -505,7 +505,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 21, 2026',
+      date: '2026-07-21',
       title: 'Radar: new lead sources',
       items: [
         'Radar now also searches Threads and LinkedIn, not just Reddit and news.',
@@ -514,7 +514,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 12, 2026',
+      date: '2026-07-12',
       title: 'Blog: categories, authors, search',
       items: [
         'Blog articles can now be organized into categories and tags.',
@@ -526,7 +526,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 12, 2026',
+      date: '2026-07-12',
       title: 'Radar and notifications: multilingual',
       items: [
         'Radar sources now support over 30 languages with automatic detection.',
@@ -535,7 +535,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 12, 2026',
+      date: '2026-07-12',
       title: 'Social image format fix',
       items: [
         'Instagram and Facebook post images now use the correct format automatically.',
@@ -543,7 +543,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 10, 2026',
+      date: '2026-07-10',
       title: 'Blog hosting and custom domain',
       items: [
         'Every brand now gets a dedicated public blog with AI-written, SEO-optimized articles.',
@@ -554,7 +554,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 8, 2026',
+      date: '2026-07-08',
       title: 'Radar: news and trend monitoring',
       items: [
         'Radar now automatically monitors news, subreddits, and RSS feeds.',
@@ -563,7 +563,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 5, 2026',
+      date: '2026-07-05',
       title: 'SEO and GEO optimization',
       items: [
         'New SEO analysis with a strategic keyword plan.',
@@ -573,7 +573,7 @@ const entries: ChangelogEntry[] = [
       ]
     },
     {
-      date: 'July 1, 2026',
+      date: '2026-07-01',
       title: 'Autopilot: automatic content generation',
       items: [
         'Autopilot now generates social posts and blog articles from your weekly plan.',

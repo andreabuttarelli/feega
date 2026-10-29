@@ -21,5 +21,5 @@ export function cornerHandleAt(doc: MotionDoc, clip: MotionClip, frame: number, 
 }
 
 export function cornerLocalPoint(doc: MotionDoc, clip: MotionClip, frame: number, at: Pt): Pt {
-  return apply2d(invert2d(worldOf(doc, clip, frame)), at);
+  return apply2d(invert2d(worldOf(doc, clip, frame)), [at[0], at[1]]);
 }

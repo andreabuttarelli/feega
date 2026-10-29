@@ -63,7 +63,7 @@ const MOTION_FILL: Record<FillKind, (f: Fill) => Painted | null> = {
   [FillKind.Diamond]: (f) => withStops(f as Extract<Fill, { kind: FillKind.Diamond }>, (stops) => ({ type: FillType.Diamond, stops, opacity: f.opacity }))
 };
 
-const fillStack = (fills: Fill[]): Painted[] => fills.flatMap((f) => MOTION_FILL[f.kind](f) ?? []);
+const fillStack = (fills: Fill[]): Painted[] => fills.map((f) => MOTION_FILL[f.kind](f)).filter((p): p is Painted => p !== null);
 
 function imageSlots(fills: Fill[]): { hash: string; at: number }[] {
   const painted = fills.filter((f) => MOTION_FILL[f.kind](f));

@@ -1,7 +1,6 @@
 import Images from '@lucide/svelte/icons/images';
 import Palette from '@lucide/svelte/icons/palette';
 import UsersRound from '@lucide/svelte/icons/users-round';
-import Megaphone from '@lucide/svelte/icons/megaphone';
 import Settings from '@lucide/svelte/icons/settings';
 import Camera from '@lucide/svelte/icons/camera';
 import Layers from '@lucide/svelte/icons/layers';
@@ -14,7 +13,6 @@ export const NAV_ICONS: Record<NavEntry['icon'], SvelteComponent<{ size?: number
   images: Images,
   palette: Palette,
   'users-round': UsersRound,
-  megaphone: Megaphone,
   settings: Settings,
   camera: Camera,
   layers: Layers,

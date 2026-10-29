@@ -238,10 +238,10 @@
   const headKind = $derived(customName ? 'Component' : spec.label);
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
+  const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const textFields = $derived(fieldsIn(Section.Text));
   const textField = (key: string) => textFields.find((f) => f.key === key);
   const decorationNow = $derived(clip.props.decoration);
-  const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const roundnessField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'roundness') ?? null);
   const cornersField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'corners') ?? null);
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));

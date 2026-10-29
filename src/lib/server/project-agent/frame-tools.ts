@@ -36,7 +36,7 @@ const NO_FRAME = { error: 'no_frame', message: 'No frame is open in the editor: 
 
 const NEEDS_EDITOR = { error: 'needs_open_editor', message: 'This tool looks at the rendered frame, which needs the frame open in the editor. Ask the user to open it, then retry.' };
 
-const REFUSALS: Record<Exclude<ToolRun, ToolRun.Done>, string> = {
+const REFUSALS: Record<Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>, string> = {
   [ToolRun.NotFound]: 'No frame with that id in this project.',
   [ToolRun.Unknown]: `No frame tool with that name: ${LIST_FRAME_TOOLS} lists them.`,
   [ToolRun.Invalid]: `The input does not match the tool: ${DESCRIBE_FRAME_TOOL} gives its schema.`,
@@ -60,7 +60,7 @@ export function editorFrames(db: Db, bucket: FrameBucket, place: FramePlace, ask
 
 export type FrameAsk = { node_id?: string; tool: string; input: Record<string, unknown>; verbose?: boolean };
 
-export type FrameRunner = { run: (ask: FrameAsk, callId: string) => Promise<Record<string, unknown>>; seen: Map<string, Frame[]> };
+export type FrameRunner = { run: (ask: FrameAsk, callId: string) => Promise<unknown>; seen: Map<string, Frame[]> };
 
 export function frameRunner(deps: FrameToolDeps): FrameRunner {
   const sessions = new Map<string, MotionSession>();
@@ -68,7 +68,7 @@ export function frameRunner(deps: FrameToolDeps): FrameRunner {
   const serverDraws = deps.serverDraws ?? serverFramesOpen;
   const drawable = (nodeId: string) => deps.open?.nodeId === nodeId || serverDraws();
 
-  const run = async (ask: FrameAsk, callId: string): Promise<Record<string, unknown>> => {
+  const run = async (ask: FrameAsk, callId: string): Promise<unknown> => {
     const nodeId = ask.node_id ?? deps.open?.nodeId;
     if (!nodeId) {
       return NO_FRAME;

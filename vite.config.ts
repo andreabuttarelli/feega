@@ -116,7 +116,6 @@ export default defineConfig({
       'cli/**/*.{test,spec}.{js,ts}'
     ],
     alias: { 'bun:test': 'vitest' },
-    setupFiles: ['src/test/no-live-supabase.ts'],
-    hookTimeout: 30_000
+    setupFiles: ['src/test/no-live-supabase.ts']
   }
 });

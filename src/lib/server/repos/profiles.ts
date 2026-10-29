@@ -64,7 +64,9 @@ export function profileFromAuthUser(user: User): Profile {
     id: user.id,
     email: user.email,
     name: firstString(metadata, NAME_KEYS),
-    avatarUrl: firstString(metadata, AVATAR_KEYS)
+    avatarUrl: firstString(metadata, AVATAR_KEYS),
+    termsAcceptedAt: null,
+    termsVersion: null
   };
 }
 

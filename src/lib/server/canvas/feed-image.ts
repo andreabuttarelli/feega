@@ -2,7 +2,8 @@ import sharp from 'sharp';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
-import { findNode } from '$lib/server/repos/canvas';
+import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
+import type { Asset } from '$lib/server/repos/assets';
 import { listNodeProducts } from '$lib/server/repos/products';
 import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { UPLOAD_MAX_BYTES } from '$lib/canvas/upload-kind';
@@ -50,7 +51,7 @@ async function pixelsOf(bytes: Uint8Array): Promise<PictureSize | null> {
 }
 
 export type FeedImageLanding =
-  | { placed: 'canvas'; node: Awaited<ReturnType<typeof importCanvasBytes>>['node']; asset: Awaited<ReturnType<typeof importCanvasBytes>>['asset'] }
+  | { placed: 'canvas'; node: CanvasNodeRecord; asset: Asset }
   | { placed: 'frame'; moved: Moved };
 
 export async function importFeedImage(

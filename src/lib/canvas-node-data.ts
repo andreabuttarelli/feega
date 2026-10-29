@@ -16,7 +16,8 @@ import { SYNC_STATUSES, type SyncStatus } from '$lib/canvas/sync-state';
 import { isListItemKind, type ListItem, type ListNode } from '$lib/canvas/list-node';
 import type { SelectNode } from '$lib/canvas/select-node';
 import type { CustomOutput } from '$lib/canvas/select-outputs';
-import { EFFECTS, type EffectStep } from '$lib/canvas/effects';
+import { CUSTOM, EFFECTS, type EffectStep } from '$lib/canvas/effects';
+import type { EffectId } from '$lib/canvas/effects/types';
 import type { EffectsNode } from '$lib/canvas/effects-node';
 import { LAYOUTS } from '@feega/motion-core/canvas/composition';
 import { CAMERA_PRESETS } from '@feega/motion-core/canvas/composition/camera';
@@ -257,10 +258,15 @@ function customOutputsOf(v: unknown): CustomOutput[] {
 function effectStepOf(v: unknown): EffectStep | null {
   const step = record(v);
   const id = step.id;
+  const params = record(step.params) as EffectStep['params'];
+  const enabled = step.enabled !== false;
+  if (id === CUSTOM) {
+    return typeof step.ref === 'string' ? { id: CUSTOM, ref: step.ref, params, enabled } : null;
+  }
   if (typeof id !== 'string' || !(id in EFFECTS)) {
     return null;
   }
-  return { id: id as EffectStep['id'], params: record(step.params) as EffectStep['params'], enabled: step.enabled !== false };
+  return { id: id as EffectId, params, enabled };
 }
 
 /** Il nodo `effects` dietro una riga, o null quando quella riga è un'altra cosa. */

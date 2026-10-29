@@ -937,7 +937,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     const withAssets = Object.values(ids).reduce<OpResult>((r, assetId) => registered(r, assetId), { ok: true, doc: session.doc });
     const laid = apply(withAssets.ok ? placeSfx(withAssets.doc, cues, ids, deps.newId) : withAssets, `laid ${cues.length} sound effects`);
-    return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
+    return laid.ok ? `${cues.length} sound effects on the SFX track` : (laid.error ?? null);
   };
 
   type StyleInput = { name?: string; to?: string; style?: unknown; clip_ids?: string[]; kind?: StyleKind; slot?: StyleSlot };

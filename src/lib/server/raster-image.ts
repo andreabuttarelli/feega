@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import {
 	RASTER_JPEG_MAX_EDGE,
 	RASTER_SOURCE_MAX_BYTES,
@@ -19,7 +19,7 @@ async function decodeHeicRgba(buf: Buffer): Promise<{ width: number; height: num
 }
 
 async function encodeJpeg(
-	pipeline: sharp.Sharp,
+	pipeline: Sharp,
 	opts: { maxEdge: number; maxBytes?: number }
 ): Promise<Buffer | null> {
 	const fitted = pipeline.resize({
@@ -67,7 +67,7 @@ export async function rasterToJpeg(
 	if (!mustConvert) return { ok: true, bytes: buf };
 
 	try {
-		let pipeline: sharp.Sharp;
+		let pipeline: Sharp;
 		if (kind === 'heic') {
 			const rgba = await decodeHeicRgba(buf);
 			pipeline = sharp(rgba.data, {

@@ -6,7 +6,7 @@ import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeReco
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
 import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize, type DocNodeShape } from '$lib/canvas/motion-node';
-import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
+import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { homed, placeInstance } from '$lib/motion/canvas-components';
 import { DrawTool } from '$lib/motion/draw-tool';
@@ -568,7 +568,7 @@ export const pastedSchema = z.discriminatedUnion('tool', [
   drawnPen.extend({ fill: hexColour.nullable().optional(), stroke: hexColour.nullable().optional(), gradient: gradientFillSchema.optional(), fillRule: z.enum(FILL_RULES).optional() })
 ]);
 
-export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: z.infer<typeof pastedSchema>): Promise<Moved> {
+export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: DrawnWire): Promise<Moved> {
   const drawn = drawnOf(wire);
   if (typeof drawn === 'string') {
     return refused(MoveOutcome.Invalid, drawn);

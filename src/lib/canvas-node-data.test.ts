@@ -536,3 +536,11 @@ describe('genPatch: an edit writes only what the person changed', () => {
     expect(genPatch(running, { prompt: 'ab' })).toEqual({ prompt: 'ab' });
   });
 });
+
+describe('a custom effect saved on an effects node', () => {
+  it('comes back from the row with its ref', () => {
+    const step = { id: 'custom', ref: 'fx-1', params: { amount: 2 }, enabled: true };
+
+    expect(effectsOf({ id: 'n1', type: 'effects', data: { effects: [step] } })?.effects).toEqual([step]);
+  });
+});

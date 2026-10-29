@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expandSectionEdges, sectionItemsOf, trimNote } from './section-source';
+import { expandSectionEdges, sectionItemPatch, sectionItemsOf, trimNote } from './section-source';
 import type { UpstreamEdge } from './upstream-inputs';
 
 const node = (id: string, type: string, data: Record<string, unknown> = {}) => ({ id, type, data });
@@ -80,5 +80,15 @@ describe('the note when a model takes fewer images than the section holds', () =
 
   it('stays quiet when they all fit', () => {
     expect(trimNote(3, 3)).toBeNull();
+  });
+});
+
+describe('toggling one item of a section on a consumer', () => {
+  it('excluding an item adds it to the excluded list', () => {
+    expect(sectionItemPatch({ sectionExcluded: ['a'] }, 'b', false)).toEqual({ sectionExcluded: ['a', 'b'] });
+  });
+
+  it('including an item removes it from the excluded list', () => {
+    expect(sectionItemPatch({ sectionExcluded: ['a', 'b'] }, 'a', true)).toEqual({ sectionExcluded: ['b'] });
   });
 });

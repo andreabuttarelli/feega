@@ -1,6 +1,6 @@
 import { TASK_JOB_PREFIXES } from '$lib/server/generation/task-providers';
 import type { Db } from '$lib/server/db/client';
-import type { Database } from '$lib/database.types';
+import type { Database, Json } from '$lib/database.types';
 
 /**
  * I GIRI DI UN NODO CHE PRODUCE: uno per generazione, tutti, con quello che è costato.
@@ -100,7 +100,7 @@ export async function createRun(
       node_id: input.nodeId,
       prompt: input.prompt,
       model: input.model,
-      params: input.params,
+      params: input.params as Json,
       status: 'running',
       external_job_id: input.externalJobId ?? null,
       actor_kind: input.actorKind,

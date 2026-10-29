@@ -71,9 +71,9 @@ export function mergeGraph(prev: HistoryGraph | null, next: HistoryGraph): Histo
     return old && sameRow(old, row) ? old : row;
   });
 
-  const unchanged = rows.length === prev.rows.length && rows.every((row, i) => row === prev.rows[i]) && JSON.stringify(prev.lanes) === JSON.stringify(next.lanes);
+  const unchanged = rows.length === prev.rows.length && rows.every((row, i) => row === prev.rows[i]) && JSON.stringify(prev.lanes) === JSON.stringify(next.lanes) && JSON.stringify(prev.sessions) === JSON.stringify(next.sessions);
   if (unchanged) {
     return prev;
   }
-  return { lanes: next.lanes, rows };
+  return { lanes: next.lanes, rows, sessions: next.sessions };
 }

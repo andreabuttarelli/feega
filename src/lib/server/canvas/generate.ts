@@ -707,7 +707,7 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
         model: input.model ?? '',
         prompt,
         system: textInput?.system || undefined,
-        scope: { orgId: input.orgId, projectId: input.projectId, userId: input.userId, actorKind: input.actor?.kind === 'agent' ? 'agent' : 'user', actorId: input.actor?.id, agentKey: input.actor?.agentKey ?? null }
+        scope: { orgId: input.orgId, projectId: input.projectId, userId: input.userId, actorKind: input.actor?.kind === 'agent' ? 'agent' : 'user', actorId: input.actor?.id ?? undefined, agentKey: input.actor?.agentKey ?? null }
       });
       return land(db, input, run, await depositText(db, input, out.text), out.costUsd);
     }
