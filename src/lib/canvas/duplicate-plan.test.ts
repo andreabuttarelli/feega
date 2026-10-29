@@ -120,4 +120,10 @@ describe('copyPlan', () => {
     expect(plan.nodes).toEqual([expect.objectContaining({ x: 42, y: 42, width: 400, height: 300, data: expect.objectContaining({ docHeadRevision: 1 }) })]);
     expect(plan.nodes[0].data.posterRevision).toBeUndefined();
   });
+
+  it('a copy takes the id the canvas already shows it under', () => {
+    const plan = copyPlan({ ids: ['a', 'b'], nodes: [node('a', 'text', {}), node('b', 'image', {})], edges: [], offset: DUPLICATE_OFFSET, copyIds: { a: 'a2', b: 'b2' } });
+
+    expect(plan.nodes.map((n) => n.id)).toEqual(['a2', 'b2']);
+  });
 });

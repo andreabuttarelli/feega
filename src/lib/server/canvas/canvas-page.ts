@@ -298,6 +298,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 
 const HTTP_BAD_REQUEST = 400;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const copyIdsSchema = z.record(z.string(), z.string().regex(UUID));
 const figmaAtSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
@@ -1646,7 +1647,8 @@ export const actions: Actions<CanvasParams> = {
       .split(',')
       .map((id) => id.trim())
       .filter(Boolean);
-    if (!nodeIds.length) {
+    const copyIds = copyIdsSchema.safeParse(fd.has('copy_ids') ? jsonField(fd, 'copy_ids') : {});
+    if (!nodeIds.length || !copyIds.success) {
       return fail(400, { error: 'nothing to duplicate' });
     }
 
@@ -1656,6 +1658,7 @@ export const actions: Actions<CanvasParams> = {
       canvasId: scope.canvasId,
       nodeIds,
       offset: offsetFrom(fd.get('dx'), fd.get('dy')),
+      copyIds: copyIds.data,
       actor: userActor(scope)
     });
 

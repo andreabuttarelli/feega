@@ -12,7 +12,7 @@ import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
 import type { BarContext } from '$lib/canvas/bottom-bar';
 import type { NameTag } from '$lib/canvas/node-label';
 import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-import type { Drawing } from '$lib/canvas/optimistic-insert';
+import type { Drawing, Duplication, Landing } from '$lib/canvas/optimistic-insert';
 import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
 import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
 import type { FeedImageDrag } from '$lib/canvas/feed-image';
@@ -106,7 +106,7 @@ export type FlowProps = {
     toFlow: (p: { x: number; y: number }) => { x: number; y: number },
   ) => void;
   onUpload?: (file: File, at?: { x: number; y: number }) => void;
-  onDuplicate?: (ids: string[], offset?: Offset) => void;
+  onDuplicate?: (ids: string[], offset: Offset | undefined, landing: Landing) => Duplication | null;
   onCopy?: (ids: string[]) => void;
   onPaste?: (at: { x: number; y: number }) => void;
   onTemplate?: (id: string, at: { x: number; y: number }) => void;

@@ -259,6 +259,15 @@ describe('frameKeyAction', () => {
     expect(findClip(done.doc, done.selection[0])!.clip.props.text).toBe('One');
   });
 
+  it('⌘D on a picked element copies the element inside its frame, not the whole frame', () => {
+    const duplicate = frameKeyAction(press('d', { meta: true }));
+    const doc = fixture();
+
+    const done = barAction(duplicate!, { doc, selection: ['a'], frame: 0, newId: ids() })!;
+    expect(done.doc.tracks.flatMap((t) => t.clips)).toHaveLength(doc.tracks.flatMap((t) => t.clips).length + 1);
+    expect(done.selection).not.toEqual(['a']);
+  });
+
   it('⌥⌘C copies the properties of one element and ⌥⌘V pastes them on another', () => {
     const ctx = (doc: MotionDoc, id: string) => ({ doc, selection: [id], frame: 0, newId: () => 'x' });
     const copy = frameKeyAction(press('c', { meta: true, alt: true }))!;

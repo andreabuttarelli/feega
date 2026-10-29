@@ -224,6 +224,21 @@ describe('duplicate action', () => {
     expect(result).not.toMatchObject({ status: 400 });
     expect(input.calls.some((call) => call.table === 'nodes' && call.op === 'insert')).toBe(true);
   });
+
+  const SOURCE = { id: 'a', canvas_id: 'canvas', project_id: 'project', type: 'text', display_name: null, x: 0, y: 0, z: 0, width: null, height: null, data: {}, version: 1 };
+  const COPY = '0b6f3f0e-1c2d-4e5f-8a9b-0c1d2e3f4a5b';
+
+  it('writes the copy under the id the canvas already shows', async () => {
+    const input = event({ node_ids: 'a', copy_ids: JSON.stringify({ a: COPY }) }, [SOURCE]);
+    await actions.duplicate(input as never);
+    expect(input.calls.find((call) => call.table === 'nodes' && call.op === 'insert')?.payload).toMatchObject({ id: COPY });
+  });
+
+  it('refuses a copy id that is not a uuid, before writing', async () => {
+    const input = event({ node_ids: 'a', copy_ids: JSON.stringify({ a: 'x' }) }, [SOURCE]);
+    expect(await actions.duplicate(input as never)).toMatchObject({ status: 400 });
+    expect(input.calls.some((call) => call.op === 'insert')).toBe(false);
+  });
 });
 
 describe('paste action', () => {

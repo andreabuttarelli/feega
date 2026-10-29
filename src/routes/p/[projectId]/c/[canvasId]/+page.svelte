@@ -61,7 +61,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
-  import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
+  import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
@@ -125,7 +125,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, type Drawing } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, Landing, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
@@ -3612,16 +3612,39 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let lastDuplicate: LastDuplicate | null = null;
 
-  async function duplicate(ids: string[], dragged?: Offset) {
+  const duplicates = inOrder();
+  const DUPLICATE_FAILED_NOTICE = 'The copy could not be saved and was removed.';
+
+  function duplicate(ids: string[], dragged: Offset | undefined, landing: Landing): Duplication | null {
     const offset = dragged ?? repeatOffset(lastDuplicate, ids);
-    const fields: Fields = offset ? { node_ids: ids.join(','), dx: offset.dx, dy: offset.dy } : { node_ids: ids.join(',') };
+    const sources = nodes.filter((n) => ids.includes(n.id));
+    if (!sources.length) {
+      return null;
+    }
+    const copyIds = Object.fromEntries(sources.map((n) => [n.id, crypto.randomUUID()]));
+    const copies = sources.map((n) => ({ from: n.id, to: copyIds[n.id] }));
+    const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
+    const shown = landing === Landing.Now ? copiedNodes(plan) : [];
+    nodes = [...nodes, ...shown.map((n) => toTile(n, { select: true }))];
+    lastDuplicate = offset ? { ids: copies.map((c) => c.to), offset } : null;
+    const fields: Fields = { node_ids: ids.join(','), copy_ids: JSON.stringify(copyIds), ...(offset ? { dx: offset.dx, dy: offset.dy } : {}) };
+    return { copies, saved: duplicates(() => saveDuplicate(fields, copies.map((c) => c.to))) };
+  }
+
+  async function saveDuplicate(fields: Fields, copyIds: string[]): Promise<boolean> {
     const result = await post('duplicate', fields);
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
     const connected = (result?.connections ?? []) as Connection[];
-    lastDuplicate = offset && created.length ? { ids: created.map((n) => n.id), offset } : null;
-    if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
+    if (!created.length) {
+      nodes = nodes.filter((n) => !copyIds.includes(n.id));
+      failed = DUPLICATE_FAILED_NOTICE;
+      return false;
+    }
+    const shown = new Set(nodes.map((n) => n.id));
+    nodes = [...created.reduce((all, n) => settle(all, n.id, toTile(n)), nodes), ...created.filter((n) => !shown.has(n.id)).map((n) => toTile(n, { select: true }))];
     if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
-    if (created.length) { pushGesture(createManyGesture(created, connected)); }
+    pushGesture(createManyGesture(created, connected));
+    return true;
   }
 
   /**

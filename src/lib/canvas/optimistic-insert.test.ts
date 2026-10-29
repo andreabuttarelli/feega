@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isOwnEcho } from './node-save';
-import { FRAME_GAP, besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from './optimistic-insert';
+import { FRAME_GAP, besideBox, copiedNodes, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from './optimistic-insert';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { CANVAS_INK, CanvasTheme, drawnFrame } from '$lib/motion/draw-create';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
@@ -109,5 +109,16 @@ describe('where a clicked frame lands and how big it is', () => {
 
   it('the plus beside a frame makes a blank one of the same size to its right', () => {
     expect(besideBox({ x: 100, y: 50, w: 400, h: 300 })).toEqual({ left: 100 + 400 + FRAME_GAP, top: 50, width: 400, height: 300 });
+  });
+});
+
+describe('a duplicate before the server answers', () => {
+  it('stands where the server writes each copy, under the id it will have', () => {
+    const plan = { nodes: [{ id: 'c1', sourceIndex: 0, type: 'motion', data: { docHeadRevision: 1 }, x: 42, y: 52, width: 400, height: 300 }, { id: 'c2', sourceIndex: 1, type: 'text', data: { prompt: 'p' }, x: 0, y: 0 }], edges: [] };
+
+    expect(copiedNodes(plan)).toEqual([
+      expect.objectContaining({ id: 'c1', type: 'motion', position: { x: 42, y: 52, z: 0 }, size: { width: 400, height: 300 }, data: { docHeadRevision: 1 }, version: 0 }),
+      expect.objectContaining({ id: 'c2', type: 'text', size: { width: null, height: null } })
+    ]);
   });
 });

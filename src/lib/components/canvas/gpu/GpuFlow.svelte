@@ -104,7 +104,7 @@
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
-  import type { Drawing } from '$lib/canvas/optimistic-insert';
+  import { Landing, type Drawing } from '$lib/canvas/optimistic-insert';
   import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -185,7 +185,7 @@
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
 
-  import { dragOffset } from '$lib/canvas/duplicate-plan';
+  import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
@@ -1804,13 +1804,8 @@
     }
   }
 
-  function seed(drawing: Drawing | null | undefined) {
-    if (!drawing?.doc) {
-      return;
-    }
-    const { id, doc, saved } = drawing;
-    const tokens = heldTokens();
-    liveDocs.set(id, { doc, tokens: tokens ?? FEEGA_TOKENS, assets: {} });
+  function holdLive(id: string, live: LiveDoc, saved: Promise<boolean>, after?: () => void) {
+    liveDocs.set(id, live);
     drawSaves.set(id, saved);
     savers.get(id)?.holdSave(saved);
     void saved.then((landed) => {
@@ -1819,10 +1814,28 @@
         liveDocs.clear(id);
         return;
       }
-      if (!tokens) {
-        void adoptTokens(id);
-      }
+      after?.();
     });
+  }
+
+  function seed(drawing: Drawing | null | undefined) {
+    if (!drawing?.doc) {
+      return;
+    }
+    const tokens = heldTokens();
+    holdLive(drawing.id, { doc: drawing.doc, tokens: tokens ?? FEEGA_TOKENS, assets: {} }, drawing.saved, tokens ? undefined : () => void adoptTokens(drawing.id));
+  }
+
+  function duplicateTiles(ids: string[], offset?: Offset) {
+    const docs = new Map(ids.flatMap((id) => (liveOf(id) ? [[id, liveOf(id)!] as const] : [])));
+    const ready = ids.every((id) => !holdsDoc(byId.get(id)?.kind ?? '') || docs.has(id));
+    const made = props.onDuplicate?.(ids, offset, ready ? Landing.Now : Landing.OnSave);
+    for (const { from, to } of ready && made ? made.copies : []) {
+      const live = docs.get(from);
+      if (live) {
+        holdLive(to, { ...live, playhead: undefined }, made!.saved);
+      }
+    }
   }
 
   function frameUnderDrawing(drawn: DrawnWire) {
@@ -2538,7 +2551,7 @@
     const copyOffset = e.altKey && grabbed ? dragOffset(new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }])), { id: ids[0], position: grabbed }) : undefined;
     if (copyOffset && props.onDuplicate) {
       settleOverrides();
-      props.onDuplicate(ids, copyOffset);
+      duplicateTiles(ids, copyOffset);
       return;
     }
     const moves = ids.flatMap((id) => (overrides.get(id) ? [{ id, x: overrides.get(id)!.x, y: overrides.get(id)!.y }] : []));
@@ -2788,7 +2801,7 @@
     'zoom-selection': zoomToSelection,
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
-    duplicate: () => selected.length && props.onDuplicate?.(selected),
+    duplicate: () => selected.length && duplicateTiles(selected),
     copy: () => void copySystem(),
     paste: () => undefined,
     undo: () => props.onUndo?.(),
@@ -3056,7 +3069,7 @@
     'wrap-stack': (ids) => props.onWrapStack?.(ids),
     'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
-    duplicate: (ids) => props.onDuplicate?.(ids),
+    duplicate: (ids) => duplicateTiles(ids),
     'connect-new': () => {
       if (selection.box) {
         connectPickerAt = { x: selection.box.x + selection.box.width + 24, y: selection.box.y };

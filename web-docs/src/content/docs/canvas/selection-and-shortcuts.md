@@ -38,7 +38,7 @@ Selecting a frame opens its properties in the right bar.
 | Key | Action |
 |---|---|
 | Backspace / Delete | Delete the selection |
-| Cmd/Ctrl+D | Duplicate |
+| Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
 | Cmd/Ctrl+C | Copy |
 | Cmd/Ctrl+V | Paste at the centre of the view |
 | Cmd/Ctrl+Z | Undo |

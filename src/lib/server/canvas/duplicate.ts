@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { createConnection, createNode, listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
-import { copyPlan, DUPLICATE_OFFSET, type DuplicatePlan } from '$lib/canvas/duplicate-plan';
+import { copyPlan, DUPLICATE_OFFSET, type CopyIds, type DuplicatePlan } from '$lib/canvas/duplicate-plan';
 import { holdsDoc } from '$lib/canvas/motion-node';
 import { copyHead } from '$lib/server/repos/motion-revisions';
 
@@ -21,7 +21,7 @@ import { copyHead } from '$lib/server/repos/motion-revisions';
  */
 export async function duplicateNodes(
   db: Db,
-  input: { orgId: string; projectId: string; canvasId: string; nodeIds: string[]; offset?: { dx: number; dy: number }; actor?: Actor }
+  input: { orgId: string; projectId: string; canvasId: string; nodeIds: string[]; offset?: { dx: number; dy: number }; copyIds?: CopyIds; actor?: Actor }
 ): Promise<{ nodes: CanvasNodeRecord[]; connections: Connection[] }> {
   if (!input.nodeIds.length) {
     return { nodes: [], connections: [] };
@@ -44,7 +44,8 @@ export async function duplicateNodes(
       sourceHandle: e.sourceHandle,
       targetHandle: e.targetHandle
     })),
-    offset: input.offset ?? DUPLICATE_OFFSET
+    offset: input.offset ?? DUPLICATE_OFFSET,
+    copyIds: input.copyIds
   });
 
   const chosen = existingNodes.filter((n) => chosenIds.includes(n.id));
@@ -61,6 +62,7 @@ export async function writePlan(
   const nodes: CanvasNodeRecord[] = [];
   for (const planned of plan.nodes) {
     const node = await createNode(db, {
+      id: planned.id,
       orgId: input.orgId,
       projectId: input.projectId,
       canvasId: input.canvasId,

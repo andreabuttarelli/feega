@@ -4,6 +4,7 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { drawnElement, drawnFrame, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { PENDING_FRAME_TYPE } from './pending-frame';
+import type { DuplicatePlan } from './duplicate-plan';
 
 const OUTPUT_SIDE = 320;
 
@@ -144,3 +145,17 @@ export function defaultFrameBox(at: { x: number; y: number }, last: Side | null)
 }
 
 export const besideBox = (tile: { x: number; y: number; w: number; h: number }): CanvasBox => ({ left: tile.x + tile.w + FRAME_GAP, top: tile.y, width: tile.w, height: tile.h - MOTION_NODE_BAR_H });
+
+export enum Landing {
+  Now = 'now',
+  OnSave = 'on-save'
+}
+
+export type Duplication = { copies: { from: string; to: string }[]; saved: Promise<boolean> };
+
+export const copiedNodes = (plan: DuplicatePlan): CanvasNodeRecord[] =>
+  plan.nodes.flatMap((p) =>
+    p.id
+      ? [{ id: p.id, canvasId: '', projectId: '', type: p.type, displayName: null, position: { x: p.x, y: p.y, z: 0 }, size: { width: p.width ?? null, height: p.height ?? null }, data: p.data, version: 0 }]
+      : []
+  );
