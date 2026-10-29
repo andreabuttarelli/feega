@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { readHead, readRevision } from '$lib/server/repos/motion-revisions';
+import { RevisionOutcome, readHead, readRevision, type MotionHead } from '$lib/server/repos/motion-revisions';
 import { commitOnto } from '$lib/server/motion/frame-ops';
 import type { Actor } from '$lib/server/repos/actor';
 import {
@@ -85,7 +85,11 @@ async function currentEdgeState(db: Db, orgId: string, canvasId: string, edgeId:
   return { exists: edges.some((edge) => edge.id === edgeId) };
 }
 
-async function applyWrite(db: Db, orgId: string, canvasId: string, write: InverseWrite, actor: Actor): Promise<void> {
+type DocRestore = Extract<InverseWrite, { op: 'restore_doc' }>;
+
+const isDocRestore = (write: InverseWrite): write is DocRestore => write.op === 'restore_doc';
+
+async function applyWrite(db: Db, orgId: string, write: Exclude<InverseWrite, DocRestore>, actor: Actor): Promise<void> {
   switch (write.op) {
     case 'delete_node':
       await deleteNode(db, { orgId, nodeId: write.nodeId, actor });
@@ -115,14 +119,12 @@ async function applyWrite(db: Db, orgId: string, canvasId: string, write: Invers
     case 'restore_edge':
       await restoreConnection(db, { orgId, connectionId: write.edgeId, actor });
       return;
-    case 'restore_doc': {
-      const old = await readRevision(db, { orgId, nodeId: write.nodeId, version: write.version });
-      if (old) {
-        await commitOnto(db, { orgId, nodeId: write.nodeId, expectedVersion: write.expectedVersion, doc: old.doc, actor, summary: `Undid back to version ${write.version}` });
-      }
-      return;
-    }
   }
+}
+
+async function restoreDoc(db: Db, orgId: string, write: DocRestore, old: MotionHead, actor: Actor): Promise<boolean> {
+  const restored = await commitOnto(db, { orgId, nodeId: write.nodeId, expectedVersion: write.expectedVersion, doc: old.doc, actor, summary: `Undid back to version ${write.version}` });
+  return restored.outcome === RevisionOutcome.Written;
 }
 
 async function currentDocState(db: Db, orgId: string, nodeId: string): Promise<CurrentNodeState> {
@@ -165,8 +167,24 @@ export async function undoGesture(
     return { outcome: 'refused', reason: check.reason };
   }
 
+  const restores: { write: DocRestore; old: MotionHead }[] = [];
+  for (const write of check.writes.filter(isDocRestore)) {
+    const old = await readRevision(db, { orgId: input.orgId, nodeId: write.nodeId, version: write.version });
+    if (!old) {
+      return { outcome: 'refused', reason: 'revision_missing' };
+    }
+    restores.push({ write, old });
+  }
+
+  for (const { write, old } of restores) {
+    if (!(await restoreDoc(db, input.orgId, write, old, input.actor))) {
+      return { outcome: 'refused', reason: 'node_changed_by_peer' };
+    }
+  }
   for (const write of check.writes) {
-    await applyWrite(db, input.orgId, input.canvasId, write, input.actor);
+    if (!isDocRestore(write)) {
+      await applyWrite(db, input.orgId, write, input.actor);
+    }
   }
 
   return { outcome: 'undone', redo: { items: input.gesture.items.map(redoItemOf) } };

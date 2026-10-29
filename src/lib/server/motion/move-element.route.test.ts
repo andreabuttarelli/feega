@@ -186,6 +186,29 @@ describe('undo of a move', () => {
     expect(result).toMatchObject({ outcome: 'undone', redo: { items: [{ kind: 'doc.revision', nodeId: SOURCE, before: 2, after: 3 }] } });
     expect(written(input, SOURCE).map((r) => [r.version, clipIds(r.doc)])).toEqual([[3, ['txt']]]);
   });
+
+  const ELEMENT = '99999999-9999-4999-8999-999999999999';
+  const moveOut = JSON.stringify([
+    { kind: 'node.create', nodeId: ELEMENT, after: { position: { x: 0, y: 0, z: 0 } } },
+    { kind: 'doc.revision', nodeId: SOURCE, before: 1, after: 2 }
+  ]);
+  const elementDeleted = (input: ReturnType<typeof event>) =>
+    input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && (c.payload as { deleted_at?: string }).deleted_at && c.filters.some(([k, v]) => k === 'id' && v === ELEMENT));
+
+  it('a move out of a frame comes back as one gesture: the frame doc restored and the element it made removed', async () => {
+    const input = event({ items: moveOut }, { nodes: [frameRow(SOURCE), { ...frameRow(ELEMENT), type: 'element' }], motion_revisions: [revisionRow(SOURCE, 2, newMotionDoc(MotionFormat.Landscape)), revisionRow(SOURCE, 1, withText())] });
+
+    expect(await actions.undo(input as never)).toMatchObject({ outcome: 'undone' });
+    expect(written(input, SOURCE).map((r) => [r.version, clipIds(r.doc)])).toEqual([[3, ['txt']]]);
+    expect(elementDeleted(input)).toBe(true);
+  });
+
+  it('when the frame doc cannot be restored, the element the move made stays: never half an undo', async () => {
+    const input = event({ items: moveOut }, { nodes: [frameRow(SOURCE), { ...frameRow(ELEMENT), type: 'element' }], motion_revisions: [revisionRow(SOURCE, 2, newMotionDoc(MotionFormat.Landscape))] });
+
+    expect(await actions.undo(input as never)).toMatchObject({ status: 409, data: { reason: 'revision_missing' } });
+    expect(elementDeleted(input)).toBe(false);
+  });
 });
 
 describe('connect action', () => {
