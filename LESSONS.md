@@ -3428,6 +3428,10 @@ Signal: inpaint keeps the painted area and regenerates the rest; reframe returns
 
 **Signal:** a WebGPU page that runs smoothly and then gets killed on iPhone; on desktop the GPU memory "leaks" but never crashes. Counting `GPUDevice.createTexture` minus `GPUTexture.destroy` shows thousands of live textures (24 GB after 5 min on the heavy canvas). **Move:** wgpu's WebGPU backend makes `Drop` a no-op for textures and buffers; the memory goes only when JS GC collects the wrapper, and Safari's GC does not see GPU pressure. Call `texture.destroy()` / `buffer.destroy()` (after the last submit that uses it) for every short-lived GPU resource. `scripts/perf/mobile-memory.ts` counts them.
 
+## Blocky holes around glyphs on the canvas: GL state leaked into vello_hybrid
+
+**Signal:** crisp text with a coarse 4×4 px halo in the canvas background colour (dots show through), display list clean, only on some loads; headless Chromium (no WebGPU adapter → WebGL). **Move:** vello_hybrid enables `BLEND` once at creation and never again; any own GL pass that disables it (filters, flip, reproject) makes every later strip draw overwrite instead of blend. Own passes go through `gl_state::isolated`, which restores what they switched off. Reproduce headless with Playwright on a white-on-black text node: holes = pixels equal to the canvas grey inside the black box.
+
 ## A new column written before its migration breaks every write, silently in Vercel
 
 **Signal:** every save shows "The server failed to save this change", Vercel logs are empty, `schema-drift-check` lists an unapplied migration. **Move:** new optional columns/RPC args are written with a fallback (retry without on PGRST202/PGRST204/42703), and `handleError` must `console.error` — Sentry's wrapper alone shows nothing in Vercel. Migrations merged to `dev` are applied to production (which `dev` uses) before the user tests `dev`.
