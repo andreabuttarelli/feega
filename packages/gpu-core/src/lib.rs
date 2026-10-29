@@ -11,6 +11,7 @@ pub mod filters;
 pub mod gl_passes;
 #[cfg(target_arch = "wasm32")]
 pub mod gl_reproject;
+pub mod gl_state;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod glyphs;
 pub mod fragments;
