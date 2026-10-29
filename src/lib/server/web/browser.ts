@@ -3,6 +3,7 @@ import { RequestVerdict, requestVerdict } from './screenshot';
 import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
 import { OVERLAY_SELECTOR, type Overlay } from './overlays';
+import { pageTreeOf, TREE_LIMITS } from '$lib/server/url-import/page-tree';
 
 export type Target = { selector?: string; text?: string };
 export type ScrollTo = { px?: number; to?: 'top' | 'bottom' };
@@ -34,6 +35,7 @@ export type AppTab = Tab & {
   label: (target: Target) => Promise<string>;
   ui: () => Promise<UiDigest>;
   vector: () => Promise<unknown>;
+  tree: () => Promise<unknown>;
   overlay: () => Promise<Overlay | null>;
   press: (key: string) => Promise<void>;
   paint: (html: string, size: { width: number; height: number }) => Promise<Buffer>;
@@ -234,6 +236,7 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     },
     ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
     vector: () => vectorOfPage(page),
+    tree: () => page.evaluate(pageTreeOf, TREE_LIMITS),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
     press: (key) => page.keyboard.press(key as Parameters<Page['keyboard']['press']>[0]),
     paint: async (html, size) => {

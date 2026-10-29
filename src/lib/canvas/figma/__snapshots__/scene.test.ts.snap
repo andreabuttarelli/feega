@@ -163,6 +163,7 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
         "text": "dal 
 nulla",
         "weight": 700,
+        "wraps": false,
       },
     ],
     "clip": "clip",
@@ -361,6 +362,7 @@ nulla",
             "text": "dal 
 nulla",
             "weight": 700,
+            "wraps": false,
           },
         ],
         "clip": "clip",
