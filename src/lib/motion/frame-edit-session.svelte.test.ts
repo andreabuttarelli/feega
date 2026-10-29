@@ -277,3 +277,24 @@ describe('holding the save until an upload is done', () => {
     expect(vi.mocked(port.send).mock.calls[0][0]).toEqual(outgoing({ version: 1, doc: base }, longer(90)));
   });
 });
+
+describe('a scrub saves once', () => {
+  it('a slow scrub of many ticks under a live gesture sends one save, after release', async () => {
+    const { session, port } = open();
+    const TICKS = 40;
+    const SLOWER_THAN_THE_DEBOUNCE_MS = 400;
+
+    session.live.begin();
+    for (let i = 1; i <= TICKS; i++) {
+      session.edit(longer(60 + i), 'Edited opacity');
+      await vi.advanceTimersByTimeAsync(SLOWER_THAN_THE_DEBOUNCE_MS);
+    }
+    expect(port.send).not.toHaveBeenCalled();
+
+    session.live.release();
+    await vi.runAllTimersAsync();
+
+    expect(port.send).toHaveBeenCalledTimes(1);
+    expect(port.recorded).toHaveBeenCalledTimes(1);
+  });
+});

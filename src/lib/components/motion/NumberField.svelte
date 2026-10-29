@@ -3,6 +3,7 @@
   import { KeyMark } from '$lib/motion/timeline-layers';
   import { FieldFill, FieldKind, Gesture, Nudge, fillShare, gestureOf, formatValue, nudged, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
   import { MIXED, type Shared } from '$lib/motion/mixed';
+  import type { LiveGesture } from '$lib/motion/live-edit';
 
   let {
     label,
@@ -15,6 +16,7 @@
     mark = null,
     expression = false,
     disabled = false,
+    gesture = null,
     onchange,
     onkey,
     onexpression
@@ -29,14 +31,17 @@
     mark?: KeyMark | null;
     expression?: boolean;
     disabled?: boolean;
+    gesture?: LiveGesture | null;
     onchange: (value: number) => void;
     onkey?: () => void;
     onexpression?: () => void;
   } = $props();
 
   const MIXED_TEXT = 'Mixed';
-  const known = $derived(value === MIXED ? Math.min(range.max, Math.max(range.min, 0)) : value);
-  const text = $derived(value === MIXED ? '' : formatValue(value, range.step));
+  let scrubbing = $state<number | null>(null);
+  const shown = $derived(scrubbing ?? value);
+  const known = $derived(shown === MIXED ? Math.min(range.max, Math.max(range.min, 0)) : shown);
+  const text = $derived(shown === MIXED ? '' : formatValue(shown, range.step));
 
   const NUDGE_KEYS: Record<string, Nudge> = { ArrowUp: Nudge.Up, ArrowDown: Nudge.Down };
   const LONG_PRESS_MS = 550;
@@ -76,14 +81,34 @@
     scrub = { x: e.clientX, start: known };
   }
 
+  function scrubTo(next: number) {
+    if (next === known) {
+      return;
+    }
+    if (scrubbing === null) {
+      gesture?.begin();
+    }
+    scrubbing = next;
+    onchange(next);
+  }
+
+  function endScrub() {
+    if (scrubbing !== null) {
+      gesture?.release();
+    }
+    scrubbing = null;
+  }
+
   function moveScrub(e: PointerEvent) {
     if (!scrub) {
       return;
     }
-    const next = scrubbed(scrub.start, e.clientX - scrub.x, range, precisionOf(e));
-    if (next !== known) {
-      onchange(next);
-    }
+    scrubTo(scrubbed(scrub.start, e.clientX - scrub.x, range, precisionOf(e)));
+  }
+
+  function leaveScrub() {
+    scrub = null;
+    endScrub();
   }
 
   let drag: { dx: number; start: number; gesture: Gesture } | null = null;
@@ -109,22 +134,20 @@
     if (drag.gesture !== Gesture.Scrub) {
       return;
     }
-    const next = scrubbed(drag.start, drag.dx, range, precisionOf(e));
-    if (next !== known) {
-      onchange(next);
-    }
+    scrubTo(scrubbed(drag.start, drag.dx, range, precisionOf(e)));
   }
 
   function releaseValue() {
     if (!drag) {
       return;
     }
-    const gesture = drag.gesture;
+    const was = drag.gesture;
     drag = null;
+    endScrub();
     if (document.pointerLockElement === input) {
       document.exitPointerLock();
     }
-    if (gesture === Gesture.Click) {
+    if (was === Gesture.Click) {
       input?.focus();
       input?.select();
     }
@@ -165,8 +188,8 @@
   }
 </script>
 
-<div class="field {kind}" class:disabled class:expression data-field={name} class:mixed={value === MIXED} style={fill === FieldFill.Range && value !== MIXED ? `--fill: ${fillShare(value, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
-  <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={() => (scrub = null)} onlostpointercapture={() => (scrub = null)} aria-hidden="true">{label}</span>
+<div class="field {kind}" class:disabled class:expression data-field={name} class:mixed={shown === MIXED} style={fill === FieldFill.Range && shown !== MIXED ? `--fill: ${fillShare(shown, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
+  <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={leaveScrub} onlostpointercapture={leaveScrub} aria-hidden="true">{label}</span>
   <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={value === MIXED ? MIXED_TEXT : undefined} onpointerdown={pressValue} onpointermove={dragValue} onpointerup={releaseValue} onpointercancel={releaseValue} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
   {#if unit}<span class="unit" aria-hidden="true">{unit}</span>{/if}
   {#if mark}

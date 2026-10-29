@@ -25,8 +25,9 @@
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import ColourRow from './ColourRow.svelte';
   import NumberField from './NumberField.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
 
-  let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, gesture = null, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const BOX_FIELDS = [
     { key: 'x', label: 'X', of: (b: Bounds) => b.left },
@@ -137,7 +138,7 @@
         <div class="grid2">
           {#each BOX_FIELDS as f (f.key)}
             <div data-prop={f.key}>
-              <NumberField label={f.label} kind={FieldKind.Glyph} name={`Selection ${f.key}`} value={Math.round(f.of(bounds) * 100) / 100} range={BOX_RANGE} unit="px" onchange={(v) => setBox({ [f.key]: v })} />
+              <NumberField {gesture} label={f.label} kind={FieldKind.Glyph} name={`Selection ${f.key}`} value={Math.round(f.of(bounds) * 100) / 100} range={BOX_RANGE} unit="px" onchange={(v) => setBox({ [f.key]: v })} />
             </div>
           {/each}
         </div>
@@ -148,7 +149,7 @@
       <div class="grid2">
         {#each GAP_FIELDS as f (f.axis)}
           <div data-prop={`gap-${f.axis}`}>
-            <NumberField label={f.label} kind={FieldKind.Glyph} name={f.name} value={gapShown(f.axis)} range={GAP_RANGE} unit="px" onchange={(v) => setGap(f.axis, v)} />
+            <NumberField {gesture} label={f.label} kind={FieldKind.Glyph} name={f.name} value={gapShown(f.axis)} range={GAP_RANGE} unit="px" onchange={(v) => setGap(f.axis, v)} />
           </div>
         {/each}
       </div>
@@ -160,7 +161,7 @@
           {@const look = fieldLook(key)}
           {@const range = sliderOf(first.component, { key, ...TRANSFORM[key] }, doc)}
           <div data-prop={key}>
-            <NumberField label={look.short ?? TRANSFORM[key].label} kind={FieldKind.Glyph} name={TRANSFORM[key].label} value={valueOf(key)} {range} unit={range.unit ?? look.unit} onchange={(v) => setNumber(key, v)} />
+            <NumberField {gesture} label={look.short ?? TRANSFORM[key].label} kind={FieldKind.Glyph} name={TRANSFORM[key].label} value={valueOf(key)} {range} unit={range.unit ?? look.unit} onchange={(v) => setNumber(key, v)} />
           </div>
         {/each}
       </div>
@@ -171,7 +172,7 @@
         {#each styleFields as { field: f, value } (f.key)}
           {#if f.control === Control.Range}
             <div data-prop={f.key}>
-              <NumberField label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
+              <NumberField {gesture} label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
             </div>
           {:else if f.control === Control.Color}
             <label class="line" data-prop={f.key}>
