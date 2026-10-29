@@ -19,6 +19,20 @@ A **free element** is a shape, text, image or SVG placed directly on the canvas.
 - New layers are pinned left and top, so resizing a frame keeps their size and distance from the edges.
 - `Resize to fit` (`⌥⇧⌘R`) fits a frame to its contents.
 
+## Styling the frame
+
+With nothing inside the frame selected, the right bar shows the frame's own look, with the same controls as a layer:
+
+- **Frame size** preset, **W** and **H**, and **Layout grid**.
+- **Appearance**: opacity, blend mode, corner radius (uniform or per corner) and **Clip content**.
+- **Fill**: several fills, each a colour, gradient or image.
+- **Stroke**: colour, width, inside/center/outside, per side.
+- **Effects**: drop and inner shadows, layer and background blur.
+
+The first edit gives the frame a surface: a locked full-frame layer under every other, named `Frame`, that replaces the brand background. It is not listed in Layers and a click on it selects nothing. **Clip content** is on by default: layers are cut to the frame's rounded corners in the editor, the player and exports. Code export paints the page root with it. Agents add it with `set_canvas` `surface: true` and style it with `set_props`.
+
+Scenes, camera, breakpoints, prototype flow, styles and variables sit in the folded **Frame settings** group below.
+
 ## Selecting
 
 - Right-click on stacked layers lists them so you can pick the one underneath.

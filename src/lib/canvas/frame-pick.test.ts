@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { withSurface } from '@feega/motion-core/motion/surface';
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
@@ -200,5 +201,15 @@ describe('an image inserted in a frame', () => {
     const live = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };
 
     expect(pickers.of('frame', live)).toBe(pickers.of('frame', { ...live }));
+  });
+});
+
+describe('the frame surface', () => {
+  it('is never picked: a click on the empty frame selects nothing', () => {
+    const surfaced = framePicker({ ...live, doc: withSurface(live.doc, 'surface') });
+    const corner = space.pointToWorld([20, 20]);
+
+    expect(surfaced.pick(corner, space)).toBeNull();
+    expect(surfaced.stack(corner, space)).toEqual([]);
   });
 });

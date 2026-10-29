@@ -36,4 +36,6 @@ export const PRESET_LABEL: Record<FramePreset, string> = {
 
 export const applyPreset = (doc: MotionDoc, preset: FramePreset): OpResult => resizeFrame({ ...doc, freeSize: true }, PRESET_SIZE[preset]);
 
+export const resizeTo = (doc: MotionDoc, size: CanvasSize): OpResult => resizeFrame({ ...doc, freeSize: true }, size);
+
 export const presetOf = (doc: Pick<MotionDoc, 'width' | 'height'>): FramePreset | null => FRAME_PRESETS.find((p) => PRESET_SIZE[p].width === doc.width && PRESET_SIZE[p].height === doc.height) ?? null;

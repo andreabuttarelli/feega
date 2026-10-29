@@ -23,6 +23,11 @@ describe('what Properties shows for the selection', () => {
 });
 
 describe('which sections each selection kind gets', () => {
+  it('the frame itself: layer (opacity, corners), fill, stroke and effects, never a shape kind', () => {
+    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toEqual([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
+  });
+
+
   it('a text layer: layout, layer, fill, stroke and text, never a path', () => {
     const sections = sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Motion);
 

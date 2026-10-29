@@ -59,6 +59,23 @@ describe('frame inspector panel', () => {
     expect(body).not.toContain('data-testid="clip-bar"');
   });
 
+  it('shows the frame look like a layer: fill, stroke, corners, effects, with the frame settings folded below', () => {
+    const body = html([]);
+
+    expect(body).toContain('data-testid="frame-look"');
+    for (const section of ['layer', 'fill', 'stroke', 'effects']) {
+      expect(body).toContain(`data-section="${section}"`);
+    }
+    expect(body).not.toContain('data-section="timing"');
+    expect(body).not.toContain('data-section="shape"');
+    expect(body).toContain('data-testid="radius-per-corner"');
+    expect(body).toContain('data-testid="frame-width"');
+    expect(body).toContain('data-prop="clipContent"');
+    expect(body).toContain('data-testid="frame-height"');
+    expect(body.indexOf('data-testid="frame-look"')).toBeLessThan(body.indexOf('data-testid="frame-settings"'));
+    expect(body.indexOf('data-testid="frame-settings"')).toBeLessThan(body.indexOf('data-testid="camera-inspector"'));
+  });
+
   it('offers device presets on a device', () => {
     expect(html(['device'])).toContain('data-testid="device-presets"');
   });

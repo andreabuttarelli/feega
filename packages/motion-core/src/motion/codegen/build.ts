@@ -1,4 +1,5 @@
 import { Background, compOf, type MotionClip, type MotionDoc, type MotionTrack } from '../doc';
+import { clipRadii, clipsContent } from '../surface';
 import type { BrandTokens } from '../brand';
 import { parseProps, type ComponentId } from '../components';
 import { childrenInOrder, compBounds } from '../layout/resolve';
@@ -380,6 +381,15 @@ function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, pl
   return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf, timeline };
 }
 
+const HIDDEN: Rule[] = [['overflow', 'hidden']];
+
+function pageCut(doc: MotionDoc): Rule[] {
+  const radii = clipRadii(doc);
+  const side = Math.min(doc.width, doc.height);
+  const rounded: Rule[] = radii ? [['border-radius', radii.map((r) => px(r * side)).join(' ')]] : [];
+  return [...(clipsContent(doc) ? HIDDEN : []), ...rounded];
+}
+
 function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): ElementNode {
   const top = childrenOf(null, scope);
   const visual = top.filter((c) => c.component !== 'BrandBackground');
@@ -393,7 +403,8 @@ function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): Element
       return root;
     }
   }
-  const rules: Rule[] = [['position', 'relative'], ...own, ...framed, ['min-height', px(scope.space.height)], ['overflow', 'hidden']];
+  const cut = scope.plan ? HIDDEN : pageCut(scope.shared.doc);
+  const rules: Rule[] = [['position', 'relative'], ...own, ...framed, ['min-height', px(scope.space.height)], ...cut];
   const children = top.flatMap((c) => nodeOf(c, null, scope, tag) ?? []);
   return { kind: NodeKind.Element, tag, className: '', rules, attrs: [], children, styleBinds: [] };
 }

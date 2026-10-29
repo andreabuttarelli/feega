@@ -1,4 +1,5 @@
 import { ungroupClip } from '$lib/motion/group';
+import { dropSurface, withSurface } from '@feega/motion-core/motion/surface';
 import { addBreakpoint, BreakpointPreset, clearOverride, OVERRIDE_KEYS, OverrideKey, removeBreakpoint, setOverride, stackOn } from '@feega/motion-core/motion/breakpoints/model';
 import { groupLight, settleGroups, ungroupLight } from '$lib/motion/light-group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
@@ -419,6 +420,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     height: doc.height,
     fps: doc.fps,
     background: doc.background,
+    surface: doc.surface ?? null,
     motionBlur: doc.motionBlur,
     duration: secs(doc.durationInFrames),
     still: doc.still ? { time: secs(doc.still.frame) } : null,
@@ -2618,7 +2620,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         fps: z.literal(FRAME_RATES).optional(),
         background: z.enum([Background.Brand, Background.Transparent]).optional(),
         still: z.union([z.number().min(0), z.literal(false)]).optional(),
-        layout_guides: z.array(layoutGuideSchema).max(MAX_LAYOUT_GUIDES).optional()
+        layout_guides: z.array(layoutGuideSchema).max(MAX_LAYOUT_GUIDES).optional(),
+        surface: z.boolean().optional().describe('true gives the frame its own surface, a locked full-frame Shape under every layer (its id is `surface` in get_motion_doc): style it with set_props like any Shape (fills, strokes, roundness/corners) and effects for shadows and blur; false removes it and brings back the brand background')
       }),
       execute: async (input) => {
         const stretched = input.duration !== undefined && session.doc.script ? durationProblem(input.duration, session.doc.script) : null;
@@ -2631,7 +2634,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.preset ? PRESET_SIZE[input.preset] : input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
-        return apply(guided, 'changed the canvas');
+        const surfaced: OpResult = guided.ok && input.surface !== undefined ? { ok: true, doc: input.surface ? withSurface(guided.doc, deps.newId()) : dropSurface(guided.doc) } : guided;
+        return apply(surfaced, 'changed the canvas');
       }
     }),
 
