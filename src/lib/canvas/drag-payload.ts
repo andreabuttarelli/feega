@@ -101,7 +101,7 @@ export const CANVAS_DRAG_FILLED_NODE = 'application/x-feega-filled-node';
 export const CANVAS_DRAG_OUTPUT = 'application/x-feega-node-output';
 
 export type FilledNodeDrag = {
-  type: 'image' | 'video' | 'text' | 'doc' | 'influencer' | 'social_account_feed' | 'products' | 'iframe';
+  type: 'image' | 'video' | 'model3d' | 'text' | 'doc' | 'influencer' | 'social_account_feed' | 'products' | 'iframe';
   data: Record<string, unknown>;
   w: number;
   h: number;
@@ -220,6 +220,7 @@ export function serializeFilledNodeDrag(drag: FilledNodeDrag): string {
 const FILLED_NODE_DRAG_TYPES = new Set<FilledNodeDrag['type']>([
   'image',
   'video',
+  'model3d',
   'text',
   'doc',
   'influencer',

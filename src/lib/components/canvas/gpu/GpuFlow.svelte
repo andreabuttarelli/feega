@@ -157,6 +157,7 @@
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
   import { CANVAS_DRAG_FEED_IMAGE, parseFeedImageDrag } from '$lib/canvas/feed-image';
   import { isAddable, type Addable } from '$lib/canvas/addable';
+  import { hotDrag, hotTiles } from '$lib/canvas/hot-models';
   import { edgeKindsFor } from '$lib/canvas/connect-rules';
   import { connectionRefusal, landingOf, type Connection } from '$lib/canvas/connection-verdict';
   import { focusEdges } from '$lib/canvas/edge-focus';
@@ -3155,6 +3156,8 @@
   {#if spec.chrome && props.onCreate}
     <CanvasAddBar
       onpick={addAtCentre}
+      models={hotTiles((medium) => props.modelChoicesFor?.(medium) ?? [])}
+      onmodel={(model) => props.onCreateFilled?.(hotDrag(model), viewCentre())}
       onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? viewCentre() : undefined) : undefined}
       oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
