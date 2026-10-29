@@ -32,6 +32,11 @@ const comments = (db: Db) => (db as unknown as CommentTable).from('canvas_commen
 
 const rowOf = (r: Row): CommentRow => ({ id: r.id, nodeId: r.node_id, parentId: r.parent_id, authorId: r.author_id, x: r.x, y: r.y, body: r.body, resolvedAt: r.resolved_at, timeMs: r.time_ms, mentions: r.mentions ?? [], editedAt: r.edited_at, createdAt: r.created_at });
 
+export async function commentNodeId(db: Db, scope: Scope & { id: string }): Promise<string | null> {
+  const { data } = await comments(db).select('node_id').eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId).eq('id', scope.id).maybeSingle();
+  return data?.node_id ?? null;
+}
+
 export enum CommentOutcome {
   Added = 'added',
   Invalid = 'invalid',
