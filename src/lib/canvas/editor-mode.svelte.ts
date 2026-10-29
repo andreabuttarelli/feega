@@ -10,22 +10,28 @@ export enum EditorMode {
 export enum ModeInspector {
   Properties = 'properties',
   Code = 'code',
-  Soon = 'soon'
+  Play = 'play'
+}
+
+export enum CanvasLines {
+  Nodes = 'nodes',
+  Prototype = 'prototype'
 }
 
 type ModeSpec = {
   label: string;
   edit: EditMode;
   inspector: ModeInspector;
+  lines: CanvasLines;
   onMotionKey: EditorMode;
   onCodeKey: EditorMode;
 };
 
 export const MODES: Record<EditorMode, ModeSpec> = {
-  [EditorMode.Design]: { label: 'Design', edit: EditMode.Design, inspector: ModeInspector.Properties, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code },
-  [EditorMode.Motion]: { label: 'Motion', edit: EditMode.Motion, inspector: ModeInspector.Properties, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
-  [EditorMode.Play]: { label: 'Play', edit: EditMode.Design, inspector: ModeInspector.Soon, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
-  [EditorMode.Code]: { label: 'Code', edit: EditMode.Design, inspector: ModeInspector.Code, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design }
+  [EditorMode.Design]: { label: 'Design', edit: EditMode.Design, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code },
+  [EditorMode.Motion]: { label: 'Motion', edit: EditMode.Motion, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
+  [EditorMode.Play]: { label: 'Play', edit: EditMode.Design, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
+  [EditorMode.Code]: { label: 'Code', edit: EditMode.Design, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design }
 };
 
 export const EDITOR_MODE_KEY = 'feega.editor-mode';

@@ -90,7 +90,9 @@
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { EditMode, startMode, timelineShown } from '$lib/motion/edit-mode';
-  import { ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { CanvasLines, ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { elementKey } from '$lib/canvas/prototype-arrows';
+  import type { PrototypeLink } from '$lib/motion/prototype/links';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
@@ -346,7 +348,7 @@
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
   const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
   $effect(() => {
-    prototypePlayer.editing = inside?.nodeId ?? null;
+    prototypePlayer.editing = inside?.nodeId ?? (selected.length === 1 && playerFrames.some((f) => f.id === selected[0]) ? selected[0] : null);
   });
   $effect(() => {
     prototypeLink.docs = prototypeDocs;
@@ -543,8 +545,9 @@
     return own.find((p) => p.handle === (handle ?? null)) ?? own[0] ?? null;
   }
 
+  const showsPrototype = $derived(editorMode.spec.lines === CanvasLines.Prototype);
   const curves = $derived(
-    edges.flatMap((e) => {
+    (showsPrototype ? [] : edges).flatMap((e) => {
       const from = portFor(e.source, PortSide.Out, e.sourceHandle);
       const to = portFor(e.target, PortSide.In, e.targetHandle);
       return from && to ? [{ edge: e, curve: wireCurve({ x: from.x + PORT_OFFSET, y: from.y }, { x: to.x - PORT_OFFSET, y: to.y }) }] : [];
@@ -1860,6 +1863,41 @@
     return true;
   }
 
+  function linkElements(): Map<string, WorldRect> {
+    return new Map(
+      arrowLinks.flatMap((l) => {
+        const at = pickerOf(l.from);
+        const box = at?.picker.outline(l.clip, at.space);
+        return box ? [[elementKey(l.from, l.clip), box] as const] : [];
+      })
+    );
+  }
+
+  function pickedHandle(): WorldRect | null {
+    const at = inside && picks.length === 1 ? pickerOf(inside.nodeId) : null;
+    return at ? at.picker.outline(picks[0], at.space) : null;
+  }
+
+  function openLink(link: PrototypeLink) {
+    select([link.from]);
+    goInside(link.from, Gesture.Click, link.clip);
+  }
+
+  function dragLink() {
+    if (!picks.length) {
+      return;
+    }
+    prototypeLink.aim({ clipId: picks[0], interactionId: null });
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointerup', up);
+      const node = topNodeAt(toWorld(view, local(ev)));
+      if (!node || !linkPrototype(node)) {
+        prototypeLink.stop();
+      }
+    };
+    window.addEventListener('pointerup', up);
+  }
+
   function onDown(e: PointerEvent) {
     glide = null;
     dropHover();
@@ -3044,7 +3082,9 @@
       {#snippet children(frame)}<span class="bp-label" data-testid="breakpoint-view-label">{viewLabels.get(frame.id)}</span>{/snippet}
     </FrameOverlays>
     <PrototypePlayerHost frames={playerFrames} />
-    <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} />
+    {#if showsPrototype}
+      <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />
+    {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom});--zoom:${view.zoom}`}>
       <svg class="gpu-edges core" aria-hidden="true">
         {#each curves as c (c.edge.id)}

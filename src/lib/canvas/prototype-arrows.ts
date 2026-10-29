@@ -1,6 +1,7 @@
 import type { PrototypeLink } from '$lib/motion/prototype/links';
 import { frameScreenRect, type FrameBox } from '$lib/canvas/frame-screen';
 import type { Viewport } from '$lib/canvas/dot-grid';
+import type { WorldRect } from '$lib/canvas/frame-pick';
 
 export type ArrowFrame = FrameBox & { id: string };
 export type Arrow = { id: string; path: string; head: string; label: { x: number; y: number }; from: string; to: string };
@@ -36,7 +37,13 @@ export function curveBetween(from: Point, to: Point): { path: string; head: stri
   };
 }
 
-export function arrowsFor(links: readonly PrototypeLink[], frames: readonly ArrowFrame[], view: Viewport): Arrow[] {
+export const elementKey = (frame: string, clip: string): string => `${frame}:${clip}`;
+
+export function elementEdge(box: WorldRect, view: Viewport): Point {
+  return { x: view.x + (box.x + box.w) * view.zoom, y: view.y + (box.y + box.h / 2) * view.zoom };
+}
+
+export function arrowsFor(links: readonly PrototypeLink[], frames: readonly ArrowFrame[], view: Viewport, elements: ReadonlyMap<string, WorldRect> = new Map()): Arrow[] {
   const byId = new Map(frames.map((f) => [f.id, f]));
   return links.flatMap((link) => {
     const source = byId.get(link.from);
@@ -44,7 +51,8 @@ export function arrowsFor(links: readonly PrototypeLink[], frames: readonly Arro
     if (!source || !target) {
       return [];
     }
-    const curve = curveBetween(rightEdge(source, view), leftEdge(target, view));
+    const element = elements.get(elementKey(link.from, link.clip));
+    const curve = curveBetween(element ? elementEdge(element, view) : rightEdge(source, view), leftEdge(target, view));
     return [{ id: `${link.from}:${link.id}`, path: curve.path, head: curve.head, label: curve.mid, from: link.from, to: link.to }];
   });
 }
