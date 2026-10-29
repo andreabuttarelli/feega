@@ -113,7 +113,7 @@ describe('gateCreditsCore, org-scoped cache', () => {
     client.rpc = (async (fn: string, args?: unknown) => {
       rpcCalls.push({ fn, args });
       return { data: 1000, error: null };
-    }) as typeof client.rpc;
+    }) as unknown as typeof client.rpc;
     vi.doMock('./supabase-admin', () => ({ createAdminClient: () => client }));
     vi.doMock('./ai-log', () => ({ isCreditExempt: () => false }));
 

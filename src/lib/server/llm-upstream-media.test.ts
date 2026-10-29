@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const M = vi.hoisted(() => ({
 	env: {} as Record<string, string | undefined>,
-	generateText: vi.fn(async () => ({ text: 'ciao', usage: {} }))
+	generateText: vi.fn(async (_opts: { messages: { content: unknown }[] }) => ({ text: 'ciao', usage: {} }))
 }));
 
 vi.mock('$env/dynamic/private', () => ({ env: M.env }));

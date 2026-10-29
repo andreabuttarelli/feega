@@ -70,7 +70,7 @@ describe('satisfiesSchema (guardia di conformità sul secondario)', () => {
 // che le const esistano.
 const M = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>,
-  llmStructured: vi.fn(async (_opts: { label?: string }) => ({ plan: 'ok' })),
+  llmStructured: vi.fn(async (_opts: { label?: string; reasoningEffort?: string }) => ({ plan: 'ok' })),
   llmText: vi.fn(),
   llmImagesFromInline: vi.fn(() => undefined)
 }));

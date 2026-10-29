@@ -102,7 +102,7 @@ describe('motion agent brand tools', () => {
   it('browses the web with the shared web tools when the workspace gives them', async () => {
     const search = vi.fn(async () => ({ ok: true as const, results: [], costUsd: 0.007 }));
     const read = vi.fn(async () => ({ ok: false as const, error: 'x' }));
-    const { run } = setup({ web: { search, read, spend: () => {} } });
+    const { run } = setup({ web: { search, read, store: vi.fn(), spend: () => {} } });
 
     expect(await run('web_search', { query: 'launch videos' })).toEqual({ ok: true, results: [] });
     expect(await run('read_page', { url: 'https://a.example/' })).toEqual({ ok: false, error: 'x' });

@@ -3,15 +3,15 @@ import { isProduceApproved, markProduceApproved, type PreviewPost } from './medi
 
 describe('isProduceApproved', () => {
   it('is false for a plain post array', () => {
-    const posts = [{ platform: 'instagram', caption: 'hi' }] as PreviewPost[];
+    const posts: PreviewPost[] = [{ imageUrl: 'hi' }];
     expect(isProduceApproved(posts)).toBe(false);
   });
 
   it('survives rebuilding a produced[] via onPost-style push of the same post refs', () => {
-    const posts = [
-      { platform: 'instagram', caption: 'a' },
-      { platform: 'linkedin', caption: 'b' }
-    ] as PreviewPost[];
+    const posts: PreviewPost[] = [
+      { imageUrl: 'a' },
+      { imageUrl: 'b' }
+    ];
     markProduceApproved(posts, true);
     expect(isProduceApproved(posts)).toBe(true);
 
@@ -22,7 +22,7 @@ describe('isProduceApproved', () => {
   });
 
   it('is false when produce did not approve', () => {
-    const posts = [{ platform: 'instagram', caption: 'hi' }] as PreviewPost[];
+    const posts: PreviewPost[] = [{ imageUrl: 'hi' }];
     markProduceApproved(posts, false);
     const produced = [...posts];
     expect(isProduceApproved(produced)).toBe(false);

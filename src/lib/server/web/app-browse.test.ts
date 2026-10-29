@@ -76,7 +76,8 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
     ui: vi.fn(async () => UI),
     vector: vi.fn(async () => ({})),
     overlay: vi.fn(async () => (tour && cookies.length ? { buttons: ['Skip', 'Next'] } : null)),
-    press: vi.fn(async () => undefined)
+    press: vi.fn(async () => undefined),
+    paint: vi.fn(async () => Buffer.from('png'))
   };
   return tab;
 }
