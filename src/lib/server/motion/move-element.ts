@@ -38,9 +38,11 @@ export const boxSchema = z.object({ left: z.number().finite(), top: z.number().f
 
 export const versionsSchema = z.record(z.string(), z.number().int().min(0));
 
-export const moveAskSchema = z.object({ sourceNodeId: z.string().min(1), clipId: z.string().min(1), drop: dropSchema, box: boxSchema.nullish(), versions: versionsSchema.optional() }).strict();
+const idsSchema = z.array(z.string().min(1).max(64)).max(256);
 
-export const freeAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema }).strict();
+export const moveAskSchema = z.object({ sourceNodeId: z.string().min(1), clipId: z.string().min(1), drop: dropSchema, box: boxSchema.nullish(), versions: versionsSchema.optional(), id: z.string().uuid().optional(), ids: idsSchema.optional() }).strict();
+
+export const freeAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema, ids: idsSchema.optional() }).strict();
 
 export const outputAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema, id: z.string().uuid().optional() }).strict();
 
@@ -230,7 +232,7 @@ export async function copyElement(store: FrameStore, ask: MoveAsk): Promise<Move
   return carry(store, { ...read.source, id: ask.id }, read.target, planCopy(read.source, read.target, ask, askedIds(ask.ids)), SUMMARY.copiedIn);
 }
 
-export const componentAskSchema = z.object({ sourceNodeId: z.string().min(1), compId: z.string().min(1), drop: z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict() }).strict();
+export const componentAskSchema = z.object({ sourceNodeId: z.string().min(1), compId: z.string().min(1), drop: z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict(), id: z.string().uuid().optional(), ids: idsSchema.optional() }).strict();
 
 export type ComponentAsk = z.infer<typeof componentAskSchema> & { canvasId: string };
 
@@ -239,7 +241,7 @@ export async function placeComponent(store: FrameStore, ask: ComponentAsk): Prom
   if (!source) {
     return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
   }
-  return carry(store, { ...source, canvasId: ask.canvasId }, null, planComponent(source, ask.compId, ask.drop, newId), SUMMARY.movedIn);
+  return carry(store, { ...source, canvasId: ask.canvasId, id: ask.id }, null, planComponent(source, ask.compId, ask.drop, askedIds(ask.ids)), SUMMARY.movedIn);
 }
 
 export enum FreeSource {
@@ -258,7 +260,7 @@ export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSch
   }
 
   const kept = after === FreeSource.Keep;
-  const plan = planFree(source, target, ask.drop, newId);
+  const plan = planFree(source, target, ask.drop, askedIds(ask.ids));
   return carry(store, source, target, plan.ok ? { ...plan, source: kept ? { left: Left.Kept } : { left: Left.Removed } } : plan, kept ? SUMMARY.copiedIn : SUMMARY.movedIn);
 }
 

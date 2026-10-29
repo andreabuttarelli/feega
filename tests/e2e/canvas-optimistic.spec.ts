@@ -22,6 +22,8 @@ const sheet = (id: string, shape: string) => ({
   assets: []
 });
 
+const boxClip = { id: 'box', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.3, y: 0.5, width: 0.3, height: 0.3, fills: [{ type: 'solid', color: '#ff5a1f' }] } };
+
 const blankFrame = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [] }], comps: {}, assets: [] };
 
 type Seed = (s: { type: string; x: number; y: number; data: Record<string, unknown> }) => Promise<{ id: string }>;
@@ -35,9 +37,9 @@ async function element(admin: SupabaseClient, seedNode: Seed, owner: Owner, i: n
   return node.id;
 }
 
-async function frame(admin: SupabaseClient, seedNode: Seed, owner: Owner): Promise<string> {
+async function frame(admin: SupabaseClient, seedNode: Seed, owner: Owner, doc: object = blankFrame): Promise<string> {
   const node = await seedNode({ type: 'motion', x: 120, y: 420, data: LANDSCAPE });
-  const { error } = await admin.from('motion_revisions').insert({ org_id: owner.orgId, node_id: node.id, version: 1, doc: blankFrame, actor_kind: 'user', actor_id: owner.userId });
+  const { error } = await admin.from('motion_revisions').insert({ org_id: owner.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: owner.userId });
   expect(error).toBeNull();
   return node.id;
 }
@@ -142,6 +144,21 @@ async function openComments(page: Page, session: { projectId: string; canvasId: 
   await page.getByTestId('canvas-comments').click();
   await expect(page.getByTestId('comments-panel')).toBeVisible();
 }
+
+const withBox = { ...blankFrame, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [boxClip] }] };
+
+async function pickBox(page: Page, host: string) {
+  const box = (await tile(page, host).boundingBox())!;
+  const at = { x: box.x + box.width * 0.3, y: box.y + box.height * 0.5 };
+  await expect(async () => {
+    await page.mouse.click(at.x, at.y);
+    await expect(page.getByTestId('frame-selection')).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 25_000 });
+  return at;
+}
+
+const headDoc = async (admin: SupabaseClient, nodeId: string) => (await admin.from('motion_revisions').select('doc').eq('node_id', nodeId).order('version', { ascending: false }).limit(1)).data?.[0]?.doc as { tracks: { clips: { id: string }[] }[] } | undefined;
+const clipCount = (doc: { tracks: { clips: unknown[] }[] } | undefined) => doc?.tracks.flatMap((t) => t.clips).length ?? -1;
 
 const tile = (page: Page, id: string) => page.locator(`[data-testid="gpu-node"][data-id="${id}"]`);
 
@@ -372,5 +389,39 @@ test.describe('canvas actions are optimistic @real', () => {
     await page.mouse.move(handle.x + 200, handle.y + 100, { steps: 10 });
     await page.mouse.up();
     await verdict('group-scale', page);
+  });
+
+  test('an element dragged out of a frame shows as its own tile before the server answers', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const host = await frame(admin, seedNode, session, withBox);
+    await open(page, session);
+    const at = await pickBox(page, host);
+    await watch(page, { shown: Shown.Changed });
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down();
+    await page.mouse.move(1000, 160, { steps: 20 });
+    await page.mouse.up();
+    await verdict('move-out-of-frame', page);
+    await expect.poll(async () => clipCount(await headDoc(admin, host)), { timeout: 15_000 }).toBe(0);
+    const made = (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).neq('id', host).is('deleted_at', null)).data ?? [];
+    expect(made).toHaveLength(1);
+    await expect.poll(async () => clipCount(await headDoc(admin, made[0].id)), { timeout: 15_000 }).toBe(1);
+  });
+
+  test('pasted elements show before the server answers', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const host = await frame(admin, seedNode, session, withBox);
+    await open(page, session);
+    await pickBox(page, host);
+    await page.keyboard.press('ControlOrMeta+c');
+    for (const _ of [1, 2, 3]) {
+      await page.keyboard.press('Escape');
+    }
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    await watch(page, { shown: Shown.Changed });
+    await page.keyboard.press('ControlOrMeta+v');
+    await verdict('paste-elements', page);
+    await expect.poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.length, { timeout: 15_000 }).toBe(2);
+    expect(clipCount(await headDoc(admin, host))).toBe(1);
   });
 });

@@ -110,7 +110,7 @@
   import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
-  import { frameDocs, type FrameDocEdit } from '$lib/canvas/frame-docs';
+  import { frameDocs, type FrameDocEdit, type HeldDoc } from '$lib/canvas/frame-docs';
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
@@ -1531,7 +1531,31 @@
     return result.ok;
   }
 
-  onMount(() => frameDocs.publish({ edit: editFrameDoc }));
+  const frameDocOf = (nodeId: string) => savers.get(nodeId)?.history.present ?? liveOf(nodeId)?.doc ?? null;
+
+  function holdFrameDoc(held: HeldDoc, saved: Promise<boolean>) {
+    const live = liveOf(held.nodeId);
+    if (!live) {
+      const like = liveOf(held.like);
+      holdLive(held.nodeId, { doc: held.doc, tokens: like?.tokens ?? heldTokens() ?? FEEGA_TOKENS, assets: like?.assets ?? {} }, saved);
+      return;
+    }
+    const session = saverOf(held.nodeId);
+    const before = frameDocOf(held.nodeId) ?? live.doc;
+    session?.settleHeld(held.doc);
+    session?.holdSave(saved);
+    liveDocs.set(held.nodeId, { ...live, doc: held.doc });
+    void saved.then((landed) => {
+      const now = liveOf(held.nodeId);
+      if (landed || !now) {
+        return;
+      }
+      session?.settleHeld(before);
+      liveDocs.set(held.nodeId, { ...now, doc: before });
+    });
+  }
+
+  onMount(() => frameDocs.publish({ edit: editFrameDoc, doc: frameDocOf, hold: holdFrameDoc }));
 
   function startTrailer() {
     if (panelNodeId) {

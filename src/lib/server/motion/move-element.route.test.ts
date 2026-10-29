@@ -4,7 +4,10 @@ import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server
 import { fakeDb } from '$lib/server/db/fake-db';
 import { listConnections, listNodes } from '$lib/server/repos/canvas';
 import { canvasFrameInputs } from './move-element';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DropOn } from '$lib/motion/move-element';
+import { idsFrom, planCopy, planFree, planMove } from '$lib/motion/move-plan';
+import { motionNodeSize } from '$lib/canvas/motion-node';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { drawnTile } from '$lib/canvas/optimistic-insert';
@@ -294,6 +297,46 @@ describe('elements in and out of frames', () => {
     expect(written(input, TARGET)).toHaveLength(1);
     expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && (c.payload as { deleted_at?: string }).deleted_at)).toBe(false);
     expect((result as { undo: { kind: string }[] }).undo.map((u) => u.kind)).toEqual(['doc.revision']);
+  });
+});
+
+describe('a move the canvas already shows', () => {
+  const CHOSEN = '12121212-1212-4121-8121-121212121212';
+  const IDS = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8'];
+  const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+  const snap = (nodeId: string, doc: MotionDoc, width: number) => ({ nodeId, doc, stage: { width, height: (width * doc.height) / doc.width } });
+  const madeDoc = (input: ReturnType<typeof event>, nodeId: string) => written(input, nodeId)[0]?.doc;
+  const createdAs = (input: ReturnType<typeof event>) => input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { id: string };
+  const firstDoc = (input: ReturnType<typeof event>) => (input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert' && (c.payload as { version: number }).version === 1)?.payload as { doc: MotionDoc }).doc;
+
+  it('dragged out, the new element is stored under the node id and clip ids the canvas picked', async () => {
+    const drop = { on: DropOn.Canvas, x: 900, y: 40 } as const;
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify(drop), node_id: CHOSEN, ids: JSON.stringify(IDS) }, { nodes: [{ ...frameRow(SOURCE), width: 400 }, frameRow(TARGET)] });
+    const shown = planMove(snap(SOURCE, withText(), 400), null, { clipId: 'txt', drop }, idsFrom(IDS, () => 'random'));
+
+    expect(await actions.moveElement(input as never)).toMatchObject({ outcome: 'done', created: true });
+    expect(createdAs(input).id).toBe(CHOSEN);
+    expect(shown.ok && firstDoc(input)).toEqual(shown.ok && shown.landing.doc);
+  });
+
+  it('copied onto the canvas, the copy is stored under the ids the canvas picked', async () => {
+    const drop = { on: DropOn.Canvas, x: 300, y: 300 } as const;
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify(drop), node_id: CHOSEN, ids: JSON.stringify(IDS) }, { nodes: [{ ...frameRow(SOURCE), width: 400 }, frameRow(TARGET)] });
+    const shown = planCopy(snap(SOURCE, withText(), 400), null, { clipId: 'txt', drop }, idsFrom(IDS, () => 'random'));
+
+    expect(await actions.copyElement(input as never)).toMatchObject({ outcome: 'done', created: true });
+    expect(createdAs(input).id).toBe(CHOSEN);
+    expect(shown.ok && firstDoc(input)).toEqual(shown.ok && shown.landing.doc);
+  });
+
+  it('a free element pasted into a frame lands with the clip ids the canvas picked', async () => {
+    const drop = { on: DropOn.Frame, nodeId: TARGET, at: { x: 0.3, y: 0.6 } } as const;
+    const input = event({ source: SOURCE, drop: JSON.stringify(drop), ids: JSON.stringify(IDS) }, { nodes: [element, frameRow(TARGET)] });
+    const target = newMotionDoc(MotionFormat.Vertical);
+    const shown = planFree(snap(SOURCE, withText(), 200), snap(TARGET, target, motionNodeSize(formatOf(target)).w), drop, idsFrom(IDS, () => 'random'));
+
+    expect(await actions.copyFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(shown.ok && madeDoc(input, TARGET)).toEqual(shown.ok && shown.landing.doc);
   });
 });
 
