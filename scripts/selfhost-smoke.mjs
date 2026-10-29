@@ -146,7 +146,6 @@ async function main() {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: VIEWPORT });
   await page.addInitScript((tourKey) => {
-    localStorage.setItem('feega:canvas-bar-mode', 'design');
     localStorage.setItem(tourKey, '1');
   }, TOUR_SEEN_KEY);
   page.on('pageerror', (err) => pageErrors.push(err.message));

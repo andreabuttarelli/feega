@@ -15,7 +15,6 @@ async function shot(page: Page, name: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('feega:canvas-bar-mode', 'design'));
 });
 
 test.describe('shape tools on the canvas @real', () => {
