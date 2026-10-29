@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { breakpointViews, viewAt } from '$lib/canvas/breakpoint-views';
+  import { breakpointViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
+  import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
@@ -271,7 +272,7 @@
     addLingerTimer = setTimeout(() => (addLinger = null), ADD_LINGER_MS);
     return () => clearTimeout(addLingerTimer);
   });
-  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[] } | null>(null);
+  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[]; at: string } | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
@@ -392,7 +393,17 @@
     if (!look || !text) {
       return [];
     }
-    return placed.flatMap((t) => {
+    const views = bpViews.flatMap((v) => {
+      const t = byId.get(v.nodeId);
+      if (!t) {
+        return [];
+      }
+      const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selected.includes(t.id);
+      const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
+      const { x, y, w, h } = v.frame.box;
+      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, ring: on ? chrome.ring : NodeChrome.None, handles: false, hovered: false, ringColor: ringColour({ outputs: [] }, look), names: false, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
+    });
+    const tiles = placed.flatMap((t) => {
       const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
       if (!coreDrawn.has(t.id) && !handed) {
         return [];
@@ -408,6 +419,7 @@
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
       return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
+    return [...tiles, ...views];
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
@@ -943,7 +955,7 @@
   function hoverElement(w: Point) {
     const hit = framePickAt(w);
     const quad = hit?.clip ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
-    pickHover = hit?.clip && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad } : null;
+    pickHover = hit?.clip && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id } : null;
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
@@ -994,7 +1006,6 @@
     return live ? [[v.frame.id, { ...live, doc: v.doc }] as const] : [];
   })));
   const viewOverlays = $derived(bpViews.map((v) => ({ id: v.frame.id, ...v.frame.box, rotation: 0, bar: 0, doc: { width: v.frame.box.w, height: v.frame.box.h } })));
-  const viewLabels = $derived(new Map(bpViews.map((v) => [v.frame.id, `${v.name} ${v.width}`])));
   const coreLive = $derived(viewLives.size ? new Map([...liveDocs.map, ...viewLives]) : liveDocs.map);
   $effect(() => {
     canvasComponents.set(
@@ -1390,6 +1401,28 @@
     return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0, resizing.has(nodeId) ? FrameFit.Stretch : FrameFit.Contain), frame, live };
   }
 
+  function editedView(nodeId: string) {
+    const breakpointId = savers.get(nodeId)?.breakpoint ?? BASE_BREAKPOINT;
+    return breakpointId === BASE_BREAKPOINT ? null : (bpViews.find((v) => v.nodeId === nodeId && v.breakpointId === breakpointId) ?? null);
+  }
+
+  function editPickerOf(nodeId: string) {
+    const shown = editedView(nodeId);
+    const live = shown ? viewLives.get(shown.frame.id) : null;
+    if (!shown || !live) {
+      return pickerOf(nodeId);
+    }
+    const picker = pickers.of(shown.frame.id, live, () => liveOf(nodeId)?.playhead);
+    return { picker, space: picker.spaceOf(shown.frame.box, 0), frame: shown.frame, live };
+  }
+
+  function marksIn(overlayId: string) {
+    const shown = viewOf(overlayId);
+    const nodeId = shown?.nodeId ?? overlayId;
+    const breakpointId = shown?.breakpointId ?? BASE_BREAKPOINT;
+    return (savers.get(nodeId)?.breakpoint ?? BASE_BREAKPOINT) === breakpointId ? selectionMarks(nodeId) : [];
+  }
+
   let timed: string | null = null;
 
   function scrubTo(nodeId: string, frame: number) {
@@ -1424,7 +1457,7 @@
   });
 
   function selectionMarks(nodeId: string) {
-    const at = inside?.nodeId === nodeId ? pickerOf(nodeId) : null;
+    const at = inside?.nodeId === nodeId ? editPickerOf(nodeId) : null;
     if (!at) {
       return [];
     }
@@ -1603,7 +1636,7 @@
     const doc = saver?.history.present;
     const found = doc ? findClip(doc, clip)?.clip : null;
     const size = at?.picker.frameSize();
-    if (!saver || !at || !doc || !found || !size || !editsText(doc, clip)) {
+    if (editedView(nodeId) || !saver || !at || !doc || !found || !size || !editsText(doc, clip)) {
       return;
     }
     const caret = await caretSource(() => at.live.tokens, () => at.live.assets)(doc, clip);
@@ -1740,7 +1773,7 @@
       pickMany(nodeId, [instead]);
       clip = instead;
     }
-    const at = pickerOf(nodeId);
+    const at = editPickerOf(nodeId);
     const saver = saverOf(nodeId);
     if (!at || !saver || e.button !== 0 || frameChrome(kindOfNode(nodeId)).dragsHost) {
       return;
@@ -1748,7 +1781,10 @@
     e.preventDefault();
     e.stopPropagation();
     dropHover();
-    const start = saver.history.present;
+    const source = saver.history.present;
+    const shownView = editedView(nodeId);
+    const start = shownView ? at.live.doc : source;
+    const lifted = (doc: MotionDoc) => (shownView ? liftViewEdit(source, shownView.breakpointId, start, doc) : doc);
     const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }));
     if (!inScope) {
       return;
@@ -1780,10 +1816,10 @@
         carried = !!out;
       }
       const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
-      result = dragged.result.ok ? { ok: true, doc: inScope.merge(dragged.result.doc) } : dragged.result;
+      result = dragged.result.ok ? { ok: true, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
       frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
       if (result.ok) {
-        liveDocs.set(nodeId, { ...at.live, doc: result.doc });
+        liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: result.doc });
       }
     };
     const up = (ev: PointerEvent) => {
@@ -1885,6 +1921,10 @@
     const target = e.target as HTMLElement;
     const hit = boxHit(hitAt(w), target);
     if (prototypeLink.draft && e.button === PRIMARY_BUTTON && hit.kind === HitKind.Node && linkPrototype(hit.nodeId)) {
+      e.preventDefault();
+      return;
+    }
+    if (hit.kind === HitKind.Empty && viewAt(bpViews, w) && pickElement(e, w)) {
       e.preventDefault();
       return;
     }
@@ -3002,7 +3042,7 @@
         {#if edit}
           <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
-        {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : selectionMarks(frame.id) as mark (mark.clip)}
+        {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={shows(frameViews, FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
@@ -3022,7 +3062,7 @@
         {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length)) || measuredGapsIn.length)}
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} measured={measuredGapsIn} />
         {/if}
-        {#if pickHover?.nodeId === frame.id}
+        {#if pickHover?.at === frame.id}
           <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
         {@const live = peering ? liveOf(frame.id) : null}
@@ -3041,7 +3081,15 @@
       {/snippet}
     </FrameOverlays>
     <FrameOverlays {view} frames={viewOverlays}>
-      {#snippet children(frame)}<span class="bp-label" data-testid="breakpoint-view-label">{viewLabels.get(frame.id)}</span>{/snippet}
+      {#snippet children(frame)}
+        {@const nodeId = viewOf(frame.id)?.nodeId ?? frame.id}
+        {#each typing || cropping?.nodeId === nodeId ? [] : marksIn(frame.id) as mark (mark.clip)}
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={null} turn={0} ongrab={(grip, handle, e) => grab(nodeId, mark.clip, grip, handle, e)} />
+        {/each}
+        {#if pickHover?.at === frame.id}
+          <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {/if}
+      {/snippet}
     </FrameOverlays>
     <PrototypePlayerHost frames={playerFrames} />
     <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} />
@@ -3268,15 +3316,6 @@
 </div>
 
 <style>
-  .bp-label {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    padding-bottom: 4px;
-    color: var(--ui-ink-2);
-    font-size: var(--ui-text-xs);
-    white-space: nowrap;
-  }
 
   .wrap.commenting .surface {
     cursor: crosshair;

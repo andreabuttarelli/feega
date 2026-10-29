@@ -241,15 +241,29 @@ function cascaded(doc: MotionDoc, breakpointId: string): { doc: MotionDoc; width
   return { doc: applied, width: target.width };
 }
 
+const changedKeys = (after: MotionClip, before: MotionClip) => OVERRIDE_KEYS.filter((key) => !same(readField(after, key), readField(before, key)));
+
 function liftClip(edited: MotionClip, source: MotionClip, before: MotionClip, breakpointId: string): MotionClip {
-  const changed = OVERRIDE_KEYS.filter((key) => !same(readField(edited, key), readField(before, key)));
+  const changed = changedKeys(edited, before);
   if (!changed.length) {
-    return withOverrides(edited, source.overrides);
+    return source;
   }
 
-  const base = changed.reduce((c, key) => applyOverride(c, key, readField(source, key)), edited);
   const at = { ...source.overrides?.[breakpointId], ...Object.fromEntries(changed.map((key) => [key, readField(edited, key)])) };
-  return withOverrides(base, { ...source.overrides, [breakpointId]: at });
+  return withOverrides(source, { ...source.overrides, [breakpointId]: at });
+}
+
+export function carryChanges(into: MotionDoc, before: MotionDoc, after: MotionDoc): MotionDoc {
+  const befores = new Map(clipsOf(before).map((c) => [c.id, c]));
+  const afters = new Map(clipsOf(after).map((c) => [c.id, c]));
+  return mapClips(into, (clip) => {
+    const was = befores.get(clip.id);
+    const now = afters.get(clip.id);
+    if (!was || !now) {
+      return clip;
+    }
+    return changedKeys(now, was).reduce((c, key) => applyOverride(c, key, readField(now, key)), clip);
+  });
 }
 
 export function liftEdit(source: MotionDoc, breakpointId: string, edited: MotionDoc): MotionDoc {
