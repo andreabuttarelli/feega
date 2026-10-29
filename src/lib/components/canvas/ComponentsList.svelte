@@ -1,27 +1,51 @@
 <script lang="ts">
   import Diamond from '@lucide/svelte/icons/diamond';
+  import Copy from '@lucide/svelte/icons/copy';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
-  import { CANVAS_DRAG_COMPONENT, serializeComponentDrag } from '$lib/canvas/component-drag';
+  import { CANVAS_DRAG_COMPONENT, componentClipText, serializeComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
+  import type { ComponentGroup } from '$lib/motion/canvas-components';
 
-  const groups = $derived(canvasComponents.groups);
+  type ListedGroup = ComponentGroup & { thumb?: string | null };
+
+  let { groups = null, title = 'Components' }: { groups?: ListedGroup[] | null; title?: string } = $props();
+
+  const shown = $derived<ListedGroup[]>(groups ?? canvasComponents.groups);
 
   const label = (variant: Record<string, string>) => Object.values(variant).join(' · ');
 
-  function drag(e: DragEvent, frameId: string, compId: string) {
-    e.dataTransfer?.setData(CANVAS_DRAG_COMPONENT, serializeComponentDrag({ frameId, compId }));
+  function drag(e: DragEvent, item: ComponentDrag) {
+    e.dataTransfer?.setData(CANVAS_DRAG_COMPONENT, serializeComponentDrag(item));
     e.dataTransfer!.effectAllowed = 'copy';
+  }
+
+  function copy(item: ComponentDrag) {
+    void navigator.clipboard?.writeText(componentClipText(item));
+  }
+
+  function copyKey(e: KeyboardEvent, item: ComponentDrag) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+      e.preventDefault();
+      copy(item);
+    }
   }
 </script>
 
-{#if groups.length}
+{#if shown.length}
   <section class="components" data-testid="canvas-components">
-    <h4>Components</h4>
-    {#each groups as group (group.key)}
+    <h4>{title}</h4>
+    {#each shown as group (group.key)}
       <div class="group">
-        <span class="name"><Diamond size={14} />{group.name}</span>
+        <span class="name">
+          {#if group.thumb}<img class="thumb" src={group.thumb} alt="" loading="lazy" />{:else}<Diamond size={14} />{/if}
+          {group.name}
+        </span>
         {#each group.variants as v (v.compId)}
-          <div class="row" draggable="true" role="listitem" data-testid="component-row" data-comp={v.compId} ondragstart={(e) => drag(e, group.frameId, v.compId)}>
-            {label(v.variant) || 'Main'}
+          {@const item = { frameId: group.frameId, compId: v.compId }}
+          <div class="row" draggable="true" role="listitem" tabindex="0" data-testid="component-row" data-comp={v.compId} ondragstart={(e) => drag(e, item)} onkeydown={(e) => copyKey(e, item)}>
+            <span class="variant">{label(v.variant) || 'Main'}</span>
+            <button type="button" class="copy" data-testid="component-copy" aria-label="Copy" title="Copy" onclick={() => copy(item)}>
+              <Copy size={12} />
+            </button>
           </div>
         {/each}
       </div>
@@ -61,15 +85,49 @@
     font-weight: 600;
   }
 
+  .thumb {
+    width: 32px;
+    height: 20px;
+    object-fit: cover;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-surface);
+  }
+
   .row {
-    padding: 4px 8px 4px 22px;
+    display: flex;
+    align-items: center;
+    padding: 4px 4px 4px 22px;
     border-radius: var(--ui-radius-sm);
     color: var(--ui-text);
     font-size: var(--ui-type-caption);
     cursor: grab;
   }
 
-  .row:hover {
+  .row:hover,
+  .row:focus-visible {
     background: var(--ui-hover);
+    outline: none;
+  }
+
+  .variant {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .copy {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+    opacity: 0;
+  }
+
+  .row:hover .copy,
+  .row:focus-within .copy {
+    opacity: 1;
   }
 </style>

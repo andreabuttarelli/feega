@@ -117,7 +117,8 @@
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
-  import { CANVAS_DRAG_COMPONENT, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
+  import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
+  import { fetchComponentSource } from '$lib/canvas/project-components';
   import { placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
@@ -2829,6 +2830,11 @@
     }
     e.preventDefault();
     const at = pasteAt();
+    const component = parseComponentClip(e.clipboardData!.getData(TEXT_MIME));
+    if (component) {
+      void dropComponent(component, at, soleFrame);
+      return;
+    }
     pasteFrom(await eventSource(e.clipboardData!), at);
   }
 
@@ -2935,12 +2941,15 @@
     }
   }
 
-  function dropComponent(dragged: ComponentDrag, world: Point) {
+  async function dropComponent(dragged: ComponentDrag, world: Point, fallbackFrame: string | null = null) {
     const targetId = topNodeAt(world);
-    const frame = coreFrames.find((f) => f.id === targetId);
+    const frame = coreFrames.find((f) => f.id === targetId) ?? coreFrames.find((f) => f.id === fallbackFrame);
     const saver = frame ? saverOf(frame.id) : null;
-    const source = liveOf(dragged.frameId)?.doc;
-    if (!frame || !saver || !source) {
+    if (!frame || !saver) {
+      return;
+    }
+    const source = liveOf(dragged.frameId)?.doc ?? (await fetchComponentSource(page.params.projectId ?? '', dragged));
+    if (!source) {
       return;
     }
     const offset = { x: (world.x - (frame.box.x + frame.box.w / 2)) / frame.box.w, y: (world.y - (frame.box.y + frame.box.h / 2)) / frame.box.h };
@@ -2970,7 +2979,7 @@
     const component = parseComponentDrag(e.dataTransfer?.getData(CANVAS_DRAG_COMPONENT) ?? '');
     if (component) {
       e.preventDefault();
-      dropComponent(component, toFlow(at));
+      void dropComponent(component, toFlow(at));
       return;
     }
     const filled = parseFilledNodeDrag(e.dataTransfer?.getData(CANVAS_DRAG_FILLED_NODE) ?? '');

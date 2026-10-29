@@ -4,7 +4,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { createComponent, instanceOf } from './main-component';
 import { addVariant } from './variants';
-import { componentGroups, placeInstance } from './canvas-components';
+import { componentGroups, componentSlice, placeInstance } from './canvas-components';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -78,5 +78,17 @@ describe('components on a canvas', () => {
     const { doc } = frameWithButton();
 
     expect(placeInstance(doc, doc, 'nope', newId).ok).toBe(false);
+  });
+});
+
+describe('a component carried to another canvas', () => {
+  it('keeps only the main and what it nests, and still places an instance', () => {
+    const { doc: source, compId } = frameWithButton();
+
+    const slice = componentSlice(source, compId);
+
+    expect(Object.keys(slice.comps)).toEqual([compId]);
+    expect(slice.tracks).toEqual([]);
+    expect(placeInstance(newMotionDoc(MotionFormat.Landscape), slice, compId, newId).ok).toBe(true);
   });
 });

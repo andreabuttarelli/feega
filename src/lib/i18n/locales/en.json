@@ -103,6 +103,7 @@
   "app": {
     "nav2": {
       "layers": "Layers",
+      "components": "Components",
       "materials": "Assets",
       "brands": "Brands",
       "influencers": "Influencers",
