@@ -19,7 +19,7 @@ describe('right bar of a canvas selection', () => {
   it('gives every frame "…" entry a home in the frame right bar', () => {
     const home = new Set(FRAME_PANEL_ACTIONS.map((a) => a.id));
     const motionPanel = new Set(['frame-voice', 'frame-music', 'frame-code']);
-    const elsewhere = new Set(['copy-link']);
+    const elsewhere = new Set(['copy-link', 'wrap-stack']);
     const overflow = SELECTION_ACTIONS.filter((a) => (a.group === 'overflow' || a.group === 'fixed') && !motionPanel.has(a.id) && !elsewhere.has(a.id));
 
     expect(overflow.filter((a) => !home.has(a.id)).map((a) => a.id)).toEqual([]);
@@ -67,7 +67,7 @@ describe('group and ungroup', () => {
       ['align-middle', 'Alt+V'],
       ['align-bottom', 'Alt+S'],
       ['tidy-up', 'Mod+Alt+T'],
-      ['stack', 'Shift+A'],
+      ['stack', null],
       ['section-selection', 'Shift+S'],
       ['run-technique-rows', null],
       ['edit-technique', null],
@@ -85,6 +85,7 @@ describe('group and ungroup', () => {
       ['frame-selection', 'Mod+Alt+G'],
       ['resize-to-fit', 'Mod+Alt+Shift+R'],
       ['wrap-stack', 'Shift+A'],
+      ['remove-stack', 'Alt+Shift+A'],
       ['union', 'Alt+Shift+U'],
       ['subtract', 'Alt+Shift+S'],
       ['intersect', 'Alt+Shift+I'],
@@ -160,7 +161,7 @@ describe('group and ungroup', () => {
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
     expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame']);
-    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', 'frame-code', 'frame-voice', 'frame-music', 'frame-interactive', 'frame-components', 'frame-templates', 'frame-history', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report']);
+    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['wrap-stack', 'export', 'frame-code', 'frame-voice', 'frame-music', 'frame-interactive', 'frame-components', 'frame-templates', 'frame-history', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
 

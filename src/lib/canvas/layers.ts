@@ -7,10 +7,11 @@ import { isLockedComp } from '$lib/motion/template/library';
 import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
 import { TrackKind } from '@feega/motion-core/motion/components';
-import { joinMask, leaveMask, maskMembers, maskOf, releaseMasks, useAsMask } from '$lib/motion/mask-group';
-import { Command } from '$lib/motion/shortcuts';
+import { joinMask, leaveMask, maskMembers, maskOf } from '$lib/motion/mask-group';
 import { NODE_KIND_LABEL } from './node-label';
 import { elementName } from '$lib/motion/element-name';
+import { layoutKind } from '@feega/motion-core/motion/layout/stack';
+import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import type { NodeType } from './node-data';
 
 export enum LayerKind {
@@ -46,7 +47,11 @@ export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string,
 
 const FRAME_TYPE = 'motion';
 
-export const elementGlyph = (clip: { component: string; props: Record<string, unknown> } | undefined): string | undefined => (clip?.component === 'Shape' ? String(clip.props.shape) : clip?.component);
+type Glyphed = { component: string; props: Record<string, unknown>; autoLayout?: { direction: AutoLayout['direction'] } | null };
+
+const shapeGlyph = (clip: Glyphed): string => (clip.component === 'Shape' ? String(clip.props.shape) : clip.component);
+
+export const elementGlyph = (clip: Glyphed | undefined): string | undefined => (clip ? (layoutKind(clip) ?? shapeGlyph(clip)) : undefined);
 
 export const nodeIcon = (node: { type: string; still?: boolean }): string => (node.type === FRAME_TYPE ? (node.still ? NodeIcon.Still : NodeIcon.Video) : node.type);
 type Parts = Record<string, readonly string[]>;
@@ -139,7 +144,7 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     kind: kindOf(walk, clip, template),
     depth,
     label: doc.comps[comp]?.name ?? clipLabel(clip),
-    type: clip.component,
+    type: layoutKind(clip) ?? clip.component,
     nodeId,
     hidden: !!clip.hidden,
     locked: template || !!clip.locked,
@@ -272,13 +277,6 @@ const DROP: Record<LayerKind, (at: number) => Place> = {
 };
 
 export const dropPlace = (kind: LayerKind, at: number): Place => DROP[kind](at);
-
-export type LayerMenuItem = { command: Command.UseAsMask | Command.RemoveMask; summary: string; op: (doc: MotionDoc, ids: readonly string[]) => OpResult };
-
-export const LAYER_MENU: readonly LayerMenuItem[] = [
-  { command: Command.UseAsMask, summary: 'Used as mask', op: useAsMask },
-  { command: Command.RemoveMask, summary: 'Removed a mask', op: releaseMasks }
-];
 
 export function dropLayer(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId): OpResult {
   const into = place === Place.Into && maskMembers(doc).has(target);

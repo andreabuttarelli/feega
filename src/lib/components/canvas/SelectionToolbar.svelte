@@ -6,7 +6,7 @@
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import Square from '@lucide/svelte/icons/square';
   import { isFrameAction } from '$lib/canvas/frame-dialogs';
-  import { actionsIn, enabledFor, shownFor, toolbarSlots, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { actionsFor, actionsIn, enabledFor, shownFor, toolbarSlots, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
@@ -53,6 +53,7 @@
     frameTools = false,
     musicEnabled = false,
     withheld = [],
+    elementActions = [],
     onrun,
     oncancelvariants,
     variantsInFlight = 0,
@@ -78,6 +79,7 @@
     frameTools?: boolean;
     musicEnabled?: boolean;
     withheld?: readonly SelectionActionId[];
+    elementActions?: readonly SelectionActionId[];
     onrun?: () => void;
     oncancelvariants?: () => void;
     variantsInFlight?: number;
@@ -136,7 +138,8 @@
   const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
   const danger = $derived(actionsIn('danger', count));
   const fixed = $derived(actionsIn('fixed', count).filter((a) => !withheld.includes(a.id)));
-  const slots = $derived(toolbarSlots([...fixed, ...secondary, ...overflow, ...danger]));
+  const picked = $derived(actionsFor(elementActions).filter((a) => !overflow.some((o) => o.id === a.id)));
+  const slots = $derived(toolbarSlots([...fixed, ...secondary, ...picked, ...overflow, ...danger]));
 
   function gateOf(action: SelectionAction) {
     return enabledFor(action.id, nodeSummaries, edges, stale);
@@ -305,7 +308,7 @@
             {#each slots.overflow as action (action.id)}
               {@const Icon = SELECTION_ACTION_ICON[action.id]}
               {@const gate = gateOf(action)}
-              <DropdownMenu.Item class="min-h-11 md:min-h-8" disabled={!gate.enabled} title={gate.reason} onSelect={() => onaction?.(action.id)}>
+              <DropdownMenu.Item class="min-h-11 md:min-h-8" disabled={!gate.enabled} title={gate.reason} data-action={action.id} onSelect={() => onaction?.(action.id)}>
                 <Icon strokeWidth={1.7} />
                 {action.label}
               </DropdownMenu.Item>

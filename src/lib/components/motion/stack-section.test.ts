@@ -25,10 +25,10 @@ const row = (() => {
 const clip = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip;
 const html = (doc: MotionDoc, id: string) => render(StackSection, { props: { doc, clip: clip(doc, id), commit: () => {} } }).body;
 
-describe('the auto layout section', () => {
-  it('a container shows direction, alignment, gap and padding, and can be removed', () => {
+describe('the stack section', () => {
+  it('a stack shows direction, alignment, stretch, gap and padding', () => {
     const body = html(row, 'box');
-    for (const id of ['auto-layout-align', 'auto-layout-gap', 'auto-layout-padding', 'auto-layout-remove']) {
+    for (const id of ['auto-layout-align', 'auto-layout-gap', 'auto-layout-padding', 'auto-layout-stretch']) {
       expect(body).toContain(`data-testid="${id}"`);
     }
     expect(body).toMatch(/aria-label="Horizontal"[^>]*aria-checked="true"|aria-checked="true"[^>]*aria-label="Horizontal"/);
@@ -75,10 +75,14 @@ describe('the auto layout section', () => {
     expect(html(row, 'a')).toMatch(/data-segmented="Absolute"[\s\S]*?>Yes<[\s\S]*?>No</);
   });
 
-  it('a plain rectangle only offers to add auto layout', () => {
+  it('a plain rectangle shows nothing: Wrap with stack makes a stack', () => {
     const body = html(row, 'plain');
-    expect(body).toContain('data-testid="auto-layout-add"');
+    expect(body).not.toContain('data-testid="auto-layout-add"');
     expect(body).not.toContain('Width sizing');
+  });
+
+  it('marks stretch when the stack stretches its children', () => {
+    expect(html(must(setAutoLayout(row, 'box', { align: Align.Stretch })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-stretch"|data-testid="auto-layout-stretch"[^>]*aria-pressed="true"/);
   });
 });
 

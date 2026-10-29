@@ -7,6 +7,7 @@ import { addClip, setTransform } from '@feega/motion-core/motion/timeline';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { ComponentId } from '@feega/motion-core/motion/components';
+import { wrapInStack } from '$lib/motion/layout/ops';
 
 function withClip(component: ComponentId, id: string, doc: MotionDoc = newMotionDoc(MotionFormat.Landscape)): MotionDoc {
   const added = addClip(doc, { component, from: 0 }, id);
@@ -23,6 +24,39 @@ function inspect(component: ComponentId, mode = EditMode.Motion) {
 }
 
 const sections = (html: string) => [...html.matchAll(/data-section="([^"]+)"/g)].map((m) => m[1]);
+
+function inspectStack(id: string) {
+  const texted = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 't');
+  const stacked = texted.ok ? wrapInStack(texted.doc, ['t'], 'stack', 'lane') : texted;
+  if (!stacked.ok) {
+    throw new Error(stacked.error);
+  }
+  const clip = findClip(stacked.doc, id)!.clip;
+  return render(MotionInspector, { props: { doc: stacked.doc, clip, tokens: FEEGA_TOKENS, assets: [], frame: 0, mode: EditMode.Design, onchange: () => {} } }).body;
+}
+
+describe('a Stack in Properties', () => {
+  it('shows the Stack section above the shared fill, stroke and effects, with Remove stack', () => {
+    const html = inspectStack('stack');
+    const order = sections(html).filter((s) => ['stack', 'fill', 'stroke', 'effects'].includes(s));
+
+    expect(order[0]).toBe('stack');
+    expect(order).toEqual(expect.arrayContaining(['fill', 'stroke', 'effects']));
+    expect(html).toContain('data-testid="auto-layout-remove"');
+    expect(html.match(/data-testid="stack-section"/g)).toHaveLength(1);
+  });
+
+  it('shows a child its sizing in the stack, without Remove stack', () => {
+    const html = inspectStack('t');
+
+    expect(sections(html)).toContain('stack');
+    expect(html).not.toContain('data-testid="auto-layout-remove"');
+  });
+
+  it('shows no Stack section on a clip outside any stack', () => {
+    expect(sections(inspect('Title'))).not.toContain('stack');
+  });
+});
 
 describe('Properties for one clip', () => {
   it('a title: its name and kind on top, then layout, layer, fill, effects, text, animation in that order', () => {

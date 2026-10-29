@@ -33,6 +33,7 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   'frame-selection': Command.FrameSelection,
   'resize-to-fit': Command.ResizeToFit,
   'wrap-stack': Command.WrapStack,
+  'remove-stack': Command.RemoveStack,
   'union': Command.Union,
   'subtract': Command.Subtract,
   'intersect': Command.Intersect,

@@ -2,6 +2,7 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from '$lib/motion/edit-mode';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import type { CanvasLayer, LayerHover } from './layers';
+import type { ActionId } from '$lib/motion/actions';
 
 export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
@@ -23,6 +24,7 @@ export type VideoSide = {
   select(ids: string[]): void;
   selectPart(clipId: string, part: string): void;
   edit(result: OpResult, summary: string): void;
+  run(id: ActionId): void;
   preview(doc: MotionDoc | null): void;
 };
 

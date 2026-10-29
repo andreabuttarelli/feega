@@ -331,8 +331,8 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
   });
 
-  it('⇧A stacks the selected tiles', () => {
-    expect(matchCanvasShortcut(ev('A', { shiftKey: true }))).toEqual({ id: 'stack' });
+  it('⇧A wraps the selection with a stack', () => {
+    expect(matchCanvasShortcut(ev('A', { shiftKey: true }))).toEqual({ id: 'wrap-stack' });
     expect(matchCanvasShortcut(ev('a'))).toBeNull();
   });
 

@@ -4,7 +4,9 @@ import { mainNav } from './main-nav.svelte';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
 import { ungroupClip } from '$lib/motion/group';
 import { groupLight, ungroupLight } from '$lib/motion/light-group';
-import { wrapWithStack, freezeLayout, resizeToFit, wrapInFrame } from '$lib/motion/layout/ops';
+import { removeStack, resizeToFit, wrapInFrame, wrapWithStack } from '$lib/motion/layout/ops';
+import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
+import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Flip, flipClips } from '$lib/motion/layer-props';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
@@ -102,13 +104,19 @@ function framed(ctx: BarCtx): Done | null {
   return done(wrapInFrame(ctx.doc, ctx.selection, container, ctx.newId()), 'Framed the selection', [container]);
 }
 
-function autoLayout(ctx: BarCtx): Done | null {
-  const lone = ctx.selection.length === 1 ? findClip(ctx.doc, ctx.selection[0])?.clip : null;
-  if (lone?.autoLayout) {
-    return done(freezeLayout(ctx.doc, lone.id), 'Removed auto layout', [lone.id]);
-  }
+function wrapStack(ctx: BarCtx): Done | null {
   const { result, containerId } = wrapWithStack(ctx.doc, ctx.selection, ctx.newId);
-  return done(result, 'Added auto layout', [containerId]);
+  return done(result, 'Wrapped with a stack', [containerId]);
+}
+
+const loneStack = (doc: MotionDoc, selection: readonly string[]): (MotionClip & { autoLayout: AutoLayout }) | null => {
+  const [clip] = selection.length === 1 ? clipsOf(doc, selection) : [];
+  return clip?.autoLayout ? (clip as MotionClip & { autoLayout: AutoLayout }) : null;
+};
+
+function unwrapStack(ctx: BarCtx): Done | null {
+  const stack = loneStack(ctx.doc, ctx.selection);
+  return stack ? done(removeStack(ctx.doc, stack.id), 'Removed the stack', childrenInOrder(clipsOf(ctx.doc, topIds(ctx.doc)), stack).map((c) => c.id)) : null;
 }
 
 const clipOp = (op: ClipOp): BarOp => ({ shown: any, run: (ctx) => {
@@ -220,7 +228,8 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.Ungroup]: { shown: oneGroup, run: ungrouped },
   [Action.FrameSelection]: { shown: any, run: framed },
   [Action.ResizeToFit]: { shown: any, run: (ctx) => kept(ctx, resizeToFit(ctx.doc, ctx.selection[0]), 'Resized the frame to fit') },
-  [Action.WrapStack]: { shown: any, run: autoLayout },
+  [Action.WrapStack]: { shown: any, run: wrapStack },
+  [Action.RemoveStack]: { shown: (doc, selection) => loneStack(doc, selection) !== null, run: unwrapStack },
   [Action.Union]: combine(BooleanOp.Union),
   [Action.Subtract]: combine(BooleanOp.Subtract),
   [Action.Intersect]: combine(BooleanOp.Intersect),
@@ -247,7 +256,7 @@ const LATER_OPS: Partial<Record<ActionId, LaterOp>> = {
   [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load, ctx.assets), 'Outlined text') }
 };
 
-const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.WrapStack, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
+const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.WrapStack, Action.RemoveStack, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
 
 export const FRAME_STRUCTURE_ACTIONS: ReadonlySet<ActionId> = new Set(STRUCTURE_ORDER);
 
@@ -303,3 +312,19 @@ export function frameKeyAction(e: KeyboardEvent): ActionId | null {
   const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, EditMode.Design);
   return command && FRAME_KEYS.has(command) ? command : null;
 }
+
+const shownIn = (id: ActionId, doc: MotionDoc, selection: readonly string[]) => (BAR_OPS[id] ?? LATER_OPS[id])?.shown(doc, selection) ?? runs(id);
+
+export const elementMenuIds = (doc: MotionDoc, picks: readonly string[]): ReadonlySet<SelectionActionId> =>
+  new Set([...FRAME_ELEMENT_MENU].filter((id) => shownIn(frameMenuAction(id)!, doc, picks)));
+
+const TOOLBAR_ELEMENT_ACTIONS: readonly SelectionActionId[] = ['wrap-stack', 'remove-stack'];
+
+export const elementToolbarActions = (doc: MotionDoc, picks: readonly string[]): SelectionActionId[] => {
+  const shown = elementMenuIds(doc, picks);
+  return picks.length ? TOOLBAR_ELEMENT_ACTIONS.filter((id) => shown.has(id)) : [];
+};
+
+const LAYER_ACTIONS: readonly ActionId[] = [Action.WrapStack, Action.RemoveStack, Action.CreateComponent, Command.UseAsMask, Command.RemoveMask, Action.ToggleHidden, Action.ToggleLocked, Action.Delete];
+
+export const layerMenuActions = (doc: MotionDoc, selection: readonly string[]): ActionId[] => (selection.length ? LAYER_ACTIONS.filter((id) => shownIn(id, doc, selection)) : []);

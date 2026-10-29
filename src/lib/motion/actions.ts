@@ -8,6 +8,8 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import Code from '@lucide/svelte/icons/code';
+import StretchHorizontal from '@lucide/svelte/icons/stretch-horizontal';
+import SquareSplitVertical from '@lucide/svelte/icons/square-split-vertical';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import Ruler from '@lucide/svelte/icons/ruler';
 import PenLine from '@lucide/svelte/icons/pen-line';
@@ -113,7 +115,6 @@ import Ungroup from '@lucide/svelte/icons/ungroup';
 import Frame from '@lucide/svelte/icons/frame';
 import Shrink from '@lucide/svelte/icons/shrink';
 import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
-import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
 import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -256,7 +257,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.FrameSelection]: { name: 'Frame selection', icon: Frame, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ResizeToFit]: { name: 'Resize to fit', icon: Shrink, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Section]: { name: 'Section selection', icon: LayoutDashboard, group: GuideGroup.Edit, menu: MenuSection.Layer },
-  [Command.WrapStack]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.WrapStack]: { name: 'Wrap with stack', icon: StretchHorizontal, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.RemoveStack]: { name: 'Remove stack', icon: SquareSplitVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.EditAsVector]: { name: 'Edit as vector', icon: PenTool, group: GuideGroup.Edit, menu: MenuSection.Layer },

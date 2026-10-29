@@ -29,7 +29,7 @@ describe('videoSide', () => {
   it('serves the layers panel the frame doc and selecting there selects the element', () => {
     const doc = newMotionDoc(MotionFormat.Landscape);
     let selection: string[] = [];
-    const side = videoSide({ nodeId: 'n1', doc: () => doc, selection: () => selection, select: (ids) => (selection = ids), edit: () => {} });
+    const side = videoSide({ nodeId: 'n1', doc: () => doc, selection: () => selection, select: (ids) => (selection = ids), edit: () => {}, run: () => {} });
 
     side.select(['card']);
 
@@ -57,7 +57,7 @@ describe('videoSide parts', () => {
   it('picking a poster part keeps the part for the properties panel', () => {
     const doc = newMotionDoc(MotionFormat.Landscape);
     let picked: { clip: string; part: string } | null = null;
-    const side = videoSide({ nodeId: 'n1', doc: () => doc, selection: () => ['card'], part: () => 'lines.0', select: () => {}, selectPart: (clip, part) => (picked = { clip, part }), edit: () => {} });
+    const side = videoSide({ nodeId: 'n1', doc: () => doc, selection: () => ['card'], part: () => 'lines.0', select: () => {}, selectPart: (clip, part) => (picked = { clip, part }), edit: () => {}, run: () => {} });
 
     side.selectPart('card', 'lines.0');
 

@@ -12,6 +12,7 @@ import type { MotionClip } from '@feega/motion-core/motion/doc';
 export enum Section {
   Content = 'content',
   Layout = 'layout',
+  Stack = 'stack',
   Align = 'align',
   Constraints = 'constraints',
   Transform = 'transform',
@@ -29,6 +30,7 @@ export enum Section {
 
 export const SECTION_ORDER: readonly Section[] = [
   Section.Layout,
+  Section.Stack,
   Section.Align,
   Section.Constraints,
   Section.Content,
@@ -48,6 +50,7 @@ export const SECTION_ORDER: readonly Section[] = [
 export const SECTION_TITLE: Record<Section, string> = {
   [Section.Content]: 'Content',
   [Section.Layout]: 'Layout',
+  [Section.Stack]: 'Stack',
   [Section.Align]: 'Alignment',
   [Section.Constraints]: 'Constraints',
   [Section.Transform]: 'Transform',
@@ -63,7 +66,7 @@ export const SECTION_TITLE: Record<Section, string> = {
   [Section.Parent]: 'Parent & mask'
 };
 
-const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Align, Section.Constraints, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text]);
+const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text]);
 
 const DEFAULT_OPEN = Object.fromEntries(SECTION_ORDER.map((s) => [s, OPEN_FIRST.has(s)])) as Record<Section, boolean>;
 
@@ -306,6 +309,7 @@ const countOf = (n: number, noun: string) => (n ? `${n} ${noun}` : '');
 const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
   [Section.Content]: (clip) => clipName(clip),
   [Section.Layout]: () => '',
+  [Section.Stack]: () => '',
   [Section.Align]: () => '',
   [Section.Constraints]: () => '',
   [Section.Transform]: layoutSummary,
