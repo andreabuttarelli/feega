@@ -62,24 +62,3 @@ export function lastGesture(newestFirst: readonly LoggedEvent[], writer: Writer)
 
   return items.length ? { items } : null;
 }
-
-const writerOf = (event: LoggedEvent): Writer => ({ kind: event.actorKind, id: event.actorId, agentKey: event.agentKey });
-
-export function agentChanges<E extends LoggedEvent>(newestFirst: readonly E[]): E[][] {
-  const changes: E[][] = [];
-
-  for (const event of newestFirst) {
-    if (event.actorKind !== 'agent') {
-      continue;
-    }
-    const head = changes.at(-1)?.[0];
-    const joins = head && sameWriter(event, writerOf(head)) && Date.parse(head.createdAt) - Date.parse(event.createdAt) <= SAME_GESTURE_MS;
-    if (joins) {
-      changes.at(-1)!.push(event);
-      continue;
-    }
-    changes.push([event]);
-  }
-
-  return changes;
-}

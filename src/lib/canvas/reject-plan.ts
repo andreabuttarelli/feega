@@ -75,5 +75,3 @@ export type RejectResult =
   | { outcome: RejectOutcome.Confirm; nodeId: string; touchedBy: number[] }
   | { outcome: RejectOutcome.NotFound }
   | { outcome: RejectOutcome.Stale; nodeId: string };
-
-export type AgentChange = { eventIds: number[]; agent: string | null; at: string; writes: { kind: UndoItem['kind']; nodeId: string | null; edgeId: string | null }[] };

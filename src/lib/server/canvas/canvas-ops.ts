@@ -85,7 +85,7 @@ import { arrangeNodes } from '$lib/server/canvas/arrange';
 import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileBox, type TileMove } from '$lib/canvas/align';
 import { Axis, Edge } from '$lib/motion/space';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
-import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
+import { revertChange } from '$lib/server/canvas/revert';
 import { Keep } from '$lib/canvas/reject-plan';
 import { lastGesture } from '$lib/canvas/undo-last';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
@@ -121,6 +121,7 @@ export type CanvasDeps = {
   projectId: string;
   userId: string;
   brandId?: string | null;
+  agentKey?: string;
   sessionId?: string | null;
 };
 
@@ -132,7 +133,7 @@ export type CanvasCtx = CanvasDeps & {
 export function canvasCtx(deps: CanvasDeps): CanvasCtx {
   const billed = <T>(fn: () => Promise<T>): Promise<T> =>
     deps.brandId ? withBrandContext(deps.brandId, fn) : withOrgContext(deps.orgId, fn);
-  return { ...deps, actor: agentActor(deps.userId, undefined, deps.sessionId), billed };
+  return { ...deps, actor: agentActor(deps.userId, deps.agentKey, deps.sessionId), billed };
 }
 
 const EXPORT_MAX_FRAMES = 50;
@@ -456,11 +457,11 @@ const distributeNodesInput = arrangeInput.extend({ axis: z.enum(Object.values(Ax
 const stackNodesInput = arrangeInput.extend({ gap: z.number().min(0).default(STACK_GAP).describe('space between nodes in canvas units') }).strict();
 const undoLastInput = z.object({ canvasId: z.string() }).strict();
 const UNDO_LOOKBACK = 50;
-const rejectChangeInput = z
+const revertChangeInput = z
   .object({
     canvasId: z.string(),
-    eventIds: z.array(z.number().int()).min(1).describe('canvas_events ids of one change, from agent_changes or view activity'),
-    choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })).optional().describe('one per conflict: keep mine, or take the reject'),
+    entryId: z.string().min(1).describe('an entry id (event:<n>) or a session key from list_history'),
+    choices: z.array(z.object({ path: z.string(), keep: z.enum(Keep), eventId: z.number().int().optional() })).optional().describe('one per conflict: keep mine (the value there now), or reject (the value before the change)'),
     confirm: z.boolean().optional().describe('delete a created node even though someone else connected or edited it')
   })
   .strict();
@@ -821,25 +822,14 @@ export const CANVAS_OPS = {
     }
   }),
 
-  agent_changes: op({
-    access: Access.Read,
-    input: canvasIdInput,
-    run: async (ctx, input) => {
-      if (!(await inProject(ctx, input.canvasId))) {
-        return NOT_IN_PROJECT;
-      }
-      return { changes: await listAgentChanges(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) };
-    }
-  }),
-
-  reject_change: op({
+  revert_change: op({
     access: Access.Write,
-    input: rejectChangeInput,
+    input: revertChangeInput,
     run: async (ctx, input) => {
       if (!(await inProject(ctx, input.canvasId))) {
         return NOT_IN_PROJECT;
       }
-      return rejectChange(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor });
+      return revertChange(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor });
     }
   }),
 

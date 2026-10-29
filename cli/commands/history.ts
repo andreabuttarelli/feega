@@ -1,11 +1,11 @@
 import { loadSession } from '../lib/auth.ts';
-import { PointAction, historyApi, historyRows } from '../lib/history.ts';
+import { PointAction, historyApi, historyRows, keepChoices } from '../lib/history.ts';
 
-type HistoryFlags = { ai?: boolean; people?: boolean; frame?: string; json?: boolean; org?: string; preview?: string; restore?: string; name?: string; as?: string; merge?: string; drop?: string; keep?: string };
+type HistoryFlags = { ai?: boolean; people?: boolean; frame?: string; json?: boolean; org?: string; preview?: string; restore?: string; name?: string; as?: string; merge?: string; drop?: string; keep?: string; revert?: string; choose?: string[]; confirm?: boolean };
 
 const AUTHOR_FLAGS = { ai: 'ai', people: 'people' } as const;
 
-const POINT_FLAGS = [PointAction.Preview, PointAction.Restore, PointAction.Name, PointAction.Merge, PointAction.Drop] as const;
+const POINT_FLAGS = [PointAction.Preview, PointAction.Restore, PointAction.Name, PointAction.Merge, PointAction.Drop, PointAction.Revert] as const;
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -19,7 +19,7 @@ async function token(): Promise<string> {
 export async function cmdHistory(canvasId: string, opts: HistoryFlags) {
   const action = POINT_FLAGS.find((flag) => opts[flag]);
   if (action) {
-    const answer = await historyApi.at(await token(), { canvasId, entryId: opts[action]!, action, name: opts.as, keep: opts.keep }, opts.org);
+    const answer = await historyApi.at(await token(), { canvasId, entryId: opts[action]!, action, name: opts.as, keep: opts.keep, choices: keepChoices(opts.choose ?? []), confirm: opts.confirm === true }, opts.org);
     console.log(JSON.stringify(answer, null, 2));
     return;
   }

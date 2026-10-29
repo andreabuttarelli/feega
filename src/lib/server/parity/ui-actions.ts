@@ -121,8 +121,6 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   detach_technique: canvas('detach_technique'),
   open_technique: canvas('open_technique'),
   undo: canvas('undo_gesture'),
-  agent_changes: canvas('agent_changes'),
-  reject_change: canvas('reject_change'),
   suggestNextStep: canvas('suggest_next_steps')
 };
 

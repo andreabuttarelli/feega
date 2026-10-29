@@ -8,6 +8,11 @@ export enum HistorySource {
   Conflict = 'conflict'
 }
 
+export enum SessionPrefix {
+  Session = 'session',
+  Idle = 'idle'
+}
+
 export enum EntryKind {
   NodeCreate = 'node.create',
   NodeUpdate = 'node.update',
@@ -151,10 +156,10 @@ export function historyGraph(entries: HistoryEntry[], query: HistoryQuery): Hist
     rows.push({ entry, lane: known === -1 ? lanes.push(lane) - 1 : known });
   }
 
-  return { lanes, rows, sessions: sessionsOf(rows) };
+  return { lanes, rows, sessions: sessionsOf(lanes, rows) };
 }
 
-function sessionsOf(rows: HistoryRow[]): HistorySession[] {
+function sessionsOf(lanes: Lane[], rows: HistoryRow[]): HistorySession[] {
   const sessions = new Map<string, HistorySession>();
   const idle = new Map<number, { key: string; at: number }>();
 
@@ -162,8 +167,8 @@ function sessionsOf(rows: HistoryRow[]): HistorySession[] {
     const at = Date.parse(row.entry.at);
     const open = idle.get(row.lane);
     const fresh = !open || open.at - at > IDLE_SESSION_MS;
-    const idleKey = fresh ? `idle:${row.lane}:${row.entry.id}` : open.key;
-    const key = row.entry.sessionId ? `session:${row.entry.sessionId}` : idleKey;
+    const idleKey = fresh ? `${SessionPrefix.Idle}:${lanes[row.lane].key}:${row.entry.id}` : open.key;
+    const key = row.entry.sessionId ? `${SessionPrefix.Session}:${row.entry.sessionId}` : idleKey;
     if (!row.entry.sessionId) {
       idle.set(row.lane, { key, at });
     }
@@ -197,11 +202,12 @@ export enum HistoryAction {
   Restore = 'restore',
   Name = 'name',
   Merge = 'merge',
-  Drop = 'drop'
+  Drop = 'drop',
+  Revert = 'revert'
 }
 
 const SOURCE_ACTIONS: Record<HistorySource, readonly HistoryAction[]> = {
-  [HistorySource.Event]: [],
+  [HistorySource.Event]: [HistoryAction.Revert],
   [HistorySource.Version]: [HistoryAction.Preview, HistoryAction.Restore],
   [HistorySource.Revision]: [HistoryAction.Preview, HistoryAction.Restore, HistoryAction.Name],
   [HistorySource.Branch]: [HistoryAction.Merge, HistoryAction.Drop],

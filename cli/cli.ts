@@ -375,7 +375,8 @@ program
   });
 
 program
-  .command('history <canvasId>')
+  .command('history')
+  .argument('<canvasId>')
   .description('One timeline of everything that changed a canvas, newest first, by author (free)')
   .option('--ai', 'Only the sidebar chat and outside agents')
   .option('--people', 'Only people')
@@ -387,6 +388,9 @@ program
   .option('--merge <entryId>', 'Merge this branch back into its frame (with --keep on conflicts)')
   .option('--keep <side>', 'branch or main: which side wins every conflict of --merge')
   .option('--drop <entryId>', 'Remove this branch without merging')
+  .option('--revert <entryId>', 'Revert one change or session (an id or session key from --json), keeping later edits')
+  .option('--choose <field=mine|reject...>', 'With --revert: keep the value there now (mine) or the one before the change (reject)')
+  .option('--confirm', 'With --revert: delete a created node even if someone else connected or edited it')
   .option('--json', 'Print the raw answer, lanes included')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (canvasId: string, opts) => {

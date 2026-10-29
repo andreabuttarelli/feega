@@ -12,6 +12,7 @@
   import GitMerge from '@lucide/svelte/icons/git-merge';
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Undo2 from '@lucide/svelte/icons/undo-2';
   import { Side } from '$lib/motion/branch-merge';
   import { untrack, type Component } from 'svelte';
   import { SegmentedControl } from '$lib/components/ui/shell';
@@ -24,6 +25,7 @@
   import { liveRefresh, mergeGraph } from '$lib/canvas/history/live';
   import { watchHistory } from '$lib/realtime/history-channel';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { Keep, RejectOutcome, type EventConflict } from '$lib/canvas/reject-plan';
 
   let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
 
@@ -50,7 +52,8 @@
     [HistoryAction.Restore]: { label: 'Restore to here', icon: RotateCcw },
     [HistoryAction.Name]: { label: 'Name this version', icon: Tag },
     [HistoryAction.Merge]: { label: 'Merge', icon: GitMerge },
-    [HistoryAction.Drop]: { label: 'Drop', icon: Trash2 }
+    [HistoryAction.Drop]: { label: 'Drop', icon: Trash2 },
+    [HistoryAction.Revert]: { label: 'Revert this change', icon: Undo2 }
   };
 
   const KEEPS = [
@@ -73,6 +76,8 @@
   let conflicts = $state<string[] | null>(null);
   let branching = $state(false);
   let expanded = $state<Record<string, boolean>>({});
+  let asking = $state<{ id: string; conflicts: EventConflict[]; picks: Record<string, Keep> } | null>(null);
+  let confirming = $state<string | null>(null);
 
   let resolving = $state<string | null>(null);
 
@@ -131,7 +136,7 @@
     };
   });
 
-  const pointUrl = (entry: HistoryEntry) => `/p/${projectId}/c/${canvasId}/history/${encodeURIComponent(entry.id)}`;
+  const pointUrl = (entry: Pick<HistoryEntry, 'id'>) => `/p/${projectId}/c/${canvasId}/history/${encodeURIComponent(entry.id)}`;
 
   function toggle(entry: HistoryEntry) {
     opened = opened === entry.id ? null : entry.id;
@@ -149,6 +154,42 @@
     reads += 1;
   }
 
+  const conflictKey = (c: { eventId: number; path: string }) => `${c.eventId}:${c.path}`;
+
+  type Reverted = { outcome: string; conflicts?: EventConflict[] };
+
+  const REVERT_REPLY: Partial<Record<string, (id: string, out: Reverted) => void>> = {
+    [RejectOutcome.Rejected]: () => {
+      notice = 'Reverted.';
+      reads += 1;
+    },
+    [RejectOutcome.Conflict]: (id, out) => {
+      const found = out.conflicts ?? [];
+      asking = { id, conflicts: found, picks: Object.fromEntries(found.map((c) => [conflictKey(c), Keep.Mine])) };
+    },
+    [RejectOutcome.Confirm]: (id) => {
+      confirming = id;
+    }
+  };
+
+  async function revert(id: string, choices: { eventId: number; path: string; keep: Keep }[] = [], confirm = false) {
+    asking = null;
+    confirming = null;
+    const res = await fetch(pointUrl({ id }), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: HistoryAction.Revert, choices, confirm }) });
+    const out = (await res.json().catch(() => ({ outcome: '' }))) as Reverted;
+    const reply = REVERT_REPLY[out.outcome];
+    notice = reply ? '' : ACTION_FAILED;
+    reply?.(id, out);
+  }
+
+  function revertChosen() {
+    if (!asking) {
+      return;
+    }
+    const { id, conflicts: found, picks } = asking;
+    void revert(id, found.map((c) => ({ eventId: c.eventId, path: c.path, keep: picks[conflictKey(c)] })));
+  }
+
   const RUN: Record<HistoryAction, (entry: HistoryEntry) => Promise<void> | void> = {
     [HistoryAction.Preview]: async (entry) => {
       const res = await fetch(pointUrl(entry));
@@ -161,7 +202,8 @@
       naming = entry.summary ?? '';
     },
     [HistoryAction.Merge]: (entry) => write(entry, { action: HistoryAction.Merge }),
-    [HistoryAction.Drop]: (entry) => write(entry, { action: HistoryAction.Drop })
+    [HistoryAction.Drop]: (entry) => write(entry, { action: HistoryAction.Drop }),
+    [HistoryAction.Revert]: (entry) => revert(entry.id)
   };
 
   async function branchFrame(name: string) {
@@ -226,6 +268,31 @@
     <p class="empty" role="status">{notice}</p>
   {/if}
 
+  {#if asking}
+    <div class="point" data-testid="history-revert-conflicts">
+      <p class="empty">Changed again since. Keep which?</p>
+      {#each asking.conflicts as conflict (conflictKey(conflict))}
+        <div class="conflict">
+          <span class="summary">{conflict.path.replace(/^data\./, '')}</span>
+          <label><input type="radio" bind:group={asking.picks[conflictKey(conflict)]} value={Keep.Mine} /> Now: {JSON.stringify(conflict.mine)}</label>
+          <label><input type="radio" bind:group={asking.picks[conflictKey(conflict)]} value={Keep.Reject} /> Before: {JSON.stringify(conflict.original)}</label>
+        </div>
+      {/each}
+      <div class="point-actions">
+        <button type="button" class="point-action" onclick={() => (asking = null)}>Cancel</button>
+        <button type="button" class="point-action" onclick={revertChosen} data-testid="history-revert-apply">Revert</button>
+      </div>
+    </div>
+  {:else if confirming}
+    <div class="point" data-testid="history-revert-confirm">
+      <p class="empty">Someone else connected or edited what this change created. Revert anyway?</p>
+      <div class="point-actions">
+        <button type="button" class="point-action" onclick={() => (confirming = null)}>Keep it</button>
+        <button type="button" class="point-action" onclick={() => void revert(confirming!, [], true)}>Revert</button>
+      </div>
+    </div>
+  {/if}
+
   {#if graph && graph.lanes.length}
     <div class="lanes" data-testid="history-lanes">
       {#each graph.lanes as lane (lane.key)}
@@ -251,6 +318,7 @@
             <button type="button" class="what toggle" aria-expanded={!!expanded[session.key]} onclick={() => (expanded = { ...expanded, [session.key]: !expanded[session.key] })} data-testid="history-session-toggle">
               <span class="chevron" class:on={expanded[session.key]}><ChevronRight size={ICON} /></span>{lane.label}: {sessionLabel(session)}
             </button>
+            <button type="button" class="point-action" title="Revert this session" aria-label="Revert this session" onclick={() => void revert(session.key)} data-testid="history-session-revert"><Undo2 size={ICON} /></button>
             <time class="when" datetime={session.rows[0].entry.at}>{timeOf(session.rows[0].entry.at)}</time>
           </li>
           {#if expanded[session.key]}
@@ -539,6 +607,13 @@
     display: grid;
     place-items: center;
     transition: transform 120ms ease;
+  }
+
+  .conflict {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
   }
 
   .chevron.on {
