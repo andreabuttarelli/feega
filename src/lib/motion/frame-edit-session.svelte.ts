@@ -1,5 +1,6 @@
 import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import type { DocOp } from './doc-ops';
+import { applyOps, type DocOp } from './doc-ops';
+import type { PeerStep } from './frame-step';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { landed, outgoing, remote, type Revision, type Synced } from './frame-sync';
@@ -22,6 +23,7 @@ export type SessionPort = {
   stepped: () => void;
   playhead: () => number;
   saved: (head: Revision) => void;
+  landed: (from: Revision, to: Revision) => void;
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
 };
@@ -199,6 +201,13 @@ export class FrameEditSession {
     return next !== null;
   }
 
+  followStep(step: PeerStep): boolean {
+    if (step.base !== this.version) {
+      return false;
+    }
+    return this.takeRemote({ version: step.version, doc: applyOps(this.baseDoc, step.ops) });
+  }
+
   holdSave(until: Promise<unknown>) {
     const hold = until.catch(() => undefined).finally(() => {
       if (this.held === hold) {
@@ -226,6 +235,9 @@ export class FrameEditSession {
     const result = await this.port.send(outgoing(base, sent), this.version, this.unsavedSummary);
     this.saving = false;
 
+    if (result.ok && result.doc) {
+      this.port.landed(base, { version: result.version, doc: result.doc });
+    }
     if (result.ok) {
       this.follow(landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc }));
       this.saveState = SaveState.Saved;
@@ -247,11 +259,10 @@ export class FrameEditSession {
   private follow(next: Synced) {
     this.baseDoc = next.base.doc;
     this.version = next.base.version;
-    this.port.saved(next.base);
-    if (next.present === this.history.present) {
-      return;
+    if (next.present !== this.history.present) {
+      this.history = followHead(this.history, next.present);
+      this.selection = this.selection.filter((id) => findClip(next.present, id));
     }
-    this.history = followHead(this.history, next.present);
-    this.selection = this.selection.filter((id) => findClip(next.present, id));
+    this.port.saved(next.base);
   }
 }

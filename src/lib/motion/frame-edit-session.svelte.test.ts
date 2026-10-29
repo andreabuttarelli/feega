@@ -4,6 +4,8 @@ import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { DocAccess, FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
 import { outgoing } from './frame-sync';
+import { OpKind } from './doc-ops';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 const base = newMotionDoc(MotionFormat.Landscape);
 const longer = (frames: number): MotionDoc => ({ ...base, durationInFrames: frames });
@@ -18,6 +20,7 @@ function open(send: SessionPort['send'] = accepted) {
     stepped: vi.fn(),
     playhead: () => 12,
     saved: vi.fn(),
+    landed: vi.fn(),
     pull: vi.fn(async () => {}),
     send: vi.fn(send)
   };
@@ -224,6 +227,43 @@ describe('remote heads', () => {
     expect(session.version).toBe(2);
     expect(session.selection).toEqual([]);
     expect(port.saved).toHaveBeenCalled();
+  });
+
+  it('a teammate step on the revision this session holds is followed, keeping the selection', () => {
+    const clipped = addClip(base, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'a' } }, 'kept');
+    const { port } = open();
+    const session = new FrameEditSession({ head: { version: 1, doc: clipped.ok ? clipped.doc : base }, selection: ['kept'] }, port);
+
+    expect(session.followStep({ nodeId: 'n1', base: 1, version: 2, ops: [{ kind: OpKind.DocSet, field: 'durationInFrames', value: 99 }] })).toBe(true);
+
+    expect(session.version).toBe(2);
+    expect(session.history.present.durationInFrames).toBe(99);
+    expect(session.selection).toEqual(['kept']);
+  });
+
+  it('the host hears of a followed head once the session already holds it, so it shows the new doc', () => {
+    const { session, port } = open();
+    const shown: MotionDoc[] = [];
+    vi.mocked(port.saved).mockImplementation(() => shown.push(session.history.present));
+
+    session.takeRemote({ version: 2, doc: longer(99) });
+
+    expect(shown.map((d) => d.durationInFrames)).toEqual([99]);
+  });
+
+  it('a step from another revision is left for the head fetch', () => {
+    const { session } = open();
+
+    expect(session.followStep({ nodeId: 'n1', base: 4, version: 5, ops: [{ kind: OpKind.DocSet, field: 'durationInFrames', value: 99 }] })).toBe(false);
+    expect(session.version).toBe(1);
+  });
+
+  it('a landed save tells the host which revision it came from, so peers get the step', async () => {
+    const { session, port } = open();
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(port.landed).toHaveBeenCalledWith({ version: 1, doc: base }, { version: 2, doc: longer(60) });
   });
 
   it('a head arriving mid-save is held and pulled after the save', async () => {

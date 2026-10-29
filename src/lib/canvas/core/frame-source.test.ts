@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, stillFrame, toFetch } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stillFrame, toFetch } from './frame-source';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -150,5 +150,21 @@ describe('same live doc', () => {
     expect(sameLive(live, { ...live, assets: {} })).toBe(false);
     expect(sameLive(live, { ...live, playhead: 4 })).toBe(false);
     expect(sameLive(undefined, live)).toBe(false);
+  });
+});
+
+describe('the picture a frame shows while a new revision loads', () => {
+  const has = (...groups: string[]) => (g: string) => groups.includes(g);
+
+  it('keeps the revision it showed until the new one is built, never a stand-in', () => {
+    expect(shownGroup('a:2', 'a:1', has('a:1'))).toBe('a:1');
+  });
+
+  it('swaps to the new revision once it is built', () => {
+    expect(shownGroup('a:2', 'a:1', has('a:1', 'a:2'))).toBe('a:2');
+  });
+
+  it('a frame never built has nothing to show', () => {
+    expect(shownGroup('a:1', undefined, has())).toBeNull();
   });
 });

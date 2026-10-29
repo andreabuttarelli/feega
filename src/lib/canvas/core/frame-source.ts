@@ -41,6 +41,13 @@ export const sameLive = (a: Shown | undefined, b: Shown): boolean => Boolean(a) 
 export const toFetch = <F extends { id: string }>(frames: readonly F[], keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
   frames.filter((f) => !asked.has(keyOf(f)) && !drawnLive.has(f.id));
 
+export const shownGroup = (current: string, previous: string | undefined, built: (group: string) => boolean): string | null => {
+  if (built(current)) {
+    return current;
+  }
+  return previous && built(previous) ? previous : null;
+};
+
 export const drawsAny = (list: DisplayList): boolean => list.items.length > 0;
 
 export function logGaps(id: string, list: DisplayList) {

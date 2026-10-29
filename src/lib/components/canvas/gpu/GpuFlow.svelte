@@ -85,6 +85,7 @@
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
+  import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
@@ -134,7 +135,7 @@
   import { elementGlyph } from '$lib/canvas/layers';
   import { imageSourceTile } from '$lib/canvas/free-image';
   import { frameRinged } from '$lib/canvas/layers';
-  import { framesOnCanvas, sameLive, toFetch } from '$lib/canvas/core/frame-source';
+  import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
@@ -925,8 +926,57 @@
     }
   }
 
+  const stepped = new Set<string>();
+  const stepKey = (id: string, revision: number) => `${id}:${revision}`;
+  const knownSource = (f: FrameAt) => {
+    const held = fetched.get(f.id);
+    return held && held.revision === f.revision && stepped.has(stepKey(f.id, f.revision)) ? { revision: f.revision, ...held.live } : null;
+  };
+
+  function takeStep(step: PeerStep) {
+    const saver = savers.get(step.nodeId);
+    if (saver?.followStep(step)) {
+      return;
+    }
+    const held = fetched.get(step.nodeId);
+    const linked = coreFrames.find((f) => f.id === step.nodeId)?.linked;
+    const doc = held && !linked ? nextDoc({ version: held.revision, doc: held.live.doc, assets: held.live.assets }, step) : null;
+    if (!held || !doc) {
+      return;
+    }
+    stepped.add(stepKey(step.nodeId, step.version));
+    fetched = new Map(fetched).set(step.nodeId, { revision: step.version, live: { ...held.live, doc } });
+  }
+
+  const STEP_WAIT_MS = 400;
+
+  async function followHead(nodeId: string, saver: FrameEditSession) {
+    await new Promise((resolve) => setTimeout(resolve, STEP_WAIT_MS));
+    const revision = revisionOfFrame(nodeId);
+    if (revision <= saver.version) {
+      return;
+    }
+    const res = await fetch(coreSource(nodeId), { cache: 'no-store' }).catch(() => null);
+    const body = res?.ok ? ((await res.json().catch(() => null)) as { revision: number; doc: LiveDoc['doc'] } | null) : null;
+    if (body?.doc && body.revision > saver.version) {
+      saver.takeRemote({ version: body.revision, doc: body.doc });
+    }
+  }
+
+  const following = new Set<string>();
+
   $effect(() => {
-    const due = toFetch(coreFrames, pickKey, asked, liveDocs.map);
+    for (const f of coreFrames) {
+      const saver = savers.get(f.id);
+      if (saver && liveDocs.map.has(f.id) && f.revision > untrack(() => saver.version) && !following.has(stepKey(f.id, f.revision))) {
+        following.add(stepKey(f.id, f.revision));
+        void followHead(f.id, saver);
+      }
+    }
+  });
+
+  $effect(() => {
+    const due = toFetch(coreFrames.filter((f) => fetched.get(f.id)?.revision !== f.revision), pickKey, asked, liveDocs.map);
     if (!due.length) {
       return;
     }
@@ -934,7 +984,9 @@
     void (async () => {
       for (const f of due) {
         await quiet();
-        await fetchPickDoc(f.id, f.revision);
+        if (fetched.get(f.id)?.revision !== f.revision) {
+          await fetchPickDoc(f.id, f.revision);
+        }
       }
     })();
   });
@@ -1241,6 +1293,12 @@
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
         saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
+        landed: (from, to) => {
+          const step = stepOf(nodeId, from, to);
+          if (step) {
+            presence?.landed(step);
+          }
+        },
         pull: async () => {},
         send: async (ops, version, summary) => {
           const form = new FormData();
@@ -1310,6 +1368,7 @@
   const onCanvas = $derived(new Set((props.peers ?? []).filter((p) => p.cursor).map((p) => p.userId)));
 
   onMount(() => peering?.start());
+  onMount(() => presence?.onHead(takeStep));
   onMount(lockOverscroll);
 
   $effect(() => {
@@ -3196,7 +3255,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={coreLive} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>

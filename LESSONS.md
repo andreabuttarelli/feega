@@ -3466,6 +3466,9 @@ Signal: hover and click inside a frame outline the entire frame; double-click tu
 ### A worktree's dev server stops seeing edits after `git checkout`
 Signal: a fix green in vitest changes nothing in the browser; a `console.warn` added to a component never prints. Cause: the Vite watcher in a worktree drops after switching commits and keeps serving old modules. Move: restart `vite dev` after every checkout or edit you test in e2e; a bisect on a live server measures only the first commit. In an agent worktree it never sees an edit at all: `vite.config.ts` lists `.claude/worktrees` in `server.watch.ignored`.
 
+### A peer's frame "flashes black" but a dark-pixel probe sees nothing
+Signal: a two-browser probe counting near-black pixels stays green while the user reports a flash. Cause: the flash is the frame's stand-in in the paper colour, black only in dark theme; the probe ran in light theme, on a small doc edited through the API, and never hit it. Move: drive the edit through the UI and flag every sample that matches neither the before nor the after screenshot (`tests/e2e/peer-frame-patch.spec.ts`); then read which layer the chain drew (`chains` in `CoreFrames.svelte`).
+
 ### A `.svelte` file calls a name that does not exist and CI is green
 Signal: a click throws `ReferenceError: x is not defined` in a component; the suite and the runtime type gate passed. Cause: `scripts/typecheck-runtime.mjs` runs plain `tsc`, which never reads `.svelte`, and `svelte-check` was not in CI, so its errors piled up to ~380 and real ones (an undefined function, registry tables missing rows, a type that hid a dropped field) drowned in fixture noise. Move: `npm run check` must stay at zero (CI `Type check` step); a new error is read, not silenced. It needs `.env` (from `.env.example`) because `$env` types come from it.
 
