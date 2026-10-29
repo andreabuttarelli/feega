@@ -121,6 +121,7 @@ export type CanvasDeps = {
   projectId: string;
   userId: string;
   brandId?: string | null;
+  sessionId?: string | null;
 };
 
 export type CanvasCtx = CanvasDeps & {
@@ -131,7 +132,7 @@ export type CanvasCtx = CanvasDeps & {
 export function canvasCtx(deps: CanvasDeps): CanvasCtx {
   const billed = <T>(fn: () => Promise<T>): Promise<T> =>
     deps.brandId ? withBrandContext(deps.brandId, fn) : withOrgContext(deps.orgId, fn);
-  return { ...deps, actor: agentActor(deps.userId), billed };
+  return { ...deps, actor: agentActor(deps.userId, undefined, deps.sessionId), billed };
 }
 
 const EXPORT_MAX_FRAMES = 50;

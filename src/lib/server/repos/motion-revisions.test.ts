@@ -63,13 +63,13 @@ export function revisionsDb(seed: Row[] = [], schema: { checkpoints: boolean } =
     }
     const version = Number(a.p_expected) + 1;
     const fields = { version, doc: a.p_doc, summary: a.p_summary, created_at: new Date().toISOString() };
-    const sameActor = head && head.actor_kind === a.p_actor_kind && (head.actor_id ?? null) === a.p_actor_id && (head.agent_key ?? null) === a.p_agent_key;
+    const sameActor = head && head.actor_kind === a.p_actor_kind && (head.actor_id ?? null) === a.p_actor_id && (head.agent_key ?? null) === a.p_agent_key && (head.session_id ?? null) === (a.p_session_id ?? null);
     const recent = head && Date.parse(String(head.created_at)) > Date.now() - Number(a.p_coalesce_ms);
     if (Number(a.p_coalesce_ms) > 0 && sameActor && recent && !head.sealed) {
       Object.assign(head, fields);
       return { data: version, error: null };
     }
-    const error = insert({ org_id: a.p_org_id, node_id: a.p_node_id, actor_kind: a.p_actor_kind, actor_id: a.p_actor_id, agent_key: a.p_agent_key, ...fields });
+    const error = insert({ org_id: a.p_org_id, node_id: a.p_node_id, actor_kind: a.p_actor_kind, actor_id: a.p_actor_id, agent_key: a.p_agent_key, session_id: a.p_session_id ?? null, ...fields });
     return { data: error ? null : version, error: null };
   };
 
@@ -104,6 +104,14 @@ describe('motion revisions', () => {
       [2, 'user', 'Undo', 0],
       [1, 'agent', 'added a title', 1]
     ]);
+  });
+
+  it('two sessions of the same agent are two revisions, each with its session', async () => {
+    const { db, rows } = revisionsDb();
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor: { ...agent, sessionId: 's-1' }, checkpoint: Checkpoint.Coalesce });
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: newMotionDoc(MotionFormat.Square), actor: { ...agent, sessionId: 's-2' }, checkpoint: Checkpoint.Coalesce });
+
+    expect(rows.map((r) => r.session_id)).toEqual(['s-1', 's-2']);
   });
 
   it('no revision yet means no head', async () => {

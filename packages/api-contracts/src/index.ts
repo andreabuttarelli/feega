@@ -35,6 +35,14 @@ export function toolFromHeader(value: string | null | undefined): string | null 
   return value && /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value : null;
 }
 
+export const SESSION_HEADER = 'x-feega-session';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function sessionFromHeader(value: string | null | undefined): string | null {
+  return value && UUID.test(value) ? value : null;
+}
+
 type EndpointShape = {
   readonly tool: string;
   readonly title: string;

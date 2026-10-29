@@ -30,7 +30,7 @@ export const openFrameSchema = z.object({
   mode: z.enum(DocMode).default(DocMode.Video)
 });
 
-export type FrameToolDeps = { db: Db; orgId: string; projectId: string; userId: string; open: OpenFrame | null; editor: EditorFrames | null; serverDraws?: () => boolean };
+export type FrameToolDeps = { db: Db; orgId: string; projectId: string; userId: string; sessionId?: string | null; open: OpenFrame | null; editor: EditorFrames | null; serverDraws?: () => boolean };
 
 const NO_FRAME = { error: 'no_frame', message: 'No frame is open in the editor: pass node_id (list_motion_videos or list_nodes give it).' };
 
@@ -79,7 +79,7 @@ export function frameRunner(deps: FrameToolDeps): FrameRunner {
 
     const open = deps.open?.nodeId === nodeId ? deps.open : null;
     const turn = { sessions, selection: open?.selection ?? [], editor: open ? deps.editor : null };
-    const ran = await runMotionTool(deps.db, { orgId: deps.orgId, userId: deps.userId, nodeId, projectId: deps.projectId, agentKey: SIDEBAR_AGENT_KEY }, { tool: ask.tool, input: ask.input, callId }, turn);
+    const ran = await runMotionTool(deps.db, { orgId: deps.orgId, userId: deps.userId, nodeId, projectId: deps.projectId, agentKey: SIDEBAR_AGENT_KEY, sessionId: deps.sessionId }, { tool: ask.tool, input: ask.input, callId }, turn);
     if (ran.outcome !== ToolRun.Done) {
       return { error: ran.outcome, message: REFUSALS[ran.outcome], detail: ran.detail };
     }

@@ -4,6 +4,7 @@
   import Bot from '@lucide/svelte/icons/bot';
   import Cog from '@lucide/svelte/icons/cog';
   import Frame from '@lucide/svelte/icons/frame';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Eye from '@lucide/svelte/icons/eye';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import Tag from '@lucide/svelte/icons/tag';
@@ -18,7 +19,7 @@
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { postPageAction } from '$lib/api/page-action';
   import { LocalOff, isOff } from '$lib/local-user';
-  import { ENTRY_VERBS, EntryKind, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, laneSpans, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
+  import { EntryKind, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, entryLabel, laneSpans, sessionLabel, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
   import type { HistoryPreview } from '$lib/server/canvas/history-actions';
 
   let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
@@ -68,6 +69,7 @@
   let notice = $state('');
   let conflicts = $state<string[] | null>(null);
   let branching = $state(false);
+  let expanded = $state<Record<string, boolean>>({});
 
   let resolving = $state<string | null>(null);
 
@@ -214,78 +216,106 @@
     <p class="empty">Nothing changed here yet.</p>
   {:else if graph}
     <ol class="rows">
-      {#each graph.rows as row, index (row.entry.id)}
-        {@const lane = graph.lanes[row.lane]}
+      {#each graph.sessions as session, index (session.key)}
+        {@const lane = graph.lanes[session.lane]}
         {@const Icon = LANE_ICONS[lane.icon]}
-        {@const open = row.entry.kind === EntryKind.ConflictOpen}
-        {@const actions = actionsOf(row.entry)}
-        <li class="row" class:conflict={open} class:open={opened === row.entry.id} data-testid="history-row" data-lane={lane.kind} onclick={() => actions.length && toggle(row.entry)} onkeydown={(e) => e.key === 'Enter' && actions.length && toggle(row.entry)} role={actions.length ? 'button' : undefined} tabindex={actions.length ? 0 : undefined}>
-          <svg class="graph" width={gutter} height={ROW_PX} aria-hidden="true">
-            {#each spans as span, l (l)}
-              {#if index >= span.first && index <= span.last}
-                <line x1={laneX(l)} x2={laneX(l)} y1={index === span.first ? ROW_PX / 2 : 0} y2={index === span.last ? ROW_PX / 2 : ROW_PX} stroke={graph.lanes[l].colour} stroke-opacity="0.45" stroke-width="1.5" />
-              {/if}
-            {/each}
-            {#each forks.filter((f) => f.from === index) as fork (fork.to)}
-              <path d={`M ${laneX(row.lane)} ${ROW_PX / 2} Q ${laneX(fork.lane)} ${ROW_PX / 2} ${laneX(fork.lane)} ${ROW_PX}`} fill="none" stroke={lane.colour} stroke-width="1.5" stroke-dasharray="3 2" data-testid="history-fork" />
-            {/each}
-            <circle cx={laneX(row.lane)} cy={ROW_PX / 2} r={DOT_R} fill={lane.colour} />
-          </svg>
-          <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
-          <span class="what">{ENTRY_VERBS[row.entry.kind]}{#if row.entry.summary}<span class="summary"> · {row.entry.summary}</span>{/if}</span>
-          {#if open}
-            <span class="sides">
-              {#each SIDES as side (side.keep)}
-                <button type="button" class="side" disabled={resolving === row.entry.id} onclick={(e) => { e.stopPropagation(); void resolve(row.entry.id, side.keep); }} data-testid="history-keep-{side.keep}">{side.label}</button>
-              {/each}
-            </span>
-          {:else}
-            <time class="when" datetime={row.entry.at}>{timeOf(row.entry.at)}</time>
-          {/if}
-        </li>
-        {#if opened === row.entry.id}
-          <li class="point" data-testid="history-point">
-            <div class="point-actions">
-              {#each actions as action (action)}
-                {@const ui = ACTION_UI[action]}
-                <button type="button" class="point-action" onclick={() => void RUN[action](row.entry)} data-testid={`history-action-${action}`}><ui.icon size={ICON} />{ui.label}</button>
-              {/each}
-            </div>
-            {#if naming !== null}
-              <input class="name-input" aria-label="Version name" placeholder="Name this version" value={naming} data-testid="history-name-input" onkeydown={(e) => e.key === 'Enter' && void write(row.entry, { action: HistoryAction.Name, name: e.currentTarget.value }).then(() => (naming = null))} />
-            {/if}
-            {#if conflicts}
-              <div class="preview" data-testid="history-conflicts">
-                <span>{conflicts.length} conflicts with the frame</span>
-                <div class="point-actions">
-                  {#each KEEPS as keep (keep.side)}
-                    <button type="button" class="point-action" onclick={() => void write(row.entry, { action: HistoryAction.Merge, keep: keep.side })}>{keep.label}</button>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-            {#if preview}
-              <div class="preview" data-testid="history-preview">
-                {#if isFrame(preview)}
-                  <span>Frame at version {preview.version}{preview.summary ? ` · ${preview.summary}` : ''}</span>
-                  <span class="summary">{preview.clips} clips · {preview.seconds.toFixed(1)} s</span>
-                {:else}
-                  <span>{preview.name}</span>
-                  <span class="summary">{preview.nodes.length} nodes · {preview.connections} connections</span>
-                  <ul class="preview-nodes">
-                    {#each preview.nodes as n (n.id)}
-                      <li>{n.type}</li>
-                    {/each}
-                  </ul>
-                {/if}
-              </div>
-            {/if}
+        {#if session.rows.length > 1}
+          <li class="row" data-testid="history-session" data-lane={lane.kind}>
+            {@render graphCell(index, session.lane)}
+            <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
+            <button type="button" class="what toggle" aria-expanded={!!expanded[session.key]} onclick={() => (expanded = { ...expanded, [session.key]: !expanded[session.key] })} data-testid="history-session-toggle">
+              <span class="chevron" class:on={expanded[session.key]}><ChevronRight size={ICON} /></span>{lane.label}: {sessionLabel(session)}
+            </button>
+            <time class="when" datetime={session.rows[0].entry.at}>{timeOf(session.rows[0].entry.at)}</time>
           </li>
+          {#if expanded[session.key]}
+            {#each session.rows as step (step.entry.id)}
+              {@render entryRow(step.entry, index, session.lane, true)}
+            {/each}
+          {/if}
+        {:else}
+          {@render entryRow(session.rows[0].entry, index, session.lane, false)}
         {/if}
       {/each}
     </ol>
   {/if}
 </div>
+
+{#snippet graphCell(index: number, laneIndex: number)}
+  {#if graph}
+  <svg class="graph" width={gutter} height={ROW_PX} aria-hidden="true">
+    {#each spans as span, l (l)}
+      {#if index >= span.first && index <= span.last}
+        <line x1={laneX(l)} x2={laneX(l)} y1={index === span.first ? ROW_PX / 2 : 0} y2={index === span.last ? ROW_PX / 2 : ROW_PX} stroke={graph.lanes[l].colour} stroke-opacity="0.45" stroke-width="1.5" />
+      {/if}
+    {/each}
+    {#each forks.filter((f) => f.from === index) as fork (fork.to)}
+      <path d={`M ${laneX(laneIndex)} ${ROW_PX / 2} Q ${laneX(fork.lane)} ${ROW_PX / 2} ${laneX(fork.lane)} ${ROW_PX}`} fill="none" stroke={graph.lanes[laneIndex].colour} stroke-width="1.5" stroke-dasharray="3 2" data-testid="history-fork" />
+    {/each}
+    <circle cx={laneX(laneIndex)} cy={ROW_PX / 2} r={DOT_R} fill={graph.lanes[laneIndex].colour} />
+  </svg>
+  {/if}
+{/snippet}
+
+{#snippet entryRow(entry: HistoryEntry, index: number, laneIndex: number, step: boolean)}
+  {@const lane = graph!.lanes[laneIndex]}
+  {@const Icon = LANE_ICONS[lane.icon]}
+  {@const open = entry.kind === EntryKind.ConflictOpen}
+  {@const actions = actionsOf(entry)}
+  <li class="row" class:step class:conflict={open} class:open={opened === entry.id} data-testid="history-row" data-lane={lane.kind} onclick={() => actions.length && toggle(entry)} onkeydown={(e) => e.key === 'Enter' && actions.length && toggle(entry)} role={actions.length ? 'button' : undefined} tabindex={actions.length ? 0 : undefined}>
+    {@render graphCell(index, laneIndex)}
+    <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
+    <span class="what">{entryLabel(entry)}{#if entry.summary}<span class="summary"> · {entry.summary}</span>{/if}</span>
+    {#if open}
+      <span class="sides">
+        {#each SIDES as side (side.keep)}
+          <button type="button" class="side" disabled={resolving === entry.id} onclick={(e) => { e.stopPropagation(); void resolve(entry.id, side.keep); }} data-testid="history-keep-{side.keep}">{side.label}</button>
+        {/each}
+      </span>
+    {:else}
+      <time class="when" datetime={entry.at}>{timeOf(entry.at)}</time>
+    {/if}
+  </li>
+  {#if opened === entry.id}
+    <li class="point" data-testid="history-point">
+      <div class="point-actions">
+        {#each actions as action (action)}
+          {@const ui = ACTION_UI[action]}
+          <button type="button" class="point-action" onclick={() => void RUN[action](entry)} data-testid={`history-action-${action}`}><ui.icon size={ICON} />{ui.label}</button>
+        {/each}
+      </div>
+      {#if naming !== null}
+        <input class="name-input" aria-label="Version name" placeholder="Name this version" value={naming} data-testid="history-name-input" onkeydown={(e) => e.key === 'Enter' && void write(entry, { action: HistoryAction.Name, name: e.currentTarget.value }).then(() => (naming = null))} />
+      {/if}
+      {#if conflicts}
+        <div class="preview" data-testid="history-conflicts">
+          <span>{conflicts.length} conflicts with the frame</span>
+          <div class="point-actions">
+            {#each KEEPS as keep (keep.side)}
+              <button type="button" class="point-action" onclick={() => void write(entry, { action: HistoryAction.Merge, keep: keep.side })}>{keep.label}</button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+      {#if preview}
+        <div class="preview" data-testid="history-preview">
+          {#if isFrame(preview)}
+            <span>Frame at version {preview.version}{preview.summary ? ` · ${preview.summary}` : ''}</span>
+            <span class="summary">{preview.clips} clips · {preview.seconds.toFixed(1)} s</span>
+          {:else}
+            <span>{preview.name}</span>
+            <span class="summary">{preview.nodes.length} nodes · {preview.connections} connections</span>
+            <ul class="preview-nodes">
+              {#each preview.nodes as n (n.id)}
+                <li>{n.type}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/if}
+    </li>
+  {/if}
+{/snippet}
 
 <style>
   .history {
@@ -466,6 +496,33 @@
 
   .graph {
     flex: 0 0 auto;
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  .chevron {
+    display: grid;
+    place-items: center;
+    transition: transform 120ms ease;
+  }
+
+  .chevron.on {
+    transform: rotate(90deg);
+  }
+
+  .row.step .what {
+    padding-left: 14px;
+    color: var(--ui-text-secondary);
   }
 
   .who {

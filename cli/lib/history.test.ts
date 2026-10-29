@@ -68,13 +68,13 @@ describe('historyApi.resolve', () => {
 });
 
 describe('historyRows', () => {
-  it('names each entry by its lane', () => {
+  it('names each entry by its lane, what it touched and its session', () => {
     const history: History = {
       canvas_id: 'c-1',
       lanes: [{ key: 'agent:claude-code', kind: 'agent', label: 'claude-code' }],
-      entries: [{ id: 'event:1', source: 'event', kind: 'node.create', at: '2026-10-29T10:00:00Z', lane: 0, node_id: 'n-1', frame_id: null, summary: null }]
+      entries: [{ id: 'event:1', source: 'event', kind: 'node.create', at: '2026-10-29T10:00:00Z', lane: 0, node_id: 'n-1', frame_id: null, subject: 'Hero title', session_id: 's-1', summary: null }]
     };
 
-    expect(historyRows(history)).toEqual([{ at: '2026-10-29T10:00:00Z', who: 'claude-code', what: 'node.create', target: 'n-1', summary: '', id: 'event:1' }]);
+    expect(historyRows(history)).toEqual([{ at: '2026-10-29T10:00:00Z', who: 'claude-code', what: 'node.create', target: 'Hero title', session: 's-1', summary: '', id: 'event:1' }]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EntryKind, HistoryAction, HistoryFilter, HistorySource, LaneKind, actionsOf, branchForks, entryRef, historyGraph, laneOf, laneSpans, type HistoryEntry } from './timeline';
+import { EntryKind, HistoryAction, HistoryFilter, HistorySource, LaneKind, actionsOf, branchForks, entryLabel, entryRef, historyGraph, laneOf, laneSpans, sessionLabel, type HistoryEntry } from './timeline';
 
 const entry = (id: string, at: string, author: HistoryEntry['author'], extra: Partial<HistoryEntry> = {}): HistoryEntry => ({
   id,
@@ -10,6 +10,8 @@ const entry = (id: string, at: string, author: HistoryEntry['author'], extra: Pa
   nodeId: null,
   frameId: null,
   summary: null,
+  sessionId: null,
+  subject: null,
   ...extra
 });
 
@@ -120,5 +122,49 @@ describe('entryRef reads back the id of an entry', () => {
     expect(entryRef('version:v1')).toEqual({ source: HistorySource.Version, key: 'v1', version: null });
     expect(entryRef('revision:frame-1:4')).toEqual({ source: HistorySource.Revision, key: 'frame-1', version: 4 });
     expect(entryRef('nope')).toBeNull();
+  });
+});
+
+describe('historyGraph groups rows into sessions', () => {
+  it('one agent turn is one session, whatever the gap between its steps', () => {
+    const graph = historyGraph(
+      [
+        entry('a', '2026-10-29T12:00:00Z', claude, { sessionId: 's-1' }),
+        entry('b', '2026-10-29T11:00:00Z', claude, { sessionId: 's-1' }),
+        entry('c', '2026-10-29T10:59:00Z', claude, { sessionId: 's-2' })
+      ],
+      { filter: HistoryFilter.All, names: {} }
+    );
+
+    expect(graph.sessions.map((s) => s.rows.map((r) => r.entry.id))).toEqual([['a', 'b'], ['c']]);
+  });
+
+  it('a person without a session id is grouped by idle gap on their own lane', () => {
+    const graph = historyGraph(
+      [
+        entry('a', '2026-10-29T12:00:00Z', marco),
+        entry('b', '2026-10-29T11:58:00Z', claude),
+        entry('c', '2026-10-29T11:57:00Z', marco),
+        entry('d', '2026-10-29T10:00:00Z', marco)
+      ],
+      { filter: HistoryFilter.All, names: {} }
+    );
+
+    expect(graph.sessions.map((s) => s.rows.map((r) => r.entry.id))).toEqual([['a', 'c'], ['b'], ['d']]);
+  });
+});
+
+describe('a row names what it touched', () => {
+  it('a step says the verb and the node', () => {
+    expect(entryLabel(entry('a', '2026-10-29T12:00:00Z', marco, { subject: 'Hero title' }))).toBe('Changed Hero title');
+    expect(entryLabel(entry('a', '2026-10-29T12:00:00Z', marco, { kind: EntryKind.NodeDelete, subject: 'Image' }))).toBe('Removed Image');
+  });
+
+  it('a session counts its steps and names the node when they share one', () => {
+    const one = historyGraph([entry('a', '2026-10-29T12:00:00Z', claude, { sessionId: 's', subject: 'Landing' }), entry('b', '2026-10-29T11:59:00Z', claude, { sessionId: 's', subject: 'Landing' })], { filter: HistoryFilter.All, names: {} });
+    const many = historyGraph([entry('a', '2026-10-29T12:00:00Z', claude, { sessionId: 's', subject: 'Landing' }), entry('b', '2026-10-29T11:59:00Z', claude, { sessionId: 's', subject: 'Logo' })], { filter: HistoryFilter.All, names: {} });
+
+    expect(sessionLabel(one.sessions[0])).toBe('2 changes to Landing');
+    expect(sessionLabel(many.sessions[0])).toBe('2 changes');
   });
 });

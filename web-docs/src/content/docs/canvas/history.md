@@ -27,6 +27,16 @@ Each author has its own lane, colour and icon, drawn as a graph beside the list:
 - each **outside agent** connected over MCP or the CLI (one lane per agent);
 - **system** writes.
 
+## Sessions
+
+Changes are grouped into sessions, one row each: "claude-code: 12 changes to Landing". Click a
+session to expand it into its single steps. Every row names the node it touched ("Changed Hero
+title", "Removed Image", "Connected Hero title → Image").
+
+- An **outside agent** (MCP or CLI) opens one session per connection or command.
+- The **chat** opens one session per turn.
+- A **person** gets a new session after 10 minutes without changes.
+
 ## Filters
 
 - **All**, **AI** (chat and agents) or **People**.
@@ -97,5 +107,9 @@ feega resolve-conflict <canvasId> <conflictId> mine|theirs
 A conflict entry has `kind` `conflict.open` (or `conflict.resolved`, with the side kept as
 `summary`) and `id` `conflict:<conflictId>`.
 
-Each entry carries `id` (the `entryId` above), `kind`, `at`, `lane` (index into `lanes`), `node_id`, `frame_id`, `summary`
-and its `author`.
+Each entry carries `id` (the `entryId` above), `kind`, `at`, `lane` (index into `lanes`), `node_id`, `frame_id`, `subject`
+(the name of what it touched), `session_id`, `summary` and its `author`. `sessions` lists the
+groups, newest first: `key`, `lane`, `label` and the ids of its `entries`.
+
+A client that writes through the API can send its own session as a UUID in the
+`x-feega-session` header; the CLI and the MCP server do it for you.

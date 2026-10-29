@@ -16,6 +16,7 @@ export type Actor = {
   kind: ActorKind;
   id: string | null;
   agentKey?: string | null;
+  sessionId?: string | null;
 };
 
 /** Colonne actor sulle tabelle che hanno anche `agent_key` (nodes, chat, ai_calls). */
@@ -38,6 +39,6 @@ export function edgeActorCols(actor: Actor | undefined): Record<string, unknown>
   return { actor_kind: actor.kind, actor_id: actor.id };
 }
 
-export function agentActor(userId: string, agentKey: string = SIDEBAR_AGENT_KEY): Actor {
-  return { kind: 'agent', id: userId, agentKey };
+export function agentActor(userId: string, agentKey: string = SIDEBAR_AGENT_KEY, sessionId?: string | null): Actor {
+  return { kind: 'agent', id: userId, agentKey, ...(sessionId ? { sessionId } : {}) };
 }

@@ -107,7 +107,7 @@ export const startMotionTurn = (input: MotionTurnInput): Promise<MotionTurn | Re
 async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
   const startedAt = Date.now();
   const { db, userId, orgId, project, motion, message, attachments = [], selection, model, reasoning, requester, browser, timing = PLATFORM_TIMING } = input;
-  const actor = agentActor(userId, MOTION_AGENT_KEY);
+  const actor = agentActor(userId, MOTION_AGENT_KEY, crypto.randomUUID());
   const nodeScope = { orgId, nodeId: motion.record.id };
 
   const [head, tokens, threadId] = await Promise.all([

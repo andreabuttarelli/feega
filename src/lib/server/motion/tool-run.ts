@@ -37,7 +37,7 @@ export enum ToolRun {
 
 export type ToolRunAsk = { tool: string; input: unknown; version?: number; callId?: string };
 
-export type ToolRunScope = { orgId: string; userId: string; nodeId: string; projectId?: string; agentKey?: string };
+export type ToolRunScope = { orgId: string; userId: string; nodeId: string; projectId?: string; agentKey?: string; sessionId?: string | null };
 
 export type EditorFrames = (callId: string, times: number[], doc: MotionDoc) => Promise<Frame[] | null>;
 
@@ -141,7 +141,7 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
     return { outcome: ToolRun.Conflict, detail: `the video is at revision ${saved.version}, not ${version}` };
   }
 
-  const actor = agentActor(scope.userId, scope.agentKey ?? TOOL_RUN_AGENT_KEY);
+  const actor = agentActor(scope.userId, scope.agentKey ?? TOOL_RUN_AGENT_KEY, scope.sessionId);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.nodeId };
   const assets = saved.alongside;
   const tokens = once(() => motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId }));

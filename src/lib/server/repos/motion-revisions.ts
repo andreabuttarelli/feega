@@ -170,9 +170,9 @@ export async function listRevisions(db: Db, input: { orgId: string; nodeId: stri
   }));
 }
 
-export type RevisionMark = { nodeId: string; version: number; summary: string | null; actorKind: string; actorId: string | null; agentKey: string | null; createdAt: string };
+export type RevisionMark = { nodeId: string; version: number; summary: string | null; actorKind: string; actorId: string | null; agentKey: string | null; sessionId: string | null; createdAt: string };
 
-type MarkRow = { node_id: string; version: number; summary: string | null; actor_kind: string; actor_id: string | null; agent_key: string | null; created_at: string };
+type MarkRow = { node_id: string; version: number; summary: string | null; actor_kind: string; actor_id: string | null; agent_key: string | null; session_id?: string | null; created_at: string };
 
 export async function listRevisionMarks(db: Db, input: { orgId: string; nodeIds: string[]; limit: number }): Promise<RevisionMark[]> {
   if (!input.nodeIds.length) {
@@ -181,7 +181,7 @@ export async function listRevisionMarks(db: Db, input: { orgId: string; nodeIds:
 
   const { data, error } = await db
     .from('motion_revisions')
-    .select('node_id, version, summary, actor_kind, actor_id, agent_key, created_at')
+    .select('node_id, version, summary, actor_kind, actor_id, agent_key, session_id, created_at')
     .eq('org_id', input.orgId)
     .in('node_id', input.nodeIds)
     .order('created_at', { ascending: false })
@@ -197,6 +197,7 @@ export async function listRevisionMarks(db: Db, input: { orgId: string; nodeIds:
     actorKind: row.actor_kind,
     actorId: row.actor_id,
     agentKey: row.agent_key,
+    sessionId: row.session_id ?? null,
     createdAt: row.created_at
   }));
 }
@@ -221,7 +222,8 @@ async function insertRevision(db: Db, input: CommitArgs): Promise<boolean> {
     version: input.expectedVersion + 1,
     doc: input.doc,
     summary: input.summary,
-    ...actorCols(input.actor)
+    ...actorCols(input.actor),
+    session_id: input.actor.sessionId ?? null
   } as never);
   if (error?.code === UNIQUE_VIOLATION) {
     return false;
@@ -242,7 +244,8 @@ async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
     p_actor_kind: input.actor.kind,
     p_actor_id: input.actor.id ?? null,
     p_agent_key: input.actor.agentKey ?? null,
-    p_coalesce_ms: COALESCE_MS[input.checkpoint]
+    p_coalesce_ms: COALESCE_MS[input.checkpoint],
+    p_session_id: input.actor.sessionId ?? null
   });
   if (error?.code === FUNCTION_MISSING) {
     return insertRevision(db, input);

@@ -2,7 +2,7 @@ import { request } from './api.ts';
 
 export type HistoryLane = { key: string; kind: string; label: string };
 
-export type HistoryEntry = { id: string; source: string; kind: string; at: string; lane: number; node_id: string | null; frame_id: string | null; summary: string | null };
+export type HistoryEntry = { id: string; source: string; kind: string; at: string; lane: number; node_id: string | null; frame_id: string | null; subject: string | null; session_id: string | null; summary: string | null };
 
 export type History = { canvas_id: string; lanes: HistoryLane[]; entries: HistoryEntry[] };
 
@@ -46,7 +46,8 @@ export function historyRows(history: History) {
     at: e.at,
     who: history.lanes[e.lane]?.label ?? '',
     what: e.kind,
-    target: e.frame_id ?? e.node_id ?? '',
+    target: e.subject ?? e.frame_id ?? e.node_id ?? '',
+    session: e.session_id ?? '',
     summary: e.summary ?? '',
     id: e.id
   }));

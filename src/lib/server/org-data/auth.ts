@@ -36,6 +36,7 @@ export type OrgCaller = {
   /** Assente sul percorso JWT: nessuna chiave, nessuno scope da controllare. */
   apiKeyId?: string;
   writeAllowed: boolean;
+  sessionId?: string | null;
 };
 
 export type AuthFailure = { status: number; body: { error: string; message?: string } };

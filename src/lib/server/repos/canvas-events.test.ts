@@ -57,6 +57,14 @@ describe('recordEvent: ogni scrittura porta org_id e l attore', () => {
     });
   });
 
+  it('the session of the turn lands on the event', async () => {
+    const { db, calls } = fakeDb({ canvas_events: [eventRow] });
+
+    await recordEvent(db, { orgId: ORG, canvasId: CANVAS, kind: 'node.update', nodeId: NODE, actor: { kind: 'agent', id: USER, agentKey: 'claude-code', sessionId: 's-1' } });
+
+    expect(calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ session_id: 's-1' });
+  });
+
   it('before/after arrivano sempre, anche quando nessuno chiederà mai di annullare questo evento', async () => {
     const { db, calls } = fakeDb({ canvas_events: [eventRow] });
 
@@ -96,6 +104,7 @@ describe('recordEvent: ogni scrittura porta org_id e l attore', () => {
       actorKind: 'user',
       actorId: USER,
       agentKey: null,
+      sessionId: null,
       createdAt: '2026-09-22T00:00:00Z'
     });
   });
