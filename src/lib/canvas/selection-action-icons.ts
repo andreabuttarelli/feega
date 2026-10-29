@@ -4,6 +4,9 @@
  * che non disegna niente.
  */
 import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
+import EyeOff from '@lucide/svelte/icons/eye-off';
+import Lock from '@lucide/svelte/icons/lock';
+import ClipboardCopy from '@lucide/svelte/icons/clipboard-copy';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
 import Link from '@lucide/svelte/icons/link';
 import Globe from '@lucide/svelte/icons/globe';
@@ -131,6 +134,10 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'detach-instance': Unlink,
   'push-instance': ArrowUpToLine,
   'reset-instance': RotateCcw,
+  hide: EyeOff,
+  lock: Lock,
+  'copy-properties': ClipboardCopy,
+  'paste-properties': ClipboardPaste,
   'create-formats': Proportions,
   'combine-video': Clapperboard,
   export: Download,

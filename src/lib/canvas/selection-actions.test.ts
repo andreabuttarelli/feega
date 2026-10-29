@@ -28,6 +28,8 @@ describe('group and ungroup', () => {
       ['export', null],
       ['copy', 'Mod+C'],
       ['paste', 'Mod+V'],
+      ['copy-properties', 'Mod+Alt+C'],
+      ['paste-properties', 'Mod+Alt+V'],
       ['bring-front', 'Mod+]'],
       ['send-back', 'Mod+['],
       ['align-left', 'Alt+A'],
@@ -62,6 +64,12 @@ describe('group and ungroup', () => {
       ['flatten', 'Mod+E'],
       ['outline-stroke', 'Mod+Alt+O'],
       ['outline-text', 'Mod+Shift+O'],
+      ['create-component', 'Mod+Alt+K'],
+      ['detach-instance', null],
+      ['push-instance', null],
+      ['reset-instance', null],
+      ['hide', 'Mod+Shift+H'],
+      ['lock', 'Mod+Shift+L'],
       ['delete', 'Backspace']
     ]);
   });
@@ -239,5 +247,15 @@ describe('the selection bar shows a few actions and folds the rest', () => {
     expect(slots.fixed.map((a) => a.id)).toEqual(['copy-link']);
     expect(slots.pinned.map((a) => a.id)).toEqual(['duplicate']);
     expect(slots.overflow.map((a) => a.id)).toEqual(['copy-link', 'export']);
+  });
+});
+
+describe('editor modes: the context menu reaches every layer op', () => {
+  it('lists instance ops, hide, lock and copy/paste properties in its order', () => {
+    const ids: string[] = CANVAS_MENU.map((a) => a.id);
+
+    for (const id of ['create-component', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties']) {
+      expect(ids).toContain(id);
+    }
   });
 });
