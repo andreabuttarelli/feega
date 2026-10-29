@@ -1,7 +1,6 @@
 import type { Db } from '$lib/server/db/client';
+import { nextCanvasName } from '$lib/canvas/canvas-names';
 import { createCanvas, deleteCanvas, listCanvases, renameCanvas, type Canvas } from '$lib/server/repos/canvas';
-
-const UNTITLED_PREFIX = 'Untitled canvas ';
 
 export enum CanvasRemoval {
   Removed = 'removed',
@@ -9,15 +8,6 @@ export enum CanvasRemoval {
 }
 
 export type RemovalResult = { outcome: CanvasRemoval.Removed; nextCanvasId: string } | { outcome: CanvasRemoval.LastCanvas };
-
-export function nextCanvasName(existing: string[]): string {
-  const taken = existing
-    .filter((name) => name.startsWith(UNTITLED_PREFIX))
-    .map((name) => Number(name.slice(UNTITLED_PREFIX.length)))
-    .filter(Number.isInteger);
-
-  return `${UNTITLED_PREFIX}${Math.max(0, ...taken) + 1}`;
-}
 
 export async function openNewCanvas(db: Db, scope: { orgId: string; projectId: string }): Promise<Canvas> {
   const canvases = await listCanvases(db, scope);

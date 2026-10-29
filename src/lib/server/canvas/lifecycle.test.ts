@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { CanvasRemoval, nextCanvasName, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
+import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 
 const ORG = 'org-1';
 const OTHER_ORG = 'org-2';
@@ -13,16 +13,6 @@ const canvasRow = (id: string, name: string, orgId = ORG, deletedAt: string | nu
   name,
   viewport: null,
   deleted_at: deletedAt
-});
-
-describe('nextCanvasName', () => {
-  it('starts at 1 on a project without untitled canvases', () => {
-    expect(nextCanvasName(['Moodboard'])).toBe('Untitled canvas 1');
-  });
-
-  it('skips numbers already taken', () => {
-    expect(nextCanvasName(['Untitled canvas 1', 'Untitled canvas 3'])).toBe('Untitled canvas 4');
-  });
 });
 
 describe('openNewCanvas', () => {
