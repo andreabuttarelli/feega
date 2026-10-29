@@ -5,7 +5,7 @@ sidebar:
   order: 12
 ---
 
-A code frame runs real component code on the canvas: a landing page, a pricing table, a whole small site with several pages. Add one with **Code frame** from the add bar (under *More nodes*); it starts as a React counter. The tabs on top switch between **URL**, **HTML**, **React** and **Svelte** (switching framework replaces the code with a starter, after asking).
+A code frame runs real component code on the canvas: a landing page, a pricing table, a whole small site with several pages. Add one with **Code frame** from the **+** menu in the bottom bar (under *Generate*); it starts as a React counter. The tabs on top switch between **URL**, **HTML**, **React** and **Svelte** (switching framework replaces the code with a starter, after asking).
 
 - **Files.** A frame holds several files. The entry is `App.tsx` for React and `App.svelte` for Svelte; it must `export default` the component. Add a file with **+** (for example `pages/Pricing.tsx`) and import it with a relative path (`./pages/Pricing`). `.tsx`, `.ts`, `.jsx`, `.js`, `.svelte` and `.css` files are supported.
 - **npm packages.** Bare imports load from [esm.sh](https://esm.sh): `framer-motion`, `lucide-react`, `react-router-dom`, `gsap` and most packages work without setup. React is 19.1, Svelte is 5.38.

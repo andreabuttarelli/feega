@@ -18,8 +18,8 @@ export const COACH_STEPS: Record<CoachStep, CoachStepSpec> = {
   [CoachStep.AddText]: {
     number: 1,
     title: 'Add a Generate text node',
-    body: 'Click Generate text in the bar below. We fill in a prompt for you.',
-    locate: (root) => root.querySelector('.add-bar button[aria-label="Generate text"]')
+    body: 'Open + in the bar below and pick Generate text. We fill in a prompt for you.',
+    locate: (root) => root.querySelector('.add-bar [data-insert="text"]') ?? root.querySelector('.add-bar [data-testid="insert-open"]')
   },
   [CoachStep.AddImage]: {
     number: 2,

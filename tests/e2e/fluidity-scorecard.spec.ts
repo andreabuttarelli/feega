@@ -633,8 +633,8 @@ const STEPS: Step[] = [
         await leaveEditor(page);
         await clickEmpty(page);
         const before = await domIds(page);
-        await page.getByTestId('add-bar').getByTestId('bar-mode').getByRole('radio', { name: 'Generate' }).click();
-        await page.getByTestId('add-bar').getByRole('button', { name: kind, exact: true }).click();
+        await page.getByTestId('add-bar').getByTestId('insert-open').click();
+        await page.getByTestId('insert-menu').getByRole('menuitem', { name: kind, exact: true }).click();
         const id = await newNode(page, before);
         ids.set(kind, id);
         return { touched: [id] };
