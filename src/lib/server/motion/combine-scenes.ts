@@ -14,7 +14,7 @@ export const COMBINE_STATUS: Record<Exclude<CombineOutcome, CombineOutcome.Done>
 
 export const MAX_SCENES = 40;
 
-export const combineAskSchema = z.object({ frameIds: z.array(z.string().uuid()).min(2).max(MAX_SCENES) }).strict();
+export const combineAskSchema = z.object({ frameIds: z.array(z.string().uuid()).min(2).max(MAX_SCENES), id: z.string().uuid().optional() }).strict();
 
 export type CombineAsk = z.infer<typeof combineAskSchema>;
 
@@ -31,7 +31,7 @@ export async function combineScenes(store: FrameStore, ask: CombineAsk): Promise
 
   const first = frames[0];
   const { doc, at } = planCombine(frames.map((f) => ({ nodeId: f.nodeId, doc: f.doc, at: f.at ?? { x: 0, y: 0 }, height: heightOf(f) })));
-  const place = { projectId: first.projectId, canvasId: first.canvasId, ...at };
+  const place = { projectId: first.projectId, canvasId: first.canvasId, ...at, id: ask.id };
   const frameId = await store.create(place, doc);
   return { outcome: CombineOutcome.Done, frameId, undo: [created(frameId, place)] };
 }

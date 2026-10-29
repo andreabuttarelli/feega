@@ -3,15 +3,12 @@ import { findNode } from '$lib/server/repos/canvas';
 import { findAssets } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
 import { frameStore } from '$lib/server/motion/move-element';
-import { layersFrame, type PlacedLayer } from '$lib/motion/layers-frame';
+import { layersFrame, layersFramePlace, type PlacedLayer } from '$lib/motion/layers-frame';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { LayerBox } from '$lib/layer-boxes';
 
-const FRAME_GAP = 80;
-const DEFAULT_NODE_WIDTH = 320;
-
-type Place = { projectId: string; canvasId: string; x: number; y: number };
+type Place = { projectId: string; canvasId: string; x: number; y: number; id?: string };
 
 export type LayersToFrameDeps = {
   findNode: typeof findNode;
@@ -34,7 +31,7 @@ const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.fi
 
 const boxesOf = (value: unknown): LayerBox[] => (Array.isArray(value) ? (value as LayerBox[]) : []);
 
-export async function layersToFrame(db: Db, deps: LayersToFrameDeps, input: { orgId: string; nodeId: string }): Promise<LayersToFrame> {
+export async function layersToFrame(db: Db, deps: LayersToFrameDeps, input: { orgId: string; nodeId: string; frameId?: string }): Promise<LayersToFrame> {
   const node = await deps.findNode(db, input);
   if (!node) {
     return { ok: false, error: 'node_not_found' };
@@ -63,7 +60,7 @@ export async function layersToFrame(db: Db, deps: LayersToFrameDeps, input: { or
 
   const doc = layersFrame(pictureOf(base, node.displayName ?? 'Layers'), layers, () => crypto.randomUUID().slice(0, 8));
   const frameId = await deps.createFrame(
-    { projectId: node.projectId, canvasId: node.canvasId, x: node.position.x + (node.size.width ?? DEFAULT_NODE_WIDTH) + FRAME_GAP, y: node.position.y },
+    { projectId: node.projectId, canvasId: node.canvasId, ...layersFramePlace({ x: node.position.x, y: node.position.y, width: node.size.width }), id: input.frameId },
     doc
   );
   return { ok: true, frameId };

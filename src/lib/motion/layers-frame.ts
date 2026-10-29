@@ -6,6 +6,10 @@ import type { Fraction } from '$lib/layer-boxes';
 export type PlacedLayer = { output: Output; box: Fraction };
 
 const CENTRE = { x: 0.5, y: 0.5 };
+const FRAME_GAP = 80;
+const DEFAULT_NODE_WIDTH = 320;
+
+export const layersFramePlace = (node: { x: number; y: number; width: number | null }): { x: number; y: number } => ({ x: node.x + (node.width ?? DEFAULT_NODE_WIDTH) + FRAME_GAP, y: node.y });
 const FIRST_FRAME = 0;
 
 function boxed(doc: MotionDoc, clipId: string, box: Fraction): MotionDoc {

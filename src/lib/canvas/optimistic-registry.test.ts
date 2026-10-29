@@ -116,6 +116,9 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
     [OptimisticAction.MoveElement, carried],
     [OptimisticAction.PlaceComponent, carried],
     [OptimisticAction.CopyFree, carried],
+    [OptimisticAction.InsertScene, carried],
+    [OptimisticAction.CombineScenes, carried],
+    [OptimisticAction.LayersToFrame, carried],
     [OptimisticAction.ScaleGroup, { id: 'a', width: 300, height: 300 }],
     [OptimisticAction.RestoreRun, { id: 'a', runId: 'r', mediaId: 'm' }]
   ] as const) {

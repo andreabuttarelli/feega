@@ -35,7 +35,10 @@ export enum OptimisticAction {
   MoveElement = 'moveElement',
   CopyElement = 'copyElement',
   PlaceComponent = 'placeComponent',
-  CopyFree = 'copyFree'
+  CopyFree = 'copyFree',
+  InsertScene = 'insertScene',
+  CombineScenes = 'combineScenes',
+  LayersToFrame = 'layersToFrame'
 }
 
 export enum Landing {
@@ -66,6 +69,9 @@ type Inputs = {
   [OptimisticAction.CopyElement]: Carried;
   [OptimisticAction.PlaceComponent]: Carried;
   [OptimisticAction.CopyFree]: Carried;
+  [OptimisticAction.InsertScene]: Carried;
+  [OptimisticAction.CombineScenes]: Carried;
+  [OptimisticAction.LayersToFrame]: Carried;
 };
 
 export type Carried = { fields: Record<string, string>; made: CanvasNodeRecord | null; gone: string | null };
@@ -287,7 +293,10 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   [OptimisticAction.MoveElement]: carriedRow('Moving the element did not save and was undone.'),
   [OptimisticAction.CopyElement]: carriedRow('The paste did not save and was removed.'),
   [OptimisticAction.PlaceComponent]: carriedRow('Placing the component did not save and was removed.'),
-  [OptimisticAction.CopyFree]: carriedRow('The paste did not save and was removed.')
+  [OptimisticAction.CopyFree]: carriedRow('The paste did not save and was removed.'),
+  [OptimisticAction.InsertScene]: carriedRow('Inserting the scene did not save and was undone.'),
+  [OptimisticAction.CombineScenes]: carriedRow('The combined video did not save and was removed.'),
+  [OptimisticAction.LayersToFrame]: carriedRow('The layers frame did not save and was removed.')
 };
 
 const LANDED: Record<Landing, (answer: Answer) => boolean> = {

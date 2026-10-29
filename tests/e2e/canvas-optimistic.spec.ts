@@ -424,4 +424,22 @@ test.describe('canvas actions are optimistic @real', () => {
     await expect.poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.length, { timeout: 15_000 }).toBe(2);
     expect(clipCount(await headDoc(admin, host))).toBe(1);
   });
+
+  test('combined scenes show their parent frame before the server answers', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const first = await frame(admin, seedNode, session);
+    const second = await seedNode({ type: 'motion', x: 800, y: 420, data: LANDSCAPE });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: second.id, version: 1, doc: blankFrame, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+    await open(page, session);
+    await page.keyboard.press('ControlOrMeta+a');
+    const at = await centre(page, first);
+    await page.mouse.click(at.x, at.y, { button: 'right' });
+    const item = page.getByRole('menuitem', { name: 'Combine into video' });
+    await expect(item).toBeVisible();
+    await watch(page, { shown: Shown.Changed });
+    await item.click();
+    await verdict('combine-scenes', page);
+    await expect.poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).is('deleted_at', null)).data?.length, { timeout: 15_000 }).toBe(3);
+  });
 });

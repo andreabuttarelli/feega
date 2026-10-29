@@ -3,7 +3,8 @@ import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { DropOn } from '$lib/motion/move-element';
 import { Left, type FrameSnap, type LandingPlan, type MovePlan, type OnCanvas } from '$lib/motion/move-plan';
 import { ADDABLE_LABEL } from './addable';
-import { atFirstRevision, motionOf } from './motion-node';
+import { atFirstRevision, frameNodeOf, motionOf } from './motion-node';
+import { pendingPicture } from './optimistic-insert';
 import type { HeldDoc } from './frame-docs';
 
 const ID_LENGTH = 8;
@@ -55,3 +56,17 @@ export function shownMove(plan: MovePlan | null, place: Place, sourceId: string)
 export function shownLanding(plan: LandingPlan | null, place: Place, like: string): Shown {
   return plan?.ok ? landed(plan, place, like) : NOTHING;
 }
+
+export function shownFrame(doc: MotionDoc, at: { x: number; y: number }, place: Place, like: string): Shown {
+  const shaped = frameNodeOf(doc);
+  const landing: OnCanvas = { on: DropOn.Canvas, at, doc, clipId: '', shape: { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h } };
+  return { made: madeOf(landing, place), gone: null, docs: [{ nodeId: place.id, doc, like }] };
+}
+
+export function shownPending(id: string, at: { x: number; y: number }, size: { w: number; h: number }): Shown {
+  return { made: pendingPicture(id, { x: at.x + size.w / 2, y: at.y + size.h / 2 }, size), gone: null, docs: [] };
+}
+
+export const shownDoc = (nodeId: string, doc: MotionDoc | null): Shown => ({ made: null, gone: null, docs: doc ? [{ nodeId, doc, like: nodeId }] : [] });
+
+export const NOTHING_SHOWN = NOTHING;

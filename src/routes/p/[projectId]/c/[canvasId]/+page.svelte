@@ -153,7 +153,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameDocs } from '$lib/canvas/frame-docs';
-  import { freshIds, shownLanding, shownMove, snapOf, type Shown } from '$lib/canvas/frame-moves';
+  import { NOTHING_SHOWN, freshIds, shownDoc, shownFrame, shownLanding, shownMove, shownPending, snapOf, type Shown } from '$lib/canvas/frame-moves';
+  import { planCombine, planInsert, type SceneTile } from '$lib/motion/scenes';
+  import { layersFramePlace } from '$lib/motion/layers-frame';
   import { idsFrom, planComponent, planCopy, planFree, planMove, type FrameSnap } from '$lib/motion/move-plan';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
@@ -564,7 +566,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   const placeOf = (id: string) => ({ id, canvasId: data.canvas.id, projectId: data.projectId });
 
-  type CarryAction = OptimisticAction.MoveElement | OptimisticAction.CopyElement | OptimisticAction.PlaceComponent | OptimisticAction.CopyFree;
+  type CarryAction = OptimisticAction.MoveElement | OptimisticAction.CopyElement | OptimisticAction.PlaceComponent | OptimisticAction.CopyFree | OptimisticAction.InsertScene | OptimisticAction.CombineScenes | OptimisticAction.LayersToFrame;
 
   function carry(action: CarryAction, fields: Record<string, string>, shown: Shown): Promise<boolean> {
     const saved = optimistic(action, { fields, made: shown.made, gone: shown.gone }).then((outcome) => outcome === OpOutcome.Landed);
@@ -1686,7 +1688,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     refreshDue ||= refreshOf(action) === Refresh.AfterIdle;
     const before = { nodes, edges };
     return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record), toEdge }, async (name, fields) => {
-      await places.flush();
+      await Promise.all([places.flush(), saves.flush()]);
       return post(name, fields);
     }));
   }
@@ -3560,12 +3562,22 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function insertSceneDrop(drop: SceneDrop) {
-    await Promise.all([saves.flush(drop.targetId), saves.flush(drop.sourceId)]);
-    await landed(post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
+    const [target, source] = [snapAt(drop.targetId), snapAt(drop.sourceId)];
+    const doc = target && source ? planInsert(target, source, drop.at) : null;
+    await carry(OptimisticAction.InsertScene, { target: drop.targetId, source: drop.sourceId, at: String(drop.at) }, shownDoc(drop.targetId, doc));
+  }
+
+  function sceneTile(id: string): SceneTile[] {
+    const tile = nodes.find((n) => n.id === id);
+    const doc = frameDocs.doc(id);
+    return tile && doc ? [{ nodeId: id, doc, at: { x: tile.x, y: tile.y }, height: tile.h }] : [];
   }
 
   async function combineScenes(frameIds: string[]) {
-    await landed(post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
+    const made = crypto.randomUUID();
+    const tiles = frameIds.flatMap(sceneTile);
+    const combined = tiles.length === frameIds.length ? planCombine(tiles) : null;
+    await carry(OptimisticAction.CombineScenes, { frame_ids: JSON.stringify(frameIds), node_id: made }, combined ? shownFrame(combined.doc, combined.at, placeOf(made), frameIds[0]) : NOTHING_SHOWN);
   }
 
   async function imageTool(nodeId: string, tool: ImageTool) {
@@ -3594,7 +3606,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function layersToFrame(nodeId: string) {
-    await landed(post('layersToFrame', { node_id: nodeId }));
+    const made = crypto.randomUUID();
+    const tile = nodes.find((n) => n.id === nodeId);
+    const shown = tile ? shownPending(made, layersFramePlace({ x: tile.x, y: tile.y, width: tile.w }), { w: tile.w, h: tile.h }) : NOTHING_SHOWN;
+    await carry(OptimisticAction.LayersToFrame, { node_id: nodeId, frame_id: made }, shown);
   }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {

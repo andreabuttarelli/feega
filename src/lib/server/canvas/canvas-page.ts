@@ -1311,12 +1311,14 @@ export const actions: Actions<CanvasParams> = {
 
   layersToFrame: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const nodeId = String((await request.formData()).get('node_id') ?? '');
+    const fd = await request.formData();
+    const nodeId = String(fd.get('node_id') ?? '');
+    const frameId = z.string().uuid().safeParse(fd.get('frame_id') ?? undefined);
     if (!nodeId) {
       return fail(400, { error: 'invalid request' });
     }
 
-    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId });
+    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId, frameId: frameId.success ? frameId.data : undefined });
     return made.ok ? { outcome: 'done', frameId: made.frameId } : fail(400, { error: made.error });
   },
 
@@ -1334,7 +1336,7 @@ export const actions: Actions<CanvasParams> = {
   combineScenes: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = combineAskSchema.safeParse({ frameIds: jsonField(fd, 'frame_ids') });
+    const ask = combineAskSchema.safeParse({ frameIds: jsonField(fd, 'frame_ids'), id: fd.get('node_id') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'pick two or more frames' });
     }
