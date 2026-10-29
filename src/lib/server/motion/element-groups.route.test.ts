@@ -126,3 +126,40 @@ describe('grouping free elements on the canvas', () => {
     expect(deletedIds(input)).toEqual([FRAME]);
   });
 });
+
+describe('wrapping free elements with a stack', () => {
+  const two = () => ({ nodes: [elementRow(A, AT_A), elementRow(B, AT_B)], motion_revisions: [revisionRow(A, box('a', AT_A)), revisionRow(B, box('b', AT_B))] });
+
+  it('⇧A makes one free Stack element holding both, in a row, and removes the two', async () => {
+    const id = '88888888-8888-4888-8888-888888888888';
+    const input = event({ ids: JSON.stringify([A, B]), node_id: id }, two());
+
+    const result = await actions.stackElements(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', created: true });
+    expect(input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload).toMatchObject({ id });
+    const [node] = inserted(input);
+    expect(node).toMatchObject({ x: 0, y: 0, display_name: 'Stack' });
+    expect(node.data.kind).not.toBe('group');
+    const doc = revisions(input)[0].doc;
+    const stack = clipsOf(doc).find((c) => !c.parent)!;
+    expect(stack.autoLayout).toMatchObject({ direction: 'horizontal' });
+    expect(clipsOf(doc).filter((c) => c.parent === stack.id).map((c) => c.id).sort()).toEqual(['a', 'b']);
+    expect(node.width / node.height).toBeCloseTo(doc.width / doc.height, 1);
+    expect(deletedIds(input).sort()).toEqual([A, B].sort());
+  });
+
+  it('wraps one free text by itself', async () => {
+    const input = event({ ids: JSON.stringify([A]) }, { nodes: [elementRow(A, AT_A)], motion_revisions: [revisionRow(A, box('a', AT_A))] });
+
+    expect(await actions.stackElements(input as never)).toMatchObject({ outcome: 'done' });
+    expect(clipsOf(revisions(input)[0].doc).find((c) => c.id === 'a')!.parent).toBeTruthy();
+  });
+
+  it('refuses a frame', async () => {
+    const frame = { ...elementRow(FRAME, AT_A), data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } };
+    const input = event({ ids: JSON.stringify([FRAME]) }, { nodes: [frame], motion_revisions: [revisionRow(FRAME, box('f', AT_A))] });
+
+    expect(await actions.stackElements(input as never)).not.toMatchObject({ outcome: 'done' });
+  });
+});

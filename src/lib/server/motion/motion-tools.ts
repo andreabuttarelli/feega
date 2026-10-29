@@ -180,7 +180,7 @@ import { ParentOpacity } from '@feega/motion-core/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
 import { FRAME_PRESETS, PRESET_SIZE } from '$lib/motion/frame-presets';
-import { leaveStack, freezeLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from '$lib/motion/layout/ops';
+import { leaveStack, freezeLayout, removeStack, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
 import { expressionToKeys, setCameraExpression, setExpression } from '@feega/motion-core/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -1980,6 +1980,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Move a child of an auto layout to position index (0 = first) in its container.',
       inputSchema: z.object({ container_id: z.string(), clip_id: z.string(), index: z.number().int().min(0) }),
       execute: async (input) => apply(reorderChild(session.doc, input.container_id, input.clip_id, input.index), `moved ${input.clip_id} to ${input.index}`)
+    }),
+
+    remove_stack: tool({
+      description: 'Remove a stack (an auto layout container), like the editor Remove stack (⌥⇧A): its children keep the boxes the layout gave them and move to the stack\'s parent, in its place when that parent is a stack too; the stack itself is deleted. To keep the container and only turn its layout off use set_auto_layout off.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async ({ clip_id }) => apply(removeStack(session.doc, clip_id), `removed the stack ${clip_id}`)
     }),
 
     leave_auto_layout: tool({
