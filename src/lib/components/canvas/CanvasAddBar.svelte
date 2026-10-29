@@ -26,6 +26,7 @@
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
   import PhoneSheet from './PhoneSheet.svelte';
+  import { EditorMode, MODES, editorMode } from '$lib/canvas/editor-mode.svelte';
   import ProviderIcon from './ProviderIcon.svelte';
   import { hotDrag, type HotModel } from '$lib/canvas/hot-models';
   import { CANVAS_DRAG_FILLED_NODE } from '$lib/canvas/drag-payload';
@@ -71,6 +72,12 @@
   const PERCENT = 100;
   const SWITCH_PX = 64;
   const INSERT_LABEL = 'Insert';
+  const MODE_SHORTCUT: Partial<Record<EditorMode, string>> = {
+    [EditorMode.Design]: 'E',
+    [EditorMode.Motion]: 'E',
+    [EditorMode.Code]: '⇧D'
+  };
+  const modeTip = (mode: EditorMode) => (MODE_SHORTCUT[mode] ? `${MODES[mode].label} (${MODE_SHORTCUT[mode]})` : MODES[mode].label);
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);
@@ -271,6 +278,21 @@
   </span>
 {/snippet}
 
+{#snippet modeSlot()}
+  <div class="group modes" role="group" aria-label="Editor mode" data-testid="editor-mode-switch" data-mode={editorMode.current}>
+    {#each Object.values(EditorMode) as mode (mode)}
+      {@const Icon = MODES[mode].icon}
+      <span class="tool">
+        <button type="button" class="pick" class:on={editorMode.current === mode} aria-pressed={editorMode.current === mode} aria-label={MODES[mode].label} data-mode={mode} onclick={() => editorMode.set(mode)}>
+          <Icon size={17} strokeWidth={1.7} />
+        </button>
+        <span class="add-tip" role="tooltip">{modeTip(mode)}</span>
+      </span>
+    {/each}
+  </div>
+  <span class="mode-divider" aria-hidden="true"></span>
+{/snippet}
+
 {#snippet commentSlot()}
   {#if oncomment}
     <span class="tool">
@@ -313,6 +335,7 @@
 {/snippet}
 
 <div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
+  {#if !phone}{@render modeSlot()}{/if}
   <div class="group" data-testid={`bar-${context}`}>
     {#each BAR_SLOTS as s (s)}{@render SLOT[s]()}{/each}
   </div>
@@ -438,6 +461,12 @@
 
   .pick {
     cursor: pointer;
+  }
+
+  .mode-divider {
+    align-self: stretch;
+    margin: 6px 4px;
+    border-left: 1px solid var(--ui-divider);
   }
 
   .zoom {

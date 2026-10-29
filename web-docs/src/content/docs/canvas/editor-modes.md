@@ -1,11 +1,11 @@
 ---
 title: Editor modes
-description: Design, Motion, Play and Code — one switch at the top of the canvas decides what your edits do.
+description: Design, Motion, Play and Code — one switch in the bottom bar decides what your edits do.
 sidebar:
   order: 13
 ---
 
-The switch at the top centre of the canvas sets one mode for the whole editor. Feega remembers it in your browser.
+The switch at the left of the bottom bar sets one mode for the whole editor. Feega remembers it in your browser.
 
 | Mode | What it does | Key |
 |---|---|---|
@@ -19,4 +19,4 @@ The switch at the top centre of the canvas sets one mode for the whole editor. F
 - Play starts the player on the frame you are in, or the one frame selected.
 - Stills always edit in Design: Motion applies to frames that have a timeline.
 
-The mode used to live in a row at the top of each frame's properties. That row is gone: the header switch replaces it, for every frame at once.
+The mode used to live in a row at the top of each frame's properties. That row is gone: the bottom-bar switch replaces it, for every frame at once.
