@@ -9,7 +9,7 @@ export enum CanvasRemoval {
 
 export type RemovalResult = { outcome: CanvasRemoval.Removed; nextCanvasId: string } | { outcome: CanvasRemoval.LastCanvas };
 
-export async function openNewCanvas(db: Db, scope: { orgId: string; projectId: string }): Promise<Canvas> {
+export async function openNewCanvas(db: Db, scope: { orgId: string; projectId: string; id?: string }): Promise<Canvas> {
   const canvases = await listCanvases(db, scope);
   const name = nextCanvasName(canvases.map((c) => c.name));
   return createCanvas(db, { ...scope, name });

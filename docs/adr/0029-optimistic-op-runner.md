@@ -26,7 +26,9 @@ Every action is a row in `REGISTRY` (`src/lib/canvas/optimistic-registry.ts`): l
 server fields, touched rows, landing test (`Moved` = `outcome === 'done'`, `Answered` = any
 success), undo source, refresh. A new action is a row. State that is not canvas rows gets
 its own registry run by the same runner: comment threads (`src/lib/canvas/comment-ops.ts`),
-where an op touches thread ids instead of nodes/edges.
+where an op touches thread ids instead of nodes/edges; the pages list and canvas share
+(`src/lib/canvas/page-ops.ts`). Where the server would mint an id or token, the client mints
+it and the server stores it, so nothing needs reconciling.
 
 Optimistic concurrency is unchanged: writes that carry `nodes.version` keep sending it, a
 `conflict` is a refusal (rolled back), and the server records it in `canvas_conflicts` (#1566),

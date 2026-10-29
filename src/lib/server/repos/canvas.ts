@@ -171,11 +171,11 @@ export async function listCanvases(
 
 export async function createCanvas(
   db: Db,
-  input: { orgId: string; projectId: string; name: string }
+  input: { orgId: string; projectId: string; name: string; id?: string }
 ): Promise<Canvas> {
   const { data, error } = await db
     .from('canvases')
-    .insert({ org_id: input.orgId, project_id: input.projectId, name: input.name })
+    .insert({ ...(input.id ? { id: input.id } : {}), org_id: input.orgId, project_id: input.projectId, name: input.name })
     .select(CANVAS_COLUMNS)
     .single();
 

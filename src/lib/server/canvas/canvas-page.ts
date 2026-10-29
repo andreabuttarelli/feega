@@ -363,10 +363,11 @@ function templateValues(raw: FormDataEntryValue | null): Record<string, string> 
 }
 
 export const actions: Actions<CanvasParams> = {
-  new_canvas: async ({ params, locals }) => {
+  new_canvas: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const projectId = scope.canvas.projectId;
-    const canvas = await openNewCanvas(scope.db, { orgId: scope.orgId, projectId });
+    const id = z.string().uuid().safeParse((await request.formData()).get('id') ?? undefined);
+    const canvas = await openNewCanvas(scope.db, { orgId: scope.orgId, projectId, id: id.success ? id.data : undefined });
     throw redirect(303, canvasPath(projectId, canvas.id));
   },
 
@@ -1193,7 +1194,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid sharing state' });
     }
 
-    const shareToken = await setCanvasShare(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, state });
+    const shareToken = await setCanvasShare(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, state, token: String(fd.get('token') ?? '') || undefined });
     return { shareToken };
   },
 

@@ -20,7 +20,7 @@ import { calendarOf } from '$lib/canvas/calendar-node';
 import { saleLabel } from '$lib/canvas/product-discount';
 import { Capability, modeAllows, modeOf } from '$lib/project-mode';
 import { audioOutputIds } from '$lib/canvas/node-media';
-import { mintShareToken } from '$lib/canvas/share-token';
+import { mintedOr } from '$lib/canvas/share-token';
 
 export { ShareState };
 
@@ -33,9 +33,9 @@ const SHARED_FACE_PRESET: ThumbnailPreset = 'canvas512';
 
 export async function setCanvasShare(
   db: Db,
-  input: { orgId: string; canvasId: string; state: ShareState }
+  input: { orgId: string; canvasId: string; state: ShareState; token?: string }
 ): Promise<string | null> {
-  const token = input.state === ShareState.On ? mintShareToken() : null;
+  const token = input.state === ShareState.On ? mintedOr(input.token) : null;
 
   const { error } = await db
     .from('canvases')
