@@ -36,13 +36,6 @@ function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
     });
 }
 
-export function breakpointViews(frames: readonly FrameAt[], docOf: (id: string) => MotionDoc | null | undefined): BreakpointView[] {
-  return frames.flatMap((frame) => {
-    const doc = docOf(frame.id);
-    return doc?.breakpoints?.length ? viewsOfFrame(frame, doc) : [];
-  });
-}
-
 type Held = { stamp: string; doc: MotionDoc; views: BreakpointView[] };
 
 const stampOf = ({ kind, revision, box }: FrameAt) => `${kind}|${revision}|${box.x}|${box.y}|${box.w}|${box.h}`;
