@@ -31,7 +31,14 @@ export enum OptimisticAction {
   Remove = 'remove',
   Duplicate = 'duplicate',
   ScaleGroup = 'scaleGroup',
-  RestoreRun = 'restore'
+  RestoreRun = 'restore',
+  MoveElement = 'moveElement',
+  CopyElement = 'copyElement',
+  PlaceComponent = 'placeComponent',
+  CopyFree = 'copyFree',
+  InsertScene = 'insertScene',
+  CombineScenes = 'combineScenes',
+  LayersToFrame = 'layersToFrame'
 }
 
 export enum Landing {
@@ -46,7 +53,7 @@ export enum Refresh {
 }
 
 type Inputs = {
-  [OptimisticAction.MoveFree]: { id: string; frameId: string; at: { x: number; y: number } };
+  [OptimisticAction.MoveFree]: { id: string; frameId: string; at: { x: number; y: number }; ids?: string[] };
   [OptimisticAction.Stack]: { ids: string[]; id: string };
   [OptimisticAction.Section]: { ids: string[]; id: string };
   [OptimisticAction.Group]: { ids: string[]; id: string };
@@ -58,7 +65,16 @@ type Inputs = {
   [OptimisticAction.Duplicate]: { ids: string[]; copies: CanvasNodeRecord[]; copyIds: CopyIds; offset?: Offset };
   [OptimisticAction.ScaleGroup]: { id: string; width: number; height: number };
   [OptimisticAction.RestoreRun]: { id: string; runId: string; mediaId: string | null };
+  [OptimisticAction.MoveElement]: Carried;
+  [OptimisticAction.CopyElement]: Carried;
+  [OptimisticAction.PlaceComponent]: Carried;
+  [OptimisticAction.CopyFree]: Carried;
+  [OptimisticAction.InsertScene]: Carried;
+  [OptimisticAction.CombineScenes]: Carried;
+  [OptimisticAction.LayersToFrame]: Carried;
 };
+
+export type Carried = { fields: Record<string, string>; made: CanvasNodeRecord | null; gone: string | null };
 
 type Rows = CanvasRows<OptTile, OptEdge>;
 
@@ -116,6 +132,18 @@ function scaled<N extends OptTile>(nodes: N[], input: Inputs[OptimisticAction.Sc
   });
 }
 
+function carriedRow(notice: string): Row<Carried> {
+  return {
+    fields: (i) => i.fields,
+    apply: (rows, i, ctx) => ({ ...rows, nodes: [...rows.nodes.filter((n) => n.id !== i.gone), ...(i.made ? [{ ...ctx.toTile(i.made), select: true }] : [])] }),
+    touched: (i) => nodesOnly([i.made?.id, i.gone].filter((id): id is string => !!id)),
+    landing: Landing.Moved,
+    undo: serverUndo,
+    refresh: Refresh.AfterIdle,
+    notice
+  };
+}
+
 function removedUndo(before: Rows, input: Inputs[OptimisticAction.Remove]): UndoItem[] {
   const edges = before.edges.filter((e) => input.edgeIds.includes(e.id));
   const nodes = before.nodes.filter((n) => input.nodeIds.includes(n.id));
@@ -145,7 +173,7 @@ function offsetFields(offset: Offset | undefined): Record<string, string> {
 
 const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   [OptimisticAction.MoveFree]: {
-    fields: (i) => ({ source: i.id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: i.frameId, at: i.at }) }),
+    fields: (i) => ({ source: i.id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: i.frameId, at: i.at }), ...(i.ids ? { ids: JSON.stringify(i.ids) } : {}) }),
     apply: (rows, i) => ({ ...rows, nodes: rows.nodes.filter((n) => n.id !== i.id) }),
     touched: (i) => nodesOnly([i.id]),
     landing: Landing.Moved,
@@ -261,7 +289,14 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
     undo: noUndo,
     refresh: Refresh.AfterIdle,
     notice: 'Showing that version did not save and was undone.'
-  }
+  },
+  [OptimisticAction.MoveElement]: carriedRow('Moving the element did not save and was undone.'),
+  [OptimisticAction.CopyElement]: carriedRow('The paste did not save and was removed.'),
+  [OptimisticAction.PlaceComponent]: carriedRow('Placing the component did not save and was removed.'),
+  [OptimisticAction.CopyFree]: carriedRow('The paste did not save and was removed.'),
+  [OptimisticAction.InsertScene]: carriedRow('Inserting the scene did not save and was undone.'),
+  [OptimisticAction.CombineScenes]: carriedRow('The combined video did not save and was removed.'),
+  [OptimisticAction.LayersToFrame]: carriedRow('The layers frame did not save and was removed.')
 };
 
 const LANDED: Record<Landing, (answer: Answer) => boolean> = {

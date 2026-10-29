@@ -28,7 +28,10 @@ success), undo source, refresh. A new action is a row. State that is not canvas 
 its own registry run by the same runner: comment threads (`src/lib/canvas/comment-ops.ts`),
 where an op touches thread ids instead of nodes/edges; the pages list and canvas share
 (`src/lib/canvas/page-ops.ts`). Where the server would mint an id or token, the client mints
-it and the server stores it, so nothing needs reconciling.
+it and the server stores it, so nothing needs reconciling. Actions that change a frame doc
+plan on the client with the same pure planner the server runs (`src/lib/motion/move-plan.ts`,
+`src/lib/motion/scenes.ts`), seeded with client-chosen clip ids, and hold the planned docs
+through `frameDocs.hold` until the op lands.
 
 Optimistic concurrency is unchanged: writes that carry `nodes.version` keep sending it, a
 `conflict` is a refusal (rolled back), and the server records it in `canvas_conflicts` (#1566),

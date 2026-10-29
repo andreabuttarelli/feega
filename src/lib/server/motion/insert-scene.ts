@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertSceneAt, sceneNodeIds } from '$lib/motion/scenes';
+import { planInsert } from '$lib/motion/scenes';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import type { FrameStore } from './move-element';
@@ -30,11 +30,11 @@ export async function insertScene(store: FrameStore, ask: InsertAsk): Promise<In
   if (!target || !source) {
     return { outcome: InsertOutcome.NotFound };
   }
-  if (!sceneNodeIds(target.doc).length || sceneNodeIds(source.doc).length || target.nodeId === source.nodeId) {
+  const doc = planInsert(target, source, ask.at);
+  if (!doc) {
     return { outcome: InsertOutcome.Invalid, detail: 'drop a frame that is not a sequence onto a sequence' };
   }
 
-  const doc = insertSceneAt(target.doc, { nodeId: source.nodeId, durationInFrames: source.doc.durationInFrames }, Math.round(ask.at * target.doc.durationInFrames));
   const write = await store.write(target.nodeId, target.version, doc, SUMMARY);
   if (write.outcome === RevisionOutcome.Conflict) {
     return { outcome: InsertOutcome.Conflict };

@@ -153,12 +153,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameDocs } from '$lib/canvas/frame-docs';
+  import { NOTHING_SHOWN, freshIds, shownDoc, shownFrame, shownLanding, shownMove, shownPending, snapOf, type Shown } from '$lib/canvas/frame-moves';
+  import { planCombine, planInsert, type SceneTile } from '$lib/motion/scenes';
+  import { layersFramePlace } from '$lib/motion/layers-frame';
+  import { idsFrom, planComponent, planCopy, planFree, planMove, type FrameSnap } from '$lib/motion/move-plan';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
-  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -546,8 +550,47 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!id || !frame) {
       return DropVerdict.Ignored;
     }
-    void optimistic(OptimisticAction.MoveFree, { id, frameId: frame.frameId, at: frame.at });
+    moveFreeInto(id, { nodeId: frame.frameId, at: frame.at });
     return DropVerdict.Taken;
+  }
+
+  const newClipId = () => freshIds()[0];
+
+  const PLAN_OF_CARRY = { [OptimisticAction.MoveElement]: planMove, [OptimisticAction.CopyElement]: planCopy } as const;
+
+  function snapAt(id: string): FrameSnap | null {
+    const tile = nodes.find((n) => n.id === id);
+    const doc = frameDocs.doc(id);
+    return tile && doc ? snapOf(tile, doc) : null;
+  }
+
+  const placeOf = (id: string) => ({ id, canvasId: data.canvas.id, projectId: data.projectId });
+
+  type CarryAction = OptimisticAction.MoveElement | OptimisticAction.CopyElement | OptimisticAction.PlaceComponent | OptimisticAction.CopyFree | OptimisticAction.InsertScene | OptimisticAction.CombineScenes | OptimisticAction.LayersToFrame;
+
+  function carry(action: CarryAction, fields: Record<string, string>, shown: Shown): Promise<boolean> {
+    const saved = optimistic(action, { fields, made: shown.made, gone: shown.gone }).then((outcome) => outcome === OpOutcome.Landed);
+    shown.docs.forEach((held) => frameDocs.hold(held, saved));
+    return saved;
+  }
+
+  function moveFreeInto(id: string, hold: FrameHold): Promise<boolean> {
+    const ids = freshIds();
+    const [source, target] = [snapAt(id), snapAt(hold.nodeId)];
+    const plan = source && target ? planFree(source, target, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }, idsFrom(ids, newClipId)) : null;
+    const saved = optimistic(OptimisticAction.MoveFree, { id, frameId: hold.nodeId, at: hold.at, ids }).then((outcome) => outcome === OpOutcome.Landed);
+    shownLanding(plan, placeOf(hold.nodeId), id).docs.forEach((held) => frameDocs.hold(held, saved));
+    return saved;
+  }
+
+  function carryElement(action: OptimisticAction.MoveElement | OptimisticAction.CopyElement, ask: { source: string; clip: string; drop: Drop; box?: StageRect | null }) {
+    const ids = freshIds();
+    const made = crypto.randomUUID();
+    const source = snapAt(ask.source);
+    const target = ask.drop.on === DropOn.Frame ? snapAt(ask.drop.nodeId) : null;
+    const planned = source && (ask.drop.on === DropOn.Canvas || target) ? PLAN_OF_CARRY[action](source, target, { clipId: ask.clip, drop: ask.drop, box: ask.box }, idsFrom(ids, newClipId)) : null;
+    const fields = { source: ask.source, clip: ask.clip, drop: JSON.stringify(ask.drop), ...(ask.box ? { box: JSON.stringify(ask.box) } : {}), node_id: made, ids: JSON.stringify(ids) };
+    return carry(action, fields, shownMove(planned, placeOf(made), ask.source));
   }
 
   async function elementOut(source: string, out: ElementOut, phase: DragPhase) {
@@ -556,7 +599,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!drop) {
       return;
     }
-    await landed(post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), ...(out.box ? { box: JSON.stringify(out.box) } : {}) }));
+    await carryElement(OptimisticAction.MoveElement, { source, clip: out.clipId, drop, box: out.box });
   }
 
   function rotateGroupBy(id: string, degrees: number) {
@@ -671,15 +714,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function intoFrame(id: string, hold: FrameHold) {
-    if (!(await landed(post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }) })))) {
+    if (!(await moveFreeInto(id, hold))) {
       focusOn([id], undefined, FocusMode.Select);
-      return;
     }
-    nodes = nodes.filter((n) => n.id !== id);
   }
 
   async function dropComponent(drag: ComponentDrag, at: { x: number; y: number }) {
-    await landed(post('placeComponent', { source: drag.frameId, comp: drag.compId, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x, y: at.y }) }));
+    const ids = freshIds();
+    const made = crypto.randomUUID();
+    const drop = { on: DropOn.Canvas, x: at.x, y: at.y } as const;
+    const source = snapAt(drag.frameId);
+    const planned = source ? planComponent(source, drag.compId, drop, idsFrom(ids, newClipId)) : null;
+    await carry(OptimisticAction.PlaceComponent, { source: drag.frameId, comp: drag.compId, drop: JSON.stringify(drop), node_id: made, ids: JSON.stringify(ids) }, shownMove(planned, placeOf(made), drag.frameId));
   }
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
@@ -1642,7 +1688,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     refreshDue ||= refreshOf(action) === Refresh.AfterIdle;
     const before = { nodes, edges };
     return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record), toEdge }, async (name, fields) => {
-      await places.flush();
+      await Promise.all([places.flush(), saves.flush()]);
       return post(name, fields);
     }));
   }
@@ -3516,12 +3562,22 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function insertSceneDrop(drop: SceneDrop) {
-    await Promise.all([saves.flush(drop.targetId), saves.flush(drop.sourceId)]);
-    await landed(post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
+    const [target, source] = [snapAt(drop.targetId), snapAt(drop.sourceId)];
+    const doc = target && source ? planInsert(target, source, drop.at) : null;
+    await carry(OptimisticAction.InsertScene, { target: drop.targetId, source: drop.sourceId, at: String(drop.at) }, shownDoc(drop.targetId, doc));
+  }
+
+  function sceneTile(id: string): SceneTile[] {
+    const tile = nodes.find((n) => n.id === id);
+    const doc = frameDocs.doc(id);
+    return tile && doc ? [{ nodeId: id, doc, at: { x: tile.x, y: tile.y }, height: tile.h }] : [];
   }
 
   async function combineScenes(frameIds: string[]) {
-    await landed(post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
+    const made = crypto.randomUUID();
+    const tiles = frameIds.flatMap(sceneTile);
+    const combined = tiles.length === frameIds.length ? planCombine(tiles) : null;
+    await carry(OptimisticAction.CombineScenes, { frame_ids: JSON.stringify(frameIds), node_id: made }, combined ? shownFrame(combined.doc, combined.at, placeOf(made), frameIds[0]) : NOTHING_SHOWN);
   }
 
   async function imageTool(nodeId: string, tool: ImageTool) {
@@ -3550,7 +3606,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function layersToFrame(nodeId: string) {
-    await landed(post('layersToFrame', { node_id: nodeId }));
+    const made = crypto.randomUUID();
+    const tile = nodes.find((n) => n.id === nodeId);
+    const shown = tile ? shownPending(made, layersFramePlace({ x: tile.x, y: tile.y, width: tile.w }), { w: tile.w, h: tile.h }) : NOTHING_SHOWN;
+    await carry(OptimisticAction.LayersToFrame, { node_id: nodeId, frame_id: made }, shown);
   }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
@@ -3746,7 +3805,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
     for (const [i, clip] of copied.clipIds.entries()) {
-      await landed(post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify(pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER })) }));
+      void carryElement(OptimisticAction.CopyElement, { source: copied.frameId, clip, drop: pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER }) });
     }
   }
 
@@ -3755,14 +3814,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function pasteElementsIntoEach(frameIds: string[], copied: CopiedElements) {
     for (const nodeId of frameIds) {
       for (const clip of copied.clipIds) {
-        await landed(post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Frame, nodeId, at: FRAME_CENTRE }) }));
+        void carryElement(OptimisticAction.CopyElement, { source: copied.frameId, clip, drop: { on: DropOn.Frame, nodeId, at: FRAME_CENTRE } });
       }
     }
   }
 
   async function pasteFreeInto(frameId: string, freeIds: string[]) {
-    for (const source of freeIds) {
-      await landed(post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
+    for (const id of freeIds) {
+      const ids = freshIds();
+      const drop = { on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE } as const;
+      const [source, target] = [snapAt(id), snapAt(frameId)];
+      const planned = source && target ? planFree(source, target, drop, idsFrom(ids, newClipId)) : null;
+      void carry(OptimisticAction.CopyFree, { source: id, drop: JSON.stringify(drop), ids: JSON.stringify(ids) }, shownLanding(planned, placeOf(frameId), id));
     }
   }
 

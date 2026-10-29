@@ -152,6 +152,8 @@ function jsonField(fd: FormData, key: string): unknown {
   }
 }
 
+const chosenIds = (fd: FormData) => ({ id: fd.get('node_id') ?? undefined, ids: jsonField(fd, 'ids') });
+
 function canvasFrames(scope: Scope) {
   return frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope), projectId: scope.canvas.projectId });
 }
@@ -1309,12 +1311,14 @@ export const actions: Actions<CanvasParams> = {
 
   layersToFrame: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const nodeId = String((await request.formData()).get('node_id') ?? '');
+    const fd = await request.formData();
+    const nodeId = String(fd.get('node_id') ?? '');
+    const frameId = z.string().uuid().safeParse(fd.get('frame_id') ?? undefined);
     if (!nodeId) {
       return fail(400, { error: 'invalid request' });
     }
 
-    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId });
+    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId, frameId: frameId.success ? frameId.data : undefined });
     return made.ok ? { outcome: 'done', frameId: made.frameId } : fail(400, { error: made.error });
   },
 
@@ -1332,7 +1336,7 @@ export const actions: Actions<CanvasParams> = {
   combineScenes: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = combineAskSchema.safeParse({ frameIds: jsonField(fd, 'frame_ids') });
+    const ask = combineAskSchema.safeParse({ frameIds: jsonField(fd, 'frame_ids'), id: fd.get('node_id') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'pick two or more frames' });
     }
@@ -1365,7 +1369,7 @@ export const actions: Actions<CanvasParams> = {
   moveElement: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop'), box: jsonField(fd, 'box'), versions: jsonField(fd, 'versions') });
+    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop'), box: jsonField(fd, 'box'), versions: jsonField(fd, 'versions'), ...chosenIds(fd) });
     if (!ask.success) {
       return fail(400, { error: 'spostamento non valido' });
     }
@@ -1375,7 +1379,7 @@ export const actions: Actions<CanvasParams> = {
   copyElement: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop') });
+    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop'), ...chosenIds(fd) });
     if (!ask.success) {
       return fail(400, { error: 'invalid paste' });
     }
@@ -1385,7 +1389,7 @@ export const actions: Actions<CanvasParams> = {
   placeComponent: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = componentAskSchema.safeParse({ sourceNodeId: fd.get('source'), compId: fd.get('comp'), drop: jsonField(fd, 'drop') });
+    const ask = componentAskSchema.safeParse({ sourceNodeId: fd.get('source'), compId: fd.get('comp'), drop: jsonField(fd, 'drop'), ...chosenIds(fd) });
     if (!ask.success) {
       return fail(400, { error: 'invalid component drop' });
     }
@@ -1395,7 +1399,7 @@ export const actions: Actions<CanvasParams> = {
   moveFree: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop'), ids: jsonField(fd, 'ids') });
     if (!ask.success) {
       return fail(400, { error: 'invalid drop' });
     }
@@ -1405,7 +1409,7 @@ export const actions: Actions<CanvasParams> = {
   copyFree: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop'), ids: jsonField(fd, 'ids') });
     if (!ask.success) {
       return fail(400, { error: 'invalid paste' });
     }

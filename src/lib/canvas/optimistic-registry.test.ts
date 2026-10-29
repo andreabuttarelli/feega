@@ -12,6 +12,7 @@ const edge = (id: string): OptEdge => ({ id, source: 'a', target: 'b', mode: 'fi
 const ctx = { toTile: (r: CanvasNodeRecord): OptTile => ({ id: r.id, type: r.type, displayName: r.displayName, x: r.position.x, y: r.position.y, w: r.size.width ?? 0, h: r.size.height ?? 0, data: r.data, version: r.version }) };
 const copy = (id: string, version = 0): CanvasNodeRecord => ({ id, canvasId: 'c', projectId: 'p', type: 'motion', displayName: null, position: { x: 32, y: 32, z: 0 }, size: { width: 100, height: 100 }, data: { docHeadRevision: 1 }, version });
 const duplicated = { ids: ['a'], copies: [copy('a2')], copyIds: { a: 'a2' } };
+const carried = { fields: { source: 'a', clip: 'txt', ids: '["k1"]' }, made: copy('m'), gone: 'a' };
 const start = (): CanvasRows<OptTile, OptEdge> => ({ nodes: [tile('a'), tile('b', 200)], edges: [edge('e')] });
 
 type Sent = { action: string; fields: Record<string, string> };
@@ -84,6 +85,17 @@ describe('optimistic registry: every action says how it looks before the server 
     expect(shown.nodes[0].data).toMatchObject({ refId: 'm1', runId: 'r1' });
   });
 
+  it('an element carried out of a frame shows its new tile, picked, and an emptied element leaves', () => {
+    const shown = optimisticOp(OptimisticAction.MoveElement, carried, start(), ctx, async () => null).apply(start());
+    expect(shown.nodes.map((n) => [n.id, n.select ?? false])).toEqual([['b', false], ['m', true]]);
+  });
+
+  it('a carry sends the fields it was given, ids included', async () => {
+    const t = runner({ outcome: 'done', undo: [] });
+    await t.run(optimisticOp(OptimisticAction.CopyElement, carried, t.rows(), ctx, t.post));
+    expect(t.sent).toEqual([{ action: 'copyElement', fields: carried.fields }]);
+  });
+
   it('delete takes nodes and wires away', () => {
     const shown = optimisticOp(OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }, start(), ctx, async () => null).apply(start());
     expect(shown).toEqual({ nodes: [tile('b', 200)], edges: [] });
@@ -101,6 +113,12 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
     [OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }],
     [OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }],
     [OptimisticAction.Duplicate, duplicated],
+    [OptimisticAction.MoveElement, carried],
+    [OptimisticAction.PlaceComponent, carried],
+    [OptimisticAction.CopyFree, carried],
+    [OptimisticAction.InsertScene, carried],
+    [OptimisticAction.CombineScenes, carried],
+    [OptimisticAction.LayersToFrame, carried],
     [OptimisticAction.ScaleGroup, { id: 'a', width: 300, height: 300 }],
     [OptimisticAction.RestoreRun, { id: 'a', runId: 'r', mediaId: 'm' }]
   ] as const) {

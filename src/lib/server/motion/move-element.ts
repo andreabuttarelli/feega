@@ -1,14 +1,13 @@
 import { z } from 'zod';
 import { TEXT_SIZINGS } from '@feega/motion-core/motion/text-sizing';
-import { Background, formatOf, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
+import { formatOf, type MotionDoc, type MotionFormat } from '@feega/motion-core/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize, type DocNodeShape } from '$lib/canvas/motion-node';
-import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
+import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, motionNodeSize, type DocNodeShape } from '$lib/canvas/motion-node';
+import { CanvasTheme, drawnElement, drawnFrame, drawnOf, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
-import { homed, placeInstance } from '$lib/motion/canvas-components';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { gradientFillSchema } from '@feega/motion-core/motion/fill/model';
 import { FILL_RULES } from '@feega/motion-core/motion/shape/schema';
@@ -19,19 +18,12 @@ import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { commitOnto } from './frame-ops';
 import { DocMode, docMode } from '@feega/motion-core/motion/still';
-import { DropOn, OutputKind, clipCentre, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
+import { DropOn, OutputKind, linkOutput, mediaElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
+import { Left, MoveOutcome, StillAt, idsFrom, landFree, landIn, landOnCanvas, planComponent, planCopy, planFree, planMove, type CanvasDrop, type Landing, type LandingPlan, type MovePlan, type Refusal, type SourceLeft, type Stage } from '$lib/motion/move-plan';
 import { RevisionOutcome, appendRevision, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 
-export enum MoveOutcome {
-  Done = 'done',
-  NotFound = 'motion_node_not_found',
-  NoElement = 'element_not_found',
-  SameFrame = 'same_frame',
-  NoOutput = 'no_output',
-  Conflict = 'conflict',
-  Invalid = 'invalid'
-}
+export { MoveOutcome };
 
 export { DropOn, type Drop };
 
@@ -46,9 +38,11 @@ export const boxSchema = z.object({ left: z.number().finite(), top: z.number().f
 
 export const versionsSchema = z.record(z.string(), z.number().int().min(0));
 
-export const moveAskSchema = z.object({ sourceNodeId: z.string().min(1), clipId: z.string().min(1), drop: dropSchema, box: boxSchema.nullish(), versions: versionsSchema.optional() }).strict();
+const idsSchema = z.array(z.string().min(1).max(64)).max(256);
 
-export const freeAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema }).strict();
+export const moveAskSchema = z.object({ sourceNodeId: z.string().min(1), clipId: z.string().min(1), drop: dropSchema, box: boxSchema.nullish(), versions: versionsSchema.optional(), id: z.string().uuid().optional(), ids: idsSchema.optional() }).strict();
+
+export const freeAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema, ids: idsSchema.optional() }).strict();
 
 export const outputAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema, id: z.string().uuid().optional() }).strict();
 
@@ -61,7 +55,7 @@ export const MOVE_STATUS: Record<Exclude<MoveOutcome, MoveOutcome.Done>, number>
   [MoveOutcome.Invalid]: 422
 };
 
-export type Stage = { width: number; height: number };
+export type { Stage };
 
 export type StoredFrame = { nodeId: string; projectId: string; canvasId: string; version: number; doc: MotionDoc; kind?: FrameKind; stage?: Stage; row?: Record<string, unknown>; at?: { x: number; y: number } };
 
@@ -81,7 +75,7 @@ export type Moved =
   | { outcome: MoveOutcome.Done; frameId: string; clipId: string; created: boolean; versions: Record<string, number>; undo: UndoItem[]; turn?: { id: string; degrees: number } }
   | { outcome: Exclude<MoveOutcome, MoveOutcome.Done>; detail?: string };
 
-export type MoveAsk = { sourceNodeId: string; clipId: string; drop: Drop; box?: Box | null; versions?: Record<string, number> };
+export type MoveAsk = { sourceNodeId: string; clipId: string; drop: Drop; box?: Box | null; versions?: Record<string, number>; id?: string; ids?: string[] };
 
 export type OutputAsk = { sourceNodeId: string; drop: Drop; id?: string };
 
@@ -119,20 +113,27 @@ function failedWrite(write: RevisionWrite): Moved {
   return write.outcome === RevisionOutcome.Invalid ? refused(MoveOutcome.Invalid, write.error) : refused(MoveOutcome.Conflict);
 }
 
-type Landing = { frameId: string; clipId: string; created: boolean; undo: UndoItem[]; version: number; rollback: () => Promise<void> };
+type Landed = { frameId: string; clipId: string; created: boolean; undo: UndoItem[]; version: number; rollback: () => Promise<void> };
 
-async function landInFrame(store: FrameStore, target: StoredFrame, element: Element, drop: Extract<Drop, { on: DropOn.Frame }>, summary: string): Promise<Landing | Moved> {
-  const placed = placeElement(target.doc, element, { at: drop.at, frame: drop.frame }, newId);
-  if (!placed.ok) {
-    return refused(MoveOutcome.Invalid, placed.error);
+const isLanded = (value: Landed | Moved): value is Landed => 'frameId' in value && !('outcome' in value);
+
+const refusedBy = (plan: Refusal): Moved => refused(plan.outcome, plan.detail);
+
+async function land(store: FrameStore, place: Place & { id?: string }, landing: Landing, target: StoredFrame | null, summary: string): Promise<Landed | Moved> {
+  if (landing.on === DropOn.Canvas) {
+    const frameId = await store.create({ ...place, ...landing.at }, landing.doc, landing.shape);
+    return { frameId, clipId: landing.clipId, created: true, version: 1, undo: [created(frameId, landing.at)], rollback: () => store.remove(frameId) };
   }
-  const write = await store.write(target.nodeId, target.version, placed.doc, summary);
+  if (!target) {
+    return refused(MoveOutcome.NotFound, `no frame ${landing.nodeId}`);
+  }
+  const write = await store.write(target.nodeId, target.version, landing.doc, summary);
   if (write.outcome !== RevisionOutcome.Written) {
     return failedWrite(write);
   }
   return {
     frameId: target.nodeId,
-    clipId: placed.clipId,
+    clipId: landing.clipId,
     created: false,
     version: write.head.version,
     undo: [revision(target.nodeId, target.version)],
@@ -140,46 +141,38 @@ async function landInFrame(store: FrameStore, target: StoredFrame, element: Elem
   };
 }
 
-async function landOnCanvas(store: FrameStore, place: Place, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, mode: DocMode, box: Box | null): Promise<Landing> {
-  const doc = frameOf(element, mode, box, newId);
-  const frameId = await store.create({ ...place, x: drop.x, y: drop.y }, doc);
-  const clipId = doc.tracks.flatMap((t) => t.clips)[0]?.id ?? element.clip.id;
-  return { frameId, clipId, created: true, version: 1, undo: [created(frameId, drop)], rollback: () => store.remove(frameId) };
-}
+const done = (landed: Landed, versions: Record<string, number> = {}, undo: UndoItem[] = []): Moved => ({
+  outcome: MoveOutcome.Done,
+  frameId: landed.frameId,
+  clipId: landed.clipId,
+  created: landed.created,
+  versions: { [landed.frameId]: landed.version, ...versions },
+  undo: [...landed.undo, ...undo]
+});
 
-function atCanvasPixels(element: Element, area: Box, node: { w: number; h: number }): Element {
-  const sheet = blankElement({ left: 0, top: 0, width: node.w, height: node.h });
-  if (!sheet.ok || element.size.width * area.width >= sheet.doc.width) {
-    return element;
+async function leave(store: FrameStore, source: StoredFrame, left: SourceLeft, landed: Landed): Promise<Moved> {
+  if (left.left === Left.Kept) {
+    return done(landed);
   }
-  return { ...element, size: { width: sheet.doc.width / area.width, height: sheet.doc.height / area.height } };
-}
-
-enum StillAt {
-  Kept = 'kept',
-  Settled = 'settled'
-}
-
-const STILL_AT: Record<StillAt, (doc: MotionDoc) => MotionDoc> = { [StillAt.Kept]: (doc) => doc, [StillAt.Settled]: canvasReady };
-
-async function landFree(store: FrameStore, place: Place & { id?: string }, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, mode: DocMode, box: Box | null, stage: Stage, stillAt: StillAt = StillAt.Kept): Promise<Landing> {
-  const area = box ?? elementBox(element);
-  const shaped = elementNodeOf({ width: area.width * stage.width, height: area.height * stage.height });
-  const at = { x: drop.x - shaped.w / 2, y: drop.y - shaped.h / 2 };
-  const doc = STILL_AT[stillAt]({ ...frameOf(atCanvasPixels(element, area, shaped), mode, area, newId), background: Background.Transparent });
-  const frameId = await store.create({ ...place, ...at }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(element.clip) });
-  const clipId = doc.tracks.flatMap((t) => t.clips)[0]?.id ?? element.clip.id;
-  return { frameId, clipId, created: true, version: 1, undo: [created(frameId, at)], rollback: () => store.remove(frameId) };
-}
-
-function seenAt(element: Element, from: StoredFrame, to: StoredFrame): Element {
-  if (!from.stage || !to.stage) {
-    return element;
+  if (left.left === Left.Removed) {
+    await store.remove(source.nodeId);
+    return done(landed, {}, [deleted(source)]);
   }
-  return { ...element, size: { width: (to.doc.width * from.stage.width) / to.stage.width, height: (to.doc.height * from.stage.height) / to.stage.height } };
+  const write = await store.write(source.nodeId, source.version, left.doc, SUMMARY.movedOut);
+  if (write.outcome !== RevisionOutcome.Written) {
+    await landed.rollback();
+    return failedWrite(write);
+  }
+  return done(landed, { [source.nodeId]: write.head.version }, [revision(source.nodeId, source.version)]);
 }
 
-const isLanding = (value: Landing | Moved): value is Landing => 'frameId' in value && !('outcome' in value);
+async function carry(store: FrameStore, source: StoredFrame & { id?: string }, target: StoredFrame | null, plan: MovePlan, summary: string): Promise<Moved> {
+  if (!plan.ok) {
+    return refusedBy(plan);
+  }
+  const landed = await land(store, source, plan.landing, target, summary);
+  return isLanded(landed) ? leave(store, source, plan.source, landed) : landed;
+}
 
 async function targetOf(store: FrameStore, drop: Drop, versions?: Record<string, number>): Promise<StoredFrame | Moved | null> {
   if (drop.on === DropOn.Canvas) {
@@ -205,92 +198,41 @@ export async function landElement(store: FrameStore, from: StoredFrame & { right
   if (frame && !('doc' in frame)) {
     return frame;
   }
-  const landing = frame
-    ? await landInFrame(store, frame, element, drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.movedIn)
-    : await landOnCanvas(store, from, element, drop as Extract<Drop, { on: DropOn.Canvas }>, docMode(from.doc), null);
-  if (!isLanding(landing)) {
-    return landing;
-  }
-  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+  const landing: LandingPlan = frame && drop.on === DropOn.Frame ? landIn(frame, element, drop, newId) : { ok: true, landing: landOnCanvas(element, drop as CanvasDrop, docMode(from.doc), null, newId) };
+  return carry(store, from, frame, landing.ok ? { ...landing, source: { left: Left.Kept } } : landing, SUMMARY.movedIn);
 }
 
-function landOut(store: FrameStore, source: StoredFrame, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, box: Box | null): Promise<Landing> {
-  const mode = docMode(source.doc);
-  return source.stage ? landFree(store, source, element, drop, mode, box, source.stage) : landOnCanvas(store, source, element, drop, mode, box);
+const askedIds = (ids: string[] | undefined): NewId => idsFrom(ids ?? [], newId);
+
+async function readBoth(store: FrameStore, ask: MoveAsk): Promise<{ source: StoredFrame; target: StoredFrame | null } | Moved> {
+  const source = await store.read(ask.sourceNodeId);
+  if (!source) {
+    return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
+  }
+  const target = await targetOf(store, ask.drop, ask.versions);
+  return target && !('doc' in target) ? target : { source, target };
 }
 
 export async function moveElement(store: FrameStore, ask: MoveAsk): Promise<Moved> {
-  const source = await store.read(ask.sourceNodeId);
-  if (!source) {
-    return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
+  const read = await readBoth(store, ask);
+  if ('outcome' in read) {
+    return read;
   }
-  if (ask.drop.on === DropOn.Frame && ask.drop.nodeId === source.nodeId) {
-    return refused(MoveOutcome.SameFrame);
-  }
-  if (stale(source, ask.versions)) {
+  if (stale(read.source, ask.versions)) {
     return refused(MoveOutcome.Conflict);
   }
-
-  const lifted = liftElement(source.doc, ask.clipId);
-  if (!lifted.ok) {
-    return refused(MoveOutcome.NoElement, lifted.error);
-  }
-
-  const target = await targetOf(store, ask.drop, ask.versions);
-  if (target && !('doc' in target)) {
-    return target;
-  }
-  const landing = target
-    ? await landInFrame(store, target, seenAt(lifted.element, source, target), ask.drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.movedIn)
-    : await landOut(store, source, lifted.element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, ask.box ?? null);
-  if (!isLanding(landing)) {
-    return landing;
-  }
-
-  if (leftEmpty(source.kind ?? FrameKind.Frame, lifted.doc)) {
-    await store.remove(source.nodeId);
-    return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: [...landing.undo, deleted(source)] };
-  }
-
-  const left = await store.write(source.nodeId, source.version, lifted.doc, SUMMARY.movedOut);
-  if (left.outcome !== RevisionOutcome.Written) {
-    await landing.rollback();
-    return failedWrite(left);
-  }
-  return {
-    outcome: MoveOutcome.Done,
-    frameId: landing.frameId,
-    clipId: landing.clipId,
-    created: landing.created,
-    versions: { [landing.frameId]: landing.version, [source.nodeId]: left.head.version },
-    undo: [...landing.undo, revision(source.nodeId, source.version)]
-  };
+  return carry(store, { ...read.source, id: ask.id }, read.target, planMove(read.source, read.target, ask, askedIds(ask.ids)), SUMMARY.movedIn);
 }
 
 export async function copyElement(store: FrameStore, ask: MoveAsk): Promise<Moved> {
-  const source = await store.read(ask.sourceNodeId);
-  if (!source) {
-    return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
+  const read = await readBoth(store, ask);
+  if ('outcome' in read) {
+    return read;
   }
-  const lifted = liftElement(source.doc, ask.clipId);
-  if (!lifted.ok) {
-    return refused(MoveOutcome.NoElement, lifted.error);
-  }
-
-  const target = await targetOf(store, ask.drop, ask.versions);
-  if (target && !('doc' in target)) {
-    return target;
-  }
-  const landing = target
-    ? await landInFrame(store, target, seenAt(lifted.element, source, target), ask.drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.copiedIn)
-    : await landOut(store, source, lifted.element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, ask.box ?? null);
-  if (!isLanding(landing)) {
-    return landing;
-  }
-  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+  return carry(store, { ...read.source, id: ask.id }, read.target, planCopy(read.source, read.target, ask, askedIds(ask.ids)), SUMMARY.copiedIn);
 }
 
-export const componentAskSchema = z.object({ sourceNodeId: z.string().min(1), compId: z.string().min(1), drop: z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict() }).strict();
+export const componentAskSchema = z.object({ sourceNodeId: z.string().min(1), compId: z.string().min(1), drop: z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict(), id: z.string().uuid().optional(), ids: idsSchema.optional() }).strict();
 
 export type ComponentAsk = z.infer<typeof componentAskSchema> & { canvasId: string };
 
@@ -299,19 +241,7 @@ export async function placeComponent(store: FrameStore, ask: ComponentAsk): Prom
   if (!source) {
     return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
   }
-  const instanceId = newId();
-  const from = homed(source.doc, source.nodeId);
-  const placed = placeInstance(from, from, ask.compId, () => instanceId);
-  if (!placed.ok) {
-    return refused(MoveOutcome.Invalid, placed.error);
-  }
-  const lifted = liftElement(placed.doc, instanceId);
-  if (!lifted.ok) {
-    return refused(MoveOutcome.NoElement, lifted.error);
-  }
-
-  const landing = await landOut(store, { ...source, canvasId: ask.canvasId }, lifted.element, ask.drop, null);
-  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+  return carry(store, { ...source, canvasId: ask.canvasId, id: ask.id }, null, planComponent(source, ask.compId, ask.drop, askedIds(ask.ids)), SUMMARY.movedIn);
 }
 
 export enum FreeSource {
@@ -329,35 +259,9 @@ export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSch
     return target ?? refused(MoveOutcome.NotFound);
   }
 
-  const drop = ask.drop;
-  const spread = (axis: 'x' | 'y', size: 'width' | 'height', centre: number) => drop.at[axis] + ((centre - 0.5) * (source.stage?.[size] ?? 0)) / (target.stage?.[size] ?? 1);
-  let doc = target.doc;
-  let clipId = '';
-  for (const clip of source.doc.tracks.flatMap((t) => t.clips)) {
-    const lifted = liftElement(source.doc, clip.id);
-    if (!lifted.ok) {
-      return refused(MoveOutcome.NoElement, lifted.error);
-    }
-    const centre = clipCentre(clip);
-    const placed = placeElement(doc, seenAt(lifted.element, source, target), { at: { x: spread('x', 'width', centre.x), y: spread('y', 'height', centre.y) }, frame: drop.frame }, newId);
-    if (!placed.ok) {
-      return refused(MoveOutcome.Invalid, placed.error);
-    }
-    doc = placed.doc;
-    clipId = placed.clipId;
-  }
-
   const kept = after === FreeSource.Keep;
-  const write = await store.write(target.nodeId, target.version, doc, kept ? SUMMARY.copiedIn : SUMMARY.movedIn);
-  if (write.outcome !== RevisionOutcome.Written) {
-    return failedWrite(write);
-  }
-  const done = { outcome: MoveOutcome.Done, frameId: target.nodeId, clipId, created: false, versions: { [target.nodeId]: write.head.version } } as const;
-  if (kept) {
-    return { ...done, undo: [revision(target.nodeId, target.version)] };
-  }
-  await store.remove(source.nodeId);
-  return { ...done, undo: [revision(target.nodeId, target.version), deleted(source)] };
+  const plan = planFree(source, target, ask.drop, askedIds(ask.ids));
+  return carry(store, source, target, plan.ok ? { ...plan, source: kept ? { left: Left.Kept } : { left: Left.Removed } } : plan, kept ? SUMMARY.copiedIn : SUMMARY.movedIn);
 }
 
 const OUTPUT_LONG_SIDE = 320;
@@ -379,13 +283,15 @@ export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Mo
     return target;
   }
   const element = mediaElement(found.output, target?.doc.fps);
-  const landing = target
-    ? await landInFrame(store, target, element, ask.drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.placed)
-    : await landFree(store, { ...found, id: ask.id }, element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, FRAME_OF_OUTPUT[found.output.kind], null, outputStage(element), StillAt.Settled);
-  if (!isLanding(landing)) {
-    return landing;
+  const landing: LandingPlan =
+    target && ask.drop.on === DropOn.Frame
+      ? landIn(target, element, ask.drop, newId)
+      : { ok: true, landing: landFree(element, ask.drop as CanvasDrop, FRAME_OF_OUTPUT[found.output.kind], null, outputStage(element), newId, StillAt.Settled) };
+  if (!landing.ok) {
+    return refusedBy(landing);
   }
-  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+  const landed = await land(store, { ...found, id: ask.id }, landing.landing, target, SUMMARY.placed);
+  return isLanded(landed) ? done(landed) : landed;
 }
 
 export async function placeMedia(store: FrameStore, output: Output, drop: Extract<Drop, { on: DropOn.Frame }>): Promise<Moved> {
@@ -393,11 +299,12 @@ export async function placeMedia(store: FrameStore, output: Output, drop: Extrac
   if (!target || !('doc' in target)) {
     return target ?? refused(MoveOutcome.NotFound);
   }
-  const landing = await landInFrame(store, target, mediaElement(output, target.doc.fps), drop, SUMMARY.pasted);
-  if (!isLanding(landing)) {
-    return landing;
+  const landing = landIn(target, mediaElement(output, target.doc.fps), drop, newId);
+  if (!landing.ok) {
+    return refusedBy(landing);
   }
-  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: false, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
+  const landed = await land(store, target, landing.landing, target, SUMMARY.pasted);
+  return isLanded(landed) ? done(landed) : landed;
 }
 
 async function linkFrame(store: FrameStore, ask: { sourceNodeId: string; frameNodeId: string }): Promise<Moved> {

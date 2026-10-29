@@ -35,6 +35,15 @@ function deps(over: Partial<LayersToFrameDeps> = {}): LayersToFrameDeps {
 }
 
 describe('layersToFrame', () => {
+  it('creates the frame under the id the canvas already shows', async () => {
+    const d = deps();
+    const id = '5a5a5a5a-5a5a-45a5-85a5-5a5a5a5a5a5a';
+
+    await layersToFrame(db, d, { ...SCOPE, frameId: id });
+
+    expect(d.createFrame).toHaveBeenCalledWith(expect.objectContaining({ id, x: 900, y: 40 }), expect.anything());
+  });
+
   it('makes one frame to the right of the node with the base and every layer as image elements', async () => {
     const d = deps();
 
