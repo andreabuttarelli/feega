@@ -143,7 +143,7 @@ export type FlowProps = {
   onViewOutput?: (id: string) => void;
   variantsInFlightFor?: (id: string) => number;
   onCancelVariants?: (id: string) => void;
-  historyFor?: (id: string) => { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } | null;
+  historyFor?: (id: string) => { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void; oncompare: (a: string, b: string) => void } | null;
   onCancelRun?: (id: string) => void;
   onCompareOutputs?: (ids: string[]) => void;
   onCloud?: (provider: CloudProviderId, mode: CloudMode, nodeId: string | null, at: { x: number; y: number }) => void;

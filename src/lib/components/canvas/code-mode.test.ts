@@ -5,6 +5,7 @@ import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { EditorMode } from '$lib/canvas/editor-mode.svelte';
 import { FRAME_MODE_ACTIONS, FrameDialog } from '$lib/canvas/frame-dialogs';
+import { CodeTarget, exportCode } from '@feega/motion-core/motion/codegen/index';
 import DevCode from './DevCode.svelte';
 
 const panel = readFileSync('src/lib/components/canvas/FrameInspectorPanel.svelte', 'utf8');
@@ -15,8 +16,8 @@ describe('code mode', () => {
   it('shows the targets, the code, copy and the full export inline', () => {
     const body = render(DevCode, { props: { doc: newMotionDoc(MotionFormat.Landscape), name: 'Hero', assets: {}, tokens: FEEGA_TOKENS } }).body;
 
-    for (const id of ['react', 'html', 'svelte']) {
-      expect(body).toContain(`data-testid="dev-code-target-${id}"`);
+    for (const label of ['React', 'HTML', 'Svelte']) {
+      expect(body).toContain(`>${label}</button>`);
     }
     expect(body).toContain('data-testid="dev-code-copy"');
     expect(body).toContain('data-testid="dev-code-download"');
@@ -34,11 +35,10 @@ describe('code mode', () => {
     expect(panel).not.toContain('name="Frame"');
   });
 
-  it('titles the exported page and the zip folder after the frame', () => {
-    const doc = newMotionDoc(MotionFormat.Landscape);
-    const body = render(DevCode, { props: { doc, name: 'Landing page', assets: {}, tokens: FEEGA_TOKENS } }).body;
+  it('titles the exported page after the frame', () => {
+    const out = exportCode(newMotionDoc(MotionFormat.Landscape), { target: CodeTarget.Html, name: 'Landing page', assets: {}, brand: FEEGA_TOKENS });
 
-    expect(body).toContain('&lt;title>Landing page&lt;/title>');
+    expect(out.files.find((f) => f.path === 'index.html')?.content).toContain('<title>Landing page</title>');
   });
 
   it('Export code… opens Code mode instead of a dialog', () => {

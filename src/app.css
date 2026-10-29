@@ -193,6 +193,12 @@
   --ui-accent-ink: #ffffff;
   --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
   --ui-hover-outline: #b14cff;
+  --ui-syntax-comment: #7a8594;
+  --ui-syntax-string: #1a7f37;
+  --ui-syntax-tag: #c2255c;
+  --ui-syntax-number: #b35900;
+  --ui-syntax-keyword: #7048e8;
+  --ui-syntax-property: #0b6bcb;
   --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ui-ok: #1f9d55;
   --ui-warn: #d98e04;
@@ -315,6 +321,12 @@
 
 /* Dark mode — JS always sets data-theme via toggle or OS detection */
 :root[data-theme="dark"] {
+  --ui-syntax-comment: #7a8594;
+  --ui-syntax-string: #8bd49c;
+  --ui-syntax-tag: #ff8fa3;
+  --ui-syntax-number: #f2b872;
+  --ui-syntax-keyword: #c3a1ff;
+  --ui-syntax-property: #7cc4ff;
   --ink:        #ededed;
   --ink-soft:   #a1a1a6;
   --ink-faint:  #666;

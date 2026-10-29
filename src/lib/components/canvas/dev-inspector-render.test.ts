@@ -13,12 +13,12 @@ const panel = readFileSync('src/lib/components/canvas/FrameInspectorPanel.svelte
 const flow = readFileSync('src/lib/components/canvas/gpu/GpuFlow.svelte', 'utf8');
 
 describe('the dev inspector', () => {
-  it('shows the measures, the CSS, the Tailwind classes and the brand variable of a layer', () => {
+  it('shows the measures, the grouped properties and the brand variable of a layer', () => {
     const body = render(DevInspector, { props: { doc, clipId: 'card', brand: FEEGA_TOKENS, onexport: () => {} } }).body;
 
     expect(body).toContain('data-testid="dev-measures"');
-    expect(body).toContain('width: 480px;');
-    expect(body).toContain('w-[480px]');
+    expect(body).toContain('480');
+    expect(body).toContain('data-testid="dev-snippets-toggle"');
     expect(body).toContain('brand.accent');
     expect(body).toContain('data-testid="dev-export"');
   });
