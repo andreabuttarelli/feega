@@ -5,6 +5,7 @@
  */
 import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
+import Link from '@lucide/svelte/icons/link';
 import Globe from '@lucide/svelte/icons/globe';
 import CodeXml from '@lucide/svelte/icons/code-xml';
 import Eraser from '@lucide/svelte/icons/eraser';
@@ -90,6 +91,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'split-layers': Layers,
   'layers-to-frame': Frame,
   'copy-id': Hash,
+  'copy-link': Link,
   report: Flag,
   group: Group,
   ungroup: Ungroup,

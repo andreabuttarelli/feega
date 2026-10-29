@@ -52,6 +52,7 @@
     runQuote = null,
     frameTools = false,
     musicEnabled = false,
+    withheld = [],
     onrun,
     oncancelvariants,
     variantsInFlight = 0,
@@ -76,6 +77,7 @@
     runQuote?: RunQuote | null;
     frameTools?: boolean;
     musicEnabled?: boolean;
+    withheld?: readonly SelectionActionId[];
     onrun?: () => void;
     oncancelvariants?: () => void;
     variantsInFlight?: number;
@@ -139,7 +141,8 @@
   const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
   const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameDialogAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
   const danger = $derived(actionsIn('danger', count));
-  const slots = $derived(toolbarSlots([...secondary, ...overflow, ...danger]));
+  const fixed = $derived(actionsIn('fixed', count).filter((a) => !withheld.includes(a.id)));
+  const slots = $derived(toolbarSlots([...fixed, ...secondary, ...overflow, ...danger]));
 
   function gateOf(action: SelectionAction) {
     return enabledFor(action.id, nodeSummaries, edges, stale);
@@ -290,6 +293,9 @@
             <Columns2 strokeWidth={1.7} />
           </Button>
         {/if}
+        {#each slots.fixed as action (action.id)}
+          {@render iconAction(action, '')}
+        {/each}
         {#each slots.pinned as action (action.id)}
           {@render iconAction(action, '')}
         {/each}

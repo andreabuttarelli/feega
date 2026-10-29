@@ -2780,6 +2780,7 @@
     'run-downstream': (ids) => props.onRunGraph?.(GraphScope.Downstream, ids),
     'run-stale': (ids) => props.onRunGraph?.(GraphScope.Stale, ids),
     'copy-id': (ids) => void navigator.clipboard?.writeText(ids.join('\n')),
+    'copy-link': (ids) => props.onCopyLink?.(ids),
     report: (ids) => void window.open(reportHref({ node: ids[0] }), '_blank', 'noopener'),
     group: (ids) => props.onGroup?.(ids),
     ungroup: (ids) => props.onUngroup?.(ids),
@@ -3185,6 +3186,7 @@
       runQuote={props.runQuoteFor?.(selected) ?? null}
       frameTools
       musicEnabled={props.musicEnabled}
+      withheld={props.onCopyLink ? [] : ['copy-link']}
       onrun={() => props.onRunNode?.(selected[0])}
       variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
       oncancelvariants={() => props.onCancelVariants?.(selected[0])}
