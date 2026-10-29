@@ -120,3 +120,17 @@ describe('a branch merges back or is dropped from History', () => {
     expect((await actAt(db, { ...scope, entryId: `branch:${BRANCH}:1`, action: HistoryAction.Restore, actor: user })).outcome).toBe(HistoryOutcome.Unsupported);
   });
 });
+
+describe('a conflict entry is resolved elsewhere, not from History', () => {
+  it('has nothing to preview', async () => {
+    const { db } = fakeDb(rows(), { filter: true });
+
+    expect((await previewAt(db, { ...scope, entryId: 'conflict:c1' })).outcome).toBe(HistoryOutcome.Unsupported);
+  });
+
+  it('has no action to run', async () => {
+    const { db } = fakeDb(rows(), { filter: true });
+
+    expect((await actAt(db, { ...scope, entryId: 'conflict:c1', action: HistoryAction.Restore, actor: user })).outcome).toBe(HistoryOutcome.Unsupported);
+  });
+});
