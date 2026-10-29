@@ -223,7 +223,7 @@
             <div class="point-actions">
               {#each actions as action (action)}
                 {@const ui = ACTION_UI[action]}
-                <button type="button" class="point-action" onclick={() => void RUN[action](row.entry)} data-testid={`history-${action}`}><ui.icon size={ICON} />{ui.label}</button>
+                <button type="button" class="point-action" onclick={() => void RUN[action](row.entry)} data-testid={`history-action-${action}`}><ui.icon size={ICON} />{ui.label}</button>
               {/each}
             </div>
             {#if naming !== null}
