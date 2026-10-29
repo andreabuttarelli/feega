@@ -3,6 +3,7 @@
   import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
+  import { pressMenu } from '$lib/motion/press-menu';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
@@ -61,6 +62,7 @@
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
   import { frameProperties } from '../frame-properties.svelte';
+  import { selectionProperties } from '../selection-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
@@ -170,7 +172,7 @@
   import { GraphScope } from '$lib/canvas/run-graph';
   import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
-  import { STACK_GAP, alignTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
@@ -217,7 +219,6 @@
   const HALF = 2;
   const CORE = 'core';
   const MOVE_SLOP_PX = 3;
-  const LONG_PRESS_MS = 500;
   const LABEL_CLEARANCE = 24;
   const WHEEL_ZOOM = 0.01;
   const STEP_ZOOM = 1.2;
@@ -743,7 +744,6 @@
   let downAt: Point = { x: 0, y: 0 };
   const touches = new Map<number, Point>();
   let pinch: { dist: number; mid: Point } | null = null;
-  let press: ReturnType<typeof setTimeout> | null = null;
   let suppressMenu = false;
   let captureId: number | null = null;
 
@@ -1138,7 +1138,7 @@
   let elementMenu = $state<Point | null>(null);
   let elementLayers = $state<{ id: string; label: string }[]>([]);
 
-  function openElementMenu(e: MouseEvent): boolean {
+  function openElementMenu(e: { clientX: number; clientY: number }): boolean {
     const hit = elementAt(toWorld(view, local(e)), Reach.Top);
     if (!hit) {
       return false;
@@ -1366,7 +1366,26 @@
     frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
+    frameProperties.runAction = runSelectionAction;
     return () => frameProperties.clear();
+  });
+
+  $effect(() => {
+    if (!selected.length || !spec.chrome) {
+      return;
+    }
+    const ids = [...selected];
+    selectionProperties.publish({
+      summaries: selectedSummaries,
+      choicesFor: props.modelChoicesFor,
+      runQuote: props.runQuoteFor?.(ids) ?? null,
+      onaction: runSelectionAction,
+      onpropertychange: (patch) => props.onPropertyChange?.(ids, patch),
+      onview: () => props.onViewOutput?.(ids[0]),
+      onalign: (edge) => alignSelection(ids, edge),
+      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis))
+    });
+    return () => selectionProperties.clear();
   });
 
   const Step = { Back: 'back', Forward: 'forward' } as const;
@@ -2001,10 +2020,6 @@
     menuAt = null;
     picked = null;
     startGesture(kind, hit, w, e);
-    if (e.pointerType === 'touch' && hit.kind === HitKind.Node) {
-      const at = { x: e.clientX, y: e.clientY };
-      press = setTimeout(() => openMenu(hit.nodeId, at), LONG_PRESS_MS);
-    }
   }
 
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
@@ -2096,10 +2111,6 @@
       return;
     }
     const far = Math.hypot(p.x - downAt.x, p.y - downAt.y) > MOVE_SLOP_PX;
-    if (far && press) {
-      clearTimeout(press);
-      press = null;
-    }
     if (far && captureId !== null) {
       surface?.setPointerCapture(captureId);
       captureId = null;
@@ -2200,10 +2211,6 @@
     captureId = null;
     if (touches.size < 2) {
       pinch = null;
-    }
-    if (press) {
-      clearTimeout(press);
-      press = null;
     }
     const a = active;
     active = null;
@@ -2481,18 +2488,18 @@
     menuAt = at;
   }
 
-  function onContextMenu(e: MouseEvent) {
-    e.preventDefault();
+  function openMenuAt(at: Point) {
+    const e = { clientX: at.x, clientY: at.y };
     if (suppressMenu || !spec.chrome || openElementMenu(e)) {
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
     if (node) {
-      openMenu(node, { x: e.clientX, y: e.clientY });
+      openMenu(node, at);
       return;
     }
     if (selected.length) {
-      menuAt = { x: e.clientX, y: e.clientY };
+      menuAt = at;
       menuLayers = layersAt(menuAt);
     }
   }
@@ -3086,7 +3093,7 @@
     onpointerenter={measureSurface}
     onclick={onClickInside}
     ondblclick={onDouble}
-    oncontextmenu={onContextMenu}
+    use:pressMenu={openMenuAt}
     onpointerleave={() => {
       props.onPointer?.(null);
       pickHover = null;

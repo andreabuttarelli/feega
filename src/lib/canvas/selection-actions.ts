@@ -262,6 +262,18 @@ export function menuFor(available: ReadonlySet<SelectionActionId>, summaries: re
   return CANVAS_MENU.filter((a) => available.has(a.id) && summaries.length >= a.minNodes && shownFor(a.id, summaries));
 }
 
+const PANEL_ORDER: readonly SelectionActionId[] = ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame', 'duplicate', 'group', 'ungroup', 'tidy-up', 'export'];
+
+const PANEL_ACTIONS: readonly SelectionAction[] = PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
+
+const FRAME_PANEL_ORDER: readonly SelectionActionId[] = ['export', 'frame-components', 'frame-templates', 'frame-history', 'frame-branches', 'frame-interactive', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report'];
+
+export const FRAME_PANEL_ACTIONS: readonly SelectionAction[] = FRAME_PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
+
+export function panelActionsFor(summaries: readonly Summary[]): SelectionAction[] {
+  return PANEL_ACTIONS.filter((a) => summaries.length >= a.minNodes && shownFor(a.id, summaries));
+}
+
 export function actionsIn(group: SelectionActionGroup, count: number): SelectionAction[] {
   return SELECTION_ACTIONS.filter((a) => a.group === group && count >= a.minNodes);
 }
