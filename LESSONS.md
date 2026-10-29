@@ -3482,3 +3482,6 @@ Signal: a `@real` spec waits for `frame-hover-box`, `selection-overlay`, `part-b
 
 **Signal:** URL import of a Tailwind 4 site draws almost nothing; the tree has nodes but no fills and no TEXT. **Move:** Chrome computes Tailwind 4 colours as `oklch()`; a reader that parses only `rgb()` drops them. Paint unknown colour syntax on a 1×1 canvas and read the pixel back (`pageTreeOf`). Check a page with `CHROMIUM_PATH=… npx vitest run src/lib/server/url-import/page-tree.browser.test.ts`.
 
+## An instance in auto layout lands far off, the same instance free on the frame is fine
+
+**Signal:** a component instance whose main contains only another instance is pushed by the size of the whole frame. **Move:** `compBounds` measured top clips by their own box; a Precomp host has none. Ask the instance content (`instanceContent`) for nested hosts. Same family: content past `MAX_COMP_DEPTH` silently disappears from renders.
