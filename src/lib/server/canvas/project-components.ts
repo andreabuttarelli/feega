@@ -7,6 +7,8 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 type Scope = { orgId: string; projectId: string };
 
+const FRAME_NAME = 'Frame';
+
 const posterOf = (projectId: string, canvasId: string, data: Record<string, unknown>): string | null =>
   typeof data.posterAssetId === 'string' ? `/p/${projectId}/c/${canvasId}/assets/${data.posterAssetId}` : null;
 
@@ -21,7 +23,7 @@ export async function listProjectComponents(db: Db, scope: Scope): Promise<Canva
     const components = docs
       .filter(({ frame, head }) => frame.canvasId === canvas.id && head)
       .flatMap(({ frame, head }) =>
-        componentGroups([{ id: frame.id, doc: head!.doc }]).map((group) => ({ ...group, thumb: posterOf(scope.projectId, canvas.id, frame.data) }))
+        componentGroups([{ id: frame.id, doc: head!.doc }]).map((group) => ({ ...group, thumb: posterOf(scope.projectId, canvas.id, frame.data), frameName: frame.displayName ?? FRAME_NAME }))
       );
     return components.length ? [{ canvasId: canvas.id, canvasName: canvas.name, components }] : [];
   });

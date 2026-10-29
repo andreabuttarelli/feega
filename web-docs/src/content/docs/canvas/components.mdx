@@ -11,6 +11,12 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 Create a component from the selection with `⌥⌘K`. The **Components** panel lists them; drag one onto the canvas to add an instance.
 
+## Go to main component
+
+Select an instance and click the target icon in the Instance inspector header, or right-click it and pick **Go to main component**. Feega switches canvas if the main lives on another one, pans to it and selects it. Hover the icon to see where the main is (`canvas › frame`). In the Components panel, the same icon on a row is **Show main**.
+
+An instance placed in another frame carries a copy of its main: edits to the main reach instances in the same frame, not those in other frames or canvases.
+
 ## Components across canvases
 
 The **Components** panel in the rail (`Alt+5`) lists the components of every canvas in the project, grouped by canvas, with the poster of the frame that holds them. Search by component or canvas name.

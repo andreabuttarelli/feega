@@ -1,6 +1,8 @@
 <script lang="ts">
   import Diamond from '@lucide/svelte/icons/diamond';
   import Copy from '@lucide/svelte/icons/copy';
+  import Target from '@lucide/svelte/icons/target';
+  import { mainNav } from '$lib/canvas/main-nav.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, componentClipText, serializeComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import type { ComponentGroup } from '$lib/motion/canvas-components';
@@ -44,8 +46,12 @@
         </span>
         {#each group.variants as v (v.compId)}
           {@const item = { frameId: group.frameId, compId: v.compId }}
+          {@const main = { compId: v.compId, home: group.home }}
           <div class="row" draggable="true" role="listitem" tabindex="0" data-testid="component-row" data-comp={v.compId} ondragstart={(e) => drag(e, item)} onkeydown={(e) => copyKey(e, item)}>
             <span class="variant">{label(v.variant) || 'Main'}</span>
+            <button type="button" class="copy" data-testid="component-show-main" aria-label="Show main" title={mainNav.where(main)?.label ?? 'Show main'} onclick={() => mainNav.go(main)}>
+              <Target size={12} />
+            </button>
             <button type="button" class="copy" data-testid="component-copy" aria-label="Copy" title="Copy" onclick={() => copy(item)}>
               <Copy size={12} />
             </button>

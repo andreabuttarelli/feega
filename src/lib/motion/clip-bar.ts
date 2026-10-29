@@ -48,6 +48,7 @@ const PLACEMENT: Partial<Record<ActionId, Placement>> = {
   [Action.Duplicate]: Placement.Inline,
   [Action.CreateComponent]: Placement.Structure,
   [Action.DetachInstance]: Placement.Structure,
+  [Action.GoToMain]: Placement.Structure,
   [Action.PushInstance]: Placement.Structure,
   [Action.ResetInstance]: Placement.Structure,
   [Action.Group]: Placement.Structure,

@@ -16,6 +16,7 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   'flip-vertical': Command.FlipVertical,
   'create-component': Command.CreateComponent,
   'detach-instance': Command.DetachInstance,
+  'go-to-main': Command.GoToMain,
   'reset-instance': Command.ResetInstance,
   'push-instance': Command.PushInstance,
   hide: Command.ToggleHidden,

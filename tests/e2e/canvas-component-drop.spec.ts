@@ -20,7 +20,7 @@ const must = (r: OpResult): MotionDoc => {
 };
 
 let n = 0;
-const button = must(createComponent(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Buy now', size: 0.1 } }, 'label')), ['label'], () => `e2e${++n}`, 'Button'));
+const button = must(createComponent(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Buy now', size: 0.12, x: 0.5, y: 0.5, width: 0.6, height: 0.25 } }, 'label')), ['label'], () => `e2e${++n}`, 'Button'));
 const blank = newMotionDoc(MotionFormat.Landscape);
 
 async function openComponents(page: Page) {
