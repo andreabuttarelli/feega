@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "bin": { "feega": "bin/feega.mjs" },
-  "files": ["bin", "launcher.mjs"],
+  "files": ["bin", "launcher.mjs", "telemetry.mjs"],
   "engines": { "node": ">=22" },
   "repository": { "type": "git", "url": "git+https://github.com/andreabuttarelli/feega.git", "directory": "npx" },
   "homepage": "https://feega.app"
