@@ -12,7 +12,7 @@ export function smallTextInHugeFrame(): FigmaMessage {
   return { meta: {}, blobs: [], nodes: [pageNode(), poster, caption] };
 }
 
-function button(parent: number, type: string, at: { x: number; y: number }, extra: Partial<FigmaRawNode>) {
+function button(parent: number, type: string, at: { x: number; y: number }, extra: Partial<FigmaRawNode> & { slot?: string }) {
   const box = node(type, parent, { ...at, w: 160, h: 48, fillPaints: [solid(0, 0.4, 1)], frameMaskDisabled: false, name: 'Button', ...extra });
   const label = node('TEXT', box.id, { x: 16, y: 12, w: 80, h: 20, fontName: inter('Bold'), fontSize: 16, fillPaints: [solid(1, 1, 1)], textData: { characters: 'Buy' }, slot: 'a' });
   return [box, label];
