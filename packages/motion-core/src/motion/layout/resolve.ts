@@ -25,13 +25,19 @@ function boundsOf(boxes: readonly Box[]): Box | null {
   return { left, top, width: right - left, height: bottom - top };
 }
 
-export function compBounds(comp: MotionDoc['comps'][string], space: Size): Box | null {
-  return boundsOf(visualClips(comp.tracks).filter((c) => !c.parent && !c.hidden).map((c) => pivotBox(c.props, space)));
+const shifted = (box: Box, clip: MotionClip, space: Size): Box => ({ ...box, left: box.left + Number(clip.transform?.x ?? 0) * space.width, top: box.top + Number(clip.transform?.y ?? 0) * space.height });
+
+export function compBounds(comp: MotionDoc['comps'][string], space: Size, content: Content = NO_CONTENT): Box | null {
+  const boxOf = (c: MotionClip) => {
+    const shown = content(c);
+    return shown ? shifted(shown, c, space) : pivotBox(c.props, space);
+  };
+  return boundsOf(visualClips(comp.tracks).filter((c) => !c.parent && !c.hidden).map(boxOf));
 }
 
 function instanceContent(doc: MotionDoc, size: Size, measure: TextMeasure): Content {
   const cache = new Map<string, Box | null>();
-  return (clip) => {
+  const content: Content = (clip) => {
     const id = clip.component === 'Precomp' && !clip.props.scene ? String(clip.props.comp ?? '') : '';
     const comp = id ? doc.comps[id] : undefined;
     if (!comp) {
@@ -42,10 +48,12 @@ function instanceContent(doc: MotionDoc, size: Size, measure: TextMeasure): Cont
     const key = own.overrides || own.values ? `${id}${JSON.stringify(own)}` : id;
     if (!cache.has(key)) {
       const tracks = key === id ? comp.tracks : laidOut(overridden(comp.tracks, clip, comp.component), space, measure, instanceContent(doc, space, measure));
-      cache.set(key, compBounds({ ...comp, tracks }, space));
+      cache.set(key, null);
+      cache.set(key, compBounds({ ...comp, tracks }, space, content));
     }
     return cache.get(key) ?? null;
   };
+  return content;
 }
 
 const visualClips = (tracks: readonly MotionTrack[]): MotionClip[] => tracks.flatMap((t) => t.clips as MotionClip[]);

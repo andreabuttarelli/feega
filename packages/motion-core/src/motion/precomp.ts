@@ -15,7 +15,7 @@ import { overridden } from './instance-overrides';
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
 
-export const MAX_COMP_DEPTH = 8;
+export const MAX_COMP_DEPTH = 24;
 const MAX_LOOPS = 600;
 export const SEPARATOR = '__';
 export { CLIP_LEVEL_OVERRIDES, overridden, withOverride } from './instance-overrides';

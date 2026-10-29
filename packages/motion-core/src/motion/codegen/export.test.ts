@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseMotionDoc } from '../doc';
 import { CodeTarget, exportCode, type CodeExport } from './index';
 import { Align } from '../layout/auto-layout';
-import { absoluteDoc, featureGridDoc, heroDoc } from './fixtures/small';
+import { absoluteDoc, featureGridDoc, heroDoc, variantsDoc } from './fixtures/small';
 import { landingDoc, LANDING_ASSETS } from './fixtures/landing';
 
 const file = (out: CodeExport, path: string) => {
@@ -190,5 +190,32 @@ describe('a Stack exports as a flex div', () => {
     expect(out).toContain('display: flex');
     expect(out).toContain('flex-direction: column');
     expect(out).toMatch(/gap: (var\(--space-\d+\)|\d+px)/);
+  });
+});
+
+describe('a variant set exported back to code', () => {
+  const react = exportCode(variantsDoc(), { name: 'Toolbar' });
+  const svelte = exportCode(variantsDoc(), { name: 'Toolbar', target: CodeTarget.Svelte });
+
+  it('instances keep the component name and pass the variant as a prop, never the Default value', () => {
+    const page = file(react, 'src/pages/Toolbar.tsx');
+    expect(page).toContain("import { Button } from '../components/Button';");
+    expect(page).toMatch(/<Button[^>]*variant="outline"[^>]*children="Cancel"/);
+    expect(page).not.toContain('variant="Default"');
+    expect(page).not.toContain('ButtonOutline');
+  });
+
+  it('the set is one component that picks the variant implementation', () => {
+    const button = file(react, 'src/components/Button.tsx');
+    expect(button).toContain("import { ButtonOutline } from './ButtonOutline';");
+    expect(button).toContain("variant?: 'outline';");
+    expect(button).toContain("if (variant === 'outline') {");
+    expect(button).toContain('return <ButtonDefault {...props} />;');
+    expect(file(react, 'src/components/ButtonOutline.tsx')).toContain('export function ButtonOutline(');
+  });
+
+  it('Svelte gets the same dispatching component', () => {
+    expect(file(svelte, 'src/routes/+page.svelte')).toMatch(/import Button from '[^']*components\/Button\.svelte';/);
+    expect(file(svelte, 'src/lib/components/Button.svelte')).toContain("{#if variant === 'outline'}");
   });
 });

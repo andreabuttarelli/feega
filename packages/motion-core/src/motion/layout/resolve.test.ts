@@ -135,6 +135,19 @@ describe('withAutoLayout', () => {
     const mainLeft = 0.5;
     expect(x('j') + mainLeft).toBeCloseTo(0.4);
   });
+
+  it('un componente che mostra solo un altro componente prende la misura di quello, non del frame intero', () => {
+    const button = shape('btn', { x: 0.6, y: 0.6, width: 0.2, height: 0.1 });
+    const inner = newClip({ id: 'in', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'k' } });
+    const host = newClip({ id: 'i', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'wrap' }, parent: 'c' });
+    const comp = (name: string, clip: MotionClip) => ({ name, durationInFrames: 30, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: '', clips: [clip] }] });
+    const doc = {
+      ...docOf([shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }), host, shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow({ gap: 10 }) })]),
+      comps: { k: comp('Button', button), wrap: comp('Link', inner) }
+    } as MotionDoc;
+    const laid = withAutoLayout(doc).tracks.flatMap((t) => t.clips).find((c) => c.id === 'i')!;
+    expect(laid.transform).toMatchObject({ x: -0.39, y: -0.55 });
+  });
 });
 
 describe('strokes in layout', () => {

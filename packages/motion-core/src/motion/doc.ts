@@ -156,6 +156,8 @@ const templateMarkSchema = z.object({
 
 export const propertyDefSchema = z.object({ kind: z.enum(['boolean', 'text', 'swap', 'nested']), target: z.string().min(1).max(80), default: z.union([z.string().max(2000), z.boolean()]).optional(), nested: z.string().min(1).max(40).optional(), preferred: z.array(z.string().min(1).max(80)).max(40).optional() }).strict();
 
+export const DEFAULT_VARIANT = 'Default';
+
 export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional(), properties: z.record(z.string().min(1).max(40), propertyDefSchema).optional(), home: z.string().min(1).max(64).optional() }).strict();
 
 const compSchema = z.object({

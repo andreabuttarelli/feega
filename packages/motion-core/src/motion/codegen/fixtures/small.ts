@@ -54,3 +54,20 @@ export function absoluteDoc() {
   kit.text('caption', 'Limited run', { parent: 'poster', name: 'Caption', size: 18, color: PAPER, box: box(40, 320, 300, 30) });
   return kit.doc();
 }
+
+export function variantsDoc() {
+  const kit = new DocKit(800, 200);
+  const shaped = (compId: string, fill: string) =>
+    kit.component(compId, 'Button', (b) => {
+      b.frame(`${compId}-box`, { name: 'Button', box: box(0, 0, 140, 44), fill, radius: 8, layout: { direction: Direction.Horizontal, justify: Justify.Center, align: Align.Center, padding: { top: 12, right: 20, bottom: 12, left: 20 } } });
+      b.text(`${compId}-label`, 'Save', { parent: `${compId}-box`, name: 'Label', size: 15, weight: 600, color: INK });
+    });
+  shaped('cmp-default', BRAND);
+  shaped('cmp-outline', PAPER);
+  kit.frame('row', { name: 'Toolbar', box: box(0, 0, 800, 200), fill: PAPER, layout: { direction: Direction.Horizontal, gap: 12, padding: { top: 40, right: 40, bottom: 40, left: 40 } } });
+  kit.instance('save', 'cmp-default', { parent: 'row', name: 'Save', box: box(40, 40, 140, 44) });
+  kit.instance('cancel', 'cmp-outline', { parent: 'row', name: 'Cancel', box: box(192, 40, 140, 44), overrides: { 'cmp-outline-label': { text: 'Cancel' } } });
+  const doc = kit.doc();
+  const variant = (compId: string, value: string) => ({ ...doc.comps[compId], component: { name: 'Button', set: 'Button', variant: { variant: value }, properties: { children: { kind: 'text' as const, target: `${compId}-label`, default: 'Save' } } } });
+  return { ...doc, comps: { ...doc.comps, 'cmp-default': variant('cmp-default', 'Default'), 'cmp-outline': variant('cmp-outline', 'outline') } };
+}
