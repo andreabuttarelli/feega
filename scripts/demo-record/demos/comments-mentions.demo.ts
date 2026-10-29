@@ -37,7 +37,8 @@ test('comments with mentions and timeline markers', async ({ page, session, admi
     await d.click(page.getByTestId('frame-timeline-play'));
     await d.click(page.getByTestId('frame-timeline-mark'));
     await d.wait(1200);
-    await d.click(page.getByTestId('canvas-switcher'));
+    await page.keyboard.press('Alt+1');
+    await d.click(page.getByTestId('canvas-more'));
     await d.click(page.getByTestId('canvas-comments'));
     const panelDraft = page.getByTestId('comments-panel').getByTestId('comment-draft');
     await d.type(panelDraft, 'Ping @Br');

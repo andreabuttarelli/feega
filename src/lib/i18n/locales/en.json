@@ -124,6 +124,7 @@
     },
     "shell": {
       "rail": "Sections",
+      "pages": "Pages",
       "closePanel": "Close panel",
       "resizeChat": "Resize chat",
       "collapseChat": "Collapse chat",
@@ -146,8 +147,7 @@
         "properties": "Properties",
         "backToCanvas": "Back to canvas",
         "switchView": "Canvas, properties or chat",
-        "projects": "Projects",
-        "canvases": "Canvases"
+        "projects": "Projects"
       },
       "canvasActions": {
         "new": "New canvas",

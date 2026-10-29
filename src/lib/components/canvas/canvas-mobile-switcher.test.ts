@@ -23,7 +23,7 @@ describe('il titolo della mobile top bar apre lo switcher', () => {
 
 describe('lo switcher elenca le tele del progetto corrente e gli altri progetti', () => {
   it('itera canvases e projects, non un elenco statico', () => {
-    expect(switcher).toMatch(/#each canvases as canvas/);
+    expect(switcher).toMatch(/<PagesList {canvases}/);
     expect(switcher).toMatch(/#each projects as project/);
   });
 
@@ -34,7 +34,6 @@ describe('lo switcher elenca le tele del progetto corrente e gli altri progetti'
   });
 
   it('naviga per href reale, non un handler che reimplementa il routing', () => {
-    expect(switcher).toMatch(/<a href={canvas\.href}/);
     expect(switcher).toMatch(/<a href={project\.href}/);
   });
 

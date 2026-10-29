@@ -16,18 +16,7 @@ describe.each(Object.entries(sources))('lo switcher %s', (_name, source) => {
     expect(source).toMatch(/matching\(/);
   });
 
-  it('elimina la tela solo dal menu ⋯, dopo conferma', () => {
-    expect(source).toMatch(/data-testid="canvas-more"/);
-    expect(source).toMatch(/data-testid="canvas-delete"[\s\S]*?onSelect={askDeleteCurrent}/);
-    expect(source).toMatch(/<ConfirmDialog/);
-  });
-
-  it('mostra il brand del progetto quando c\'è', () => {
-    expect(source).toMatch(/{#if brandName/);
-  });
-
   it('il nome lungo si tronca e resta leggibile nel tooltip', () => {
-    expect(source).toMatch(/title={canvas\.name}/);
     expect(source).toMatch(/title={project\.name}/);
   });
 });

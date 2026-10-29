@@ -10,7 +10,8 @@ test.describe('canvas comments @real', () => {
     const node = await seedNode({ type: 'text', x: 200, y: 160, data: { text: 'hello' } });
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('canvas-switcher').click();
+    await page.keyboard.press('Alt+1');
+    await page.getByTestId('canvas-more').click();
     await page.getByTestId('canvas-comments').click();
     const panel = page.getByTestId('comments-panel');
     await expect(panel).toContainText('No comments yet');

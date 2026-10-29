@@ -54,6 +54,13 @@
   const projectId = $derived(data.project.id);
   const canvasId = $derived(page.params.canvasId ?? '');
   const currentCanvas = $derived(data.canvases.find((c: { id: string }) => c.id === canvasId));
+  const pagesProps = $derived({
+    canvases: data.canvases,
+    currentId: canvasId,
+    onVersions: isOff(LocalOff.Versions) ? null : () => versionsPanel.show(),
+    onComments: isOff(LocalOff.Comments) ? null : () => commentsPanel.show(),
+    commentsUnseen: commentsPanel.unseen
+  });
   const activeSheetId = $derived(page.state.sheet ? sheetEntryForPath(page.state.sheet.path)?.id ?? null : null);
 
   let leftPanel = $state<LeftPanelKind | null>(null);
@@ -266,7 +273,6 @@
   {:else if onCanvasRoute}
     <CanvasTopBar
       {projectId}
-      onVersions={isOff(LocalOff.Versions) ? null : () => versionsPanel.show()}
       projectName={data.project.name}
       projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
         id: p.id,
@@ -276,12 +282,7 @@
         mode: p.mode
       }))}
       projectMode={data.project.mode}
-      brandName={data.brand?.name ?? null}
-      onComments={isOff(LocalOff.Comments) ? null : () => commentsPanel.show()}
-      commentsUnseen={commentsPanel.unseen}
-      canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? ''}
-      canvases={data.canvases}
       creditBalance={data.creditBalance}
       {chatOpen}
       onToggleChat={toggleChat}
@@ -305,6 +306,7 @@
             {projectId}
             kind={leftPanel}
             labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
+            pages={pagesProps}
             onclose={() => (leftPanel = null)}
           />
         {/await}

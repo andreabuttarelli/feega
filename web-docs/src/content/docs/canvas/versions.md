@@ -7,7 +7,7 @@ sidebar:
 
 ## Canvas versions
 
-- **Save the whole canvas under a name** from the canvas menu and restore it later. Restoring keeps the moment before it as a version too, so a restore can be undone.
+- **Save the whole canvas under a name** from the page menu (Pages panel, … on the current page) and restore it later. Restoring keeps the moment before it as a version too, so a restore can be undone.
 - A version holds every node, connection and the content of frames and free elements.
 
 ## Frame versions
