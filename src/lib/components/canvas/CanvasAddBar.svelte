@@ -24,7 +24,8 @@
   import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
   import { CANVAS_ADD_BAR, CLOUD_ADDABLE, AI_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
-  import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
+  import { CANVAS_DRAG_MEDIUM, CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
+  import { drawsBox } from '$lib/motion/draw-create';
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
   import PhoneSheet from './PhoneSheet.svelte';
@@ -270,6 +271,10 @@
       e.dataTransfer?.setData(CANVAS_DRAG_FILLED_NODE, JSON.stringify(hotDrag(tile.model)));
       return;
     }
+    if (tile.tool) {
+      e.dataTransfer?.setData(CANVAS_DRAG_TOOL, tile.tool);
+      return;
+    }
     if (!tile.drag) {
       return;
     }
@@ -340,7 +345,7 @@
           data-insert={tile.id}
           data-tool={tile.tool}
           title={tile.hint ?? tile.label}
-          draggable={tile.drag || tile.model ? 'true' : undefined}
+          draggable={tile.drag || tile.model || (tile.tool && drawsBox(tile.tool)) ? 'true' : undefined}
           ondragstart={(e) => startDrag(e, tile)}
           ondragend={() => (menuOpen = false)}
           onclick={() => insert(tile)}

@@ -26,3 +26,5 @@ On a phone, tap the title in the top bar: the sheet lists the pages first, then 
 The layers of the current page, below Pages. The search icon next to Layers opens a filter. Hovering a row shows its **hide** and **lock** buttons.
 
 The top-left of the canvas keeps only the main menu and the project switcher.
+
+Drag a shape, text, frame or stack tile from the add menu onto a Layers row to create it there: above or below the row, or inside a frame or group. Undo removes it.

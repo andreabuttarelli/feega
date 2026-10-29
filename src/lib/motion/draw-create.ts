@@ -33,6 +33,8 @@ const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, 
   [DrawTool.Stack]: { component: 'Shape', props: { shape: ShapeKind.Rect, fill: 'transparent' } }
 };
 
+export const drawsBox = (tool: DrawTool): boolean => tool in BOX_CLIP;
+
 const MIN_PEN_POINTS = 2;
 const MIN_SIDE = 0.001;
 

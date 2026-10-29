@@ -14,6 +14,10 @@ import { elementName } from '$lib/motion/element-name';
 import { layoutKind } from '@feega/motion-core/motion/layout/stack';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import type { NodeType } from './node-data';
+import { drawClip } from '$lib/motion/draw-create';
+import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
+
+const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
 
 export enum LayerKind {
   Node = 'node',
@@ -316,6 +320,11 @@ export function dropLayer(doc: MotionDoc, dragged: string, target: string, place
   }
   const mask = into ? target : maskOf(doc, target);
   return mask && mask !== dragged ? joinMask(moved.doc, dragged, mask) : leaveMask(moved.doc, dragged);
+}
+
+export function dropTool(doc: MotionDoc, tool: DrawTool, target: string, place: Place, id: string, box: DrawBox = DROP_BOX): OpResult {
+  const drawn = drawClip(doc, tool, box, 0, id);
+  return drawn.ok ? dropLayer(drawn.doc, id, target, place) : drawn;
 }
 
 export function dropLayers(doc: MotionDoc, dragged: readonly string[], target: string, place: Place, topFirst: readonly string[], newId: NewId = newTrackId): OpResult {
