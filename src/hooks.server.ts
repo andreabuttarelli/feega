@@ -268,11 +268,7 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
         name === 'content-range' || name === 'x-supabase-api-version'
     });
 
-  // Brand-scoped AI credit attribution: every request under /app/[brand]/… or
-  // /api/v1/brands/[slug]/… runs inside withBrandContext, so ANY AI call it triggers
-  // (chat tools, post generation, blog actions…) lands in ai_calls with
-  // brand_id and bills the right brand — no per-route wrapping needed.
-  const slug = event.params.brand ?? event.params.slug;
+  const slug = event.params.slug;
 
   // Page-payload cache (see $lib/server/page-cache): anything that can write for this brand
   // drops its cached pages, so the next navigation re-reads. Doing it here — once, on the
