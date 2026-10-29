@@ -12,6 +12,7 @@ let share = $state<ShareWritten | null>(null);
 let notice = $state<string | null>(null);
 let base: PageRow[] = [];
 let inFlight = 0;
+let reread: Promise<void> = Promise.resolve();
 
 async function send(op: PageOp, projectId: string): Promise<Record<string, unknown> | null> {
   const body = new FormData();
@@ -35,7 +36,7 @@ const run = createOptimistic<Shell, ShellTouched>(
       };
     },
     idle: () => {
-      void invalidate(CANVAS_LIST_DEPENDENCY).then(() => {
+      reread = invalidate(CANVAS_LIST_DEPENDENCY).then(() => {
         if (!inFlight) {
           pages = null;
         }
@@ -61,12 +62,14 @@ export const canvasPages = {
   dismiss() {
     notice = null;
   },
-  run<K extends PageAction>(action: K, input: Parameters<typeof pageOp<K>>[1], loaded: PageRow[], href: string): Promise<OpOutcome> {
+  async run<K extends PageAction>(action: K, input: Parameters<typeof pageOp<K>>[1], loaded: PageRow[], href: string): Promise<OpOutcome> {
     const route = canvasRouteOf(href);
     if (!route) {
-      return Promise.resolve(OpOutcome.RolledBack);
+      return OpOutcome.RolledBack;
     }
     base = pages ?? loaded;
-    return run(runnablePage(pageOp(action, input), (op) => send(op, route.projectId)));
+    const outcome = await run(runnablePage(pageOp(action, input), (op) => send(op, route.projectId)));
+    await reread;
+    return outcome;
   }
 };
