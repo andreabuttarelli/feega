@@ -85,7 +85,7 @@ function sectionFor(e: KeyboardEvent): boolean {
 }
 
 function stackFor(e: KeyboardEvent): boolean {
-  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.AutoLayout;
+  return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.WrapStack;
 }
 
 function editModeFor(e: KeyboardEvent): boolean {
@@ -130,7 +130,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.PreviewSelection]: { id: 'zoom-selection' },
   [Command.Help]: { id: 'help' },
   [Command.TidyUp]: { id: 'tidy' },
-  [Command.AutoLayout]: { id: 'stack' },
+  [Command.WrapStack]: { id: 'stack' },
   [Command.ToggleEditMode]: { id: 'edit-mode' },
   [Command.Section]: { id: 'section' },
   [Command.AlignLeft]: { id: 'align', edge: Edge.Left },

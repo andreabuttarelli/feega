@@ -256,7 +256,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.FrameSelection]: { name: 'Frame selection', icon: Frame, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ResizeToFit]: { name: 'Resize to fit', icon: Shrink, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Section]: { name: 'Section selection', icon: LayoutDashboard, group: GuideGroup.Edit, menu: MenuSection.Layer },
-  [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.WrapStack]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.EditAsVector]: { name: 'Edit as vector', icon: PenTool, group: GuideGroup.Edit, menu: MenuSection.Layer },

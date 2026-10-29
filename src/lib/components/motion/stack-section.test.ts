@@ -4,7 +4,7 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/mot
 import { Align, Direction, Justify, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, wrapInStack } from '$lib/motion/layout/ops';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import AutoLayoutSection from './AutoLayoutSection.svelte';
+import StackSection from './StackSection.svelte';
 
 
 function must(r: OpResult): MotionDoc {
@@ -23,7 +23,7 @@ const row = (() => {
 })();
 
 const clip = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip;
-const html = (doc: MotionDoc, id: string) => render(AutoLayoutSection, { props: { doc, clip: clip(doc, id), commit: () => {} } }).body;
+const html = (doc: MotionDoc, id: string) => render(StackSection, { props: { doc, clip: clip(doc, id), commit: () => {} } }).body;
 
 describe('the auto layout section', () => {
   it('a container shows direction, alignment, gap and padding, and can be removed', () => {

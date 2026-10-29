@@ -220,7 +220,7 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.Ungroup]: { shown: oneGroup, run: ungrouped },
   [Action.FrameSelection]: { shown: any, run: framed },
   [Action.ResizeToFit]: { shown: any, run: (ctx) => kept(ctx, resizeToFit(ctx.doc, ctx.selection[0]), 'Resized the frame to fit') },
-  [Action.AutoLayout]: { shown: any, run: autoLayout },
+  [Action.WrapStack]: { shown: any, run: autoLayout },
   [Action.Union]: combine(BooleanOp.Union),
   [Action.Subtract]: combine(BooleanOp.Subtract),
   [Action.Intersect]: combine(BooleanOp.Intersect),
@@ -247,7 +247,7 @@ const LATER_OPS: Partial<Record<ActionId, LaterOp>> = {
   [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load, ctx.assets), 'Outlined text') }
 };
 
-const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.AutoLayout, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
+const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.WrapStack, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
 
 export const FRAME_STRUCTURE_ACTIONS: ReadonlySet<ActionId> = new Set(STRUCTURE_ORDER);
 

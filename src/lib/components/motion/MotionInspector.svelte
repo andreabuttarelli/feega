@@ -70,7 +70,7 @@
   import InOutPresetsSection from './InOutPresetsSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
-  import AutoLayoutSection from './AutoLayoutSection.svelte';
+  import StackSection from './StackSection.svelte';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
   import BindChip from './BindChip.svelte';
@@ -548,7 +548,7 @@
     {/if}
     {#if layerExtras}<StyleSection {doc} {clip} {commit} />{/if}
     {#if layerExtras}<VariablesSection {doc} {clip} {commit} />{/if}
-    {#if layerExtras}<AutoLayoutSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<StackSection {doc} {clip} {commit} />{/if}
   {/if}
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}

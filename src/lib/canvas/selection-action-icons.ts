@@ -122,7 +122,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'resize-to-fit': Shrink,
   'section-selection': LayoutDashboard,
   stack: Rows3,
-  'auto-layout': Columns2,
+  'wrap-stack': Columns2,
   'union': SquaresUnite,
   'subtract': SquaresSubtract,
   'intersect': SquaresIntersect,

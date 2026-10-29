@@ -55,7 +55,7 @@ const PLACEMENT: Partial<Record<ActionId, Placement>> = {
   [Action.Ungroup]: Placement.Structure,
   [Action.FrameSelection]: Placement.Structure,
   [Action.ResizeToFit]: Placement.Structure,
-  [Action.AutoLayout]: Placement.Structure,
+  [Action.WrapStack]: Placement.Structure,
   [Action.Union]: Placement.Shape,
   [Action.Subtract]: Placement.Shape,
   [Action.Intersect]: Placement.Shape,

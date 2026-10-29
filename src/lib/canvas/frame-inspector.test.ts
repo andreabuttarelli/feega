@@ -142,11 +142,11 @@ describe('barAction', () => {
   });
 
   it('adds auto layout around the selection, and a second run removes it', () => {
-    const added = barAction(Action.AutoLayout, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const added = barAction(Action.WrapStack, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
     const container = added.selection[0];
 
     expect(findClip(added.doc, container)?.clip.autoLayout).toBeTruthy();
-    expect(findClip(barAction(Action.AutoLayout, { doc: added.doc, selection: [container], frame: 0, newId: fresh() })!.doc, container)?.clip.autoLayout).toBeFalsy();
+    expect(findClip(barAction(Action.WrapStack, { doc: added.doc, selection: [container], frame: 0, newId: fresh() })!.doc, container)?.clip.autoLayout).toBeFalsy();
   });
 
   it('unites two shapes into a live group that keeps both editable', () => {
