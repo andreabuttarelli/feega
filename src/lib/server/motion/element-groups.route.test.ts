@@ -158,12 +158,13 @@ describe('wrapping free elements with a stack', () => {
   });
 
   it('lists the new stack in Layers with the wrapped element indented under it', async () => {
-    const input = event({ ids: JSON.stringify([A]), node_id: '99999999-9999-4999-8999-999999999999' }, { nodes: [elementRow(A, AT_A)], motion_revisions: [revisionRow(A, box('a', AT_A))] });
+    const id = '99999999-9999-4999-8999-999999999999';
+    const input = event({ ids: JSON.stringify([A]), node_id: id }, { nodes: [elementRow(A, AT_A)], motion_revisions: [revisionRow(A, box('a', AT_A))] });
     await actions.stackElements(input as never);
     const [node] = inserted(input);
     const doc = revisions(input)[0].doc;
 
-    const rows = layerRows([{ id: node.id, type: 'motion', name: node.display_name, element: true }], null, { [node.id]: frameRows(doc, node.id) });
+    const rows = layerRows([{ id, type: 'motion', name: node.display_name, element: true }], null, { [id]: frameRows(doc, id) });
 
     expect(rows.map((r) => [r.label, r.depth])).toEqual([
       ['Stack', 0],
