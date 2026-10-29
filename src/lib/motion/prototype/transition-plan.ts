@@ -34,7 +34,7 @@ export function transitionPlan(transition: Transition, reverse: boolean): Transi
     return NONE;
   }
   const timing = { durationMs: transition.durationMs, easing: easeCss(transition.easing) };
-  if (transition.kind === TransitionKind.Dissolve) {
+  if (!('direction' in transition)) {
     return { ...timing, incoming: [{ opacity: 0 }, { opacity: 1 }], outgoing: [] };
   }
   const direction = reverse ? FLIPPED[transition.direction] : transition.direction;
