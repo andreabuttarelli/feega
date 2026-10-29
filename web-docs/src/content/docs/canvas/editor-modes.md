@@ -19,6 +19,14 @@ The switch at the left of the bottom bar sets one mode for the whole editor. Fee
 - Play starts the player on the frame you are in, or the one frame selected.
 - Stills always edit in Design: Motion applies to frames that have a timeline.
 
+## Recording in Motion
+
+- **Drag, resize, rotate on the canvas** key the change at the playhead. A layer that was not animated starts a track: its value stays at its first frame and the new one lands at the playhead. The anchor point is never keyed.
+- **Drawing** a new layer in Motion sets its resting values, with no keyframes. It starts at the playhead.
+- **Motion path**: select one layer whose position is animated and its path shows on the canvas, one tick per frame.
+- **Onion skin**: turn it on with **Onion skin** in the timeline bar. The selected layer shows as faint outlines at its previous and next keyframes.
+- **Voice-over and music**: with nothing selected, the right panel has a Sound row with **Voice-over…** and **Music…**. They are also in the node's **…** menu.
+
 The mode used to live in a row at the top of each frame's properties. That row is gone: the bottom-bar switch replaces it, for every frame at once.
 
 ## The properties panel

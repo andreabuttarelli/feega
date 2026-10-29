@@ -38,6 +38,19 @@ describe('frame inspector panel', () => {
     expect(body).toContain('data-testid="frame-action-export"');
   });
 
+  it('offers voice-over and music in Motion only', () => {
+    frameProperties.runAction = () => undefined;
+    editorMode.set(EditorMode.Motion);
+    const motion = html([]);
+    editorMode.set(EditorMode.Design);
+    const design = html([]);
+    frameProperties.clear();
+
+    expect(motion).toContain('data-testid="frame-sound-voice"');
+    expect(motion).toContain('data-testid="frame-sound-music"');
+    expect(design).not.toContain('data-testid="frame-sound-section"');
+  });
+
   it('shows the frame itself, with its camera, when no element is selected', () => {
     const body = html([]);
 

@@ -5,6 +5,7 @@
   import { setPathTangent } from '$lib/motion/path-ops';
   import { KeyEnd as Side } from '@feega/motion-core/motion/graph';
   import { hostFraction } from '$lib/motion/host-point';
+  import { positionTrail } from '$lib/motion/motion-trail';
 
   let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -20,7 +21,7 @@
   const shown = $derived(live ?? clip);
   const pivot = $derived(pivotOf(shown, size));
   const handles = $derived(pathHandles(shown, size) ?? []);
-  const trail = $derived(sampled());
+  const trail = $derived(shown.path ? sampled().map((p) => screen(p)) : positionTrail(shown, size).map(([x, y]) => ({ x, y })));
   const here = $derived(pathAt(shown, frame - shown.from, size));
 
   function sampled(): [number, number][] {
@@ -76,9 +77,8 @@
 {#if trail.length}
   <div class="overlay" bind:this={host} data-testid="path-overlay" role="presentation" onpointermove={move} onpointerup={end} onpointercancel={end}>
     <svg viewBox={`0 0 ${size.width} ${size.height}`} preserveAspectRatio="none" aria-hidden="true">
-      <polyline class="trail" points={trail.map((p) => screen(p)).map((p) => `${p.x},${p.y}`).join(' ')} />
-      {#each trail as p, i (i)}
-        {@const s = screen(p)}
+      <polyline class="trail" points={trail.map((p) => `${p.x},${p.y}`).join(' ')} />
+      {#each trail as s, i (i)}
         <rect class="tick" x={s.x - 2} y={s.y - 2} width="4" height="4" />
       {/each}
       {#each handles as h (h.frame)}

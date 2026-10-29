@@ -35,6 +35,11 @@ export enum TimelineAccess {
   Edit = 'edit'
 }
 
+export enum SoundEntries {
+  Hidden = 'hidden',
+  Shown = 'shown'
+}
+
 type ModeSpec = {
   label: string;
   icon: Component;
@@ -46,13 +51,14 @@ type ModeSpec = {
   onCodeKey: EditorMode;
   chrome: ModeChrome;
   timeline: TimelineAccess;
+  sounds: SoundEntries;
 };
 
 export const MODES: Record<EditorMode, ModeSpec> = {
-  [EditorMode.Design]: { label: 'Design', icon: PenTool, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Scrub },
-  [EditorMode.Motion]: { label: 'Motion', icon: Diamond, edit: EditMode.Motion, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Recording, timeline: TimelineAccess.Edit },
-  [EditorMode.Play]: { label: 'Play', icon: Play, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden },
-  [EditorMode.Code]: { label: 'Code', icon: CodeXml, edit: EditMode.Design, access: DocAccess.Read, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden }
+  [EditorMode.Design]: { label: 'Design', icon: PenTool, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Scrub, sounds: SoundEntries.Hidden },
+  [EditorMode.Motion]: { label: 'Motion', icon: Diamond, edit: EditMode.Motion, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Recording, timeline: TimelineAccess.Edit, sounds: SoundEntries.Shown },
+  [EditorMode.Play]: { label: 'Play', icon: Play, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden },
+  [EditorMode.Code]: { label: 'Code', icon: CodeXml, edit: EditMode.Design, access: DocAccess.Read, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden }
 };
 
 const FRAME_TIMELINE: Record<TimelineAccess, (kindHasTimeline: boolean, mode: EditMode) => boolean> = {

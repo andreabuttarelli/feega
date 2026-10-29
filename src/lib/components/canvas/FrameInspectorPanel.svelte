@@ -38,7 +38,8 @@
   import { inView, liftEdit } from '@feega/motion-core/motion/breakpoints/model';
   import BreakpointsSection from '$lib/components/motion/BreakpointsSection.svelte';
   import BreakpointOverrides from '$lib/components/motion/BreakpointOverrides.svelte';
-  import { ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { ModeInspector, SoundEntries, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import SoundSection from './SoundSection.svelte';
   import PlayInspector from './PlayInspector.svelte';
   import NodeInspector from './NodeInspector.svelte';
   import { FRAME_PANEL_ACTIONS } from '$lib/canvas/selection-actions';
@@ -114,6 +115,7 @@
   </aside>
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
+    {#if editorMode.spec.sounds === SoundEntries.Shown && frameProperties.runAction}<SoundSection onrun={frameProperties.runAction} />{/if}
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />

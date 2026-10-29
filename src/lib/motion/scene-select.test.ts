@@ -226,10 +226,21 @@ describe('dragging a handle', () => {
 });
 
 describe('writing a drag', () => {
-  it('a property without keyframes gets the static value', () => {
-    const doc = must(writePatch(base, 'back', 30, { x: 0.1 }));
+  it('a property without keyframes starts a track: its value held at the clip start, the drag keyed at the playhead', () => {
+    const before = findClip(base, 'back')!.clip;
+    const doc = must(writePatch(base, 'back', before.from + 30, { x: 0.1 }));
 
-    expect(findClip(doc, 'back')?.clip.transform.x).toBe(0.1);
+    expect(findClip(doc, 'back')?.clip.keyframes.x?.map((k) => [k.frame, k.value])).toEqual([
+      [0, before.transform.x ?? 0],
+      [30, 0.1]
+    ]);
+  });
+
+  it('the anchor point is never keyed', () => {
+    const doc = must(writePatch(base, 'back', 30, { anchorX: 0.2 }));
+
+    expect(findClip(doc, 'back')?.clip.transform.anchorX).toBe(0.2);
+    expect(findClip(doc, 'back')?.clip.keyframes.anchorX).toBeUndefined();
   });
 
   it('a keyed property gets a keyframe at the playhead, in clip time', () => {
@@ -241,7 +252,7 @@ describe('writing a drag', () => {
       [0, 0],
       [20, 0.2]
     ]);
-    expect(clip.transform.y).toBe(0.1);
+    expect(clip.keyframes.y?.at(-1)).toMatchObject({ frame: 20, value: 0.1 });
   });
 });
 
