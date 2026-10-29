@@ -4,6 +4,7 @@ import { page } from '$app/state';
 import { refreshSheet } from '$lib/canvas/sheet-nav';
 import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 import { postSettingsAction } from './api';
+import { resetForm } from './reset-form';
 import { settingsTarget } from './sections';
 
 type UpdateOptions = { reset?: boolean; invalidateAll?: boolean };
@@ -27,7 +28,7 @@ function updater(form: HTMLFormElement, result: ActionResult) {
     const sheet = page.state.sheet;
     const succeeded = result.type === 'success';
     if (succeeded && reset) {
-      form.reset();
+      resetForm(form);
     }
     if (succeeded && refresh) {
       await invalidateAll();
