@@ -573,6 +573,7 @@
   {@const look = fieldLook(prop.key, prop.source)}
   {@const range = slider(prop)}
   <NumberField
+    {gesture}
     label={named ? prop.label : (look.short ?? prop.label)}
     kind={named || !look.short ? FieldKind.Named : FieldKind.Glyph}
     name={prop.label}
@@ -610,6 +611,7 @@
   {@const look = fieldLook(field.key)}
   {@const range = fieldSlider(field)}
   <NumberField
+    {gesture}
     label={look.short ?? field.label}
     kind={look.short ? FieldKind.Glyph : FieldKind.Named}
     name={field.label}
@@ -992,7 +994,7 @@
         {@const physics = clip.physics}
         {#each PHYSICS_KEYS as key (key)}
           <div class="stack" data-physics={key}>
-            <NumberField label={PHYSICS[key].label} kind={FieldKind.Named} name={PHYSICS[key].label} value={physics[key]} range={PHYSICS[key]} onchange={(v) => setPhysicsValue(key, v)} />
+            <NumberField {gesture} label={PHYSICS[key].label} kind={FieldKind.Named} name={PHYSICS[key].label} value={physics[key]} range={PHYSICS[key]} onchange={(v) => setPhysicsValue(key, v)} />
           </div>
         {/each}
         <div class="line">
@@ -1093,7 +1095,7 @@
   {#if spec.track === TrackKind.Visual}
     <div class="stackable" data-testid="depth-section">
       <div class="stack">
-        <NumberField label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
+        <NumberField {gesture} label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
       </div>
       <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
       {#if doc.camera && clip.component !== 'Light'}

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, stillFrame } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, stillFrame, toFetch } from './frame-source';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -119,5 +119,36 @@ describe('a transparent doc on the canvas', () => {
   it('elements and groups stay see-through, and an opaque doc keeps its own colour', () => {
     expect(onStage(list(null), FrameKind.Element).background).toBeNull();
     expect(onStage(list([1, 0, 0, 1]), FrameKind.Frame).background).toEqual([1, 0, 0, 1]);
+  });
+});
+
+describe('frames to fetch', () => {
+  const at = (id: string, revision: number) => ({ id, kind: FrameKind.Frame, revision, box: { x: 0, y: 0, w: 10, h: 10 } });
+  const keyOf = (f: { id: string; revision: number }) => `${f.id}:${f.revision}`;
+
+  it('a frame drawn from its live doc is not fetched again when a save bumps its revision', () => {
+    const frames = [at('edited', 8), at('other', 3)];
+
+    expect(toFetch(frames, keyOf, new Set(['edited:7']), new Set(['edited'])).map((f) => f.id)).toEqual(['other']);
+  });
+
+  it('a frame already asked for at this revision is not fetched twice', () => {
+    expect(toFetch([at('a', 2)], keyOf, new Set(['a:2']), new Set())).toEqual([]);
+  });
+});
+
+describe('same live doc', () => {
+  const doc = newMotionDoc(MotionFormat.Landscape);
+  const live = { doc, tokens: {} as never, assets: {}, playhead: 3 };
+
+  it('a save that hands back the same doc is no new picture to draw', () => {
+    expect(sameLive(live, { ...live })).toBe(true);
+  });
+
+  it('a new doc, files or playhead is', () => {
+    expect(sameLive(live, { ...live, doc: { ...doc } })).toBe(false);
+    expect(sameLive(live, { ...live, assets: {} })).toBe(false);
+    expect(sameLive(live, { ...live, playhead: 4 })).toBe(false);
+    expect(sameLive(undefined, live)).toBe(false);
   });
 });

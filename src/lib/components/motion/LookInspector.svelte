@@ -58,10 +58,10 @@
         </select>
       </label>
       <div class="row">
-        <NumberField label="Intensity" kind={FieldKind.Named} name="Environment intensity" value={look.environment.intensity} range={{ ...ENVIRONMENT.intensity, step: 0.05 }} fill={FieldFill.Range} onchange={(v) => commit(setLook(doc, { environment: { intensity: v } }), 'Environment intensity')} />
+        <NumberField {gesture} label="Intensity" kind={FieldKind.Named} name="Environment intensity" value={look.environment.intensity} range={{ ...ENVIRONMENT.intensity, step: 0.05 }} fill={FieldFill.Range} onchange={(v) => commit(setLook(doc, { environment: { intensity: v } }), 'Environment intensity')} />
       </div>
       <div class="row">
-        <NumberField label="Rotation" kind={FieldKind.Named} name="Environment rotation" value={look.environment.rotation} range={{ ...ENVIRONMENT.rotation, step: 1 }} unit="°" onchange={(v) => commit(setLook(doc, { environment: { rotation: v } }), 'Environment rotation')} />
+        <NumberField {gesture} label="Rotation" kind={FieldKind.Named} name="Environment rotation" value={look.environment.rotation} range={{ ...ENVIRONMENT.rotation, step: 1 }} unit="°" onchange={(v) => commit(setLook(doc, { environment: { rotation: v } }), 'Environment rotation')} />
       </div>
       <label class="check"><input type="checkbox" checked={look.softShadows} onchange={(e) => commit(setLook(doc, { softShadows: e.currentTarget.checked }), 'Soft shadows')} /> Soft shadows</label>
       <label class="check"><input type="checkbox" checked={look.contactShadow} onchange={(e) => commit(setLook(doc, { contactShadow: e.currentTarget.checked }), 'Contact shadow')} /> Contact shadow</label>
@@ -79,11 +79,11 @@
             <button type="button" class="link" onclick={() => commit(removeLight(doc, light.id), `Removed light ${light.id}`)}>Remove</button>
           </div>
           <div class="row">
-            <NumberField label="Intensity" kind={FieldKind.Named} name="Light intensity" value={light.intensity} range={{ ...LIGHT.intensity, step: 0.1 }} fill={FieldFill.Range} onchange={(v) => editLight(light, { intensity: v })} />
+            <NumberField {gesture} label="Intensity" kind={FieldKind.Named} name="Light intensity" value={light.intensity} range={{ ...LIGHT.intensity, step: 0.1 }} fill={FieldFill.Range} onchange={(v) => editLight(light, { intensity: v })} />
           </div>
           <div class="axes">
             {#each POSITION as axis (axis)}
-              <NumberField label={axis.toUpperCase()} name={`Light ${axis}`} value={light[axis]} range={{ ...LIGHT[axis], step: 0.1 }} onchange={(v) => editLight(light, { [axis]: v })} />
+              <NumberField {gesture} label={axis.toUpperCase()} name={`Light ${axis}`} value={light[axis]} range={{ ...LIGHT[axis], step: 0.1 }} onchange={(v) => editLight(light, { [axis]: v })} />
             {/each}
           </div>
         </div>

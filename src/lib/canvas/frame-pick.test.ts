@@ -5,7 +5,7 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { toWorld } from '$lib/canvas/gpu/camera';
-import { FrameFit, FramePickers, framePicker, frameSpace } from './frame-pick';
+import { FrameFit, FramePickers, Reuse, framePicker, frameSpace } from './frame-pick';
 import { addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { groupClips } from '$lib/motion/group';
@@ -194,6 +194,16 @@ describe('an image inserted in a frame', () => {
 
     const arrived = { ...uploading, assets: { shot: 'blob:https://app.test/0b1c' } };
     expect(pickers.of('frame', arrived).pick(centre, stage)).toBe('img');
+  });
+
+  it('keeps the held picker through a live gesture, so a scrub never recompiles the frame', () => {
+    const pickers = new FramePickers();
+    const live = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };
+    const held = pickers.of('frame', live);
+    const scrubbed = { ...live, doc: { ...placed.doc } };
+
+    expect(pickers.of('frame', scrubbed, undefined, Reuse.Held)).toBe(held);
+    expect(pickers.of('frame', scrubbed)).not.toBe(held);
   });
 
   it('reuses the picker while neither the doc nor the files change', () => {

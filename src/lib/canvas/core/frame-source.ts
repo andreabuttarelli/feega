@@ -34,6 +34,13 @@ export const stillFrame = (doc: MotionDoc): number => docStill(doc) ?? restFrame
 
 export const frameOfLive = (live: { doc: Parameters<typeof stillFrame>[0]; playhead?: number }): number => live.playhead ?? stillFrame(live.doc);
 
+type Shown = { doc: unknown; tokens: unknown; assets: unknown; playhead?: number };
+
+export const sameLive = (a: Shown | undefined, b: Shown): boolean => Boolean(a) && a!.doc === b.doc && a!.tokens === b.tokens && a!.assets === b.assets && a!.playhead === b.playhead;
+
+export const toFetch = <F extends { id: string }>(frames: readonly F[], keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
+  frames.filter((f) => !asked.has(keyOf(f)) && !drawnLive.has(f.id));
+
 export const drawsAny = (list: DisplayList): boolean => list.items.length > 0;
 
 export function logGaps(id: string, list: DisplayList) {

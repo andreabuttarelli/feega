@@ -124,12 +124,17 @@ export type FramePicker = ReturnType<typeof framePicker>;
 
 type HeldPicker = { doc: LiveDoc['doc']; assets: LiveDoc['assets']; picker: FramePicker };
 
+export enum Reuse {
+  Changed = 'changed',
+  Held = 'held'
+}
+
 export class FramePickers {
   #held = new Map<string, HeldPicker>();
 
-  of(id: string, live: LiveDoc, playhead: () => number | undefined = () => live.playhead): FramePicker {
+  of(id: string, live: LiveDoc, playhead: () => number | undefined = () => live.playhead, reuse = Reuse.Changed): FramePicker {
     const held = this.#held.get(id);
-    if (held && held.doc === live.doc && held.assets === live.assets) {
+    if (held && (reuse === Reuse.Held || (held.doc === live.doc && held.assets === live.assets))) {
       return held.picker;
     }
     const picker = framePicker(live, playhead);

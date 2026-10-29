@@ -30,6 +30,7 @@ function symbolsUrl(points: readonly number[]): string | null {
   return symbols ? `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(symbols)}&display=block` : null;
 }
 const CUSTOM = 'Custom';
+const BOOKS_KEPT = 16;
 
 function codePointsOf(doc: MotionDoc): number[] {
   const clips = doc.tracks.flatMap((t) => t.clips);
@@ -55,16 +56,28 @@ export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEng
   const sheet = remembered((url) => read.text(url).catch(() => ''));
   let made: ReturnType<Engine> | null = null;
   const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));
+  const books = new Map<string, FaceBook>();
   return async (raw, assets, tokens) => {
     const doc = preparedDoc({ doc: raw, tokens, assets });
     const google = googleFontsUrl(usedFaces(doc), doc.fonts);
     const points = codePointsOf(doc);
     const symbols = symbolsUrl(points);
     const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : []), ...(symbols ? [symbols] : [])].map(sheet));
-    const rules = [...css, uploadFaceCss(doc.fonts, assets), localFaceCss(doc.fonts)].flatMap(faceRules);
+    const own = [uploadFaceCss(doc.fonts, assets), localFaceCss(doc.fonts)];
+    const rules = [...css, ...own].flatMap(faceRules);
     const urls = [...new Set(rules.filter((r) => needed(r, points)).map((r) => r.url))];
+    const key = JSON.stringify([google, symbols, own, urls, doc.fonts]);
+    const known = books.get(key);
+    if (known) {
+      return known;
+    }
     const loaded = await Promise.all(urls.map(source));
-    return faceBook(rules, new Map(loaded.filter((l): l is [string, Source] => l !== null)), doc.fonts);
+    const book = faceBook(rules, new Map(loaded.filter((l): l is [string, Source] => l !== null)), doc.fonts);
+    if (books.size >= BOOKS_KEPT) {
+      books.delete(books.keys().next().value as string);
+    }
+    books.set(key, book);
+    return book;
   };
 }
 

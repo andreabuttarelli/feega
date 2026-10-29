@@ -19,7 +19,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
-  import { drawsAny, frameOfLive, logGaps, onStage, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -170,7 +170,7 @@
   $effect(() => {
     for (const f of frames) {
       const source = live.get(f.id);
-      if (source && (liveBuilt.get(f.id) !== source || liveStamp.get(f.id) !== f.scenes)) {
+      if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
         liveBuilt.set(f.id, source);
         liveStamp.set(f.id, f.scenes);
         void rebuildLive(f, source);
@@ -196,7 +196,7 @@
     if (room <= 0) {
       return;
     }
-    const next = fillOrder(withoutViews(frames), view, area).filter((f) => !asked.has(keyOf(f))).slice(0, room);
+    const next = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup).slice(0, room);
     for (const f of next) {
       asked.add(keyOf(f));
       inFlight++;
@@ -248,7 +248,7 @@
   const cardBlocks = $derived(new Map(shownCards.filter((c) => !cardLists.has(c.key)).map((c) => [blocksGroup(c.key), { card: c, list: withoutPictures(c.frame.list, look) }])));
   const blocksById = $derived(new Map([...cardBlocks.entries()].map(([group, { card }]) => [card.frame.id, { id: card.frame.id, group, box: card.frame.box, size: { width: card.frame.list.width, height: card.frame.list.height }, bytes: 0, ...(card.turn ? { turn: card.turn } : {}) }])));
 
-  const rebuilding = $derived(new Set([...shownCards.filter((c) => !cardLists.has(c.key)).map((c) => c.frame.id), ...frames.filter((f) => !lists.has(keyOf(f))).map((f) => f.id)]));
+  const rebuilding = $derived(new Set([...shownCards.filter((c) => !cardLists.has(c.key)).map((c) => c.frame.id), ...frames.filter((f) => !lists.has(groupOf(f))).map((f) => f.id)]));
   const drawnLast = new Map<string, HeldFrame>();
   const RETAIN_MS: Record<Device, number> = { [Device.Desktop]: 15_000, [Device.Phone]: 0 };
   const lastSeen = new Map<string, number>();

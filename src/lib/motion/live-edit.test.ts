@@ -23,6 +23,16 @@ describe('live edits', () => {
     expect(p.record).toHaveBeenCalledWith('doc-29', 'Edited colour');
   });
 
+  it('says a gesture is under way from begin until release', () => {
+    const live = liveEdits(port());
+
+    expect(live.active()).toBe(false);
+    live.begin();
+    expect(live.active()).toBe(true);
+    live.release();
+    expect(live.active()).toBe(false);
+  });
+
   it('cancel puts the committed doc back and records nothing', () => {
     const p = port();
     const live = liveEdits(p);

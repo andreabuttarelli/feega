@@ -1,4 +1,5 @@
 import { withAutoLayout } from '../layout/resolve';
+import { perDoc } from '../per-doc';
 import { clipRadii } from '../surface';
 import { withStacking } from '../layout/stacking';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
@@ -632,7 +633,9 @@ function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): Motio
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
 }
 
-const shownDoc = (raw: ComposeInput): MotionDoc => withStacking(withAutoLayout(withoutHidden(withoutMutedLanes(boundDoc(withVars(raw.doc, raw.vars))))));
+const laidOut = perDoc((doc: MotionDoc, vars: VarValues | undefined): MotionDoc => withStacking(withAutoLayout(withoutHidden(withoutMutedLanes(boundDoc(withVars(doc, vars)))))));
+
+const shownDoc = (raw: ComposeInput): MotionDoc => laidOut(raw.doc, raw.vars);
 
 const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
 

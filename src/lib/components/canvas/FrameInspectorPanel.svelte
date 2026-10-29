@@ -155,7 +155,7 @@
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <AlignBar count={session.selection.length} onalign={alignPicks} ondistribute={distributePicks} />
-      <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
+      <MultiInspector gesture={session.live} {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}
       <TemplateInspector actions={headerBar} gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}

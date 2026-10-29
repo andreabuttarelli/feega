@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { baseNodeId, breakpointViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
+  import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
   import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
@@ -9,7 +9,8 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { FrameFit, FramePickers, type WorldRect } from '$lib/canvas/frame-pick';
+  import { FrameFit, FramePickers, Reuse, type WorldRect } from '$lib/canvas/frame-pick';
+  import { PickerSettle } from '$lib/canvas/picker-settle.svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
   import { lockOverscroll } from './overscroll-lock';
   import { TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
@@ -133,7 +134,7 @@
   import { elementGlyph } from '$lib/canvas/layers';
   import { imageSourceTile } from '$lib/canvas/free-image';
   import { frameRinged } from '$lib/canvas/layers';
-  import { framesOnCanvas } from '$lib/canvas/core/frame-source';
+  import { framesOnCanvas, sameLive, toFetch } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
@@ -926,7 +927,7 @@
   }
 
   $effect(() => {
-    const due = coreFrames.filter((f) => !asked.has(pickKey(f)));
+    const due = toFetch(coreFrames, pickKey, asked, liveDocs.map);
     if (!due.length) {
       return;
     }
@@ -995,6 +996,8 @@
 
   let inside = $state<Inside | null>(null);
   const savers = new Map<string, FrameEditSession>();
+  const settle = new PickerSettle();
+  const reuseOf = (nodeId: string) => (savers.get(nodeId)?.live.active() || settle.settling(nodeId) ? Reuse.Held : Reuse.Changed);
 
   $effect(() => {
     const warnUnsaved = (event: BeforeUnloadEvent) => {
@@ -1011,15 +1014,36 @@
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
   const revisionOfFrame = (id: string) => coreFrames.find((f) => f.id === id)?.revision ?? 0;
-  const bpViews = $derived(breakpointViews(coreFrames, (id) => liveOf(id)?.doc));
+  const viewDocs = new Map<string, LiveDoc['doc']>();
+  const viewDocOf = (id: string) => {
+    const held = viewDocs.get(id);
+    if (held && reuseOf(id) === Reuse.Held) {
+      return held;
+    }
+    const doc = liveOf(id)?.doc;
+    if (doc) {
+      viewDocs.set(id, doc);
+    }
+    return doc;
+  };
+  const resolveViews = heldViews();
+  const bpViews = $derived(resolveViews(coreFrames, viewDocOf));
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;
     const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
     return scenes ? { ...f, scenes } : f;
   }).concat(bpViews.map((v) => v.frame)));
+  const viewsShown = new Map<string, LiveDoc>();
   const viewLives = $derived(new Map(bpViews.flatMap((v) => {
     const live = liveOf(v.nodeId);
-    return live ? [[v.frame.id, { ...live, doc: v.doc }] as const] : [];
+    if (!live) {
+      return [];
+    }
+    const held = viewsShown.get(v.frame.id);
+    const next = { ...live, doc: v.doc };
+    const shown = held && sameLive(held, next) ? held : next;
+    viewsShown.set(v.frame.id, shown);
+    return [[v.frame.id, shown] as const];
   })));
   const viewOverlays = $derived(bpViews.map((v) => ({ id: v.frame.id, ...v.frame.box, rotation: 0, bar: 0, doc: { width: v.frame.box.w, height: v.frame.box.h } })));
   const coreLive = $derived(viewLives.size ? new Map([...liveDocs.map, ...viewLives]) : liveDocs.map);
@@ -1212,7 +1236,10 @@
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
-        recorded: () => autosize(nodeId),
+        recorded: () => {
+          settle.edited(nodeId);
+          autosize(nodeId);
+        },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
         saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
         pull: async () => {},
@@ -1433,7 +1460,7 @@
     if (!frame || !live) {
       return null;
     }
-    const picker = pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead);
+    const picker = pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead, reuseOf(nodeId));
     return { picker, space: picker.spaceOf(frame.box, byId.get(nodeId)?.rotation ?? 0, resizing.has(nodeId) ? FrameFit.Stretch : FrameFit.Contain), frame, live };
   }
 
@@ -1448,7 +1475,7 @@
     if (!shown || !live) {
       return pickerOf(nodeId);
     }
-    const picker = pickers.of(shown.frame.id, live, () => liveOf(nodeId)?.playhead);
+    const picker = pickers.of(shown.frame.id, live, () => liveOf(nodeId)?.playhead, reuseOf(nodeId));
     return { picker, space: picker.spaceOf(shown.frame.box, 0), frame: shown.frame, live };
   }
 
