@@ -4,7 +4,7 @@ import { SPLIT_MODEL } from './model';
 type Point = { x: number; y: number };
 type Layout = { axis: string; fit: number; imgW: number; imgH: number; gap: number; space: number; cx: number };
 type Word = { progress: number; rise: number; opacity: number };
-type Frame = { open: number; image: Point & { w: number; h: number; zoom: number }; left: Point; right: Point; words: Word[]; times: { openAt: number; closeAt: number } };
+type Frame = { open: number; image: Point & { w: number; h: number; zoom: number; opacity: number }; left: Point; right: Point; words: Word[]; times: { openAt: number; closeAt: number } };
 type Measure = { leftW: number; rightW: number; space: number; frameW: number; frameH: number };
 type Model = {
   splitWords: (text: string, at: number) => { left: string[]; right: string[] };

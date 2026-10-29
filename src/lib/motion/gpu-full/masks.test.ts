@@ -1,3 +1,4 @@
+import { Ease } from '@feega/motion-core/motion/design';
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -23,7 +24,7 @@ type CoverOf = NonNullable<PathItem['masks']>[number]['cover'];
 
 describe('keyframed masks', () => {
   it('draws a mask whose box is keyframed, sampled at the frame', () => {
-    const masked = patch(withCard, 'card', { mask: mask({ kind: MaskKind.Rect, x: 0.5, y: 0.5, width: 1, height: 1 }), keyframes: { maskWidth: [{ frame: 0, value: 0, ease: 'linear' }, { frame: 10, value: 1, ease: 'linear' }] } });
+    const masked = patch(withCard, 'card', { mask: mask({ kind: MaskKind.Rect, x: 0.5, y: 0.5, width: 1, height: 1 }), keyframes: { maskWidth: [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 10, value: 1, ease: Ease.Linear }] } });
     const drawn = displayListAt(masked, 5, FEEGA_TOKENS);
     const cover = card(masked, 5)?.masks?.[0].cover as Extract<CoverOf, { kind: CoverKind.Path }>;
 

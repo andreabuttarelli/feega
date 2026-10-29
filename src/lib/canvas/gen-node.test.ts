@@ -19,6 +19,8 @@ const choice = (over: Partial<ModelChoice> = {}): ModelChoice => ({
   id: 'm1',
   label: 'Modello',
   aspectRatios: ['1:1', '9:16'],
+  provider: 'p',
+  providerLabel: 'P',
   ...over
 });
 

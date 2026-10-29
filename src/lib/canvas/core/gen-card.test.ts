@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
 import { mix } from '$lib/canvas/gpu/theme';
+import { AudioFieldKind } from '$lib/canvas/audio-form';
 import type { GenTileView } from '$lib/canvas/gen-tile-view';
 import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
@@ -97,8 +98,8 @@ describe('genItems', () => {
 
   it('replaces the references band of an audio tile with its controls', () => {
     const form = [
-      { kind: 'select' as const, label: 'Operation', value: 'Text to speech', ratio: 0 },
-      { kind: 'slider' as const, label: 'Stability', value: '', ratio: 0.5 }
+      { kind: AudioFieldKind.Select, label: 'Operation', value: 'Text to speech', ratio: 0 },
+      { kind: AudioFieldKind.Slider, label: 'Stability', value: '', ratio: 0.5 }
     ];
     const items = draw(view({ medium: 'audio', form }), { id: 'n', x: 0, y: 0, w: 320, h: 400 });
 

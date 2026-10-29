@@ -168,7 +168,7 @@ describe('drawing an element on the canvas, outside any frame', () => {
 
   it('a pasted path keeps its gradient as a fill layer', () => {
     const outline = parsePath('M 0 0 L 10 0 L 10 10 Z') as Outline;
-    const gradient = { type: FillType.Linear, stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90 };
+    const gradient = { type: FillType.Linear as const, stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }], angle: 90 };
     const drawn = made(drawnElement({ tool: DrawTool.Pen, outline, fill: '#ff0000', gradient }, 'g1'));
 
     expect(findClip(drawn.doc, 'g1')!.clip.props.fills).toMatchObject([gradient]);
