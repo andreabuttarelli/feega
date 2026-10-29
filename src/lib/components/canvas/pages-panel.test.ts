@@ -25,9 +25,10 @@ describe('Pages: the canvases of the project', () => {
     expect(pages).toMatch(/<ConfirmDialog/);
   });
 
-  it('keeps versions and comments in the row menu', () => {
+  it('the row menu opens History, where versions live, and keeps comments', () => {
     expect(pages).toMatch(/data-testid="canvas-more"/);
-    expect(pages).toMatch(/data-testid="canvas-versions"/);
+    expect(pages).toMatch(/data-testid="canvas-history"[\s\S]*?History/);
+    expect(pages).not.toMatch(/Versions…/);
     expect(pages).toMatch(/data-testid="canvas-comments"/);
   });
 

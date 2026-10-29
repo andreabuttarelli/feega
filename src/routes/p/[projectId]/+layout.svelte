@@ -1,6 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
-  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
@@ -57,7 +57,7 @@
   const pagesProps = $derived({
     canvases: data.canvases,
     currentId: canvasId,
-    onVersions: isOff(LocalOff.Versions) ? null : () => versionsPanel.show(),
+    onHistory: () => historyPanel.show(),
     onComments: isOff(LocalOff.Comments) ? null : () => commentsPanel.show(),
     commentsUnseen: commentsPanel.unseen
   });
@@ -121,6 +121,12 @@
     }
     chatOpen = true;
     showMobile('chat');
+  });
+
+  $effect(() => {
+    if (historyPanel.asked) {
+      leftPanel = 'history';
+    }
   });
 
   $effect(() => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EntryKind, HistoryFilter, HistorySource, LaneKind, historyGraph, laneOf, laneSpans, type HistoryEntry } from './timeline';
+import { EntryKind, HistoryAction, HistoryFilter, HistorySource, LaneKind, actionsOf, entryRef, historyGraph, laneOf, laneSpans, type HistoryEntry } from './timeline';
 
 const entry = (id: string, at: string, author: HistoryEntry['author'], extra: Partial<HistoryEntry> = {}): HistoryEntry => ({
   id,
@@ -76,5 +76,24 @@ describe('laneSpans draws each lane from its newest to its oldest row', () => {
     );
 
     expect(laneSpans(graph)).toEqual([{ first: 0, last: 2 }, { first: 1, last: 1 }]);
+  });
+});
+
+describe('actionsOf says what a point in history can do', () => {
+  it('a saved version and a frame revision can be previewed and restored; only a revision takes a name', () => {
+    expect(actionsOf(entry('version:v1', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Version }))).toEqual([HistoryAction.Preview, HistoryAction.Restore]);
+    expect(actionsOf(entry('revision:f:4', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Revision }))).toEqual([HistoryAction.Preview, HistoryAction.Restore, HistoryAction.Name]);
+  });
+
+  it('a single structural event offers none of them', () => {
+    expect(actionsOf(entry('event:7', '2026-10-29T10:00:00Z', marco))).toEqual([]);
+  });
+});
+
+describe('entryRef reads back the id of an entry', () => {
+  it('a version id, a revision of a frame, and nonsense', () => {
+    expect(entryRef('version:v1')).toEqual({ source: HistorySource.Version, key: 'v1', version: null });
+    expect(entryRef('revision:frame-1:4')).toEqual({ source: HistorySource.Revision, key: 'frame-1', version: 4 });
+    expect(entryRef('nope')).toBeNull();
   });
 });
