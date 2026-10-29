@@ -7,8 +7,8 @@ test('connect cloud', async ({ page, session }) => {
   await openCanvas(page, session);
 
   await recordDemo(page, { slug: 'connect-cloud', title: 'import from drive or dropbox' }, async (d) => {
-    await d.click(page.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }));
-    await d.click(page.getByTestId('cloud-import'));
+    await d.click(page.getByTestId('insert-open'));
+    await d.click(page.getByTestId('insert-menu').locator('[data-insert="cloud"]'));
     await expect(page.getByTestId('cloud-picker')).toBeVisible();
     await expect(page.getByTestId('cloud-connect')).toBeVisible({ timeout: 30_000 });
     await d.wait(1800);

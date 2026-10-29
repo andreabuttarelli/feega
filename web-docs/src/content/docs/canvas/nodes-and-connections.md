@@ -7,7 +7,7 @@ sidebar:
 
 ## Add a node
 
-From the bottom bar: text, image, video, product or list. Each entry has a number; the same number on the keyboard adds that type without opening the menu. Dragging a file from the asset library, or a colour or product from the brand panel, creates a node already filled.
+From **+** in the bottom bar. One menu holds everything you can add: drawing tools, Generate nodes (text, image, video, product, list and more), import (upload a file, Drive or Dropbox, Figma) and templates; with a frame selected it also offers Insert image and templates for that frame. On a phone the Insert sheet shows the same menu. Each node entry has a number; the same number on the keyboard adds that type without opening the menu, and an entry can be dragged onto the canvas to drop it at that spot. Dragging a file from the asset library, or a colour or product from the brand panel, creates a node already filled.
 
 ## What a wire carries
 

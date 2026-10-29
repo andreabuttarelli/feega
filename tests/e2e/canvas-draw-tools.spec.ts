@@ -1,3 +1,4 @@
+import { openInsert, pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import poster from './fixtures/poster-type-grid.json' with { type: 'json' };
@@ -41,7 +42,7 @@ test.describe('drawing inside a frame @real', () => {
     const at = (fx: number, fy: number) => ({ x: box.x + box.width * fx, y: box.y + box.height * fy });
 
     async function drag(tool: string, from: { x: number; y: number }, to: { x: number; y: number }) {
-      await page.getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
+      await pickBarTool(page, tool);
       await page.mouse.move(from.x, from.y);
       await page.mouse.down();
       await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2);
@@ -51,7 +52,7 @@ test.describe('drawing inside a frame @real', () => {
 
     await drag('rectangle', at(0.3, 0.5), at(0.6, 0.7));
     await expect.poll(() => shapes('rect'), { timeout: 10_000 }).toBe(1);
-    await expect(page.getByTestId('draw-tools').locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('add-bar').locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('editor-stage'), 'the frame keeps showing the live editor after a save').toHaveAttribute('data-shown', 'true');
     await shoot(page, '20-draw-rectangle');
 
@@ -61,7 +62,7 @@ test.describe('drawing inside a frame @real', () => {
     await drag('text', at(0.4, 0.75), at(0.9, 0.85));
     await expect.poll(async () => (await clips()).filter((c) => c.component === 'Text').length, { timeout: 10_000 }).toBe(1);
 
-    await page.getByTestId('draw-tools').locator('[data-tool="pen"]').click();
+    await pickBarTool(page, 'pen');
     for (const [fx, fy] of [
       [0.2, 0.2],
       [0.8, 0.25],
