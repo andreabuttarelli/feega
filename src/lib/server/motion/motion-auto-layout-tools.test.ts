@@ -14,6 +14,30 @@ function setup() {
   return { session, run };
 }
 
+describe('a stack child through the agent', () => {
+  it('refuses x/y: the stack places it, reorder or make it absolute', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    await run('wrap_in_stack', { clip_ids: ['id1', 'id2'] });
+
+    const moved = await run('set_props', { clip_id: 'id1', props: { x: 0.2 } });
+    expect(moved.ok).toBe(false);
+    expect(String(moved.error)).toMatch(/reorder_stack.*absolute/);
+
+    await run('set_layout_item', { clip_id: 'id1', absolute: true });
+    expect((await run('set_props', { clip_id: 'id1', props: { x: 0.2 } })).ok).toBe(true);
+  });
+
+  it('sizes a child by fill weight and percent', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
+    await run('wrap_in_stack', { clip_ids: ['id1'] });
+    await run('set_layout_item', { clip_id: 'id1', width: Sizing.Fill, widthGrow: 2, height: Sizing.Percent, heightPercent: 50, alignSelf: 'end' });
+    expect(findClip(session.doc, 'id1')!.clip.layoutItem).toMatchObject({ widthGrow: 2, heightPercent: 50, alignSelf: 'end' });
+  });
+});
+
 describe('motion agent auto layout tools', () => {
   it('wraps clips, edits the layout without resetting what it does not name, sizes and reorders a child', async () => {
     const { session, run } = setup();

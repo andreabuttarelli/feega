@@ -19,7 +19,8 @@
   import { formatPadding, parsePadding } from '$lib/motion/layout/padding-text';
   import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
   import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '@feega/motion-core/motion/layout/model';
-  import { layoutParent, leaveStack, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
+  import { layoutParent, leaveStack, reorderChild, setAutoLayout, setChildSize, setLayoutItem } from '$lib/motion/layout/ops';
+  import { MAX_PERCENT, formatSize, parseSize, type SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
   import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
   import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
@@ -43,7 +44,14 @@
     [Flow.Grid]: { direction: Direction.Grid, wrap: false }
   };
 
-  const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'Fixed', [Sizing.Hug]: 'Fit', [Sizing.Fill]: 'Fill' };
+  const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'px', [Sizing.Hug]: 'Hug', [Sizing.Fill]: 'Fill', [Sizing.Percent]: '%' };
+  const AXES = [
+    { axis: 'width', label: 'Width', grow: 'widthGrow', percent: 'widthPercent' },
+    { axis: 'height', label: 'Height', grow: 'heightGrow', percent: 'heightPercent' }
+  ] as const;
+  type AxisRow = (typeof AXES)[number];
+  const SELF_ALIGNS = ['', Align.Start, Align.Center, Align.End, Align.Stretch] as const;
+  const SELF_ALIGN_LABEL: Record<(typeof SELF_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End', [Align.Stretch]: 'Stretch' };
   const SIDES: (keyof Padding)[] = ['top', 'right', 'bottom', 'left'];
   const SIDE_LABEL: Record<keyof Padding, string> = { top: 'T', right: 'R', bottom: 'B', left: 'L' };
   const SPOTS = [Align.Start, Align.Center, Align.End] as const;
@@ -76,7 +84,24 @@
   const lined = $derived(!!layout && (layout.wrap || layout.direction === Direction.Grid));
   const siblings = $derived(parent ? childrenInOrder(doc.tracks.flatMap((t) => t.clips as MotionClip[]), parent).map((c) => c.id) : []);
   const place = $derived(siblings.indexOf(clip.id));
-  const sizings = $derived((parent ? [Sizing.Fixed, Sizing.Hug, Sizing.Fill] : [Sizing.Fixed, Sizing.Hug]).map((value) => ({ value, label: SIZING_LABEL[value] })));
+  const sizings = $derived(parent ? [Sizing.Fixed, Sizing.Percent, Sizing.Fill, Sizing.Hug] : [Sizing.Fixed, Sizing.Hug]);
+  const pixels = (row: AxisRow) => Number(clip.props[row.axis] ?? 0) * doc[row.axis];
+  const VALUE_OF: Record<Sizing, (row: AxisRow) => number | undefined> = {
+    [Sizing.Fixed]: (row) => pixels(row),
+    [Sizing.Hug]: () => undefined,
+    [Sizing.Fill]: (row) => item[row.grow] ?? 1,
+    [Sizing.Percent]: (row) => item[row.percent] ?? MAX_PERCENT
+  };
+  const entryOf = (row: AxisRow): SizeEntry => ({ sizing: item[row.axis], value: VALUE_OF[item[row.axis]](row) });
+
+  function typeSize(row: AxisRow, text: string) {
+    const entry = parseSize(text);
+    if (entry && sizings.includes(entry.sizing)) {
+      commit(setChildSize(doc, clip.id, row.axis, entry), `Changed the ${row.axis}`);
+    }
+  }
+
+  const pickUnit = (row: AxisRow, sizing: Sizing) => commit(setChildSize(doc, clip.id, row.axis, { sizing, value: sizing === Sizing.Fixed ? pixels(row) : undefined }), `Changed the ${row.axis} sizing`);
 
   const set = (patch: Partial<AutoLayout>, summary: string) => commit(setAutoLayout(doc, clip.id, patch), summary);
   const size = (patch: Partial<LayoutItem>, summary: string) => commit(setLayoutItem(doc, clip.id, patch), summary);
@@ -184,12 +209,14 @@
     {/if}
 
     {#if layout || parent}
-      <Field label="Width">
-        <SegmentedControl label="Width sizing" options={sizings} value={item.width} onchange={(v) => size({ width: v as Sizing }, 'Changed the width sizing')} />
-      </Field>
-      <Field label="Height">
-        <SegmentedControl label="Height sizing" options={sizings} value={item.height} onchange={(v) => size({ height: v as Sizing }, 'Changed the height sizing')} />
-      </Field>
+      {#each AXES as row (row.axis)}
+        <Field label={row.label} id={`stack-size-${row.axis}`}>
+          <input id={`stack-size-${row.axis}`} class={cn(FIELD_INPUT, 'w-full')} placeholder="120 · 50% · 2fr · hug" value={formatSize(entryOf(row))} data-testid={`stack-size-${row.axis}`} onchange={(e) => typeSize(row, e.currentTarget.value)} />
+          <select aria-label={`${row.label} unit`} class={cn(FIELD_INPUT, 'w-16 shrink-0')} value={item[row.axis]} data-testid={`stack-unit-${row.axis}`} onchange={(e) => pickUnit(row, e.currentTarget.value as Sizing)}>
+            {#each sizings as value (value)}<option {value}>{SIZING_LABEL[value]}</option>{/each}
+          </select>
+        </Field>
+      {/each}
       <Field label="Min / max W">
         <input aria-label="Min width" placeholder="min" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.minWidth ?? ''} onchange={(e) => size({ minWidth: optionalPx(e.currentTarget.value) }, 'Changed the min width')} />
         <input aria-label="Max width" placeholder="max" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.maxWidth ?? ''} onchange={(e) => size({ maxWidth: optionalPx(e.currentTarget.value) }, 'Changed the max width')} />
@@ -215,9 +242,17 @@
       </Field>
     {/if}
 
+    {#if parent && !inGrid && !item.absolute}
+      <Field label="Align self">
+        <select aria-label="Align self" class={cn(FIELD_INPUT, 'w-full')} value={item.alignSelf ?? ''} data-testid="stack-align-self" onchange={(e) => size({ alignSelf: cellAlign(e.currentTarget.value) }, 'Aligned in the stack')}>
+          {#each SELF_ALIGNS as value (value)}<option {value}>{SELF_ALIGN_LABEL[value]}</option>{/each}
+        </select>
+      </Field>
+    {/if}
+
     {#if parent}
       <Field label="In layout">
-        <div class="flex min-w-0 flex-1" data-testid="auto-layout-absolute"><SegmentedField name="Absolute" options={YES_NO} value={answerOf(item.absolute)} onchange={(v) => size({ absolute: v === Answer.Yes }, 'Changed absolute position')} /></div>
+        <div class="flex min-w-0 flex-1" data-testid="auto-layout-absolute"><SegmentedField name="Absolute position" options={YES_NO} value={answerOf(item.absolute)} onchange={(v) => size({ absolute: v === Answer.Yes }, 'Changed absolute position')} /></div>
         <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the stack')}><ChevronUp /></IconButton>
         <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the stack')}><ChevronDown /></IconButton>
         <IconButton label="Take out of the stack" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the stack')}><LogOut /></IconButton>

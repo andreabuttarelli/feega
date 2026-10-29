@@ -7,6 +7,7 @@ import { unionBounds } from '$lib/motion/multi-select';
 import { Grip, aabb, dragPatch, quadOf, spacing, type Bounds, type Boxes, type Gap, type Guide, type Pt } from '$lib/motion/scene-select';
 import { moveBy, writeTransform } from '$lib/motion/space';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { arrowStep, stackPlaced, stepInStack } from '$lib/motion/layout/ops';
 
 export enum SelectionKind {
   Element = 'element',
@@ -94,7 +95,14 @@ export function dragClips(d: Drag): Dragged {
   return onWholePixels(at, asGroup(at) ? dragGroup(at, others) : dragOne(at, others));
 }
 
-export const nudgeClips = (doc: MotionDoc, ids: readonly string[], frame: number, by: Pt, mode: EditMode): OpResult => moveBy(doc, ids, frame, by, mode);
+export function nudgeClips(doc: MotionDoc, ids: readonly string[], frame: number, by: Pt, mode: EditMode): OpResult {
+  const stacked = ids.filter((id) => stackPlaced(doc, id));
+  if (!stacked.length) {
+    return moveBy(doc, ids, frame, by, mode);
+  }
+  const step = ids.length === 1 ? arrowStep(doc, ids[0], by) : 0;
+  return step ? stepInStack(doc, ids[0], step) : { ok: false, error: 'a stack places its children: arrows reorder one child along the stack' };
+}
 
 export function measuredGaps(doc: MotionDoc, frame: number, boxes: Boxes, picks: readonly string[], hovered: string): Gap[] {
   const shown = picks.filter(present(doc, boxes));
