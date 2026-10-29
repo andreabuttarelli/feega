@@ -265,6 +265,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToolText]: motion('add_clip'),
   [Command.ToolRectangle]: motion('add_shape'),
   [Command.ToolFrame]: motion('add_shape'),
+  [Command.ToolStack]: motion('wrap_in_stack'),
   [Command.ToolEllipse]: motion('add_shape'),
   [Command.ToolPolygon]: motion('add_shape'),
   [Command.ToolStar]: motion('add_shape'),

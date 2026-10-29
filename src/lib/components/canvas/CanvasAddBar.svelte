@@ -15,7 +15,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import { DockPlace, toolsIn } from '$lib/canvas/draw-dock';
   import { BAR_SLOTS, BarContext, BarSlot } from '$lib/canvas/bottom-bar';
-  import { INSERT_SECTION_TITLE, InsertSection, insertSections } from '$lib/canvas/insert-menu';
+  import { INSERT_SECTION_TITLE, InsertSection, insertMenuMaxHeight, insertSections } from '$lib/canvas/insert-menu';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { Command } from '$lib/motion/shortcuts';
@@ -103,6 +103,20 @@
   });
 
   let menuOpen = $state(false);
+  let menuMaxPx = $state(insertMenuMaxHeight(Number.MAX_SAFE_INTEGER));
+
+  function fitMenu() {
+    if (barEl) {
+      menuMaxPx = insertMenuMaxHeight(barEl.getBoundingClientRect().top);
+    }
+  }
+
+  $effect(() => {
+    void timelinePx;
+    if (menuOpen) {
+      fitMenu();
+    }
+  });
   let showTemplates = $state(false);
 
   $effect(() => {
@@ -188,7 +202,8 @@
     [DrawTool.Pen]: Command.ToolPen,
     [DrawTool.Pencil]: Command.ToolPencil,
     [DrawTool.ShapeBuilder]: Command.ToolShapeBuilder,
-    [DrawTool.Frame]: Command.ToolFrame
+    [DrawTool.Frame]: Command.ToolFrame,
+    [DrawTool.Stack]: Command.ToolStack
   };
 
   const DRAW_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
@@ -342,6 +357,8 @@
   {/each}
 {/snippet}
 
+<svelte:window onresize={fitMenu} />
+
 <div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
   {#if !phone}{@render modeSlot()}{/if}
   <div class="group" data-testid={`bar-${context}`}>
@@ -364,7 +381,7 @@
   {/if}
 
   {#if menuOpen && !phone}
-    <div class="insert-menu" role="menu" aria-label={INSERT_LABEL} data-testid="insert-menu">
+    <div class="insert-menu" role="menu" aria-label={INSERT_LABEL} data-testid="insert-menu" style:max-height={`${menuMaxPx}px`}>
       {@render insertMenu()}
     </div>
   {/if}
@@ -425,7 +442,6 @@
     left: 50%;
     transform: translateX(-50%);
     width: min(440px, calc(100vw - 32px));
-    max-height: min(560px, 70vh);
     overflow-y: auto;
     padding: 4px 10px 10px;
     border-radius: var(--ui-radius-md);
