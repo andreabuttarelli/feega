@@ -384,6 +384,9 @@ program
   .option('--restore <entryId>', 'Put the canvas or frame back to this entry; the present is kept first')
   .option('--name <entryId>', 'Name the frame revision at this entry (with --as)')
   .option('--as <name>', 'The name for --name; empty removes it')
+  .option('--merge <entryId>', 'Merge this branch back into its frame (with --keep on conflicts)')
+  .option('--keep <side>', 'branch or main: which side wins every conflict of --merge')
+  .option('--drop <entryId>', 'Remove this branch without merging')
   .option('--json', 'Print the raw answer, lanes included')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (canvasId: string, opts) => {

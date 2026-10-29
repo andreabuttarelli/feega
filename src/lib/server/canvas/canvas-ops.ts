@@ -57,7 +57,9 @@ import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-exp
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
-import { nameAt, previewAt, restoreTo } from '$lib/server/canvas/history-actions';
+import { actAt, previewAt } from '$lib/server/canvas/history-actions';
+import { HistoryAction } from '$lib/canvas/history/timeline';
+import { Side } from '$lib/motion/branch-merge';
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
@@ -1382,13 +1384,25 @@ export const CANVAS_OPS = {
   restore_to: op({
     access: Access.Write,
     input: historyPoint,
-    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? restoreTo(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor }) : NOT_IN_PROJECT)
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Restore, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  merge_branch_at: op({
+    access: Access.Write,
+    input: historyPoint.extend({ keep: z.enum(Side).optional().describe('which side wins every conflict; without it a conflict is answered, not merged') }),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Merge, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  drop_branch_at: op({
+    access: Access.Write,
+    input: historyPoint,
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Drop, actor: ctx.actor }) : NOT_IN_PROJECT)
   }),
 
   name_version: op({
     access: Access.Write,
     input: historyPoint.extend({ name: z.string().max(200).describe('empty removes the name') }),
-    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? nameAt(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor }) : NOT_IN_PROJECT)
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Name, actor: ctx.actor }) : NOT_IN_PROJECT)
   }),
 
   list_canvas_comments: op({

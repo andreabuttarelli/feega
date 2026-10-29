@@ -146,14 +146,16 @@ export function historyGraph(entries: HistoryEntry[], query: HistoryQuery): Hist
 export enum HistoryAction {
   Preview = 'preview',
   Restore = 'restore',
-  Name = 'name'
+  Name = 'name',
+  Merge = 'merge',
+  Drop = 'drop'
 }
 
 const SOURCE_ACTIONS: Record<HistorySource, readonly HistoryAction[]> = {
   [HistorySource.Event]: [],
   [HistorySource.Version]: [HistoryAction.Preview, HistoryAction.Restore],
   [HistorySource.Revision]: [HistoryAction.Preview, HistoryAction.Restore, HistoryAction.Name],
-  [HistorySource.Branch]: []
+  [HistorySource.Branch]: [HistoryAction.Merge, HistoryAction.Drop]
 };
 
 export const actionsOf = (entry: Pick<HistoryEntry, 'source'>): readonly HistoryAction[] => SOURCE_ACTIONS[entry.source];
@@ -182,4 +184,16 @@ export function laneSpans(graph: HistoryGraph): LaneSpan[] {
     span.last = Math.max(span.last, index);
   });
   return spans;
+}
+
+export type BranchFork = { from: number; to: number; lane: number };
+
+export function branchForks(graph: HistoryGraph): BranchFork[] {
+  return graph.rows.flatMap((row, from) => {
+    if (row.entry.source !== HistorySource.Branch) {
+      return [];
+    }
+    const to = graph.rows.findIndex((r, i) => i > from && r.entry.source === HistorySource.Revision && r.entry.nodeId === row.entry.frameId);
+    return to === -1 ? [] : [{ from, to, lane: graph.rows[to].lane }];
+  });
 }

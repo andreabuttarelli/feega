@@ -118,23 +118,6 @@ test.describe('dialogs from a selected canvas frame @real', () => {
     await page.screenshot({ path: `${SHOTS}-04-chat.png` });
     await page.getByTestId('frame-chat').getByRole('button', { name: 'Close' }).click();
 
-    await pickMore(page, 'Version history…');
-    await expect(page.getByTestId('frame-revisions')).toBeVisible();
-    await page.getByTestId('version-name').fill('before-templates');
-    await page.getByTestId('version-name').press('Enter');
-    await expect(page.getByTestId('revision').first()).toBeVisible();
-    await page.screenshot({ path: `${SHOTS}-05-history.png` });
-    await page.getByTestId('frame-revisions').getByRole('button', { name: 'Close' }).click();
-    await frameKept(page, before, '05b-history-after');
-
-    await pickMore(page, 'Branches…');
-    await expect(page.getByTestId('frame-branches')).toBeVisible();
-    await page.getByTestId('branch-name').fill('try-it');
-    await page.getByTestId('branch-name').press('Enter');
-    await expect(page.getByTestId('branch-open')).toBeVisible({ timeout: 20_000 });
-    await page.screenshot({ path: `${SHOTS}-06-branches.png` });
-    await page.getByTestId('frame-branches').getByRole('button', { name: 'Close' }).click();
-
     await pickMore(page, 'Add voice-over…');
     await expect(page.getByRole('dialog', { name: /voice-over/i })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}-07-voice.png` });

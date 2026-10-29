@@ -175,7 +175,6 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'frame-interactive', label: 'Interactive…', group: 'overflow', minNodes: 1 },
   { id: 'frame-components', label: 'Components…', group: 'overflow', minNodes: 1 },
   { id: 'frame-templates', label: 'Templates…', group: 'overflow', minNodes: 1 },
-  { id: 'frame-branches', label: 'Branches…', group: 'overflow', minNodes: 1 },
   { id: 'frame-history', label: 'History', group: 'overflow', minNodes: 1 },
   { id: 'frame-chat', label: 'Chat history…', group: 'overflow', minNodes: 1 },
   { id: 'frame-save-template', label: 'Save as template…', group: 'overflow', minNodes: 1 },
@@ -270,7 +269,7 @@ const PANEL_ORDER: readonly SelectionActionId[] = ['remove-background', 'upscale
 
 const PANEL_ACTIONS: readonly SelectionAction[] = PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
-const FRAME_PANEL_ORDER: readonly SelectionActionId[] = ['export', 'frame-components', 'frame-templates', 'frame-history', 'frame-branches', 'frame-interactive', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report'];
+const FRAME_PANEL_ORDER: readonly SelectionActionId[] = ['export', 'frame-components', 'frame-templates', 'frame-history', 'frame-interactive', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report'];
 
 export const FRAME_PANEL_ACTIONS: readonly SelectionAction[] = FRAME_PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 

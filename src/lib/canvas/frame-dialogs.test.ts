@@ -58,3 +58,10 @@ describe('History of a frame', () => {
     expect(shownFor('frame-history', [image])).toBe(false);
   });
 });
+
+describe('branches of a frame', () => {
+  it('live in History as lanes, not behind a Branches… dialog', () => {
+    expect(Object.keys(FRAME_DIALOG_ACTIONS)).not.toContain('frame-branches');
+    expect(SELECTION_ACTIONS.map((a) => a.label)).not.toContain('Branches…');
+  });
+});

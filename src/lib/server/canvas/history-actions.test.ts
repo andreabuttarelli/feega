@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { HistoryOutcome, nameAt, previewAt, restoreTo } from './history-actions';
+import { HistoryAction } from '$lib/canvas/history/timeline';
+import { HistoryOutcome, actAt, previewAt } from './history-actions';
 
 const ORG = 'org-1';
 const CANVAS = 'c-1';
@@ -52,7 +53,7 @@ describe('Restore to here never destroys the present', () => {
   it('a saved version comes back, and the moment before is saved first', async () => {
     const fake = fakeDb(rows(), { filter: true, store: true });
 
-    const out = await restoreTo(fake.db, { ...scope, entryId: 'version:v1', actor: user });
+    const out = await actAt(fake.db, { action: HistoryAction.Restore,  ...scope, entryId: 'version:v1', actor: user });
 
     expect(out.outcome).toBe(HistoryOutcome.Done);
     expect(fake.calls.filter((c) => c.table === 'canvas_versions' && c.op === 'insert').map((c) => (c.payload as { name: string }).name)).toEqual(['Before restoring Start']);
@@ -61,13 +62,13 @@ describe('Restore to here never destroys the present', () => {
   it('a frame revision of another canvas is missing, not restored', async () => {
     const { db } = fakeDb(rows(), { filter: true });
 
-    expect((await restoreTo(db, { orgId: ORG, canvasId: 'elsewhere', entryId: `revision:${FRAME}:2`, actor: user })).outcome).toBe(HistoryOutcome.Missing);
+    expect((await actAt(db, { action: HistoryAction.Restore,  orgId: ORG, canvasId: 'elsewhere', entryId: `revision:${FRAME}:2`, actor: user })).outcome).toBe(HistoryOutcome.Missing);
   });
 
   it('an unknown version is missing', async () => {
     const { db } = fakeDb(rows(), { filter: true });
 
-    expect((await restoreTo(db, { ...scope, entryId: 'version:nope', actor: user })).outcome).toBe(HistoryOutcome.Missing);
+    expect((await actAt(db, { action: HistoryAction.Restore,  ...scope, entryId: 'version:nope', actor: user })).outcome).toBe(HistoryOutcome.Missing);
   });
 });
 
@@ -75,7 +76,7 @@ describe('Name this version', () => {
   it('names a frame revision', async () => {
     const fake = fakeDb(rows(), { filter: true, store: true });
 
-    const out = await nameAt(fake.db, { ...scope, entryId: `revision:${FRAME}:2`, name: 'Client review', actor: user });
+    const out = await actAt(fake.db, { action: HistoryAction.Name,  ...scope, entryId: `revision:${FRAME}:2`, name: 'Client review', actor: user });
 
     expect(out.outcome).toBe(HistoryOutcome.Done);
     const patch = fake.calls.find((c) => c.table === 'nodes' && c.op === 'update');
@@ -85,6 +86,37 @@ describe('Name this version', () => {
   it('a saved version already has its name', async () => {
     const { db } = fakeDb(rows(), { filter: true });
 
-    expect((await nameAt(db, { ...scope, entryId: 'version:v1', name: 'x', actor: user })).outcome).toBe(HistoryOutcome.Unsupported);
+    expect((await actAt(db, { action: HistoryAction.Name,  ...scope, entryId: 'version:v1', name: 'x', actor: user })).outcome).toBe(HistoryOutcome.Unsupported);
+  });
+});
+
+describe('a branch merges back or is dropped from History', () => {
+  const BRANCH = 'branch-1';
+  const branched = () => {
+    const base = rows();
+    return {
+      ...base,
+      nodes: [...base.nodes, node(BRANCH, 'motion', 0, { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null, branchOf: { nodeId: FRAME, baseVersion: 3, name: 'Bolder' } })],
+      motion_revisions: [...base.motion_revisions, { ...revision(1, 300), node_id: BRANCH }]
+    };
+  };
+
+  it('Drop removes the branch node', async () => {
+    const fake = fakeDb(branched(), { filter: true, store: true });
+
+    expect((await actAt(fake.db, { ...scope, entryId: `branch:${BRANCH}:1`, action: HistoryAction.Drop, actor: user })).outcome).toBe(HistoryOutcome.Done);
+    expect(fake.calls.some((c) => c.table === 'nodes' && c.op === 'update' && JSON.stringify(c.payload).includes('deleted_at'))).toBe(true);
+  });
+
+  it('Merge writes the branch into the frame', async () => {
+    const fake = fakeDb(branched(), { filter: true, store: true });
+
+    expect((await actAt(fake.db, { ...scope, entryId: `branch:${BRANCH}:1`, action: HistoryAction.Merge, actor: user })).outcome).toBe(HistoryOutcome.Done);
+  });
+
+  it('a branch is not restored or named', async () => {
+    const { db } = fakeDb(branched(), { filter: true });
+
+    expect((await actAt(db, { ...scope, entryId: `branch:${BRANCH}:1`, action: HistoryAction.Restore, actor: user })).outcome).toBe(HistoryOutcome.Unsupported);
   });
 });

@@ -51,7 +51,6 @@ import Music from '@lucide/svelte/icons/music';
 import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 import Blocks from '@lucide/svelte/icons/blocks';
 import LayoutTemplate from '@lucide/svelte/icons/layout-template';
-import GitBranch from '@lucide/svelte/icons/git-branch';
 import History from '@lucide/svelte/icons/history';
 import MessageSquareText from '@lucide/svelte/icons/message-square-text';
 import Proportions from '@lucide/svelte/icons/proportions';
@@ -149,7 +148,6 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'frame-interactive': SlidersHorizontal,
   'frame-components': Blocks,
   'frame-templates': LayoutTemplate,
-  'frame-branches': GitBranch,
   'frame-history': History,
   'frame-chat': MessageSquareText,
   'frame-save-template': BookmarkPlus,

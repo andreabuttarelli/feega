@@ -3395,7 +3395,6 @@
       frame={frameOfLive(liveOf(nodeId)!)}
       onedit={(result, summary) => commit(nodeId, result, summary)}
       onswitch={(next) => (frameDialog = { nodeId, dialog: next })}
-      onfocus={(id) => select([id])}
       onimages={(rows) => props.onExportRows?.([nodeId], rows) ?? Promise.resolve('Export failed')}
       onpreview={(doc) => showDialogDoc(nodeId, doc)}
       onclose={() => closeDialog(nodeId)}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EntryKind, HistoryAction, HistoryFilter, HistorySource, LaneKind, actionsOf, entryRef, historyGraph, laneOf, laneSpans, type HistoryEntry } from './timeline';
+import { EntryKind, HistoryAction, HistoryFilter, HistorySource, LaneKind, actionsOf, branchForks, entryRef, historyGraph, laneOf, laneSpans, type HistoryEntry } from './timeline';
 
 const entry = (id: string, at: string, author: HistoryEntry['author'], extra: Partial<HistoryEntry> = {}): HistoryEntry => ({
   id,
@@ -85,8 +85,33 @@ describe('actionsOf says what a point in history can do', () => {
     expect(actionsOf(entry('revision:f:4', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Revision }))).toEqual([HistoryAction.Preview, HistoryAction.Restore, HistoryAction.Name]);
   });
 
+  it('a branch can be merged back or dropped', () => {
+    expect(actionsOf(entry('branch:b:1', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Branch }))).toEqual([HistoryAction.Merge, HistoryAction.Drop]);
+  });
+
   it('a single structural event offers none of them', () => {
     expect(actionsOf(entry('event:7', '2026-10-29T10:00:00Z', marco))).toEqual([]);
+  });
+});
+
+describe('branchForks draws each branch off the lane of its frame', () => {
+  it('a branch links to the next older revision of its frame, on that row lane', () => {
+    const graph = historyGraph(
+      [
+        entry('branch:b:1', '2026-10-29T13:00:00Z', chat, { source: HistorySource.Branch, kind: EntryKind.BranchCreate, nodeId: 'b', frameId: 'f' }),
+        entry('event:1', '2026-10-29T12:00:00Z', claude),
+        entry('revision:f:3', '2026-10-29T11:00:00Z', marco, { source: HistorySource.Revision, kind: EntryKind.RevisionCommit, nodeId: 'f', frameId: 'f' })
+      ],
+      { filter: HistoryFilter.All, names: {} }
+    );
+
+    expect(branchForks(graph)).toEqual([{ from: 0, to: 2, lane: 2 }]);
+  });
+
+  it('a branch whose frame has no revision on screen draws no fork', () => {
+    const graph = historyGraph([entry('branch:b:1', '2026-10-29T13:00:00Z', chat, { source: HistorySource.Branch, nodeId: 'b', frameId: 'f' })], { filter: HistoryFilter.All, names: {} });
+
+    expect(branchForks(graph)).toEqual([]);
   });
 });
 

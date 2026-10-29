@@ -8,7 +8,7 @@ import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
 
 const HTTP_NOT_FOUND = 404;
 
-type Body = { name?: string };
+type Body = { name?: string; keep?: string };
 
 type Route = { op: CanvasOpName; input: (body: Body) => Record<string, unknown> };
 
@@ -18,7 +18,9 @@ const READS: Partial<Record<string, Route>> = {
 
 const WRITES: Partial<Record<string, Route>> = {
   [HistoryAction.Restore]: { op: 'restore_to', input: () => ({}) },
-  [HistoryAction.Name]: { op: 'name_version', input: (body) => ({ name: String(body.name ?? '') }) }
+  [HistoryAction.Name]: { op: 'name_version', input: (body) => ({ name: String(body.name ?? '') }) },
+  [HistoryAction.Merge]: { op: 'merge_branch_at', input: (body) => (body.keep ? { keep: body.keep } : {}) },
+  [HistoryAction.Drop]: { op: 'drop_branch_at', input: () => ({}) }
 };
 
 async function run(request: Request, url: URL, params: { canvasId: string; entryId: string; action: string }, route: Route | undefined, body: Body) {

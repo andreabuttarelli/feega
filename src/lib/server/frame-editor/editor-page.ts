@@ -53,23 +53,11 @@ export const actions: Actions<EditorParams> = {
 
   head: async ({ locals, params }) => answered(await runEditorOp('read_head', editorCtx(await scopeFor(locals, params)), {})),
 
-  branches: async ({ locals, params }) => answered(await runEditorOp('list_branches', editorCtx(await scopeFor(locals, params)), {})),
-
   createBranch: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const input = EDITOR_OPS.create_branch.input.safeParse({ name: (await request.formData()).get('name') });
     return input.success ? answered(await runEditorOp('create_branch', editorCtx(scope), input.data)) : fail(HTTP_BAD_REQUEST, { error: 'invalid_branch_name' });
   },
-
-  reviewBranch: async ({ locals, params }) => answered(await runEditorOp('review_branch', editorCtx(await scopeFor(locals, params)), {})),
-
-  mergeBranch: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const input = EDITOR_OPS.merge_branch.input.safeParse({ choices: parsedJson(String((await request.formData()).get('choices') ?? '{}')) });
-    return input.success ? answered(await runEditorOp('merge_branch', editorCtx(scope), input.data)) : fail(HTTP_BAD_REQUEST, { error: 'invalid_choices' });
-  },
-
-  dropBranch: async ({ locals, params }) => answered(await runEditorOp('drop_branch', editorCtx(await scopeFor(locals, params)), {})),
 
   exported: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);

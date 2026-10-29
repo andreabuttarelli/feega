@@ -35,6 +35,14 @@ describe('historyApi', () => {
     expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history/version%3Av1/restore?org=org-1');
   });
 
+  it('merges and drops a branch of the timeline', async () => {
+    await historyApi.at('t', { canvasId: 'c-1', entryId: 'branch:b-1:1', action: 'merge', keep: 'main' });
+    expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history/branch%3Ab-1%3A1/merge');
+
+    await historyApi.at('t', { canvasId: 'c-1', entryId: 'branch:b-1:1', action: 'drop' });
+    expect(seen.at(-1)).toBe('/api/v1/canvas/c-1/history/branch%3Ab-1%3A1/drop');
+  });
+
   it('sends no filter it was not given', async () => {
     await historyApi.list('t', { canvasId: 'c-1' });
 
