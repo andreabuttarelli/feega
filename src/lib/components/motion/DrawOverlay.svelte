@@ -3,7 +3,7 @@
   import { DRAGGED_TEXT_SIZING, NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
-  import { LINE_PAINT, drawClip, lineOutline, penClip, penPaint, type LineTool } from '$lib/motion/draw-create';
+  import { DRAW_SUMMARY, LINE_PAINT, drawClip, lineOutline, penClip, penPaint, type LineTool } from '$lib/motion/draw-create';
   import { mapOutline, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
   import { smoothStroke, straightStroke } from '$lib/motion/shape/pencil';
   import { Handle, Mirror, addPoint, dragHandle, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
@@ -30,21 +30,6 @@
   const MIN_LINE_PX = 2;
   const MIN_TEXT_DRAG_PX = 10;
   const PENCIL_SMOOTHING_PX = 2;
-
-  const SUMMARY: Record<DrawTool, string> = {
-    [DrawTool.Select]: '',
-    [DrawTool.Text]: 'Drew a text',
-    [DrawTool.Rectangle]: 'Drew a rectangle',
-    [DrawTool.Ellipse]: 'Drew an ellipse',
-    [DrawTool.Polygon]: 'Drew a polygon',
-    [DrawTool.Star]: 'Drew a star',
-    [DrawTool.Line]: 'Drew a line',
-    [DrawTool.Arrow]: 'Drew an arrow',
-    [DrawTool.Pen]: 'Drew a path',
-    [DrawTool.Pencil]: 'Drew a path',
-    [DrawTool.ShapeBuilder]: '',
-    [DrawTool.Frame]: 'Drew a frame'
-  };
 
   let host = $state<HTMLDivElement | null>(null);
   let drag = $state<{ from: DragPoint; to: DragPoint; square: boolean } | null>(null);
@@ -81,7 +66,7 @@
   const unit = (box: DrawBox): DrawBox => ({ x: box.x / doc.width, y: box.y / doc.height, width: box.width / doc.width, height: box.height / doc.height });
 
   function create(result: OpResult, id: string) {
-    onchange(result, SUMMARY[tool]);
+    onchange(result, DRAW_SUMMARY[tool]);
     if (result.ok) {
       oncreated(id);
     }
