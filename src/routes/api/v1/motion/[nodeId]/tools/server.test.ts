@@ -241,12 +241,12 @@ const stack = async () => (await head()).tracks.flatMap((t) => [...t.clips].reve
 const clipOf = async (id: string) => (await head()).tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
 
 describe('layout and layer tools through the endpoint', () => {
-  it('add_auto_layout paints its container fill right under the children, over the background', async () => {
+  it('wrap_in_stack paints its container fill right under the children, over the background', async () => {
     const bg = await shape({ x: 540, y: 675, width: 1080, height: 1350 });
     const a = await shape({ x: 300, y: 675, width: 100, height: 100 });
     const b = await shape({ x: 600, y: 675, width: 100, height: 100 });
 
-    const out = await tool('add_auto_layout', { clip_ids: [a, b], fill: '#ff0000', stroke: '#00ff00', stroke_width: 4, radius: 0.2 });
+    const out = await tool('wrap_in_stack', { clip_ids: [a, b], fill: '#ff0000', stroke: '#00ff00', stroke_width: 4, radius: 0.2 });
 
     expect(out.ok).toBe(true);
     expect(await stack()).toEqual([b, a, out.container_id, bg]);
@@ -261,11 +261,11 @@ describe('auto layout sizing through the endpoint', () => {
     expect((await tool('set_layout_item', { clip_id: a, width: 'fill' })).ok).toBe(true);
   });
 
-  it('add_auto_layout takes the children with their sizing in one call', async () => {
+  it('wrap_in_stack takes the children with their sizing in one call', async () => {
     const a = await shape({ x: 300, y: 675, width: 100, height: 100 });
     const b = await shape({ x: 600, y: 675, width: 100, height: 100 });
 
-    const out = await tool('add_auto_layout', { children: [{ clip_id: a, width: 'fill' }, { clip_id: b, height: 'hug' }] });
+    const out = await tool('wrap_in_stack', { children: [{ clip_id: a, width: 'fill' }, { clip_id: b, height: 'hug' }] });
 
     expect(out.ok).toBe(true);
     expect((await clipOf(a)).layoutItem).toMatchObject({ width: 'fill' });

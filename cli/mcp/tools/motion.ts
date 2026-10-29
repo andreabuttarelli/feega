@@ -188,7 +188,7 @@ export function registerMotionTools(server: McpServer) {
       title: 'Export a frame as code',
       description:
         'Turn a frame (with its nested frames, text, images, vectors and component instances) into a code project a developer keeps: ' +
-        '`target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Auto layout becomes flex/grid, components become one file each ' +
+        '`target` react (React + Tailwind, default), html (HTML + CSS) or svelte (SvelteKit). Stacks (auto layout) become flex/grid, components become one file each ' +
         'with typed props for what differs between instances, colours and fonts become tokens. Returns `files` (path + content) and `notes` for what has no static ' +
         'code equivalent. Static only: animation is not exported. Reads only, free, no AI.',
       inputSchema: z.object({ org, node_id: z.string(), target: z.enum(CODE_TARGETS).optional() }),
