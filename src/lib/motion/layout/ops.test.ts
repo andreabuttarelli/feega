@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
-import { wrapWithStack, leaveStack, reorderChild, freezeLayout, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
+import { wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 
@@ -178,12 +178,34 @@ describe('wrapWithStack (⇧A)', () => {
     expect(clip(must(result), 'a').parent).toBe(containerId);
   });
 
-  it('turns a lone clip that already has children into the container', () => {
+  it('wraps a lone clip that already has children in a new stack too', () => {
     const wrapped = must(wrapInStack(row, ['a', 'b'], 'box', 'lane'));
     const plain = must(setAutoLayout(wrapped, 'box', null));
     const { result, containerId } = wrapWithStack(plain, ['box'], newId);
-    expect(containerId).toBe('box');
-    expect(clip(must(result), 'box').autoLayout).toBeTruthy();
+    expect(containerId).not.toBe('box');
+    expect(clip(must(result), 'box').parent).toBe(containerId);
+    expect(clip(must(result), containerId).autoLayout).toBeTruthy();
+  });
+
+  it('wraps a single text in a stack that hugs it', () => {
+    const { result, containerId } = wrapWithStack(row, ['k'], newId);
+    const doc = must(result);
+    expect(clip(doc, 'k').parent).toBe(containerId);
+    expect(clip(doc, containerId).layoutItem).toMatchObject({ width: Sizing.Hug, height: Sizing.Hug });
+  });
+
+  it('wraps children of a stack in a nested stack, in the place they held', () => {
+    const outer = must(wrapInStack(row, ['a', 'b', 'k'], 'outer', 'lane'));
+    const doc = must(wrapInStack(outer, ['b', 'k'], 'inner', 'lane-2'));
+
+    expect(clip(doc, 'inner').parent).toBe('outer');
+    expect(clip(doc, 'outer').autoLayout!.order).toEqual(['a', 'inner']);
+    expect(['b', 'k'].map((id) => clip(doc, id).parent)).toEqual(['inner', 'inner']);
+  });
+
+  it('names the new lane Stack', () => {
+    const doc = must(wrapInStack(row, ['a', 'b'], 'box', 'lane'));
+    expect(doc.tracks.find((t) => t.id === 'lane')!.name).toBe('Stack');
   });
 });
 
@@ -248,5 +270,34 @@ describe('freezeLayout', () => {
 
   it('refuses a clip that is not an auto layout', () => {
     expect(freezeLayout(row, 'a').ok).toBe(false);
+  });
+});
+
+describe('removeStack (unwrap)', () => {
+  const laid = must(wrapInStack(row, ['a', 'b'], 'box', 'lane'));
+  const removed = must(removeStack(laid, 'box'));
+
+  it('deletes the stack', () => {
+    expect(findClip(removed, 'box')).toBeNull();
+  });
+
+  it('keeps the children where the layout put them, with no parent', () => {
+    const was = clip(withAutoLayout(laid), 'b').props;
+
+    expect(clip(removed, 'b').parent ?? null).toBeNull();
+    expect(clip(removed, 'b').layoutItem).toBeUndefined();
+    expect(clip(removed, 'b').props).toMatchObject({ x: was.x, y: was.y, width: was.width, height: was.height });
+  });
+
+  it('hands the children to the parent stack, in the place the unwrapped one held', () => {
+    const outer = must(wrapInStack(must(wrapInStack(row, ['a', 'b'], 'inner', 'lane-1')), ['inner', 'k'], 'outer', 'lane-2'));
+    const doc = must(removeStack(outer, 'inner'));
+
+    expect(['a', 'b'].map((id) => clip(doc, id).parent)).toEqual(['outer', 'outer']);
+    expect(clip(doc, 'outer').autoLayout!.order).toEqual(['a', 'b', 'k']);
+  });
+
+  it('refuses a clip that is not a stack', () => {
+    expect(removeStack(row, 'a').ok).toBe(false);
   });
 });
