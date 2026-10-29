@@ -3464,3 +3464,6 @@ Signal: hover and click inside a frame outline the entire frame; double-click tu
 
 ### A worktree's dev server stops seeing edits after `git checkout`
 Signal: a fix green in vitest changes nothing in the browser; a `console.warn` added to a component never prints. Cause: the Vite watcher in a worktree drops after switching commits and keeps serving old modules. Move: restart `vite dev` after every checkout or edit you test in e2e; a bisect on a live server measures only the first commit.
+
+### A `.svelte` file calls a name that does not exist and CI is green
+Signal: a click throws `ReferenceError: x is not defined` in a component; the suite and the runtime type gate passed. Cause: `scripts/typecheck-runtime.mjs` runs plain `tsc`, which never reads `.svelte`, and `svelte-check` was not in CI, so its errors piled up to ~380 and real ones (an undefined function, registry tables missing rows, a type that hid a dropped field) drowned in fixture noise. Move: `npm run check` must stay at zero (CI `Type check` step); a new error is read, not silenced. It needs `.env` (from `.env.example`) because `$env` types come from it.
