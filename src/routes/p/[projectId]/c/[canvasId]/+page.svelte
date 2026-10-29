@@ -1516,6 +1516,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const SAVE_DEBOUNCE_MS = 400;
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
+  const FAILED_NOTICE_MS = 8000;
+  const SAVE_GAVE_UP_NOTICE = 'A change could not be saved after several tries and was reloaded from the server.';
   const REMOTE_REFRESH_MS = 250;
   let saveStatus = $state(SaveStatus.Saved);
   let placeStatus = $state(SaveStatus.Saved);
@@ -1531,7 +1533,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     debounceMs: SAVE_DEBOUNCE_MS,
     maxWaitMs: SAVE_MAX_WAIT_MS,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
-    onStatus: (status) => { saveStatus = status; keepOutbox(); }
+    onStatus: (status) => { saveStatus = status; keepOutbox(); },
+    onGaveUp: () => { failed = SAVE_GAVE_UP_NOTICE; refreshSoon(); }
+  });
+
+  $effect(() => {
+    if (!failed || failedIsCreditsExhausted) {
+      return;
+    }
+    const shown = failed;
+    const timer = setTimeout(() => { if (failed === shown) { failed = null; } }, FAILED_NOTICE_MS);
+    return () => clearTimeout(timer);
   });
 
   const places = createPlaceSaves({
@@ -4081,13 +4093,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
   <p class="save-status" role="status" data-status={syncShown.state} aria-label={syncShown.label} title={syncShown.label}></p>
   {#if failed}
-    <!-- Un salvataggio perso in silenzio si scopre alla prossima apertura, quando quel che si era
-         scritto non c'è più e nessuno sa perché. -->
     <p class="warning" role="alert">
       {failed}
       {#if failedIsCreditsExhausted}
         <a href={BILLING_PATH}>Buy credits</a>
       {/if}
+      <button type="button" class="warning-close" aria-label="Dismiss" onclick={() => (failed = null)}>×</button>
     </p>
   {/if}
   {#if figmaShown}
@@ -4800,6 +4811,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     background: var(--paper, #fff);
     border: 1px solid var(--line-2, #d2d2d7);
     border-radius: 0;
+  }
+
+  .warning-close {
+    margin-left: 8px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
   }
 
   .warning.reload {

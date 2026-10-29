@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { CHECKPOINT_IDLE_MS, Checkpoint, RevisionOutcome, appendRevision, headCache, listRevisions, readCheckpoint, readHead, readRevision, sealRevision } from './motion-revisions';
+import { CHECKPOINT_IDLE_MS, Checkpoint, RevisionOutcome, appendRevision, headCache, listRevisionMarks, listRevisions, readCheckpoint, readHead, readRevision, sealRevision } from './motion-revisions';
 
 type Row = Record<string, unknown>;
 
@@ -278,5 +278,38 @@ describe('a cached head is read without the doc while the version holds', () => 
     (await readHead(db, { orgId: ORG, nodeId: NODE }, cache))!.doc.height = 1;
 
     expect((await readHead(db, { orgId: ORG, nodeId: NODE }, cache))?.doc.height).toBe(1080);
+  });
+});
+
+function beforeSessionsDb() {
+  const rows: Row[] = [];
+  const db = {
+    from: () => ({
+      select: (columns: string) => {
+        const answer = columns.includes('session_id') ? { data: null, error: { code: '42703', message: 'column motion_revisions.session_id does not exist' } } : { data: [{ node_id: NODE, version: 1, summary: null, actor_kind: 'user', actor_id: 'u1', agent_key: null, created_at: '2026-10-29T00:00:00Z' }], error: null };
+        const chain = { eq: () => chain, in: () => chain, order: () => chain, limit: async () => answer };
+        return chain;
+      },
+      insert: async (row: Row) => ('session_id' in row ? { error: { code: 'PGRST204', message: "Could not find the 'session_id' column" } } : (rows.push(row), { error: null }))
+    }),
+    rpc: async () => ({ data: null, error: { code: 'PGRST202', message: 'no function' } })
+  } as unknown as Db;
+  return { db, rows };
+}
+
+describe('motion revisions before the session column exists', () => {
+  it('a write still lands when the database has no session_id yet', async () => {
+    const { db, rows } = beforeSessionsDb();
+
+    const write = await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor: { ...user, sessionId: 's-1' } });
+
+    expect(write.outcome).toBe(RevisionOutcome.Written);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('the history marks still read when the database has no session_id yet', async () => {
+    const marks = await listRevisionMarks(beforeSessionsDb().db, { orgId: ORG, nodeIds: [NODE], limit: 10 });
+
+    expect(marks.map((m) => [m.version, m.sessionId])).toEqual([[1, null]]);
   });
 });
