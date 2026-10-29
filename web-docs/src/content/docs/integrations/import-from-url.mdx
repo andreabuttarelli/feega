@@ -1,0 +1,34 @@
+---
+title: Import from URL
+description: Turn a public web page into an editable frame.
+sidebar:
+  order: 4
+---
+
+Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text, flex rows and columns become auto layout, backgrounds, borders, corners and shadows become fills, strokes and effects, pictures are copied into your project, inline SVG icons become vector paths. It is not a screenshot.
+
+## In the app
+
+Open the insert menu (**+**), go to **Import**, choose **From URL…**, paste the address and press **Import**. The frame lands in the middle of the view, named after the page title.
+
+## Limits
+
+- Public `http`/`https` pages only. Private network addresses and pages behind a login are refused.
+- The page is read at desktop width (1280 px), down to 3840 px from the top, up to 1500 layers.
+- Fonts that Google Fonts does not have fall back to Inter.
+- Four imports a minute per person.
+- Not yet: tablet and phone layouts as breakpoints, repeated blocks as components, gradients.
+
+## CLI
+
+```bash
+feega canvas import-url $PROJECT https://example.com --canvas <canvas> --x 0 --y 0
+```
+
+`x` and `y` are the canvas position of the frame centre. The answer has `frame_id` and `truncated` (true when the page hit the layer or height cap).
+
+## MCP and API
+
+Over MCP: `canvas_tool({ project_id, op: "import_url", input: { canvasId, url, x, y } })`.
+
+Over HTTP: `POST /api/v1/projects/{projectId}/url-import` with `{ canvasId, url, x, y }`. Errors: `not_public` (400), `failed` (502, the page answered with an error), `unreadable` (422), `rate_limited` (429), `no_browser` (503).

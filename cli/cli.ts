@@ -586,6 +586,18 @@ canvas
   });
 
 canvas
+  .command('import-url <projectId> <url>')
+  .description('Draw a public web page as an editable frame: layers, text, auto layout and images')
+  .requiredOption('--canvas <id>', 'The canvas')
+  .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, url: string, opts) => {
+    const { cmdCanvasImportUrl } = await import('./commands/canvas.ts');
+    await cmdCanvasImportUrl(projectId, url, opts);
+  });
+
+canvas
   .command('frame <projectId>')
   .description('Draw an empty frame on a canvas, like the frame tool: a box in canvas units, or a width and a preset format')
   .requiredOption('--canvas <id>', 'The canvas')
