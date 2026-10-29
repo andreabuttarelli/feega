@@ -1,4 +1,3 @@
-import { openInsert, pickBarTool } from './fixtures/canvas-bar';
 import { randomUUID } from 'node:crypto';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
@@ -29,7 +28,8 @@ test.describe('Drive and Dropbox picker @real', () => {
       );
     });
 
-    await (await openInsert(page)).locator('[data-insert="cloud"]').click();
+    await page.locator('[data-testid="bar-mode"] [data-mode="design"]').click();
+    await page.getByTestId('cloud-import').click();
     await expect(page.getByTestId('cloud-picker')).toBeVisible();
     await expect(page.getByTestId('cloud-connect-link')).toHaveAttribute('href', /\/api\/v1\/cloud\/google_drive\/connect\?return=/);
     await page.screenshot({ path: `${SHOTS_DIR}/f4-cloud-connect.png` });

@@ -1,4 +1,3 @@
-import { openInsert } from './fixtures/canvas-bar';
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -71,7 +70,7 @@ test.describe('a node lands on the canvas at once @real', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
 
-    await (await openInsert(page)).locator('[data-insert="frame-templates"]').click();
+    await page.getByTestId('frame-templates').click();
     const picker = page.getByRole('dialog', { name: 'Frame templates' });
     await picker.getByRole('radio', { name: 'Still', exact: true }).click();
     await picker.getByTestId('component-search').fill('checker');

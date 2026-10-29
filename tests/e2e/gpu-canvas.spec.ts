@@ -1,4 +1,3 @@
-import { pickBarTool } from './fixtures/canvas-bar';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated, type E2eSession } from './fixtures/session';
@@ -139,7 +138,8 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await open(page, session);
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
-    await pickBarTool(page, 'rectangle');
+    await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
+    await bar.getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
     await expect(page.getByTestId('canvas-draw')).toBeVisible();
 
     const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;

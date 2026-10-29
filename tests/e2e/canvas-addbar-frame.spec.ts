@@ -1,4 +1,3 @@
-import { openInsert } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import path from 'node:path';
 import { SHOTS_DIR } from './fixtures/shots';
@@ -35,8 +34,7 @@ test.describe('the add bar with a frame selected @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
-    await expect((await openInsert(page)).locator('[data-insert="image"]')).toHaveCount(0);
-    await page.keyboard.press('Escape');
+    await expect(bar.getByTestId('frame-image')).toHaveCount(0);
     await page.waitForTimeout(SETTLE_MS);
     await page.screenshot({ path: `${SHOTS_DIR}/addbar-1-nothing-selected.png` });
 
@@ -45,10 +43,9 @@ test.describe('the add bar with a frame selected @real', () => {
       await expect(bar).toHaveAttribute('data-context', 'frame', { timeout: 1500 });
     }).toPass({ timeout: 25_000 });
 
-    const menu = await openInsert(page);
-    await expect(menu.locator('[data-insert="image"]')).toBeVisible();
-    await expect(menu.locator('[data-insert="frame-library"]')).toBeVisible();
-    await expect(menu.locator('button[draggable="true"]').first()).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'Insert image' })).toBeVisible();
+    await expect(bar.getByTestId('frame-library')).toBeVisible();
+    await expect(bar.locator('button[draggable="true"]').first()).toBeVisible();
     await page.screenshot({ path: `${SHOTS_DIR}/addbar-2-frame-selected.png` });
 
     await bar.getByTestId('frame-image-input').setInputFiles(BLUE_SQUARE);
@@ -64,7 +61,7 @@ test.describe('the add bar with a frame selected @real', () => {
       .toBe(true);
     await page.screenshot({ path: `${SHOTS_DIR}/addbar-3-image-in-frame.png` });
 
-    await (await openInsert(page)).locator('[data-insert="frame-library"]').click();
+    await bar.getByTestId('frame-library').click();
     await expect(page.getByTestId('template-library')).toBeVisible();
     await page.screenshot({ path: `${SHOTS_DIR}/addbar-4-templates.png` });
   });

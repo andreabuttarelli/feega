@@ -1,26 +1,29 @@
 <script lang="ts">
   import { LocalOff, isOff } from '$lib/local-user';
   import { followDocks } from '$lib/canvas/dock-lift';
+  import { localStore } from '$lib/browser-storage';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
   import Cloud from '@lucide/svelte/icons/cloud';
   import Frame from '@lucide/svelte/icons/frame';
-  import MessageCircle from '@lucide/svelte/icons/message-circle';
+    import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Film from '@lucide/svelte/icons/film';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import Plus from '@lucide/svelte/icons/plus';
+  import Shapes from '@lucide/svelte/icons/shapes';
   import { DockPlace, toolsIn } from '$lib/canvas/draw-dock';
-  import { BAR_SLOTS, BarContext, BarSlot } from '$lib/canvas/bottom-bar';
-  import { INSERT_SECTION_TITLE, InsertSection, insertSections } from '$lib/canvas/insert-menu';
+  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
+  import PenTool from '@lucide/svelte/icons/pen-tool';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { Command } from '$lib/motion/shortcuts';
   import { ACTIONS } from '$lib/motion/actions';
   import { canvasToolKeys } from '$lib/canvas/shortcuts';
   import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
-  import { CANVAS_ADD_BAR, CLOUD_ADDABLE, AI_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
+  import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, CLOUD_ADDABLE, AI_ADDABLE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { MOBILE_QUERY } from '$lib/breakpoints';
@@ -63,7 +66,6 @@
 
   const PERCENT = 100;
   const SWITCH_PX = 64;
-  const INSERT_LABEL = 'Insert';
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);
@@ -82,35 +84,13 @@
     });
   });
 
-  let menuOpen = $state(false);
+  let showMore = $state(false);
   let showTemplates = $state(false);
 
   $effect(() => {
     void context;
-    menuOpen = false;
+    showMore = false;
     showTemplates = false;
-  });
-
-  $effect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const closeOutside = (e: PointerEvent) => {
-      if (!barEl?.contains(e.target as Node)) {
-        menuOpen = false;
-      }
-    };
-    const closeOnEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        menuOpen = false;
-      }
-    };
-    window.addEventListener('pointerdown', closeOutside, true);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      window.removeEventListener('pointerdown', closeOutside, true);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
   });
 
   function pickTechnique(id: string) {
@@ -126,6 +106,10 @@
   const offered = (what: Addable) => !(isOff(LocalOff.CloudNodes) && CLOUD_ADDABLE.has(what)) && !(isOff(LocalOff.AiNodes) && AI_ADDABLE.has(what));
   const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
 
+  function pickMore(what: Addable) {
+    showMore = false;
+    onpick?.(what);
+  }
   let fileInput = $state<HTMLInputElement | null>(null);
 
   function pickFile() {
@@ -135,9 +119,7 @@
   function fileChosen(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
-    if (file) {
-      onupload?.(file);
-    }
+    if (file) { onupload?.(file); }
     input.value = '';
   }
 
@@ -172,13 +154,56 @@
   };
 
   const DRAW_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
-    const name = ACTIONS[command].name;
-    const keys = canvasToolKeys(command);
-    return { tool, name, keys, label: keys ? `${name} (${keys})` : name, icon: ACTIONS[command].icon };
+    const tip = { name: ACTIONS[command].name, keys: canvasToolKeys(command) };
+    return { tool, name: tip.name, keys: tip.keys, hint: ACTIONS[command].gesture ?? '', label: tip.keys ? `${tip.name} (${tip.keys})` : tip.name, icon: ACTIONS[command].icon };
   });
   const toolOf = (tool: DrawTool) => DRAW_TOOLS.find((t) => t.tool === tool)!;
-  const MENU_TOOLS = [...toolsIn(DockPlace.Bar), ...toolsIn(DockPlace.More)].filter((tool) => tool !== DrawTool.Select).map(toolOf);
-  const SELECT_TOOL = toolOf(DrawTool.Select);
+  const BAR_TOOLS = toolsIn(DockPlace.Bar).map(toolOf);
+  const MORE_TOOLS = toolsIn(DockPlace.More).map(toolOf);
+  const MORE_LABEL = 'More tools';
+
+  let toolsMore = $state(false);
+  const moreActive = $derived(MORE_TOOLS.find((t) => t.tool === frameBar.tool) ?? null);
+
+  function pickMoreTool(tool: DrawTool) {
+    toolsMore = false;
+    frameBar.tool = tool;
+  }
+
+  let drawOpen = $state(false);
+
+  function pickTool(tool: DrawTool) {
+    drawOpen = frameBar.tool === tool && !drawOpen;
+    frameBar.tool = tool;
+  }
+
+  function storedMode(): BarMode {
+    try {
+      return readBarMode(localStorage.getItem(BAR_MODE_KEY));
+    } catch {
+      return BarMode.Generate;
+    }
+  }
+
+  let mode = $state(localStore() ? storedMode() : BarMode.Generate);
+
+  function pickMode(next: BarMode) {
+    mode = next;
+    showMore = false;
+    showTemplates = false;
+    try {
+      localStorage.setItem(BAR_MODE_KEY, next);
+    } catch {
+      return;
+    }
+  }
+
+  const MODES: { mode: BarMode; label: string; icon: typeof PenTool }[] = [
+    { mode: BarMode.Design, label: 'Design', icon: PenTool },
+    { mode: BarMode.Generate, label: 'Generate', icon: Sparkles }
+  ];
+
+  const SELECT_TOOL = DRAW_TOOLS.find((t) => t.tool === DrawTool.Select)!;
 
   let phone = $state(typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches);
 
@@ -189,56 +214,69 @@
     return () => query.removeEventListener('change', follow);
   });
 
-  type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof Plus; run: () => void; hint?: string; drag?: Addable; tool?: DrawTool };
+  type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof PenTool; run: () => void };
+  type Section = { title: string; tiles: Tile[] };
 
-  const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], hint: `${ADDABLE_LABEL[what]} (${slot(what)})`, icon: ADDABLE_ICON[what], run: () => onpick?.(what), drag: what });
-  const toolTile = (t: (typeof DRAW_TOOLS)[number]): Tile => ({ id: `draw-${t.tool}`, label: t.name, hint: t.label, icon: t.icon, run: () => (frameBar.tool = t.tool), tool: t.tool });
-  const optional = (tile: Tile, shown: unknown): Tile[] => (shown ? [tile] : []);
+  const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what) });
+  const drawTiles = $derived(DRAW_TOOLS.filter((t) => t.tool !== DrawTool.Select).map((t) => ({ id: `draw-${t.tool}`, label: t.name, icon: t.icon, run: () => (frameBar.tool = t.tool) })));
+  const UPLOAD_TILE: Tile = { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile };
+  const cloudTiles = (): Tile[] => (oncloud ? [{ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: oncloud }] : []);
+  const figmaTiles = (): Tile[] => (onfigma ? [{ id: 'figma', label: 'Import from Figma', icon: Frame, run: onfigma }] : []);
+  const TRAILER_LABEL = 'Start from the feega trailer';
+  const trailerTiles = $derived<Tile[]>(ontrailer ? [{ id: 'feega-trailer', label: TRAILER_LABEL, icon: Film, run: ontrailer }] : []);
 
-  const SECTION_TILES: Record<InsertSection, () => Tile[]> = {
-    [InsertSection.Tools]: () => MENU_TOOLS.map(toolTile),
-    [InsertSection.Generate]: () => CANVAS_ADD_BAR.filter(offered).map(addTile),
-    [InsertSection.Import]: () => [
-      { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile },
-      ...optional({ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: () => oncloud?.() }, oncloud),
-      ...optional({ id: 'figma', label: 'Import from Figma', icon: Frame, run: () => onfigma?.() }, onfigma)
-    ],
-    [InsertSection.Templates]: () => [
-      ...optional({ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }, ontemplate),
-      ...optional({ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: () => onframes?.() }, onframes),
-      ...optional({ id: 'feega-trailer', label: 'Start from the Feega trailer', icon: Film, run: () => ontrailer?.() }, ontrailer)
-    ],
-    [InsertSection.Frame]: () => [
-      { id: 'image', label: 'Insert image', icon: ImagePlus, run: pickImage },
-      ...optional({ id: 'frame-library', label: 'Templates for this frame', icon: LayoutTemplate, run: () => onframelibrary?.() }, onframelibrary)
-    ]
+  const IMAGE_TILE: Tile = { id: 'image', label: 'Insert image', icon: ImagePlus, run: pickImage };
+  const frameLibraryTile = (): Tile[] => (onframelibrary ? [{ id: 'frame-library', label: 'Templates for this frame', icon: LayoutTemplate, run: onframelibrary }] : []);
+
+  const canvasSections = (): Section[] => [
+    { title: 'Design', tiles: drawTiles },
+    { title: 'Generate', tiles: [...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].filter(offered).map(addTile) },
+    { title: 'Media', tiles: [UPLOAD_TILE, ...cloudTiles(), ...figmaTiles()] },
+    {
+      title: 'Templates',
+      tiles: [
+        ...(ontemplate ? [{ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }] : []),
+        ...(onframes ? [{ id: 'frame-templates', label: 'Frame templates', icon: Clapperboard, run: onframes }] : []),
+        ...trailerTiles
+      ]
+    }
+  ];
+
+  const INSERT_SECTIONS: Record<BarContext, () => Section[]> = {
+    [BarContext.Canvas]: canvasSections,
+    [BarContext.Frame]: () => [...canvasSections(), { title: 'Frame', tiles: [IMAGE_TILE, ...frameLibraryTile()] }]
   };
-
-  const sections = $derived(
-    insertSections(context)
-      .map((section) => ({ section, title: INSERT_SECTION_TITLE[section], tiles: SECTION_TILES[section]() }))
-      .filter((s) => s.tiles.length)
-  );
+  const insertSections = $derived(INSERT_SECTIONS[context]().filter((section) => section.tiles.length));
 
   function insert(tile: Tile) {
-    menuOpen = false;
     phoneSheets.close(PhoneSheetKind.Insert);
     tile.run();
   }
 
-  function startDrag(e: DragEvent, tile: Tile) {
-    if (!tile.drag) {
-      return;
-    }
-    e.dataTransfer?.setData(CANVAS_DRAG_MEDIUM, tile.drag);
-  }
-
   const SLOT: Record<BarSlot, Snippet> = {
+    [BarSlot.Mode]: modeSlot,
     [BarSlot.Select]: selectSlot,
-    [BarSlot.Insert]: insertSlot,
-    [BarSlot.Comment]: commentSlot
+    [BarSlot.Generate]: nodesSlot,
+    [BarSlot.Upload]: uploadSlot,
+    [BarSlot.Comment]: commentSlot,
+    [BarSlot.More]: moreSlot,
+    [BarSlot.Templates]: templatesSlot,
+    [BarSlot.FrameTemplates]: frameTemplatesSlot,
+    [BarSlot.Draw]: drawSlot,
+    [BarSlot.Image]: imageSlot,
+    [BarSlot.FrameLibrary]: frameLibrarySlot
   };
 </script>
+
+{#snippet modeSlot()}
+  <span class="mode" role="radiogroup" aria-label="Bar tools" data-testid="bar-mode">
+    {#each MODES as m (m.mode)}
+      <button type="button" role="radio" aria-checked={mode === m.mode} aria-label={m.label} title={m.label} data-mode={m.mode} onclick={() => pickMode(m.mode)}>
+        <m.icon size={12} strokeWidth={2} />
+      </button>
+    {/each}
+  </span>
+{/snippet}
 
 {#snippet selectSlot()}
   <span class="tool">
@@ -246,15 +284,6 @@
       <SELECT_TOOL.icon size={17} strokeWidth={1.7} />
     </button>
     <span class="add-tip" role="tooltip">{SELECT_TOOL.label}</span>
-  </span>
-{/snippet}
-
-{#snippet insertSlot()}
-  <span class="tool">
-    <button type="button" class="pick" class:on={menuOpen} aria-label={INSERT_LABEL} aria-haspopup="menu" aria-expanded={menuOpen} data-testid="insert-open" onclick={() => (menuOpen = !menuOpen)}>
-      <Plus size={18} strokeWidth={1.8} />
-    </button>
-    {#if !menuOpen}<span class="add-tip" role="tooltip">{INSERT_LABEL}</span>{/if}
   </span>
 {/snippet}
 
@@ -269,36 +298,173 @@
   {/if}
 {/snippet}
 
-{#snippet insertMenu()}
-  {#each sections as s (s.section)}
-    <h4 class="insert-head">{s.title}</h4>
-    <div class="insert-grid" data-section={s.section}>
-      {#each s.tiles as tile (tile.id)}
-        <button
-          type="button"
-          role="menuitem"
-          class="insert-tile"
-          class:on={tile.tool !== undefined && frameBar.tool === tile.tool}
-          data-insert={tile.id}
-          data-tool={tile.tool}
-          title={tile.hint ?? tile.label}
-          draggable={tile.drag ? 'true' : undefined}
-          ondragstart={(e) => startDrag(e, tile)}
-          ondragend={() => (menuOpen = false)}
-          onclick={() => insert(tile)}
-        >
-          <tile.icon size={20} strokeWidth={1.6} />
-          <span>{tile.label}</span>
-        </button>
-      {/each}
-    </div>
+{#snippet uploadSlot()}
+  <span class="tool">
+    <button type="button" title="Upload file" aria-label="Upload file" onclick={pickFile}>
+      <Upload size={17} strokeWidth={1.7} />
+    </button>
+    <span class="add-tip" role="tooltip">Upload file</span>
+  </span>
+  {#if oncloud}
+    <span class="tool">
+      <button type="button" title="Import from Drive or Dropbox" aria-label="Import from Drive or Dropbox" data-testid="cloud-import" onclick={oncloud}>
+        <Cloud size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Drive / Dropbox</span>
+    </span>
+  {/if}
+  {#if onfigma}
+    <span class="tool">
+      <button type="button" title="Import from Figma" aria-label="Import from Figma" data-testid="figma-import" onclick={onfigma}>
+        <Frame size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Figma</span>
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet nodesSlot()}
+  {#each CANVAS_BAR_MAIN.filter(offered) as what (what)}
+    {@const Icon = ADDABLE_ICON[what]}
+    <span class="tool">
+      <button
+        type="button"
+        title={`${ADDABLE_LABEL[what]} (${slot(what)})`}
+        aria-label={ADDABLE_LABEL[what]}
+        draggable="true"
+        onclick={() => onpick?.(what)}
+        ondragstart={(e) => e.dataTransfer?.setData(CANVAS_DRAG_MEDIUM, what)}
+      >
+        <Icon size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">{ADDABLE_LABEL[what]}</span>
+    </span>
   {/each}
 {/snippet}
 
+{#snippet moreSlot()}
+  <span class="tool">
+    <button
+      type="button"
+      class="keys-toggle"
+      title="More nodes"
+      aria-label="More nodes"
+      aria-expanded={showMore}
+      onclick={() => {
+        showMore = !showMore;
+        showTemplates = false;
+      }}
+    >
+      <LayoutGrid size={17} strokeWidth={1.7} />
+    </button>
+    <span class="add-tip" role="tooltip">More nodes</span>
+  </span>
+{/snippet}
+
+{#snippet templatesSlot()}
+  {#if ontemplate}
+    <span class="tool">
+      <button
+        type="button"
+        class="keys-toggle"
+        title="Templates"
+        aria-label="Templates"
+        aria-expanded={showTemplates}
+        onclick={() => {
+          showTemplates = !showTemplates;
+          showMore = false;
+        }}
+      >
+        <LayoutTemplate size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Templates</span>
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet frameTemplatesSlot()}
+  {#if onframes}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-templates" onclick={onframes}>
+        <Clapperboard size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Frame templates</span>
+    </span>
+  {/if}
+  {@render trailerSlot()}
+{/snippet}
+
+{#snippet trailerSlot()}
+  {#if ontrailer}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title={TRAILER_LABEL} aria-label={TRAILER_LABEL} data-testid="feega-trailer" onclick={ontrailer}>
+        <Film size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">{TRAILER_LABEL}</span>
+    </span>
+  {/if}
+{/snippet}
+
+{#snippet toolTip(t: (typeof DRAW_TOOLS)[number])}
+  <span class="add-tip tool-tip" role="tooltip"><span class="tip-head">{t.name}{#if t.keys}<kbd>{t.keys}</kbd>{/if}</span>{#if t.hint}<span class="tip-hint">{t.hint}</span>{/if}</span>
+{/snippet}
+
+{#snippet drawSlot()}
+  <span class="draw" class:open={drawOpen} role="toolbar" aria-label="Draw" data-testid="draw-tools">
+    {#each BAR_TOOLS as t (t.tool)}
+      <span class="tool">
+        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} data-tool={t.tool} onclick={() => pickTool(t.tool)}>
+          <t.icon size={17} strokeWidth={1.7} />
+        </button>
+        {@render toolTip(t)}
+      </span>
+    {/each}
+    <span class="tool">
+      <button type="button" class="pick" class:on={!!moreActive} aria-label={moreActive ? `${MORE_LABEL}: ${moreActive.name}` : MORE_LABEL} aria-haspopup="menu" aria-expanded={toolsMore} data-testid="draw-more" data-tool={moreActive?.tool} onclick={() => (toolsMore = !toolsMore)}>
+        {#if moreActive}<moreActive.icon size={17} strokeWidth={1.7} />{:else}<Shapes size={17} strokeWidth={1.7} />{/if}
+      </button>
+      {#if !toolsMore}<span class="add-tip" role="tooltip">{MORE_LABEL}</span>{/if}
+      {#if toolsMore}
+        <span class="tools-menu" role="menu" aria-label={MORE_LABEL}>
+          {#each MORE_TOOLS as t (t.tool)}
+            <button type="button" role="menuitem" class="tools-row" class:on={frameBar.tool === t.tool} data-tool={t.tool} title={t.hint} onclick={() => pickMoreTool(t.tool)}>
+              <t.icon size={16} strokeWidth={1.7} />
+              <span class="tools-name">{t.name}</span>
+              <kbd>{t.keys}</kbd>
+            </button>
+          {/each}
+        </span>
+      {/if}
+    </span>
+  </span>
+{/snippet}
+
+{#snippet imageSlot()}
+  <span class="tool">
+    <button type="button" class="keys-toggle" title="Insert image" aria-label="Insert image" data-testid="frame-image" onclick={pickImage}>
+      <ImagePlus size={17} strokeWidth={1.7} />
+    </button>
+    <span class="add-tip" role="tooltip">Insert image</span>
+  </span>
+{/snippet}
+
+{#snippet frameLibrarySlot()}
+  {#if onframelibrary}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title="Templates for this frame" aria-label="Templates for this frame" data-testid="frame-library" onclick={onframelibrary}>
+        <LayoutTemplate size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Templates for this frame</span>
+    </span>
+  {/if}
+{/snippet}
+
 <div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
-  <div class="group" data-testid={`bar-${context}`}>
-    {#each BAR_SLOTS as s (s)}{@render SLOT[s]()}{/each}
-  </div>
+  {#key `${context}:${mode}`}
+    <div class="group" data-testid={`bar-${context}`}>
+      {#each barSlots(context, mode) as s (s)}{@render SLOT[s]()}{/each}
+    </div>
+  {/key}
   {#if zoom !== undefined}
     <span class="zoom" data-testid="canvas-zoom" title="Zoom · 0 fits the canvas">{Math.round(zoom * PERCENT)}%</span>
   {/if}
@@ -315,16 +481,40 @@
     <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} {techniques} onpicktechnique={ontechnique ? pickTechnique : undefined} />
   {/if}
 
-  {#if menuOpen && !phone}
-    <div class="insert-menu" role="menu" aria-label={INSERT_LABEL} data-testid="insert-menu">
-      {@render insertMenu()}
+  {#if showMore}
+    <div class="more">
+      {#each CANVAS_BAR_MORE.filter(offered) as what (what)}
+        {@const Icon = ADDABLE_ICON[what]}
+        <button
+          type="button"
+          class="more-item"
+          title={`${ADDABLE_LABEL[what]} (${slot(what)})`}
+          draggable="true"
+          onclick={() => pickMore(what)}
+          ondragstart={(e) => e.dataTransfer?.setData(CANVAS_DRAG_MEDIUM, what)}
+          ondragend={() => (showMore = false)}
+        >
+          <Icon size={20} strokeWidth={1.6} />
+          <span>{ADDABLE_LABEL[what]}</span>
+        </button>
+      {/each}
     </div>
   {/if}
 </div>
 
 {#if phone}
-  <PhoneSheet name="insert" title={INSERT_LABEL} open={phoneSheets.shown === PhoneSheetKind.Insert} onclose={() => phoneSheets.close(PhoneSheetKind.Insert)} floorPx={SWITCH_PX} testid="insert-sheet">
-    {@render insertMenu()}
+  <PhoneSheet name="insert" title="Insert" open={phoneSheets.shown === PhoneSheetKind.Insert} onclose={() => phoneSheets.close(PhoneSheetKind.Insert)} floorPx={SWITCH_PX} testid="insert-sheet">
+    {#each insertSections as section (section.title)}
+      <h4 class="insert-head">{section.title}</h4>
+      <div class="insert-grid">
+        {#each section.tiles as tile (tile.id)}
+          <button type="button" class="insert-tile" data-insert={tile.id} onclick={() => insert(tile)}>
+            <tile.icon size={22} strokeWidth={1.6} />
+            <span>{tile.label}</span>
+          </button>
+        {/each}
+      </div>
+    {/each}
   </PhoneSheet>
 {/if}
 
@@ -365,36 +555,6 @@
     background: var(--ui-pressed);
   }
 
-  .insert-tile.on {
-    background: var(--ui-selected);
-    color: var(--ui-accent-text);
-  }
-
-  .insert-menu {
-    position: absolute;
-    z-index: 14;
-    bottom: calc(100% + 10px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(440px, calc(100vw - 32px));
-    max-height: min(560px, 70vh);
-    overflow-y: auto;
-    padding: 4px 10px 10px;
-    border-radius: var(--ui-radius-md);
-    background: var(--ui-panel-raised);
-    box-shadow: var(--ui-shadow-float);
-  }
-
-  .insert-menu .insert-tile {
-    height: auto;
-    min-height: 72px;
-    cursor: pointer;
-  }
-
-  .insert-menu .insert-tile[draggable='true'] {
-    cursor: grab;
-  }
-
   .add-bar {
     position: absolute;
     z-index: 61;
@@ -418,6 +578,13 @@
     animation: bar-in 240ms var(--ease-expo-out);
   }
 
+  .draw {
+    display: inline-flex;
+    gap: 2px;
+    padding-right: 4px;
+    margin-right: 4px;
+    border-right: 1px solid var(--ui-divider);
+  }
 
   .pick {
     cursor: pointer;
@@ -496,6 +663,18 @@
   }
 
   @media (max-width: 767px) {
+    .draw:not(.open) .tool:not(:has(.pick.on)) {
+      display: none;
+    }
+    .group:has(.draw.open) > :not(.draw),
+    .add-bar:has(.draw.open) .zoom {
+      display: none;
+    }
+    .draw.open {
+      border-right: 0;
+      margin-right: 0;
+      padding-right: 0;
+    }
     .add-bar {
       left: 50%;
       bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px) + var(--lift, 0px));
@@ -512,16 +691,86 @@
     button:hover {
       background: none;
     }
-    button:active {
+    button:active,
+    .keys-toggle[aria-expanded='true'] {
       background: var(--ui-wash);
     }
     .add-tip {
       display: none;
     }
+    .add-bar .more {
+      left: 50%;
+      transform: translateX(-50%);
+      grid-template-columns: repeat(3, minmax(88px, 1fr));
+      max-width: calc(100vw - 2 * var(--mobile-bar-inset));
+    }
+    .add-bar .more-item {
+      font-size: 13px;
+      min-height: var(--touch-target);
+    }
   }
 
+  .keys-toggle {
+    cursor: pointer;
+    color: var(--ui-text-secondary);
+  }
 
+  .tool-tip {
+    display: grid;
+    gap: 2px;
+    text-align: left;
+  }
+  .tip-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tip-hint {
+    font-weight: var(--ui-weight-regular, 400);
+    opacity: 0.7;
+  }
+  kbd {
+    font-family: var(--ui-mono);
+    font-size: var(--ui-type-caption);
+    opacity: 0.7;
+  }
 
+  .tools-menu {
+    position: absolute;
+    z-index: 14;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: grid;
+    min-width: 220px;
+    padding: 4px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+  }
+  .tools-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    height: var(--ui-row, 32px);
+    padding: 0 10px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text);
+    font-size: var(--ui-type-body);
+  }
+  .tools-row:hover {
+    background: var(--ui-wash);
+  }
+  .tools-row.on {
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
+  }
+  .tools-name {
+    flex: 1;
+    text-align: left;
+  }
 
   .add-tip {
     position: absolute;
@@ -563,7 +812,63 @@
     border: 0;
   }
 
+  .more {
+    position: absolute;
+    z-index: 13;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: repeat(3, 96px);
+    gap: 4px;
+    padding: 6px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+  }
+  .more-item {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 12px 6px;
+    height: auto;
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-secondary);
+    text-align: center;
+  }
+  .mode {
+    display: inline-flex;
+    gap: 1px;
+    padding: 2px;
+    margin-right: 2px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-wash);
+  }
 
+  .mode button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: transparent;
+    color: var(--ui-ink-muted, inherit);
+    cursor: pointer;
+  }
 
+  @media (max-width: 767px) {
+    .mode button {
+      width: 22px;
+      min-width: 22px;
+      min-height: var(--touch-target);
+    }
+  }
 
+  .mode button[aria-checked='true'] {
+    background: var(--ui-panel-raised);
+    color: var(--ui-accent);
+  }
 </style>
