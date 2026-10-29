@@ -74,7 +74,7 @@
     {#if shown}
       <span class="file">
         <FileIcon size={14} />
-        <Select value={shown.path} onchange={(e) => (picked = e.currentTarget.value)} aria-label="File" data-testid="dev-code-file">
+        <Select value={shown.path} onchange={(e) => (picked = e.currentTarget.value)} aria-label="File" data-testid="dev-code-file" class="[&_select]:pl-7 [&_select]:font-mono [&_select]:text-ui-caption">
           {#each out.files as file (file.path)}
             <option value={file.path}>{fileName(file.path)}</option>
           {/each}
@@ -103,7 +103,6 @@
   .pickers > :global([data-slot='select']) { min-width: 0; }
   .file { position: relative; display: flex; min-width: 0; }
   .file :global(svg:first-child) { position: absolute; left: var(--ui-space-2); top: 50%; transform: translateY(-50%); color: var(--ui-icon); pointer-events: none; z-index: 1; }
-  .file :global(select) { padding-left: 28px; font-family: var(--ui-mono); font-size: var(--ui-type-caption); }
   .empty { display: flex; flex-direction: column; align-items: center; gap: var(--ui-space-2); padding: var(--ui-space-6, 24px) var(--ui-space-3); border-radius: var(--ui-radius-md); background: var(--ui-panel-sunken); color: var(--ui-text-secondary); font-size: var(--ui-type-caption); text-align: center; }
   .notes { margin: 0; font-size: var(--ui-type-caption); color: var(--ui-text-secondary); }
 </style>
