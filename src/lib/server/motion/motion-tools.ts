@@ -258,8 +258,8 @@ import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type
 import type { BreakdownAnswer } from '$lib/server/video-reference';
 import { guessedAdvance, measureText, type Advance } from '$lib/motion/text-measure';
 import { textLook } from '$lib/motion/text-look';
-import { loadOutliner } from '$lib/motion/fonts/outliner';
-import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
+import { letteringOf, outlineTexts, type LetteringLoader } from '$lib/motion/text-outline-run';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { outlineUrl } from '@feega/motion-core/motion/fonts/outline';
 import { pivotBox } from '@feega/motion-core/motion/parent';
@@ -297,7 +297,7 @@ export type MotionToolDeps = {
   sfx?: (sfx: Sfx) => Promise<SfxAsset>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   fontAdvance?: (fontUrl: string) => Promise<Advance | null>;
-  fontOutliner?: OutlinerLoader;
+  lettering?: LetteringLoader;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   probe?: (times: number[]) => Promise<FrameStat[]>;
   seam?: () => Promise<number | null>;
@@ -2103,7 +2103,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     text_to_path: tool({
       description: 'Turn Title, Text or Kicker clips into free path shapes that look the same: glyph outlines from the font with its size, tracking, leading, alignment and wrapping as rendered. Fill, stroke, opacity, transform and constraints stay; keyframes on font props and text animators are dropped. The text is no longer editable afterwards.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async (input) => apply(await outlineTexts(session.doc, input.clip_ids, deps.fontOutliner ?? loadOutliner), `outlined ${input.clip_ids.join(', ')}`)
+      execute: async (input) => apply(await outlineTexts(session.doc, input.clip_ids, deps.lettering ?? letteringOf(FEEGA_TOKENS, {})), `outlined ${input.clip_ids.join(', ')}`)
     }),
 
     set_vector_network: tool({

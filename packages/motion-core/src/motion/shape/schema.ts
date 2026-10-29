@@ -50,7 +50,7 @@ export function shapeFieldShown(kind: ShapeKind, key: string): boolean {
   return !(GEOMETRY as readonly string[]).includes(key) || (GEOMETRY_OF[kind] as readonly string[]).includes(key);
 }
 
-export const MAX_PATH = 20000;
+export const MAX_PATH = 200_000;
 export const MAX_MORPHS = 16;
 export const MAX_MODIFIERS = 12;
 export const MODIFIER_PREFIX = 'mod';

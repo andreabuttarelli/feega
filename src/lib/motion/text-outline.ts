@@ -1,68 +1,47 @@
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { elementFills } from '@feega/motion-core/motion/fill/elements';
-import type { Outliner, PathStep } from './fonts/outliner';
+import { prepare } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { Command, FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
+import { outlinesOf, planOf, Smoothing, type Outlined, type OutlinedGlyph, type TextComponent } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { TRANSFORM_KEYS } from '@feega/motion-core/motion/keyframes';
+import type { Box } from '@feega/motion-core/motion/layout';
 import { pivotBox } from '@feega/motion-core/motion/parent';
 import { MAX_PATH, ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { strokesOf } from '@feega/motion-core/motion/stroke/model';
-import { textLook } from './text-look';
-import { measureText } from './text-measure';
 import { editClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
-import { propsOwner, shownRecord } from './units';
 
-const PRECISION = 1000;
+export type Lettering = { fonts: FaceBook; tokens: BrandTokens; assets: Record<string, string> };
+
 const CAPTION = 'Caption';
-const KEPT_LAYOUT = ['x', 'y', 'width', 'height', 'align', 'opacity', 'scale', 'rotation', 'move', 'easing'] as const;
-const ALIGN_SHARE = { left: 0, center: 0.5, right: 1 } as const;
+const KEPT_LAYOUT = ['x', 'y', 'width', 'height', 'opacity', 'scale', 'rotation', 'move', 'easing'] as const;
+const PIXEL_STEP = 0.05;
 
 const fail = (error: string): OpResult => ({ ok: false, error });
-const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
 
-type Frame = { left: number; top: number; width: number; height: number };
+type Place = (x: number, y: number) => string;
 
-const STEP_ARGS: Record<PathStep['type'], (s: PathStep) => (number | undefined)[]> = {
-  M: (s) => [s.x, s.y],
-  L: (s) => [s.x, s.y],
-  Q: (s) => [s.x1, s.y1, s.x, s.y],
-  C: (s) => [s.x1, s.y1, s.x2, s.y2, s.x, s.y],
-  Z: () => []
-};
-
-function stepData(step: PathStep, box: Frame): string {
-  const args = STEP_ARGS[step.type](step).map((v, i) => round(i % 2 === 0 ? ((v ?? 0) - box.left) / box.width : ((v ?? 0) - box.top) / box.height));
-  return `${step.type}${args.join(' ')}`;
+function placer(box: Box): Place {
+  const digits = Math.max(0, Math.ceil(Math.log10(Math.max(box.width, box.height) / PIXEL_STEP)));
+  const unit = (v: number, side: number) => String(Number((v / side).toFixed(digits)));
+  return (x, y) => `${unit(x, box.width)} ${unit(y, box.height)}`;
 }
 
-function lineData(line: string, origin: { x: number; baseline: number }, look: ReturnType<typeof textLook>, outliner: Outliner, box: Frame): string {
-  const chars = [...line];
-  return chars
-    .map((char, i) => {
-      const x = origin.x + (outliner.advance(chars.slice(0, i).join('')) + look.tracking * i) * look.size;
-      return outliner.trace(char, x, origin.baseline, look.size).map((s) => stepData(s, box)).join('');
-    })
-    .join('');
+function glyphData({ face, glyph, size, skew, x, y }: OutlinedGlyph, place: Place): string {
+  const scale = size / face.unitsPerEm;
+  const point = (ux: number, uy: number) => place(x + (ux + uy * skew) * scale, y - uy * scale);
+  const step = ({ op, at }: Command) => `${op}${Array.from({ length: at.length / 2 }, (_, i) => point(at[i * 2], at[i * 2 + 1])).join(' ')}`;
+  return face.outline(glyph).map(step).join('');
 }
 
-function layoutData(text: string, look: ReturnType<typeof textLook>, box: Frame, outliner: Outliner): string {
-  const block = measureText({ ...look, text, capitals: false }, box, outliner.advance);
-  const lineHeight = look.size * look.leading;
-  const gap = (lineHeight - (outliner.ascent + outliner.descent) * look.size) / 2;
-  return block.lines
-    .map((line, i) => {
-      const width = (outliner.advance(line) + look.tracking * [...line].length) * look.size;
-      const x = block.left + (block.width - width) * ALIGN_SHARE[look.align];
-      const baseline = block.top + i * lineHeight + gap + outliner.ascent * look.size;
-      return lineData(line, { x, baseline }, look, outliner, box);
-    })
-    .join('');
-}
+const barData = (bar: number[], place: Place) => `M${Array.from({ length: bar.length / 2 }, (_, i) => place(bar[i * 2], bar[i * 2 + 1])).join('L')}Z`;
 
-const casedText = (look: ReturnType<typeof textLook>, textCase: unknown) => {
-  const text = look.capitals ? look.text.toUpperCase() : look.text;
-  return textCase === 'lower' ? text.toLowerCase() : text;
-};
+function pathOf({ glyphs, bars }: Outlined, box: Box): string {
+  const place = placer(box);
+  return [...glyphs.map((g) => glyphData(g, place)), ...bars.map((b) => barData(b, place))].join('');
+}
 
 const SHAPE_KEYS = new Set<string>([...Object.keys(COMPONENTS.Shape.schema.shape), ...TRANSFORM_KEYS]);
 
@@ -73,7 +52,17 @@ function asShape(clip: MotionClip, path: string): MotionClip {
   return { ...clip, component: 'Shape', props: props as Record<string, unknown>, keyframes, animators: [], partStyles: undefined };
 }
 
-export function textToPath(doc: MotionDoc, clipId: string, outliner: Outliner): OpResult {
+function outlined(doc: MotionDoc, clip: MotionClip, { fonts, tokens, assets }: Lettering): string | null {
+  const placed = prepare(doc, tokens, assets, { fonts, smoothing: Smoothing.Plain }).doc;
+  const props = (findClip(placed, clip.id)?.clip ?? clip).props;
+  const stage = { width: doc.width, height: doc.height };
+  const box = pivotBox(props, stage);
+  const plan = planOf({ component: clip.component as TextComponent, smoothing: Smoothing.Plain, props, box, stage, colour: (v) => v, time: 0, trim: 0, fps: doc.fps, still: 0, fonts, animators: [], asset: (id) => id });
+  const laid = typeof plan === 'string' ? plan : outlinesOf(plan, fonts);
+  return typeof laid === 'string' ? null : pathOf(laid, box);
+}
+
+export function textToPath(doc: MotionDoc, clipId: string, lettering: Lettering): OpResult {
   const clip = findClip(doc, clipId)?.clip;
   if (!clip) {
     return fail(`no clip ${clipId}`);
@@ -85,9 +74,10 @@ export function textToPath(doc: MotionDoc, clipId: string, outliner: Outliner): 
     return fail(`${clipId} runs along a path: remove the text path first`);
   }
 
-  const shown = shownRecord(propsOwner(clip.component), clip.props, doc);
-  const look = textLook(clip.component, shown);
-  const path = layoutData(casedText(look, shown.textCase), look, pivotBox(clip.props, doc), outliner);
+  const path = outlined(doc, clip, lettering);
+  if (path === null) {
+    return fail(`the font of ${clipId} could not be loaded to outline it`);
+  }
   if (!path) {
     return fail(`${clipId} has no letters to outline`);
   }
