@@ -232,4 +232,12 @@ describe('the selection bar shows a few actions and folds the rest', () => {
     expect(slots.overflow.map((a) => a.id)).toEqual(['remove-background', 'connect-new', 'export']);
     expect(slots.danger.map((a) => a.id)).toEqual(['delete']);
   });
+
+  it('keeps copy link as a fixed icon and also lists it in the overflow', () => {
+    const slots = toolbarSlots(byId(['copy-link', 'duplicate', 'export', 'delete']));
+
+    expect(slots.fixed.map((a) => a.id)).toEqual(['copy-link']);
+    expect(slots.pinned.map((a) => a.id)).toEqual(['duplicate']);
+    expect(slots.overflow.map((a) => a.id)).toEqual(['copy-link', 'export']);
+  });
 });

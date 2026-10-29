@@ -354,6 +354,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'split-layers': canvas('image_tool'),
   'layers-to-frame': canvas('layers_to_frame'),
   'copy-id': CLIPBOARD,
+  'copy-link': CLIPBOARD,
   report: uiOnly('a person reports abuse to us; not an edit'),
   group: canvas('group_elements'),
   ungroup: canvas('ungroup_element'),

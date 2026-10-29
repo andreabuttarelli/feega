@@ -72,6 +72,7 @@ export type FlowProps = {
     sourceHandle: string | null,
   ) => void;
   onDelete?: (ids: string[], mode?: DeleteMode) => void;
+  onCopyLink?: (ids: string[]) => void;
   onSection?: (ids: string[]) => void;
   onColourChange?: (ids: string[], tag: ColourTag | null) => void;
   onSectionChange?: (id: string, patch: { title?: string; fill?: string }) => void;
