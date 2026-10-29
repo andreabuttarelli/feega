@@ -10,6 +10,7 @@
   import { Depth, Gesture } from '$lib/motion/drill';
   import { FrameFit, FramePickers, type WorldRect } from '$lib/canvas/frame-pick';
   import { onDestroy, onMount, untrack } from 'svelte';
+  import { lockOverscroll } from './overscroll-lock';
   import { TILE_PAINTED } from '@feega/motion-core/motion/hyperframes/measure';
   import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
@@ -1278,6 +1279,7 @@
   const onCanvas = $derived(new Set((props.peers ?? []).filter((p) => p.cursor).map((p) => p.userId)));
 
   onMount(() => peering?.start());
+  onMount(lockOverscroll);
 
   $effect(() => {
     styleLibrary.styles = libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
@@ -3445,6 +3447,7 @@
     position: absolute;
     inset: 0;
     touch-action: none;
+    overscroll-behavior: none;
     user-select: none;
   }
 
