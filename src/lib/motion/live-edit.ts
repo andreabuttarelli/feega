@@ -5,6 +5,7 @@ export type LiveEdits<T> = {
   edit: (doc: T, summary: string) => void;
   release: () => void;
   cancel: () => void;
+  active: () => boolean;
 };
 
 export type LiveGesture = Pick<LiveEdits<unknown>, 'begin' | 'release' | 'cancel'>;
@@ -45,6 +46,9 @@ export function liveEdits<T>(port: LiveEditPort<T>): LiveEdits<T> {
       if (live) {
         end();
       }
+    },
+    active() {
+      return live;
     }
   };
 }

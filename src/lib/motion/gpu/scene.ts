@@ -195,11 +195,13 @@ function animatedStyles(root: HTMLElement, timeline: Timeline, duration: number)
   const elements = [root, ...root.querySelectorAll('*')];
   const base = new Map(elements.map((el) => [el, styleMap(el)]));
   const changes: Changes = new Map();
+  const written = new MutationObserver(() => {});
+  written.observe(root, { attributes: true, attributeFilter: ['style'], subtree: true });
   for (let i = 0; i <= SAMPLES; i++) {
     timeline.seek((duration * i) / SAMPLES);
-    for (const el of elements) {
+    for (const el of new Set(written.takeRecords().map((r) => r.target as Element))) {
       const now = styleMap(el);
-      const was = base.get(el)!;
+      const was = base.get(el) ?? new Map<string, string>();
       for (const key of new Set([...now.keys(), ...was.keys()])) {
         if (now.get(key) !== was.get(key)) {
           changes.set(el, (changes.get(el) ?? new Set()).add(key));
@@ -207,6 +209,7 @@ function animatedStyles(root: HTMLElement, timeline: Timeline, duration: number)
       }
     }
   }
+  written.disconnect();
   timeline.seek(0);
   return changes;
 }

@@ -43,6 +43,30 @@ export function breakpointViews(frames: readonly FrameAt[], docOf: (id: string) 
   });
 }
 
+type Held = { stamp: string; doc: MotionDoc; views: BreakpointView[] };
+
+const stampOf = ({ kind, revision, box }: FrameAt) => `${kind}|${revision}|${box.x}|${box.y}|${box.w}|${box.h}`;
+
+export function heldViews() {
+  const held = new Map<string, Held>();
+
+  return (frames: readonly FrameAt[], docOf: (id: string) => MotionDoc | null | undefined): BreakpointView[] =>
+    frames.flatMap((frame) => {
+      const doc = docOf(frame.id);
+      if (!doc?.breakpoints?.length) {
+        return [];
+      }
+      const known = held.get(frame.id);
+      const stamp = stampOf(frame);
+      if (known && known.doc === doc && known.stamp === stamp) {
+        return known.views;
+      }
+      const views = viewsOfFrame(frame, doc);
+      held.set(frame.id, { stamp, doc, views });
+      return views;
+    });
+}
+
 export function viewAt(views: readonly BreakpointView[], p: { x: number; y: number }): BreakpointView | null {
   return views.find(({ frame: { box } }) => p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h) ?? null;
 }

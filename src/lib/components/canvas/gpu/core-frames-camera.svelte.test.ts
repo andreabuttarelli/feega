@@ -32,7 +32,7 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCoreGl: () => new Promise(() => undefined)
 }));
 
-vi.mock('$lib/canvas/core/frame-source', () => ({ drawsAny: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
+vi.mock('$lib/canvas/core/frame-source', async (real) => ({ ...(await real<object>()), drawsAny: () => true, onStage: (l: unknown) => l, stillFrame: () => 0 }));
 
 const { default: CoreFrames } = await import('./CoreFrames.svelte');
 const dir = dirname(fileURLToPath(import.meta.url));

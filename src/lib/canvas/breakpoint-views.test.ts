@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { landingDoc } from '@feega/motion-core/motion/codegen/fixtures/landing';
 import { FrameKind } from '$lib/canvas/motion-node';
-import { baseNodeId, breakpointViews, VIEW_GAP, viewAt, viewId, viewOf, withoutViews } from './breakpoint-views';
+import { baseNodeId, breakpointViews, heldViews, VIEW_GAP, viewAt, viewId, viewOf, withoutViews } from './breakpoint-views';
 
 const doc = { width: 1440, height: 900, tracks: [], breakpoints: [{ id: 'ph', name: 'Phone', width: 390 }, { id: 'tab', name: 'Tablet', width: 810 }] } as unknown as MotionDoc;
 const frame = { id: 'n1', kind: FrameKind.Frame, revision: 4, box: { x: 100, y: 50, w: 720, h: 450 } };
@@ -25,6 +25,16 @@ describe('breakpoint views on the canvas', () => {
     expect(phone.frame.box.h).toBeCloseTo(phone.doc.height / 2);
     expect(phone.doc.height).toBeGreaterThan(page.height);
     expect(tablet.doc.width).toBe(810);
+  });
+
+  it('resolves the views again only when the doc or the frame box changes', () => {
+    const page = landingDoc();
+    const views = heldViews();
+    const [first] = views([frame], () => page);
+
+    expect(views([{ ...frame }], () => page)[0]).toBe(first);
+    expect(views([frame], () => ({ ...page }))[0]).not.toBe(first);
+    expect(views([{ ...frame, box: { ...frame.box, x: 300 } }], () => page)[0]).not.toBe(first);
   });
 
   it('a frame without breakpoints has no views', () => {
