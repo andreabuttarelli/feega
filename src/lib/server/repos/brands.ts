@@ -64,5 +64,15 @@ export async function findBrandLook(db: Db, input: { orgId: string; brandId: str
   if (error) {
     throw error;
   }
-  return data ? { name: data.name as string, content: (data.content as string | null) ?? null, logoUrl: (data.logo_url as string | null) ?? null } : null;
+  return data ? lookOf(data) : null;
 }
+
+export async function findFirstBrandLook(db: Db, orgId: string): Promise<BrandLook | null> {
+  const { data, error } = await db.from('brands').select('name, content, logo_url').eq('org_id', orgId).order('created_at').limit(1).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data ? lookOf(data) : null;
+}
+
+const lookOf = (data: { name: unknown; content: unknown; logo_url: unknown }): BrandLook => ({ name: data.name as string, content: (data.content as string | null) ?? null, logoUrl: (data.logo_url as string | null) ?? null });

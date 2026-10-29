@@ -4,6 +4,7 @@ import { defaultProps } from '@feega/motion-core/motion/components';
 
 const state = vi.hoisted(() => ({ head: null as null | Record<string, unknown> }));
 
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/motion/editor-scope', () => ({
   motionScope: async () => ({
     db: {},
