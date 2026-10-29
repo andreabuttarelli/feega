@@ -375,6 +375,19 @@ program
   });
 
 program
+  .command('history <canvasId>')
+  .description('One timeline of everything that changed a canvas, newest first, by author (free)')
+  .option('--ai', 'Only the sidebar chat and outside agents')
+  .option('--people', 'Only people')
+  .option('--frame <id>', 'Only changes to this frame')
+  .option('--json', 'Print the raw answer, lanes included')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (canvasId: string, opts) => {
+    const { cmdHistory } = await import('./commands/history.ts');
+    await cmdHistory(canvasId, opts);
+  });
+
+program
   .command('components <projectId>')
   .description('List the components of every canvas of a project')
   .action(async (projectId: string) => {

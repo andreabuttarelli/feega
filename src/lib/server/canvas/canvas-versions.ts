@@ -8,9 +8,11 @@ import { MAX_VERSION_NAME, planCanvasRestore, snapshotSchema, type CanvasSnapsho
 
 type Scope = { orgId: string; canvasId: string };
 
-export type CanvasVersion = { id: string; name: string; createdAt: string; nodes: number };
+export type CanvasVersion = { id: string; name: string; createdAt: string; nodes: number; author: Actor };
 
-type Row = { id: string; name: string; created_at: string; snapshot: unknown };
+type Row = { id: string; name: string; created_at: string; snapshot: unknown; actor_kind?: Actor['kind']; actor_id?: string | null; agent_key?: string | null };
+
+const ROW_COLUMNS = 'id, name, created_at, snapshot, actor_kind, actor_id, agent_key';
 
 type VersionTable = {
   from: (table: 'canvas_versions') => {
@@ -43,7 +45,7 @@ export async function versionSnapshot(db: Db, scope: Scope): Promise<CanvasSnaps
 
 const versionOf = (row: Row): CanvasVersion => {
   const parsed = snapshotSchema.safeParse(row.snapshot);
-  return { id: row.id, name: row.name, createdAt: row.created_at, nodes: parsed.success ? parsed.data.nodes.length : 0 };
+  return { id: row.id, name: row.name, createdAt: row.created_at, nodes: parsed.success ? parsed.data.nodes.length : 0, author: { kind: row.actor_kind ?? 'system', id: row.actor_id ?? null, agentKey: row.agent_key ?? null } };
 };
 
 export async function saveCanvasVersion(db: Db, input: Scope & { name: string; actor: Actor }): Promise<CanvasVersion> {
@@ -52,7 +54,7 @@ export async function saveCanvasVersion(db: Db, input: Scope & { name: string; a
   const { data, error } = await versions(db)
     .from('canvas_versions')
     .insert({ org_id: input.orgId, canvas_id: input.canvasId, name, snapshot, actor_kind: input.actor.kind, actor_id: input.actor.id, agent_key: input.actor.agentKey ?? null })
-    .select('id, name, created_at, snapshot')
+    .select(ROW_COLUMNS)
     .single();
   if (error || !data) {
     throw error ?? new Error('canvas version not saved');
@@ -61,7 +63,7 @@ export async function saveCanvasVersion(db: Db, input: Scope & { name: string; a
 }
 
 export async function listCanvasVersions(db: Db, scope: Scope): Promise<CanvasVersion[]> {
-  const { data, error } = await versions(db).from('canvas_versions').select('id, name, created_at, snapshot').eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId).order('created_at', { ascending: false }).limit(LIST_LIMIT);
+  const { data, error } = await versions(db).from('canvas_versions').select(ROW_COLUMNS).eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId).order('created_at', { ascending: false }).limit(LIST_LIMIT);
   if (error) {
     throw error;
   }

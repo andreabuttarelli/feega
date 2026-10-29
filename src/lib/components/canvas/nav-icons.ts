@@ -6,6 +6,7 @@ import Settings from '@lucide/svelte/icons/settings';
 import Camera from '@lucide/svelte/icons/camera';
 import Layers from '@lucide/svelte/icons/layers';
 import Component from '@lucide/svelte/icons/component';
+import History from '@lucide/svelte/icons/history';
 import type { Component as SvelteComponent } from 'svelte';
 import type { NavEntry } from '$lib/shell-nav';
 
@@ -17,5 +18,6 @@ export const NAV_ICONS: Record<NavEntry['icon'], SvelteComponent<{ size?: number
   settings: Settings,
   camera: Camera,
   layers: Layers,
-  components: Component
+  components: Component,
+  history: History
 };

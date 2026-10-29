@@ -1,3 +1,4 @@
+import { CHAT_AGENT_KEY } from '$lib/canvas/history/timeline';
 /**
  * CHI HA FATTO COSA: la coppia che ogni scrittura porta addosso.
  *
@@ -9,7 +10,7 @@
 export const ACTOR_KINDS = ['user', 'agent', 'system'] as const;
 export type ActorKind = (typeof ACTOR_KINDS)[number];
 
-export const SIDEBAR_AGENT_KEY = 'sidebar';
+export const SIDEBAR_AGENT_KEY = CHAT_AGENT_KEY;
 
 export type Actor = {
   kind: ActorKind;

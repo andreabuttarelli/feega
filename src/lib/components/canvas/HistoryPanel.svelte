@@ -1,0 +1,220 @@
+<script lang="ts">
+  import UserRound from '@lucide/svelte/icons/user-round';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import Bot from '@lucide/svelte/icons/bot';
+  import Cog from '@lucide/svelte/icons/cog';
+  import Frame from '@lucide/svelte/icons/frame';
+  import type { Component } from 'svelte';
+  import { SegmentedControl } from '$lib/components/ui/shell';
+  import { canvasSelection } from '$lib/canvas/canvas-selection';
+  import { ENTRY_VERBS, HistoryFilter, LaneIcon, laneSpans, type HistoryGraph } from '$lib/canvas/history/timeline';
+
+  let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
+
+  const ICON = 12;
+  const LANE_PX = 12;
+  const ROW_PX = 28;
+  const DOT_R = 3.5;
+
+  const LANE_ICONS: Record<LaneIcon, Component<{ size?: number }>> = {
+    [LaneIcon.Person]: UserRound,
+    [LaneIcon.Chat]: MessageSquare,
+    [LaneIcon.Agent]: Bot,
+    [LaneIcon.System]: Cog
+  };
+
+  const FILTERS = [
+    { value: HistoryFilter.All, label: 'All' },
+    { value: HistoryFilter.Ai, label: 'AI' },
+    { value: HistoryFilter.People, label: 'People' }
+  ];
+
+  let filter = $state(HistoryFilter.All);
+  let oneFrame = $state(false);
+  let graph = $state<HistoryGraph | null>(null);
+  let failed = $state(false);
+
+  const frameId = $derived(oneFrame ? ($canvasSelection[0] ?? null) : null);
+  const spans = $derived(graph ? laneSpans(graph) : []);
+  const gutter = $derived(Math.max(1, graph?.lanes.length ?? 1) * LANE_PX);
+
+  $effect(() => {
+    const params = new URLSearchParams({ author: filter, ...(frameId ? { frame: frameId } : {}) });
+    const controller = new AbortController();
+    failed = false;
+    fetch(`/p/${projectId}/c/${canvasId}/history?${params}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((read: HistoryGraph) => (graph = read))
+      .catch((e: Error) => {
+        if (e.name !== 'AbortError') {
+          failed = true;
+        }
+      });
+    return () => controller.abort();
+  });
+
+  const timeOf = (at: string) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const laneX = (lane: number) => lane * LANE_PX + LANE_PX / 2;
+</script>
+
+<div class="history" data-testid="history-panel">
+  <div class="filters">
+    <SegmentedControl label="Who" options={FILTERS} value={filter} onchange={(v) => (filter = v as HistoryFilter)} class="flex-1" />
+    <button type="button" class="frame-toggle" class:on={oneFrame} aria-pressed={oneFrame} aria-label="One frame" title="Only the selected frame" disabled={!$canvasSelection.length && !oneFrame} onclick={() => (oneFrame = !oneFrame)} data-testid="history-one-frame">
+      <Frame size={14} />
+    </button>
+  </div>
+
+  {#if graph && graph.lanes.length}
+    <div class="lanes" data-testid="history-lanes">
+      {#each graph.lanes as lane (lane.key)}
+        {@const Icon = LANE_ICONS[lane.icon]}
+        <span class="lane" style:--lane={lane.colour} title={lane.label}><Icon size={ICON} /><span class="lane-name">{lane.label}</span></span>
+      {/each}
+    </div>
+  {/if}
+
+  {#if failed}
+    <p class="empty">History could not be read.</p>
+  {:else if graph && !graph.rows.length}
+    <p class="empty">Nothing changed here yet.</p>
+  {:else if graph}
+    <ol class="rows">
+      {#each graph.rows as row, index (row.entry.id)}
+        {@const lane = graph.lanes[row.lane]}
+        {@const Icon = LANE_ICONS[lane.icon]}
+        <li class="row" data-testid="history-row" data-lane={lane.kind}>
+          <svg class="graph" width={gutter} height={ROW_PX} aria-hidden="true">
+            {#each spans as span, l (l)}
+              {#if index >= span.first && index <= span.last}
+                <line x1={laneX(l)} x2={laneX(l)} y1={index === span.first ? ROW_PX / 2 : 0} y2={index === span.last ? ROW_PX / 2 : ROW_PX} stroke={graph.lanes[l].colour} stroke-opacity="0.45" stroke-width="1.5" />
+              {/if}
+            {/each}
+            <circle cx={laneX(row.lane)} cy={ROW_PX / 2} r={DOT_R} fill={lane.colour} />
+          </svg>
+          <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
+          <span class="what">{ENTRY_VERBS[row.entry.kind]}{#if row.entry.summary}<span class="summary"> · {row.entry.summary}</span>{/if}</span>
+          <time class="when" datetime={row.entry.at}>{timeOf(row.entry.at)}</time>
+        </li>
+      {/each}
+    </ol>
+  {/if}
+</div>
+
+<style>
+  .history {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .frame-toggle {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+  }
+
+  .frame-toggle:hover:not(:disabled),
+  .frame-toggle.on {
+    background: var(--ui-hover);
+    color: var(--ui-text);
+  }
+
+  .frame-toggle:disabled {
+    opacity: 0.4;
+  }
+
+  .lanes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 2px;
+  }
+
+  .lane {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--ui-radius-full);
+    background: color-mix(in srgb, var(--lane) 14%, transparent);
+    color: var(--lane);
+    font-size: 11px;
+  }
+
+  .lane-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--ui-row-sm);
+    padding-right: 4px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text);
+  }
+
+  .row:hover {
+    background: var(--ui-hover);
+  }
+
+  .graph {
+    flex: 0 0 auto;
+  }
+
+  .who {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+  }
+
+  .what {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .summary {
+    color: var(--ui-text-secondary);
+  }
+
+  .when {
+    flex: 0 0 auto;
+    color: var(--ui-text-tertiary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .empty {
+    margin: 8px 6px;
+    color: var(--ui-text-secondary);
+  }
+</style>
