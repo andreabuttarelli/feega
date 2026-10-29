@@ -110,6 +110,7 @@
   import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+  import { frameDocs, type FrameDocEdit } from '$lib/canvas/frame-docs';
   import './flow-base.css';
   import CanvasAddBar from '../CanvasAddBar.svelte';
   import CanvasDrawLayer from '../CanvasDrawLayer.svelte';
@@ -1519,6 +1520,18 @@
       liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
     }
   }
+
+  function editFrameDoc(nodeId: string, change: FrameDocEdit, summary: string): boolean {
+    const live = liveOf(nodeId);
+    if (!live || !saverOf(nodeId)) {
+      return false;
+    }
+    const result = change(live.doc);
+    commit(nodeId, result, summary);
+    return result.ok;
+  }
+
+  onMount(() => frameDocs.publish({ edit: editFrameDoc }));
 
   function startTrailer() {
     if (panelNodeId) {

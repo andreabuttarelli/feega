@@ -4,6 +4,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const SLOW_SERVER_MS = Number(process.env.OPTIMISTIC_DELAY_MS ?? 2_000);
 const FRAME_BUDGET = 2;
+const BOTTOM_RIGHT = 2;
 const MEASURING = process.env.OPTIMISTIC_MEASURE === '1';
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const READS = new Set(['snapshot', 'revision', 'canvasComments', 'audio_voices']);
@@ -47,7 +48,8 @@ enum Shown {
   OnTop = 'on-top',
   Named = 'named',
   Present = 'present',
-  Absent = 'absent'
+  Absent = 'absent',
+  Resized = 'resized'
 }
 
 type Expect = { shown: Shown; id?: string; name?: string; selector?: string };
@@ -59,13 +61,16 @@ async function watch(page: Page, want: Expect) {
     const tiles = () => [...document.querySelectorAll<HTMLElement>('[data-testid="gpu-node"]')];
     const idsNow = () => tiles().map((t) => t.dataset.id).sort().join();
     const initial = idsNow();
+    const widthOf = () => tiles().find((t) => t.dataset.id === w.id)?.getBoundingClientRect().width ?? 0;
+    const startWidth = widthOf();
     const met: Record<string, () => boolean> = {
       gone: () => !tiles().some((t) => t.dataset.id === w.id),
       changed: () => idsNow() !== initial,
       'on-top': () => tiles().at(-1)?.dataset.id === w.id,
       named: () => tiles().some((t) => t.dataset.id === w.id && t.getAttribute('aria-label') === w.name),
       present: () => !!document.querySelector(w.selector!),
-      absent: () => !document.querySelector(w.selector!)
+      absent: () => !document.querySelector(w.selector!),
+      resized: () => Math.abs(widthOf() - startWidth) > 2
     };
     const begin = () => {
       if (probe.start) {
@@ -143,6 +148,11 @@ const tile = (page: Page, id: string) => page.locator(`[data-testid="gpu-node"][
 async function pick(page: Page, id: string) {
   await page.locator(`[data-motion-node="${id}"]`).click();
   await page.keyboard.press('Escape');
+}
+
+async function corner(page: Page, id: string) {
+  const box = (await tile(page, id).boundingBox())!;
+  return { x: box.x + box.width, y: box.y + box.height };
 }
 
 async function centre(page: Page, id: string) {
@@ -319,5 +329,48 @@ test.describe('canvas actions are optimistic @real', () => {
     await verdict('share-canvas', page);
     const link = await page.locator('.share-link input').inputValue();
     await expect.poll(async () => (await admin.from('canvases').select('share_token').eq('id', session.canvasId).single()).data?.share_token, { timeout: 15_000 }).toBe(link.split('/s/')[1]);
+  });
+
+  test('a resized element refits its doc on the canvas, without asking the server', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const sized: string[] = [];
+    page.on('request', (r) => {
+      if (r.url().includes('frameSize')) {
+        sized.push(r.url());
+      }
+    });
+    const id = await element(admin, seedNode, session, 0);
+    await open(page, session);
+    await page.locator(`[data-motion-node="${id}"]`).click();
+    const handle = page.getByTestId('frame-selection-handle').nth(BOTTOM_RIGHT);
+    await expect(handle).toBeVisible({ timeout: 15_000 });
+    const grip = (await handle.boundingBox())!;
+    await watch(page, { shown: Shown.Resized, id });
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + 120, grip.y + 80, { steps: 10 });
+    await page.mouse.up();
+    await verdict('element-resize', page);
+    expect(sized, 'the doc refits locally').toEqual([]);
+  });
+
+  test('a scaled group changes size before the server answers', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    await element(admin, seedNode, session, 0);
+    await element(admin, seedNode, session, 1);
+    await open(page, session);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('ControlOrMeta+g');
+    await expect.poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('display_name', 'Group').is('deleted_at', null)).data?.length, { timeout: 15_000 }).toBe(1);
+    const group = (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('display_name', 'Group').single()).data!.id as string;
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.locator(`[data-motion-node="${group}"]`).click();
+    const handle = await corner(page, group);
+    await watch(page, { shown: Shown.Resized, id: group });
+    await page.mouse.move(handle.x, handle.y);
+    await page.mouse.down();
+    await page.mouse.move(handle.x + 200, handle.y + 100, { steps: 10 });
+    await page.mouse.up();
+    await verdict('group-scale', page);
   });
 });
