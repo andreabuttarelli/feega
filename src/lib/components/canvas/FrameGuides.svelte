@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Gap, Guide, Pt } from '$lib/motion/scene-select';
+  import type { DropLine } from '$lib/motion/layout/stack-drag';
 
   type Rect = { left: number; top: number; width: number; height: number };
 
-  let { area, size, guides, gaps, measured }: { area: Rect; size: { width: number; height: number }; guides: Guide[]; gaps: Gap[]; measured: Gap[] } = $props();
+  let { area, size, guides, gaps, measured, drop = null }: { area: Rect; size: { width: number; height: number }; guides: Guide[]; gaps: Gap[]; measured: Gap[]; drop?: DropLine | null } = $props();
 
   const pct = ([x, y]: Pt) => `left:${(x / size.width) * 100}%;top:${(y / size.height) * 100}%`;
   const middle = (g: Gap): Pt => (g.axis === 'x' ? [(g.from + g.to) / 2, g.at] : [g.at, (g.from + g.to) / 2]);
@@ -15,6 +16,7 @@
     {#each guides as g (g.axis + g.at)}
       {#if g.axis === 'x'}<line class="guide" data-testid="frame-guide" x1={g.at} y1="0" x2={g.at} y2={size.height} />{:else}<line class="guide" data-testid="frame-guide" x1="0" y1={g.at} x2={size.width} y2={g.at} />{/if}
     {/each}
+    {#if drop}<line class="drop" data-testid="stack-drop-line" x1={drop.x1} y1={drop.y1} x2={drop.x2} y2={drop.y2} />{/if}
     {#each labelled as { gap: g } (g.axis + g.from + g.to + g.at)}
       {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
     {/each}
@@ -42,6 +44,12 @@
   .gap {
     stroke: #ff3d7f;
     stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .drop {
+    stroke: var(--ui-accent-solid, #0d99ff);
+    stroke-width: 2px;
     vector-effect: non-scaling-stroke;
   }
 

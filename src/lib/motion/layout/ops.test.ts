@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
-import { wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
+import { setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 
@@ -299,5 +299,31 @@ describe('removeStack (unwrap)', () => {
 
   it('refuses a clip that is not a stack', () => {
     expect(removeStack(row, 'a').ok).toBe(false);
+  });
+});
+
+describe('a stack child as a flex item', () => {
+  const stacked = must(wrapInStack(row, ['a', 'b'], 'box', 'lane'));
+
+  it('fills by a weight', () => {
+    const item = clip(must(setChildSize(stacked, 'a', 'width', { sizing: Sizing.Fill, value: 2 })), 'a').layoutItem;
+    expect(item).toMatchObject({ width: Sizing.Fill, widthGrow: 2 });
+  });
+
+  it('takes a percent of the stack', () => {
+    const item = clip(must(setChildSize(stacked, 'a', 'height', { sizing: Sizing.Percent, value: 50 })), 'a').layoutItem;
+    expect(item).toMatchObject({ height: Sizing.Percent, heightPercent: 50 });
+  });
+
+  it('keeps a fixed size in pixels', () => {
+    const done = clip(must(setChildSize(stacked, 'a', 'width', { sizing: Sizing.Fixed, value: 270 })), 'a');
+    expect(done.layoutItem?.width).toBe(Sizing.Fixed);
+    expect(done.props.width).toBeCloseTo(270 / stacked.width);
+  });
+
+  it('steps earlier and later among its siblings, never past the ends', () => {
+    const later = must(stepInStack(stacked, 'a', 1));
+    expect(clip(later, 'box').autoLayout?.order).toEqual(['b', 'a']);
+    expect(stepInStack(later, 'a', 1).ok).toBe(false);
   });
 });

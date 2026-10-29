@@ -1,6 +1,7 @@
 import { SECTION_ORDER, Section } from './inspector-sections';
 import { ClipFamily } from './track-style';
 import { EditMode } from './edit-mode';
+import { Placement } from '@feega/motion-core/motion/layout/stack';
 
 export enum PropertiesView {
   Frame = 'frame',
@@ -50,7 +51,16 @@ const MODE_HIDES: Record<EditMode, ReadonlySet<Section>> = {
   [EditMode.Design]: new Set([Section.Animate])
 };
 
-export function sectionsFor(family: ClipFamily, view: PropertiesView, mode: EditMode): Section[] {
+const PLACEMENT: Record<Placement, { hides: ReadonlySet<Section>; position: boolean }> = {
+  [Placement.Free]: { hides: new Set(), position: true },
+  [Placement.Flow]: { hides: new Set([Section.Align, Section.Constraints]), position: false },
+  [Placement.Absolute]: { hides: new Set([Section.Constraints]), position: true }
+};
+
+export const positionShown = (placement: Placement): boolean => PLACEMENT[placement].position;
+
+export function sectionsFor(family: ClipFamily, view: PropertiesView, mode: EditMode, placement: Placement = Placement.Free): Section[] {
   const allowed = new Set(FAMILY_SECTIONS[family]);
-  return SECTION_ORDER.filter((s) => allowed.has(s) && !MODE_HIDES[mode].has(s) && (VIEW_KEEPS[view]?.has(s) ?? true));
+  const hidden = (s: Section) => MODE_HIDES[mode].has(s) || PLACEMENT[placement].hides.has(s);
+  return SECTION_ORDER.filter((s) => allowed.has(s) && !hidden(s) && (VIEW_KEEPS[view]?.has(s) ?? true));
 }

@@ -56,10 +56,13 @@ describe('the stack section', () => {
     expect(body).not.toContain('auto-layout-gap');
   });
 
-  it('sizes read Fixed, Fit and Fill, as in Framer', () => {
+  it('a child sizes in px, %, Fill or Hug, typed or picked', () => {
     const body = html(row, 'a');
-    expect(body).toContain('>Fit<');
-    expect(body).not.toContain('>Hug<');
+    for (const unit of ['>px<', '>%<', '>Fill<', '>Hug<']) {
+      expect(body).toContain(unit);
+    }
+    expect(body).toContain('data-testid="stack-size-width"');
+    expect(body).toContain('data-testid="stack-align-self"');
   });
 
   it('padding is one value until it differs per side', () => {
@@ -72,7 +75,7 @@ describe('the stack section', () => {
   });
 
   it('absolute is a Yes / No', () => {
-    expect(html(row, 'a')).toMatch(/data-segmented="Absolute"[\s\S]*?>Yes<[\s\S]*?>No</);
+    expect(html(row, 'a')).toMatch(/data-segmented="Absolute position"[\s\S]*?>Yes<[\s\S]*?>No</);
   });
 
   it('a plain rectangle shows nothing: Wrap with stack makes a stack', () => {
