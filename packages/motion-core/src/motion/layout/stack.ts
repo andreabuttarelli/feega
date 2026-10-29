@@ -1,5 +1,5 @@
 import { Direction } from './auto-layout';
-import type { AutoLayout } from './model';
+import type { AutoLayout, LayoutItem } from './model';
 
 export enum LayoutKind {
   Stack = 'stack',
@@ -20,3 +20,18 @@ export const LAYOUT_KIND_LABEL: Record<LayoutKind, string> = {
 type Laid = { autoLayout?: Pick<AutoLayout, 'direction'> | null };
 
 export const layoutKind = (clip: Laid): LayoutKind | null => (clip.autoLayout ? KIND_OF_DIRECTION[clip.autoLayout.direction] : null);
+
+export enum Placement {
+  Free = 'free',
+  Flow = 'flow',
+  Absolute = 'absolute'
+}
+
+type Placeable = { layoutItem?: Pick<LayoutItem, 'absolute'> | null };
+
+export function placementOf(clip: Placeable, parent: Laid | null): Placement {
+  if (!parent?.autoLayout) {
+    return Placement.Free;
+  }
+  return clip.layoutItem?.absolute ? Placement.Absolute : Placement.Flow;
+}
