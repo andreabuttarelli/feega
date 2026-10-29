@@ -7,10 +7,14 @@
     siMistralai,
     siPerplexity,
     siDeepseek,
+    siKuaishou,
+    siMinimax,
     type SimpleIcon
   } from 'simple-icons';
 
-  let { provider }: { provider: string } = $props();
+  let { provider, size = 12 }: { provider: string; size?: number } = $props();
+
+  const PETAL_ANGLES = [0, 60, 120, 180, 240, 300];
 
   const ICON: Record<string, SimpleIcon> = {
     anthropic: siAnthropic,
@@ -20,19 +24,27 @@
     qwen: siQwen,
     mistralai: siMistralai,
     perplexity: siPerplexity,
-    deepseek: siDeepseek
+    deepseek: siDeepseek,
+    kuaishou: siKuaishou,
+    minimax: siMinimax
   };
 
   const icon = $derived(ICON[provider]);
   const letter = $derived(provider.charAt(0).toUpperCase());
 </script>
 
-{#if icon}
-  <svg class="provider-icon" viewBox="0 0 24 24" width="12" height="12" fill={`#${icon.hex}`} aria-hidden="true">
+{#if provider === 'openai'}
+  <svg class="provider-icon" viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+    {#each PETAL_ANGLES as angle}
+      <ellipse cx="12" cy="7" rx="3" ry="5" transform={`rotate(${angle} 12 12)`} />
+    {/each}
+  </svg>
+{:else if icon}
+  <svg class="provider-icon" viewBox="0 0 24 24" width={size} height={size} fill={`#${icon.hex}`} aria-hidden="true">
     <path d={icon.path} />
   </svg>
 {:else}
-  <span class="provider-letter" aria-hidden="true">{letter}</span>
+  <span class="provider-letter" style={`width:${size}px;height:${size}px;font-size:${Math.round(size * 0.66)}px`} aria-hidden="true">{letter}</span>
 {/if}
 
 <style>
