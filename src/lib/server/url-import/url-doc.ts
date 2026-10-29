@@ -46,11 +46,15 @@ function countOf(doc: MotionDoc): ComponentCount {
   return { components: mains.size, instances: uses - mains.size };
 }
 
-export function urlPlan(tree: PageTree, newId: () => string): UrlPlan | null {
+export type Marker = (root: RestNode) => RestNode;
+
+const REPEATED: Marker = (root) => repeatedOf(root).root;
+
+export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED): UrlPlan | null {
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
   const images = refsOf(tree.root);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
-  const root = mapped({ ...repeatedOf(tree.root).root, name }, keyOf);
+  const root = mapped({ ...mark(tree.root), name }, keyOf);
   const plan = planOf(restMessage([root], FILE_KEY), newId);
   return plan ? { plan: { ...plan, items: plan.items.map((item) => ({ ...item, name })) }, images, name, components: countOf(plan.items[0].doc) } : null;
 }
