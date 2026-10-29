@@ -5,7 +5,7 @@
   import Upload from '@lucide/svelte/icons/upload';
   import Cloud from '@lucide/svelte/icons/cloud';
   import Frame from '@lucide/svelte/icons/frame';
-  import Globe from '@lucide/svelte/icons/globe';
+  import Link from '@lucide/svelte/icons/link';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
@@ -221,7 +221,7 @@
       { id: 'upload', label: 'Upload file', icon: Upload, run: pickFile },
       ...optional({ id: 'cloud', label: 'Import from Drive or Dropbox', icon: Cloud, run: () => oncloud?.() }, oncloud),
       ...optional({ id: 'figma', label: 'Import from Figma', icon: Frame, run: () => onfigma?.() }, onfigma),
-      ...optional({ id: 'url', label: 'From URL…', icon: Globe, run: () => onurl?.() }, onurl)
+      ...optional({ id: 'url', label: 'From URL…', icon: Link, run: () => onurl?.() }, onurl)
     ],
     [InsertSection.Templates]: () => [
       ...optional({ id: 'templates', label: 'Templates', icon: LayoutTemplate, run: () => (showTemplates = true) }, ontemplate),
