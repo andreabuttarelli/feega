@@ -18,6 +18,10 @@ export function viewOf(id: string): { nodeId: string; breakpointId: string } | n
   return { nodeId: id.slice(0, at), breakpointId: id.slice(at + SEPARATOR.length) };
 }
 
+export const baseNodeId = (id: string) => viewOf(id)?.nodeId ?? id;
+
+export const withoutViews = <T extends { id: string }>(frames: readonly T[]): T[] => frames.filter((f) => !viewOf(f.id));
+
 function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
   const scale = frame.box.w / doc.width;
   let x = frame.box.x + frame.box.w + VIEW_GAP;
