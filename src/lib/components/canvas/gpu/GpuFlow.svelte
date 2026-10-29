@@ -90,8 +90,8 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
-  import { EditMode, startMode, timelineShown } from '$lib/motion/edit-mode';
-  import { CanvasLines, ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { EditMode, startMode } from '$lib/motion/edit-mode';
+  import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
   import { elementKey } from '$lib/canvas/prototype-arrows';
   import type { PrototypeLink } from '$lib/motion/prototype/links';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
@@ -1461,9 +1461,15 @@
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
     const mode = nodeId && live ? frameMode(live.doc) : EditMode.Design;
-    const shown = nodeId ? timelineShown(frameChrome(kindOfNode(nodeId)).timeline, mode) : false;
-    return nodeId && live && shown ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
+    const access = nodeId ? frameTimeline(editorMode.timeline, frameChrome(kindOfNode(nodeId)).timeline, mode) : TimelineAccess.Hidden;
+    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: live.doc, frame: frameOfLive(live), access } : null;
   });
+
+  const TIMELINE_CHANGE: Record<TimelineAccess, (nodeId: string) => (doc: LiveDoc['doc'], summary: string) => void> = {
+    [TimelineAccess.Hidden]: () => () => {},
+    [TimelineAccess.Scrub]: () => () => {},
+    [TimelineAccess.Edit]: (nodeId) => (doc, summary) => commit(nodeId, { ok: true, doc }, summary)
+  };
 
   function selectionMarks(nodeId: string) {
     const at = inside?.nodeId === nodeId ? editPickerOf(nodeId) : null;
@@ -2559,6 +2565,7 @@
     stack: () => placeTiles(stackTiles(placedBoxes(selected), STACK_GAP)),
     'edit-mode': () => editorMode.toggleMotion(),
     'code-mode': () => editorMode.toggleCode(),
+    timeline: () => editorMode.toggleTimeline(),
     enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
@@ -3046,7 +3053,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} onpointermove={(e) => (pointer = { x: e.clientX, y: e.clientY })} oncopy={(e) => onCopy(e, false)} oncut={(e) => onCopy(e, true)} onpaste={onPasteEvent} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondragleave={onDragLeave} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" class:commenting={props.commenting} onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondragleave={onDragLeave} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={CORE} data-mode-chrome={editorMode.spec.chrome} data-timeline={timeline?.access ?? TimelineAccess.Hidden} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   {#if timeline}
     {@const nodeId = timeline.nodeId}
     <div style="display: contents" role="presentation" onpointerdown={(e) => e.stopPropagation()} onwheel={(e) => e.stopPropagation()}>
@@ -3065,7 +3072,7 @@
         onram={() => cacheRam(nodeId, timeline!.doc)}
         {assetUrl}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
-        onchange={(doc, summary) => commit(nodeId, { ok: true, doc }, summary)}
+        onchange={TIMELINE_CHANGE[timeline.access](nodeId)}
       />
     </div>
   {/if}
@@ -3426,6 +3433,15 @@
     height: 100%;
     overflow: clip;
     background: var(--ui-canvas);
+  }
+
+  .wrap[data-mode-chrome='recording']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--ui-recording);
+    pointer-events: none;
+    z-index: 40;
   }
 
   .surface {

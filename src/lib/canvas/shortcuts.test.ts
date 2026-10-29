@@ -336,6 +336,10 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('a'))).toBeNull();
   });
 
+  it('⌘J shows or hides the timeline', () => {
+    expect(matchCanvasShortcut(ev('j', { metaKey: true }))).toEqual({ id: 'timeline' });
+  });
+
   it('E switches between Design and Motion', () => {
     expect(matchCanvasShortcut(ev('e'))).toEqual({ id: 'edit-mode' });
     expect(matchCanvasShortcut(ev('e', { metaKey: true }))).toBeNull();

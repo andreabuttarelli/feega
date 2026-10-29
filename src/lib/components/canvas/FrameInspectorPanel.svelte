@@ -104,7 +104,7 @@
     {/if}
   </aside>
 {:else if session && doc && tokens && !session.selection.length}
-  <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
+  <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />
@@ -117,7 +117,7 @@
     <VariablesLibrarySection {doc} onchange={editGuides} />
   </aside>
 {:else if session && doc && tokens && shown}
-  <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
+  <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
@@ -139,6 +139,10 @@
 {/if}
 
 <style>
+  .frame-inspector[data-mode-chrome='recording'] {
+    box-shadow: inset 2px 0 0 var(--ui-recording);
+  }
+
   .frame-inspector {
     display: flex;
     flex-direction: column;

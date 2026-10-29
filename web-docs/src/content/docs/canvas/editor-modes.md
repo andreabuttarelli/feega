@@ -9,8 +9,8 @@ The switch at the left of the bottom bar sets one mode for the whole editor. Fee
 
 | Mode | What it does | Key |
 |---|---|---|
-| **Design** | Edits set the resting state of a layer. Editing an animated property shifts its whole animation. | `E` toggles with Motion |
-| **Motion** | Edits create or move a keyframe at the playhead. The timeline opens on video frames. | `E` |
+| **Design** | Edits set the resting state of a layer. Editing an animated property shifts its whole animation, curve shape kept, with a notice. `⌘J` opens the timeline to scrub, read-only. | `E` toggles with Motion |
+| **Motion** | Recording: a red border marks the canvas and the properties bar. Edits create or move a keyframe at the playhead; the ◇ next to a property toggles its keyframe. The timeline opens on video frames; `⌘J` hides it. | `E` |
 | **Play** | Connect and try: [prototype links](/canvas/prototype-links/) drawn as arrows, node lines hidden. The right panel holds the link, Prototype flow (Play, Copy play link), Play on canvas and Interactive. | — |
 | **Code** | Read a layer as CSS or Tailwind, export the frame as React, HTML or Svelte. Nothing can be edited. See [Code mode](/canvas/dev-mode/). | `Shift+D` |
 
