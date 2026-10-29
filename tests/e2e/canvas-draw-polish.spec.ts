@@ -35,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('draw polish inside a frame @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
-  async function open({ page, session, admin, seedNode }: { page: Page; session: { orgId: string; userId: string; projectId: string; canvasId: string }; admin: import('@supabase/supabase-js').SupabaseClient; seedNode: (n: Record<string, unknown>) => Promise<{ id: string }> }) {
+  async function open({ page, session, admin, seedNode }: { page: Page; session: { orgId: string; userId: string; projectId: string; canvasId: string }; admin: import('@supabase/supabase-js').SupabaseClient; seedNode: (n: { type: string } & Record<string, unknown>) => Promise<{ id: string }> }) {
     const node = await seedNode({ type: 'motion', x: 80, y: 80, data: PORTRAIT });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: poster, actor_kind: 'user', actor_id: session.userId });
     expect(error).toBeNull();

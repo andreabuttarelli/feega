@@ -1,7 +1,7 @@
 import { expect, gotoHydrated } from './session';
 import type { Page } from '@playwright/test';
 
-type Seed = (node: { type: string; x: number; y: number; data: object }) => Promise<{ id: string }>;
+type Seed = (node: { type: string; x: number; y: number; data: Record<string, unknown> }) => Promise<{ id: string }>;
 type Admin = { from: (table: string) => { insert: (row: object) => PromiseLike<{ error: unknown }> } };
 type Session = { orgId: string; userId: string; projectId: string; canvasId: string };
 

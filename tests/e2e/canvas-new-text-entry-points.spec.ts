@@ -93,7 +93,7 @@ async function expectAutoWidth(page: Page, admin: SupabaseClient, session: E2eSe
   }
 }
 
-async function openFrame(page: Page, admin: SupabaseClient, session: E2eSession, seedNode: (n: Record<string, unknown>) => Promise<{ id: string }>) {
+async function openFrame(page: Page, admin: SupabaseClient, session: E2eSession, seedNode: (n: { type: string } & Record<string, unknown>) => Promise<{ id: string }>) {
   const frame = await seedNode({ type: 'motion', x: 80, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
   const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc: blankFrame, actor_kind: 'user', actor_id: session.userId });
   expect(error).toBeNull();

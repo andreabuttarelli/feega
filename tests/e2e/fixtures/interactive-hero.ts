@@ -1,6 +1,6 @@
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { addClip, setCanvas, setKeyframes, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, setCanvas, setKeyframes, setProps, setTransform, type NewClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setExpression } from '@feega/motion-core/motion/expression/ops';
 import { Ease } from '@feega/motion-core/motion/design';
 import { PlayMode } from '@feega/motion-core/motion/interactive/settings';
@@ -26,7 +26,7 @@ const must = (r: OpResult): MotionDoc => {
 
 type Step = (doc: MotionDoc) => MotionDoc;
 
-const clip = (id: string, component: string, props: Record<string, unknown>, transform: Record<string, number> = {}): Step => (doc) => {
+const clip = (id: string, component: NewClip['component'], props: Record<string, unknown>, transform: Record<string, number> = {}): Step => (doc) => {
   const added = must(addClip(doc, { component, from: 0, durationInFrames: HERO_FRAMES, props }, id));
   return Object.keys(transform).length ? must(setTransform(added, id, transform)) : added;
 };
