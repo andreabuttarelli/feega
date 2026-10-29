@@ -20,21 +20,3 @@ export function overridden(tracks: MotionTrack[], host: MotionClip, main?: Motio
   const merged = (c: MotionClip) => ({ ...propertyOverride(main, values, c), ...overrides?.[c.id] });
   return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (Object.keys(merged(c)).length ? withOverride(c, merged(c)) : c)) }));
 }
-
-const handedOn = (clip: MotionClip, overrides: Overrides): MotionClip =>
-  clip.component === 'Precomp' ? { ...clip, props: { ...clip.props, overrides: { ...overrides, ...(clip.props.overrides as Overrides | undefined) } } } : clip;
-
-export function overriddenDeep(tracks: MotionTrack[], host: MotionClip, main?: MotionComp['component']): MotionTrack[] {
-  const own = overridden(tracks, host, main);
-  const overrides = host.props.overrides as Overrides | undefined;
-  if (!overrides) {
-    return own;
-  }
-  return own.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => handedOn(c, overrides)) }));
-}
-
-export function nestedOnly(overrides: Overrides, top: readonly MotionClip[]): Overrides | undefined {
-  const ids = new Set(top.map((c) => c.id));
-  const kept = Object.entries(overrides).filter(([id]) => !ids.has(id));
-  return kept.length ? Object.fromEntries(kept) : undefined;
-}

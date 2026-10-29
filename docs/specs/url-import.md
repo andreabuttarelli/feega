@@ -52,12 +52,12 @@ Fonts not in the Google Fonts catalogue fall back to Inter.
 - Occurrences become `INSTANCE` nodes whose `componentId` is the first copy; that copy is the main, placed
   where it was. Names from a rule table (logo, button, nav link, link, list item, card, feature card).
 - Figma scene: an instance builds its own layers at the main's position and diffs them with the main
-  (`instance-diff.ts`). Differences on any clip, nested groups included, become overrides (text, fills,
-  geometry, auto layout, layout item); images that differ become per-instance image slots. A different
-  layer count leaves the copy unlinked. An instance that draws its own layers links even when its size
+  (`instance-diff.ts`). Differences on any clip become overrides (text, fills, geometry, auto layout,
+  layout item); inside nested groups they are path overrides. Images that differ on top-level clips
+  become per-instance image slots. A different layer count, or a different image inside a nested group,
+  leaves the copy unlinked. An instance that draws its own layers links even when its size
   differs from the main.
-- Rendering: an instance with overrides is laid out again after they apply (`instanceTracks`), overrides
-  reach clips inside nested groups, a group's size in a flow is the size of what it shows (instances
+- Rendering: an instance with overrides is laid out again after they apply (`instanceTracks`), a group's size in a flow is the size of what it shows (instances
   included), and a frame without auto layout inside a flow keeps its box as an invisible background.
 
 ## Not in the MVP

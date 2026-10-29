@@ -1,7 +1,7 @@
 import type { MotionClip, MotionComp, MotionDoc, MotionTrack } from '../doc';
 import type { Box } from '../layout';
 import { pivotBox, type Size } from '../parent';
-import { overriddenDeep } from '../instance-overrides';
+import { overridden } from '../instance-overrides';
 import type { ShapeKind } from '../shape/schema';
 import { StrokeAlign, sidesShown, strokesOf } from '../stroke/model';
 import { Sizing, layoutTree, type Item, type Padding } from './auto-layout';
@@ -56,7 +56,7 @@ function instanceContent(doc: MotionDoc, size: Size, measure: TextMeasure): Cont
 }
 
 export function instanceTracks(doc: MotionDoc, host: MotionClip, comp: MotionComp, size: Size, measure: TextMeasure = estimatedText): MotionTrack[] {
-  const tracks = overriddenDeep(comp.tracks, host, comp.component);
+  const tracks = overridden(comp.tracks, host, comp.component);
   if (tracks === comp.tracks) {
     return tracks;
   }
