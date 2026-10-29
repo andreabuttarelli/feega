@@ -34,7 +34,8 @@
 
   const shown = $derived(resolveColor(value || undefined, tokens));
   const base = $derived(HEX.test(shown) ? shown.slice(0, 7).toLowerCase() : FALLBACK);
-  const level = $derived(alpha ?? 1);
+  let heldLevel = $state<number | null>(null);
+  const level = $derived(heldLevel ?? alpha ?? 1);
 
   let format = $state(ColourFormat.Hex);
   let hsb = $state<Hsb>({ h: 0, s: 0, b: 0 });
@@ -42,9 +43,10 @@
   let dropper = $state<EyeDropperCtor | null>(null);
   let queued: (() => void) | null = null;
   let frame = 0;
+  let dragging = false;
 
   $effect(() => {
-    if (hexOfHsb(hsb) !== base) {
+    if (!dragging && hexOfHsb(hsb) !== base) {
       hsb = hsbOfHex(base);
     }
   });
@@ -85,6 +87,7 @@
   }
 
   function setLevel(next: number) {
+    heldLevel = next;
     schedule(() => onchange(base, next));
   }
 
@@ -93,6 +96,7 @@
     const track = { rect: el.getBoundingClientRect() };
     const at = (m: PointerEvent) => move(unitAt(m.clientX - track.rect.left, track.rect.width), unitAt(m.clientY - track.rect.top, track.rect.height), track);
     el.setPointerCapture(e.pointerId);
+    dragging = true;
     gesture?.begin();
     at(e);
     const onmove = (m: PointerEvent) => at(m);
@@ -101,6 +105,8 @@
       cancelAnimationFrame(frame);
       flush();
       recent = remember(recent, hexOfHsb(hsb), localStore());
+      dragging = false;
+      heldLevel = null;
       gesture?.release();
     };
     el.addEventListener('pointermove', onmove);
@@ -217,6 +223,7 @@
     return { destroy: () => node.removeEventListener('mousedown', hold) };
   }
 
+  const live = $derived(hexOfHsb(hsb));
   const pure = $derived(hexOfHsb({ h: hsb.h, s: HUNDRED, b: HUNDRED }));
   const rows = $derived(
     [
@@ -240,7 +247,7 @@
     onpointerdown={dragSquare}
     onkeydown={keySquare}
   >
-    <span class="thumb" style={`left: ${hsb.s}%; top: ${HUNDRED - hsb.b}%; --c: ${base};`}></span>
+    <span class="thumb" style={`left: ${hsb.s}%; top: ${HUNDRED - hsb.b}%; --c: ${live};`}></span>
   </div>
 
   <div class="sliders">
@@ -250,8 +257,8 @@
         <span class="thumb small" style={`left: ${(hsb.h / TURN) * HUNDRED}%; --c: ${pure};`}></span>
       </div>
       {#if alpha !== null}
-        <div class="track level" role="slider" tabindex="0" aria-label="Opacity" aria-valuemin="0" aria-valuemax={HUNDRED} aria-valuenow={percentOfAlpha(level)} data-testid="colour-alpha" style={`--c: ${base};`} onpointerdown={dragLevel} onkeydown={keyLevel}>
-          <span class="thumb small" style={`left: ${level * HUNDRED}%; --c: ${base};`}></span>
+        <div class="track level" role="slider" tabindex="0" aria-label="Opacity" aria-valuemin="0" aria-valuemax={HUNDRED} aria-valuenow={percentOfAlpha(level)} data-testid="colour-alpha" style={`--c: ${live};`} onpointerdown={dragLevel} onkeydown={keyLevel}>
+          <span class="thumb small" style={`left: ${level * HUNDRED}%; --c: ${live};`}></span>
         </div>
       {/if}
     </div>
