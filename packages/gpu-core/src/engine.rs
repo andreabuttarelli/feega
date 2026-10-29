@@ -11,11 +11,13 @@ use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
 use crate::layers::{prepare, Blending, Surface};
 use crate::pictures::Pictures;
 use crate::scene::{build, Placed};
+use crate::texture_budget::{bytes_of, over_cap};
 use crate::Skipped;
 
 const KEPT_LAYERS: usize = 32;
 const SPARE_TEXTURES: usize = 4;
 const KEPT_FRAMES: u64 = 240;
+const LAYER_BYTES: u64 = 32 * 1024 * 1024;
 const KEYED_POINTS_MAX: usize = 1000;
 const OFF_TARGET: Rect = Rect::new(-2.0, -2.0, -1.0, -1.0);
 
@@ -26,10 +28,16 @@ struct Cached {
     used: u64,
 }
 
-#[derive(Default)]
 struct LayerCache {
     entries: HashMap<String, Cached>,
     tick: u64,
+    cap: u64,
+}
+
+impl Default for LayerCache {
+    fn default() -> Self {
+        LayerCache { entries: HashMap::new(), tick: 0, cap: LAYER_BYTES }
+    }
 }
 
 impl LayerCache {
@@ -47,6 +55,8 @@ impl LayerCache {
             let excess = rest.len() - KEPT_LAYERS;
             stale.extend(rest.into_iter().take(excess).map(|(k, _)| k.clone()));
         }
+        let rest: Vec<(String, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
+        stale.extend(over_cap(&rest, self.cap));
         for key in stale {
             if let Some(gone) = self.entries.remove(&key) {
                 vello.unregister_texture(gone.image);
@@ -219,6 +229,11 @@ impl Engine {
         Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new() })
     }
 
+    pub fn set_budget(&mut self, pool: u64, layers: u64) {
+        self.filters.set_pool_bytes(pool);
+        self.cache.cap = layers;
+    }
+
     pub fn cached_layers(&self) -> usize {
         self.cache.entries.len()
     }
@@ -259,6 +274,11 @@ impl Engine {
         if self.spare.len() > SPARE_TEXTURES {
             self.spare.remove(0).destroy();
         }
+    }
+
+    pub fn scratch_bytes(&self) -> u64 {
+        let layers: u64 = self.cache.entries.values().map(|c| bytes_of((c._texture.width(), c._texture.height()))).sum();
+        self.filters.pooled_bytes() + layers + self.spare_bytes()
     }
 
     pub fn spare_bytes(&self) -> u64 {

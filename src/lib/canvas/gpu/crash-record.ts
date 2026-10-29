@@ -11,6 +11,7 @@ export type CrashSample = {
   submits: number;
   gpuLagMs: number;
   cacheBytes: number;
+  scratchBytes: number;
   pictureBytes: number;
   wasmBytes: number;
   zoom: number;
@@ -27,7 +28,9 @@ const RECORD_KEY = 'feega:canvas-crash-record';
 const OPEN_KEY = 'feega:canvas-open';
 const OPEN = '1';
 
-export const blankSample = (): CrashSample => ({ device: '', dpr: 0, resolution: 0, canvas: '', textureBytes: 0, textures: 0, texturesCreated: 0, submits: 0, gpuLagMs: 0, cacheBytes: 0, pictureBytes: 0, wasmBytes: 0, zoom: 0, zoomPerSecond: 0, panPerSecond: 0, gestureFrames: 0, rasterZoom: 0, at: 0 });
+export const blankSample = (): CrashSample => ({ device: '', dpr: 0, resolution: 0, canvas: '', textureBytes: 0, textures: 0, texturesCreated: 0, submits: 0, gpuLagMs: 0, cacheBytes: 0, scratchBytes: 0, pictureBytes: 0, wasmBytes: 0, zoom: 0, zoomPerSecond: 0, panPerSecond: 0, gestureFrames: 0, rasterZoom: 0, at: 0 });
+
+export const wasInGesture = (record: CrashSample): boolean => record.gestureFrames > 0;
 
 function quietly<T>(run: () => T, fallback: T): T {
   try {

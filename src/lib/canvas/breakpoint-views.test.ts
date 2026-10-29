@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { landingDoc } from '@feega/motion-core/motion/codegen/fixtures/landing';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { breakpointViews, VIEW_GAP, viewAt, viewOf } from './breakpoint-views';
 
@@ -15,6 +16,15 @@ describe('breakpoint views on the canvas', () => {
       ['ph', { x: 100 + 720 + VIEW_GAP + 405 + VIEW_GAP, y: 50, w: 195, h: 450 }]
     ]);
     expect(views[0].frame.revision).toBe(4);
+  });
+
+  it('a view is as tall as the page it shows at that width', () => {
+    const page = landingDoc();
+    const [tablet, phone] = breakpointViews([{ ...frame, box: { x: 0, y: 0, w: 720, h: 2240 } }], () => page);
+
+    expect(phone.frame.box.h).toBeCloseTo(phone.doc.height / 2);
+    expect(phone.doc.height).toBeGreaterThan(page.height);
+    expect(tablet.doc.width).toBe(810);
   });
 
   it('a frame without breakpoints has no views', () => {

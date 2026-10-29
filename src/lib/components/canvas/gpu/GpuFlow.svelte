@@ -1,6 +1,6 @@
 <script lang="ts">
   import { breakpointViews, viewAt } from '$lib/canvas/breakpoint-views';
-  import { BASE_BREAKPOINT, resolveAt } from '@feega/motion-core/motion/breakpoints/model';
+  import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
   import { cardRadiusOf } from '$lib/canvas/core/gen-card';
   import { LocalOff, isOff } from '$lib/local-user';
@@ -991,7 +991,7 @@
   }).concat(bpViews.map((v) => v.frame)));
   const viewLives = $derived(new Map(bpViews.flatMap((v) => {
     const live = liveOf(v.nodeId);
-    return live ? [[v.frame.id, { ...live, doc: resolveAt(live.doc, v.breakpointId) }] as const] : [];
+    return live ? [[v.frame.id, { ...live, doc: v.doc }] as const] : [];
   })));
   const viewOverlays = $derived(bpViews.map((v) => ({ id: v.frame.id, ...v.frame.box, rotation: 0, bar: 0, doc: { width: v.frame.box.w, height: v.frame.box.h } })));
   const viewLabels = $derived(new Map(bpViews.map((v) => [v.frame.id, `${v.name} ${v.width}`])));

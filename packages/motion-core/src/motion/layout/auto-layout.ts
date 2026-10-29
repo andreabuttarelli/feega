@@ -168,6 +168,17 @@ function lines<T>(items: T[], size: (item: T) => number, room: number, gap: numb
   return out;
 }
 
+function fitted(k: Item, flow: Flow, room: number | undefined): Partial<Size> {
+  const { cross: c } = AXES[flow.direction];
+  if (room === undefined || flow.wrap) {
+    return {};
+  }
+  if (k.sizing[c] === Sizing.Fill) {
+    return { [c]: clamp(k, c, room) };
+  }
+  return c === 'width' && measure(k).width > room ? { width: clamp(k, 'width', room) } : {};
+}
+
 function hugCross(item: Item, flow: Flow, main: number): number {
   const { main: m, cross: c } = AXES[flow.direction];
   const kids = flowing(item);
@@ -185,8 +196,8 @@ function hugCross(item: Item, flow: Flow, main: number): number {
 function hugMain(item: Item, flow: Flow, cross?: number): number {
   const { main: m, cross: c } = AXES[flow.direction];
   const kids = flowing(item);
-  const given = (k: Item): Partial<Size> => (cross !== undefined && !flow.wrap && k.sizing[c] === Sizing.Fill ? { [c]: clamp(k, c, cross - PAD[c](flow.padding)) } : {});
-  return sum(kids.map((k) => measure(k, given(k))[m])) + gaps(kids.length, flow.gap) + PAD[m](flow.padding);
+  const room = cross === undefined ? undefined : cross - PAD[c](flow.padding);
+  return sum(kids.map((k) => measure(k, fitted(k, flow, room))[m])) + gaps(kids.length, flow.gap) + PAD[m](flow.padding);
 }
 
 const columnsOf = (flow: Flow) => Math.max(1, Math.round(flow.columns ?? DEFAULT_COLUMNS));
@@ -399,13 +410,13 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
     return;
   }
   const kids = flowing(item);
-  const stretched = (k: Item) => k.sizing[c] === Sizing.Fill && !flow.wrap;
-  const natural = new Map(kids.map((k) => [k, measure(k, stretched(k) ? { [c]: inner[c] } : {})[m]]));
+  const given = new Map(kids.map((k) => [k, fitted(k, flow, inner[c])]));
+  const natural = new Map(kids.map((k) => [k, measure(k, given.get(k))[m]]));
   const rows = flow.wrap ? lines(kids, (k) => natural.get(k)!, inner[m], flow.gap) : [kids];
   const stripes = rows.map((row) => {
     const room = inner[m] - gaps(row.length, flow.gap);
     const mains = grow(row, row.map((k) => natural.get(k)!), room, m);
-    const crossOf = (k: Item, i: number) => measure(k, { [m]: mains[i] })[c];
+    const crossOf = (k: Item, i: number) => measure(k, { ...given.get(k), [m]: mains[i] })[c];
     const lineCross = flow.wrap ? Math.max(...row.map(crossOf)) : inner[c];
     const crosses = row.map((k, i) => (k.sizing[c] === Sizing.Fill ? clamp(k, c, lineCross) : crossOf(k, i)));
     return { row, mains, lineCross, crosses };

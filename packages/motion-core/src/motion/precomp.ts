@@ -10,7 +10,7 @@ import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './
 import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
 import { facesOf, screenCompOf, screenHostId } from './device-screen';
 import type { Device } from './devices';
-import { propertyOverride, type PropertyValues } from './property-resolve';
+import { overridden } from './instance-overrides';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
@@ -18,6 +18,7 @@ export type GroupProps = { span?: number };
 export const MAX_COMP_DEPTH = 8;
 const MAX_LOOPS = 600;
 export const SEPARATOR = '__';
+export { CLIP_LEVEL_OVERRIDES, overridden, withOverride } from './instance-overrides';
 const STILL = { kind: TransitionKind.None, durationInFrames: 0 };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
@@ -140,26 +141,6 @@ function placed(host: MotionClip, comp: MotionComp, tracks: MotionTrack[]): Moti
   const laid = w.loops.flatMap((k) => tracks.map((t) => loopTrack(t, k)));
   const present = new Set(laid.flatMap((t) => t.clips.map((c) => c.id)));
   return laid.map((t) => ({ ...t, clips: t.clips.map((c) => (c.parent && c.parent !== host.id && !present.has(c.parent) ? { ...c, parent: null } : c)) }));
-}
-
-type Overrides = Record<string, Record<string, unknown>>;
-
-export const CLIP_LEVEL_OVERRIDES = ['hidden', 'effects', 'transform'] as const;
-
-export function withOverride(clip: MotionClip, override: Record<string, unknown>): MotionClip {
-  const level = Object.fromEntries(CLIP_LEVEL_OVERRIDES.filter((k) => k in override).map((k) => [k, override[k]]));
-  const props = Object.fromEntries(Object.entries(override).filter(([k]) => !(CLIP_LEVEL_OVERRIDES as readonly string[]).includes(k)));
-  return { ...clip, ...level, props: { ...clip.props, ...props } };
-}
-
-export function overridden(tracks: MotionTrack[], host: MotionClip, main?: MotionComp['component']): MotionTrack[] {
-  const overrides = host.props.overrides as Overrides | undefined;
-  const values = host.props.propValues as PropertyValues | undefined;
-  if (!overrides && !main?.properties) {
-    return tracks;
-  }
-  const merged = (c: MotionClip) => ({ ...propertyOverride(main, values, c), ...overrides?.[c.id] });
-  return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (Object.keys(merged(c)).length ? withOverride(c, merged(c)) : c)) }));
 }
 
 type Expander = (doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number) => MotionTrack[];
