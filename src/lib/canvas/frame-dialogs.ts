@@ -1,6 +1,7 @@
+import { EditorMode } from './editor-mode.svelte';
+
 export enum FrameDialog {
   Export = 'export',
-  Code = 'code',
   Voice = 'voice',
   Music = 'music',
   Interactive = 'interactive',
@@ -14,7 +15,6 @@ export enum FrameDialog {
 }
 
 export const FRAME_DIALOG_ACTIONS = {
-  'frame-code': FrameDialog.Code,
   'frame-voice': FrameDialog.Voice,
   'frame-music': FrameDialog.Music,
   'frame-interactive': FrameDialog.Interactive,
@@ -30,3 +30,13 @@ export const FRAME_DIALOG_ACTIONS = {
 export type FrameDialogActionId = keyof typeof FRAME_DIALOG_ACTIONS;
 
 export const isFrameDialogAction = (id: string): id is FrameDialogActionId => id in FRAME_DIALOG_ACTIONS;
+
+export const FRAME_MODE_ACTIONS = {
+  'frame-code': EditorMode.Code
+} as const;
+
+export type FrameModeActionId = keyof typeof FRAME_MODE_ACTIONS;
+
+export const isFrameModeAction = (id: string): id is FrameModeActionId => id in FRAME_MODE_ACTIONS;
+
+export const isFrameAction = (id: string): boolean => isFrameDialogAction(id) || isFrameModeAction(id);

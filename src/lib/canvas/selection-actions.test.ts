@@ -131,7 +131,7 @@ describe('group and ungroup', () => {
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
     expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame']);
-    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
+    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', 'frame-code', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
 

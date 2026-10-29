@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EditMode } from '$lib/motion/edit-mode';
+import { DocAccess } from '$lib/motion/frame-edit-session.svelte';
 import { CanvasLines, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeInspector, MODES, readEditorMode } from './editor-mode.svelte';
 
 class MemoryStore {
@@ -75,5 +76,10 @@ describe('editor mode', () => {
   it('Play draws prototype arrows instead of node lines', () => {
     expect(MODES[EditorMode.Play].lines).toBe(CanvasLines.Prototype);
     expect([EditorMode.Design, EditorMode.Motion, EditorMode.Code].map((m) => MODES[m].lines)).toEqual([CanvasLines.Nodes, CanvasLines.Nodes, CanvasLines.Nodes]);
+  });
+
+  it('Code reads and exports, every other mode writes', () => {
+    expect(MODES[EditorMode.Code].access).toBe(DocAccess.Read);
+    expect([EditorMode.Design, EditorMode.Motion, EditorMode.Play].map((m) => MODES[m].access)).toEqual([DocAccess.Write, DocAccess.Write, DocAccess.Write]);
   });
 });

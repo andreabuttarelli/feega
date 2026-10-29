@@ -4,6 +4,7 @@ import Diamond from '@lucide/svelte/icons/diamond';
 import Play from '@lucide/svelte/icons/play';
 import CodeXml from '@lucide/svelte/icons/code-xml';
 import { EditMode } from '$lib/motion/edit-mode';
+import { DocAccess } from '$lib/motion/frame-edit-session.svelte';
 
 export enum EditorMode {
   Design = 'design',
@@ -29,15 +30,16 @@ type ModeSpec = {
   edit: EditMode;
   inspector: ModeInspector;
   lines: CanvasLines;
+  access: DocAccess;
   onMotionKey: EditorMode;
   onCodeKey: EditorMode;
 };
 
 export const MODES: Record<EditorMode, ModeSpec> = {
-  [EditorMode.Design]: { label: 'Design', icon: PenTool, edit: EditMode.Design, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code },
-  [EditorMode.Motion]: { label: 'Motion', icon: Diamond, edit: EditMode.Motion, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
-  [EditorMode.Play]: { label: 'Play', icon: Play, edit: EditMode.Design, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
-  [EditorMode.Code]: { label: 'Code', icon: CodeXml, edit: EditMode.Design, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design }
+  [EditorMode.Design]: { label: 'Design', icon: PenTool, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code },
+  [EditorMode.Motion]: { label: 'Motion', icon: Diamond, edit: EditMode.Motion, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
+  [EditorMode.Play]: { label: 'Play', icon: Play, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code },
+  [EditorMode.Code]: { label: 'Code', icon: CodeXml, edit: EditMode.Design, access: DocAccess.Read, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design }
 };
 
 export const EDITOR_MODE_KEY = 'feega.editor-mode';

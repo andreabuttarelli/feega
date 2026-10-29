@@ -70,7 +70,7 @@
   import { BRAND_REMIX_PROMPT } from '$lib/gallery/model';
   import { goto } from '$app/navigation';
   import { FrameExtras } from '$lib/canvas/frame-extras.svelte';
-  import { FRAME_DIALOG_ACTIONS, FrameDialog, isFrameDialogAction } from '$lib/canvas/frame-dialogs';
+  import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { Reach, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
@@ -79,7 +79,7 @@
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
-  import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
+  import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
@@ -229,6 +229,8 @@
   const tiles = $derived(props.tiles ?? []);
   const mode = $derived(props.mode ?? CanvasMode.Edit);
   const spec = $derived(CANVAS_MODES[mode]);
+  const editable = $derived(spec.flow.nodesDraggable && editorMode.spec.access === DocAccess.Write);
+  const connectable = $derived(spec.flow.nodesConnectable && editorMode.spec.access === DocAccess.Write);
 
   setTileRender(() => props.tile);
   setTileResize(() => props.onResize);
@@ -569,8 +571,8 @@
   );
 
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
-  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && spec.flow.nodesDraggable ? selectedBoxes[0] : null);
-  const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
+  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && editable ? selectedBoxes[0] : null);
+  const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && editable);
 
   $effect(() => {
     const incoming = tiles;
@@ -754,7 +756,7 @@
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
   function hitAt(w: Point): Hit {
-    const port = spec.flow.nodesConnectable ? portAt(ports, w, view.zoom) : null;
+    const port = connectable ? portAt(ports, w, view.zoom) : null;
     if (port) {
       return { kind: HitKind.Port, nodeId: port.nodeId, handle: port.handle };
     }
@@ -856,8 +858,10 @@
     if (id && deeper?.clip) {
       select([id]);
       goInside(id, Gesture.Double, deeper.clip);
-      void startTyping(id, deeper.clip);
-      startCrop(id, deeper.clip);
+      if (editable) {
+        void startTyping(id, deeper.clip);
+        startCrop(id, deeper.clip);
+      }
       return;
     }
     if (id && !target.closest('textarea, input, [contenteditable="true"]')) {
@@ -1184,6 +1188,7 @@
     const edit = editorMode.spec.edit;
     for (const session of savers.values()) {
       session.mode = startMode(session.history.present, edit);
+      session.access = editorMode.spec.access;
     }
   });
 
@@ -1215,6 +1220,7 @@
         }
       }
     );
+    session.access = editorMode.spec.access;
     savers.set(nodeId, session);
     return session;
   }
@@ -2104,7 +2110,7 @@
         suppressMenu ||= far;
       },
       [GestureKind.Drag]: (a) => {
-        if (a.kind !== GestureKind.Drag || (!far && !a.moved) || !spec.flow.nodesDraggable) {
+        if (a.kind !== GestureKind.Drag || (!far && !a.moved) || !editable) {
           return;
         }
         if (!a.moved) {
@@ -2887,6 +2893,10 @@
   };
 
   function runSelectionAction(id: SelectionActionId) {
+    if (selected.length === 1 && isFrameModeAction(id)) {
+      editorMode.set(FRAME_MODE_ACTIONS[id]);
+      return;
+    }
     if (selected.length === 1 && isFrameDialogAction(id)) {
       frameDialog = { nodeId: selected[0], dialog: FRAME_DIALOG_ACTIONS[id] };
       return;

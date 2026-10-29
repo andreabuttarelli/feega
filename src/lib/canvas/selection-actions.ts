@@ -18,7 +18,7 @@ import type { PostCompositionNode } from './post-composition';
 import { FrameKind, docKindOf, holdsDoc } from './motion-node';
 import { sourceAssetIdOf } from './image-source';
 import { Edge } from '$lib/motion/space';
-import { FRAME_DIALOG_ACTIONS, isFrameDialogAction, type FrameDialogActionId } from './frame-dialogs';
+import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, isFrameAction, type FrameDialogActionId, type FrameModeActionId } from './frame-dialogs';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
@@ -89,7 +89,8 @@ export type SelectionActionId =
   | 'combine-video'
   | 'export'
   | 'delete'
-  | FrameDialogActionId;
+  | FrameDialogActionId
+  | FrameModeActionId;
 
 export type SelectionActionGroup = 'fixed' | 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
 
@@ -211,7 +212,7 @@ const isFrame = (n: Summary) => kindOf(n) === FrameKind.Frame;
 
 const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && isFrame(summaries[0]);
 
-const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[]).map((id) => [id, isOneFrame]));
+const FRAME_DIALOG_SHOWN = Object.fromEntries([...Object.keys(FRAME_MODE_ACTIONS), ...Object.keys(FRAME_DIALOG_ACTIONS)].map((id) => [id, isOneFrame]));
 
 const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(sourceAssetIdOf(summaries[0].data));
 
@@ -244,11 +245,11 @@ export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): 
 
 export type FrameOnlyActionId = 'create-component' | 'detach-instance' | 'push-instance' | 'reset-instance' | 'hide' | 'lock' | 'copy-properties' | 'paste-properties' | 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'auto-layout' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
 
-export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId>;
+export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId | FrameModeActionId>;
 
 const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['create-component', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
 
-export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameDialogAction(id);
+export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameAction(id);
 
 const MIN_ALIGNED_TILES = 2;
 
