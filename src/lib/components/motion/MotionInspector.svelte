@@ -843,7 +843,7 @@
   {#if roundnessField}{@render radiusControl(roundnessField)}{/if}
   {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
-    {#if hasChildren}
+    {#if hasChildren || view === PropertiesView.Frame}
       <div class="line" data-prop="clipContent">
         <span class="label">Clip content</span>
         <SegmentedField name="Clip content" options={YES_NO} value={answerOf(clip.clipContent)} onchange={(v) => commit(setClipFlags(doc, clip.id, { clipContent: v === Answer.Yes }), 'Changed clip content')} />

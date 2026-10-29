@@ -1,3 +1,4 @@
+import { withSurface } from '@feega/motion-core/motion/surface';
 import { describe, expect, it } from 'vitest';
 import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -33,6 +34,12 @@ const ok = (r: ReturnType<typeof layerEdit>) => {
 };
 
 describe('layer rows', () => {
+  it('never list the frame surface: it is the frame, not a layer', () => {
+    const doc = withSurface(video(), 'surface');
+
+    expect(layerRows(NODES, { nodeId: 'm1', doc }).some((r) => r.id === 'surface')).toBe(false);
+  });
+
   it('mark a component instance so the panel draws its diamond', () => {
     const made = createComponent(video(), ['t1'], (() => {
       let n = 0;

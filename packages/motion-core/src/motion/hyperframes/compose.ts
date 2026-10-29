@@ -1,4 +1,5 @@
 import { withAutoLayout } from '../layout/resolve';
+import { clipRadii } from '../surface';
 import { withStacking } from '../layout/stacking';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
@@ -611,6 +612,12 @@ function hotScript(script: string): string {
   return script.replace('<script>', HOT_SCRIPT).replace('<script type="module">', HOT_MODULE);
 }
 
+function rootCorners(doc: MotionDoc): string {
+  const radii = clipRadii(doc);
+  const side = Math.min(doc.width, doc.height);
+  return radii ? `#root{border-radius:${radii.map((r) => pxOf(r * side)).join(' ')}}` : '';
+}
+
 function zoomed(doc: MotionDoc, scale: number): string {
   return `#root{width:${doc.width}px;height:${doc.height}px${scale === 1 ? '' : `;zoom:${scale}`}}`;
 }
@@ -773,7 +780,7 @@ export function composeHtml(raw: ComposeInput): string {
     fitScript(),
     hotRuntime(),
     fontLinks(doc, input.assets),
-    `<style>${BASE_CSS}#root{background:${esc(background)}}${zoomed(doc, scale)}${stage ? STAGE_CSS : ''}</style>`,
+    `<style>${BASE_CSS}#root{background:${esc(background)}}${rootCorners(doc)}${zoomed(doc, scale)}${stage ? STAGE_CSS : ''}</style>`,
     '</head><body>',
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${frame.width}" data-height="${frame.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     HOT_OPEN,

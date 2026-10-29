@@ -1,4 +1,5 @@
 import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { layerTracks } from '@feega/motion-core/motion/surface';
 import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
 import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feega/motion-core/motion/timeline';
 import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
@@ -106,7 +107,7 @@ function masksOf(doc: MotionDoc): { masks: Masks; masked: ReadonlySet<string> } 
 const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
 
 function trackRows(walk: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
-  return tracks.flatMap((track, index) => {
+  return layerTracks(walk.doc, tracks).flatMap((track, index) => {
     if (!groupsTrack(track, walk.mode)) {
       return track.clips.flatMap((clip) => clipRows(walk, clip, depth));
     }

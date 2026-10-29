@@ -15,9 +15,10 @@ import { renderAt } from '../effects/render';
 import { effectOfKey } from '../effects/model';
 import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linear } from './filters';
 import { BlendMode } from '../blend';
-import { MASK_KEYS } from '../mask';
+import { MASK_KEYS, MaskMode } from '../mask';
+import { clipRadii } from '../surface';
 import { mattePairs, MATTE_READ } from '../matte';
-import { maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
+import { CoverKind, maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
 import { FillType, cropOf, fillsOf, type Fill, type FillOf } from '../fill/model';
 import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
@@ -576,7 +577,18 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     unsupported.push({ clip: clip.id, component: clip.component, reason: drawn });
   }
   const background = doc.background === Background.Transparent ? null : colour('brand.background');
-  return { ...size, background, items, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+  const cut = frameCut(doc);
+  const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;
+  return { ...size, background, items: framed, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+}
+
+function frameCut(doc: MotionDoc): MaskLayer | null {
+  const radii = clipRadii(doc);
+  if (!radii) {
+    return null;
+  }
+  const contours = rectOutline(radii, { w: doc.width, h: doc.height }).map((c) => flatten(c).flatMap(([x, y]) => [x, y]));
+  return { mode: MaskMode.Add, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours, matrix: IDENTITY } };
 }
 
 const REST_WINDOW_SECONDS = 2;

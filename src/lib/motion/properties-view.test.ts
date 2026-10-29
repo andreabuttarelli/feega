@@ -23,8 +23,8 @@ describe('what Properties shows for the selection', () => {
 });
 
 describe('which sections each selection kind gets', () => {
-  it('the frame itself: only its look, layer, fill, stroke, corners and effects', () => {
-    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toEqual([Section.Layer, Section.Fill, Section.Stroke, Section.Shape, Section.Effects]);
+  it('the frame itself: layer (opacity, corners), fill, stroke and effects, never a shape kind', () => {
+    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toEqual([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
   });
 
 

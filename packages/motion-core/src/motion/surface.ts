@@ -2,8 +2,10 @@ import { TrackKind, defaultProps } from './components';
 import { Background, findClip, newClip, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import { FillType } from './fill/model';
 import { ShapeKind } from './shape/schema';
+import { cornerRadii, type Corners } from './shape/geometry';
 
 const SURFACE_NAME = 'Frame';
+const MAX_ROUNDNESS = 0.5;
 
 const surfaceProps = () => ({
   ...defaultProps('Shape'),
@@ -20,6 +22,24 @@ export function frameSurface(doc: MotionDoc): MotionClip | null {
   return doc.surface ? (findClip(doc, doc.surface)?.clip ?? null) : null;
 }
 
+export const clipsContent = (doc: MotionDoc): boolean => frameSurface(doc)?.clipContent !== false;
+
+export function clipRadii(doc: MotionDoc): Corners | null {
+  const surface = frameSurface(doc);
+  if (!surface || surface.clipContent === false) {
+    return null;
+  }
+
+  const props = surface.props as { roundness?: number; corners?: number[] };
+  const radii = cornerRadii(props.roundness ?? 0, props.corners ?? []).map((r) => Math.min(Math.max(r, 0), MAX_ROUNDNESS)) as Corners;
+
+  return radii.some((r) => r > 0) ? radii : null;
+}
+
+export const isLayer = (doc: MotionDoc, id: string): boolean => id !== doc.surface && !!findClip(doc, id);
+
+export const layerTracks = <T extends { clips: readonly { id: string }[] }>(doc: Pick<MotionDoc, 'surface'>, tracks: readonly T[]): T[] => tracks.filter((t) => !t.clips.some((c) => c.id === doc.surface));
+
 function spanned(doc: MotionDoc, id: string): MotionDoc {
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, from: 0, durationInFrames: doc.durationInFrames } : c)) })) };
 }
@@ -30,7 +50,7 @@ export function withSurface(doc: MotionDoc, id: string): MotionDoc {
     return spanned(doc, existing.id);
   }
 
-  const clip = newClip({ id, name: SURFACE_NAME, from: 0, durationInFrames: doc.durationInFrames, component: 'Shape', props: surfaceProps(), locked: true });
+  const clip = newClip({ id, name: SURFACE_NAME, from: 0, durationInFrames: doc.durationInFrames, component: 'Shape', props: surfaceProps(), locked: true, clipContent: true });
   const track: MotionTrack = { id, kind: TrackKind.Visual, name: SURFACE_NAME, clips: [clip] };
   const firstAudio = doc.tracks.findIndex((t) => t.kind === TrackKind.Audio);
   const at = firstAudio < 0 ? doc.tracks.length : firstAudio;
