@@ -1,8 +1,8 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { createConnection, createNode, listConnections, listNodes, type CanvasNodeRecord, type Connection } from '$lib/server/repos/canvas';
-import { planDuplicate, DUPLICATE_OFFSET, type DuplicatePlan, type DuplicatedNode } from '$lib/canvas/duplicate-plan';
-import { docNodeCopy, holdsDoc } from '$lib/canvas/motion-node';
+import { copyPlan, DUPLICATE_OFFSET, type DuplicatePlan } from '$lib/canvas/duplicate-plan';
+import { holdsDoc } from '$lib/canvas/motion-node';
 import { copyHead } from '$lib/server/repos/motion-revisions';
 
 /**
@@ -34,9 +34,9 @@ export async function duplicateNodes(
 
   const chosenIds = existingNodes.filter((n) => input.nodeIds.includes(n.id)).map((n) => n.id);
 
-  const plan = planDuplicate({
+  const plan = copyPlan({
     ids: chosenIds,
-    nodes: existingNodes.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.position.x, y: n.position.y })),
+    nodes: existingNodes.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.position.x, y: n.position.y, width: n.size.width, height: n.size.height })),
     edges: existingEdges.map((e) => ({
       id: e.id,
       source: e.sourceNodeId,
@@ -48,9 +48,8 @@ export async function duplicateNodes(
   });
 
   const chosen = existingNodes.filter((n) => chosenIds.includes(n.id));
-  const sized = { ...plan, nodes: plan.nodes.map((planned) => docCopy(planned, chosen[planned.sourceIndex])) };
-  const written = await writePlan(db, input, sized);
-  await Promise.all(written.nodes.map((node, i) => copiedHead(db, input, chosen[sized.nodes[i].sourceIndex], node)));
+  const written = await writePlan(db, input, plan);
+  await Promise.all(written.nodes.map((node, i) => copiedHead(db, input, chosen[plan.nodes[i].sourceIndex], node)));
   return written;
 }
 
@@ -91,13 +90,6 @@ export async function writePlan(
   }
 
   return { nodes, connections };
-}
-
-function docCopy(planned: DuplicatedNode, source: CanvasNodeRecord): DuplicatedNode {
-  if (!holdsDoc(source.type)) {
-    return planned;
-  }
-  return { ...docNodeCopy(planned), width: source.size.width ?? undefined, height: source.size.height ?? undefined };
 }
 
 async function copiedHead(db: Db, input: { orgId: string; actor?: Actor }, source: CanvasNodeRecord, copy: CanvasNodeRecord): Promise<void> {
