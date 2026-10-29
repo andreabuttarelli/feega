@@ -69,13 +69,23 @@ function ghostText({ box, doc }: Ghost): string {
   return `<text x="${box.width / 2}" y="${box.height / 2}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="${size}" fill="${String(clip?.props.color ?? GHOST_STROKE)}">${String(clip?.props.text ?? '')}</text>`;
 }
 
+function ghostLine({ wire, box }: Ghost): string {
+  if (wire.tool !== DrawTool.Line && wire.tool !== DrawTool.Arrow) {
+    return '';
+  }
+  return `<path d="M${wire.from.x - box.left} ${wire.from.y - box.top} L${wire.to.x - box.left} ${wire.to.y - box.top}" ${GHOST_PAINT}/>`;
+}
+
 const GHOST_SHAPE: Record<DrawnWire['tool'], (ghost: Ghost) => string> = {
   [DrawTool.Pen]: ({ wire, box }) => `<path d="${wire.tool === DrawTool.Pen ? wire.path : ''}" transform="translate(${-box.left} ${-box.top})" ${GHOST_PAINT}/>`,
   [DrawTool.Ellipse]: ({ box }) => `<ellipse cx="${box.width / 2}" cy="${box.height / 2}" rx="${box.width / 2}" ry="${box.height / 2}" ${GHOST_PAINT}/>`,
   [DrawTool.Rectangle]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`,
   [DrawTool.Polygon]: ({ box }) => `<polygon points="${box.width / 2},0 ${box.width},${box.height} 0,${box.height}" ${GHOST_PAINT}/>`,
   [DrawTool.Star]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`,
-  [DrawTool.Text]: ghostText
+  [DrawTool.Text]: ghostText,
+  [DrawTool.Line]: ghostLine,
+  [DrawTool.Arrow]: ghostLine,
+  [DrawTool.Frame]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`
 };
 
 function ghostSvg(ghost: Ghost): string {

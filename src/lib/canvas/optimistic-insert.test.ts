@@ -57,6 +57,12 @@ describe('a shape drawn on the canvas before the server answers', () => {
     expect(drawn?.look).toMatch(/^data:image\/svg\+xml,/);
   });
 
+  it('a line stands as the stroke that was drawn', () => {
+    const look = decodeURIComponent(drawnTile('l1', { tool: DrawTool.Line, from: { x: 0, y: 0 }, to: { x: 200, y: 80 } })?.look ?? '');
+
+    expect(look).toContain('<path');
+  });
+
   it('a text stands as its words in the ink of the canvas, not as a grey box', () => {
     const look = decodeURIComponent(drawnTile('t1', { tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 }, theme: CanvasTheme.Dark })?.look ?? '');
 
