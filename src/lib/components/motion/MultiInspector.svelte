@@ -20,9 +20,10 @@
   import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { placeBox, setPropAcross, sharedConstraint, sharedFields, type BoxPatch } from '$lib/motion/selection-props';
-  import { documentColours, isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
-  import { BRAND_COLORS, Control } from '@feega/motion-core/motion/components';
+  import { documentColours, recolour, selectionColours } from '$lib/motion/selection-colours';
+  import { Control } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
+  import ColourRow from './ColourRow.svelte';
   import NumberField from './NumberField.svelte';
 
   let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
@@ -204,17 +205,7 @@
       <section class="section ui-section" data-section="colours">
         <h3>Selection colours</h3>
         {#each colours as { colour, count } (colour)}
-          <label class="line" data-colour={colour}>
-            <span>{colour}</span>
-            <span class="count">{count}</span>
-            {#if isBrandToken(colour)}
-              <select aria-label={`Replace ${colour}`} data-testid="token-swap" value={colour} onchange={(e) => swapColour(colour, e.currentTarget.value)}>
-                {#each BRAND_COLORS as token (token)}<option value={token}>{token}</option>{/each}
-              </select>
-            {:else}
-              <ColorField name={`Replace ${colour}`} display={ColourDisplay.Chip} value={colour.slice(0, 7)} palette={() => documentColours(doc)} onchange={(v) => swapColour(colour, v)} />
-            {/if}
-          </label>
+          <ColourRow {colour} {count} palette={() => documentColours(doc)} onchange={(to) => swapColour(colour, to)} />
         {/each}
       </section>
     {/if}

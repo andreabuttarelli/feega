@@ -44,7 +44,8 @@ test.describe('selection colours with brand tokens @real', () => {
     const row = page.locator(`[data-section="colours"] [data-colour="${TOKEN}"]`);
     await expect(row).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: `${SHOTS}/p2b-colours-1-token.png` });
-    await row.getByTestId('token-swap').selectOption(SWAPPED);
+    await row.getByRole('button', { name: `Edit ${TOKEN}` }).click();
+    await page.getByTestId('colour-popover').getByRole('button', { name: 'Brand secondary' }).click();
     await page.waitForTimeout(SETTLE_MS);
     await page.screenshot({ path: `${SHOTS}/p2b-colours-2-swapped.png` });
 
