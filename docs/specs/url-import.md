@@ -44,18 +44,21 @@ Fonts not in the Google Fonts catalogue fall back to Inter.
 
 - Skeleton signature: type, auto layout direction, text size/weight, image fill presence, recursively; text,
   image src and colours ignored.
-- Candidate: FRAME/GROUP, ≥2 nodes, ≥16 px per side, painted or with image/icon, no GROUP inside an auto
-  layout, parent not in auto layout (an instance inside a flow inside a comp is drawn wrong by the
-  renderer).
+- Candidate: FRAME/GROUP, ≥2 nodes, ≥16 px per side, painted or with image/icon; inside auto layout too.
 - Same skeleton → one set; root style (fills, strokes, radius, effects, opacity) → variant
-  (`Style=Primary|Secondary|…`); within a variant copies must share the rounded size. Kept when ≥2 copies.
+  (`Style=Primary|Secondary|…`). Size is not part of the key: a copy of another size is an instance with a
+  size override. Kept when ≥2 copies.
 - Outermost wins: nothing nested inside an occurrence becomes a component.
 - Occurrences become `INSTANCE` nodes whose `componentId` is the first copy; that copy is the main, placed
   where it was. Names from a rule table (logo, button, nav link, link, list item, card, feature card).
 - Figma scene: an instance builds its own layers at the main's position and diffs them with the main
-  (`instance-diff.ts`). Differences on top-level clips become overrides (text, fills, geometry; no
-  geometry when the main has auto layout); images that differ become per-instance image slots. Anything
-  else leaves the copy unlinked.
+  (`instance-diff.ts`). Differences on any clip, nested groups included, become overrides (text, fills,
+  geometry, auto layout, layout item); images that differ become per-instance image slots. A different
+  layer count leaves the copy unlinked. An instance that draws its own layers links even when its size
+  differs from the main.
+- Rendering: an instance with overrides is laid out again after they apply (`instanceTracks`), overrides
+  reach clips inside nested groups, a group's size in a flow is the size of what it shows (instances
+  included), and a frame without auto layout inside a flow keeps its box as an invisible background.
 
 ## Not in the MVP
 
