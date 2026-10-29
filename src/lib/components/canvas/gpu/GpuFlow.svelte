@@ -77,7 +77,7 @@
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { Reach, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
-  import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
+  import { pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
@@ -963,10 +963,10 @@
     return { nodeId: frame.id, breakpointId: BASE_BREAKPOINT, clip, space, picker, frame };
   }
 
-  function hoverElement(w: Point) {
-    const hit = framePickAt(w);
-    const quad = hit?.clip ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
-    pickHover = hit?.clip && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id } : null;
+  function hoverElement(w: Point, reach: Reach) {
+    const hit = elementAt(w, reach);
+    const quad = hit ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
+    pickHover = hit && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id } : null;
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
@@ -1088,8 +1088,8 @@
     if (!hit?.clip || !doc) {
       return null;
     }
-    const clip = chainTarget(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
-    return clip ? { nodeId: hit.nodeId, breakpointId: hit.breakpointId, clip } : null;
+    const clip = pickTarget(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
+    return clip ? { ...hit, clip } : null;
   }
 
   function groupOfPick(nodeId: string): string | null {
@@ -1098,13 +1098,13 @@
   }
 
   function pickElement(e: PointerEvent, w: Point): boolean {
-    const deep = e.metaKey || e.ctrlKey;
-    const hit = e.button === 0 && !e.shiftKey && e.pointerType === 'mouse' ? elementAt(w, deep ? Reach.Deep : Reach.Top) : null;
+    const reach = reachOf(e);
+    const hit = e.button === 0 && !e.shiftKey && e.pointerType === 'mouse' ? elementAt(w, reach) : null;
     if (!hit) {
       return false;
     }
     select([hit.nodeId]);
-    goInside(hit.nodeId, deep ? Gesture.Deep : Gesture.Click, hit.clip);
+    goInside(hit.nodeId, reach === Reach.Deep ? Gesture.Deep : Gesture.Click, hit.clip);
     const saver = saverOf(hit.nodeId);
     if (saver) {
       saver.breakpoint = hit.breakpointId;
@@ -2111,7 +2111,7 @@
       hovered = e.pointerType === 'mouse' ? topNodeAt(w) : null;
       hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
       if (e.pointerType === 'mouse' && !e.buttons) {
-        hoverElement(w);
+        hoverElement(w, reachOf(e));
         hoverHandle(w);
       }
       return;

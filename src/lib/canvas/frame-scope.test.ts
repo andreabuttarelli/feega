@@ -4,7 +4,7 @@ import { addClip, setProps, setTransform, type OpResult } from '@feega/motion-co
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips, instanceOf } from '$lib/motion/main-component';
 import { Reach } from './frame-select';
-import { chainTarget, enteredFrom, parentPick, scopeOf, scoped } from './frame-scope';
+import { pickTarget, enteredFrom, parentPick, scopeOf, scoped } from './frame-scope';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -123,24 +123,24 @@ describe('scoped inside an instance', () => {
   });
 });
 
-describe('chainTarget', () => {
+describe('pickTarget', () => {
   const { doc, group, member } = grouped();
   const chain = [group, member('a')];
 
   it('a click picks the group', () => {
-    expect(chainTarget(doc, chain, [], Reach.Top)).toBe(group);
+    expect(pickTarget(doc, chain, [], Reach.Top)).toBe(group);
   });
 
   it('a deep click reaches the member inside the group', () => {
-    expect(chainTarget(doc, chain, [], Reach.Deep)).toBe(member('a'));
+    expect(pickTarget(doc, chain, [], Reach.Deep)).toBe(member('a'));
   });
 
   it('a click next to a picked member picks its sibling, not the group', () => {
-    expect(chainTarget(doc, [group, member('b')], [member('a')], Reach.Top)).toBe(member('b'));
+    expect(pickTarget(doc, [group, member('b')], [member('a')], Reach.Top)).toBe(member('b'));
   });
 
   it('picks nothing over bare frame', () => {
-    expect(chainTarget(doc, [], [], Reach.Top)).toBeNull();
+    expect(pickTarget(doc, [], [], Reach.Top)).toBeNull();
   });
 });
 

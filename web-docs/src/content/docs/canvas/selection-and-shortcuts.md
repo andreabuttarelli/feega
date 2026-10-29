@@ -12,6 +12,17 @@ sidebar:
 - Cmd/Ctrl+A selects all nodes (not while typing in a field).
 - Esc clears the selection.
 
+## Select inside a frame
+
+Picking inside a frame works like Figma, in the base frame and in every breakpoint view.
+
+- The hover outline shows exactly what a click would select.
+- A click selects the frame's top-level element under the pointer.
+- Double-click enters the selected container and selects the child under the pointer; on text it starts editing.
+- Once inside a container, hover and click pick among its children. Clicking outside it goes back up.
+- Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it.
+- Esc goes up one level.
+
 With several nodes selected, dragging one moves all, and the selection bar shows the shared properties, editable once for all.
 
 ## Properties of a frame or a multi-selection
