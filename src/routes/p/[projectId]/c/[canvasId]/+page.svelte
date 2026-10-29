@@ -117,15 +117,17 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
-  import { canvasMediaUploader, projectMedia } from '$lib/canvas/media-uploader';
+  import { canvasMediaUploader, projectMedia, storeFile } from '$lib/canvas/media-uploader';
+  import { MediaKind, kindOfFile } from '$lib/motion/media/pick';
   import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
   import { changedRaw } from '$lib/motion/template/raw-values';
   import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
-  import { OpOutcome, createOptimistic } from '$lib/canvas/optimistic-ops';
+  import { OpOutcome, createOptimistic, type OptimisticPort } from '$lib/canvas/optimistic-ops';
   import { CommentAction, commentOp, restoreThreads, runnable } from '$lib/canvas/comment-ops';
-  import { OptimisticAction, Refresh, optimisticOp, refreshOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
+  import { OptimisticAction, Refresh, optimisticOp, refreshOf, requestOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
+  import { replaySent, sentLog, type SentLog } from '$lib/canvas/sent-ops';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, CopyShown, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
@@ -1556,6 +1558,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const OFFLINE_RUN_NOTICE = 'Offline: generating needs a connection. Your edits are kept and will save when you are back.';
   const LINE_REFUSED_NOTICE = 'A line change was refused by the canvas and was undone.';
   let outbox: Outbox | null = null;
+  let sent: SentLog = sentLog([], () => {});
   const batchWrites = inFlightWrites();
   const saves = createSaveScheduler({
     send: sendSave,
@@ -1611,7 +1614,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     places.restore(opened.places);
     lines.restore(opened.ops);
+    sent = sentLog([...opened.sent, ...sent.all()], (ops) => void outbox?.save({ sent: ops }));
     keepOutbox();
+    if (opened.sent.length) {
+      await replaySent(sent, opened.sent, post);
+      void refresh();
+    }
   }
 
   $effect(() => {
@@ -1663,8 +1671,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let refreshDue = false;
 
-  const runOptimistic = createOptimistic<CanvasRows<Tile, FlowEdge>>(
-    {
+  const canvasPort: OptimisticPort<CanvasRows<Tile, FlowEdge>> = {
       read: () => ({ nodes, edges }),
       write: (rows) => { nodes = rows.nodes; edges = rows.edges; },
       reserve: holdGesture,
@@ -1680,17 +1687,20 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         }
       },
       notice: (text) => { failed = text; }
-    },
-    restoreCanvas
-  );
+    };
+
+  const runOptimistic = createOptimistic(canvasPort, restoreCanvas);
+  const runUpload = createOptimistic(canvasPort, restoreCanvas);
 
   function optimistic<K extends OptimisticAction>(action: K, input: Parameters<typeof optimisticOp<K, Tile, FlowEdge>>[1]): Promise<OpOutcome> {
     refreshDue ||= refreshOf(action) === Refresh.AfterIdle;
     const before = { nodes, edges };
+    const kept = { id: crypto.randomUUID(), ...requestOf(action, input) };
+    sent.add(kept);
     return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record), toEdge }, async (name, fields) => {
       await Promise.all([places.flush(), saves.flush()]);
       return post(name, fields);
-    }));
+    })).finally(() => sent.drop(kept.id));
   }
 
   let productsOverride = $state<Record<string, Product[]> | null>(null);
@@ -2139,6 +2149,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name}`;
+    if (!hold) {
+      await uploadOnCanvas(file, path, at);
+      return;
+    }
     const up = await supabase.storage
       .from('canvas-assets')
       .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
@@ -2147,20 +2161,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    if (hold) {
-      const size = await pictureSize(file);
-      await landed(post('upload', {
-        path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
-        drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
-      }));
-      return;
-    }
+    const size = await pictureSize(file);
+    await landed(post('upload', {
+      path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
+      drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
+    }));
+  }
 
-    const result = await post('upload', {
-      path, file_name: file.name, mime_type: file.type, bytes: file.size, x: at.x, y: at.y
-    });
-    const created = result?.node as CanvasNodeRecord | undefined;
-    if (created) { nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })]; }
+  const uploadProgress = new SvelteMap<string, number>();
+  const UPLOAD_TILE = genNodeSize('image');
+
+  async function uploadOnCanvas(file: File, path: string, at: { x: number; y: number }) {
+    const id = crypto.randomUUID();
+    const local = URL.createObjectURL(file);
+    if (kindOfFile(file.type) === MediaKind.Image) {
+      catalogPosters.set(id, local);
+    }
+    uploadProgress.set(id, 0);
+    const fields = { path, file_name: file.name, mime_type: file.type, bytes: String(file.size), x: String(at.x), y: String(at.y), node_id: id };
+    const stored = storeFile(supabase, path, file, (fraction) => uploadProgress.set(id, fraction));
+    await runUpload(optimisticOp(OptimisticAction.Upload, { record: pendingPicture(id, { x: at.x + UPLOAD_TILE.w / 2, y: at.y + UPLOAD_TILE.h / 2 }, UPLOAD_TILE), fields }, { nodes, edges }, { toTile: (record) => toTile(record), toEdge }, async (name, sent) => ((await stored) ? null : post(name, sent))));
+    uploadProgress.delete(id);
+    catalogPosters.delete(id);
+    URL.revokeObjectURL(local);
   }
 
   const RENDER_VIEW_GAP = 24;
@@ -4588,7 +4611,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
           />
         {:else if row.type === PENDING_FRAME_TYPE}
           {@const look = catalogPosters.get(id)}
-          <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
+          <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}{#if uploadProgress.has(id)}<span class="upload-progress" data-testid="upload-progress" style:width={`${Math.round((uploadProgress.get(id) ?? 0) * 100)}%`}></span>{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
           <MotionNode node={motion} href={motionNodePath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
@@ -4715,6 +4738,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+
+  .pending-frame {
+    position: relative;
+  }
+
+  .upload-progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--primary);
+    transition: width 120ms linear;
   }
 
   @keyframes pending-pulse {

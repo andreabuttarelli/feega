@@ -125,6 +125,17 @@ describe('upload action over a frame', () => {
   });
 });
 
+describe('upload action on the canvas', () => {
+  it('stores the node under the id of the tile already on screen', async () => {
+    const id = '23232323-2323-4232-8232-232323232323';
+    const input = event({ path: 'org/project/photo.png', file_name: 'photo.png', mime_type: 'image/png', bytes: '10', x: '40', y: '60', node_id: id });
+
+    await actions.upload(input as never);
+
+    expect(input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload).toMatchObject({ id, type: 'image', x: 40, y: 60 });
+  });
+});
+
 describe('a generated output placed on the empty canvas', () => {
   const asset = (type: string, width: number, height: number) => ({ id: ASSET, org_id: 'org', project_id: 'project', type, url: 'x', content: type === 'text' ? 'Hello' : null, mime_type: 'image/png', bytes: 1, width, height, duration_s: type === 'video' ? 3 : null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' });
   const placed = (input: ReturnType<typeof event>) => ({

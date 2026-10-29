@@ -38,13 +38,15 @@ export enum OptimisticAction {
   CopyFree = 'copyFree',
   InsertScene = 'insertScene',
   CombineScenes = 'combineScenes',
-  LayersToFrame = 'layersToFrame'
+  LayersToFrame = 'layersToFrame',
+  Upload = 'upload'
 }
 
 export enum Landing {
   Moved = 'moved',
   Answered = 'answered',
-  Created = 'created'
+  Created = 'created',
+  Placed = 'placed'
 }
 
 export enum Refresh {
@@ -72,6 +74,7 @@ type Inputs = {
   [OptimisticAction.InsertScene]: Carried;
   [OptimisticAction.CombineScenes]: Carried;
   [OptimisticAction.LayersToFrame]: Carried;
+  [OptimisticAction.Upload]: { record: CanvasNodeRecord; fields: Record<string, string> };
 };
 
 export type Carried = { fields: Record<string, string>; made: CanvasNodeRecord | null; gone: string | null };
@@ -156,6 +159,8 @@ function removedUndo(before: Rows, input: Inputs[OptimisticAction.Remove]): Undo
     }))
   ];
 }
+
+const placedOf = (answer: Answer): CanvasNodeRecord | null => (answer.node ?? null) as CanvasNodeRecord | null;
 
 const createdOf = (answer: Answer) => ({ nodes: (answer.nodes ?? []) as CanvasNodeRecord[], connections: (answer.connections ?? []) as Connection[] });
 
@@ -296,19 +301,34 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   [OptimisticAction.CopyFree]: carriedRow('The paste did not save and was removed.'),
   [OptimisticAction.InsertScene]: carriedRow('Inserting the scene did not save and was undone.'),
   [OptimisticAction.CombineScenes]: carriedRow('The combined video did not save and was removed.'),
-  [OptimisticAction.LayersToFrame]: carriedRow('The layers frame did not save and was removed.')
+  [OptimisticAction.LayersToFrame]: carriedRow('The layers frame did not save and was removed.'),
+  [OptimisticAction.Upload]: {
+    fields: (i) => i.fields,
+    apply: (rows, i, ctx) => ({ ...rows, nodes: [...rows.nodes, { ...ctx.toTile(i.record), select: true }] }),
+    settle: (rows, answer, ctx, i) => ({ ...rows, nodes: settled(rows.nodes, i.record.id, { ...ctx.toTile(placedOf(answer)!), select: true }) }),
+    touched: (i) => nodesOnly([i.record.id]),
+    landing: Landing.Placed,
+    undo: (answer) => createdUndo({ nodes: [placedOf(answer)] }),
+    refresh: Refresh.None,
+    notice: 'The upload did not save and was removed.'
+  }
 };
 
 const LANDED: Record<Landing, (answer: Answer) => boolean> = {
   [Landing.Moved]: (answer) => answer.outcome === MOVED_DONE,
   [Landing.Answered]: () => true,
-  [Landing.Created]: (answer) => createdOf(answer).nodes.length > 0
+  [Landing.Created]: (answer) => createdOf(answer).nodes.length > 0,
+  [Landing.Placed]: (answer) => placedOf(answer) !== null
 };
 
 export const refreshOf = (action: OptimisticAction): Refresh => REGISTRY[action].refresh;
 
 export function restoreCanvas<N extends OptTile, E extends OptEdge>(current: CanvasRows<N, E>, before: CanvasRows<N, E>, touched: Touched): CanvasRows<N, E> {
   return { nodes: restoreRows(current.nodes, before.nodes, touched.nodes), edges: restoreRows(current.edges, before.edges, touched.edges) };
+}
+
+export function requestOf<K extends OptimisticAction>(action: K, input: Inputs[K]): { action: K; fields: Record<string, string> } {
+  return { action, fields: (REGISTRY[action] as Row<Inputs[K]>).fields(input) };
 }
 
 export function optimisticOp<K extends OptimisticAction, N extends OptTile, E extends OptEdge>(
