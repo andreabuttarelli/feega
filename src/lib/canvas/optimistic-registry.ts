@@ -3,7 +3,8 @@ import type { CopyIds, Offset } from './duplicate-plan';
 import { settle as settled } from './optimistic-insert';
 import { DropOn } from '$lib/motion/move-element';
 import { SECTION_DEFAULT_FILL } from './node-data';
-import { layoutOf } from './node-layout';
+import { layoutOf, scaleGroup } from './node-layout';
+import { shownOutput } from './gen-history';
 import { cleanNodeName } from './node-name';
 import { groupedLocally, ungroupedLocally } from './optimistic-group';
 import { restoreRows, type OptimisticOp, type Touched } from './optimistic-ops';
@@ -11,7 +12,7 @@ import { SECTION_TYPE, sectionBoxAround } from './section';
 import { stackedLocally, type Stack } from './stacking';
 import type { UndoItem } from './undo-plan';
 
-export type OptTile = { id: string; type: string; displayName: string | null; x: number; y: number; w: number; h: number; data: Record<string, unknown>; version: number; select?: boolean };
+export type OptTile = { id: string; type: string; displayName: string | null; x: number; y: number; w: number; h: number; data: Record<string, unknown>; version: number; select?: boolean; userHeight?: number | null };
 export type OptEdge = { id: string; source: string; target: string; mode?: string };
 export type CanvasRows<N extends OptTile, E extends OptEdge> = { nodes: N[]; edges: E[] };
 export type RowContext<N, E = OptEdge> = { toTile: (record: CanvasNodeRecord) => N; toEdge?: (connection: Connection) => E };
@@ -28,7 +29,9 @@ export enum OptimisticAction {
   Rename = 'rename',
   EdgeMode = 'set_edge_mode',
   Remove = 'remove',
-  Duplicate = 'duplicate'
+  Duplicate = 'duplicate',
+  ScaleGroup = 'scaleGroup',
+  RestoreRun = 'restore'
 }
 
 export enum Landing {
@@ -53,6 +56,8 @@ type Inputs = {
   [OptimisticAction.EdgeMode]: { connectionId: string; mode: string };
   [OptimisticAction.Remove]: { nodeIds: string[]; edgeIds: string[] };
   [OptimisticAction.Duplicate]: { ids: string[]; copies: CanvasNodeRecord[]; copyIds: CopyIds; offset?: Offset };
+  [OptimisticAction.ScaleGroup]: { id: string; width: number; height: number };
+  [OptimisticAction.RestoreRun]: { id: string; runId: string; mediaId: string | null };
 };
 
 type Rows = CanvasRows<OptTile, OptEdge>;
@@ -94,6 +99,21 @@ function sectionRecord(id: string, picked: readonly OptTile[]): CanvasNodeRecord
 function joined<N extends OptTile>(nodes: N[], ids: readonly string[], groupId: string): N[] {
   const wanted = new Set(ids);
   return nodes.map((n) => (wanted.has(n.id) ? { ...n, data: { ...n.data, groupId } } : n));
+}
+
+const membersOf = (rows: Rows, groupId: string): string[] => rows.nodes.filter((n) => layoutOf(n.data).groupId === groupId).map((n) => n.id);
+
+function scaled<N extends OptTile>(nodes: N[], input: Inputs[OptimisticAction.ScaleGroup]): N[] {
+  const group = nodes.find((n) => n.id === input.id);
+  if (!group) {
+    return nodes;
+  }
+  const placed = (n: N) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
+  const boxes = new Map(scaleGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === input.id).map(placed), { w: input.width, h: input.height }).map((t) => [t.id, t]));
+  return nodes.map((n) => {
+    const t = boxes.get(n.id);
+    return t ? { ...n, x: t.x, y: t.y, w: t.w, h: t.h, userHeight: t.h } : n;
+  });
 }
 
 function removedUndo(before: Rows, input: Inputs[OptimisticAction.Remove]): UndoItem[] {
@@ -223,6 +243,24 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
     undo: createdUndo,
     refresh: Refresh.None,
     notice: 'The copy did not save and was removed.'
+  },
+  [OptimisticAction.ScaleGroup]: {
+    fields: (i) => ({ id: i.id, width: String(i.width), height: String(i.height) }),
+    apply: (rows, i) => ({ ...rows, nodes: scaled(rows.nodes, i) }),
+    touched: (i, rows) => nodesOnly([i.id, ...membersOf(rows, i.id)]),
+    landing: Landing.Moved,
+    undo: serverUndo,
+    refresh: Refresh.None,
+    notice: 'The group size did not save and was undone.'
+  },
+  [OptimisticAction.RestoreRun]: {
+    fields: (i) => ({ node_id: i.id, run_id: i.runId }),
+    apply: (rows, i) => ({ ...rows, nodes: rows.nodes.map((n) => (n.id === i.id && i.mediaId ? { ...n, data: shownOutput(n.data, { id: i.runId, mediaId: i.mediaId }) } : n)) }),
+    touched: (i) => nodesOnly([i.id]),
+    landing: Landing.Answered,
+    undo: noUndo,
+    refresh: Refresh.AfterIdle,
+    notice: 'Showing that version did not save and was undone.'
   }
 };
 

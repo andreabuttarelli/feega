@@ -68,6 +68,22 @@ describe('optimistic registry: every action says how it looks before the server 
     expect(shown.nodes.map((n) => [n.id, n.select ?? false])).toEqual([['a', false], ['b', false], ['a2', true]]);
   });
 
+  it('scaling a group scales its members around its corner, and pins their height', () => {
+    const rows: CanvasRows<OptTile, OptEdge> = { nodes: [{ ...tile('g'), data: { kind: 'group' } }, { ...tile('a', 50), data: { kind: 'element', groupId: 'g' }, w: 50, h: 50 }], edges: [] };
+    const op = optimisticOp(OptimisticAction.ScaleGroup, { id: 'g', width: 200, height: 200 }, rows, ctx, async () => null);
+
+    expect(op.apply(rows).nodes.map(({ id, x, w, h, userHeight }) => ({ id, x, w, h, userHeight }))).toEqual([
+      { id: 'g', x: 0, w: 200, h: 200, userHeight: 200 },
+      { id: 'a', x: 100, w: 100, h: 100, userHeight: 100 }
+    ]);
+    expect(op.touched.nodes).toEqual(['g', 'a']);
+  });
+
+  it('restoring a run shows its media on the node', () => {
+    const shown = optimisticOp(OptimisticAction.RestoreRun, { id: 'a', runId: 'r1', mediaId: 'm1' }, start(), ctx, async () => null).apply(start());
+    expect(shown.nodes[0].data).toMatchObject({ refId: 'm1', runId: 'r1' });
+  });
+
   it('delete takes nodes and wires away', () => {
     const shown = optimisticOp(OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }, start(), ctx, async () => null).apply(start());
     expect(shown).toEqual({ nodes: [tile('b', 200)], edges: [] });
@@ -84,7 +100,9 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
     [OptimisticAction.Rename, { id: 'a', name: 'x' }],
     [OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }],
     [OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }],
-    [OptimisticAction.Duplicate, duplicated]
+    [OptimisticAction.Duplicate, duplicated],
+    [OptimisticAction.ScaleGroup, { id: 'a', width: 300, height: 300 }],
+    [OptimisticAction.RestoreRun, { id: 'a', runId: 'r', mediaId: 'm' }]
   ] as const) {
     it(`${action} rolls back`, async () => {
       const t = runner(null);

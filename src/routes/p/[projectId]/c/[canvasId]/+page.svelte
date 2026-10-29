@@ -146,12 +146,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
-  import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
+  import { layoutOf, rotateGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { frameDocs } from '$lib/canvas/frame-docs';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
@@ -2704,23 +2705,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void invalidate('app:credits');
   }
 
-  /**
-   * SBLOCCARE UNA CORSA CHE NON TORNA. Ottimista come il trascinamento: subito spento sullo
-   * schermo, e scritto solo alla fine — il nodo altrimenti resterebbe «in corso» a vita quando
-   * il provider non risponde più o la scheda è stata chiusa a metà giro.
-   */
-  /** Rimettere in vetrina un giro di prima: lo decide il server, che sa quale asset è quel giro. */
   async function restore(id: string, gen: GenNodeState, runId: string) {
-    const mediaId = (runsByNode[id] ?? []).find((r) => r.id === runId)?.mediaId;
-    if (mediaId) {
-      nodes = nodes.map((node) =>
-        node.id === id
-          ? { ...node, data: shownOutput(node.data, { id: runId, mediaId }) }
-          : node
-      );
-    }
-    await post('restore', { node_id: id, run_id: runId });
-    await refresh();
+    const mediaId = (runsByNode[id] ?? []).find((r) => r.id === runId)?.mediaId ?? null;
+    await optimistic(OptimisticAction.RestoreRun, { id, runId, mediaId });
   }
 
   /**
@@ -2823,9 +2810,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   };
 
   async function sizeFrameDoc(id: string, picture: { width: number; height: number }, was: { width: number; height: number } | null = null) {
-    const open = layersSource.video;
-    if (open?.nodeId === id) {
-      open.edit(was ? fitElementToNode(keepTextSize(open.doc, was, picture), picture) : fitToNode(open.doc, picture, resizeMode), 'Resized the frame');
+    const mode = resizeMode;
+    if (frameDocs.edit(id, (doc) => (was ? fitElementToNode(keepTextSize(doc, was, picture), picture) : fitToNode(doc, picture, mode)), 'Resized the frame')) {
       return;
     }
     const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: resizeMode });
@@ -2841,13 +2827,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function resize(id: string, width: number, height: number) {
     const group = nodes.find((n) => n.id === id);
     if (group && motionOf(group)?.kind === FrameKind.Group) {
-      const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
-      const scaled = new Map(scaleGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), { w: width, h: height }).map((t) => [t.id, t]));
-      nodes = nodes.map((n) => {
-        const t = scaled.get(n.id);
-        return t ? { ...n, x: t.x, y: t.y, w: t.w, h: t.h, userHeight: t.h } : n;
-      });
-      await post('scaleGroup', { id, width: String(width), height: String(height) });
+      await optimistic(OptimisticAction.ScaleGroup, { id, width, height });
       return;
     }
     const plan = framePlan(id, width, height);
@@ -3054,30 +3034,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return line;
   }
 
-  async function connect(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null = null) {
-    if (nodes.find((n) => n.id === target)?.type !== 'motion') {
-      const line = link(source, target, kind, targetHandle, sourceHandle);
-      pushGesture({ items: [{ kind: 'edge.create', edgeId: line.id, sourceNodeId: source, targetNodeId: target }] });
-      return;
-    }
-    const res = await post('connect', {
-      source_node_id: source,
-      target_node_id: target,
-      kind,
-      ...(targetHandle ? { target_handle: targetHandle } : {}),
-      ...(sourceHandle ? { source_handle: sourceHandle } : {})
-    });
-
-    const created = (res?.connection ?? null) as Connection | null;
-    if (!created) {
-      return;
-    }
-
-    edges = [...edges.filter((edge) => edge.id !== created.id), toEdge(created)];
-    const linked = (res?.linked as { undo?: UndoItem[] } | null)?.undo ?? [];
-    pushGesture({
-      items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }, ...linked]
-    });
+  function connect(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null = null) {
+    const line = link(source, target, kind, targetHandle, sourceHandle);
+    pushGesture({ items: [{ kind: 'edge.create', edgeId: line.id, sourceNodeId: source, targetNodeId: target }] });
   }
 
   /**
