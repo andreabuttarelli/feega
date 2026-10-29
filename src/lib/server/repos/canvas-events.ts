@@ -51,8 +51,10 @@ export type CanvasEvent = {
   createdAt: string;
 };
 
-const EVENT_COLUMNS =
-  'id, org_id, canvas_id, kind, node_id, edge_id, before, after, actor_kind, actor_id, agent_key, session_id, created_at';
+const SESSIONLESS_COLUMNS = 'id, org_id, canvas_id, kind, node_id, edge_id, before, after, actor_kind, actor_id, agent_key, created_at';
+const EVENT_COLUMNS = `${SESSIONLESS_COLUMNS}, session_id`;
+const UNDEFINED_COLUMN = '42703';
+const COLUMN_MISSING = 'PGRST204';
 
 type EventRow = {
   id: number;
@@ -121,12 +123,15 @@ export async function recordEvent(db: Db, input: RecordEventInput): Promise<Canv
     ...eventActorCols(input.actor)
   };
 
-  const { data, error } = await db.from('canvas_events').insert(row).select(EVENT_COLUMNS).single();
+  const tried = await db.from('canvas_events').insert(row).select(EVENT_COLUMNS).single();
+  const { session_id: _session, ...sessionless } = row as typeof row & { session_id?: string | null };
+  const { data, error } = tried.error?.code === COLUMN_MISSING ? await db.from('canvas_events').insert({ ...sessionless, org_id: input.orgId }).select(SESSIONLESS_COLUMNS).single() : tried;
 
   if (error) {
+    console.error('canvas_events insert failed', { canvasId: input.canvasId, kind: input.kind, error });
     throw error;
   }
-  return toEvent(data as EventRow);
+  return toEvent(data as unknown as EventRow);
 }
 
 /** L'attività recente di una tela, più recente prima — la fonte di un pannello "cosa è successo qui". */
@@ -134,15 +139,17 @@ export async function listCanvasEvents(
   db: Db,
   scope: { orgId: string; canvasId: string; limit?: number; sinceId?: number }
 ): Promise<CanvasEvent[]> {
-  const query = db.from('canvas_events').select(EVENT_COLUMNS).eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId);
-  const { data, error } = await (scope.sinceId === undefined ? query : query.gte('id', scope.sinceId))
-    .order('id', { ascending: false })
-    .limit(scope.limit ?? 200);
+  const events = (columns: string) => {
+    const query = db.from('canvas_events').select(columns).eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId);
+    return (scope.sinceId === undefined ? query : query.gte('id', scope.sinceId)).order('id', { ascending: false }).limit(scope.limit ?? 200);
+  };
+  const tried = await events(EVENT_COLUMNS);
+  const { data, error } = tried.error?.code === UNDEFINED_COLUMN ? await events(SESSIONLESS_COLUMNS) : tried;
 
   if (error) {
     throw error;
   }
-  return (data ?? []).map((row) => toEvent(row as EventRow));
+  return (data ?? []).map((row) => toEvent(row as unknown as EventRow));
 }
 
 export async function lastNodeEventId(db: Db, scope: { orgId: string; nodeId: string }): Promise<number | null> {

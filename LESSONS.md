@@ -3427,6 +3427,10 @@ Signal: inpaint keeps the painted area and regenerates the rest; reframe returns
 
 **Signal:** a WebGPU page that runs smoothly and then gets killed on iPhone; on desktop the GPU memory "leaks" but never crashes. Counting `GPUDevice.createTexture` minus `GPUTexture.destroy` shows thousands of live textures (24 GB after 5 min on the heavy canvas). **Move:** wgpu's WebGPU backend makes `Drop` a no-op for textures and buffers; the memory goes only when JS GC collects the wrapper, and Safari's GC does not see GPU pressure. Call `texture.destroy()` / `buffer.destroy()` (after the last submit that uses it) for every short-lived GPU resource. `scripts/perf/mobile-memory.ts` counts them.
 
+## A new column written before its migration breaks every write, silently in Vercel
+
+**Signal:** every save shows "The server failed to save this change", Vercel logs are empty, `schema-drift-check` lists an unapplied migration. **Move:** new optional columns/RPC args are written with a fallback (retry without on PGRST202/PGRST204/42703), and `handleError` must `console.error` — Sentry's wrapper alone shows nothing in Vercel.
+
 ## Desktop native canvas
 
 ### A render thread that reads the camera, then waits for a drawable, shows a stale frame

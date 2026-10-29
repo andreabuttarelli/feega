@@ -174,23 +174,23 @@ export type RevisionMark = { nodeId: string; version: number; summary: string | 
 
 type MarkRow = { node_id: string; version: number; summary: string | null; actor_kind: string; actor_id: string | null; agent_key: string | null; session_id?: string | null; created_at: string };
 
+const MARK_COLUMNS = 'node_id, version, summary, actor_kind, actor_id, agent_key, created_at';
+const UNDEFINED_COLUMN = '42703';
+
 export async function listRevisionMarks(db: Db, input: { orgId: string; nodeIds: string[]; limit: number }): Promise<RevisionMark[]> {
   if (!input.nodeIds.length) {
     return [];
   }
 
-  const { data, error } = await db
-    .from('motion_revisions')
-    .select('node_id, version, summary, actor_kind, actor_id, agent_key, session_id, created_at')
-    .eq('org_id', input.orgId)
-    .in('node_id', input.nodeIds)
-    .order('created_at', { ascending: false })
-    .limit(input.limit);
+  const marks = (columns: string) =>
+    db.from('motion_revisions').select(columns).eq('org_id', input.orgId).in('node_id', input.nodeIds).order('created_at', { ascending: false }).limit(input.limit);
+  const tried = await marks(`${MARK_COLUMNS}, session_id`);
+  const { data, error } = tried.error?.code === UNDEFINED_COLUMN ? await marks(MARK_COLUMNS) : tried;
 
   if (error) {
     throw error;
   }
-  return ((data ?? []) as MarkRow[]).map((row) => ({
+  return ((data ?? []) as unknown as MarkRow[]).map((row) => ({
     nodeId: row.node_id,
     version: Number(row.version),
     summary: row.summary,
@@ -212,30 +212,29 @@ export const CHECKPOINT_IDLE_MS = 3_000;
 const COALESCE_MS: Record<Checkpoint, number> = { [Checkpoint.Coalesce]: CHECKPOINT_IDLE_MS, [Checkpoint.Cut]: 0 };
 
 const FUNCTION_MISSING = 'PGRST202';
+const COLUMN_MISSING = 'PGRST204';
 
 type CommitArgs = { orgId: string; nodeId: string; expectedVersion: number; doc: MotionDoc; actor: Actor; summary: string | null; checkpoint: Checkpoint };
 
 async function insertRevision(db: Db, input: CommitArgs): Promise<boolean> {
-  const { error } = await db.from('motion_revisions').insert({
-    org_id: input.orgId,
-    node_id: input.nodeId,
-    version: input.expectedVersion + 1,
-    doc: input.doc,
-    summary: input.summary,
-    ...actorCols(input.actor),
-    session_id: input.actor.sessionId ?? null
-  } as never);
+  const row = { node_id: input.nodeId, version: input.expectedVersion + 1, doc: input.doc, summary: input.summary, ...actorCols(input.actor) };
+  const tried = await db.from('motion_revisions').insert({ org_id: input.orgId, ...row, session_id: input.actor.sessionId ?? null } as never);
+  const { error } = tried.error?.code === COLUMN_MISSING ? await db.from('motion_revisions').insert({ org_id: input.orgId, ...row } as never) : tried;
   if (error?.code === UNIQUE_VIOLATION) {
     return false;
   }
   if (error) {
+    console.error('motion_revisions insert failed', { nodeId: input.nodeId, version: input.expectedVersion + 1, error });
     throw error;
   }
   return true;
 }
 
+type RevisionRpc = { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string } | null }> };
+
 async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
-  const { data, error } = await (db as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string } | null }> }).rpc('commit_motion_revision', {
+  const rpc = (args: Record<string, unknown>) => (db as unknown as RevisionRpc).rpc('commit_motion_revision', args);
+  const args = {
     p_org_id: input.orgId,
     p_node_id: input.nodeId,
     p_expected: input.expectedVersion,
@@ -244,13 +243,15 @@ async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
     p_actor_kind: input.actor.kind,
     p_actor_id: input.actor.id ?? null,
     p_agent_key: input.actor.agentKey ?? null,
-    p_coalesce_ms: COALESCE_MS[input.checkpoint],
-    p_session_id: input.actor.sessionId ?? null
-  });
+    p_coalesce_ms: COALESCE_MS[input.checkpoint]
+  };
+  const tried = await rpc({ ...args, p_session_id: input.actor.sessionId ?? null });
+  const { data, error } = tried.error?.code === FUNCTION_MISSING ? await rpc(args) : tried;
   if (error?.code === FUNCTION_MISSING) {
     return insertRevision(db, input);
   }
   if (error) {
+    console.error('commit_motion_revision failed', { nodeId: input.nodeId, expected: input.expectedVersion, error });
     throw error;
   }
   return data !== null;
