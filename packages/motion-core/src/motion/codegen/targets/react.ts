@@ -1,4 +1,4 @@
-import { isProp, PropType, type Bound, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode, type Animation } from '../ir';
+import { axisCondition, axisType, fallbackMember, isFlagAxis, isProp, PropType, type SetSpec, type Bound, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode, type Animation } from '../ir';
 import { camel, pascal } from '../naming';
 import { MOTION_IMPORT, MOTION_VERSION, motionFiles } from './react-motion';
 import type { CodeFile } from '../model';
@@ -52,11 +52,13 @@ function styleAttr(node: ElementNode): string {
   return binds.length ? ` style={{ ${binds.map((b) => `${camelProperty(b.property)}: ${b.prop}`).join(', ')} }}` : '';
 }
 
+const variantAttrs = (node: UseNode) => (node.set?.variant ?? []).map((v) => (isFlagAxis([v.value]) ? ` ${v.name}={${v.value}}` : ` ${v.name}="${v.value}"`)).join('');
+
 function useLines(node: UseNode, depth: number, ctx: Ctx): string[] {
   const classes = tailwindOf(node.rules, ctx.tokens, node.media);
   const props = node.props.map((p) => (typeof p.value === 'boolean' ? ` ${p.name}={${p.value}}` : ` ${p.name}=${attrValue({ literal: p.value })}`)).join('');
   const forwards = node.forwards.map((f) => ` ${f.name}={${f.prop}}`).join('');
-  return [`${pad(depth)}<${node.component}${classes ? ` className="${classes}"` : ''}${props}${forwards} />`];
+  return [`${pad(depth)}<${node.set?.name ?? node.component}${classes ? ` className="${classes}"` : ''}${variantAttrs(node)}${props}${forwards} />`];
 }
 
 function svgOf(node: SvgNode, ctx: Ctx): string {
@@ -109,6 +111,26 @@ function componentFile(spec: ComponentSpec, tokens: TokenLookup, anims: Map<stri
   return { path: `src/components/${spec.name}.tsx`, content };
 }
 
+function setFile(set: SetSpec): CodeFile {
+  const fallback = fallbackMember(set);
+  const fields = [...set.axes.map((a) => `  ${a.name}?: ${axisType(a.values)};`), ...set.props.map((p) => `  ${p.name}?: ${p.type};`), '  className?: string;'];
+  const branches = set.members.filter((m) => m !== fallback).flatMap((m) => [`  if (${axisCondition(set, m.variant)}) {`, `    return <${m.component} {...props} />;`, '  }']);
+  const content = [
+    ...set.members.map((m) => `import { ${m.component} } from './${m.component}';`),
+    '',
+    `export type ${set.name}Props = {`,
+    ...fields,
+    '};',
+    '',
+    `export function ${set.name}({ ${set.axes.map((a) => a.name).join(', ')}, ...props }: ${set.name}Props) {`,
+    ...branches,
+    `  return <${fallback.component} {...props} />;`,
+    '}',
+    ''
+  ].join('\n');
+  return { path: `src/components/${set.name}.tsx`, content };
+}
+
 function pageFile(page: PageSpec, name: string, tokens: TokenLookup, anims: Map<string, Animation>): CodeFile {
   const own = new Map<string, Animation>();
   const body = nodeLines(page.root, 2, dialect, { tokens, root: null, file: name, anims: own });
@@ -136,7 +158,7 @@ export function reactProject(page: PageSpec, slug: string): CodeFile[] {
   const tokens = lookupOf(page.tokens);
   const name = pascal(page.name);
   const anims = new Map<string, Animation>();
-  const sources = [pageFile(page, name, tokens, anims), ...page.components.map((c) => componentFile(c, tokens, anims))];
+  const sources = [pageFile(page, name, tokens, anims), ...page.components.map((c) => componentFile(c, tokens, anims)), ...page.sets.map(setFile)];
   const head = ['<!doctype html>', '<html lang="en">', '  <head>', '    <meta charset="UTF-8" />', '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />', `    <title>${page.name}</title>`, ...fontLinks(page.tokens).map((l) => `    ${l}`), '  </head>', '  <body>', '    <div id="root"></div>', '    <script type="module" src="/src/main.tsx"></script>', '  </body>', '</html>', ''];
   return [
     { path: 'README.md', content: readme(page, 'React + Tailwind CSS', ['npm install', 'npm run dev'], 'src/components/') },

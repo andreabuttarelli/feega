@@ -1,10 +1,8 @@
-import type { MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
+import { DEFAULT_VARIANT, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { innerClips, instanceOf, type MainComponent, type NewId } from './main-component';
 import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export type Variant = Record<string, string>;
-
-const DEFAULT_VALUE = 'Default';
 
 const MAX_VARIANTS = 64;
 
@@ -39,7 +37,7 @@ export function addVariant(doc: MotionDoc, compId: string, variant: Variant, new
     return fail(`${compId} is not a component`);
   }
   const set = setOf(compId, main.component);
-  const base = { ...Object.fromEntries(Object.keys(variant).map((k) => [k, DEFAULT_VALUE])), ...main.component.variant };
+  const base = { ...Object.fromEntries(Object.keys(variant).map((k) => [k, DEFAULT_VARIANT])), ...main.component.variant };
   const wanted = { ...base, ...variant };
   if (setMembers(doc, compId).some(([, c]) => sameVariant(c.component!.variant ?? {}, wanted))) {
     return fail(`the set already has the variant ${JSON.stringify(wanted)}`);
