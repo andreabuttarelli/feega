@@ -3448,3 +3448,6 @@ Signal: the image shows in the frame, the inspector names it, yet no selection b
 
 ### A double-click on a new text does nothing while the playhead is past 0
 Signal: outlined box, no caret; it works with the playhead at 0. Cause: the text started at the playhead and `Text` fades up, so at that frame it is transparent and `pickOwnersAt` skips it. Move: check the clip's `from` against the playhead before blaming the editor.
+
+### A whole frame is blank, other frames draw
+Signal: one frame renders nothing on the canvas, no error on screen. Cause: a stored clip prop a `.strict()` component schema refuses (e.g. `radius` on Shape) made `parseMotionDoc` reject the whole doc. Move: run `parseMotionDoc(doc)` on the stored doc and read `error`; load is Lenient and must drop bad props (`salvageProps`), never refuse the doc.

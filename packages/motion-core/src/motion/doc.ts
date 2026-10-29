@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { COMP_CARD, COMP_CARD_LAYOUTS } from './card-layouts';
 import { screenCompOf } from './device-screen';
-import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
+import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, salvageProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
 import { withMediaPickers } from './legacy-media';
@@ -291,7 +291,7 @@ export function byFrame<T extends { frame: number }>(track: readonly T[]): T[] {
 }
 
 export function clipProps(components: CustomComponents, component: ComponentId, props: unknown, strictness: Strictness): PropsVerdict {
-  const base = parseProps(component, props);
+  const base = strictness === Strictness.Lenient ? salvageProps(component, props) : parseProps(component, props);
   if (!base.ok || component !== 'Custom') {
     return base;
   }

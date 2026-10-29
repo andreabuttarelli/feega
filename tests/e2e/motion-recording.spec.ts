@@ -27,17 +27,17 @@ test.describe('Motion records, Design scrubs @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId('motion-node-stage').dblclick({ position: { x: 40, y: 40 } });
-    const modeSwitch = page.getByRole('radiogroup', { name: 'Editor mode' });
+    const modeSwitch = page.getByTestId('editor-mode-switch');
     const canvas = page.locator('[data-canvas-surface]');
     const timeline = page.getByTestId('frame-timeline');
 
-    await modeSwitch.getByRole('radio', { name: 'Motion' }).click();
+    await modeSwitch.locator('[data-mode="motion"]').click();
     await expect(canvas).toHaveAttribute('data-mode-chrome', 'recording');
     await expect(timeline).toBeVisible();
     await page.waitForTimeout(SETTLE_MS);
     await shoot(page, 'motion-recording');
 
-    await modeSwitch.getByRole('radio', { name: 'Design' }).click();
+    await modeSwitch.locator('[data-mode="design"]').click();
     await expect(canvas).toHaveAttribute('data-mode-chrome', 'plain');
     await expect(timeline).toBeHidden();
     await page.keyboard.press('Meta+j');
