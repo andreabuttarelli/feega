@@ -3,7 +3,7 @@ import type { Database } from '$lib/database.types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DocShareRow } from '$lib/canvas/doc-node';
 
-type Json = Database['public']['Tables']['nodes']['Row']['data'];
+type NodeData = NonNullable<Database['public']['Tables']['nodes']['Update']['data']>;
 
 /**
  * IL LINK PUBBLICO DI UN DOCUMENTO, lato database.
@@ -32,7 +32,7 @@ export async function setDocShare(
   const { error } = await db
     .from('nodes')
     .update({
-      data: input.data as Json,
+      data: input.data as NodeData,
       public_token_hash: input.tokenHash,
       public_expires_at: input.expiresAt,
       updated_at: new Date().toISOString()
@@ -52,7 +52,7 @@ export async function clearDocShare(
   const { error } = await db
     .from('nodes')
     .update({
-      data: input.data as Json,
+      data: input.data as NodeData,
       public_token_hash: null,
       public_expires_at: null,
       updated_at: new Date().toISOString()

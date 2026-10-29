@@ -44,7 +44,7 @@ export const load = async (event: ServerLoadEvent<ComposeParams>) => {
   const [head, tokens, assets, runs, gallery] = await Promise.all([
     headOrNew(db, nodeScope, motion.node),
     motionTokens(db, { orgId, brandId }),
-    motionAssets({ db, orgId, projectId, canvasId, nodeId: motion.record.id }),
+    motionAssets({ db, orgId, projectId, canvasId }),
     listNodeRuns(db, nodeScope),
     editorGallery(db, nodeScope)
   ]);

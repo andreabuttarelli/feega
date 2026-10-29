@@ -441,6 +441,8 @@ function csvToMarkdown(raw: string): string {
   return md;
 }
 
+const CHROME_TAGS: ReadonlySet<string> = new Set(['script', 'style', 'noscript', 'svg', 'button']);
+
 export async function htmlToMarkdown(html: string): Promise<string> {
   const TurndownService = (await import('turndown')).default;
   // @ts-expect-error no types
@@ -451,9 +453,7 @@ export async function htmlToMarkdown(html: string): Promise<string> {
     bulletListMarker: '-'
   });
   td.use(gfm);
-  // Chrome, not content: inline scripts/styles and icon paths would otherwise land in the output
-  // as text, and "Copy"/"✓" button labels would sit inside every code block.
-  td.remove(['script', 'style', 'noscript', 'svg', 'button']);
+  td.remove((node) => CHROME_TAGS.has(node.nodeName.toLowerCase()));
   // Turndown only fences <pre> that wraps a <code>; a bare <pre> (how the docs pages write their
   // shell snippets) would otherwise flatten into prose and lose the line breaks that make it code.
   td.addRule('bare-pre', {
@@ -465,7 +465,7 @@ export async function htmlToMarkdown(html: string): Promise<string> {
   return td.turndown(html.replace(/<\/(span|code|strong|b|em|a|kbd)>(?=<[a-z])/gi, '$& ')).trim();
 }
 
-async function htmlFromUrl(url: string): Promise<{ markdown: string; title?: string }> {
+async function htmlFromUrl(url: string): Promise<{ markdown: string; title?: string | null }> {
   const res = await fetch(url, {
     headers: { 'user-agent': 'feegaKnowledge/1.0' },
     signal: AbortSignal.timeout(20_000)

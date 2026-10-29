@@ -15,7 +15,7 @@ export const CAPTURE_MAX_EDGE = 3840;
 const IMPORT_TIMEOUT_MS = 20_000;
 const SNIFF_BYTES = 512;
 
-type Picture = { mime: string; ext: string; scalable: keyof FormatEnum | null };
+type Picture = { mime: string; ext: string; scalable: keyof FormatEnum | 'avif' | null };
 
 const SIGNATURES: [Picture, (head: Buffer) => boolean][] = [
   [{ mime: 'image/png', ext: 'png', scalable: 'png' }, (h) => h.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))],
