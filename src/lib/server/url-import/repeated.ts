@@ -14,7 +14,7 @@ const CANDIDATES = new Set(['FRAME', 'GROUP']);
 const STYLE_VALUES = ['Primary', 'Secondary', 'Tertiary'];
 const STYLE_PROP = 'Style';
 
-type Seen = { node: RestNode; order: number; skeleton: string; parts: number; style: string; size: string };
+type Seen = { node: RestNode; order: number; skeleton: string; parts: number; style: string };
 type Facts = { tag: string; painted: boolean; texts: number; image: boolean; icon: boolean; height: number; y: number };
 type Group = Seen[];
 type Chosen = { name: string; variants: Group[] };
@@ -55,14 +55,10 @@ const leafOf = (n: RestNode) => `${n.type}${n.type === 'TEXT' ? `${n.style?.font
 
 const styleOf = (n: RestNode) => JSON.stringify([n.fills, n.strokes, n.strokeWeight, n.cornerRadius, n.rectangleCornerRadii, n.effects, n.opacity]);
 
-const sizeOf = (n: RestNode) => `${Math.round(n.absoluteBoundingBox?.width ?? 0)}x${Math.round(n.absoluteBoundingBox?.height ?? 0)}`;
-
 const drawn = (n: RestNode) => {
   const facts = factsOf(n);
   return facts.painted || facts.image || facts.icon;
 };
-
-const groupInFlow = (n: RestNode): boolean => (n.children ?? []).some((c) => (n.layoutMode && c.type === 'GROUP') || groupInFlow(c));
 
 const bigEnough = (n: RestNode) => (n.absoluteBoundingBox?.width ?? 0) >= MIN_SIDE && (n.absoluteBoundingBox?.height ?? 0) >= MIN_SIDE;
 
@@ -70,20 +66,20 @@ function seenOf(root: RestNode): { seen: Seen[]; parent: Map<string, string> } {
   const seen: Seen[] = [];
   const parent = new Map<string, string>();
   let order = 0;
-  const visit = (n: RestNode, above: RestNode | null): { skeleton: string; parts: number } => {
+  const visit = (n: RestNode): { skeleton: string; parts: number } => {
     const at = order++;
     const kids = (n.children ?? []).map((c) => {
       parent.set(c.id, n.id);
-      return visit(c, n);
+      return visit(c);
     });
     const skeleton = `${leafOf(n)}${n.layoutMode ?? ''}[${kids.map((k) => k.skeleton).join(',')}]`;
     const parts = 1 + kids.reduce((sum, k) => sum + k.parts, 0);
-    if (n !== root && CANDIDATES.has(n.type) && parts >= MIN_PARTS && bigEnough(n) && drawn(n) && !groupInFlow(n) && !above?.layoutMode) {
-      seen.push({ node: n, order: at, skeleton, parts, style: styleOf(n), size: sizeOf(n) });
+    if (n !== root && CANDIDATES.has(n.type) && parts >= MIN_PARTS && bigEnough(n) && drawn(n)) {
+      seen.push({ node: n, order: at, skeleton, parts, style: styleOf(n) });
     }
     return { skeleton, parts };
   };
-  visit(root, null);
+  visit(root);
   return { seen, parent };
 }
 
@@ -96,7 +92,7 @@ function groupedBy<T>(items: T[], key: (t: T) => string): T[][] {
 }
 
 function variantsOf(sets: Seen[]): Group[] {
-  const byStyle = groupedBy(sets, (s) => s.style).map((style) => groupedBy(style, (s) => s.size).sort((a, b) => b.length - a.length)[0]);
+  const byStyle = groupedBy(sets, (s) => s.style);
   const repeated = byStyle.some((g) => g.length >= MIN_OCCURRENCES);
   return repeated ? byStyle.sort((a, b) => b.length - a.length) : [];
 }
@@ -136,16 +132,15 @@ const flattened = (n: RestNode): RestNode => {
   return n.children ? { ...n, children: kids } : n;
 };
 
-type Marking = { componentId: string; name: string; size: { x: number; y: number } };
+type Marking = { componentId: string; name: string };
 
 function markingsOf(chosen: Chosen[]): Map<string, Marking> {
   const marks = new Map<string, Marking>();
   for (const { name, variants } of chosen) {
     variants.forEach((group, index) => {
       const main = group[0].node;
-      const size = { x: main.absoluteBoundingBox!.width, y: main.absoluteBoundingBox!.height };
       const mainName = variants.length > 1 ? `${name} / ${STYLE_PROP}=${styleValue(index)}` : name;
-      group.forEach((s, i) => marks.set(s.node.id, { componentId: main.id, name: i === 0 ? mainName : name, size }));
+      group.forEach((s, i) => marks.set(s.node.id, { componentId: main.id, name: i === 0 ? mainName : name }));
     });
   }
   return marks;
