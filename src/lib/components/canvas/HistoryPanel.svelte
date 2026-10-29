@@ -18,6 +18,7 @@
   import { SegmentedControl } from '$lib/components/ui/shell';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
+  import { baseNodeId } from '$lib/canvas/breakpoint-views';
   import { postPageAction } from '$lib/api/page-action';
   import { LocalOff, isOff } from '$lib/local-user';
   import { EntryKind, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, entryLabel, laneSpans, sessionLabel, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
@@ -87,7 +88,7 @@
     { keep: 'theirs', label: 'Keep theirs' }
   ];
 
-  const frameId = $derived(oneFrame ? ($canvasSelection[0] ?? null) : null);
+  const frameId = $derived(oneFrame && $canvasSelection[0] ? baseNodeId($canvasSelection[0]) : null);
   const spans = $derived(graph ? laneSpans(graph) : []);
   const forks = $derived(graph ? branchForks(graph) : []);
   const gutter = $derived(Math.max(1, graph?.lanes.length ?? 1) * LANE_PX);

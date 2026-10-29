@@ -30,6 +30,7 @@
   import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
@@ -195,7 +196,7 @@
     if (room <= 0) {
       return;
     }
-    const next = fillOrder(frames, view, area).filter((f) => !asked.has(keyOf(f))).slice(0, room);
+    const next = fillOrder(withoutViews(frames), view, area).filter((f) => !asked.has(keyOf(f))).slice(0, room);
     for (const f of next) {
       asked.add(keyOf(f));
       inFlight++;
