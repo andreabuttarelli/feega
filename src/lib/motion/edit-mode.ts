@@ -11,26 +11,6 @@ export enum EditMode {
   Motion = 'motion'
 }
 
-export const EDIT_MODE_KEY = 'feega.frame-edit-mode';
-
-type ModeStore = Pick<Storage, 'getItem' | 'setItem'>;
-
-export function recalledMode(store: Pick<ModeStore, 'getItem'> | null): string | null {
-  try {
-    return store?.getItem(EDIT_MODE_KEY) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export function rememberMode(store: Pick<ModeStore, 'setItem'> | null, mode: EditMode): void {
-  try {
-    store?.setItem(EDIT_MODE_KEY, mode);
-  } catch {
-    return;
-  }
-}
-
 const animated = (clip: MotionClip, key: string) => Boolean(clip.keyframes[key]?.length);
 
 const sameColor = (color: string) => color;
@@ -57,17 +37,11 @@ export function designWarning(mode: EditMode, clip: MotionClip): string | null {
   return `Animated: ${keys.join(', ')}. Design moves every keyframe by your change; Motion keys it at the playhead.`;
 }
 
-const NEXT: Record<EditMode, EditMode> = { [EditMode.Design]: EditMode.Motion, [EditMode.Motion]: EditMode.Design };
-
-export const nextMode = (mode: EditMode): EditMode => NEXT[mode];
-
 export const readMode = (stored: string | null): EditMode => (Object.values(EditMode) as string[]).includes(stored ?? '') ? (stored as EditMode) : EditMode.Design;
 
 export function startMode(doc: MotionDoc, stored: string | null): EditMode {
   return controlShown(doc, VideoControl.EditMode) && timelineFits(doc) ? readMode(stored) : EditMode.Design;
 }
-
-export const shownMode = (toggled: Partial<Record<string, EditMode>>, nodeId: string, doc: MotionDoc, stored: string | null): EditMode => toggled[nodeId] ?? startMode(doc, stored);
 
 export const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };
 

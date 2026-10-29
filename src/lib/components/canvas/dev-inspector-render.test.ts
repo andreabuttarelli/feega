@@ -27,12 +27,12 @@ describe('the dev inspector', () => {
     expect(render(DevInspector, { props: { doc, clipId: 'ghost', brand: null } }).body).not.toContain('dev-inspector');
   });
 
-  it('replaces the editable properties while coder mode is on', () => {
-    expect(panel).toMatch(/\{#if frameProperties\.dev && session && doc\}[\s\S]*<DevInspector[\s\S]*\{:else if session && doc && tokens && !session\.selection\.length\}/);
+  it('replaces the editable properties in Code mode', () => {
+    expect(panel).toMatch(/\{:else if editorMode\.spec\.inspector === ModeInspector\.Code && session && doc\}[\s\S]*<DevInspector[\s\S]*\{:else if session && doc && tokens && !session\.selection\.length\}/);
   });
 
-  it('the frame turns hover measures on for coder mode and hands the panel its export', () => {
-    expect(flow).toMatch(/\(altHeld \|\| shows\(frameViews, FrameView\.Dev\)\)/);
+  it('the frame turns hover measures on in Code mode and hands the panel its export', () => {
+    expect(flow).toMatch(/\(altHeld \|\| editorMode\.spec\.inspector === ModeInspector\.Code\)/);
     expect(flow).toMatch(/frameProperties\.exportPicks = \(\) => props\.onExportElements\?\.\(panelNodeId, picks\)/);
   });
 });

@@ -89,7 +89,8 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
-  import { EditMode, recalledMode, rememberMode, shownMode, startMode, timelineShown } from '$lib/motion/edit-mode';
+  import { EditMode, startMode, timelineShown } from '$lib/motion/edit-mode';
+  import { ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
   import { msOfFrame, type CommentMark } from '$lib/canvas/comment-marks';
   import FrameTimeline from '../FrameTimeline.svelte';
@@ -1161,8 +1162,14 @@
     picks = [];
   });
 
-  const modeStore = () => (typeof localStorage === 'undefined' ? null : localStorage);
-  let toggledModes = $state.raw<Partial<Record<string, EditMode>>>({});
+  const frameMode = (doc: LiveDoc['doc']): EditMode => startMode(doc, editorMode.spec.edit);
+
+  $effect(() => {
+    const edit = editorMode.spec.edit;
+    for (const session of savers.values()) {
+      session.mode = startMode(session.history.present, edit);
+    }
+  });
 
   function saverOf(nodeId: string) {
     const held = savers.get(nodeId);
@@ -1173,14 +1180,10 @@
     }
     const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
     const session: FrameEditSession = new FrameEditSession(
-      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: startMode(live.doc, recalledMode(modeStore())) },
+      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: frameMode(live.doc) },
       {
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
-        moded: (mode) => {
-          rememberMode(modeStore(), mode);
-          toggledModes = { ...toggledModes, [nodeId]: mode };
-        },
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
         recorded: () => autosize(nodeId),
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
@@ -1338,13 +1341,8 @@
     }
     frameProperties.publish(panelNodeId, panelSession, panelTokens, panelExtras);
     frameProperties.part = pickedPart;
-    frameProperties.toggleDev = () => (frameViews = flipView(frameViews, FrameView.Dev));
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     return () => frameProperties.clear();
-  });
-
-  $effect(() => {
-    frameProperties.dev = shows(frameViews, FrameView.Dev);
   });
 
   const Step = { Back: 'back', Forward: 'forward' } as const;
@@ -1418,7 +1416,7 @@
   const timeline = $derived.by(() => {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
-    const mode = nodeId && live ? shownMode(toggledModes, nodeId, live.doc, recalledMode(modeStore())) : EditMode.Design;
+    const mode = nodeId && live ? frameMode(live.doc) : EditMode.Design;
     const shown = nodeId ? timelineShown(frameChrome(kindOfNode(nodeId)).timeline, mode) : false;
     return nodeId && live && shown ? { nodeId, doc: live.doc, frame: frameOfLive(live) } : null;
   });
@@ -1815,7 +1813,7 @@
   }
 
   function measuredIn(nodeId: string): Gap[] {
-    const live = (altHeld || shows(frameViews, FrameView.Dev)) && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
+    const live = (altHeld || editorMode.spec.inspector === ModeInspector.Code) && inside?.nodeId === nodeId && pickHover?.nodeId === nodeId && !frameGuides ? liveOf(nodeId) : null;
     if (!live || !pickHover) {
       return [];
     }
@@ -2473,7 +2471,8 @@
     align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
     stack: () => placeTiles(stackTiles(placedBoxes(selected), STACK_GAP)),
-    'edit-mode': () => inside && savers.get(inside.nodeId)?.toggleMode(),
+    'edit-mode': () => editorMode.toggleMotion(),
+    'code-mode': () => editorMode.toggleCode(),
     enter: () => enterSelected(selected, summaries),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
@@ -2956,8 +2955,8 @@
         doc={timeline.doc}
         frame={timeline.frame}
         selection={picks.length > 1 ? picks : inside?.level.clip ? [inside.level.clip] : []}
-        mode={shownMode(toggledModes, nodeId, timeline.doc, recalledMode(modeStore()))}
-        onmode={() => savers.get(nodeId)?.toggleMode()}
+        mode={frameMode(timeline.doc)}
+        onmode={() => editorMode.toggleMotion()}
         onframe={(f) => scrubTo(nodeId, f)}
         onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}
         onaction={(id) => void runFrameAction(id)}
@@ -3032,7 +3031,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={shownMode(toggledModes, frame.id, tools.doc, recalledMode(modeStore()))} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={{ ...frameViews, [FrameView.Rulers]: rulersPref.on }} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}

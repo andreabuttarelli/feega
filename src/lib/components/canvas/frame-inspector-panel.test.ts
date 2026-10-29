@@ -5,6 +5,7 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { EditorMode, editorMode } from '$lib/canvas/editor-mode.svelte';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -20,7 +21,7 @@ function sessionOf(selection: string[]) {
   const doc = must(addClip(device, { component: 'Particles', from: 0, durationInFrames: 30, props: {} }, 'sparks'));
   return new FrameEditSession(
     { head: { version: 1, doc }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, moded: () => {}, saved: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
   );
 }
 
@@ -70,16 +71,23 @@ describe('frame inspector panel', () => {
     expect(html(['a', 'b'])).toContain('data-testid="frame-inspector"');
   });
 
-  it('carries a Design | Motion segmented control and a Coder mode toggle on one row', () => {
+  it('no longer carries a per-frame mode row: the mode lives in the header', () => {
     for (const selection of [[], ['a']]) {
       const body = html(selection);
 
-      expect(body).toContain('data-testid="frame-mode-row"');
-      expect(body).toContain('role="radiogroup"');
-      expect(body).toContain('>Design<');
-      expect(body).toContain('>Motion<');
-      expect(body).toContain('>Coder mode<');
-      expect(body).not.toContain('Dev mode');
+      expect(body).not.toContain('data-testid="frame-mode-row"');
+      expect(body).not.toContain('>Coder mode<');
     }
+  });
+
+  it('reads the layer code in Code mode and shows a placeholder in Play', () => {
+    editorMode.set(EditorMode.Code);
+    expect(html(['a'])).toContain('aria-label="Code mode"');
+
+    editorMode.set(EditorMode.Play);
+    expect(html(['a'])).toContain('data-testid="play-soon"');
+
+    editorMode.set(EditorMode.Design);
+    expect(html(['a'])).toContain('data-testid="header-actions"');
   });
 });

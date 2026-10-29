@@ -3,7 +3,6 @@
   import MultiInspector from '$lib/components/motion/MultiInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
-  import FrameModeRow from '$lib/components/canvas/FrameModeRow.svelte';
   import DevInspector from '$lib/components/canvas/DevInspector.svelte';
   import { frameProperties } from './frame-properties.svelte';
   import HeaderActions from '$lib/components/motion/HeaderActions.svelte';
@@ -38,6 +37,7 @@
   import { inView, liftEdit } from '@feega/motion-core/motion/breakpoints/model';
   import BreakpointsSection from '$lib/components/motion/BreakpointsSection.svelte';
   import BreakpointOverrides from '$lib/components/motion/BreakpointOverrides.svelte';
+  import { ModeInspector, editorMode } from '$lib/canvas/editor-mode.svelte';
 
   const FIRST_FRAME = 0;
 
@@ -85,14 +85,14 @@
   }
 </script>
 
-{#snippet modeRow()}{#if session}<FrameModeRow {session} />{/if}{/snippet}
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
 
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
-{#if frameProperties.dev && session && doc}
-  <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Coder mode">
-    {@render modeRow()}
+{#if editorMode.spec.inspector === ModeInspector.Soon}
+  <p class="empty" data-testid="play-soon">Play mode is coming: prototype links and playback will live here.</p>
+{:else if editorMode.spec.inspector === ModeInspector.Code && session && doc}
+  <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Code mode">
     {#if shown?.clip}
       <DevInspector doc={shownDoc!} clipId={shown.clip.id} brand={tokens} onexport={frameProperties.exportPicks} />
     {:else}
@@ -101,7 +101,6 @@
   </aside>
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
-    {@render modeRow()}
     <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
     <ScenesSection {doc} onchange={editGuides} />
     <FramePresetSection {doc} onchange={editGuides} />
@@ -115,7 +114,6 @@
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" aria-label="Properties">
-    {@render modeRow()}
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <MultiInspector {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />

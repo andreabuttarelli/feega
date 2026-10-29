@@ -361,7 +361,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleRulers]: { name: 'Rulers', icon: Ruler, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
-  [Command.ToggleDevMode]: { name: 'Coder mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleDevMode]: { name: 'Code mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
   [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },

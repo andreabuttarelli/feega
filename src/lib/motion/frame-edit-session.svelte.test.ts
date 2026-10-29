@@ -17,7 +17,6 @@ function open(send: SessionPort['send'] = accepted) {
     recorded: vi.fn(),
     stepped: vi.fn(),
     playhead: () => 12,
-    moded: vi.fn(),
     saved: vi.fn(),
     pull: vi.fn(async () => {}),
     send: vi.fn(send)
@@ -35,16 +34,8 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('the edit mode and the playhead', () => {
-  it('starts in Design, flips to Motion and back, and tells the host each time', () => {
-    const { session, port } = open();
-
-    expect(session.mode).toBe(EditMode.Design);
-    session.toggleMode();
-    session.toggleMode();
-
-    expect(port.moded).toHaveBeenNthCalledWith(1, EditMode.Motion);
-    expect(port.moded).toHaveBeenNthCalledWith(2, EditMode.Design);
-    expect(session.mode).toBe(EditMode.Design);
+  it('starts in Design', () => {
+    expect(open().session.mode).toBe(EditMode.Design);
   });
 
   it('opens in the mode the host remembered', () => {

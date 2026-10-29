@@ -20,7 +20,7 @@ function sessionAt(breakpoint: string, selection: string[]) {
   const doc = must(setOverride(phone, 'ph', 'a', OverrideKey.Hidden, true));
   const session = new FrameEditSession(
     { head: { version: 1, doc }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, moded: () => {}, saved: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
   );
   session.breakpoint = breakpoint;
   return session;
