@@ -9,7 +9,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
 import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
 import { precompose } from '@feega/motion-core/motion/precomp';
-import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor } from './frame-inspector';
+import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor, stacksWholeElement } from './frame-inspector';
 import { findClip } from '@feega/motion-core/motion/doc';
 import { copyElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
@@ -367,5 +367,15 @@ describe('use as mask inside a canvas frame', () => {
 
     const released = barAction(Command.RemoveMask, { doc: masked!.doc, selection: ['a', 'b'], frame: 0, newId: ids() });
     expect(members(released!.doc)).toEqual([]);
+  });
+});
+
+describe('wrap with stack on a free element', () => {
+  it('wraps the whole element as a new canvas stack, never turning its own clip into one', () => {
+    const doc = fixture();
+
+    expect(stacksWholeElement(Action.WrapStack, doc, ['a', 'b'])).toBe(true);
+    expect(stacksWholeElement(Action.WrapStack, doc, ['a'])).toBe(false);
+    expect(stacksWholeElement(Action.Group, doc, ['a', 'b'])).toBe(false);
   });
 });
