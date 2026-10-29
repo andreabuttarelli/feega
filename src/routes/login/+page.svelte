@@ -650,6 +650,9 @@
     padding: 24px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     border-radius: var(--ui-radius-lg);
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .iab-card h2 {
     font-size: 1.3rem;
