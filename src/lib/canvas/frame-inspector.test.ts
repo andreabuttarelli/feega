@@ -331,3 +331,11 @@ describe('FRAME_ELEMENT_MENU', () => {
     expect(frameBarActions(shapes(), ['top'])).toEqual(expect.arrayContaining([Action.FlipHorizontal, Action.FlipVertical]));
   });
 });
+
+describe('editor modes: no layer op lives only in a key', () => {
+  it('the frame context menu offers instance ops, hide, lock and copy/paste properties', () => {
+    for (const id of ['create-component', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties'] as const) {
+      expect(FRAME_ELEMENT_MENU.has(id)).toBe(true);
+    }
+  });
+});

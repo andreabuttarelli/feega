@@ -22,6 +22,7 @@ A **free element** is a shape, text, image or SVG placed directly on the canvas.
 ## Selecting
 
 - Right-click on stacked layers lists them so you can pick the one underneath.
+- Right-click a layer to hide (`⇧⌘H`), lock (`⇧⌘L`), copy properties (`⌥⌘C`) or paste them (`⌥⌘V`).
 - Hold `Cmd`/`Ctrl` and drag across a frame to select elements inside groups, not the groups.
 - `Cmd+F` finds any node by name, text or prompt.
 
