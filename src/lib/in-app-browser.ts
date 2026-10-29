@@ -1,32 +1,120 @@
-// Detects embedded "in-app" browsers — the webviews inside native apps like Instagram,
-// Facebook, TikTok, LinkedIn, etc. Google (and most OAuth providers) reject sign-in from
-// these with a `disallowed_useragent` error, so we need to bounce the user out into their
-// real default browser before starting the OAuth flow.
 
 import { isNativeShell } from './native-shell';
 
 export type InAppBrowser = {
-  /** True when we believe the page is running inside a native app's embedded webview. */
   isInApp: boolean;
   os: 'ios' | 'android' | 'other';
-  /** Best-effort name of the host app, used to make the "open in browser" hint friendlier. */
   app: string | null;
 };
 
-// Apps that advertise themselves in the UA string. Order matters only for the label we show.
-const IN_APP_PATTERNS: Array<[RegExp, string]> = [
-  [/Instagram/i, 'Instagram'],
-  [/FBAN|FBAV|FB_IAB|FB4A|FBIOS/i, 'Facebook'],
-  [/Messenger/i, 'Messenger'],
-  [/TikTok|musical_ly|BytedanceWebview|trill/i, 'TikTok'],
-  [/LinkedInApp/i, 'LinkedIn'],
-  [/Twitter/i, 'X'],
-  [/Line\//i, 'LINE'],
-  [/Snapchat/i, 'Snapchat'],
-  [/Pinterest/i, 'Pinterest'],
-  [/WhatsApp/i, 'WhatsApp'],
-  [/GSA\//i, 'Google App']
+type Steps = Record<'ios' | 'android', string[]>;
+
+type AppRule = { name: string; ua: RegExp; steps: Steps };
+
+const MENU_SAFARI = ['Tap the menu in the top right corner.', 'Choose "Open in Safari".'];
+const MENU_CHROME = ['Tap the menu in the top right corner.', 'Choose "Open in Chrome" or "Open in browser".'];
+
+const APP_RULES: AppRule[] = [
+  {
+    name: 'Threads',
+    ua: /Barcelona/i,
+    steps: {
+      ios: ['Tap the three dots at the top right.', 'Choose "Open in external browser".'],
+      android: ['Tap the three dots at the top right.', 'Choose "Open in Chrome".']
+    }
+  },
+  {
+    name: 'Instagram',
+    ua: /Instagram/i,
+    steps: {
+      ios: ['Tap the three dots (•••) at the top right.', 'Choose "Open in external browser".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in Chrome".']
+    }
+  },
+  {
+    name: 'Messenger',
+    ua: /(?<!Micro)Messenger/i,
+    steps: {
+      ios: ['Tap the three dots (•••) at the top right.', 'Choose "Open in Safari".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in Chrome".']
+    }
+  },
+  {
+    name: 'Facebook',
+    ua: /FBAN|FBAV|FB_IAB|FB4A|FBIOS/i,
+    steps: {
+      ios: ['Tap the three dots (•••) at the bottom or top right.', 'Choose "Open in Safari".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in Chrome".']
+    }
+  },
+  {
+    name: 'TikTok',
+    ua: /TikTok|musical_ly|BytedanceWebview|trill/i,
+    steps: {
+      ios: ['Tap the three dots (•••) at the top right.', 'Choose "Open in browser".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in browser".']
+    }
+  },
+  {
+    name: 'LinkedIn',
+    ua: /LinkedInApp/i,
+    steps: {
+      ios: ['Tap the compass icon at the bottom right.', 'Choose "Open in Safari".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in browser".']
+    }
+  },
+  { name: 'X', ua: /Twitter/i, steps: { ios: MENU_SAFARI, android: MENU_CHROME } },
+  {
+    name: 'LINE',
+    ua: /Line\//i,
+    steps: {
+      ios: ['Tap the share icon at the bottom right.', 'Choose "Open in Safari".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in other browser".']
+    }
+  },
+  {
+    name: 'Snapchat',
+    ua: /Snapchat/i,
+    steps: {
+      ios: ['Tap the three dots (•••) at the top right.', 'Choose "Open in Safari".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in browser".']
+    }
+  },
+  {
+    name: 'WeChat',
+    ua: /MicroMessenger/i,
+    steps: {
+      ios: ['Tap the three dots (•••) at the top right.', 'Choose "Open in Safari".'],
+      android: ['Tap the three dots (⋮) at the top right.', 'Choose "Open in browser".']
+    }
+  },
+  { name: 'Pinterest', ua: /Pinterest/i, steps: { ios: MENU_SAFARI, android: MENU_CHROME } },
+  { name: 'WhatsApp', ua: /WhatsApp/i, steps: { ios: MENU_SAFARI, android: MENU_CHROME } },
+  { name: 'Google App', ua: /GSA\//i, steps: { ios: MENU_SAFARI, android: MENU_CHROME } }
 ];
+
+const GENERIC_STEPS: Steps = {
+  ios: [
+    'Look for a menu (•••) or a share icon in this app.',
+    'Choose "Open in Safari" or "Open in browser".',
+    'Or copy the link below and paste it in Safari.'
+  ],
+  android: [
+    'Look for a menu (⋮) in this app.',
+    'Choose "Open in Chrome" or "Open in browser".',
+    'Or copy the link below and paste it in Chrome.'
+  ]
+};
+
+export type InAppGuide = { title: string; steps: string[] };
+
+export function guideFor(detected: InAppBrowser): InAppGuide {
+  const platform = detected.os === 'android' ? 'android' : 'ios';
+  const rule = APP_RULES.find((r) => r.name === detected.app);
+  const steps = rule ? rule.steps[platform] : GENERIC_STEPS[platform];
+  const title = detected.app ? `In ${detected.app}` : 'In this app';
+  return { title, steps };
+}
 
 export function detectInAppBrowser(ua: string = typeof navigator !== 'undefined' ? navigator.userAgent : ''): InAppBrowser {
   const os: InAppBrowser['os'] = /iPhone|iPad|iPod/i.test(ua)
@@ -35,24 +123,13 @@ export function detectInAppBrowser(ua: string = typeof navigator !== 'undefined'
       ? 'android'
       : 'other';
 
-  let app: string | null = null;
-  for (const [re, name] of IN_APP_PATTERNS) {
-    if (re.test(ua)) {
-      app = name;
-      break;
-    }
-  }
+  const app = APP_RULES.find((r) => r.ua.test(ua))?.name ?? null;
 
   if (isNativeShell(ua)) {
     return { isInApp: false, os, app: null };
   }
 
   let isInApp = app !== null;
-
-  // Generic heuristics for in-app browsers that don't name themselves in the UA:
-  // - Android System WebView injects "; wv)" into the UA.
-  // - iOS webviews run WebKit ("AppleWebKit") but, unlike real Safari, drop the "Safari" token
-  //   (and aren't Chrome/Firefox/Edge for iOS, which keep CriOS/FxiOS/EdgiOS).
   if (!isInApp) {
     if (os === 'android' && /;\s*wv\)/i.test(ua)) isInApp = true;
     if (os === 'ios' && /AppleWebKit/i.test(ua) && !/Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS/i.test(ua)) isInApp = true;
@@ -61,11 +138,9 @@ export function detectInAppBrowser(ua: string = typeof navigator !== 'undefined'
   return { isInApp, os, app };
 }
 
-// Android can hand a URL straight to the user's default browser via an `intent://` URL.
-// iOS webviews have no reliable programmatic escape, so callers fall back to instructions.
 export function androidIntentUrl(rawUrl: string): string {
   const u = new URL(rawUrl);
   const scheme = u.protocol.replace(':', '');
-  const withoutScheme = rawUrl.slice(u.protocol.length + 2); // strip "https://"
+  const withoutScheme = rawUrl.slice(u.protocol.length + 2);
   return `intent://${withoutScheme}#Intent;scheme=${scheme};action=android.intent.action.VIEW;end`;
 }
