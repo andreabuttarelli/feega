@@ -33,6 +33,13 @@ Selecting a frame opens its properties in the right bar.
 - **Selection colours** lists every colour used in the frame, nested groups and pasted Figma vectors included, most used first with a count. Changing one swatch recolours every element that uses it, in one step you can undo.
 - With several elements selected inside a frame, the right bar shows the properties they all have: text properties when all are text, plus layout, opacity and their selection colours. Values that differ read **Mixed**; editing one applies it to every selected element at once.
 
+## Edits show at once
+
+Delete, group, ungroup, wrap with stack, wrap in a section, bring to front or back, rename,
+a wire's mode and dropping a free element into a frame change the canvas on the same frame you
+act. They save in the background, in the order you made them. Undo works while they are still
+saving. If the server refuses one, the canvas puts it back and says so.
+
 ## Shortcuts
 
 | Key | Action |

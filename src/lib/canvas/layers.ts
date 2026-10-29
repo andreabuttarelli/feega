@@ -1,4 +1,5 @@
-import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
 import { layerTracks } from '@feega/motion-core/motion/surface';
 import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
 import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feega/motion-core/motion/timeline';
@@ -104,7 +105,7 @@ function groupLabel(track: Track, index: number): string {
 }
 
 type Masks = ReadonlyMap<string, readonly string[]>;
-type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string>; folded: ReadonlySet<string> };
+type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string>; folded: ReadonlySet<string>; scope?: readonly Clip[] };
 
 const NO_MASKS = { masks: new Map(), masked: new Set<string>() };
 
@@ -115,13 +116,27 @@ function masksOf(doc: MotionDoc): { masks: Masks; masked: ReadonlySet<string> } 
 
 const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
 
-function trackRows(walk: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
-  return layerTracks(walk.doc, tracks).flatMap((track, index) => {
+function kidsOf(walk: Walk, clip: Clip): Clip[] {
+  const scope = walk.scope ?? [];
+  if (clip.autoLayout) {
+    return childrenInOrder(scope as MotionClip[], clip as MotionClip & { autoLayout: AutoLayout });
+  }
+  return scope.filter((c) => c.parent === clip.id);
+}
+
+function trackRows(source: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
+  const shown = layerTracks(source.doc, tracks);
+  const scope = shown.flatMap((t) => t.clips);
+  const held = new Set(scope.map((c) => c.id));
+  const walk = { ...source, scope };
+  const topOf = (track: Track) => track.clips.filter((c) => !c.parent || !held.has(c.parent));
+
+  return shown.flatMap((track, index) => {
     if (!groupsTrack(track, walk.mode)) {
-      return track.clips.flatMap((clip) => clipRows(walk, clip, depth));
+      return topOf(track).flatMap((clip) => clipRows(walk, clip, depth));
     }
     const group: LayerRow = { id: track.id, key: `${walk.path}${track.id}`, kind: LayerKind.Track, depth, label: groupLabel(track, index), type: track.kind, nodeId: walk.nodeId, hidden: !!track.hidden, locked: !!track.locked, nested: walk.nested };
-    return [group, ...track.clips.flatMap((clip) => clipRows(walk, clip, depth + 1))];
+    return [group, ...topOf(track).flatMap((clip) => clipRows(walk, clip, depth + 1))];
   });
 }
 
@@ -156,10 +171,13 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     ...(doc.comps[comp]?.component ? { instance: true } : {})
   };
   const nests = comp !== '' && !template;
-  row.foldable = nests || undefined;
-  const inside = nests && !walk.folded.has(key) ? (doc.comps[comp]?.tracks ?? []) : [];
+  const kids = kidsOf(walk, clip);
+  row.foldable = nests || kids.length > 0 || undefined;
+  const open = !walk.folded.has(key);
+  const inside = nests && open ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
-  return [row, ...own, ...trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1), ...maskedRows(walk, clip.id, depth + 1)];
+  const held = open ? kids.flatMap((kid) => clipRows(walk, kid, depth + 1)) : [];
+  return [row, ...own, ...held, ...trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1), ...maskedRows(walk, clip.id, depth + 1)];
 }
 
 function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number, clipKey: string): LayerRow {
@@ -191,10 +209,22 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
 
+function elementRows(rows: readonly LayerRow[]): LayerRow[] {
+  const roots = rows.filter((r) => r.depth === TRACK_DEPTH);
+  if (roots.length !== 1) {
+    return [];
+  }
+  return rows.filter((r) => r.depth > TRACK_DEPTH).map((r) => ({ ...r, depth: r.depth - 1 }));
+}
+
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
     const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? (node.glyph ?? NodeIcon.Element) : nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
-    return folded.has(node.id) || node.element ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
+    if (folded.has(node.id)) {
+      return [row];
+    }
+    const inside = childRows(node.id, open, outlines, folded);
+    return [row, ...(node.element ? elementRows(inside) : inside)];
   });
 }
 

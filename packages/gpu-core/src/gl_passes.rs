@@ -5,6 +5,7 @@ use web_sys::{WebGl2RenderingContext as Gl, WebGlFramebuffer, WebGlProgram, WebG
 
 use crate::filter_passes::Op;
 use crate::filters::Runner;
+use crate::gl_state::{isolated, Switches};
 
 const VERTEX: &str = "#version 300 es
 void main() {
@@ -511,6 +512,22 @@ impl Drop for GlTex {
 
 pub type Tex = Rc<GlTex>;
 
+pub const PASS_CAPS: [u32; 4] = [Gl::BLEND, Gl::SCISSOR_TEST, Gl::DEPTH_TEST, Gl::STENCIL_TEST];
+
+impl Switches for Gl {
+    fn is_on(&self, cap: u32) -> bool {
+        self.is_enabled(cap)
+    }
+
+    fn set(&self, cap: u32, on: bool) {
+        if on {
+            self.enable(cap);
+        } else {
+            self.disable(cap);
+        }
+    }
+}
+
 pub struct GlRunner {
     gl: Gl,
     programs: Vec<(Op, WebGlProgram)>,
@@ -570,19 +587,18 @@ impl GlRunner {
         gl.bind_framebuffer(Gl::FRAMEBUFFER, Some(&self.fbo));
         gl.framebuffer_texture_2d(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0, Gl::TEXTURE_2D, Some(&out.texture), 0);
         gl.viewport(0, 0, out.width as i32, out.height as i32);
-        for cap in [Gl::BLEND, Gl::SCISSOR_TEST, Gl::DEPTH_TEST, Gl::STENCIL_TEST] {
-            gl.disable(cap);
-        }
-        gl.color_mask(true, true, true, true);
-        gl.bind_vertex_array(None);
-        gl.use_program(Some(program));
-        for (unit, (name, tex)) in [("a", &a.texture), ("b", &b.texture), ("params", &params)].into_iter().enumerate() {
-            gl.active_texture(Gl::TEXTURE0 + unit as u32);
-            gl.bind_texture(Gl::TEXTURE_2D, Some(tex));
-            gl.uniform1i(gl.get_uniform_location(program, name).as_ref(), unit as i32);
-        }
-        gl.uniform2i(gl.get_uniform_location(program, "outSize").as_ref(), out.width as i32, out.height as i32);
-        gl.draw_arrays(Gl::TRIANGLES, 0, 3);
+        isolated(gl, &PASS_CAPS, || {
+            gl.color_mask(true, true, true, true);
+            gl.bind_vertex_array(None);
+            gl.use_program(Some(program));
+            for (unit, (name, tex)) in [("a", &a.texture), ("b", &b.texture), ("params", &params)].into_iter().enumerate() {
+                gl.active_texture(Gl::TEXTURE0 + unit as u32);
+                gl.bind_texture(Gl::TEXTURE_2D, Some(tex));
+                gl.uniform1i(gl.get_uniform_location(program, name).as_ref(), unit as i32);
+            }
+            gl.uniform2i(gl.get_uniform_location(program, "outSize").as_ref(), out.width as i32, out.height as i32);
+            gl.draw_arrays(Gl::TRIANGLES, 0, 3);
+        });
         gl.bind_framebuffer(Gl::FRAMEBUFFER, None);
         gl.active_texture(Gl::TEXTURE0);
         gl.delete_texture(Some(&params));

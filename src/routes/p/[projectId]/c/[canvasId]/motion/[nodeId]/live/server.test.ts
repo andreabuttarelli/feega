@@ -5,6 +5,7 @@ import { LIVE_MESSAGE } from '$lib/motion/interactive/live-bridge';
 
 const state = vi.hoisted(() => ({ head: null as null | Record<string, unknown> }));
 
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/motion/editor-scope', () => ({
   motionScope: async () => ({
     db: {},

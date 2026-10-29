@@ -1,7 +1,7 @@
 import { isInteractive } from '@feega/motion-core/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
 import { findAssets, listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
-import { findBrandLook } from '$lib/server/repos/brands';
+import { findBrandLook, findFirstBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
@@ -54,7 +54,8 @@ export async function headOrNew(db: Db, scope: { orgId: string; nodeId: string }
 }
 
 export async function motionTokens(db: Db, input: { orgId: string; brandId: string | null }): Promise<BrandTokens> {
-  const brand = input.brandId ? await findBrandLook(db, { orgId: input.orgId, brandId: input.brandId }) : null;
+  const chosen = input.brandId ? await findBrandLook(db, { orgId: input.orgId, brandId: input.brandId }) : null;
+  const brand = chosen ?? (await findFirstBrandLook(db, input.orgId));
   if (!brand) {
     return FEEGA_TOKENS;
   }

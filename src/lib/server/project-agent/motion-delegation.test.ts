@@ -68,6 +68,7 @@ const store = vi.hoisted(() => ({
   history: [] as unknown[]
 }));
 
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/web/view-images', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/web/view-images')>()),
   viewImages: async (urls: string[], _detail: unknown, prefix: string) => ({ images: urls.map((url, i) => ({ url, path: `${prefix}/${i}.jpg`, width: 1, height: 1 })), parts: [] })

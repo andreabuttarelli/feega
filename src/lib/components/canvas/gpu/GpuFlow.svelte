@@ -24,9 +24,9 @@
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
-  import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor } from '$lib/canvas/frame-inspector';
+  import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
-  import { loadOutliner } from '$lib/motion/fonts/outliner';
+  import { letteringOf } from '$lib/motion/text-outline-run';
   import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
   import { followDocks } from '$lib/canvas/dock-lift';
   import { frameScreenRect } from '$lib/canvas/frame-screen';
@@ -95,6 +95,8 @@
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+  import { stackPlaced } from '$lib/motion/layout/ops';
+  import { dragInStack, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { EditMode, startMode } from '$lib/motion/edit-mode';
   import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
@@ -1198,6 +1200,10 @@
     if (!nodeId || !live || !picks.length) {
       return;
     }
+    if (frameChrome(kindOfNode(nodeId)).selectsOwnClip && stacksWholeElement(id, live.doc, picks)) {
+      props.onWrapStack?.([nodeId]);
+      return;
+    }
     const at = scoped(live.doc, picks, frameOfLive(live));
     if (!at) {
       return;
@@ -1207,7 +1213,7 @@
       pickMany(nodeId, at.scene(picked));
       return;
     }
-    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: live.assets });
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets) });
     if (!done) {
       return;
     }
@@ -1842,7 +1848,7 @@
     applyTextFit(fit, { amend: (fitted) => saver.amendRoot(fitted, 'Fitted text'), show: (fitted) => liveDocs.set(nodeId, { ...live, doc: fitted }), place: (node) => props.onPlace?.(nodeId, node.w, node.h) });
   }
 
-  let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[] } | null>(null);
+  let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[]; drop?: DropLine | null } | null>(null);
 
   function frameReach(at: NonNullable<ReturnType<typeof pickerOf>>): number {
     const a = at.picker.framePoint({ x: 0, y: 0 }, at.space);
@@ -1935,6 +1941,7 @@
     const edited = { left: box.x, top: box.y, width: box.w, height: box.h };
 
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
+    const stackChild = grip === Grip.Move && inScope.ids.length === 1 && stackPlaced(inScope.view, inScope.ids[0]) ? inScope.ids[0] : null;
 
     const leaving = (ev: PointerEvent, now: Carry): ElementOut | null => {
       const [clipId] = inScope.ids;
@@ -1956,6 +1963,12 @@
       if (out || carried) {
         props.onElementOut?.(nodeId, out ?? { clipId: '', client: { x: ev.clientX, y: ev.clientY }, box: null }, out ? DragPhase.Over : DragPhase.Back);
         carried = !!out;
+      }
+      if (stackChild) {
+        const dropped = dragInStack(inScope.view, stackChild, boxes, framePt(ev));
+        result = dropped.result.ok ? { ok: true, doc: lifted(inScope.merge(dropped.result.doc)) } : dropped.result;
+        frameGuides = { nodeId, guides: [], gaps: [], drop: dropped.line };
+        return;
       }
       const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
       result = dragged.result.ok ? { ok: true, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
@@ -3281,8 +3294,8 @@
         {/if}
         {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
         {@const measuredGapsIn = measuredIn(frame.id)}
-        {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length)) || measuredGapsIn.length)}
-          <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} measured={measuredGapsIn} />
+        {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length || frameGuides.drop)) || measuredGapsIn.length)}
+          <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} drop={frameGuides?.nodeId === frame.id ? (frameGuides.drop ?? null) : null} measured={measuredGapsIn} />
         {/if}
         {#if pickHover?.at === frame.id}
           <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>

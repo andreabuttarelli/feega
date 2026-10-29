@@ -413,3 +413,31 @@ describe('stretch alignment', () => {
   });
 });
 
+describe('a flex item', () => {
+  const fill = (grow: number) => ({ sizing: { width: Sizing.Fill, height: Sizing.Fixed }, grow: { width: grow } });
+  const pct = (width: number, height: number) => ({ sizing: { width: Sizing.Percent, height: Sizing.Percent }, percent: { width, height } });
+
+  it('splits the free space by fill weight', () => {
+    const out = layoutTree(box('c', 310, 100, [leaf('a', 0, 20, fill(1)), leaf('b', 0, 20, fill(2))], { gap: 10 }));
+    expect(out.get('a')?.width).toBe(100);
+    expect(out.get('b')).toMatchObject({ left: 110, width: 200 });
+  });
+
+  it('takes a percent of the stack on both axes', () => {
+    const out = layoutTree(box('c', 400, 200, [leaf('a', 10, 10, pct(25, 50)), leaf('b', 0, 20, fill(1))]));
+    expect(out.get('a')).toMatchObject({ width: 100, height: 100 });
+    expect(out.get('b')).toMatchObject({ left: 100, width: 300 });
+  });
+
+  it('overrides the stack align with its own', () => {
+    const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 20, { alignSelf: Align.End }), leaf('b', 50, 20)]));
+    expect(out.get('a')?.top).toBe(80);
+    expect(out.get('b')?.top).toBe(0);
+  });
+
+  it('stretches across when its own align is stretch', () => {
+    const out = layoutTree(box('c', 300, 100, [leaf('a', 50, 20, { alignSelf: Align.Stretch, sizing: { width: Sizing.Fixed, height: Sizing.Hug } })]));
+    expect(out.get('a')?.height).toBe(100);
+  });
+});
+

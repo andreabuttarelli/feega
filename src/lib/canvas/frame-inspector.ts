@@ -17,7 +17,7 @@ import { setClipFlags } from '@feega/motion-core/motion/organize';
 import { BooleanOp, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
-import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
+import { outlineTexts, type LetteringLoader } from '$lib/motion/text-outline-run';
 import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Command, OPACITY_KEYS, commandFor, isTyping } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
@@ -248,12 +248,12 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.ToggleLocked]: { shown: any, run: (ctx) => toggleFlag(ctx, 'locked', 'Toggled lock') }
 };
 
-export type LaterCtx = BarCtx & { load: OutlinerLoader; assets: Record<string, string> };
+export type LaterCtx = BarCtx & { load: LetteringLoader };
 
 type LaterOp = { shown: BarOp['shown']; run: (ctx: LaterCtx) => Promise<Done | null> };
 
 const LATER_OPS: Partial<Record<ActionId, LaterOp>> = {
-  [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load, ctx.assets), 'Outlined text') }
+  [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load), 'Outlined text') }
 };
 
 const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.WrapStack, Action.RemoveStack, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
@@ -290,6 +290,10 @@ export const picksFor = (id: ActionId, doc: MotionDoc, picks: readonly string[])
 const runs = (id: ActionId) => id in BAR_OPS || id in LATER_OPS || id in PICKS;
 
 export const canRunInFrame = runs;
+
+const rootIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips.filter((c) => !c.parent).map((c) => c.id));
+
+export const stacksWholeElement = (id: ActionId, doc: MotionDoc, picks: readonly string[]): boolean => id === Action.WrapStack && rootIds(doc).every((root) => picks.includes(root));
 
 export const frameMenuAction = (id: SelectionActionId): ActionId | null => {
   const run = frameMenuRun(id);

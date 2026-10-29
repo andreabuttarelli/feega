@@ -3,7 +3,7 @@ import { propertyOverride, type PropertyValues } from './property-resolve';
 
 type Overrides = Record<string, Record<string, unknown>>;
 
-export const CLIP_LEVEL_OVERRIDES = ['hidden', 'effects', 'transform'] as const;
+export const CLIP_LEVEL_OVERRIDES = ['hidden', 'effects', 'transform', 'autoLayout', 'layoutItem'] as const;
 
 export function withOverride(clip: MotionClip, override: Record<string, unknown>): MotionClip {
   const level = Object.fromEntries(CLIP_LEVEL_OVERRIDES.filter((k) => k in override).map((k) => [k, override[k]]));

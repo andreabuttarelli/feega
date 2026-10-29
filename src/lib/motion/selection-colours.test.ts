@@ -35,9 +35,10 @@ describe('selection colours', () => {
 
   it('lists brand colour tokens beside hex colours', () => {
     let d = doc();
-    d = ok(addClip(d, { component: 'Text', from: 0, durationInFrames: 60, props: { text: 'tok', color: 'brand.text', fills: [{ type: 'solid', color: 'brand.accent' }] } }, 'k'));
+    d = ok(addClip(d, { component: 'Text', from: 0, durationInFrames: 60, props: { text: 'tok', color: 'brand.text' } }, 'k'));
+    d = ok(addClip(d, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', fills: [{ type: 'solid', color: 'brand.accent' }] } }, 's'));
 
-    expect(selectionColours(d, ['k']).map((c) => c.colour)).toEqual(expect.arrayContaining(['brand.text', 'brand.accent']));
+    expect(selectionColours(d, ['k', 's']).map((c) => c.colour)).toEqual(expect.arrayContaining(['brand.text', 'brand.accent']));
   });
 
   it('recolours a token to another token and keeps it a token binding', () => {
@@ -63,6 +64,15 @@ describe('selection colours', () => {
     const d = ok(addClip(doc(), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', fills: [{ type: 'solid', color: '#FF000080' }] } }, 'u'));
 
     expect(documentColours(d)).toEqual(['#ff0000', '#000000', '#00ff00']);
+  });
+});
+
+describe('a new element', () => {
+  it('lists only the colour it paints, not its unused defaults', () => {
+    const d = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect' } }, 'r'));
+
+    expect(selectionColours(d, ['r'])).toEqual([{ colour: '#d9d9d9', count: 1 }]);
+    expect(documentColours(d)).toEqual(['#d9d9d9']);
   });
 });
 

@@ -25,13 +25,13 @@
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
-  import type { BrandTokens } from '@feega/motion-core/motion/brand';
+  import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
   import type { ComponentProps } from 'svelte';
   import { THREE_D_COMPONENTS } from '@feega/motion-core/motion/components';
   import { PickMode } from '$lib/motion/clip-bar';
   import { PropertiesView } from '$lib/motion/properties-view';
   import { barActionLater, frameBarActions, inspectorOf } from '$lib/canvas/frame-inspector';
-  import { loadOutliner } from '$lib/motion/fonts/outliner';
+  import { letteringOf } from '$lib/motion/text-outline-run';
   import type { ActionId } from '$lib/motion/actions';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { mergeScope, scopeView } from '$lib/motion/instance-view';
@@ -93,7 +93,7 @@
     if (!session || !doc) {
       return;
     }
-    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: loadOutliner, assets: {} });
+    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}) });
     if (!done) {
       return;
     }

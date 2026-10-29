@@ -47,13 +47,21 @@ function instanceContent(doc: MotionDoc, size: Size, measure: TextMeasure): Cont
     const own = { overrides: clip.props.overrides, values: clip.props.propValues };
     const key = own.overrides || own.values ? `${id}${JSON.stringify(own)}` : id;
     if (!cache.has(key)) {
-      const tracks = key === id ? comp.tracks : laidOut(overridden(comp.tracks, clip, comp.component), space, measure, instanceContent(doc, space, measure));
       cache.set(key, null);
-      cache.set(key, compBounds({ ...comp, tracks }, space, content));
+      cache.set(key, compBounds({ ...comp, tracks: instanceTracks(doc, clip, comp, size, measure) }, space, content));
     }
     return cache.get(key) ?? null;
   };
   return content;
+}
+
+export function instanceTracks(doc: MotionDoc, host: MotionClip, comp: MotionComp, size: Size, measure: TextMeasure = estimatedText): MotionTrack[] {
+  const tracks = overridden(comp.tracks, host, comp.component);
+  if (tracks === comp.tracks) {
+    return tracks;
+  }
+  const space = comp.frame ?? size;
+  return laidOut(tracks, space, measure, instanceContent(doc, space, measure));
 }
 
 const visualClips = (tracks: readonly MotionTrack[]): MotionClip[] => tracks.flatMap((t) => t.clips as MotionClip[]);
@@ -111,6 +119,9 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, cont
     min: { width: own.minWidth, height: own.minHeight },
     max: { width: own.maxWidth, height: own.maxHeight },
     absolute: own.absolute,
+    grow: { width: own.widthGrow, height: own.heightGrow },
+    percent: { width: own.widthPercent, height: own.heightPercent },
+    alignSelf: own.alignSelf,
     baseline: isText(clip.component) ? textBaseline(clip.component, clip.props, Math.min(size.width, size.height)) : undefined,
     heightAt: reflowsText(clip) ? (width) => measure(clip.component, clip.props, Math.min(size.width, size.height), width).height : undefined,
     cell: { column: own.column, row: own.row, columnSpan: own.columnSpan, rowSpan: own.rowSpan, x: own.cellX, y: own.cellY }

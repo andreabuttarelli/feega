@@ -1,29 +1,16 @@
-import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { BuiltinFont } from '@feega/motion-core/motion/fonts/model';
-import { outlineUrl } from '@feega/motion-core/motion/fonts/outline';
-import type { Outliner } from './fonts/outliner';
-import { textToPath } from './text-outline';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { textToPath, type Lettering } from './text-outline';
 
-const REGULAR_WEIGHT = 400;
+export type LetteringLoader = (doc: MotionDoc) => Promise<Lettering>;
 
-export type OutlinerLoader = (url: string) => Promise<Outliner | null>;
+export const letteringOf =
+  (tokens: BrandTokens, assets: Record<string, string>): LetteringLoader =>
+  async (doc) => ({ fonts: await loadFonts(doc, assets, tokens), tokens, assets });
 
-async function outlineOne(doc: MotionDoc, id: string, load: OutlinerLoader, assets: Record<string, string>): Promise<OpResult> {
-  const clip = findClip(doc, id)?.clip;
-  if (!clip) {
-    return { ok: false, error: `no clip ${id}` };
-  }
-  const family = String(clip.props.font ?? BuiltinFont.Sans);
-  const url = outlineUrl(family, Number(clip.props.weight ?? REGULAR_WEIGHT), doc.fonts, assets);
-  const outliner = url ? await load(url) : null;
-  return outliner ? textToPath(doc, id, outliner) : { ok: false, error: `the font ${family} could not be loaded to outline ${id}` };
-}
-
-export async function outlineTexts(doc: MotionDoc, ids: readonly string[], load: OutlinerLoader, assets: Record<string, string> = {}): Promise<OpResult> {
-  let result: OpResult = { ok: true, doc };
-  for (const id of ids) {
-    result = result.ok ? await outlineOne(result.doc, id, load, assets) : result;
-  }
-  return result;
+export async function outlineTexts(doc: MotionDoc, ids: readonly string[], load: LetteringLoader): Promise<OpResult> {
+  const lettering = await load(doc);
+  return ids.reduce<OpResult>((result, id) => (result.ok ? textToPath(result.doc, id, lettering) : result), { ok: true, doc });
 }

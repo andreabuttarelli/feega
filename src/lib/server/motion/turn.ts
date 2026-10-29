@@ -26,6 +26,7 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { drawFrames, firstFrames } from '$lib/server/motion/server-frames';
 import { fontAdvance } from '$lib/server/motion/font-advance';
+import { letteringOf } from '$lib/motion/text-outline-run';
 import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
@@ -199,6 +200,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
     fontAdvance: readFontAdvance,
+    lettering: letteringOf(tokens, assetUrls(assets)),
     trackReader: ffmpegLumas,
     fonts: () => orgFontFamilies(db, orgId),
     inspect: frameStats,

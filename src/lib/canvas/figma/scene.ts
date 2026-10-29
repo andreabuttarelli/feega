@@ -442,8 +442,9 @@ function patchedNode(n: FigmaRawNode, ctx: Ctx): FigmaRawNode {
   return (ctx.scope.patches.get(key) ?? []).reduce(withPatch, n);
 }
 
-const hasOverrides = (n: FigmaRawNode, symbol: FigmaRawNode) =>
-  Boolean(n.symbolData?.symbolOverrides?.length) || n.size?.x !== symbol.size?.x || n.size?.y !== symbol.size?.y;
+const resized = (n: FigmaRawNode, symbol: FigmaRawNode) => n.size?.x !== symbol.size?.x || n.size?.y !== symbol.size?.y;
+
+const hasOverrides = (n: FigmaRawNode, symbol: FigmaRawNode, drawsOwnLayers: boolean) => Boolean(n.symbolData?.symbolOverrides?.length) || (!drawsOwnLayers && resized(n, symbol));
 
 function scopeOf(n: FigmaRawNode, ctx: Ctx, flattened: boolean): Ctx {
   const here = ctx.scope.inside ? [...ctx.scope.trail, keyOf(n.guid)] : [];
@@ -542,7 +543,8 @@ function componentOf(n: FigmaRawNode, ctx: Ctx): ComponentRef | null {
     return null;
   }
   const main = ctx.byKey.get(keyOf(id));
-  const linked = Boolean(main) && !hasOverrides(n, main!);
+  const drawsOwnLayers = Boolean(ctx.children.get(keyOf(n.guid))?.length);
+  const linked = Boolean(main) && !hasOverrides(n, main!, drawsOwnLayers);
   return { key: keyOf(id), ...namedRef(main?.name ?? n.name ?? 'Component'), inPaste: linked };
 }
 

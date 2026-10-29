@@ -32,6 +32,8 @@
   const CHANNEL_MAX: Record<ColourFormat, number[]> = { [ColourFormat.Hex]: [], [ColourFormat.Rgb]: [255, 255, 255], [ColourFormat.Hsl]: [TURN, HUNDRED, HUNDRED], [ColourFormat.Hsb]: [TURN, HUNDRED, HUNDRED] };
   const BRAND = BRAND_COLORS as readonly string[];
 
+  const swatchName = (colour: string) => (BRAND.includes(colour) ? `${colourLabel(colour)} · ${colourLabel(resolveColor(colour, tokens))}` : colourLabel(colour));
+
   const shown = $derived(resolveColor(value || undefined, tokens));
   const base = $derived(HEX.test(shown) ? shown.slice(0, 7).toLowerCase() : FALLBACK);
   let heldLevel = $state<number | null>(null);
@@ -286,7 +288,7 @@
     <span class="row-head">{row.head}</span>
     <div class="row">
       {#each row.colours as colour (colour)}
-        <button type="button" class="swatch" class:on={value.toLowerCase() === colour.toLowerCase()} style={`--c: ${resolveColor(colour, tokens)};`} title={colourLabel(colour)} aria-label={colourLabel(colour)} onclick={() => commit(colour)}></button>
+        <button type="button" class="swatch" class:on={value.toLowerCase() === colour.toLowerCase()} style={`--c: ${resolveColor(colour, tokens)};`} title={swatchName(colour)} aria-label={swatchName(colour)} onclick={() => commit(colour)}></button>
       {/each}
     </div>
   {/each}
