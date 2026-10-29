@@ -189,6 +189,7 @@
   --ui-hit: 32px;
   --ui-hit-gap: 8px;
   --ui-accent: #0099ff;
+  --ui-recording: #ff3b30;
   --ui-accent-ink: #ffffff;
   --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
   --ui-hover-outline: #b14cff;

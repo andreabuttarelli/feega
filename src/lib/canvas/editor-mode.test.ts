@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditMode } from '$lib/motion/edit-mode';
 import { DocAccess } from '$lib/motion/frame-edit-session.svelte';
-import { CanvasLines, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeInspector, MODES, readEditorMode } from './editor-mode.svelte';
+import { CanvasLines, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeChrome, ModeInspector, MODES, frameTimeline, readEditorMode, TimelineAccess } from './editor-mode.svelte';
 
 class MemoryStore {
   kept = new Map<string, string>();
@@ -81,5 +81,35 @@ describe('editor mode', () => {
   it('Code reads and exports, every other mode writes', () => {
     expect(MODES[EditorMode.Code].access).toBe(DocAccess.Read);
     expect([EditorMode.Design, EditorMode.Motion, EditorMode.Play].map((m) => MODES[m].access)).toEqual([DocAccess.Write, DocAccess.Write, DocAccess.Write]);
+  });
+
+  it('only Motion records: a coloured border on canvas and right bar', () => {
+    expect(MODES[EditorMode.Motion].chrome).toBe(ModeChrome.Recording);
+    expect([EditorMode.Design, EditorMode.Play, EditorMode.Code].map((m) => MODES[m].chrome)).toEqual([ModeChrome.Plain, ModeChrome.Plain, ModeChrome.Plain]);
+  });
+
+  it('Motion edits the timeline, Design opens it to scrub with ⌘J', () => {
+    const mode = new EditorModeState(new MemoryStore());
+    expect(mode.timeline).toBe(TimelineAccess.Hidden);
+    mode.toggleTimeline();
+    expect(mode.timeline).toBe(TimelineAccess.Scrub);
+    mode.set(EditorMode.Motion);
+    expect(mode.timeline).toBe(TimelineAccess.Edit);
+    mode.toggleTimeline();
+    expect(mode.timeline).toBe(TimelineAccess.Hidden);
+  });
+
+  it('Play and Code never show the timeline', () => {
+    const mode = new EditorModeState(new MemoryStore());
+    mode.set(EditorMode.Code);
+    mode.toggleTimeline();
+    expect(mode.timeline).toBe(TimelineAccess.Hidden);
+  });
+
+  it('a frame that cannot animate never opens the timeline to edit, but a still can be scrubbed', () => {
+    expect(frameTimeline(TimelineAccess.Edit, true, EditMode.Design)).toBe(TimelineAccess.Hidden);
+    expect(frameTimeline(TimelineAccess.Edit, true, EditMode.Motion)).toBe(TimelineAccess.Edit);
+    expect(frameTimeline(TimelineAccess.Scrub, true, EditMode.Design)).toBe(TimelineAccess.Scrub);
+    expect(frameTimeline(TimelineAccess.Scrub, false, EditMode.Design)).toBe(TimelineAccess.Hidden);
   });
 });

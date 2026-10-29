@@ -23,6 +23,7 @@ export type CanvasCommandId =
   | 'tidy'
   | 'stack'
   | 'edit-mode'
+  | 'timeline'
   | 'code-mode'
   | 'section'
   | 'delete-keep'
@@ -235,6 +236,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     if (key === 'Backspace' || key === 'Delete') return { id: 'delete-keep' };
     if (e.shiftKey) return null;
     if (key.toLowerCase() === 'a') return { id: 'select-all' };
+    if (key.toLowerCase() === 'j') return { id: 'timeline' };
     const command = PASTE_MOD_KEYS[key.toLowerCase()];
     if (command) return { id: command };
     return null;
@@ -307,6 +309,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
   { id: 'stack', keys: ['⇧A'], label: 'Stack the selected tiles' },
   { id: 'edit-mode', keys: ['E'], label: 'Design or Motion: edit the resting state or key at the playhead' },
+  { id: 'timeline', keys: ['mod', 'J'], label: 'Timeline: scrub in Design, key in Motion' },
   { id: 'code-mode', keys: ['⇧D'], label: 'Code: read and export a layer' },
   { id: 'section', keys: ['⇧S'], label: 'Wrap the selection in a section' },
   { id: 'delete-keep', keys: ['mod', '⌫'], label: 'Delete a section, keep what is in it' },
@@ -353,6 +356,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   tidy: GuideGroup.Edit,
   stack: GuideGroup.Edit,
   'edit-mode': GuideGroup.Edit,
+  timeline: GuideGroup.Edit,
   'code-mode': GuideGroup.View,
   section: GuideGroup.Edit,
   'delete-keep': GuideGroup.Edit,
