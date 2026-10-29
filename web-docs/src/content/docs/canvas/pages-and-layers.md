@@ -14,7 +14,8 @@ Every canvas of the project is a page.
 - **Switch** by clicking a page.
 - **New page** with **+**.
 - **Rename** with a double click on the current page, or from its **…** menu.
-- **Versions** and **Comments** of the current page are in its **…** menu.
+- **Versions** and **Comments** of the current page are in its **…** menu (shown on hover).
+- **Collapse** Pages with its chevron; drag the line below the list to resize it.
 - **Delete** from the same menu, after a confirmation. The last page cannot be deleted.
 - **Import .feega** and **Download .feega** are in the panel menu (**…** next to **+**). See [.feega files](/canvas/feega-files/).
 
@@ -22,6 +23,6 @@ On a phone, tap the title in the top bar: the sheet lists the pages first, then 
 
 ## Layers
 
-The layers of the current page, below Pages. Each row has **hide** and **lock** buttons.
+The layers of the current page, below Pages. The search icon next to Layers opens a filter. Hovering a row shows its **hide** and **lock** buttons.
 
 The top-left of the canvas keeps only the main menu and the project switcher.

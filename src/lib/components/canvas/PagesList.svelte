@@ -2,6 +2,8 @@
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import Plus from '@lucide/svelte/icons/plus';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Trash from '@lucide/svelte/icons/trash-2';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
@@ -36,6 +38,28 @@
   } = $props();
 
   const ICON = 14;
+  const ROW_PX = 28;
+  const DEFAULT_ROWS = 4;
+  const MAX_LIST_VH = 0.6;
+
+  let collapsed = $state(false);
+  let listHeight = $state(ROW_PX * DEFAULT_ROWS);
+
+  function resize(e: PointerEvent) {
+    const handle = e.currentTarget as HTMLElement;
+    const startY = e.clientY;
+    const startHeight = listHeight;
+    handle.setPointerCapture(e.pointerId);
+    const move = (m: PointerEvent) => {
+      listHeight = Math.min(window.innerHeight * MAX_LIST_VH, Math.max(ROW_PX, startHeight + m.clientY - startY));
+    };
+    const stop = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', stop);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', stop);
+  }
 
   const current = $derived(canvases.find((canvas) => canvas.id === currentId) ?? null);
   const lastCanvas = $derived(canvases.length <= 1);
@@ -74,7 +98,10 @@
 
 <section class="pages" class:touch={density === Density.Touch} data-testid="pages">
   <div class="pages-head">
-    <span class="pages-label">{$_('app.shell.pages')}</span>
+    <button type="button" class="pages-toggle" data-testid="pages-toggle" aria-expanded={!collapsed} onclick={() => (collapsed = !collapsed)}>
+      {#if collapsed}<ChevronRight size={12} />{:else}<ChevronDown size={12} />{/if}
+      <span class="pages-label">{$_('app.shell.pages')}</span>
+    </button>
     {#if !isOff(LocalOff.NewCanvas)}
       <button type="button" class="pages-icon" data-testid="canvas-new" aria-label={$_('app.shell.canvasActions.new')} title={$_('app.shell.canvasActions.new')} onclick={() => run(CanvasAction.New)}>
         <Plus size={ICON} />
@@ -99,7 +126,7 @@
     </DropdownMenu.Root>
   </div>
 
-  <ul class="pages-list">
+  <ul class="pages-list" hidden={collapsed} style:max-height={density === Density.Pointer ? `${listHeight}px` : undefined}>
     {#each canvases as canvas (canvas.id)}
       {@const isCurrent = canvas.id === currentId}
       <li class="page-row" class:is-current={isCurrent} data-testid={isCurrent ? 'canvas-row-current' : undefined}>
@@ -121,7 +148,7 @@
         {/if}
         {#if isCurrent && !renaming}
           <DropdownMenu.Root>
-            <DropdownMenu.Trigger class="pages-icon" data-testid="canvas-more" aria-label={$_('app.shell.canvasActions.more')}>
+            <DropdownMenu.Trigger class="pages-icon row-more" data-testid="canvas-more" aria-label={$_('app.shell.canvasActions.more')}>
               <Ellipsis size={ICON} />
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end" collisionPadding={8} class="w-44">
@@ -159,6 +186,10 @@
     {/each}
   </ul>
 
+  {#if !collapsed && density === Density.Pointer}
+    <div class="pages-resize" role="separator" aria-orientation="horizontal" aria-label="Resize pages" data-testid="pages-resize" onpointerdown={resize}></div>
+  {/if}
+
   {#if current}
     <FeegaFile bind:this={feegaFile} page={current.href} />
   {/if}
@@ -176,13 +207,14 @@
 <style>
   .pages {
     --row-h: 28px;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--ui-line);
+    padding: 4px 6px 0;
   }
   .pages.touch {
     --row-h: var(--touch-target);
+    padding: 0;
   }
 
   .pages-head {
@@ -190,20 +222,30 @@
     align-items: center;
     gap: 2px;
     height: var(--row-h);
-    padding: 0 2px 0 8px;
   }
-  .pages-label {
+
+  .pages-toggle {
+    display: flex;
     flex: 1 1 auto;
-    font-size: 11px;
-    font-weight: var(--ui-weight-semibold);
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
     color: var(--ui-text-secondary);
+    text-align: left;
+  }
+
+  .pages-label {
+    font-size: 11px;
+    font-weight: var(--ui-weight-medium);
   }
 
   .pages-list {
     margin: 0;
     padding: 0;
     list-style: none;
-    max-height: 30vh;
     overflow-y: auto;
   }
 
@@ -215,11 +257,11 @@
     color: var(--ui-text);
   }
   .page-row:hover {
-    background: var(--ui-hover);
+    background: color-mix(in srgb, var(--ui-text) 5%, transparent);
   }
   .page-row.is-current {
-    background: var(--ui-selected);
-    font-weight: var(--ui-weight-semibold);
+    background: color-mix(in srgb, var(--ui-text) 9%, transparent);
+    font-weight: var(--ui-weight-medium);
   }
 
   .page-link {
@@ -228,10 +270,14 @@
     flex: 1 1 auto;
     min-width: 0;
     height: 100%;
-    padding: 0 8px;
-    font-size: var(--ui-type-body);
+    padding: 0 8px 0 20px;
+    font-size: 12px;
     text-decoration: none;
     color: inherit;
+  }
+  .touch .page-link {
+    font-size: 15px;
+    padding-left: 12px;
   }
   .page-name {
     overflow: hidden;
@@ -243,16 +289,41 @@
     display: grid;
     place-items: center;
     flex: none;
-    width: var(--row-h);
-    height: var(--row-h);
+    width: 24px;
+    height: 24px;
+    margin-right: 2px;
     border: 0;
     border-radius: var(--ui-radius-sm);
     background: transparent;
     color: var(--ui-text-secondary);
   }
+  .touch :global(.pages-icon) {
+    width: var(--row-h);
+    height: var(--row-h);
+  }
   .pages :global(.pages-icon:hover) {
     background: var(--ui-hover);
     color: var(--ui-text);
+  }
+  .pages :global(.row-more) {
+    opacity: 0;
+  }
+  .page-row:hover :global(.row-more),
+  .page-row:focus-within :global(.row-more),
+  .pages :global(.row-more[data-state='open']),
+  .touch :global(.row-more) {
+    opacity: 1;
+  }
+
+  .pages-resize {
+    flex: none;
+    height: 7px;
+    margin: 0 -6px;
+    cursor: row-resize;
+    background: linear-gradient(var(--ui-divider), var(--ui-divider)) center / 100% 1px no-repeat;
+  }
+  .pages-resize:hover {
+    background-size: 100% 2px;
   }
 
   .rename-form {
@@ -260,15 +331,18 @@
     padding: 0 2px;
   }
   .rename-input {
+    box-sizing: border-box;
     width: 100%;
     height: calc(var(--row-h) - 4px);
-    padding: 0 6px;
-    border: 1px solid var(--ui-accent);
+    padding: 0 6px 0 18px;
+    border: 0;
     border-radius: var(--ui-radius-sm);
-    background: transparent;
+    box-shadow: var(--ui-ring);
+    background: var(--ui-panel);
     font: inherit;
-    font-size: max(12px, 1em);
+    font-size: 12px;
     color: inherit;
+    outline: none;
   }
   .touch .rename-input {
     font-size: 16px;
@@ -276,10 +350,10 @@
 
   .unseen-dot {
     flex: none;
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     margin-left: 6px;
-    background: #0b6bff;
-    border-radius: 9999px;
+    background: var(--ui-accent);
+    border-radius: var(--ui-radius-full);
   }
 </style>

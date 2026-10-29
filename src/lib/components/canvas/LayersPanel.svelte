@@ -38,10 +38,11 @@
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
-  const INDENT_PX = 14;
-  const FOLD_GUTTER = 24;
+  const INDENT_PX = 12;
+  const FOLD_GUTTER = 20;
+  const FOLD_ICON = 12;
   const PROBE_LANES = 6;
-  let { density = Density.Pointer }: { density?: Density } = $props();
+  let { density = Density.Pointer, searching = true }: { density?: Density; searching?: boolean } = $props();
   const rowStep = $derived(ROW_STEP_PX[density]);
   const OVERSCAN = 8;
   const FALLBACK_VIEW_PX = 1000;
@@ -174,7 +175,6 @@
   const shown = $derived(searchRows(rows, query));
   const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
-  const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
   const renamable = (row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
@@ -294,7 +294,10 @@
   {/each}
 {/if}
 
-<input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
+{#if searching}
+  <!-- svelte-ignore a11y_autofocus -->
+  <input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" autofocus={density === Density.Pointer} bind:value={query} onkeydown={(e) => e.stopPropagation()} />
+{/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
@@ -329,13 +332,13 @@
     >
       {#if (row.kind === LayerKind.Node && frames.has(row.id)) || row.foldable}
         <button type="button" class="fold" aria-label={folds.has(row.key) ? 'Unfold' : 'Fold'} aria-expanded={!folds.has(row.key)} data-testid="layer-fold" onclick={(e) => (e.stopPropagation(), fold(row.key))}>
-          {#if folds.has(row.key)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
+          {#if folds.has(row.key)}<ChevronRight size={FOLD_ICON} />{:else}<ChevronDown size={FOLD_ICON} />{/if}
         </button>
       {/if}
       {#if row.thumb}
         <img class="thumb" src={row.thumb} alt="" loading="lazy" decoding="async" data-testid="layer-thumb" />
       {/if}
-      <span class="icon" class:instance={row.instance} data-instance={row.instance || undefined} style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
+      <span class="icon" data-instance={row.instance || undefined}><RowIcon size={ICON} strokeWidth={1.75} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
         <input class="name-input" value={row.label} autofocus aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
@@ -347,12 +350,14 @@
         <IconButton size={IconSize.Sm} label="Send backward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Down, SUMMARY[LayerAction.Down]))}><ChevronDown /></IconButton>
       {/if}
       {#if editable(row)}
+        <span class="toggles" class:held={row.hidden || row.locked}>
         <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
           {#if row.hidden}<EyeOff />{:else}<Eye />{/if}
         </IconButton>
         <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
           {#if row.locked}<Lock />{:else}<LockOpen />{/if}
         </IconButton>
+        </span>
       {/if}
     </div>
   {:else}
@@ -378,12 +383,13 @@
 
 <style>
   .search {
+    box-sizing: border-box;
     width: 100%;
-    height: var(--ui-row);
-    margin-bottom: 8px;
-    padding: 0 10px;
+    height: var(--ui-row-sm);
+    margin-bottom: 4px;
+    padding: 0 8px;
     border: 0;
-    border-radius: var(--ui-radius-md);
+    border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
     color: var(--ui-text);
     font: inherit;
@@ -408,16 +414,16 @@
     flex-direction: column;
     gap: 1px;
     outline: none;
-    font-size: var(--ui-type-label);
+    font-size: 12px;
   }
 
   .row {
     display: flex;
     align-items: center;
     gap: 8px;
-    height: var(--ui-row);
-    padding-right: 6px;
-    border-radius: var(--ui-radius-md);
+    height: var(--ui-row-sm);
+    padding-right: 4px;
+    border-radius: var(--ui-radius-sm);
     color: var(--ui-text);
     cursor: default;
     user-select: none;
@@ -425,7 +431,7 @@
   }
 
   .layers.touch {
-    --ui-row: 44px;
+    --ui-row-sm: 44px;
   }
 
   .layers.touch :global(button) {
@@ -438,7 +444,7 @@
   }
 
   .row:hover {
-    background: var(--ui-wash);
+    background: var(--ui-hover);
   }
 
   .row[data-drop='above'] {
@@ -458,14 +464,11 @@
   }
 
   .row.picked {
-    background: var(--ui-accent-solid);
-    color: var(--ui-on-accent);
-    font-weight: var(--ui-weight-medium);
+    background: var(--ui-selected);
   }
 
-  .row.picked .icon,
-  .row.picked .flag {
-    color: var(--ui-on-accent);
+  .row.picked .icon {
+    color: var(--ui-text);
   }
 
   .row.inside {
@@ -488,11 +491,19 @@
   .icon {
     display: grid;
     place-items: center;
-    color: var(--hue, var(--ui-icon-ink));
+    color: var(--ui-icon-ink);
   }
 
-  .icon.instance {
-    color: #9747ff;
+  .toggles {
+    display: flex;
+    opacity: 0;
+  }
+
+  .row:hover .toggles,
+  .row:focus-within .toggles,
+  .toggles.held,
+  .layers.touch .toggles {
+    opacity: 1;
   }
 
   .thumb {
@@ -530,12 +541,12 @@
     place-items: center;
     width: 16px;
     height: 16px;
-    margin-left: -22px;
+    margin-left: -18px;
     padding: 0;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-xs);
     background: transparent;
-    color: var(--ui-text-3);
+    color: var(--ui-text-tertiary);
   }
 
   .fold:hover {
