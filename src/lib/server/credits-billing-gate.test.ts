@@ -13,7 +13,7 @@ vi.mock('./billing', () => ({
   billingProvider: async () => mockProvider.current
 }));
 
-function fakeProvider(kind: 'open' | 'feega', gate: BillingProvider['gate']): BillingProvider {
+function fakeProvider(kind: 'open' | 'dazero', gate: BillingProvider['gate']): BillingProvider {
   return {
     kind,
     gate,
@@ -26,7 +26,7 @@ function fakeProvider(kind: 'open' | 'feega', gate: BillingProvider['gate']): Bi
 describe('gateCredits() delegation', () => {
   it('propagates a denial thrown by the provider (mirrors feega when the ledger is exhausted)', async () => {
     const { CreditsExhaustedError } = await import('$lib/server/credits');
-    mockProvider.current = fakeProvider('feega', async () => {
+    mockProvider.current = fakeProvider('dazero', async () => {
       throw new CreditsExhaustedError({
         used: 400,
         quota: 400,
