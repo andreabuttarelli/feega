@@ -112,6 +112,7 @@ export enum Command {
   Opacity100 = 'opacity-100',
   CreateComponent = 'create-component',
   DetachInstance = 'detach-instance',
+  GoToMain = 'go-to-main',
   ResetInstance = 'reset-instance',
   PushInstance = 'push-instance',
   ToolSelect = 'tool-select',

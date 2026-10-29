@@ -93,6 +93,7 @@ describe('group and ungroup', () => {
       ['outline-stroke', 'Mod+Alt+O'],
       ['outline-text', 'Mod+Shift+O'],
       ['create-component', 'Mod+Alt+K'],
+      ['go-to-main', null],
       ['detach-instance', null],
       ['push-instance', null],
       ['reset-instance', null],

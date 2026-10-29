@@ -123,7 +123,7 @@
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
   import { fetchComponentSource } from '$lib/canvas/project-components';
-  import { placeInstance } from '$lib/motion/canvas-components';
+  import { homed, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -2973,6 +2973,22 @@
     }
   }
 
+  let mainPicked = 0;
+
+  $effect(() => {
+    const pick = props.pickMain;
+    const doc = pick ? liveOf(pick.nodeId)?.doc : null;
+    const clip = pick && doc ? mainClipOf(doc, pick.compId) : null;
+    if (!pick || !clip || pick.key === mainPicked) {
+      return;
+    }
+    mainPicked = pick.key;
+    untrack(() => {
+      select([pick.nodeId]);
+      goInside(pick.nodeId, Gesture.Click, clip);
+    });
+  });
+
   let componentOver = $state<string | null>(null);
   const componentOverBox = $derived(componentOver ? (coreFrames.find((f) => f.id === componentOver)?.box ?? null) : null);
 
@@ -2997,7 +3013,7 @@
       return;
     }
     const offset = { x: (world.x - (frame.box.x + frame.box.w / 2)) / frame.box.w, y: (world.y - (frame.box.y + frame.box.h / 2)) / frame.box.h };
-    commit(frame.id, placeInstance(saver.history.present, source, dragged.compId, () => crypto.randomUUID().slice(0, 8), offset), 'Inserted a component');
+    commit(frame.id, placeInstance(saver.history.present, homed(source, dragged.frameId), dragged.compId, () => crypto.randomUUID().slice(0, 8), offset), 'Inserted a component');
   }
 
   function onDrop(e: DragEvent) {

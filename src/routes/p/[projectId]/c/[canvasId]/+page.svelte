@@ -79,7 +79,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
+  import { afterNavigate, beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
   import { page, updated } from '$app/state';
   import { track } from '$lib/analytics';
   import { TEMPLATE_AUTO_INSERTED, WELCOME_PARAM, campaignOf } from '$lib/onboarding/campaigns';
@@ -164,6 +164,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import type { ComponentDrag } from '$lib/canvas/component-drag';
+  import { MAIN_PARAM, mainHref, mainNav, type MainPick } from '$lib/canvas/main-nav.svelte';
+  import { fetchProjectComponents } from '$lib/canvas/project-components';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
@@ -409,15 +411,38 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
+    const compId = page.url.searchParams.get(MAIN_PARAM);
     const clean = new URL(page.url);
     clean.searchParams.delete(FRAME_PARAM);
+    clean.searchParams.delete(MAIN_PARAM);
     replaceState(clean, page.state);
     if (nodes.some((n) => n.id === id)) {
       focusOn([id], undefined, FocusMode.Select);
+      mainPick = compId ? { nodeId: id, compId, key: (mainPick?.key ?? 0) + 1 } : mainPick;
+    }
+  }
+
+  let mainPick = $state<MainPick | null>(null);
+
+  async function showMain(frameId: string, compId: string) {
+    if (nodes.some((n) => n.id === frameId)) {
+      focusOn([frameId], undefined, FocusMode.Select);
+      mainPick = { nodeId: frameId, compId, key: (mainPick?.key ?? 0) + 1 };
+      return;
+    }
+    mainNav.canvases = await fetchProjectComponents(data.projectId);
+    const location = mainNav.where({ compId, home: frameId });
+    if (location) {
+      await goto(mainHref(data.projectId, location, frameId, compId));
     }
   }
 
   onMount(() => {
+    void fetchProjectComponents(data.projectId).then((found) => (mainNav.canvases = found));
+    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null) });
+  });
+
+  afterNavigate(() => {
     requestAnimationFrame(openLinkedFrame);
   });
 
@@ -4231,6 +4256,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
     onDropComponent={dropComponent}
+    pickMain={mainPick}
     onDropFeedImage={dropFeedImage}
     onFeedImageOver={feedImageOver}
     onDraw={drawElement}

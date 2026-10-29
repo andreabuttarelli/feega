@@ -79,6 +79,7 @@ export type SelectionActionId =
   | 'outline-text'
   | 'create-component'
   | 'detach-instance'
+  | 'go-to-main'
   | 'reset-instance'
   | 'push-instance'
   | 'hide'
@@ -157,6 +158,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'outline-text', label: 'Outline text', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+O' },
   { id: 'create-component', label: 'Create component', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+K' },
   { id: 'detach-instance', label: 'Detach instance', group: 'menu', minNodes: 1 },
+  { id: 'go-to-main', label: 'Go to main component', group: 'menu', minNodes: 1 },
   { id: 'push-instance', label: 'Push overrides to main', group: 'menu', minNodes: 1 },
   { id: 'reset-instance', label: 'Reset all overrides', group: 'menu', minNodes: 1 },
   { id: 'hide', label: 'Hide / show', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+H' },
@@ -196,7 +198,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'copy-properties', 'paste-properties', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'copy-properties', 'paste-properties', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -243,11 +245,11 @@ export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): 
   return SHOWN[id]?.(summaries) ?? true;
 }
 
-export type FrameOnlyActionId = 'create-component' | 'detach-instance' | 'push-instance' | 'reset-instance' | 'hide' | 'lock' | 'copy-properties' | 'paste-properties' | 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'auto-layout' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
+export type FrameOnlyActionId = 'create-component' | 'go-to-main' | 'detach-instance' | 'push-instance' | 'reset-instance' | 'hide' | 'lock' | 'copy-properties' | 'paste-properties' | 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'auto-layout' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
 
 export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId | FrameModeActionId>;
 
-const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['create-component', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
+const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
 
 export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameAction(id);
 

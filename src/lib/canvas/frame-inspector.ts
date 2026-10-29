@@ -1,5 +1,6 @@
 import { compOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { Action, type ActionId } from '$lib/motion/actions';
+import { mainNav } from './main-nav.svelte';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
 import { ungroupClip } from '$lib/motion/group';
 import { groupLight, ungroupLight } from '$lib/motion/light-group';
@@ -150,6 +151,14 @@ const inMask = (doc: MotionDoc, selection: readonly string[]) => {
 const flip = (way: Flip, summary: string): BarOp => ({ shown: any, run: (ctx) => kept(ctx, flipClips(ctx.doc, ctx.selection, way), summary) });
 
 const oneInstance = (doc: MotionDoc, selection: readonly string[]) => selection.length === 1 && instanceOf(doc, selection[0]) !== null;
+function goToMain(doc: MotionDoc, clipId: string): null {
+  const instance = instanceOf(doc, clipId);
+  if (instance) {
+    mainNav.go({ compId: instance.compId, home: instance.comp.component?.home ?? null });
+  }
+  return null;
+}
+
 const COMPONENT_NAME = 'Component';
 const componentName = (doc: MotionDoc) => `${COMPONENT_NAME} ${Object.values(doc.comps).filter((c) => c.component).length + 1}`;
 
@@ -200,6 +209,7 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Command.SendToBack]: arrangeOp(Arrange.Back, 'Sent to back'),
   [Action.TidyUp]: { shown: several, run: (ctx) => kept(ctx, tidySpace(ctx.doc, ctx.selection, ctx.frame, propBoxes(ctx.doc), EditMode.Design), 'Tidied up') },
   [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
+  [Action.GoToMain]: { shown: oneInstance, run: (ctx) => goToMain(ctx.doc, ctx.selection[0]) },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
   [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
   [Action.ResetInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, resetOverrides(ctx.doc, ctx.selection[0]), 'Reset all overrides') },

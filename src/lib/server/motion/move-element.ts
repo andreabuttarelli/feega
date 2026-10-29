@@ -8,7 +8,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { DocNodeType, FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, leftEmpty, motionNodeSize, type DocNodeShape } from '$lib/canvas/motion-node';
 import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
-import { placeInstance } from '$lib/motion/canvas-components';
+import { homed, placeInstance } from '$lib/motion/canvas-components';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { gradientFillSchema } from '@feega/motion-core/motion/fill/model';
 import { FILL_RULES } from '@feega/motion-core/motion/shape/schema';
@@ -300,7 +300,8 @@ export async function placeComponent(store: FrameStore, ask: ComponentAsk): Prom
     return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
   }
   const instanceId = newId();
-  const placed = placeInstance(source.doc, source.doc, ask.compId, () => instanceId);
+  const from = homed(source.doc, source.nodeId);
+  const placed = placeInstance(from, from, ask.compId, () => instanceId);
   if (!placed.ok) {
     return refused(MoveOutcome.Invalid, placed.error);
   }
