@@ -13,6 +13,7 @@
   import ComponentsList from './ComponentsList.svelte';
   import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
   import X from '@lucide/svelte/icons/x';
+  import Search from '@lucide/svelte/icons/search';
   import { IconButton, IconSize, Side } from '$lib/components/ui/shell';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
 
@@ -40,12 +41,28 @@
   } = $props();
 
 
+  const SECTION_ICON = 14;
+  let searching = $state(false);
+
   const panelWidth = $derived(PANEL_WIDTHS[kind] ?? PANEL_WIDTHS.assets);
 </script>
 
 {#if kind === 'influencers'}
   <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
     <InfluencersPanel {projectId} {onclose} />
+  </div>
+{:else if kind === 'layers'}
+  <div class="left-panel is-tree" style={`width: min(${panelWidth}px, calc(100vw - 92px));`} data-testid="pages-layers">
+    <PagesList {...pages} />
+    <div class="section-head">
+      <span class="section-label">{$_(labelKey)}</span>
+      <button type="button" class="section-icon" class:on={searching} data-testid="layers-search-toggle" aria-label="Search layers" aria-pressed={searching} onclick={() => (searching = !searching)}>
+        <Search size={SECTION_ICON} />
+      </button>
+    </div>
+    <div class="left-panel-body">
+      <LayersPanel {searching} />
+    </div>
   </div>
 {:else}
   <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 92px));`}>
@@ -56,10 +73,7 @@
       </IconButton>
     </div>
     <div class="left-panel-body">
-      {#if kind === 'layers'}
-        <PagesList {...pages} />
-        <LayersPanel />
-      {:else if kind === 'components'}
+      {#if kind === 'components'}
         <ProjectComponentsPanel {projectId} />
       {:else if kind === 'brands'}
         <BrandsPanel {projectId} />
@@ -114,5 +128,42 @@
     min-height: 0;
     overflow-y: auto;
     padding: 6px;
+  }
+
+  .is-tree .left-panel-body {
+    padding: 0 6px 6px;
+  }
+
+  .section-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    height: var(--ui-row-sm);
+    margin-top: 4px;
+    padding: 0 6px 0 14px;
+  }
+
+  .section-label {
+    flex: 1 1 auto;
+    font-size: 11px;
+    font-weight: var(--ui-weight-medium);
+    color: var(--ui-text-secondary);
+  }
+
+  .section-icon {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+  }
+
+  .section-icon:hover,
+  .section-icon.on {
+    background: var(--ui-hover);
+    color: var(--ui-text);
   }
 </style>
