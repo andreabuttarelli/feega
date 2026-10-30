@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { BarContext } from './bottom-bar';
+import { EditorMode } from './editor-mode.svelte';
 import { InsertSection, insertMenuMaxHeight, insertSections } from './insert-menu';
 
 describe('the + insert menu', () => {
   it('on the canvas offers tools, generate nodes, hot models, import and templates, in that order', () => {
-    expect(insertSections(BarContext.Canvas)).toEqual([InsertSection.Tools, InsertSection.Generate, InsertSection.Models, InsertSection.Import, InsertSection.Templates]);
+    expect(insertSections(BarContext.Canvas, EditorMode.Design)).toEqual([InsertSection.Tools, InsertSection.Generate, InsertSection.Models, InsertSection.Import, InsertSection.Templates]);
   });
 
   it('a selected frame adds its own section at the end', () => {
-    expect(insertSections(BarContext.Frame)).toEqual([...insertSections(BarContext.Canvas), InsertSection.Frame]);
+    expect(insertSections(BarContext.Frame, EditorMode.Design)).toEqual([...insertSections(BarContext.Canvas, EditorMode.Design), InsertSection.Frame]);
+  });
+
+  it('Play and Code drop the tools and generate sections, as they drop the pinned groups', () => {
+    expect(insertSections(BarContext.Canvas, EditorMode.Play)).toEqual([InsertSection.Models, InsertSection.Import, InsertSection.Templates]);
+    expect(insertSections(BarContext.Canvas, EditorMode.Code)).not.toContain(InsertSection.Tools);
   });
 });
 

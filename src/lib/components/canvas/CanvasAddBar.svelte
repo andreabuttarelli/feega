@@ -14,7 +14,7 @@
   import ImagePlus from '@lucide/svelte/icons/image-plus';
   import Plus from '@lucide/svelte/icons/plus';
   import { DockPlace, toolsIn } from '$lib/canvas/draw-dock';
-  import { BAR_SLOTS, BarContext, BarSlot } from '$lib/canvas/bottom-bar';
+  import { BAR_COMPACT_QUERY, BarContext, BarSlot, BarWidth, PINNED_GENERATE, PINNED_TOOLS, barSlots } from '$lib/canvas/bottom-bar';
   import { INSERT_SECTION_TITLE, InsertSection, insertMenuMaxHeight, insertSections } from '$lib/canvas/insert-menu';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -225,12 +225,26 @@
     return () => query.removeEventListener('change', follow);
   });
 
+  let compact = $state(typeof matchMedia === 'function' && matchMedia(BAR_COMPACT_QUERY).matches);
+
+  $effect(() => {
+    const query = matchMedia(BAR_COMPACT_QUERY);
+    const follow = () => (compact = query.matches);
+    query.addEventListener('change', follow);
+    return () => query.removeEventListener('change', follow);
+  });
+
+  const slots = $derived(barSlots(editorMode.current, compact ? BarWidth.Compact : BarWidth.Wide));
+
   type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof Plus; run: () => void; hint?: string; drag?: Addable; tool?: DrawTool; model?: HotModel };
 
   const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], hint: `${ADDABLE_LABEL[what]} (${slot(what)})`, icon: ADDABLE_ICON[what], run: () => onpick?.(what), drag: what });
   const toolTile = (t: (typeof DRAW_TOOLS)[number]): Tile => ({ id: `draw-${t.tool}`, label: t.name, hint: t.label, icon: t.icon, run: () => (frameBar.tool = t.tool), tool: t.tool });
   const modelTile = (m: HotModel): Tile => ({ id: `model-${m.id}`, label: m.label, hint: m.label, icon: Plus, run: () => onmodel?.(m), model: m });
   const optional = (tile: Tile, shown: unknown): Tile[] => (shown ? [tile] : []);
+
+  const pinnedTools = PINNED_TOOLS.map(toolOf);
+  const pinnedGenerate = $derived(PINNED_GENERATE.filter(offered).map(addTile));
 
   const SECTION_TILES: Record<InsertSection, () => Tile[]> = {
     [InsertSection.Tools]: () => MENU_TOOLS.map(toolTile),
@@ -255,7 +269,7 @@
   };
 
   const sections = $derived(
-    insertSections(context)
+    insertSections(context, editorMode.current)
       .map((section) => ({ section, title: INSERT_SECTION_TITLE[section], tiles: SECTION_TILES[section]() }))
       .filter((s) => s.tiles.length)
   );
@@ -283,6 +297,8 @@
 
   const SLOT: Record<BarSlot, Snippet> = {
     [BarSlot.Select]: selectSlot,
+    [BarSlot.Draw]: drawSlot,
+    [BarSlot.Generate]: generateSlot,
     [BarSlot.Insert]: insertSlot,
     [BarSlot.Comment]: commentSlot
   };
@@ -295,6 +311,37 @@
     </button>
     <span class="add-tip" role="tooltip">{SELECT_TOOL.label}</span>
   </span>
+{/snippet}
+
+{#snippet drawSlot()}
+  <span class="mode-divider" aria-hidden="true"></span>
+  <div class="group pinned" role="group" aria-label="Tools" data-testid="pinned-tools">
+    {#each pinnedTools as t (t.tool)}
+      <span class="tool">
+        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} data-tool={t.tool} draggable={drawsBox(t.tool) ? 'true' : undefined} ondragstart={(e) => e.dataTransfer?.setData(CANVAS_DRAG_TOOL, t.tool)} onclick={() => (frameBar.tool = t.tool)}>
+          <t.icon size={17} strokeWidth={1.7} />
+        </button>
+        <span class="add-tip" role="tooltip">{t.label}</span>
+      </span>
+    {/each}
+  </div>
+{/snippet}
+
+{#snippet generateSlot()}
+  {#if pinnedGenerate.length}
+    <span class="mode-divider" aria-hidden="true"></span>
+    <div class="group pinned" role="group" aria-label="Generate" data-testid="pinned-generate">
+      {#each pinnedGenerate as tile (tile.id)}
+        <span class="tool">
+          <button type="button" class="pick" aria-label={tile.label} data-pinned={tile.id} draggable="true" ondragstart={(e) => startDrag(e, tile)} onclick={() => insert(tile)}>
+            <tile.icon size={17} strokeWidth={1.7} />
+          </button>
+          <span class="add-tip" role="tooltip">{tile.hint}</span>
+        </span>
+      {/each}
+    </div>
+    <span class="mode-divider" aria-hidden="true"></span>
+  {/if}
 {/snippet}
 
 {#snippet insertSlot()}
@@ -367,7 +414,7 @@
 <div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
   {#if !phone}{@render modeSlot()}{/if}
   <div class="group" data-testid={`bar-${context}`}>
-    {#each BAR_SLOTS as s (s)}{@render SLOT[s]()}{/each}
+    {#each slots as s (s)}{@render SLOT[s]()}{/each}
   </div>
   {#if zoom !== undefined}
     <span class="zoom" data-testid="canvas-zoom" title="Zoom · 0 fits the canvas">{Math.round(zoom * PERCENT)}%</span>
