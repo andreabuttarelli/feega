@@ -77,4 +77,12 @@ describe('repeatedOf', () => {
 
     expect(found.components.map((c) => c.name)).toEqual(['Card']);
   });
+
+  it('buttons of the same style and different heights are Size variants of one set', () => {
+    const tall = (label: string, x: number): RestNode => ({ ...button(label, x, BLUE), absoluteBoundingBox: { x, y: 20, width: 160, height: 56 } });
+    const { root, components } = repeatedOf(page([button('Start', 0, BLUE), button('Go', 140, BLUE), tall('Buy', 280), tall('Try', 460), button('Docs', 640, BLACK), button('Help', 780, BLACK)]));
+
+    expect(components).toHaveLength(1);
+    expect(new Set(root.children!.map((c) => c.name))).toEqual(new Set(['Button / Style=Primary, Size=Small', 'Button / Style=Primary, Size=Large', 'Button / Style=Secondary, Size=Small', 'Button']));
+  });
 });
