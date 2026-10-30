@@ -24,6 +24,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
 
+### A fresh core raster per still costs seconds, whatever its size
+**Signal:** a batch of small stills (component thumbnails, posters) takes 1–2 s each; timings show `raster.draw` in a few ms and the first `createImageBitmap(canvas)` eating the rest, the same at 1920×1080 and at 192×50. **Move:** the cost is the new GL context compiling its shaders on first readback, not pixels. Create one raster (`stillRaster` in `core-export.ts`) and reuse it for the whole batch; dispose it when idle.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them

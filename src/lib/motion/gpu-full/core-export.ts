@@ -53,3 +53,36 @@ export async function renderOnCore(prepared: Prepared, backend: FullBackend, tim
     media.dispose();
   }
 }
+
+export type Size = { width: number; height: number };
+
+export type StillRaster = { shoot: (prepared: Prepared, time: number, size: Size) => Promise<ImageBitmap | null>; dispose: () => void };
+
+export async function stillRaster(backend: FullBackend, side: number): Promise<StillRaster | null> {
+  const canvas = document.createElement('canvas');
+  const raster = (await BACKENDS[backend](canvas, side, side).catch(() => null)) as CoreRaster | null;
+  if (!raster) {
+    return null;
+  }
+  const media = createMedia({ frames: originalFrames() });
+
+  async function shoot(prepared: Prepared, time: number, size: Size): Promise<ImageBitmap | null> {
+    if (!coreExportable(prepared, [time])) {
+      return null;
+    }
+    const list = drawFrame(prepared, frameAt(prepared, time));
+    await media.ready(list);
+    if (raster!.draw(list, media.pictures).length) {
+      return null;
+    }
+    return createImageBitmap(canvas, 0, 0, Math.min(side, size.width), Math.min(side, size.height));
+  }
+
+  return {
+    shoot,
+    dispose: () => {
+      raster.dispose();
+      media.dispose();
+    }
+  };
+}

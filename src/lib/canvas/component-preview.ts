@@ -127,3 +127,27 @@ export function fitInTile(crop: Crop, side: number): TileFit {
   const scale = side / Math.max(crop.width, crop.height);
   return { scale, width: Math.round(crop.width * scale), height: Math.round(crop.height * scale) };
 }
+
+export type FramedDoc = { doc: MotionDoc; width: number; height: number };
+
+export function framedDoc(preview: MotionDoc, crop: Crop, side: number): FramedDoc {
+  const fit = fitInTile(crop, side);
+  const transform = { scale: fit.scale, anchorX: 0, anchorY: 0, x: (-crop.left * fit.scale) / preview.width, y: (-crop.top * fit.scale) / preview.height };
+  const tracks = preview.tracks.map((t) => (t.id === PREVIEW_HOST ? { ...t, clips: t.clips.map((c) => ({ ...c, transform })) } : t));
+  return { doc: { ...preview, tracks }, width: Math.max(1, fit.width), height: Math.max(1, fit.height) };
+}
+
+export enum Freshness {
+  Current = 'current',
+  Stale = 'stale',
+  Missing = 'missing'
+}
+
+export type StoredMark = { revision: number; hash: string };
+
+export function freshness(stored: StoredMark | undefined, revision: number): Freshness {
+  if (!stored) {
+    return Freshness.Missing;
+  }
+  return stored.revision === revision ? Freshness.Current : Freshness.Stale;
+}
