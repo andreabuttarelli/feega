@@ -18,3 +18,12 @@ unreadable below ~30%.
   larger label would be cut otherwise.
 
 Discarded: a screen-space text pass (new pipeline, second place that knows frame geometry).
+
+## Outlines and handles
+
+Hover ring, selection ring and resize handles were world-space, so they thinned as the canvas
+zoomed out. `label-size.ts` now also holds their screen widths: hover 1.5px, selection 2px,
+handles 8px, boosted up to 1.5x from 25% down to 5% (`strokeWorld`). Drawn at a 16-steps-per-octave
+zoom (`strokeZoomStep`, within 3%), so only ringed tiles rebuild per step. The live hover box in
+`overlay.ts` uses the same function. `FrameSelection.svelte` (DOM) is already screen-space and
+unchanged.
