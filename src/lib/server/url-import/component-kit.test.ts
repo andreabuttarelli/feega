@@ -4,6 +4,8 @@ import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { VarType } from '@feega/motion-core/motion/variables-model';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import { defineVariable } from '$lib/motion/variables';
+import { colourDistance } from './page-tokens';
+import { State, stateShade } from './component-kit';
 import { FULL_SHAPE, urlPlan, type UrlPlan } from './url-doc';
 import type { PageTree } from './page-tree';
 
@@ -114,5 +116,32 @@ describe('repeated blocks of an imported page become a component kit', () => {
 
     expect(backdrop.component).toBe('Shape');
     expect(backdrop.bind?.fill).toBe('Acme/Background');
+  });
+});
+
+describe('hover and pressed shades are visibly different from their base', () => {
+  it.each(['#62666d', '#7a7a7a', '#1c1d1f', '#f7f8f8', '#ffffff', '#000000', '#5e6ad2'])('%s: hover moves at least 6, pressed at least 12', (base) => {
+    expect(colourDistance(base, stateShade(base, State.Hover))).toBeGreaterThanOrEqual(6);
+    expect(colourDistance(base, stateShade(base, State.Pressed))).toBeGreaterThanOrEqual(12);
+  });
+});
+
+const framed = (doc: MotionDoc) => [{ tracks: doc.tracks, width: doc.width, height: doc.height }, ...Object.values(doc.comps).map((c) => ({ tracks: c.tracks, width: c.frame?.width ?? doc.width, height: c.frame?.height ?? doc.height }))];
+
+const radiusPx = (doc: MotionDoc, key: string) =>
+  framed(doc).flatMap((s) => (s.tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => c.bind?.radius === key).map((c) => Number(c.props.roundness) * Math.min(Number(c.props.width) * s.width, Number(c.props.height) * s.height)));
+
+describe('corner radii are bound to radius variables', () => {
+  it('a button corner is a rect bound to its radius variable and follows an edit', () => {
+    const doc = pageOf(planned());
+    const radius = 'Radius S';
+    const px = Number(doc.variables!.Acme.vars[radius].values.Default);
+    const key = `Acme/${radius}`;
+
+    expect(radiusPx(doc, key).length).toBeGreaterThan(0);
+    radiusPx(doc, key).forEach((r) => expect(r).toBeCloseTo(px, 0));
+
+    const edited = ok(defineVariable(doc, 'Acme', radius, { type: VarType.Number, values: { Default: 4 } }));
+    radiusPx(edited, key).forEach((r) => expect(r).toBeCloseTo(4, 0));
   });
 });

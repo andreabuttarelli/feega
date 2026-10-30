@@ -11,18 +11,19 @@ export const SHEET_NAME = 'Components';
 const MARGIN_PX = 80;
 const GAP_PX = 48;
 const BESIDE_PX = 240;
+const GRID_RATIO = 1.6;
 const BACKGROUND = 'Background';
 
 type Box = { left: number; top: number; right: number; bottom: number };
 
-function boxOf(comp: MotionComp): Box | null {
+function boxOf(comp: MotionComp, frame: { width: number; height: number }): Box | null {
   const boxes = comp.tracks
     .flatMap((t) => t.clips as MotionClip[])
     .filter((c) => !c.parent && Number(c.props.width) > 0 && Number(c.props.height) > 0)
     .map((c) => {
       const [x, y, w, h] = [c.props.x, c.props.y, c.props.width, c.props.height].map(Number);
       const [dx, dy] = [Number(c.transform?.x ?? 0), Number(c.transform?.y ?? 0)];
-      return { left: x - w / 2 + dx, top: y - h / 2 + dy, right: x + w / 2 + dx, bottom: y + h / 2 + dy };
+      return { left: (x - w / 2 + dx) * frame.width, top: (y - h / 2 + dy) * frame.height, right: (x + w / 2 + dx) * frame.width, bottom: (y + h / 2 + dy) * frame.height };
     });
   if (!boxes.length) {
     return null;
@@ -33,8 +34,9 @@ function boxOf(comp: MotionComp): Box | null {
 type Main = { id: string; set: string; box: Box };
 
 function mainsOf(doc: MotionDoc): Main[] {
+  const frame = { width: doc.width, height: doc.height };
   return Object.entries(doc.comps).flatMap(([id, comp]) => {
-    const box = comp.component ? boxOf(comp) : null;
+    const box = comp.component ? boxOf(comp, frame) : null;
     return box ? [{ id, set: comp.component!.set ?? id, box }] : [];
   });
 }
@@ -43,6 +45,36 @@ function rowsOf(mains: Main[]): Main[][] {
   const rows = new Map<string, Main[]>();
   mains.forEach((m) => rows.set(m.set, [...(rows.get(m.set) ?? []), m]));
   return [...rows.values()];
+}
+
+const widthOf = (m: Main) => m.box.right - m.box.left;
+const heightOf = (m: Main) => m.box.bottom - m.box.top;
+
+type Spot = { main: Main; left: number; top: number };
+
+function gridOf(mains: Main[], room: number): Spot[] {
+  const area = mains.reduce((sum, m) => sum + (widthOf(m) + GAP_PX) * (heightOf(m) + GAP_PX), 0);
+  const line = Math.min(room, Math.max(...mains.map(widthOf), Math.sqrt(area * GRID_RATIO)));
+  const spots: Spot[] = [];
+  let [left, top, tall] = [0, 0, 0];
+  const wrap = () => {
+    [left, top, tall] = [0, top + tall + GAP_PX, 0];
+  };
+  for (const row of rowsOf(mains)) {
+    const span = row.reduce((sum, m) => sum + widthOf(m) + GAP_PX, -GAP_PX);
+    if (left > 0 && left + span > line) {
+      wrap();
+    }
+    for (const main of row) {
+      if (left > 0 && left + widthOf(main) > line) {
+        wrap();
+      }
+      spots.push({ main, left, top });
+      left += widthOf(main) + GAP_PX;
+      tall = Math.max(tall, heightOf(main));
+    }
+  }
+  return spots;
 }
 
 function insideComps(doc: MotionDoc): Set<string> {
@@ -70,17 +102,10 @@ export function componentSheet(item: PlanItem, newId: NewId): PlanItem | null {
   if (!mains.length) {
     return null;
   }
-  const [mx, my, gx, gy] = [MARGIN_PX / source.width, MARGIN_PX / source.height, GAP_PX / source.width, GAP_PX / source.height];
   let doc = backdropped(source, newId);
-  let top = my;
-  for (const row of rowsOf(mains)) {
-    let left = mx;
-    for (const main of row) {
-      const placed = placeInstance(doc, source, main.id, newId, { x: left - main.box.left, y: top - main.box.top });
-      doc = placed.ok ? placed.doc : doc;
-      left += main.box.right - main.box.left + gx;
-    }
-    top += Math.max(...row.map((m) => m.box.bottom - m.box.top)) + gy;
+  for (const { main, left, top } of gridOf(mains, source.width - 2 * MARGIN_PX)) {
+    const placed = placeInstance(doc, source, main.id, newId, { x: (MARGIN_PX + left - main.box.left) / source.width, y: (MARGIN_PX + top - main.box.top) / source.height });
+    doc = placed.ok ? placed.doc : doc;
   }
   const inside = insideComps(doc);
   return { ...item, doc, name: SHEET_NAME, centre: { x: item.centre.x + item.size.width + BESIDE_PX, y: item.centre.y }, images: item.images.filter((i) => inside.has(i.clipId)) };

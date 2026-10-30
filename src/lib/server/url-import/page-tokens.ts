@@ -31,7 +31,7 @@ const MAX_EFFECTS = 4;
 const MAX_GRADIENTS = 4;
 const MAX_SPACING = 10;
 const DISPLAY_PX = 48;
-const FULL_RADIUS = 999;
+export const FULL_RADIUS = 999;
 const TIER = 1e12;
 const LIGHTNESS = 100;
 const ALL_PAINTS = Object.values(ColourPaint);
@@ -48,7 +48,9 @@ function labOf(hex: string): Lab {
 
 const distance = (a: Lab, b: Lab) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
-export const sameColour = (a: string, b: string) => distance(labOf(a), labOf(b)) <= SAME_COLOUR;
+export const colourDistance = (a: string, b: string) => distance(labOf(a), labOf(b));
+
+export const sameColour = (a: string, b: string) => colourDistance(a, b) <= SAME_COLOUR;
 
 const chromatic = (c: Cluster) => Math.hypot(c.lab[1], c.lab[2]) > CHROMATIC;
 
@@ -136,7 +138,17 @@ function paintName(c: Cluster): string {
   return PAINT_NAME[paint];
 }
 
-const extraName = (c: Cluster) => (chromatic(c) ? hueName(c) : paintName(c));
+const DARK_TINT = 25;
+const LIGHT_TINT = 80;
+
+const TINT_NAMES: { when: (c: Cluster) => boolean; name: (hue: string) => string }[] = [
+  { when: (c) => c.lab[0] <= DARK_TINT, name: (hue) => (hue === 'Blue' ? 'Navy' : 'Ink') },
+  { when: (c) => c.lab[0] >= LIGHT_TINT, name: () => 'Tint' }
+];
+
+const tintName = (c: Cluster) => TINT_NAMES.find((t) => t.when(c))?.name(hueName(c));
+
+const extraName = (c: Cluster) => (chromatic(c) ? (tintName(c) ?? hueName(c)) : paintName(c));
 
 function unique(name: string, taken: readonly string[]): string {
   if (!taken.includes(name)) {

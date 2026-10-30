@@ -7,6 +7,7 @@ export type Repeated = { root: RestNode; components: FoundComponent[] };
 const MIN_SIDE = 16;
 const MIN_PARTS = 2;
 const MIN_OCCURRENCES = 2;
+const BUTTON_NAME = 'Button';
 const BUTTON_HEIGHT = 64;
 const LINK_HEIGHT = 48;
 const HEADER_BOTTOM = 120;
@@ -14,19 +15,21 @@ const CANDIDATES = new Set(['FRAME', 'GROUP']);
 const STYLE_VALUES = ['Primary', 'Secondary', 'Tertiary'];
 const STYLE_PROP = 'Style';
 const SIZE_PROP = 'Size';
+const SHAPE_PROP = 'Variant';
+const ONE_SET_NAMES = new Set(['Logo']);
 const SIZE_STEP_PX = 4;
 const MAX_SIZES = 3;
 const SIZED = /^(Button|Nav link|Link)( \d+)?$/;
 const SIZE_VALUES: Record<number, string[]> = { 2: ['Small', 'Large'], 3: ['Small', 'Medium', 'Large'] };
 
-type Seen = { node: RestNode; order: number; skeleton: string; parts: number; style: string; size: number };
+type Seen = { node: RestNode; order: number; skeleton: string; parts: number; style: string; size: number; cta: boolean };
 type Facts = { tag: string; painted: boolean; texts: number; image: boolean; icon: boolean; height: number; y: number };
 type Group = Seen[];
 type Chosen = { name: string; variants: Group[] };
 
 const NAMES: { name: string | ((f: Facts) => string); when: (f: Facts) => boolean }[] = [
   { name: 'Logo', when: (f) => !f.texts && (f.image || f.icon) },
-  { name: 'Button', when: (f) => f.tag === 'button' || (f.painted && f.texts === 1 && !f.image && f.height <= BUTTON_HEIGHT) },
+  { name: BUTTON_NAME, when: (f) => f.tag === 'button' || (f.painted && f.texts === 1 && !f.image && f.height <= BUTTON_HEIGHT) },
   { name: (f) => (f.y < HEADER_BOTTOM ? 'Nav link' : 'Link'), when: (f) => f.tag === 'a' && f.height <= LINK_HEIGHT },
   { name: 'List item', when: (f) => f.tag === 'li' },
   { name: 'Card', when: (f) => f.image && f.texts > 0 },
@@ -48,6 +51,11 @@ function factsOf(n: RestNode): Facts {
     facts.icon ||= d.type === 'VECTOR';
   });
   return facts;
+}
+
+function ctaSkeleton(n: RestNode): string | null {
+  const facts = factsOf(n);
+  return facts.painted && nameOf(n) === BUTTON_NAME ? `${BUTTON_NAME}${n.layoutMode ?? ''}|texts=${facts.texts}|icon=${facts.icon}` : null;
 }
 
 function nameOf(n: RestNode): string {
@@ -80,7 +88,8 @@ function seenOf(root: RestNode): { seen: Seen[]; parent: Map<string, string> } {
     const skeleton = `${leafOf(n)}${n.layoutMode ?? ''}[${kids.map((k) => k.skeleton).join(',')}]`;
     const parts = 1 + kids.reduce((sum, k) => sum + k.parts, 0);
     if (n !== root && CANDIDATES.has(n.type) && parts >= MIN_PARTS && bigEnough(n) && drawn(n)) {
-      seen.push({ node: n, order: at, skeleton, parts, style: styleOf(n), size: Math.round((n.absoluteBoundingBox?.height ?? 0) / SIZE_STEP_PX) });
+      const cta = ctaSkeleton(n);
+      seen.push({ node: n, order: at, skeleton: cta ?? skeleton, cta: cta !== null, parts, style: styleOf(n), size: Math.round((n.absoluteBoundingBox?.height ?? 0) / SIZE_STEP_PX) });
     }
     return { skeleton, parts };
   };
@@ -98,7 +107,7 @@ function groupedBy<T>(items: T[], key: (t: T) => string): T[][] {
 
 function variantsOf(sets: Seen[]): Group[] {
   const byStyle = groupedBy(sets, (s) => s.style);
-  const repeated = byStyle.some((g) => g.length >= MIN_OCCURRENCES);
+  const repeated = byStyle.some((g) => g.length >= MIN_OCCURRENCES) || (Boolean(sets[0]?.cta) && sets.length >= MIN_OCCURRENCES);
   if (!repeated) {
     return [];
   }
@@ -142,10 +151,14 @@ const sizeValue = (index: number, count: number) => SIZE_VALUES[count]?.[index] 
 
 function variantNames(name: string, variants: Group[]): Map<Group, string> {
   const styles = [...new Set(variants.map((g) => g[0].style))];
+  const numbered = new Set(variants.map((g) => g[0].skeleton)).size > 1;
   const uniform = SIZED.test(name) && variants.every((g) => g.every((s) => s.size === g[0].size));
   const sizes = uniform ? [...new Set(variants.map((g) => g[0].size))].sort((a, b) => a - b) : [];
   return new Map(
     variants.map((g) => {
+      if (numbered) {
+        return [g, `${SHAPE_PROP}=${variants.indexOf(g) + 1}`];
+      }
       const pairs = [...(styles.length > 1 ? [`${STYLE_PROP}=${styleValue(styles.indexOf(g[0].style))}`] : []), ...(sizes.length > 1 ? [`${SIZE_PROP}=${sizeValue(sizes.indexOf(g[0].size), sizes.length)}`] : [])];
       return [g, pairs.join(', ')];
     })
@@ -180,6 +193,22 @@ function marked(n: RestNode, marks: Map<string, Marking>): RestNode {
   return n.children ? { ...n, children: n.children.map((c) => marked(c, marks)) } : n;
 }
 
+function oneSetPerName(chosen: Chosen[]): Chosen[] {
+  const merged = new Map<string, Chosen>();
+  const kept = chosen.filter((c) => {
+    if (!ONE_SET_NAMES.has(c.name)) {
+      return true;
+    }
+    const first = merged.get(c.name);
+    merged.set(c.name, { name: c.name, variants: [...(first?.variants ?? []), ...c.variants] });
+    return !first;
+  });
+  return kept.map((c) => {
+    const one = merged.get(c.name);
+    return one ? { ...one, variants: [...one.variants].sort((a, b) => a[0].order - b[0].order) } : c;
+  });
+}
+
 function uniquelyNamed(chosen: Chosen[]): Chosen[] {
   const uses = new Map<string, number>();
   return chosen.map((c) => {
@@ -191,7 +220,7 @@ function uniquelyNamed(chosen: Chosen[]): Chosen[] {
 
 export function repeatedOf(root: RestNode): Repeated {
   const { seen, parent } = seenOf(root);
-  const chosen = uniquelyNamed(chosenOf(seen, parent));
+  const chosen = uniquelyNamed(oneSetPerName(chosenOf(seen, parent)));
   return {
     root: marked(root, markingsOf(chosen)),
     components: chosen.map(({ name, variants }) => ({ name, variants: variants.map((g) => ({ style: variantNames(name, variants).get(g) ?? '', occurrences: g.length })) }))

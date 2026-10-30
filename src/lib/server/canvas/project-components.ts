@@ -20,11 +20,12 @@ export async function listProjectComponents(db: Db, scope: Scope): Promise<Canva
   );
 
   return canvases.flatMap((canvas) => {
-    const components = docs
-      .filter(({ frame, head }) => frame.canvasId === canvas.id && head)
-      .flatMap(({ frame, head }) =>
-        componentGroups([{ id: frame.id, doc: head!.doc }]).map((group) => ({ ...group, thumb: posterOf(scope.projectId, canvas.id, frame.data), frameName: frame.displayName ?? FRAME_NAME, revision: head!.version }))
-      );
+    const inCanvas = docs.flatMap(({ frame, head }) => (frame.canvasId === canvas.id && head ? [{ frame, head }] : []));
+    const byId = new Map(inCanvas.map(({ frame, head }) => [frame.id, { frame, head }]));
+    const components = componentGroups(inCanvas.map(({ frame, head }) => ({ id: frame.id, doc: head.doc }))).map((group) => {
+      const { frame, head } = byId.get(group.frameId)!;
+      return { ...group, thumb: posterOf(scope.projectId, canvas.id, frame.data), frameName: frame.displayName ?? FRAME_NAME, revision: head.version };
+    });
     return components.length ? [{ canvasId: canvas.id, canvasName: canvas.name, components }] : [];
   });
 }

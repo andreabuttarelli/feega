@@ -4,6 +4,7 @@ import { PropertyKind, type PropertyDef } from '@feega/motion-core/motion/proper
 import { DEFAULT_MODE, keyOf, splitKey } from '@feega/motion-core/motion/variables-model';
 import type { NewId } from '$lib/motion/main-component';
 import { resolveVariables } from '$lib/motion/variables';
+import { colourDistance } from './page-tokens';
 
 const TEXT_COMPONENTS = new Set(['Text', 'Title', 'Kicker', 'Caption']);
 const LABELLED = /^(Button|Nav link|Link|List item|Item)\b/;
@@ -13,12 +14,15 @@ const STATE_PROP = 'State';
 const MAX_PROPERTY = 40;
 const LIGHT = 0.4;
 
-enum State {
+export enum State {
   Hover = 'Hover',
   Pressed = 'Pressed'
 }
 
 const STATE_SHIFT: Record<State, number> = { [State.Hover]: 0.1, [State.Pressed]: 0.2 };
+const MIN_DELTA: Record<State, number> = { [State.Hover]: 6, [State.Pressed]: 12 };
+const SHIFT_STEP = 0.05;
+const MAX_SHIFT = 0.8;
 
 const STATES = Object.values(State);
 
@@ -48,7 +52,7 @@ const stored = (def: PropertyDef): Properties[string] => ({ ...def, kind: `${def
 
 function propertiesOf(comp: MotionComp, doc: MotionDoc): Properties {
   const direct = clipsOf(comp).filter((c) => !c.parent);
-  const texts = direct.filter((c) => TEXT_COMPONENTS.has(c.component)).sort((a, b) => top(a) - top(b));
+  const texts = clipsOf(comp).filter((c) => TEXT_COMPONENTS.has(c.component)).sort((a, b) => top(a) - top(b));
   const names = textNames(texts.length, LABELLED.test(comp.component!.name));
   const text = texts.map((c, i): [string, PropertyDef] => [names[i], { kind: PropertyKind.Text, target: c.id, default: String(c.props.text ?? '') }]);
   const toggles = direct.flatMap((c): [string, PropertyDef][] => (isImage(c) ? [['Show image', { kind: PropertyKind.Boolean, target: c.id, default: true }]] : isIcon(c, doc) ? [['Show icon', { kind: PropertyKind.Boolean, target: c.id, default: true }]] : []));
@@ -64,6 +68,16 @@ function shaded(hex: string, by: number): string {
   const light = (Math.max(...rgb) + Math.min(...rgb)) / 2 / 255 > LIGHT;
   const moved = rgb.map((c) => Math.round(light ? c * (1 - by) : c + (255 - c) * by));
   return `#${moved.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function stateShade(hex: string, state: State): string {
+  let by = STATE_SHIFT[state];
+  let shade = shaded(hex, by);
+  while (colourDistance(hex, shade) < MIN_DELTA[state] && by < MAX_SHIFT) {
+    by += SHIFT_STEP;
+    shade = shaded(hex, by);
+  }
+  return shade;
 }
 
 function copiedComp(comp: MotionComp, newId: NewId, rebind: (clip: MotionClip) => MotionClip, variant: Record<string, string>): MotionComp {
@@ -98,7 +112,7 @@ function withStates(doc: MotionDoc, compId: string, site: string, newId: NewId):
   const collection = doc.variables![site];
   const vars = { ...collection.vars };
   for (const state of STATES) {
-    vars[stateName(painted.name, state)] ??= { type: collection.vars[painted.name].type, values: { [DEFAULT_MODE]: shaded(painted.hex, STATE_SHIFT[state]) } };
+    vars[stateName(painted.name, state)] ??= { type: collection.vars[painted.name].type, values: { [DEFAULT_MODE]: stateShade(painted.hex, state) } };
   }
   const set = comp.component!.set ?? compId;
   const base = { ...comp.component!.variant, [STATE_PROP]: DEFAULT_VARIANT };
