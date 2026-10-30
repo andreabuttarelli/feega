@@ -14,6 +14,8 @@ const CANDIDATES = new Set(['FRAME', 'GROUP']);
 const STYLE_VALUES = ['Primary', 'Secondary', 'Tertiary'];
 const STYLE_PROP = 'Style';
 const SIZE_PROP = 'Size';
+const SHAPE_PROP = 'Variant';
+const ONE_SET_NAMES = new Set(['Logo']);
 const SIZE_STEP_PX = 4;
 const MAX_SIZES = 3;
 const SIZED = /^(Button|Nav link|Link)( \d+)?$/;
@@ -142,10 +144,14 @@ const sizeValue = (index: number, count: number) => SIZE_VALUES[count]?.[index] 
 
 function variantNames(name: string, variants: Group[]): Map<Group, string> {
   const styles = [...new Set(variants.map((g) => g[0].style))];
+  const numbered = new Set(variants.map((g) => g[0].skeleton)).size > 1;
   const uniform = SIZED.test(name) && variants.every((g) => g.every((s) => s.size === g[0].size));
   const sizes = uniform ? [...new Set(variants.map((g) => g[0].size))].sort((a, b) => a - b) : [];
   return new Map(
     variants.map((g) => {
+      if (numbered) {
+        return [g, `${SHAPE_PROP}=${variants.indexOf(g) + 1}`];
+      }
       const pairs = [...(styles.length > 1 ? [`${STYLE_PROP}=${styleValue(styles.indexOf(g[0].style))}`] : []), ...(sizes.length > 1 ? [`${SIZE_PROP}=${sizeValue(sizes.indexOf(g[0].size), sizes.length)}`] : [])];
       return [g, pairs.join(', ')];
     })
@@ -180,6 +186,22 @@ function marked(n: RestNode, marks: Map<string, Marking>): RestNode {
   return n.children ? { ...n, children: n.children.map((c) => marked(c, marks)) } : n;
 }
 
+function oneSetPerName(chosen: Chosen[]): Chosen[] {
+  const merged = new Map<string, Chosen>();
+  const kept = chosen.filter((c) => {
+    if (!ONE_SET_NAMES.has(c.name)) {
+      return true;
+    }
+    const first = merged.get(c.name);
+    merged.set(c.name, { name: c.name, variants: [...(first?.variants ?? []), ...c.variants] });
+    return !first;
+  });
+  return kept.map((c) => {
+    const one = merged.get(c.name);
+    return one ? { ...one, variants: [...one.variants].sort((a, b) => a[0].order - b[0].order) } : c;
+  });
+}
+
 function uniquelyNamed(chosen: Chosen[]): Chosen[] {
   const uses = new Map<string, number>();
   return chosen.map((c) => {
@@ -191,7 +213,7 @@ function uniquelyNamed(chosen: Chosen[]): Chosen[] {
 
 export function repeatedOf(root: RestNode): Repeated {
   const { seen, parent } = seenOf(root);
-  const chosen = uniquelyNamed(chosenOf(seen, parent));
+  const chosen = uniquelyNamed(oneSetPerName(chosenOf(seen, parent)));
   return {
     root: marked(root, markingsOf(chosen)),
     components: chosen.map(({ name, variants }) => ({ name, variants: variants.map((g) => ({ style: variantNames(name, variants).get(g) ?? '', occurrences: g.length })) }))

@@ -92,4 +92,14 @@ describe('repeatedOf', () => {
 
     expect(root.children!.map((c) => c.name).filter((n) => n?.includes('Size'))).toEqual([]);
   });
+
+  it('logos with different marks are variants of one Logo set, not Logo 2, Logo 3', () => {
+    const vector = (x: number): RestNode => ({ id: id(), type: 'VECTOR', name: 'path', absoluteBoundingBox: { x, y: 500, width: 30, height: 30 }, fills: [{ type: 'SOLID', color: BLACK }] });
+    const mark = (x: number, marks: number): RestNode => ({ id: id(), type: 'FRAME', name: 'div', absoluteBoundingBox: { x, y: 500, width: 100, height: 40 }, children: Array.from({ length: marks }, (_, i) => vector(x + i * 40)) });
+    const { root, components } = repeatedOf(page([mark(0, 1), mark(120, 1), mark(240, 2), mark(360, 2), mark(480, 3), mark(600, 3)]));
+
+    expect(components.map((c) => c.name)).toEqual(['Logo']);
+    expect(components[0].variants).toHaveLength(3);
+    expect(root.children!.map((c) => c.name)).toEqual(['Logo / Variant=1', 'Logo', 'Logo / Variant=2', 'Logo', 'Logo / Variant=3', 'Logo']);
+  });
 });
