@@ -4,7 +4,7 @@ import { placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
 import { dismissOverlays } from '$lib/server/web/overlays';
-import { TREE_LIMITS, type PageTree } from './page-tree';
+import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
 import type { PageOutline } from './page-outline';
 import { fontsWanted, Sectioning, urlPlan, type FontAssets, type UrlPlan } from './url-doc';
@@ -70,7 +70,25 @@ const HTTP_ERROR = 400;
 const WEB_SCHEMES = ['http:', 'https:'];
 const FILLED_SUMMARY = 'Filled page images';
 
-const TREE_SHAPE = z.object({ title: z.string(), url: z.string(), width: z.number().positive(), height: z.number().positive(), truncated: z.boolean(), root: z.object({ type: z.literal('FRAME') }).passthrough(), outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional() });
+const BOX_SHAPE = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
+
+const FONT_SHAPE = z.object({ family: z.string(), weight: z.string(), style: z.string(), url: z.string() });
+
+const SNAP_SHAPE = z.object({ ref: z.string(), box: BOX_SHAPE, mode: z.nativeEnum(SnapMode) });
+
+const TREE_SHAPE = z
+  .object({
+    title: z.string(),
+    url: z.string(),
+    width: z.number().positive(),
+    height: z.number().positive(),
+    truncated: z.boolean(),
+    root: z.object({ type: z.literal('FRAME') }).passthrough(),
+    fonts: z.array(FONT_SHAPE).optional(),
+    snaps: z.array(SNAP_SHAPE).optional(),
+    outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional()
+  })
+  .strict();
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 

@@ -173,4 +173,25 @@ describe('importPageAt', () => {
     expect(ask.importImage).toHaveBeenCalledWith('https://acme.test/hero.png');
     expect(JSON.stringify(docs.get('frame-1')?.doc)).toContain('asset-1');
   });
+
+  it('i font della pagina arrivano al planner e il testo usa la loro famiglia vera', async () => {
+    const importFont = vi.fn(async () => 'font-asset-1');
+    const { ask, docs, tab } = askOf({ importFont });
+    const sohne = { ...TREE.root.children![0], style: { fontFamily: 'Sohne', fontSize: 48, fontWeight: 600 } };
+    vi.mocked(tab.tree).mockResolvedValue({ ...TREE, root: { ...TREE.root, children: [sohne] }, fonts: [{ family: 'Sohne', weight: '600', style: 'normal', url: 'https://acme.test/sohne.woff2' }] } as never);
+
+    await importPageAt(ask);
+
+    expect(importFont).toHaveBeenCalledWith('https://acme.test/sohne.woff2');
+    const doc = docs.get('frame-1')!.doc as { fonts: { family: string }[] };
+    expect(doc.fonts.map((f) => f.family)).toContain('Sohne');
+    expect(JSON.stringify(doc)).toContain('font-asset-1');
+  });
+
+  it('un campo che l\'albero non dichiara è illeggibile, non scartato in silenzio', async () => {
+    const { ask, tab } = askOf();
+    vi.mocked(tab.tree).mockResolvedValue({ ...TREE, mystery: 1 } as never);
+
+    expect((await importPageAt(ask)).outcome).toBe(UrlImportOutcome.Unreadable);
+  });
 });
