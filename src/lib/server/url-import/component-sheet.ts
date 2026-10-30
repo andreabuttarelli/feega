@@ -1,6 +1,9 @@
 import type { MotionClip, MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
 import { placeInstance } from '$lib/motion/canvas-components';
+import { addClip, editClip } from '@feega/motion-core/motion/timeline';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
+import { DEFAULT_MODE, keyOf } from '@feega/motion-core/motion/variables-model';
 import type { NewId } from '$lib/motion/main-component';
 
 export const SHEET_NAME = 'Components';
@@ -8,7 +11,7 @@ export const SHEET_NAME = 'Components';
 const MARGIN_PX = 80;
 const GAP_PX = 48;
 const BESIDE_PX = 240;
-const BACKGROUND = /\/Background$/;
+const BACKGROUND = 'Background';
 
 type Box = { left: number; top: number; right: number; bottom: number };
 
@@ -46,12 +49,19 @@ function insideComps(doc: MotionDoc): Set<string> {
   return new Set(Object.values(doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((clip) => clip.id))));
 }
 
-const areaOf = (c: MotionClip) => Number(c.props.width ?? 0) * Number(c.props.height ?? 0);
+const FULL = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
-function backdropped(source: MotionDoc): MotionDoc['tracks'] {
-  const painted = source.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.component === 'Shape' && BACKGROUND.test(c.bind?.fill ?? '')).map((clip) => ({ track: t.id, clip })));
-  const backdrop = painted.sort((a, b) => areaOf(b.clip) - areaOf(a.clip))[0];
-  return source.tracks.map((t) => ({ ...t, clips: backdrop?.track === t.id ? [{ ...backdrop.clip, parent: null }] : [] }));
+function backdropped(source: MotionDoc, newId: NewId): MotionDoc {
+  const empty: MotionDoc = { ...source, tracks: source.tracks.map((t) => ({ ...t, clips: [] })), comps: {} };
+  const [collection, vars] = Object.entries(source.variables ?? {}).find(([, c]) => c.vars[BACKGROUND]) ?? [];
+  const fill = vars?.vars[BACKGROUND].values[DEFAULT_MODE];
+  if (!collection || typeof fill !== 'string') {
+    return empty;
+  }
+  const id = newId();
+  const added = addClip(empty, { component: 'Shape', from: 0, durationInFrames: source.durationInFrames, props: { shape: ShapeKind.Rect, fill, ...FULL } }, id);
+  const bound = added.ok ? editClip(added.doc, id, (clip) => ({ ...clip, name: BACKGROUND, bind: { fill: keyOf(collection, BACKGROUND) } })) : added;
+  return bound.ok ? bound.doc : empty;
 }
 
 export function componentSheet(item: PlanItem, newId: NewId): PlanItem | null {
@@ -61,7 +71,7 @@ export function componentSheet(item: PlanItem, newId: NewId): PlanItem | null {
     return null;
   }
   const [mx, my, gx, gy] = [MARGIN_PX / source.width, MARGIN_PX / source.height, GAP_PX / source.width, GAP_PX / source.height];
-  let doc: MotionDoc = { ...source, tracks: backdropped(source), comps: {} };
+  let doc = backdropped(source, newId);
   let top = my;
   for (const row of rowsOf(mains)) {
     let left = mx;
