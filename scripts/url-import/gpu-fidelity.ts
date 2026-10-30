@@ -21,6 +21,7 @@ const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', wa
 const LAUNCH = { channel: 'chromium', args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal', '--enable-gpu-rasterization', '--enable-unsafe-webgpu'] };
 const WHITE = { r: 255, g: 255, b: 255 };
 const DIGITS = 3;
+const BROWSER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
 const label = process.env.URL_IMPORT_GPU ?? '';
 const captured = capturedIn(process.env.URL_IMPORT_CAPTURED ?? label);
@@ -40,7 +41,7 @@ async function hostBundle(): Promise<string> {
 
 const proxied = new Map<string, { type: string; body: Buffer }>();
 
-async function served(url: string): Promise<string | null> {
+async function served(url: string, referer: string): Promise<string> {
   if (!/^https?:/.test(url)) {
     return url;
   }
@@ -48,9 +49,9 @@ async function served(url: string): Promise<string | null> {
   if (proxied.has(key)) {
     return key;
   }
-  const response = await fetch(url).catch(() => null);
+  const response = await fetch(url, { headers: { referer, 'user-agent': BROWSER_AGENT } }).catch(() => null);
   if (!response?.ok) {
-    return null;
+    return url;
   }
   proxied.set(key, { type: response.headers.get('content-type') ?? 'application/octet-stream', body: Buffer.from(await response.arrayBuffer()) });
   return key;
@@ -126,7 +127,7 @@ const rows: string[] = [];
 for (const name of names) {
   const tree = JSON.parse(readFileSync(join(captured, `${name}.json`), 'utf8')) as PageTree;
   const { made, assetOf, assets } = await plannedPage(tree);
-  const local = Object.fromEntries((await Promise.all(Object.entries(assets).map(async ([id, url]) => [id, await served(url)] as const))).filter((e): e is readonly [string, string] => Boolean(e[1])).map(([id, url]) => [id, url.startsWith('/') ? `${server.origin}${url}` : url]));
+  const local = Object.fromEntries(await Promise.all(Object.entries(assets).map(async ([id, url]) => [id, await served(url, tree.url)] as const)).then((all) => all.map(([id, url]) => [id, url.startsWith('/') ? `${server.origin}${url}` : url])));
   let top = 0;
   const items = made.plan.items.map((item) => {
     const placed = { doc: imagesFilled(item.doc, item.images, assetOf), top, ...item.size };
