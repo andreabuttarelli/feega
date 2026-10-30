@@ -1,3 +1,4 @@
+import { HIGHLIGHT, HighlightKind } from '../highlight';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
@@ -63,7 +64,7 @@ const LABEL_GAP = 4;
 const LABEL_PAD = 2;
 const LABEL_LEADING = 1.3;
 const NAME_LEADING = 1;
-const HOVER_COLOR = '#b14cff';
+const HOVER_COLOR = HIGHLIGHT[HighlightKind.Node];
 const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
 const ICON_SIZE = 12;

@@ -1,11 +1,12 @@
 <script lang="ts">
   import { Grip, handlesOf, type Pt, type Quad } from '$lib/motion/scene-select';
   import { SelectionKind } from '$lib/canvas/frame-transform';
+  import { HighlightKind, highlightStyle } from '$lib/canvas/highlight';
   import { resizeCursor, rotateCursor } from '$lib/canvas/resize-cursor';
   import { ROTATE_REACH_PX } from '$lib/canvas/gpu/geometry';
   import { quadBox, quadStyle, type ScreenQuad } from '$lib/canvas/quad-box';
 
-  let { clip, quad: drawn, kind = SelectionKind.Element, ongrab, turn = 0, pivot = null }: { clip: string; quad: ScreenQuad; kind?: SelectionKind; turn?: number; pivot?: Pt | null; ongrab: (grip: Grip, handle: number, e: PointerEvent) => void } = $props();
+  let { clip, quad: drawn, kind = SelectionKind.Element, highlight = HighlightKind.Element, ongrab, turn = 0, pivot = null }: { clip: string; quad: ScreenQuad; kind?: SelectionKind; highlight?: HighlightKind; turn?: number; pivot?: Pt | null; ongrab: (grip: Grip, handle: number, e: PointerEvent) => void } = $props();
 
   const rect = $derived(quadBox(drawn));
   const TESTID: Record<SelectionKind, string> = { [SelectionKind.Element]: 'frame-selection', [SelectionKind.Member]: 'frame-selection', [SelectionKind.Group]: 'frame-group-selection' };
@@ -32,7 +33,7 @@
     u === 0.5 ? `left:0;width:100%;top:${v * rect.height - EDGE_PX / 2}px;height:${EDGE_PX}px` : `top:0;height:100%;left:${u * rect.width - EDGE_PX / 2}px;width:${EDGE_PX}px`;
 </script>
 
-<div class="selection" class:group={kind === SelectionKind.Group} data-testid={TESTID[kind]} data-clip={clip || undefined} style={quadStyle(drawn)}>
+<div class="selection" class:group={kind === SelectionKind.Group} data-testid={TESTID[kind]} data-clip={clip || undefined} style={`${quadStyle(drawn)};${highlightStyle(highlight)}`}>
   <div class="body" data-testid="frame-selection-body" onpointerdown={(e) => ongrab(Grip.Move, 0, e)} role="presentation"></div>
   {#each corners as h, i (i)}
     <div class="rotate" data-testid="frame-selection-rotate" data-rotate={i} style={zoneStyle(h)} onpointerdown={(e) => ongrab(Grip.Rotate, i, e)} role="presentation"></div>
@@ -52,7 +53,7 @@
   .selection {
     position: absolute;
     box-sizing: border-box;
-    border: 1px solid var(--ui-accent, #3b82f6);
+    border: 1px solid var(--highlight);
     pointer-events: none;
     transform-origin: 0 0;
   }
@@ -78,7 +79,7 @@
     height: 8px;
     transform: translate(-50%, -50%);
     background: var(--ui-bg, #fff);
-    border: 1px solid var(--ui-accent, #3b82f6);
+    border: 1px solid var(--highlight);
     border-radius: var(--ui-radius-xs, 2px);
     pointer-events: auto;
   }
@@ -89,7 +90,7 @@
     width: 12px;
     height: 12px;
     transform: translate(-50%, -50%);
-    background: var(--ui-accent, #3b82f6);
+    background: var(--highlight);
     border: 2px solid var(--ui-bg, #fff);
     border-radius: 50%;
     cursor: move;

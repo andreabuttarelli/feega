@@ -147,7 +147,7 @@
 
   .outline {
     position: absolute;
-    border: 1px solid var(--ui-hover-outline, var(--ui-accent));
+    border: 1px solid var(--ui-highlight);
     pointer-events: none;
   }
 </style>
