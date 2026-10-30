@@ -86,3 +86,11 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 `fidelity-pages.ts` as the import reads them, plus a reference screenshot;
 `URL_IMPORT_FIDELITY=<label>` (`url-fidelity.browser.test.ts`) draws the plan and scores SSIM above
 the fold and over the whole page. Output in `~/Documents/feega-videos/url-import/fidelity2/`.
+
+The HTML still is not what the canvas draws. `URL_IMPORT_GPU=<label> npx vite-node --config
+scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` (optional `URL_IMPORT_CAPTURED`,
+`URL_IMPORT_ONLY`, `URL_IMPORT_GPU_BACKEND=webgl`, `URL_IMPORT_GPU_HEADED=1`) puts the same plan
+frames in a GPU core world as `CoreFrames.svelte` does, screenshots the canvas band by band and
+writes `<page>-gpu-*.png`, `<page>-gpu-score.json` and a `gpu-<backend>.md` table next to the
+HTML scores of the same label. Both harnesses stretch each frame into its node box, like the
+canvas.
