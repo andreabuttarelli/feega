@@ -248,13 +248,20 @@ function siteSlug(host: string): string {
   return `${host.replace(/[^a-z0-9]+/g, '-')}-${suffix}`;
 }
 
+export const START_PATH = '/start';
+
 export async function startPathFor(db: Db, deps: EntryDeps, user: User, chosenOrgId: string | null, startUrl: string): Promise<string> {
+  await deps.ensureProfile(db, user);
+  await orgIdFor(db, deps, user, chosenOrgId);
+  return `${START_PATH}?${START_URL_PARAM}=${encodeURIComponent(startUrl)}`;
+}
+
+export async function startProject(db: Db, deps: EntryDeps, user: User, chosenOrgId: string | null, startUrl: string): Promise<{ projectId: string; canvasId: string }> {
   await deps.ensureProfile(db, user);
   const orgId = await orgIdFor(db, deps, user, chosenOrgId);
 
   const host = startHost(startUrl);
   const project = await deps.createProject(db, { orgId, name: host, slug: siteSlug(host), brandId: null });
   const canvas = await deps.createCanvas(db, { orgId, projectId: project.id, name: DEFAULT_CANVAS_NAME });
-
-  return `${canvasPath(project.id, canvas.id)}?${START_URL_PARAM}=${encodeURIComponent(startUrl)}`;
+  return { projectId: project.id, canvasId: canvas.id };
 }

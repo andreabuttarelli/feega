@@ -15,6 +15,15 @@ app had no way to receive a site: the visitor signed up and landed on an empty U
   auto-run mode. `extent: 'top'` caps the page tree at 1800 px (`PAGE_EXTENT_HEIGHT`).
 - No model call: `PLAIN_PLANNER`; Browserless time is metered as before.
 
+Second pass (same PR): `/start` loading page. `runStart` (`$lib/start/start-steps.ts`) runs
+create → import → brand with real per-step state; each step that fails is reported and the next
+still runs. Endpoints: `POST /api/v1/start` (project + canvas, `assertPublicUrl` first) and
+`POST /api/v1/projects/:id/brand-from-site` → `brandFromSite` (dedupe by host over
+`brands.website`, else `analyzeWizardSite` → `createBrandFromWizard` with palette/logos/voice,
+`brand_fonts` rows, `setProjectBrand`, then a brand-kit frame from `brandKitDoc`). Brand analysis
+does not pass through moderation (`research.structured` → OpenRouter); its failures are credits,
+fetch or model errors, all shown with a retry.
+
 Discarded: running the import server-side before the redirect (30 s+ blank wait, no progress).
 
 Not verified: the native shell's `feega://` OAuth return (the parameter is added, its handler untested).

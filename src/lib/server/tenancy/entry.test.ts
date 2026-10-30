@@ -13,6 +13,7 @@ import {
   enterApp,
   homePathFor,
   startPathFor,
+  startProject,
   workspaceNameFor
 } from '$lib/server/tenancy/entry';
 import type { Db } from '$lib/server/db/client';
@@ -263,22 +264,32 @@ describe('a landing campaign lands with its template', () => {
 });
 
 describe('arriving from the website opens a new project with the site on it', () => {
-  it("creates a project named after the host and hands the url to the canvas", async () => {
-    const site = { ...project, id: 'site-project', name: 'stripe.com' };
-    const d = deps({ createProject: vi.fn(async () => site), createCanvas: vi.fn(async () => ({ ...canvas, id: 'site-canvas', projectId: site.id })) });
+  it('after sign-in the visitor goes to the start page, the org already in place', async () => {
+    const d = deps({ listMemberships: vi.fn(async () => []) });
 
     const path = await startPathFor(db, d, user, null, 'https://www.stripe.com/');
 
+    expect(path).toBe(`/start?start_url=${encodeURIComponent('https://www.stripe.com/')}`);
+    expect(d.createFirstOrg).toHaveBeenCalledOnce();
+    expect(d.createProject).not.toHaveBeenCalled();
+  });
+
+  it('the start page creates a project named after the host, with its canvas', async () => {
+    const site = { ...project, id: 'site-project', name: 'stripe.com' };
+    const d = deps({ createProject: vi.fn(async () => site), createCanvas: vi.fn(async () => ({ ...canvas, id: 'site-canvas', projectId: site.id })) });
+
+    const made = await startProject(db, d, user, null, 'https://www.stripe.com/');
+
     expect(d.createProject).toHaveBeenCalledWith(db, expect.objectContaining({ orgId: ORG, name: 'stripe.com', brandId: null }));
     expect(d.createCanvas).toHaveBeenCalledWith(db, { orgId: ORG, projectId: site.id, name: DEFAULT_CANVAS_NAME });
-    expect(path).toBe(`${canvasPath(site.id, 'site-canvas')}?start_url=${encodeURIComponent('https://www.stripe.com/')}`);
+    expect(made).toEqual({ projectId: site.id, canvasId: 'site-canvas' });
   });
 
   it('a brand-new user gets the org first, and no extra Untitled project', async () => {
     const site = { ...project, id: 'site-project', name: 'stripe.com' };
     const d = deps({ listMemberships: vi.fn(async () => []), createProject: vi.fn(async () => site) });
 
-    await startPathFor(db, d, user, null, 'https://stripe.com/');
+    await startProject(db, d, user, null, 'https://stripe.com/');
 
     expect(d.ensureProfile).toHaveBeenCalledOnce();
     expect(d.createFirstOrg).toHaveBeenCalledOnce();
