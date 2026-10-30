@@ -1,3 +1,4 @@
+import type { StateStyle } from './states';
 import { DEFAULT_VARIANT } from '../doc';
 import type { CodeEase } from './ease';
 
@@ -39,6 +40,7 @@ export type ElementNode = {
   styleBinds: StyleBind[];
   shownBy?: string;
   animation?: Animation;
+  states?: StateStyle;
   media?: MediaRules[];
 };
 
@@ -52,7 +54,7 @@ export type VariantPick = { name: string; value: string };
 
 export type UseNode = { kind: NodeKind.Use; clipId?: string; component: string; set?: { name: string; variant: VariantPick[] }; className: string; rules: Rule[]; props: { name: string; value: string | boolean }[]; forwards: { name: string; prop: string }[]; shownBy?: string; media?: MediaRules[] };
 
-export type SvgNode = { kind: NodeKind.Svg; clipId?: string; className: string; rules: Rule[]; width: number; height: number; markup: string; shownBy?: string; animation?: Animation; media?: MediaRules[] };
+export type SvgNode = { kind: NodeKind.Svg; clipId?: string; className: string; rules: Rule[]; width: number; height: number; markup: string; shownBy?: string; animation?: Animation; states?: StateStyle; media?: MediaRules[] };
 
 export enum Trigger {
   Load = 'load',

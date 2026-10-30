@@ -1,7 +1,7 @@
 import { isProp, NodeKind, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type Rule, type SvgNode, type UseNode } from '../ir';
 import { kebab } from '../naming';
 import type { CodeFile } from '../model';
-import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, tokensCss, type TokenLookup } from './css';
+import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, stateBlocks, tokensCss, type TokenLookup } from './css';
 import { escapeHtml, nodeLines, type Dialect } from './markup';
 import { readme } from './project';
 import { animatedNodes, animationCss, inView, INVIEW_CLASS, INVIEW_SCRIPT, PROPERTY_RULES, translates } from './keyframes';
@@ -67,8 +67,9 @@ function cssBlocks(node: CodeNode, selector: Selector, tokens: TokenLookup): str
     return [];
   }
   const own = node.className && node.rules.length ? [...ruleBlock(`.${selector(node)}`, node.rules as Rule[], tokens), '', ...mediaBlocks(`.${selector(node)}`, node.media, tokens)] : [];
+  const states = node.kind !== NodeKind.Use && node.className ? stateBlocks(`.${selector(node)}`, node.states, tokens) : [];
   const kids = node.kind === NodeKind.Element ? node.children.flatMap((c) => cssBlocks(c, selector, tokens)) : [];
-  return [...own, ...kids];
+  return [...own, ...states, ...kids];
 }
 
 export function stylesheet(root: ElementNode, block: string | null, tokens: TokenLookup): string {
