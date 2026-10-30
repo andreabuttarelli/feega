@@ -64,6 +64,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
+  import { landTiles } from '$lib/canvas/land-tiles';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
@@ -3740,7 +3741,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function landImported(landed: { nodes: unknown[]; undo: unknown[] }) {
     const landedNodes = landed.nodes as CanvasNodeRecord[];
-    nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
+    nodes = landTiles(nodes, landedNodes.map((n) => toTile(n)));
     pushGesture({ items: landed.undo as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
   }
