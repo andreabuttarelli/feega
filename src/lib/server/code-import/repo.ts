@@ -16,6 +16,19 @@ export const routeOf = (raw: string | undefined): string | null => {
   return ROUTE.test(path) && !path.includes('..') ? path : null;
 };
 
+export const MAX_ROUTES = 8;
+
+export const askedRoutes = (route: string | undefined, routes: string[] | undefined): string[] => routes ?? (route ? [route] : []);
+
+export function routesOf(raw: readonly string[]): string[] | null {
+  const routes = raw.length ? raw.map((r) => routeOf(r)) : ['/'];
+  if (routes.some((r) => r === null)) {
+    return null;
+  }
+  const unique = [...new Set(routes as string[])];
+  return unique.length <= MAX_ROUTES ? unique : null;
+}
+
 export enum PackageManager {
   Npm = 'npm',
   Pnpm = 'pnpm',

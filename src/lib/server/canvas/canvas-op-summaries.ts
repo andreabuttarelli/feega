@@ -37,7 +37,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   draw_frame: 'Draw an empty frame at x,y with a width and a preset format or a height.',
   import_lottie: 'Import a Lottie animation (JSON or an https URL of a .json or .lottie) as an editable frame at x,y; answers what it could not carry over.',
   list_figma_frames: 'List the frames of a Figma file from its link (needs the Figma token saved in Settings).',
-  import_code: 'Run a public GitHub React app in a sandbox and draw one of its pages as a frame where each code component is a main component, each usage an instance and props become variants.',
+  import_code: 'Run a public GitHub React, Vue or Svelte app in a sandbox, or read a public Storybook, and draw its pages or stories as one frame, a board each, where each code component is a main component shared across boards, each usage an instance and props become variants.',
   import_url: 'Draw a public web page as an editable frame at x,y: layers, text, auto layout and images, not a screenshot.',
   import_figma: 'Draw Figma frames from a link onto the canvas at x,y, with their layers, auto layout and images.',
   group_elements: 'Group 2 or more free elements, or wrap any nodes in a Section.',

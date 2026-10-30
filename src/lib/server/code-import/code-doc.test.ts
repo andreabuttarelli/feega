@@ -116,6 +116,38 @@ describe('codePlan', () => {
     expect(hostsOf(doc, mainId).map((h) => shownTexts(doc, main, h)[0]).sort()).toEqual(['Download', 'Save']);
   });
 
+  it('un componente annidato visto per la prima volta dentro un\'istanza ha il suo main', () => {
+    const icon = (use: number, path: string, x: number): RestNode => ({ id: nid(), type: 'VECTOR', name: 'svg', use, absoluteBoundingBox: box(x, 17, 16, 16), fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], fillGeometry: [{ path }] });
+    const row = (use: number, x: number, child: RestNode) => framed(use, [x, 10, 120, 30], BLUE, [child, text('Go', x + 24, 17)]);
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, children: [row(0, 10, icon(1, 'M 0 0 L 16 0 L 16 16 Z', 14)), row(2, 140, icon(3, 'M 0 0 L 16 16 L 0 16 Z', 144))] } };
+    const uses: ComponentUse[] = [
+      { component: 'NavLink', props: {} },
+      { component: 'Icon', props: { icon: 'home' } },
+      { component: 'NavLink', props: {} },
+      { component: 'Icon', props: { icon: 'tasks' } }
+    ];
+    const doc = codePlan(tree, uses, nid)!.plan.items[0].doc;
+
+    expect(mainsNamed(doc, 'Icon').map(([, c]) => c.component!.variant)).toEqual(expect.arrayContaining([{ icon: 'home' }, { icon: 'tasks' }]));
+  });
+
+  it('due componenti con la stessa radice: l\'esterno è un main che contiene un\'istanza dell\'interno', () => {
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, children: [framed(0, [10, 10, 80, 30], BLUE, [text('Save', 20, 17)]), framed(2, [100, 10, 80, 30], BLUE, [text('Undo', 110, 17)])] } };
+    const uses: ComponentUse[] = [
+      { component: 'Tooltip', props: {} },
+      { component: 'Button', props: { children: 'Save' }, shares: 0 },
+      { component: 'Tooltip', props: {} },
+      { component: 'Button', props: { children: 'Undo' }, shares: 2 }
+    ];
+    const doc = codePlan(tree, uses, nid)!.plan.items[0].doc;
+    const [tooltipId, tooltip] = mainsNamed(doc, 'Tooltip')[0];
+    const [buttonId] = mainsNamed(doc, 'Button')[0];
+
+    expect(tooltip.tracks.flatMap((t) => t.clips as MotionClip[]).some((c) => compOf(c) === buttonId)).toBe(true);
+    expect(hostsOf(doc, tooltipId)).toHaveLength(2);
+    expect(hostsOf(doc, tooltipId).map((h) => shownTexts(doc, tooltip, h)[0]).sort()).toEqual(['Save', 'Undo']);
+  });
+
   it('la prop di testo del codice diventa la proprietà del main, col suo nome', () => {
     const doc = docOf();
     const [, title] = mainsNamed(doc, 'CardTitle')[0];

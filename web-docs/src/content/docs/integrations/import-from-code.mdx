@@ -1,45 +1,58 @@
 ---
 title: Import from code
-description: Turn a page of a GitHub React app into a frame where every code component is a Feega component.
+description: Turn the pages of a GitHub app, or the stories of a Storybook, into a frame where every code component is a Feega component.
 sidebar:
   order: 5
 ---
 
-Paste a public GitHub repository and a page path. Feega runs the app in a sandbox, opens the page and draws it as an editable frame, like [Import from URL](/integrations/import-from-url/), with one difference: components keep their identity.
+Paste a public GitHub repository and one or more page paths, or a Storybook link. Feega reads the running app or the stories and draws them as an editable frame, like [Import from URL](/integrations/import-from-url/), with one difference: components keep their identity.
 
-- Every component of the repository rendered on the page becomes a **main component**, named as in the code.
+- Every component of the code rendered on the page becomes a **main component**, named as in the code.
 - Every other use of it is an **instance** linked to that main. Different labels become text overrides.
 - Props with a few short lowercase values (`variant="outline"`, `size="sm"`) and boolean props become **variants** of one component set. A prop the code leaves out is the variant `Default`.
 
-Export the frame back to code (React or Svelte) and you get the same names and props: `<Button variant="outline" children="Cancel" />`, with a `Button` component that picks the right variant.
+Several pages land in **one frame**, a board per page named after its path, side by side. The components are shared: a `Button` rendered on `/` and on `/settings` is one main, and the second page holds instances of it. The Components panel lists each component once.
+
+Export the frame back to code (React or Svelte) and you get the same names and props: `<Button variant="outline" children="Cancel" />`, with a `Button` component that picks the right variant. Layers grouped only for layout are plain markup, not `Group1…N` components.
 
 ## In the app
 
-Open the insert menu (**+**), go to **Import**, choose **From code…**, paste `https://github.com/owner/repo` (or `…/tree/<branch>`), type the page path (default `/`) and press **Import**. Starting the app takes 15 to 60 seconds.
+Open the insert menu (**+**), go to **Import**, choose **From code…**.
+
+- **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`), type the page paths separated by spaces (default `/`, up to 8) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 24 stories, spread across components, become boards. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
 
 ## What works
 
-- React apps that start with `npm run dev` (Vite, Next.js client components). npm, pnpm, yarn and bun lockfiles.
-- Components declared in the repository's own `.tsx`/`.jsx` files. Components from packages (icons, Radix primitives) stay plain layers.
-- A use that draws something other than its texts differently from the main (another icon, a nested component in another state) stays plain layers; the components inside it are still linked.
+- **React** apps (Vite, Next.js), including **Next.js App Router server components**, read from the debug information React 19 keeps for them.
+- **Vue 3** and **Svelte 5** apps (SvelteKit or Vite). Vue props become variants; Svelte 5 does not expose props in the browser, so Svelte components come in as mains and instances without variants.
+- npm, pnpm, yarn and bun lockfiles; the `dev` script starts the app.
+- Components declared in the repository's own files. Components from packages (icons, Radix primitives, `bits-ui`) stay plain layers.
+- A component whose only element is another component (`<Tooltip><Button/></Tooltip>`) keeps both: the outer main holds an instance of the inner one. Longer chains keep the outermost and the innermost.
+- Components rendered as a single icon (`<svg>`) become components too.
+- A use that draws more than its texts differently from the main stays plain layers; the components inside it are still linked, and a component seen for the first time inside such a use gets its own main.
+- Storybook 7 and later (`index.json`) and Storybook 6 (`stories.json`). Component names come from the story titles; a library display name such as `HeroUI.Button` counts as `Button`.
 
 ## Limits
 
-- Public repositories only. The app runs without any environment variables: pages that need secrets or a login to render show what they show without them.
-- Server components (Next.js App Router pages without `"use client"`), Svelte and Vue are not read yet.
-- The app has 6 minutes to install and start; the page then follows the URL import limits (1280 px wide, 3840 px tall, 1500 layers).
+- The app runs without any environment variables: pages that need secrets or a login show what they show without them.
+- Public repositories only.
+- A Storybook must be public; its stories are read as they render, without the controls panel.
+- The app has 6 minutes to install and start; each page then follows the URL import limits (1280 px wide, 1500 layers).
 - Two imports every ten minutes per person.
 
 ## CLI
 
 ```bash
-feega canvas import-code $PROJECT https://github.com/owner/repo --route /dashboard --canvas <canvas> --x 0 --y 0
+feega canvas import-code $PROJECT https://github.com/owner/repo --route / /settings /users --canvas <canvas> --x 0 --y 0
+feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <canvas> --x 0 --y 0
 ```
 
-The answer has `frameId`, `components`, `variants`, `instances` and `skipped` (what stayed plain layers, and why).
+The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` and `skipped` (what stayed plain layers, pages that could not be opened, and why).
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, route, x, y } })`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, x, y } })`, or `{ canvasId, storybook, stories?, x, y }`.
 
-Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, route?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, x, y }` (`routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
+

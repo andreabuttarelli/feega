@@ -1,8 +1,11 @@
 import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { importPageAt, UrlImportOutcome, type PageAsk, type Planner } from '$lib/server/url-import/import-url';
+import { fontsFor, landPlan, pageTreeAt, publicUrl, UrlImportOutcome, type PageAsk, type Planner } from '$lib/server/url-import/import-url';
+import { urlPlan } from '$lib/server/url-import/url-doc';
+import type { AppTab } from '$lib/server/web/browser';
 import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
-import { repoOf, routeOf } from './repo';
+import { boardsOf, cropped, type Capture } from './boards';
+import { repoOf, routesOf, type RepoRef } from './repo';
 import type { RepoRunner } from './sandbox-runner';
 
 export enum CodeImportOutcome {
@@ -35,19 +38,41 @@ const FROM_URL_IMPORT: Record<Exclude<UrlImportOutcome, UrlImportOutcome.Ok>, Ex
   [UrlImportOutcome.RateLimited]: CodeImportOutcome.RateLimited
 };
 
+export enum Crop {
+  Page = 'page',
+  Content = 'content'
+}
+
+const CONTENT_MARGIN = 24;
+const SETTLE_MS = 1_200;
+
+const CROPS: Record<Crop, (capture: Capture) => Capture> = {
+  [Crop.Page]: (capture) => capture,
+  [Crop.Content]: (capture) => ({ ...capture, tree: cropped(capture.tree, CONTENT_MARGIN) })
+};
+
 export type ComponentCount = { components: number; variants: number; instances: number };
 
-export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; name: string; undo: unknown[]; skipped: string[]; truncated: boolean } & ComponentCount) | { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; error?: string };
+type Refusal = { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; error?: string };
 
-export type CodeAsk = Omit<PageAsk, 'url' | 'planner'> & { repo: string; route?: string; runner: RepoRunner | null };
+export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; name: string; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[] } & ComponentCount) | Refusal;
 
-function codePlanner(names: string[]): Planner {
-  let uses: ComponentUse[] = [];
+export type CodePage = { label: string; url: string };
+
+export type LandAsk = Omit<PageAsk, 'url' | 'planner'>;
+
+export type RepoArchive = (repo: RepoRef) => Promise<Uint8Array | null>;
+
+export type CodeAsk = LandAsk & { repo: string; routes: string[]; runner: RepoRunner | null; archive?: RepoArchive | null };
+
+const refused = (outcome: Refusal['outcome'], error?: string): Refusal => ({ outcome, ...(error ? { error } : {}) });
+
+export function marksPlanner(names: string[], found: { uses: ComponentUse[] }): Planner {
   return {
     prepare: async (tab) => {
-      uses = await tab.marks(names);
+      found.uses = await tab.marks(names);
     },
-    plan: (tree, newId, fonts) => codePlan(tree, uses, newId, fonts)
+    plan: (tree, newId, fonts) => urlPlan(tree, newId, undefined, fonts)
   };
 }
 
@@ -59,27 +84,68 @@ export function componentCount(doc: MotionDoc): ComponentCount {
   return { components: new Set(mains.map(([, c]) => c.component!.set ?? c.component!.name)).size, variants: mains.length, instances: hosts - mains.length };
 }
 
-export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
-  const repo = repoOf(ask.repo);
-  const route = routeOf(ask.route);
-  if (!repo || !route) {
-    return { outcome: CodeImportOutcome.Invalid };
+async function captured(tab: AppTab, pages: CodePage[], names: string[], settleMs: number): Promise<{ captures: Capture[]; missed: string[]; last: Refusal | null }> {
+  const captures: Capture[] = [];
+  const missed: string[] = [];
+  let last: Refusal | null = null;
+  for (const page of pages) {
+    const found = { uses: [] as ComponentUse[] };
+    const tree = await pageTreeAt(tab, new URL(page.url), settleMs, marksPlanner(names, found));
+    if ('outcome' in tree) {
+      missed.push(page.label);
+      last = tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[tree.outcome], tree.error);
+      continue;
+    }
+    captures.push({ label: page.label, tree, uses: found.uses });
   }
-  if (!ask.runner) {
-    return { outcome: CodeImportOutcome.NoSandbox };
+  return { captures, missed, last };
+}
+
+export type BoardsAsk = LandAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop };
+
+export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
+  const first = ask.pages[0] ? await publicUrl(ask.pages[0].url, ask.guard) : null;
+  if (!first) {
+    return refused(CodeImportOutcome.Failed);
+  }
+  if (!ask.open) {
+    return refused(CodeImportOutcome.NoBrowser);
   }
 
-  const run = await ask.runner(repo);
-  if (!run.ok) {
-    return { outcome: CodeImportOutcome.RunFailed, error: `${run.failure}: ${run.detail}` };
+  const tab = await ask.open();
+  const { captures, missed, last } = await captured(tab, ask.pages, ask.names, ask.settleMs ?? SETTLE_MS).finally(() => tab.close());
+  if (!captures.length) {
+    return last ?? refused(CodeImportOutcome.Unreadable);
   }
 
-  const done = await importPageAt({ ...ask, url: new URL(route, run.app.url).toString(), planner: codePlanner(run.app.names) }).finally(() => run.app.stop().catch(() => undefined));
+  const { tree, uses } = boardsOf(ask.name, captures.map(CROPS[ask.crop]));
+  const done = await landPlan(ask, codePlan(tree, uses, ask.newId, await fontsFor(ask, tree)), tree.truncated);
   if (done.outcome !== UrlImportOutcome.Ok) {
-    return { outcome: FROM_URL_IMPORT[done.outcome], ...(done.error ? { error: done.error } : {}) };
+    return refused(FROM_URL_IMPORT[done.outcome], done.error);
   }
 
   const frame = await ask.store.read(done.frameId);
   const count = frame ? componentCount(frame.doc) : { components: 0, variants: 0, instances: 0 };
-  return { ...done, outcome: CodeImportOutcome.Ok, ...count };
+  const skipped = [...done.skipped, ...missed.map((label) => `${label}: could not be opened`)];
+  return { ...done, outcome: CodeImportOutcome.Ok, skipped, pages: captures.map((c) => c.label), ...count };
+}
+
+export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
+  const repo = repoOf(ask.repo);
+  const routes = routesOf(ask.routes);
+  if (!repo || !routes) {
+    return refused(CodeImportOutcome.Invalid);
+  }
+  if (!ask.runner) {
+    return refused(CodeImportOutcome.NoSandbox);
+  }
+
+  const archive = ask.archive ? await ask.archive(repo).catch(() => null) : null;
+  const run = await ask.runner(repo, archive);
+  if (!run.ok) {
+    return refused(CodeImportOutcome.RunFailed, `${run.failure}: ${run.detail}`);
+  }
+
+  const pages = routes.map((route) => ({ label: route, url: new URL(route, run.app.url).toString() }));
+  return importBoards({ ...ask, name: repo.repo, pages, names: run.app.names, crop: Crop.Page }).finally(() => run.app.stop().catch(() => undefined));
 }
