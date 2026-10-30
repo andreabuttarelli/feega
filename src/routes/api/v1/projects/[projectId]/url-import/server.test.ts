@@ -54,4 +54,21 @@ describe('POST /api/v1/projects/:id/url-import', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('the top extent caps the page at the first screens', async () => {
+    importPageAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Acme', undo: [], skipped: [], truncated: true });
+
+    const { body } = await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0, extent: 'top' }, 'u-top');
+
+    expect(importPageAt.mock.lastCall?.[0].maxHeight).toBe(1800);
+    expect(body.truncated).toBe(true);
+  });
+
+  it('without an extent the whole page is read, as before', async () => {
+    importPageAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Acme', undo: [], skipped: [], truncated: false });
+
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-full');
+
+    expect(importPageAt.mock.lastCall?.[0].maxHeight).toBeUndefined();
+  });
 });

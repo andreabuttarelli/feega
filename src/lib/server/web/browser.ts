@@ -38,7 +38,7 @@ export type AppTab = Tab & {
   label: (target: Target) => Promise<string>;
   ui: () => Promise<UiDigest>;
   vector: () => Promise<unknown>;
-  tree: () => Promise<unknown>;
+  tree: (maxHeight?: number) => Promise<unknown>;
   reveal: (mode: RevealMode) => Promise<Revealed>;
   seeAll: () => Promise<void>;
   settle: (ms: number) => Promise<void>;
@@ -284,7 +284,7 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     },
     ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
     vector: () => vectorOfPage(page),
-    tree: async () => snapped((await page.evaluate(treeScript(TREE_LIMITS))) as PageTree, (snap) => shoot(page, snap)),
+    tree: async (maxHeight = TREE_LIMITS.height) => snapped((await page.evaluate(treeScript({ ...TREE_LIMITS, height: maxHeight }))) as PageTree, (snap) => shoot(page, snap)),
     reveal: (mode) => page.evaluate(revealPage, mode),
     seeAll: async () => {
       await page.evaluateOnNewDocument(everythingInView);

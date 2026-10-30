@@ -243,6 +243,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
   import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
   import UrlImportDialog from '$lib/components/canvas/UrlImportDialog.svelte';
+  import { START_URL_PARAM, startHost, startUrlOf } from '$lib/start-url';
   import CodeImportDialog from '$lib/components/canvas/CodeImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
@@ -3738,6 +3739,33 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let figmaImportAt = $state<{ x: number; y: number } | null>(null);
   let urlImportAt = $state<{ x: number; y: number } | null>(null);
   let codeImportAt = $state<{ x: number; y: number } | null>(null);
+  let startUrl = $state<string | null>(null);
+
+  function takeStartUrl() {
+    if (!page.url.searchParams.has(START_URL_PARAM)) {
+      return;
+    }
+    const carried = startUrlOf(page.url.searchParams.get(START_URL_PARAM));
+    const clean = new URL(page.url);
+    clean.searchParams.delete(START_URL_PARAM);
+    replaceState(clean, page.state);
+    if (!carried) {
+      return;
+    }
+    startUrl = carried;
+    urlImportAt = { x: 0, y: 0 };
+  }
+
+  $effect(() => {
+    untrack(takeStartUrl);
+  });
+
+  function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
+    landImported(landed);
+    if (startUrl && landed.truncated) {
+      failed = `Imported the top of ${startHost(startUrl)}.`;
+    }
+  }
 
   function landImported(landed: { nodes: unknown[]; undo: unknown[] }) {
     const landedNodes = landed.nodes as CanvasNodeRecord[];
@@ -4220,7 +4248,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <CodeImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={codeImportAt} onimported={landImported} onclose={() => (codeImportAt = null)} />
   {/if}
   {#if urlImportAt}
-    <UrlImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={urlImportAt} onimported={landImported} onclose={() => (urlImportAt = null)} />
+    <UrlImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={urlImportAt} {startUrl} onimported={siteImported} onclose={() => ((urlImportAt = null), (startUrl = null))} />
   {/if}
   {#if figmaImportAt}
     <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />

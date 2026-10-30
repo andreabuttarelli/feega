@@ -73,6 +73,16 @@ const askOf = (over: Partial<Parameters<typeof importPageAt>[0]> = {}) => {
 };
 
 describe('importPageAt', () => {
+  it('the top of the page reads only the first screens, not the whole page', async () => {
+    const { ask, tab } = askOf({ maxHeight: 1800 });
+    vi.mocked(tab.reveal).mockResolvedValue({ height: 12_000, hidden: 0 } as never);
+
+    await importPageAt(ask);
+
+    expect(tab.tree).toHaveBeenCalledWith(1800);
+    expect(vi.mocked(tab.scroll).mock.calls.filter(([step]) => 'px' in step).length).toBe(3);
+  });
+
   it('una pagina pubblica diventa un frame col nome della pagina', async () => {
     const { ask, docs } = askOf();
 
