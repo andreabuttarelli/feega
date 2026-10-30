@@ -3,7 +3,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 
 const { modalitiesOf, imageCatalogue } = vi.hoisted(() => ({
   modalitiesOf: vi.fn(),
-  imageCatalogue: { choices: [] as { id: string; uncensored?: boolean }[], recommended: [] as { tier: string; id: string }[], synced: true }
+  imageCatalogue: { choices: [] as { id: string; uncensored?: boolean }[], recommended: [] as { tier: string; id: string; uncensored?: boolean }[], synced: true }
 }));
 vi.mock('$lib/server/canvas-catalogue', () => {
   const nothing = { choices: [], recommended: [], synced: true };
@@ -110,7 +110,7 @@ describe('loop over a products node with an influencer wired fixed', () => {
 
   it('a node without a model loops on a model its standard project allows, never the uncensored recommendation', async () => {
     imageCatalogue.choices = [{ id: 'wiro/uncensored-image', uncensored: true }, { id: 'nano-banana-2-lite' }];
-    imageCatalogue.recommended = [{ tier: 'balanced', id: 'wiro/uncensored-image' }, { tier: 'cheapest', id: 'nano-banana-2-lite' }];
+    imageCatalogue.recommended = [{ tier: 'balanced', id: 'wiro/uncensored-image', uncensored: true }, { tier: 'cheapest', id: 'nano-banana-2-lite' }];
     const { db } = fakeDb(
       {
         projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }],

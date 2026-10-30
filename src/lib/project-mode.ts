@@ -1,5 +1,3 @@
-import { REVIEWED_MODEL3D_MODELS } from './model3d-models';
-
 export enum ProjectMode {
   Standard = 'standard',
   Uncensored = 'uncensored'
@@ -26,8 +24,6 @@ export const MODE_REFUSAL: Readonly<Record<Capability, string>> = {
   [Capability.StandardModels]: 'model_not_in_this_project'
 };
 
-const WIRO_PREFIX = 'wiro/';
-
 export const SECTION_CAPABILITY: Readonly<Record<string, Capability>> = {
   influencers: Capability.CatalogueWrite
 };
@@ -48,8 +44,7 @@ export function modeAllows(mode: ProjectMode, capability: Capability): boolean {
 type ModelFacts = { id: string; uncensored?: boolean };
 
 function capabilityOfModel(model: ModelFacts): Capability {
-  const wiroOnly = model.id.startsWith(WIRO_PREFIX) && !REVIEWED_MODEL3D_MODELS.has(model.id);
-  return model.uncensored || wiroOnly ? Capability.WiroModels : Capability.StandardModels;
+  return model.uncensored ? Capability.WiroModels : Capability.StandardModels;
 }
 
 export function sectionAllowed(mode: ProjectMode, section: string): boolean {
