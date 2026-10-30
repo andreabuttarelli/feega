@@ -104,7 +104,7 @@ const MEDIUM = 500;
 const SEMIBOLD = 600;
 
 export const HEADLINE_SIZE = 0.06;
-const HAIRLINE = 0.0002;
+export const HAIRLINE = 0.00002;
 const BLEED_REACH = 2;
 export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;

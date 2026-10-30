@@ -6,14 +6,14 @@ import type { FigmaImage } from './figma-doc';
 export type ImageAssets = Record<string, string>;
 export type FigmaJob = { nodeId: string; fileKey: string; images: FigmaImage[] };
 
-type Slot = { assetId: string; at: number; innerId?: string };
+type Slot = { assetId: string; at: number; innerId?: string; fit?: string; focus?: { x: number; y: number } };
 
 type Overrides = Record<string, Record<string, unknown>>;
 
 const filledFills = (fills: unknown, slots: Slot[]) =>
   ((fills as Record<string, unknown>[] | undefined) ?? []).map((fill, at) => {
     const slot = slots.find((s) => s.at === at);
-    return slot ? { type: FillType.Image, assetId: slot.assetId, fit: ImageFit.Cover, opacity: fill.opacity ?? 1 } : fill;
+    return slot ? { type: FillType.Image, assetId: slot.assetId, fit: slot.fit ?? ImageFit.Cover, ...(slot.focus ? { focus: slot.focus } : {}), opacity: fill.opacity ?? 1 } : fill;
   });
 
 function filledInstance(doc: MotionDoc, clip: MotionClip, slots: Slot[]): MotionClip {
@@ -40,9 +40,9 @@ const filledTracks = (doc: MotionDoc, tracks: MotionTrack[], slotsOf: Map<string
 
 export function imagesFilled(doc: MotionDoc, images: readonly FigmaImage[], assets: ImageAssets): MotionDoc {
   const slotsOf = new Map<string, Slot[]>();
-  for (const { clipId, hash, at, innerId } of images) {
+  for (const { clipId, hash, at, innerId, fit, focus } of images) {
     if (assets[hash]) {
-      slotsOf.set(clipId, [...(slotsOf.get(clipId) ?? []), { assetId: assets[hash], at, innerId }]);
+      slotsOf.set(clipId, [...(slotsOf.get(clipId) ?? []), { assetId: assets[hash], at, innerId, fit, focus }]);
     }
   }
   if (!slotsOf.size) {

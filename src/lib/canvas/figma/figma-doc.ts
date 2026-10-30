@@ -1,13 +1,14 @@
 import { FrameKind } from '$lib/canvas/motion-node';
-import { compOf, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { compOf, findClip, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/motion/draw-create';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import type { Effect } from '@feega/motion-core/motion/effects/model';
 import { TYPE_SIZE } from '@feega/motion-core/motion/components';
-import { FillType } from '@feega/motion-core/motion/fill/model';
+import { FillType, MAX_STOPS } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
-import { registerFont } from '$lib/motion/fonts/ops';
+import { registerFont, registerUpload } from '$lib/motion/fonts/ops';
+import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips } from '$lib/motion/main-component';
 import { precompose } from '@feega/motion-core/motion/precomp';
@@ -19,19 +20,20 @@ import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { addClip, editClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { figmaMessage, type FigmaMessage } from './archive';
-import { Clip, Cross, Destination, Fit, FillKind, Flow, Justify, LayerKind, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
+import { Clip, Cross, Decoration, Destination, Fit, FillKind, Flow, Justify, LayerKind, PictureFit, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
 
 type NewId = () => string;
 type Unit = { x: number; y: number };
 type Size = { width: number; height: number };
 type Root = { id: string; layer: Layer };
 type Built = { doc: MotionDoc; ids: string[]; roots: Root[] };
-export type FigmaImage = { clipId: string; hash: string; at: number; innerId?: string };
+export type FigmaImage = { clipId: string; hash: string; at: number; innerId?: string; fit?: PictureFit; focus?: Unit };
 type Main = { compId: string; at: Unit; images: FigmaImage[] };
 type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[]; mains: Map<string, Main>; texts: Map<Layer, string> };
 
 export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind; images: FigmaImage[] };
 export type FigmaPlan = { items: PlanItem[]; skipped: string[]; fileKey: string | null };
+export type FontUpload = { family: string; variants: FontVariant[] };
 export type FigmaPasted = { doc: MotionDoc; selection: string[]; skipped: string[]; images: FigmaImage[]; fileKey: string | null };
 
 const IMAGE_PLACEHOLDER = '#d9d9d9';
@@ -51,13 +53,23 @@ const toUnit = (doc: MotionDoc, p: Place) => ([x, y]: Pt): Pt => [(p.centre.x * 
 
 type Painted = Record<string, unknown>;
 
-const withStops = (f: Extract<Fill, { stops: unknown }>, make: (stops: typeof f.stops) => Painted): Painted | null => (f.stops.length >= MIN_STOPS ? make(f.stops) : null);
+function fewest<T>(stops: T[]): T[] {
+  if (stops.length <= MAX_STOPS) {
+    return stops;
+  }
+  return Array.from({ length: MAX_STOPS }, (_, i) => stops[Math.round((i * (stops.length - 1)) / (MAX_STOPS - 1))]);
+}
+
+const withStops = (f: Extract<Fill, { stops: unknown }>, make: (stops: typeof f.stops) => Painted): Painted | null => (f.stops.length >= MIN_STOPS ? make(fewest(f.stops)) : null);
 
 const MOTION_FILL: Record<FillKind, (f: Fill) => Painted | null> = {
   [FillKind.Solid]: (f) => ({ type: FillType.Solid, color: (f as Extract<Fill, { kind: FillKind.Solid }>).color, opacity: f.opacity }),
   [FillKind.Image]: (f) => ({ type: FillType.Solid, color: IMAGE_PLACEHOLDER, opacity: f.opacity }),
   [FillKind.Linear]: (f) => withStops(f as Extract<Fill, { kind: FillKind.Linear }>, (stops) => ({ type: FillType.Linear, stops, angle: (f as Extract<Fill, { kind: FillKind.Linear }>).angle, opacity: f.opacity })),
-  [FillKind.Radial]: (f) => withStops(f as Extract<Fill, { kind: FillKind.Radial }>, (stops) => ({ type: FillType.Radial, stops, center: CENTRE, radius: 1, opacity: f.opacity })),
+  [FillKind.Radial]: (f) => {
+    const radial = f as Extract<Fill, { kind: FillKind.Radial }>;
+    return withStops(radial, (stops) => ({ type: FillType.Radial, stops, center: radial.center, radius: radial.radius, opacity: f.opacity }));
+  },
   [FillKind.Angular]: (f) => {
     const angular = f as Extract<Fill, { kind: FillKind.Angular }>;
     return withStops(angular, (stops) => ({ type: FillType.Angular, stops, angle: angular.angle, center: angular.center, opacity: f.opacity }));
@@ -67,9 +79,9 @@ const MOTION_FILL: Record<FillKind, (f: Fill) => Painted | null> = {
 
 const fillStack = (fills: Fill[]): Painted[] => fills.map((f) => MOTION_FILL[f.kind](f)).filter((p): p is Painted => p !== null);
 
-function imageSlots(fills: Fill[]): { hash: string; at: number }[] {
+function imageSlots(fills: Fill[]): Omit<FigmaImage, 'clipId'>[] {
   const painted = fills.filter((f) => MOTION_FILL[f.kind](f));
-  return painted.flatMap((f, at) => (f.kind === FillKind.Image ? [{ hash: f.hash, at }] : []));
+  return painted.flatMap((f, at) => (f.kind === FillKind.Image ? [{ hash: f.hash, at, fit: f.fit, focus: f.focus }] : []));
 }
 
 function strokeStack(strokes: Stroke[], doc: MotionDoc, p: Place): Painted[] {
@@ -139,8 +151,28 @@ function withFont(doc: MotionDoc, family: string, p: Place): { doc: MotionDoc; f
     p.report(`font ${family} replaced by the default`);
     return { doc, font: null };
   }
-  return { doc: registered.doc, font: family };
+  return { doc: registered.doc, font: registered.doc.fonts.find((f) => f.family.toLowerCase() === family.toLowerCase())?.family ?? family };
 }
+
+function withUploads(doc: MotionDoc, uploads: readonly FontUpload[], skipped: Set<string>): MotionDoc {
+  let next = doc;
+  for (const upload of uploads) {
+    const made = registerUpload(next, upload);
+    if (!made.ok) {
+      skipped.add(`font ${upload.family}: ${made.error}`);
+      continue;
+    }
+    next = made.doc;
+  }
+  return next;
+}
+
+const PIXELS = /^(-?\d+(?:\.\d+)?)px$/;
+
+const scaledPixels = (measure: string, p: Place) => {
+  const px = measure.match(PIXELS);
+  return px ? `${round(Number(px[1]) * p.scale)}px` : measure;
+};
 
 function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   const fonts = [layer.font, ...layer.runs.flatMap((r) => (r.font ? [r.font] : []))];
@@ -159,8 +191,8 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   const size = (n: number) => clamp(round((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
   const font = known.get(layer.font);
   const runs = layer.runs.map(({ font: f, size: s, ...rest }) => ({ ...rest, ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
-  const stacked = layer.fills.length > 1 || layer.fills.some((f) => f.kind !== FillKind.Solid);
-  const made = finished(drawn, id, layer, p, {
+  const stacked = layer.fills.length > 1 || layer.fills.some((f) => f.kind !== FillKind.Solid || f.opacity < 1);
+  const look = {
     text: layer.text,
     color: layer.color,
     ...(stacked ? { fills: fillStack(layer.fills) } : {}),
@@ -169,12 +201,18 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
     weight: layer.weight,
     italic: layer.italic,
     size: size(layer.size),
-    letterSpacing: layer.letterSpacing,
-    lineHeight: layer.lineHeight,
+    letterSpacing: scaledPixels(layer.letterSpacing, p),
+    lineHeight: scaledPixels(layer.lineHeight, p),
     align: layer.align,
     verticalAlign: 'top',
+    ...(layer.decoration === Decoration.None ? {} : { decoration: layer.decoration }),
+    ...(layer.axes ? { axes: layer.axes } : {}),
+    ...(layer.features ? { features: layer.features } : {}),
     ...(runs.length ? { runs } : {})
-  });
+  };
+  const styled = finished(drawn, id, layer, p, look);
+  const { runs: _runs, font: _font, ...plain } = look as typeof look & { font?: string };
+  const made = styled.ok ? styled : finished(drawn, id, layer, p, plain);
   if (!made.ok) {
     p.report(`${layer.name}: ${made.error}`);
     return { doc, ids: [], roots: [] };
@@ -262,7 +300,7 @@ function itemFor(child: Layer, parent: AutoLayout): Partial<{ width: Sizing; hei
   const fillsWidth = row ? child.item.grow : child.item.stretch;
   const fillsHeight = row ? child.item.stretch : child.item.grow;
   return {
-    ...(child.kind === LayerKind.Text ? { width: Sizing.Hug, height: Sizing.Hug } : {}),
+    ...(child.kind === LayerKind.Text ? (child.wraps ? { height: Sizing.Hug } : { width: Sizing.Hug, height: Sizing.Hug }) : {}),
     ...(fillsWidth ? { width: Sizing.Fill } : {}),
     ...(fillsHeight ? { height: Sizing.Fill } : {}),
     ...(child.item.absolute ? { absolute: true } : {})
@@ -274,25 +312,48 @@ function laidOut(built: Built, container: Root, layer: FrameLayer, flow: AutoLay
   const kids = built.roots.filter((r) => r.id !== container.id);
   const children = kids.flatMap((kid): Step[] => [(d) => setParent(d, kid.id, container.id, { at: p.frame }), (d) => setLayoutItem(d, kid.id, itemFor(kid.layer, flow))]);
   const clipped: Step[] = layer.clip === Clip.Content ? [(d) => editClip(d, container.id, (c) => ({ ...c, clipContent: true }))] : [];
-  return { ...built, doc: applied(built.doc, [...own, ...children, ...clipped], p, `auto layout of ${layer.name}`), roots: [container] };
+  const doc = applied(built.doc, [...own, ...children, ...clipped], p, `auto layout of ${layer.name}`);
+  return { ...built, doc: faded(doc, [container.id, ...kids.map((k) => k.id)], layer.opacity, p), roots: [container] };
 }
+
+function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Built {
+  const kids = built.roots.filter((r) => r.id !== container.id);
+  const steps: Step[] = [...kids.map((kid): Step => (d) => setParent(d, kid.id, container.id, { at: p.frame })), (d) => editClip(d, container.id, (c) => ({ ...c, clipContent: true }))];
+  const doc = applied(built.doc, steps, p, `clip of ${layer.name}`);
+  return { ...built, doc, roots: [container] };
+}
+
+const holds = (layer: FrameLayer) => Boolean(layer.autoLayout) || layer.clip === Clip.Content;
 
 function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background.IfPainted): Built {
   const flow = layer.autoLayout;
-  const background = frameBackground(doc, layer, p, flow ? Background.Always : need);
+  const background = frameBackground(doc, layer, p, holds(layer) ? Background.Always : need);
   const build = flow ? BUILD_IN_FLOW : BUILD;
-  let built: Built = { ...background, roots: flow ? [] : background.roots };
+  let built: Built = { ...background, roots: holds(layer) ? [] : background.roots };
   for (const child of layer.children) {
     const next = build[child.kind](built.doc, child, p);
     built = { doc: next.doc, ids: [...built.ids, ...next.ids], roots: [...built.roots, ...next.roots] };
   }
   const [container] = background.roots;
-  return flow && container ? laidOut({ ...built, roots: [container, ...built.roots] }, container, layer, flow, p) : built;
+  if (!container || !holds(layer)) {
+    return built;
+  }
+  const all = { ...built, roots: [container, ...built.roots] };
+  return flow ? laidOut(all, container, layer, flow, p) : clipped(all, container, layer, p);
+}
+
+const OPAQUE = 1;
+
+function faded(doc: MotionDoc, ids: string[], opacity: number, p: Place): MotionDoc {
+  if (opacity >= OPAQUE) {
+    return doc;
+  }
+  return applied(doc, ids.map((id): Step => (d) => setTransform(d, id, { opacity: round(opacity * Number(findClip(d, id)?.clip.transform?.opacity ?? OPAQUE)) })), p, 'opacity');
 }
 
 function grouped(built: Built, layer: FrameLayer, p: Place): Built {
   if (built.ids.length < 2) {
-    return built;
+    return { ...built, doc: faded(built.doc, built.ids, layer.opacity, p) };
   }
   const groupId = p.newId();
   let n = 0;
@@ -301,7 +362,7 @@ function grouped(built: Built, layer: FrameLayer, p: Place): Built {
     return built;
   }
   const named = editClip(made.doc, groupId, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME), ...(layer.clip === Clip.Content ? { clipContent: true } : {}) }));
-  return { doc: named.ok ? named.doc : made.doc, ids: [groupId], roots: [{ id: groupId, layer }] };
+  return { doc: faded(named.ok ? named.doc : made.doc, [groupId], layer.opacity, p), ids: [groupId], roots: [{ id: groupId, layer }] };
 }
 
 function clipIdsIn(doc: MotionDoc, compId: string): string[] {
@@ -392,22 +453,23 @@ function sceneOf(html: string) {
 
 const wholeSize = (size: Size): Size => ({ width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) });
 
-function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<string>): PlanItem {
+function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<string>, uploads: readonly FontUpload[]): PlanItem {
   const size = wholeSize(layer.box);
-  const blank = drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0);
+  const blank = withUploads(drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0), uploads, skipped);
   const images: FigmaImage[] = [];
   const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map(), texts: new Map() };
-  const built = layersOf(blank, layer, place);
+  const built = layersOf(blank, { ...layer, clip: Clip.None }, place);
   return { destination: Destination.Frame, doc: built.doc, size, centre, name: layer.name, kind: FrameKind.Frame, images };
 }
 
-function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped: Set<string>): PlanItem | null {
+function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped: Set<string>, uploads: readonly FontUpload[]): PlanItem | null {
   const fit = wholeSize(size);
-  const blank = blankElement({ left: 0, top: 0, ...fit });
-  if (!blank.ok) {
-    skipped.add(`${layer.name}: ${blank.error}`);
+  const empty = blankElement({ left: 0, top: 0, ...fit });
+  if (!empty.ok) {
+    skipped.add(`${layer.name}: ${empty.error}`);
     return null;
   }
+  const blank = { ...empty, doc: withUploads(empty.doc, uploads, skipped) };
   const images: FigmaImage[] = [];
   const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images, mains: new Map(), texts: new Map() };
   const built = BUILD[layer.kind](blank.doc, layer, place);
@@ -427,14 +489,14 @@ export function figmaPlan(html: string, newId: NewId): FigmaPlan | null {
 
 const isStage = (layer: Layer, destination: Destination): layer is FrameLayer => layer.kind === LayerKind.Frame && destination === Destination.Frame && layer.fills.length > 0;
 
-export function planOf(message: FigmaMessage, newId: NewId): FigmaPlan | null {
+export function planOf(message: FigmaMessage, newId: NewId, uploads: readonly FontUpload[] = []): FigmaPlan | null {
   const scene = figmaScene(message);
   if (!scene) {
     return null;
   }
   const skipped = new Set(scene.skipped);
   const items = scene.placements.flatMap((pl) => {
-    const made = isStage(pl.layer, pl.destination) ? frameItem(pl.layer, pl.centre, newId, skipped) : freeItem(pl.layer, pl.size, pl.centre, newId, skipped);
+    const made = isStage(pl.layer, pl.destination) ? frameItem(pl.layer, pl.centre, newId, skipped, uploads) : freeItem(pl.layer, pl.size, pl.centre, newId, skipped, uploads);
     return made ? [made] : [];
   });
   return items.length ? { items, skipped: [...skipped], fileKey: message.meta.fileKey ?? null } : null;

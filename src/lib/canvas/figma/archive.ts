@@ -16,6 +16,8 @@ export type Paint = {
   stops?: ColorStop[];
   transform?: Matrix;
   image?: { hash?: Uint8Array; name?: string };
+  imageScaleMode?: string;
+  focus?: Vec;
 };
 
 export type Effect = { type: string; color?: Rgba; offset?: Vec; radius?: number; spread?: number; visible?: boolean };
@@ -72,6 +74,9 @@ export type FigmaRawNode = {
   letterSpacing?: { value: number; units: string };
   textAlignHorizontal?: string;
   textAutoResize?: string;
+  textDecoration?: string;
+  fontAxes?: string;
+  fontFeatures?: string;
   textData?: { characters: string; styleOverrideTable?: FigmaRawNode[]; characterStyleIDs?: number[] };
   styleID?: number;
   symbolData?: { symbolID?: Guid; symbolOverrides?: NodePatch[] };

@@ -4,6 +4,15 @@ import { contourLength, cornerRadii, withCorner, ellipseOutline, flatten, parseP
 const close = (a: number, b: number, digits = 3) => expect(a).toBeCloseTo(b, digits);
 
 describe('path data', () => {
+  it('a closed contour of a single point writes out without breaking the rest', () => {
+    const outline = parsePath('M5 5 Z M0 0 L1 0 L1 1 Z');
+    if (typeof outline === 'string') {
+      throw new Error(outline);
+    }
+
+    expect(pathData(outline)).toBe('M5 5ZM0 0L1 0L1 1Z');
+  });
+
   it('reads absolute and relative commands into contours with handles', () => {
     const outline = parsePath('M0 0 L1 0 l0 1 H0 Z M0.2 0.2 C0.3 0.1 0.4 0.1 0.5 0.2');
     if (typeof outline === 'string') {

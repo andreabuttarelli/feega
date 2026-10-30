@@ -162,7 +162,7 @@ function pointed(clip: MotionClip, docs: Readonly<Record<string, MotionDoc>>): M
 
 export function resolveScenes(doc: MotionDoc, docs: Readonly<Record<string, MotionDoc>>): MotionDoc {
   const used = [...new Set(sceneNodeIds(doc))].filter((id) => docs[id]);
-  const latestOnTop = (clips: MotionClip[]) => (clips.some(sceneOf) ? [...clips].sort((a, b) => b.from - a.from) : clips);
+  const latestOnTop = (clips: MotionClip[]) => (clips.some(sceneOf) ? [...clips].sort((a, b) => a.from - b.from) : clips);
   const tracks = doc.tracks.map((t) => ({ ...t, clips: latestOnTop(t.clips as MotionClip[]).flatMap((c) => pointed(c, docs)) }));
 
   return used.reduce((acc, id) => embedMotion(acc, id, docs[id]), { ...doc, tracks });
