@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { START_URL_COOKIE, peekStartUrl, rememberStartUrl, takeStartUrl } from './start-url-cookie';
 
 function jar(initial: Record<string, string> = {}) {
@@ -17,6 +17,31 @@ function jar(initial: Record<string, string> = {}) {
     }
   };
 }
+
+describe('a bare domain in the link', () => {
+  it('is stored with https', () => {
+    const cookies = jar();
+    rememberStartUrl(cookies, new URL('https://oh.feega.app/?start_url=stripe.com'));
+
+    expect(cookies.store.get(START_URL_COOKIE)).toBe('https://stripe.com/');
+  });
+
+  it('a refused value logs a warning with the reason', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    rememberStartUrl(jar(), new URL('https://oh.feega.app/?start_url=javascript%3Aalert(1)'));
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('scheme'));
+    warn.mockRestore();
+  });
+
+  it('no parameter logs nothing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    rememberStartUrl(jar(), new URL('https://oh.feega.app/'));
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
 
 describe('the start url survives the trip through sign-in', () => {
   it('is kept in a short-lived httpOnly lax cookie', () => {

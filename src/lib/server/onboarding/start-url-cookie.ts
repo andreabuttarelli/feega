@@ -1,4 +1,4 @@
-import { START_URL_PARAM, startUrlOf } from '$lib/start-url';
+import { START_URL_PARAM, startUrlOf, startUrlRefusal } from '$lib/start-url';
 
 export const START_URL_COOKIE = 'feega_start_url';
 
@@ -18,8 +18,12 @@ export function rememberStartUrl(cookies: Pick<CookieJar, 'set'>, url: URL): str
     return null;
   }
 
-  const startUrl = startUrlOf(url.searchParams.get(START_URL_PARAM));
+  const raw = url.searchParams.get(START_URL_PARAM);
+  const startUrl = startUrlOf(raw);
   if (!startUrl) {
+    if (raw !== null) {
+      console.warn(`start_url refused (${startUrlRefusal(raw)}): ${raw.slice(0, 200)}`);
+    }
     return null;
   }
 
