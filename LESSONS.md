@@ -3510,3 +3510,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A URL import scores well and looks wrong on the canvas
 
 **Signal:** `url-fidelity.browser.test.ts` scores 0.95+, the canvas shows another font, content cut differently or a strip at the top. **Move:** the HTML still is not what the canvas draws. Score the GPU path too: `URL_IMPORT_GPU=<label> npx vite-node --config scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` after the HTML run with the same label, and compare both columns. Read a WebGPU canvas by screenshotting the element, never with `drawImage` after the frame presented (blank).
+
+## A tall frame exports as "Export failed", or as an image that repeats
+
+**Signal:** image export of a frame several thousand px tall (an imported page) fails, or at 2× the bottom repeats the top, or WebP is 0 bytes. **Move:** never screenshot a viewport taller than a band: Chromium paints at most ~16384 device px and the serverless build less. Draw in `BAND_PX` bands with `pictureOf` and stitch; WebP itself stops at 16383 px per side (`rowSize` fits it).

@@ -105,20 +105,23 @@ async function shiftedTo(page: Page, top: number) {
   );
 }
 
-async function pictureOf(page: Page, full: Viewport, mime: string, quality?: number): Promise<Buffer> {
+const wholeOf = (full: Viewport): PageBox => ({ left: 0, top: 0, width: full.width, height: full.height });
+
+async function pictureOf(page: Page, full: Viewport, mime: string, quality?: number, region: PageBox = wholeOf(full)): Promise<Buffer> {
   const type = SCREENSHOT_TYPE[mime];
-  if (full.height <= BAND_PX) {
-    return Buffer.from(await page.screenshot({ type, quality, omitBackground: true }));
-  }
   const bands: { input: Buffer; top: number; left: number }[] = [];
-  for (let top = 0; top < full.height; top += BAND_PX) {
-    await shiftedTo(page, top);
-    const clip = { x: 0, y: 0, width: full.width, height: Math.min(BAND_PX, full.height - top) };
+  for (let top = 0; top < region.height; top += BAND_PX) {
+    await shiftedTo(page, region.top + top);
+    const clip = { x: region.left, y: 0, width: region.width, height: Math.min(BAND_PX, region.height - top) };
     bands.push({ input: Buffer.from(await page.screenshot({ type: 'png', omitBackground: true, clip })), top: Math.round(top * full.scale), left: 0 });
   }
   await shiftedTo(page, 0);
   const { default: sharp } = await import('sharp');
-  const sheet = sharp({ create: { width: Math.round(full.width * full.scale), height: Math.round(full.height * full.scale), channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(bands);
+  const size = { width: Math.round(region.width * full.scale), height: Math.round(region.height * full.scale) };
+  if (bands.length === 1 && type === 'png') {
+    return bands[0].input;
+  }
+  const sheet = sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }, limitInputPixels: false }).composite(bands);
   return sheet.toFormat(type, quality === undefined ? {} : { quality }).toBuffer();
 }
 
@@ -149,11 +152,11 @@ async function boxOf(page: Page, clipId: string): Promise<PageBox | null> {
 }
 
 async function exportPageOf(viewport: Viewport): Promise<ExportPage> {
-  const page = await openPage(viewport);
+  const page = await openPage(banded(viewport));
   return {
     ...stillOf(page, viewport),
     boxOf: (clipId) => boxOf(page, clipId),
-    shot: async (mime, quality, clip) => Buffer.from(await page.screenshot({ type: SCREENSHOT_TYPE[mime], quality, omitBackground: true, ...(clip ? { clip: { x: clip.left, y: clip.top, width: clip.width, height: clip.height } } : {}) }))
+    shot: (mime, quality, clip) => pictureOf(page, viewport, mime, quality, clip ?? wholeOf(viewport))
   };
 }
 

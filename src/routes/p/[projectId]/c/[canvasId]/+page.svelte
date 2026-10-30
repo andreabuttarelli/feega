@@ -60,6 +60,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
+  import { exportFailure } from '$lib/canvas/export-failure';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -3574,14 +3575,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function exportPicked(picked: { frameId: string; elementIds: string[] }, rows: ExportRow[]) {
     await saves.flush(picked.frameId);
     const elements = picked.elementIds.map((elementId) => ({ frameId: picked.frameId, elementId }));
-    const out = await post('exportSelection', { elements: JSON.stringify(elements), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
-    return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
+    const answer = await send('exportSelection', { elements: JSON.stringify(elements), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    return answer.type === 'success' ? (answer.data as { url: string; name: string; files: string[]; skipped?: string[] }) : exportFailure(answer);
   }
 
   async function exportFrames(frameIds: string[], rows: ExportRow[]) {
     await Promise.all(frameIds.map((id) => saves.flush(id)));
-    const out = await post('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
-    return out?.url ? (out as { url: string; name: string; files: string[]; skipped?: string[] }) : 'Export failed';
+    const answer = await send('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    return answer.type === 'success' ? (answer.data as { url: string; name: string; files: string[]; skipped?: string[] }) : exportFailure(answer);
   }
 
   async function insertSceneDrop(drop: SceneDrop) {
