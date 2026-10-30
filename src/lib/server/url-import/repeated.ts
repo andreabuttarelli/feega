@@ -15,6 +15,8 @@ const STYLE_VALUES = ['Primary', 'Secondary', 'Tertiary'];
 const STYLE_PROP = 'Style';
 const SIZE_PROP = 'Size';
 const SIZE_STEP_PX = 4;
+const MAX_SIZES = 3;
+const SIZED = /^(Button|Nav link|Link)( \d+)?$/;
 const SIZE_VALUES: Record<number, string[]> = { 2: ['Small', 'Large'], 3: ['Small', 'Medium', 'Large'] };
 
 type Seen = { node: RestNode; order: number; skeleton: string; parts: number; style: string; size: number };
@@ -97,7 +99,13 @@ function groupedBy<T>(items: T[], key: (t: T) => string): T[][] {
 function variantsOf(sets: Seen[]): Group[] {
   const byStyle = groupedBy(sets, (s) => s.style);
   const repeated = byStyle.some((g) => g.length >= MIN_OCCURRENCES);
-  return repeated ? byStyle.sort((a, b) => b.length - a.length).flatMap((g) => groupedBy(g, (s) => String(s.size))) : [];
+  if (!repeated) {
+    return [];
+  }
+  const sorted = byStyle.sort((a, b) => b.length - a.length);
+  const sizes = new Set(sets.map((s) => s.size)).size;
+  const sized = SIZED.test(nameOf(sets[0].node)) && sizes > 1 && sizes <= MAX_SIZES;
+  return sized ? sorted.flatMap((g) => groupedBy(g, (s) => String(s.size))) : sorted;
 }
 
 function chosenOf(seen: Seen[], parent: Map<string, string>): Chosen[] {
@@ -132,9 +140,10 @@ const styleValue = (index: number) => STYLE_VALUES[index] ?? `${STYLE_PROP} ${in
 
 const sizeValue = (index: number, count: number) => SIZE_VALUES[count]?.[index] ?? `${SIZE_PROP} ${index + 1}`;
 
-function variantNames(variants: Group[]): Map<Group, string> {
+function variantNames(name: string, variants: Group[]): Map<Group, string> {
   const styles = [...new Set(variants.map((g) => g[0].style))];
-  const sizes = [...new Set(variants.map((g) => g[0].size))].sort((a, b) => a - b);
+  const uniform = SIZED.test(name) && variants.every((g) => g.every((s) => s.size === g[0].size));
+  const sizes = uniform ? [...new Set(variants.map((g) => g[0].size))].sort((a, b) => a - b) : [];
   return new Map(
     variants.map((g) => {
       const pairs = [...(styles.length > 1 ? [`${STYLE_PROP}=${styleValue(styles.indexOf(g[0].style))}`] : []), ...(sizes.length > 1 ? [`${SIZE_PROP}=${sizeValue(sizes.indexOf(g[0].size), sizes.length)}`] : [])];
@@ -153,7 +162,7 @@ type Marking = { componentId: string; name: string };
 function markingsOf(chosen: Chosen[]): Map<string, Marking> {
   const marks = new Map<string, Marking>();
   for (const { name, variants } of chosen) {
-    const named = variantNames(variants);
+    const named = variantNames(name, variants);
     variants.forEach((group) => {
       const main = group[0].node;
       const mainName = named.get(group) ? `${name} / ${named.get(group)}` : name;
@@ -185,6 +194,6 @@ export function repeatedOf(root: RestNode): Repeated {
   const chosen = uniquelyNamed(chosenOf(seen, parent));
   return {
     root: marked(root, markingsOf(chosen)),
-    components: chosen.map(({ name, variants }) => ({ name, variants: variants.map((g) => ({ style: variantNames(variants).get(g) ?? '', occurrences: g.length })) }))
+    components: chosen.map(({ name, variants }) => ({ name, variants: variants.map((g) => ({ style: variantNames(name, variants).get(g) ?? '', occurrences: g.length })) }))
   };
 }
