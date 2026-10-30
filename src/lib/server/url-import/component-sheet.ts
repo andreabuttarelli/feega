@@ -6,9 +6,9 @@ import { addClip, editClip } from '@feega/motion-core/motion/timeline';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { DEFAULT_MODE, keyOf } from '@feega/motion-core/motion/variables-model';
 import type { NewId } from '$lib/motion/main-component';
+import { SET_BACKDROP, SET_GAP_PX } from '$lib/motion/component-set';
 
 const PAD_PX = 40;
-const GAP_PX = 48;
 const PAGE_GAP_PX = 120;
 const PAGE_ROW_PX = 2400;
 const BACKGROUND = 'Background';
@@ -50,7 +50,7 @@ function backdropped(source: MotionDoc, size: { width: number; height: number },
   }
   const id = newId();
   const added = addClip(empty, { component: 'Shape', from: 0, durationInFrames: source.durationInFrames, props: { shape: ShapeKind.Rect, fill, ...FULL } }, id);
-  const bound = added.ok ? editClip(added.doc, id, (clip) => ({ ...clip, name: BACKGROUND, bind: { fill: keyOf(collection, BACKGROUND) } })) : added;
+  const bound = added.ok ? editClip(added.doc, id, (clip) => ({ ...clip, name: SET_BACKDROP, bind: { fill: keyOf(collection, BACKGROUND) } })) : added;
   return bound.ok ? bound.doc : empty;
 }
 
@@ -59,7 +59,7 @@ const clipIdsIn = (doc: MotionDoc) => new Set(Object.values(doc.comps).flatMap((
 function setDoc(set: SetOf, newId: NewId): MotionDoc {
   const source = set.source.doc;
   const size = {
-    width: Math.ceil(PAD_PX * 2 + set.mains.reduce((sum, m) => sum + widthOf(m.box) + GAP_PX, -GAP_PX)),
+    width: Math.ceil(PAD_PX * 2 + set.mains.reduce((sum, m) => sum + widthOf(m.box) + SET_GAP_PX, -SET_GAP_PX)),
     height: Math.ceil(PAD_PX * 2 + Math.max(...set.mains.map((m) => heightOf(m.box))))
   };
   let doc = backdropped(source, size, newId);
@@ -71,7 +71,7 @@ function setDoc(set: SetOf, newId: NewId): MotionDoc {
     doc = { ...doc, comps: { ...doc.comps, ...nested, [main.id]: { ...moved, component } } };
     const placed = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(main.comp.durationInFrames, doc.durationInFrames), props: { comp: main.id } }, newId());
     doc = placed.ok ? placed.doc : doc;
-    left += widthOf(main.box) + GAP_PX;
+    left += widthOf(main.box) + SET_GAP_PX;
   }
   return doc;
 }

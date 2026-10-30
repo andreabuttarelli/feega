@@ -38,6 +38,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   import_lottie: 'Import a Lottie animation (JSON or an https URL of a .json or .lottie) as an editable frame at x,y; answers what it could not carry over.',
   list_figma_frames: 'List the frames of a Figma file from its link (needs the Figma token saved in Settings).',
   import_code: 'Run a public GitHub React app in a sandbox and draw one of its pages as a frame where each code component is a main component, each usage an instance and props become variants.',
+  home_components: 'Move the main components of a frame to the project Components page, one frame per set, leaving linked instances in place.',
   import_url: 'Draw a public web page as an editable frame at x,y: layers, text, auto layout and images, not a screenshot; split into named sections (Nav, Hero, Features, Footer…) unless sections is false; its colours, type, effects, radii and spacing become shared variables and styles bound to the layers unless tokens is false.',
   import_figma: 'Draw Figma frames from a link onto the canvas at x,y, with their layers, auto layout and images.',
   group_elements: 'Group 2 or more free elements, or wrap any nodes in a Section.',

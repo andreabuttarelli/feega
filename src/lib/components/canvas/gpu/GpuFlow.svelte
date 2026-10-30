@@ -134,6 +134,9 @@
   import { instanceOf } from '$lib/motion/main-component';
   import { appendVariant } from '$lib/motion/variants';
   import VariantPlus from '../VariantPlus.svelte';
+  import ComponentSetOutline from '../ComponentSetOutline.svelte';
+  import { addSetVariant, setMainOf } from '$lib/motion/component-set';
+  import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
@@ -1245,6 +1248,10 @@
     }
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
+    if (id === Action.CreateComponent && !onComponentsPage) {
+      await saverOf(nodeId)?.flushScheduled();
+      props.onComponentMade?.(nodeId);
+    }
   }
 
   let elementMenu = $state<Point | null>(null);
@@ -1563,6 +1570,27 @@
     const saver = saverOf(nodeId);
     if (saver) {
       commit(nodeId, appendVariant(saver.history.present, compId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+    }
+  }
+
+  const onComponentsPage = $derived((page.data as { canvas?: { name?: string } }).canvas?.name === COMPONENTS_PAGE);
+
+  const isComponentSet = (nodeId: string) => {
+    const doc = onComponentsPage ? liveOf(nodeId)?.doc : null;
+    return Boolean(doc && setMainOf(doc));
+  };
+
+  function addSetVariantAt(nodeId: string) {
+    const saver = saverOf(nodeId);
+    const tile = byId.get(nodeId);
+    if (!saver || !tile) {
+      return;
+    }
+    const before = saver.history.present;
+    const grown = addSetVariant(before, () => crypto.randomUUID().slice(0, 8));
+    commit(nodeId, grown, 'Added a variant');
+    if (grown.ok && grown.doc.width !== before.width) {
+      props.onResize?.(nodeId, (tile.w * grown.doc.width) / before.width, tile.h);
     }
   }
 
@@ -3465,6 +3493,9 @@
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
           <GradientHandles rect={gradient.rect} fill={gradient.fill} onchange={(f) => dragGradient(frame.id, gradient.clip, gradient.index, f)} ondone={(f) => dropGradient(frame.id, gradient.clip, gradient.index, f)} />
+        {/if}
+        {#if isComponentSet(frame.id)}
+          <ComponentSetOutline onadd={() => addSetVariantAt(frame.id)} />
         {/if}
         {@const plus = variantMark(frame.id)}
         {#if plus}

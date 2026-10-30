@@ -125,6 +125,7 @@ export type FlowProps = {
   onAddBeside?: (id: string) => Drawing | null;
   onGroup?: (ids: string[]) => void;
   onWrapStack?: (ids: string[]) => void;
+  onComponentMade?: (nodeId: string) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;
   onUndo?: () => void;
