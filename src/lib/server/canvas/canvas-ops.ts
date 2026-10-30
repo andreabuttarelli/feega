@@ -1,3 +1,4 @@
+import { componentsPage, homeComponents } from '$lib/server/canvas/components-page';
 import { exportCodeNode } from '$lib/server/canvas/code-export-node';
 import { listProjectComponents } from './project-components';
 import { ExportMode } from '$lib/canvas/code-frame';
@@ -238,6 +239,8 @@ const frameTarget = {
 const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame node the element is in'), elementId: z.string().describe('the clip id inside that frame'), ...frameTarget }).strict();
 const placeComponentInput = z.object({ canvasId: z.string(), frameId: z.string().describe('the Frame node holding the main component'), compId: z.string().describe('the main component id'), x: z.number().finite(), y: z.number().finite() }).strict();
 const placeInFrameInput =z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
+
+const homeComponentsInput = z.object({ frameId: z.string().describe('the Frame node where a main component was just made') }).strict();
 
 const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, {tool:line|arrow, from:{x,y}, to:{x,y}, stroke?:#hex}, or {tool:pen, path:SVG d}, in canvas units') })
@@ -986,6 +989,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importFigmaInput,
     run: async (ctx, input) => importFigmaInto(figmaScope(ctx), input.canvasId, { url: input.url, nodeIds: input.frameIds ?? null, at: { x: input.x, y: input.y } })
+  }),
+
+  home_components: op({
+    access: Access.Write,
+    input: homeComponentsInput,
+    run: async (ctx, input) => homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8))
   }),
 
   import_url: op({

@@ -12,6 +12,7 @@ import { Tokening, type PageShape } from './url-doc';
 import type { SiteBrand } from './page-tokens';
 import { findSiteBrand } from '$lib/server/start/site-brand';
 import { startHost } from '$lib/start-url';
+import { componentsPage } from '$lib/server/canvas/components-page';
 
 const MS_PER_MINUTE = 60_000;
 const IMPORTS_PER_MINUTE = 4;
@@ -71,6 +72,7 @@ export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { ur
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),
     guard: (url) => assertPublicUrl(url),
     ...pageAssets(scope),
+    components: () => componentsPage(scope.db, scope),
     newId: () => crypto.randomUUID().slice(0, 8)
   });
 }

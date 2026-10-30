@@ -640,6 +640,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
+  function homeComponents(nodeId: string) {
+    void post('homeComponents', { node_id: nodeId }).then(() => invalidate(CANVAS_LIST_DEPENDENCY));
+  }
+
   function wrapInSection(ids: string[]) {
     void optimistic(OptimisticAction.Section, { ids, id: crypto.randomUUID() });
   }
@@ -3763,6 +3767,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
     landImported(landed);
+    void invalidate(CANVAS_LIST_DEPENDENCY);
     if (startUrl && landed.truncated) {
       failed = `Imported the top of ${startHost(startUrl)}.`;
     }
@@ -4322,6 +4327,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
     onWrapStack={wrapWithStack}
+    onComponentMade={homeComponents}
     onUngroup={ungroupElements}
     onRestack={restack}
     onTileDragOver={tileDragOver}

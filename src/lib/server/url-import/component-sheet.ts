@@ -1,90 +1,48 @@
-import type { MotionClip, MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
+import type { MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
-import { placeInstance } from '$lib/motion/canvas-components';
+import { componentSlice } from '$lib/motion/canvas-components';
+import { compBox, reframed, type Box } from '$lib/motion/comp-frame';
 import { addClip, editClip } from '@feega/motion-core/motion/timeline';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { DEFAULT_MODE, keyOf } from '@feega/motion-core/motion/variables-model';
 import type { NewId } from '$lib/motion/main-component';
+import { SET_BACKDROP, SET_GAP_PX } from '$lib/motion/component-set';
 
-export const SHEET_NAME = 'Components';
-
-const MARGIN_PX = 80;
-const GAP_PX = 48;
-const BESIDE_PX = 240;
-const GRID_RATIO = 1.6;
+const PAD_PX = 40;
+const PAGE_GAP_PX = 120;
+const PAGE_ROW_PX = 2400;
 const BACKGROUND = 'Background';
-
-type Box = { left: number; top: number; right: number; bottom: number };
-
-function boxOf(comp: MotionComp, frame: { width: number; height: number }): Box | null {
-  const boxes = comp.tracks
-    .flatMap((t) => t.clips as MotionClip[])
-    .filter((c) => !c.parent && Number(c.props.width) > 0 && Number(c.props.height) > 0)
-    .map((c) => {
-      const [x, y, w, h] = [c.props.x, c.props.y, c.props.width, c.props.height].map(Number);
-      const [dx, dy] = [Number(c.transform?.x ?? 0), Number(c.transform?.y ?? 0)];
-      return { left: (x - w / 2 + dx) * frame.width, top: (y - h / 2 + dy) * frame.height, right: (x + w / 2 + dx) * frame.width, bottom: (y + h / 2 + dy) * frame.height };
-    });
-  if (!boxes.length) {
-    return null;
-  }
-  return { left: Math.min(...boxes.map((b) => b.left)), top: Math.min(...boxes.map((b) => b.top)), right: Math.max(...boxes.map((b) => b.right)), bottom: Math.max(...boxes.map((b) => b.bottom)) };
-}
-
-type Main = { id: string; set: string; box: Box };
-
-function mainsOf(doc: MotionDoc): Main[] {
-  const frame = { width: doc.width, height: doc.height };
-  return Object.entries(doc.comps).flatMap(([id, comp]) => {
-    const box = comp.component ? boxOf(comp, frame) : null;
-    return box ? [{ id, set: comp.component!.set ?? id, box }] : [];
-  });
-}
-
-function rowsOf(mains: Main[]): Main[][] {
-  const rows = new Map<string, Main[]>();
-  mains.forEach((m) => rows.set(m.set, [...(rows.get(m.set) ?? []), m]));
-  return [...rows.values()];
-}
-
-const widthOf = (m: Main) => m.box.right - m.box.left;
-const heightOf = (m: Main) => m.box.bottom - m.box.top;
-
-type Spot = { main: Main; left: number; top: number };
-
-function gridOf(mains: Main[], room: number): Spot[] {
-  const area = mains.reduce((sum, m) => sum + (widthOf(m) + GAP_PX) * (heightOf(m) + GAP_PX), 0);
-  const line = Math.min(room, Math.max(...mains.map(widthOf), Math.sqrt(area * GRID_RATIO)));
-  const spots: Spot[] = [];
-  let [left, top, tall] = [0, 0, 0];
-  const wrap = () => {
-    [left, top, tall] = [0, top + tall + GAP_PX, 0];
-  };
-  for (const row of rowsOf(mains)) {
-    const span = row.reduce((sum, m) => sum + widthOf(m) + GAP_PX, -GAP_PX);
-    if (left > 0 && left + span > line) {
-      wrap();
-    }
-    for (const main of row) {
-      if (left > 0 && left + widthOf(main) > line) {
-        wrap();
-      }
-      spots.push({ main, left, top });
-      left += widthOf(main) + GAP_PX;
-      tall = Math.max(tall, heightOf(main));
-    }
-  }
-  return spots;
-}
-
-function insideComps(doc: MotionDoc): Set<string> {
-  return new Set(Object.values(doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((clip) => clip.id))));
-}
-
 const FULL = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
-function backdropped(source: MotionDoc, newId: NewId): MotionDoc {
-  const empty: MotionDoc = { ...source, tracks: source.tracks.map((t) => ({ ...t, clips: [] })), comps: {} };
+export type ComponentPages = { sets: PlanItem[]; homes: Record<number, Record<string, number>> };
+
+type Main = { id: string; comp: MotionComp; box: Box };
+type SetOf = { name: string; source: PlanItem; mains: Main[] };
+
+const widthOf = (b: Box) => b.right - b.left;
+const heightOf = (b: Box) => b.bottom - b.top;
+
+function setsOf(items: readonly PlanItem[]): Map<string, SetOf> {
+  const sets = new Map<string, SetOf>();
+  const seen = new Set<string>();
+  for (const item of items) {
+    const size = { width: item.doc.width, height: item.doc.height };
+    for (const [id, comp] of Object.entries(item.doc.comps)) {
+      const box = comp.component && !seen.has(id) ? compBox(comp, size) : null;
+      if (!box) {
+        continue;
+      }
+      seen.add(id);
+      const key = comp.component!.set ?? id;
+      const set = sets.get(key) ?? { name: comp.component!.set ?? comp.component!.name, source: item, mains: [] };
+      sets.set(key, { ...set, mains: [...set.mains, { id, comp, box }] });
+    }
+  }
+  return sets;
+}
+
+function backdropped(source: MotionDoc, size: { width: number; height: number }, newId: NewId): MotionDoc {
+  const empty: MotionDoc = { ...source, ...size, tracks: source.tracks.map((t) => ({ ...t, clips: [] })), comps: {} };
   const [collection, vars] = Object.entries(source.variables ?? {}).find(([, c]) => c.vars[BACKGROUND]) ?? [];
   const fill = vars?.vars[BACKGROUND].values[DEFAULT_MODE];
   if (!collection || typeof fill !== 'string') {
@@ -92,21 +50,58 @@ function backdropped(source: MotionDoc, newId: NewId): MotionDoc {
   }
   const id = newId();
   const added = addClip(empty, { component: 'Shape', from: 0, durationInFrames: source.durationInFrames, props: { shape: ShapeKind.Rect, fill, ...FULL } }, id);
-  const bound = added.ok ? editClip(added.doc, id, (clip) => ({ ...clip, name: BACKGROUND, bind: { fill: keyOf(collection, BACKGROUND) } })) : added;
+  const bound = added.ok ? editClip(added.doc, id, (clip) => ({ ...clip, name: SET_BACKDROP, bind: { fill: keyOf(collection, BACKGROUND) } })) : added;
   return bound.ok ? bound.doc : empty;
 }
 
-export function componentSheet(item: PlanItem, newId: NewId): PlanItem | null {
-  const source = item.doc;
-  const mains = mainsOf(source);
-  if (!mains.length) {
-    return null;
-  }
-  let doc = backdropped(source, newId);
-  for (const { main, left, top } of gridOf(mains, source.width - 2 * MARGIN_PX)) {
-    const placed = placeInstance(doc, source, main.id, newId, { x: (MARGIN_PX + left - main.box.left) / source.width, y: (MARGIN_PX + top - main.box.top) / source.height });
+const clipIdsIn = (doc: MotionDoc) => new Set(Object.values(doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((clip) => clip.id))));
+
+function setDoc(set: SetOf, newId: NewId): MotionDoc {
+  const source = set.source.doc;
+  const size = {
+    width: Math.ceil(PAD_PX * 2 + set.mains.reduce((sum, m) => sum + widthOf(m.box) + SET_GAP_PX, -SET_GAP_PX)),
+    height: Math.ceil(PAD_PX * 2 + Math.max(...set.mains.map((m) => heightOf(m.box))))
+  };
+  let doc = backdropped(source, size, newId);
+  let left = PAD_PX;
+  for (const main of set.mains) {
+    const nested = Object.fromEntries(Object.entries(componentSlice(source, main.id).comps).filter(([id]) => id !== main.id && !doc.comps[id]).map(([id, comp]) => [id, reframed(comp, source, size)]));
+    const moved = reframed(main.comp, source, size, { x: left - main.box.left, y: PAD_PX - main.box.top });
+    const { home: _home, ...component } = main.comp.component!;
+    doc = { ...doc, comps: { ...doc.comps, ...nested, [main.id]: { ...moved, component } } };
+    const placed = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(main.comp.durationInFrames, doc.durationInFrames), props: { comp: main.id } }, newId());
     doc = placed.ok ? placed.doc : doc;
+    left += widthOf(main.box) + SET_GAP_PX;
   }
-  const inside = insideComps(doc);
-  return { ...item, doc, name: SHEET_NAME, centre: { x: item.centre.x + item.size.width + BESIDE_PX, y: item.centre.y }, images: item.images.filter((i) => inside.has(i.clipId)) };
+  return doc;
+}
+
+function laidOnPage(items: PlanItem[]): PlanItem[] {
+  let [left, top, tall] = [0, 0, 0];
+  return items.map((item) => {
+    if (left > 0 && left + item.size.width > PAGE_ROW_PX) {
+      [left, top, tall] = [0, top + tall + PAGE_GAP_PX, 0];
+    }
+    const centre = { x: left + item.size.width / 2, y: top + item.size.height / 2 };
+    left += item.size.width + PAGE_GAP_PX;
+    tall = Math.max(tall, item.size.height);
+    return { ...item, centre };
+  });
+}
+
+export function componentPages(items: readonly PlanItem[], newId: NewId): ComponentPages {
+  const sets = [...setsOf(items).values()];
+  const made = sets.map((set) => {
+    const doc = setDoc(set, newId);
+    const inside = clipIdsIn(doc);
+    return { ...set.source, doc, name: set.name, size: { width: doc.width, height: doc.height }, centre: { x: 0, y: 0 }, images: items.flatMap((i) => i.images).filter((i) => inside.has(i.clipId)) };
+  });
+  const homeOf = new Map(sets.flatMap((set, at) => set.mains.map((m) => [m.id, at] as const)));
+  const homes = Object.fromEntries(
+    items.flatMap((item, i) => {
+      const own = Object.keys(item.doc.comps).flatMap((id) => (homeOf.has(id) ? [[id, homeOf.get(id)!] as const] : []));
+      return own.length ? [[i, Object.fromEntries(own)]] : [];
+    })
+  );
+  return { sets: laidOnPage(made), homes };
 }

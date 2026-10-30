@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { imagesFilled, type ImageAssets } from '$lib/canvas/figma/images';
 import { placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import type { UndoItem } from '$lib/canvas/undo-plan';
-import { homed } from '$lib/motion/canvas-components';
+import { homedAt } from '$lib/motion/canvas-components';
 import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
 import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
@@ -63,7 +63,10 @@ export type PageAsk = {
   planner?: Planner;
   maxHeight?: number;
   shape?: PageShape;
+  components?: () => Promise<ComponentsPage>;
 };
+
+export type ComponentsPage = { place: Place; at: { x: number; y: number } };
 
 const SETTLE_MS = 1_200;
 const SCROLL_STEP_PX = 700;
@@ -165,12 +168,32 @@ async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
-async function homedOnSheets(store: FrameStore, frameIds: string[], homes: UrlPlan['homes']): Promise<void> {
-  for (const [page, sheet] of Object.entries(homes)) {
-    const [pageId, sheetId] = [frameIds[Number(page)], frameIds[sheet]];
-    const frame = pageId && sheetId ? await store.read(pageId) : null;
-    if (frame) {
-      await store.write(pageId, frame.version, homed(frame.doc, sheetId), HOMED_SUMMARY);
+async function placedSets(ask: PageAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[] }> {
+  if (!sets.length || !ask.components) {
+    return { frameIds: [] };
+  }
+  const page = await ask.components();
+  const placed = await placeFigmaPlan(ask.store, page.place, { items: sets, skipped: [], fileKey: null }, page.at);
+  return { frameIds: placed.frameIds };
+}
+
+async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: UrlPlan['homes']): Promise<void> {
+  for (const [page, comps] of Object.entries(homes)) {
+    const pageId = frameIds[Number(page)];
+    const frame = pageId ? await store.read(pageId) : null;
+    const byComp = Object.fromEntries(Object.entries(comps).flatMap(([compId, set]) => (setIds[set] ? [[compId, setIds[set]]] : [])));
+    if (frame && Object.keys(byComp).length) {
+      await store.write(pageId, frame.version, homedAt(frame.doc, byComp), HOMED_SUMMARY);
+    }
+  }
+}
+
+async function filled(ask: PageAsk, frameIds: string[], items: UrlPlan['sets'], assets: ImageAssets): Promise<void> {
+  for (const [i, frameId] of frameIds.entries()) {
+    const frame = await ask.store.read(frameId);
+    const images = items[i]?.images ?? [];
+    if (frame && images.length && Object.keys(assets).length) {
+      await ask.store.write(frameId, frame.version, imagesFilled(frame.doc, images, assets), FILLED_SUMMARY);
     }
   }
 }
@@ -198,15 +221,11 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   }
 
   const placed = await placeFigmaPlan(ask.store, ask.place, made.plan, ask.at);
-  await homedOnSheets(ask.store, placed.frameIds, made.homes);
+  const sets = await placedSets(ask, made.sets);
+  await homedOnSets(ask.store, placed.frameIds, sets.frameIds, made.homes);
   const assets = await imported(ask, made.images);
-  for (const [i, frameId] of placed.frameIds.entries()) {
-    const frame = await ask.store.read(frameId);
-    const images = made.plan.items[i]?.images ?? [];
-    if (frame && images.length && Object.keys(assets).length) {
-      await ask.store.write(frameId, frame.version, imagesFilled(frame.doc, images, assets), FILLED_SUMMARY);
-    }
-  }
+  await filled(ask, placed.frameIds, made.plan.items, assets);
+  await filled(ask, sets.frameIds, made.sets, assets);
   const frameId = placed.frameIds[0];
   return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: placed.undo, skipped: placed.skipped, truncated: tree.truncated };
 }

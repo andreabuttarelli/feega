@@ -100,19 +100,18 @@ describe('repeated blocks of an imported page become a component kit', () => {
     expect(titles.map((c) => String(c.props.color).toLowerCase())).toEqual(['#00aa55', '#00aa55']);
   });
 
-  it('the mains also sit on a Components frame beside the page', () => {
+  it('the mains sit in set frames for the Components page, and the page instances point at them', () => {
     const plan = planned();
-    const sheet = plan.plan.items.find((item) => item.name === 'Components');
+    const placed = plan.sets.flatMap((set) => set.doc.tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Precomp').map((c) => String(c.props.comp)));
 
-    expect(sheet).toBeDefined();
-    expect(sheet!.centre.x).toBeGreaterThan(plan.plan.items[0].size.width / 2);
-    expect(sheet!.doc.tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Precomp').map((c) => c.props.comp).sort()).toEqual(mainsOf(pageOf(plan)).map(([id]) => id).sort());
-    expect(plan.homes).toEqual({ 0: plan.plan.items.indexOf(sheet!) });
+    expect(plan.plan.items.some((item) => item.name === 'Components')).toBe(false);
+    expect(placed.sort()).toEqual(mainsOf(pageOf(plan)).map(([id]) => id).sort());
+    expect(Object.keys(plan.homes[0]).sort()).toEqual(placed.sort());
   });
 
-  it('the Components frame is painted with the page Background variable, so light text stays readable', () => {
-    const sheet = planned().plan.items.find((item) => item.name === 'Components')!;
-    const [backdrop] = sheet.doc.tracks.flatMap((t) => t.clips);
+  it('a set frame is painted with the page Background variable, so light text stays readable', () => {
+    const [set] = planned().sets;
+    const [backdrop] = set.doc.tracks.flatMap((t) => t.clips);
 
     expect(backdrop.component).toBe('Shape');
     expect(backdrop.bind?.fill).toBe('Acme/Background');

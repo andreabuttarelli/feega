@@ -1,5 +1,6 @@
 import { compsOf, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { NewId } from './main-component';
+import { reframed } from './comp-frame';
 import { setMembers, type Variant } from './variants';
 import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
@@ -41,7 +42,7 @@ function copied(target: MotionDoc, source: MotionDoc, compId: string): MotionDoc
   if (target.comps[compId]) {
     return target;
   }
-  const comps = Object.fromEntries([...withNested(source, compId)].filter(([id]) => !target.comps[id]));
+  const comps = Object.fromEntries([...withNested(source, compId)].filter(([id]) => !target.comps[id]).map(([id, comp]) => [id, reframed(comp, source, target)]));
   const known = new Set(target.assets.map((a) => a.id));
   const assets = [...target.assets, ...source.assets.filter((a) => !known.has(a.id))];
   return { ...target, assets, comps: { ...target.comps, ...comps } };
@@ -54,6 +55,11 @@ export function componentSlice(source: MotionDoc, compId: string): MotionDoc {
 
 export function homed(source: MotionDoc, frameId: string): MotionDoc {
   const comps = Object.fromEntries(Object.entries(source.comps).map(([id, comp]) => [id, comp.component ? { ...comp, component: { ...comp.component, home: comp.component.home ?? frameId } } : comp]));
+  return { ...source, comps };
+}
+
+export function homedAt(source: MotionDoc, homes: Readonly<Record<string, string>>): MotionDoc {
+  const comps = Object.fromEntries(Object.entries(source.comps).map(([id, comp]) => [id, comp.component && homes[id] ? { ...comp, component: { ...comp.component, home: homes[id] } } : comp]));
   return { ...source, comps };
 }
 

@@ -1,4 +1,4 @@
-import { planOf, type FigmaPlan, type FontUpload } from '$lib/canvas/figma/figma-doc';
+import { planOf, type FigmaPlan, type FontUpload, type PlanItem } from '$lib/canvas/figma/figma-doc';
 import { catalogueFamily, familyFor } from '$lib/motion/vector-ui/piece';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { restMessage, type RestNode, type RestPaint, type RestStyle } from '$lib/server/figma/rest-message';
@@ -12,7 +12,7 @@ import { sectionFramed } from './section-frames';
 import { tokensOf, type SiteBrand } from './page-tokens';
 import { samplesOf, siteName, tokenised } from './token-bind';
 import { componentKit } from './component-kit';
-import { componentSheet } from './component-sheet';
+import { componentPages, type ComponentPages } from './component-sheet';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -27,7 +27,7 @@ const UNSAFE_FAMILY = /[^A-Za-z0-9 \-.']+/g;
 export type ImageRefs = Record<string, string>;
 export type FontAssets = Record<string, string>;
 export type ComponentCount = { components: number; instances: number };
-export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string; components: ComponentCount; homes: Record<number, number> };
+export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string; components: ComponentCount; sets: PlanItem[]; homes: ComponentPages['homes'] };
 
 const FAMILIES = GOOGLE_FONTS.map((f) => f.f);
 
@@ -204,23 +204,11 @@ function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: Site
   return { ...plan, items: plan.items.map((item) => ({ ...item, doc: componentKit(tokenised(item.doc, tokens, site, units), site, newId) })) };
 }
 
-type Sheeted = { plan: FigmaPlan; homes: Record<number, number> };
+const NO_PAGES: ComponentPages = { sets: [], homes: {} };
 
-function withSheets(plan: FigmaPlan, newId: () => string): Sheeted {
-  const items = [...plan.items];
-  const homes: Record<number, number> = {};
-  plan.items.forEach((item, i) => {
-    const sheet = componentSheet(item, newId);
-    if (sheet) {
-      homes[i] = items.push(sheet) - 1;
-    }
-  });
-  return { plan: { ...plan, items }, homes };
-}
-
-const SHEETED: Record<Tokening, (plan: FigmaPlan, newId: () => string) => Sheeted> = {
-  [Tokening.On]: withSheets,
-  [Tokening.Off]: (plan) => ({ plan, homes: {} })
+const PAGED: Record<Tokening, (plan: FigmaPlan, newId: () => string) => ComponentPages> = {
+  [Tokening.On]: (plan, newId) => componentPages(plan.items, newId),
+  [Tokening.Off]: () => NO_PAGES
 };
 
 const TOKENISED: Record<Tokening, Tokenise> = {
@@ -249,6 +237,6 @@ export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPE
   const tokening = shape.tokening ?? Tokening.Off;
   const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
   const counts = tokened.items.map((item) => countOf(item.doc));
-  const { plan, homes } = SHEETED[tokening](tokened, newId);
-  return { plan, images, name, homes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
+  const { sets, homes } = PAGED[tokening](tokened, newId);
+  return { plan: tokened, images, name, sets, homes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
 }

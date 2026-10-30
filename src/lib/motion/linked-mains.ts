@@ -2,6 +2,7 @@ import { compsOf, type MotionClip, type MotionComp, type MotionDoc } from '@feeg
 import { withOverride } from '@feega/motion-core/motion/precomp';
 import { componentSlice } from './canvas-components';
 import type { Overrides } from './main-component';
+import { compBox, reframed, type Point, type Size } from './comp-frame';
 
 export type HomeDocs = ReadonlyMap<string, MotionDoc | null>;
 
@@ -57,6 +58,14 @@ function detached(doc: MotionDoc, compId: string): MotionDoc {
   return { ...doc, tracks, comps: { ...comps, ...own } };
 }
 
+const sizeOf = (doc: MotionDoc): Size => ({ width: doc.width, height: doc.height });
+
+function anchored(local: MotionComp | undefined, arriving: MotionComp, size: Size): Point {
+  const was = local ? compBox(local, size) : null;
+  const now = compBox(arriving, size);
+  return was && now ? { x: was.left - now.left, y: was.top - now.top } : { x: 0, y: 0 };
+}
+
 function followed(doc: MotionDoc, compId: string, home: string, homeDoc: MotionDoc): MotionDoc {
   const main = homeDoc.comps[compId];
   if (!main?.component) {
@@ -64,12 +73,14 @@ function followed(doc: MotionDoc, compId: string, home: string, homeDoc: MotionD
   }
 
   const slice = componentSlice(homeDoc, compId).comps;
+  const [from, to] = [sizeOf(homeDoc), sizeOf(doc)];
+  const shift = anchored(doc.comps[compId], reframed(main, from, to), to);
   const picked = Object.fromEntries(
     Object.entries(slice).flatMap(([id, comp]) => {
       if (id === compId) {
-        return [[id, { ...comp, component: { ...comp.component!, home } }]];
+        return [[id, { ...reframed(comp, from, to, shift), component: { ...comp.component!, home } }]];
       }
-      return comp.component && doc.comps[id] ? [] : [[id, comp]];
+      return comp.component && doc.comps[id] ? [] : [[id, reframed(comp, from, to)]];
     })
   );
   const comps = { ...doc.comps, ...picked };
