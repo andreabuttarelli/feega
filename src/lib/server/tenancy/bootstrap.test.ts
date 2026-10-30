@@ -4,7 +4,6 @@ import { hashInviteToken, LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 import { fakeDb, filtersOf, type Call } from '$lib/server/db/fake-db';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { FreeOrgLimitReachedError } from '$lib/server/tenancy/free-org-limit';
-import { WELCOME_CREDITS } from '$lib/credit-ladder';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const USER = '22222222-2222-2222-2222-222222222222';
@@ -50,16 +49,12 @@ describe('la prima org di un utente nuovo', () => {
     expect(opsOn(calls, 'orgs_members')).toContain('insert');
   });
 
-  it("riceve i crediti di benvenuto, una riga credit_ledger source 'promo'", async () => {
+  it('non scrive nessuna riga credit_ledger: il free tier è la quota mensile, non un grant', async () => {
     const { db, calls } = fakeDb({ orgs: [orgRow], orgs_members: [], credit_ledger: [] });
 
     await createFirstOrgWith(db, { userId: USER, name: 'Acme' });
 
-    const grant = calls.find((c) => c.table === 'credit_ledger' && c.op === 'insert')!
-      .payload as Record<string, unknown>;
-    expect(grant).toMatchObject({ org_id: ORG, kind: 'grant', source: 'promo', amount: WELCOME_CREDITS });
-    expect(grant.stripe_event_id).toBe(`welcome:${ORG}`);
-    expect(grant.expires_at).toBeTruthy();
+    expect(opsOn(calls, 'credit_ledger')).not.toContain('insert');
   });
 
   it("rifiuta e non crea niente quando l'utente ha già 2 org gratuite", async () => {

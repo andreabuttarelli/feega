@@ -4,7 +4,7 @@ import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { hashInviteToken, inviteStatus, LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 import type { OrgRole } from '$lib/server/repos/orgs';
-import { assertFreeOrgLimit, grantWelcomeCredits } from '$lib/server/tenancy/free-org-limit';
+import { assertFreeOrgLimit } from '$lib/server/tenancy/free-org-limit';
 
 /**
  * I DUE MOMENTI IN CUI L'APPARTENENZA STA NASCENDO.
@@ -90,8 +90,6 @@ export async function createFirstOrgWith(db: Db, input: { userId: string; name: 
     await db.from('orgs').delete().eq('id', org.id);
     throw memberError;
   }
-
-  await grantWelcomeCredits(db, org.id);
 
   return { orgId: org.id, slug: org.slug, role: 'owner' };
 }

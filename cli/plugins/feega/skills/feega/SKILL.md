@@ -330,7 +330,7 @@ imported from a website) and content the moderation refuses. Free. CLI: `feega g
 The user may belong to several organisations; one is active, and every tool, the CLI and the web
 app work there when `org` is omitted. `list_orgs` lists them with the role and `active`.
 `team_op` changes one thing, only when the user asks: `switch_org` makes another one active, `create_org` creates one the user owns (a free
-organisation starts with the welcome credits; past the free limit the answer says how to upgrade).
+organisation gets the free monthly credits; past the free limit the answer says how to upgrade).
 `list_team` shows members, pending invites and the invite link; `team_op` also `invite` (email,
 role admin/member/viewer), `resend_invite`, `revoke_invite`, `invite_link` (anyone with it joins
 as viewer), `disable_invite_link`, `set_role`, `remove_member`, `leave`, `transfer_ownership`.

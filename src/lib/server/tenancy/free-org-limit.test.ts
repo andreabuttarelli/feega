@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { freeOrgCount, isOrgFree, WELCOME_ALREADY_GRANTED_CODE } from './free-org-limit';
+import { freeOrgCount, isOrgFree } from './free-org-limit';
 import { fakeDb } from '$lib/server/db/fake-db';
 
 const USER = '22222222-2222-2222-2222-222222222222';
@@ -65,11 +65,5 @@ describe('freeOrgCount', () => {
 		});
 
 		expect(await freeOrgCount(db, USER)).toBe(3);
-	});
-});
-
-describe('WELCOME_ALREADY_GRANTED_CODE', () => {
-	it('è la stringa che l\'unique su credit_ledger.stripe_event_id produce (23505)', () => {
-		expect(WELCOME_ALREADY_GRANTED_CODE).toBe('23505');
 	});
 });
