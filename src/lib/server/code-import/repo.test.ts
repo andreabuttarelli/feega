@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DevServer, devServerOf, managerOf, namesIn, PackageManager, repoOf, routeOf } from './repo';
+import { DevServer, devServerOf, managerOf, MAX_ROUTES, namesIn, PackageManager, repoOf, routeOf, routesOf } from './repo';
 
 describe('repoOf', () => {
   it('legge proprietario, repo e ref da un link GitHub', () => {
@@ -22,6 +22,18 @@ describe('routeOf', () => {
     expect(routeOf('/settings/profile')).toBe('/settings/profile');
     expect(routeOf('/../etc')).toBeNull();
     expect(routeOf('https://evil.test')).toBeNull();
+  });
+});
+
+describe('routesOf', () => {
+  it('nessuna rotta è la radice, i doppioni contano una volta', () => {
+    expect(routesOf([])).toEqual(['/']);
+    expect(routesOf(['/', ' /settings ', '/settings'])).toEqual(['/', '/settings']);
+  });
+
+  it('una rotta non valida o troppe rotte rifiutano tutto', () => {
+    expect(routesOf(['/', '/../x'])).toBeNull();
+    expect(routesOf(Array.from({ length: MAX_ROUTES + 1 }, (_, i) => `/r${i}`))).toBeNull();
   });
 });
 

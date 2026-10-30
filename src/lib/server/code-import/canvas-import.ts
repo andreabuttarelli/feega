@@ -7,7 +7,8 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { pageAssets } from '$lib/server/url-import/canvas-import';
-import { CodeImportOutcome, importCodeAt, type CodeImported } from './import-code';
+import { CodeImportOutcome, importCodeAt, type CodeImported, type LandAsk } from './import-code';
+import { importStorybookAt } from './import-storybook';
 import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
 
@@ -20,16 +21,16 @@ const limiter = rateWindow({ limit: IMPORTS_PER_WINDOW, windowMs: IMPORT_WINDOW_
 
 export type CodeScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
-export type CodeImportAsk = { repo: string; route?: string; at: { x: number; y: number } };
+export type CodeImportAsk = { repo?: string; routes: string[]; storybook?: string; stories?: string[]; at: { x: number; y: number } };
 
 function metered(runner: RepoRunner, scope: CodeScope): RepoRunner {
-  return async (repo) => {
+  return async (repo, archive) => {
     const started = Date.now();
     const bill = () => {
       const ms = Date.now() - started;
       logAiCall({ label: SANDBOX_LABEL, provider: 'vercel-sandbox', ms, ok: true, flatCostUsd: sandboxUsd(ms), orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId, actorKind: 'agent', actorId: scope.userId });
     };
-    const run = await runner(repo);
+    const run = await runner(repo, archive);
     if (!run.ok) {
       bill();
       return run;
@@ -38,21 +39,28 @@ function metered(runner: RepoRunner, scope: CodeScope): RepoRunner {
   };
 }
 
-export async function importCodeInto(scope: CodeScope, canvasId: string, ask: CodeImportAsk): Promise<CodeImported> {
-  if (!limiter.allow(scope.userId)) {
-    return { outcome: CodeImportOutcome.RateLimited };
-  }
-
-  const access = farmAccess(env);
-
-  return importCodeAt({
-    ...ask,
-    runner: access ? metered(sandboxRunner(access), scope) : null,
+function landing(scope: CodeScope, canvasId: string, at: { x: number; y: number }): LandAsk {
+  return {
+    at,
     store: frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId }),
     place: { projectId: scope.projectId, canvasId },
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),
     guard: (url) => assertPublicUrl(url),
     ...pageAssets(scope),
     newId: () => crypto.randomUUID().slice(0, 8)
-  });
+  };
+}
+
+export async function importCodeInto(scope: CodeScope, canvasId: string, ask: CodeImportAsk): Promise<CodeImported> {
+  if (!limiter.allow(scope.userId)) {
+    return { outcome: CodeImportOutcome.RateLimited };
+  }
+
+  const land = landing(scope, canvasId, ask.at);
+  if (ask.storybook) {
+    return importStorybookAt({ ...land, storybook: ask.storybook, stories: ask.stories });
+  }
+
+  const access = farmAccess(env);
+  return importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, runner: access ? metered(sandboxRunner(access), scope) : null });
 }

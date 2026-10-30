@@ -3506,3 +3506,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A URL-import reference screenshot does not match the tree it was taken with
 
 **Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame. **Move:** `captureBeyondViewport` and scroll-based snapshots fire resize, scroll and IntersectionObserver callbacks. Freeze the page first (`revealPage(RevealMode.Still)`: timers, rAF, `play()`, transitions), report every observed element as in view from the first script (`everythingInView`), and take the reference screenshot after the tree, with a second freeze, as `url-capture.browser.test.ts` does.
+
+## A Next.js app imported from code has no components, a Vite one does
+
+**Signal:** code import of a Next.js 16 app answers `components: 0`; the page in the reference screenshot looks right, `__reactFiber$` keys are missing on every element, the console shows the `/_next/hmr` websocket failing with 500. **Move:** Next dev blocks `/_next/*` requests whose `Origin` is not localhost or in `allowedDevOrigins`, and without the HMR socket the client never hydrates, so there are no fibers to read. The sandbox puts `origin-proxy.ts` in front of the dev server: it rewrites `Host`, `Origin` and `Referer` to `localhost:<devPort>`, HTTP and websocket upgrade alike. Probe with `scripts/code-import/probe.mts <repo> <route>` (counts fibers, Svelte and Vue metas) before blaming the marker.

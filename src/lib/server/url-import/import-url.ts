@@ -61,7 +61,7 @@ const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const refused = (outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>, error?: string): UrlImported => ({ outcome, ...(error ? { error } : {}) });
 
-async function publicUrl(raw: string, guard: PageAsk['guard']): Promise<URL | null> {
+export async function publicUrl(raw: string, guard: PageAsk['guard']): Promise<URL | null> {
   const url = URL.canParse(raw) ? new URL(raw) : null;
   if (!url || !WEB_SCHEMES.includes(url.protocol)) {
     return null;
@@ -106,12 +106,14 @@ export async function pageTreeAt(tab: AppTab, url: URL, settleMs: number, planne
   return parsed.success ? (parsed.data as unknown as PageTree) : refused(UrlImportOutcome.Unreadable);
 }
 
-async function imported(ask: PageAsk, images: Record<string, string>): Promise<ImageAssets> {
+export type LandAsk = Pick<PageAsk, 'store' | 'place' | 'at' | 'importImage' | 'importFont'>;
+
+async function imported(ask: LandAsk, images: Record<string, string>): Promise<ImageAssets> {
   const entries = await Promise.all(Object.entries(images).map(async ([hash, url]) => [hash, await ask.importImage(url).catch(() => null)] as const));
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
-async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
+export async function fontsFor(ask: LandAsk, tree: PageTree): Promise<FontAssets> {
   const importFont = ask.importFont;
   if (!importFont) {
     return {};
@@ -136,7 +138,10 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     return tree;
   }
 
-  const made = planner.plan(tree, ask.newId, await fontsFor(ask, tree));
+  return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree)), tree.truncated);
+}
+
+export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: boolean): Promise<UrlImported> {
   if (!made?.plan.items.length) {
     return refused(UrlImportOutcome.Unreadable);
   }
@@ -151,5 +156,5 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     }
   }
   const frameId = placed.frameIds[0];
-  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: placed.undo, skipped: placed.skipped, truncated: tree.truncated };
+  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: placed.undo, skipped: placed.skipped, truncated };
 }

@@ -599,15 +599,28 @@ canvas
 
 canvas
   .command('import-code <projectId> <repo>')
-  .description('Run a public GitHub React app in a sandbox and draw a page as a frame: components become main components, usages instances, props variants')
+  .description('Run a public GitHub React, Vue or Svelte app in a sandbox and draw its pages as boards of one frame: components become main components, usages instances, props variants')
   .requiredOption('--canvas <id>', 'The canvas')
-  .option('--route <path>', 'The page of the app to import', '/')
+  .option('--route <paths...>', 'The pages of the app to import (up to 8): one frame, a board per page, components shared', ['/'])
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (projectId: string, repo: string, opts) => {
     const { cmdCanvasImportCode } = await import('./commands/canvas.ts');
     await cmdCanvasImportCode(projectId, repo, opts);
+  });
+
+canvas
+  .command('import-storybook <projectId> <url>')
+  .description('Read a public Storybook and draw its stories as boards of one frame: components become main components, args variants. No app to run')
+  .requiredOption('--canvas <id>', 'The canvas')
+  .option('--story <ids...>', 'Story ids to import (default: the first stories across components, up to 24)')
+  .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, url: string, opts) => {
+    const { cmdCanvasImportStorybook } = await import('./commands/canvas.ts');
+    await cmdCanvasImportStorybook(projectId, url, opts);
   });
 
 canvas

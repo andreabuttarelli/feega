@@ -78,6 +78,8 @@ import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import'
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
 import { importCodeInto } from '$lib/server/code-import/canvas-import';
+import { askedRoutes, MAX_ROUTES } from '$lib/server/code-import/repo';
+import { MAX_STORIES } from '$lib/server/code-import/storybook';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
@@ -253,7 +255,7 @@ const importFigmaInput = z
   })
   .strict();
 
-const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).describe('a public https://github.com/<owner>/<repo> link, optionally /tree/<ref>'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a public https://github.com/<owner>/<repo> link, optionally /tree/<ref>'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const importUrlInput = z.object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite() }).strict();
 
@@ -994,7 +996,7 @@ export const CANVAS_OPS = {
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, route: input.route, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, routes: askedRoutes(input.route, input.routes), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
   }),
 
   draw_frame: op({

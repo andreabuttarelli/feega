@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codeSets, withComponents } from './code-sets';
+import { codeSets, innerOf, withComponents } from './code-sets';
 import type { RestNode } from '$lib/server/figma/rest-message';
 
 const button = (props: Record<string, string | number | boolean>) => ({ component: 'Button', props });
@@ -27,6 +27,12 @@ describe('codeSets', () => {
     expect(set!.texts).toEqual({});
   });
 
+  it('le props interne del framework ($$isPage, __proto) non sono assi', () => {
+    const [set] = codeSets([{ component: 'Page', props: { $$isPage: true, __internal: 'x', tone: 'dark' } }]);
+
+    expect(set!.variant).toEqual({ tone: 'dark' });
+  });
+
   it('una prop stringa con frasi non è un asse ma un testo', () => {
     const [set] = codeSets([{ component: 'CardTitle', props: { title: 'Total revenue' } }]);
 
@@ -47,6 +53,20 @@ describe('codeSets', () => {
 
     expect(new Set(sets.filter(Boolean).map((s) => s!.key)).size).toBe(64);
     expect(sets.filter((s) => s === null).length).toBe(8);
+  });
+});
+
+describe('withComponents con radici condivise', () => {
+  it('una catena lunga sulla stessa radice tiene il più esterno e il più interno', () => {
+    const uses = ['Layout', 'Provider', 'Tooltip', 'Button'].map((component, i) => ({ component, props: {}, ...(i ? { shares: i - 1 } : {}) }));
+    const root: RestNode = { id: '1', type: 'FRAME', children: [{ id: '2', type: 'FRAME', use: 0, absoluteBoundingBox: { x: 0, y: 0, width: 10, height: 10 } }] };
+
+    const made = withComponents(root, codeSets(uses), innerOf(uses));
+    const outer = made.children![0];
+
+    expect(outer.codeComponent?.name).toBe('Layout');
+    expect(outer.children![0].codeComponent?.name).toBe('Button');
+    expect(outer.children![0].children ?? []).toEqual([]);
   });
 });
 
