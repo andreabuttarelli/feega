@@ -1,4 +1,4 @@
-import TABLE from '@feega/motion-core/motion/template/part-usage.json';
+import TABLE from '@feega/motion-core/motion/template/part-usage.json' with { type: 'json' };
 import { parsePart } from '@feega/motion-core/motion/poster-parts';
 
 export const PAGE = '@page';
