@@ -3510,3 +3510,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A URL import scores well and looks wrong on the canvas
 
 **Signal:** `url-fidelity.browser.test.ts` scores 0.95+, the canvas shows another font, content cut differently or a strip at the top. **Move:** the HTML still is not what the canvas draws. Score the GPU path too: `URL_IMPORT_GPU=<label> npx vite-node --config scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` after the HTML run with the same label, and compare both columns. Read a WebGPU canvas by screenshotting the element, never with `drawImage` after the frame presented (blank).
+
+## The whole e2e run lists 0 tests
+
+**Signal:** `playwright test` prints `TypeError: Module ".../*.json" needs an import attribute of "type: json"` and `Total: 0 tests in 0 files`; every spec is gone, not one. Playwright loads specs with Node's own ESM loader, and one spec reaching a JSON import without the attribute (often through `src/lib` or `packages/`) aborts the collection. **Move:** add `with { type: 'json' }` to that import; `scripts/e2e/specs-load.test.ts` fails in vitest when it comes back.
