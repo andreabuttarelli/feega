@@ -27,5 +27,6 @@ effects, vectors and image fills.
 ## Consequences
 
 - Fidelity gains in the Figma scene help both importers.
-- The doc size limit applies: pages are cut at 3 840 px.
+- Pages are read down to 65 536 px and split into still frames of 16 384 px (the design limit).
+- What the doc cannot hold as layers comes in as a raster snapshot of that element only.
 - Breakpoints need a second pass on the tree; not in the MVP. Repeated subtrees become components (spec, Components).

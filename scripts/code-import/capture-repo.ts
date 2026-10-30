@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { pageTreeOf, TREE_LIMITS } from '../../src/lib/server/url-import/page-tree';
+import { TREE_LIMITS, treeScript } from '../../src/lib/server/url-import/page-tree';
 import { componentMarksOf, MARK_LIMITS } from '../../src/lib/server/code-import/component-marks';
 import { sandboxRunner } from '../../src/lib/server/code-import/sandbox-runner';
 import { repoOf } from '../../src/lib/server/code-import/repo';
@@ -32,7 +32,7 @@ try {
   await page.goto(new URL(route, run.app.url).toString(), { waitUntil: 'networkidle', timeout: NAV_TIMEOUT_MS }).catch(() => undefined);
   await page.waitForTimeout(SETTLE_MS);
   const uses = await page.evaluate(`var __name = (f) => f; (${componentMarksOf.toString()})(${JSON.stringify({ names: run.app.names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr })})`);
-  const tree = await page.evaluate(`var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(TREE_LIMITS)})`);
+  const tree = await page.evaluate(treeScript(TREE_LIMITS));
   writeFileSync(out, JSON.stringify({ tree, uses, names: run.app.names }));
   if (shot) {
     await page.screenshot({ path: shot });
