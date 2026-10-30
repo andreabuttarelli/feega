@@ -58,6 +58,11 @@ export function homed(source: MotionDoc, frameId: string): MotionDoc {
   return { ...source, comps };
 }
 
+export function homedAt(source: MotionDoc, homes: Readonly<Record<string, string>>): MotionDoc {
+  const comps = Object.fromEntries(Object.entries(source.comps).map(([id, comp]) => [id, comp.component && homes[id] ? { ...comp, component: { ...comp.component, home: homes[id] } } : comp]));
+  return { ...source, comps };
+}
+
 export const mainHome = (doc: MotionDoc, compId: string, frameId: string): string => doc.comps[compId]?.component?.home ?? frameId;
 
 export const mainClipOf = (doc: MotionDoc, compId: string): string | null => doc.tracks.flatMap((t) => t.clips).find((c) => c.props.comp === compId)?.id ?? null;

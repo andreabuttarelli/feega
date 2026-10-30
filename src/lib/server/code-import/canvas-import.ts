@@ -1,3 +1,4 @@
+import { componentsPage } from '$lib/server/canvas/components-page';
 import { env } from '$env/dynamic/private';
 import type { Db } from '$lib/server/db/client';
 import { frameStore } from '$lib/server/motion/move-element';
@@ -53,6 +54,7 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),
     guard: (url) => assertPublicUrl(url),
     ...pageAssets(scope),
+    components: () => componentsPage(scope.db, scope),
     newId: () => crypto.randomUUID().slice(0, 8)
   });
 }
