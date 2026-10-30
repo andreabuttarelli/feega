@@ -1,6 +1,6 @@
 import type { CodePage } from './import-code';
 
-export const MAX_STORIES = 24;
+export const MAX_STORIES = 12;
 
 const WEB_SCHEMES = ['http:', 'https:'];
 const INDEXES = ['index.json', 'stories.json'];

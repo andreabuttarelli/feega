@@ -45,6 +45,7 @@ export enum Crop {
 
 const CONTENT_MARGIN = 24;
 const SETTLE_MS = 1_200;
+const CAPTURE_BUDGET_MS = 150_000;
 
 const CROPS: Record<Crop, (capture: Capture) => Capture> = {
   [Crop.Page]: (capture) => capture,
@@ -84,15 +85,27 @@ export function componentCount(doc: MotionDoc): ComponentCount {
   return { components: new Set(mains.map(([, c]) => c.component!.set ?? c.component!.name)).size, variants: mains.length, instances: hosts - mains.length };
 }
 
-async function captured(tab: AppTab, pages: CodePage[], names: string[], settleMs: number): Promise<{ captures: Capture[]; missed: string[]; last: Refusal | null }> {
+enum Missed {
+  Unopened = 'could not be opened',
+  OutOfTime = 'left out, the import ran out of time'
+}
+
+type Window = { settleMs: number; budgetMs: number; now: () => number };
+
+async function captured(tab: AppTab, pages: CodePage[], names: string[], window: Window): Promise<{ captures: Capture[]; missed: string[]; last: Refusal | null }> {
   const captures: Capture[] = [];
   const missed: string[] = [];
+  const until = window.now() + window.budgetMs;
   let last: Refusal | null = null;
   for (const page of pages) {
+    if (captures.length && window.now() > until) {
+      missed.push(`${page.label}: ${Missed.OutOfTime}`);
+      continue;
+    }
     const found = { uses: [] as ComponentUse[] };
-    const tree = await pageTreeAt(tab, new URL(page.url), settleMs, marksPlanner(names, found));
+    const tree = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found));
     if ('outcome' in tree) {
-      missed.push(page.label);
+      missed.push(`${page.label}: ${Missed.Unopened}`);
       last = tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[tree.outcome], tree.error);
       continue;
     }
@@ -101,7 +114,7 @@ async function captured(tab: AppTab, pages: CodePage[], names: string[], settleM
   return { captures, missed, last };
 }
 
-export type BoardsAsk = LandAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop };
+export type BoardsAsk = LandAsk & { name: string; pages: CodePage[]; names: string[]; crop: Crop; budgetMs?: number; now?: () => number };
 
 export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   const first = ask.pages[0] ? await publicUrl(ask.pages[0].url, ask.guard) : null;
@@ -113,7 +126,8 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   }
 
   const tab = await ask.open();
-  const { captures, missed, last } = await captured(tab, ask.pages, ask.names, ask.settleMs ?? SETTLE_MS).finally(() => tab.close());
+  const window = { settleMs: ask.settleMs ?? SETTLE_MS, budgetMs: ask.budgetMs ?? CAPTURE_BUDGET_MS, now: ask.now ?? Date.now };
+  const { captures, missed, last } = await captured(tab, ask.pages, ask.names, window).finally(() => tab.close());
   if (!captures.length) {
     return last ?? refused(CodeImportOutcome.Unreadable);
   }
@@ -126,7 +140,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const frame = await ask.store.read(done.frameId);
   const count = frame ? componentCount(frame.doc) : { components: 0, variants: 0, instances: 0 };
-  const skipped = [...done.skipped, ...missed.map((label) => `${label}: could not be opened`)];
+  const skipped = [...done.skipped, ...missed];
   return { ...done, outcome: CodeImportOutcome.Ok, skipped, pages: captures.map((c) => c.label), ...count };
 }
 

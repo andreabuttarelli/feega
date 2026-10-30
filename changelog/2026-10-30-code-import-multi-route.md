@@ -8,9 +8,11 @@ Spec `docs/specs/code-import.md`.
   frame per route — mains live in a frame's doc and an instance cannot point at another frame's
   main, so the library would have been one copy per route.
 - Storybook as a source (`storybook`, `stories`): `index.json` (v7+) or `stories.json` (v6), up to
-  24 stories interleaved across components, each `iframe.html?id=…` captured and cropped to what
+  12 stories interleaved across components, each `iframe.html?id=…` captured and cropped to what
   it draws, then the same boards. Names: the last segment of every title; a library display name
-  `HeroUI.Button` counts as `Button`. No sandbox, no install.
+  `HeroUI.Button` counts as `Button`. No sandbox, no install. The first in-app run (24 stories, hosted
+  browser) opened 6 before the session ended: captures now stop at a 150 s budget (the rest is
+  reported as left out), stories settle 300 ms instead of 1.2 s, and the default is 12 stories.
 - Frameworks in `componentMarksOf`: React server components from `_debugInfo` (React 19 keeps
   name and props of each server component on the fibers it produced); Vue 3 from
   `__vueParentComponent` (an instance whose `subTree.el` is the element, props from `props`,

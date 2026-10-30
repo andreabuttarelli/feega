@@ -81,7 +81,7 @@ Code import skips URL import's `repeatedOf`: identity comes from the code, not f
 ## Storybook
 
 `storybook` instead of `repo`: `index.json` (Storybook 7+) or `stories.json` (6), stories only
-(no docs), interleaved across titles (one story per component, then the second…), at most 24, or
+(no docs), interleaved across titles (one story per component, then the second…), at most 12, or
 the ids in `stories`. Each `iframe.html?id=<id>&viewMode=story` is captured like a route and
 cropped to what it draws (24 px margin); names are the last segment of every title. No sandbox,
 no install: the cost is one Browserless session.

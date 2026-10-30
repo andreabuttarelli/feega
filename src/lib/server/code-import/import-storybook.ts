@@ -2,7 +2,9 @@ import { publicUrl } from '$lib/server/url-import/import-url';
 import { CodeImportOutcome, Crop, importBoards, type CodeImported, type LandAsk } from './import-code';
 import { MAX_STORIES, storybookBase, storybookPages } from './storybook';
 
-export type StorybookAsk = LandAsk & { storybook: string; stories?: string[]; fetchFn?: typeof fetch };
+const STORY_SETTLE_MS = 300;
+
+export type StorybookAsk = LandAsk & { storybook: string; stories?: string[]; fetchFn?: typeof fetch; budgetMs?: number; now?: () => number };
 
 export async function importStorybookAt(ask: StorybookAsk): Promise<CodeImported> {
   const base = storybookBase(ask.storybook);
@@ -18,5 +20,5 @@ export async function importStorybookAt(ask: StorybookAsk): Promise<CodeImported
     return { outcome: CodeImportOutcome.Unreadable, error: 'no index.json or stories.json with stories' };
   }
 
-  return importBoards({ ...ask, name: new URL(base).hostname, pages: stories.pages, names: stories.names, crop: Crop.Content });
+  return importBoards({ ...ask, name: new URL(base).hostname, pages: stories.pages, names: stories.names, crop: Crop.Content, settleMs: ask.settleMs ?? STORY_SETTLE_MS });
 }

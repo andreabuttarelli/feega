@@ -614,7 +614,7 @@ canvas
   .command('import-storybook <projectId> <url>')
   .description('Read a public Storybook and draw its stories as boards of one frame: components become main components, args variants. No app to run')
   .requiredOption('--canvas <id>', 'The canvas')
-  .option('--story <ids...>', 'Story ids to import (default: the first stories across components, up to 24)')
+  .option('--story <ids...>', 'Story ids to import (default: the first stories across components, up to 12)')
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--org <id>', 'Which org, if you belong to more than one')
