@@ -78,7 +78,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Reach, childBelow, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Press, Reach, childBelow, pressOn, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
@@ -2220,6 +2220,8 @@
     window.addEventListener('pointerup', up);
   }
 
+  let hostPress: PointerEvent | null = null;
+
   function onDown(e: PointerEvent) {
     glide = null;
     dropHover();
@@ -2250,7 +2252,9 @@
       e.preventDefault();
       return;
     }
-    if (hit.kind === HitKind.Node && (extendPick(e, w) || pickElement(e, w))) {
+    const press = hit.kind === HitKind.Node ? pressOn({ selected, inside: inside?.nodeId ?? null, picks }, hit.nodeId, reachOf(e)) : Press.Child;
+    hostPress = press === Press.Host ? e : null;
+    if (hit.kind === HitKind.Node && (extendPick(e, w) || (press === Press.Child && pickElement(e, w)))) {
       e.preventDefault();
       return;
     }
@@ -2483,6 +2487,11 @@
       },
       [GestureKind.Drag]: () => {
         if (a.kind !== GestureKind.Drag) {
+          return;
+        }
+        const press = hostPress;
+        hostPress = null;
+        if (!a.moved && press && pickElement(press, toWorld(view, local(press)))) {
           return;
         }
         if (!a.moved) {

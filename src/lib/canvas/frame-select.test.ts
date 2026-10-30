@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { Reach, clickTarget, frameLevel, grabbedInstead, ownClipToPick, siblingsOf, stepInside, videoSide } from './frame-select';
+import { Reach, clickTarget, frameLevel, grabbedInstead, ownClipToPick, siblingsOf, stepInside, videoSide, Press, pressOn } from './frame-select';
 
 const FRAME = frameLevel();
 const clipLevel = (clip: string) => ({ depth: Depth.Clip, clip, part: null });
@@ -109,5 +109,31 @@ describe('grabbedInstead', () => {
 
   it('a press on nothing keeps the selection', () => {
     expect(grabbedInstead(['shape'], null)).toBeNull();
+  });
+});
+
+describe('pressOn', () => {
+  const page = 'page';
+  const nested = 'card/button';
+
+  it('frame selezionato + trascinamento dentro = si muove il frame, non il figlio', () => {
+    expect(pressOn({ selected: [page], inside: null, picks: [] }, page, Reach.Top)).toBe(Press.Host);
+    expect(pressOn({ selected: [page], inside: page, picks: [] }, page, Reach.Top)).toBe(Press.Host);
+  });
+
+  it('un figlio annidato sotto il cursore non ruba il frame selezionato', () => {
+    expect(pressOn({ selected: ['other', page], inside: null, picks: [] }, page, Reach.Top)).toBe(Press.Host);
+  });
+
+  it('frame non selezionato: il clic prende il figlio come prima', () => {
+    expect(pressOn({ selected: [], inside: null, picks: [] }, page, Reach.Top)).toBe(Press.Child);
+  });
+
+  it('figlio già scelto: si lavora dentro il frame', () => {
+    expect(pressOn({ selected: [page], inside: page, picks: [nested] }, page, Reach.Top)).toBe(Press.Child);
+  });
+
+  it('Cmd/Ctrl prende sempre il figlio', () => {
+    expect(pressOn({ selected: [page], inside: null, picks: [] }, page, Reach.Deep)).toBe(Press.Child);
   });
 });
