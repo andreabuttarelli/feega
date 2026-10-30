@@ -19,7 +19,7 @@ function trail() {
 }
 
 describe('the start page runs its steps in order, each reported as it really goes', () => {
-  it('read, import, brand, open — all done', async () => {
+  it('read, brand, import, open — the brand exists before the page is imported, so its tokens follow the brand', async () => {
     const t = trail();
     const p = ports();
 
@@ -28,10 +28,10 @@ describe('the start page runs its steps in order, each reported as it really goe
     expect(t.seen).toEqual([
       [StartStep.Read, StepState.Running],
       [StartStep.Read, StepState.Done],
-      [StartStep.Import, StepState.Running],
-      [StartStep.Import, StepState.Done],
       [StartStep.Brand, StepState.Running],
       [StartStep.Brand, StepState.Done],
+      [StartStep.Import, StepState.Running],
+      [StartStep.Import, StepState.Done],
       [StartStep.Open, StepState.Running]
     ]);
     expect(p.importPage).toHaveBeenCalledWith(SCOPE, URL_IN);
