@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, panelForShortcut } from './shell-nav';
+import { NAV_ENTRIES, navEntriesByGroup, railEntries, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, panelForShortcut } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
   it('the "panel" group is Assets, Brands, Influencers, Components and History, in this order', () => {
@@ -11,8 +11,8 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(BURGER_ENTRIES.map((e) => e.id)).not.toContain('layers');
   });
 
-  it('the desktop rail reaches the photo studio next to settings', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['studio', 'settings']);
+  it('the rail leaves the photo studio out, the burger menu still reaches it', () => {
+    expect(railEntries('workbench').map((e) => e.id)).toEqual(['settings']);
     expect(BURGER_ENTRIES.map((e) => e.id)).toContain('studio');
   });
 

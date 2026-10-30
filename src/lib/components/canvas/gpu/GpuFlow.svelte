@@ -1458,6 +1458,7 @@
 
   $effect(() => {
     layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
+    layersSource.setDocs(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   });
 
   $effect(() => {
