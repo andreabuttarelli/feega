@@ -188,6 +188,20 @@ describe('importPageAt', () => {
     expect(JSON.stringify(doc)).toContain('font-asset-1');
   });
 
+  it('i font dichiarati in un foglio di stile che la pagina non può leggere arrivano lo stesso', async () => {
+    const importFont = vi.fn(async () => 'font-asset-2');
+    const fetchText = vi.fn(async () => "@font-face{font-family:'sohne-var';src:url(../fonts/sohne.woff2) format('woff2');font-weight:300 700;font-style:normal}");
+    const { ask, docs, tab } = askOf({ importFont, fetchText });
+    const sohne = { ...TREE.root.children![0], style: { fontFamily: 'sohne-var', fontSize: 48, fontWeight: 400 } };
+    vi.mocked(tab.tree).mockResolvedValue({ ...TREE, root: { ...TREE.root, children: [sohne] }, fonts: [], sheets: ['https://cdn.acme.test/css/app.css'] } as never);
+
+    await importPageAt(ask);
+
+    expect(fetchText).toHaveBeenCalledWith('https://cdn.acme.test/css/app.css');
+    expect(importFont).toHaveBeenCalledWith('https://cdn.acme.test/fonts/sohne.woff2');
+    expect(JSON.stringify(docs.get('frame-1')!.doc)).toContain('font-asset-2');
+  });
+
   it('un campo che l\'albero non dichiara è illeggibile, non scartato in silenzio', async () => {
     const { ask, tab } = askOf();
     vi.mocked(tab.tree).mockResolvedValue({ ...TREE, mystery: 1 } as never);

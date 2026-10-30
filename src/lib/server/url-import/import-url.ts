@@ -7,6 +7,7 @@ import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
 import type { PageOutline } from './page-outline';
+import { sheetFonts, type FetchText } from './sheet-fonts';
 import { FULL_SHAPE, fontsWanted, urlPlan, type FontAssets, type PageShape, type UrlPlan } from './url-doc';
 
 export enum UrlImportOutcome {
@@ -55,6 +56,7 @@ export type PageAsk = {
   guard: (url: URL) => Promise<void>;
   importImage: (url: string) => Promise<string | null>;
   importFont?: (url: string) => Promise<string | null>;
+  fetchText?: FetchText;
   newId: () => string;
   settleMs?: number;
   planner?: Planner;
@@ -85,6 +87,7 @@ const TREE_SHAPE = z
     truncated: z.boolean(),
     root: z.object({ type: z.literal('FRAME') }).passthrough(),
     fonts: z.array(FONT_SHAPE).optional(),
+    sheets: z.array(z.string()).optional(),
     snaps: z.array(SNAP_SHAPE).optional(),
     outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional()
   })
@@ -144,6 +147,13 @@ async function imported(ask: PageAsk, images: Record<string, string>): Promise<I
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
+async function withSheetFonts(ask: PageAsk, tree: PageTree): Promise<PageTree> {
+  if (!ask.fetchText || !tree.sheets?.length) {
+    return tree;
+  }
+  return { ...tree, fonts: [...(tree.fonts ?? []), ...(await sheetFonts(tree.sheets, ask.fetchText))] };
+}
+
 async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
   const importFont = ask.importFont;
   if (!importFont) {
@@ -164,10 +174,11 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
 
   const tab = await ask.open();
   const planner = ask.planner ?? PLAIN_PLANNER;
-  const tree = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
-  if ('outcome' in tree) {
-    return tree;
+  const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+  if ('outcome' in read) {
+    return read;
   }
+  const tree = await withSheetFonts(ask, read);
 
   const made = planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE);
   if (!made?.plan.items.length) {

@@ -15,13 +15,14 @@ import { startHost } from '$lib/start-url';
 
 const MS_PER_MINUTE = 60_000;
 const IMPORTS_PER_MINUTE = 4;
+const MAX_SHEET_BYTES = 2_000_000;
 const DATA_URL = /^data:(image\/[\w+.-]+);base64,(.*)$/;
 
 const limiter = rateWindow({ limit: IMPORTS_PER_MINUTE, windowMs: MS_PER_MINUTE });
 
 export type UrlScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
-export type PageAssets = { importImage: (url: string) => Promise<string>; importFont: (url: string) => Promise<string | null> };
+export type PageAssets = { importImage: (url: string) => Promise<string>; importFont: (url: string) => Promise<string | null>; fetchText: (url: string) => Promise<string> };
 
 export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'projectId'>): PageAssets {
   return {
@@ -36,7 +37,8 @@ export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'pr
       const { fileName, bytes } = await fetchCanvasLink({ url, maxBytes: MAX_FONT_BYTES });
       const saved = await storeFontBytes(scope.db, { orgId: scope.orgId, userId: scope.userId, name: fileName, bytes });
       return saved.ok ? saved.assetId : null;
-    }
+    },
+    fetchText: async (url) => new TextDecoder().decode((await fetchCanvasLink({ url, maxBytes: MAX_SHEET_BYTES })).bytes)
   };
 }
 
