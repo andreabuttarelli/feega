@@ -3,7 +3,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 
 const { modalitiesOf, imageCatalogue } = vi.hoisted(() => ({
   modalitiesOf: vi.fn(),
-  imageCatalogue: { choices: [] as { id: string; uncensored?: boolean }[], recommended: [] as { tier: string; id: string }[], synced: true }
+  imageCatalogue: { choices: [] as { id: string; uncensored?: boolean }[], recommended: [] as { tier: string; id: string; uncensored?: boolean }[], synced: true }
 }));
 vi.mock('$lib/server/canvas-catalogue', () => {
   const nothing = { choices: [], recommended: [], synced: true };
