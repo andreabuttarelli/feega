@@ -1,8 +1,8 @@
 import { withSurface } from '@feega/motion-core/motion/surface';
 import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
-import { COMPONENTS, TYPE_SIZE, type ComponentId } from '@feega/motion-core/motion/components';
+import { COMPONENTS, HAIRLINE, TYPE_SIZE, type ComponentId } from '@feega/motion-core/motion/components';
 import { NEW_TEXT_SIZING, TextSizing } from '@feega/motion-core/motion/text-sizing';
-import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Background, DESIGN_MAX_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
 import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
 import { FillKind, ShapeKind, StrokeKind } from '@feega/motion-core/motion/shape/schema';
@@ -36,7 +36,6 @@ const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, 
 export const drawsBox = (tool: DrawTool): boolean => tool in BOX_CLIP;
 
 const MIN_PEN_POINTS = 2;
-const MIN_SIDE = 0.001;
 
 const SPAN: Record<DocMode, (doc: MotionDoc, frame: number, component: ComponentId) => { from: number; durationInFrames: number }> = {
   [DocMode.Still]: (doc) => ({ from: 0, durationInFrames: doc.durationInFrames }),
@@ -151,7 +150,9 @@ function boundsOf(outline: Outline): DrawBox {
 }
 
 const PRECISION = 10000;
+const PLACE_PRECISION = 1_000_000;
 const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
+const placedRound = (n: number) => Math.round(n * PLACE_PRECISION) / PLACE_PRECISION;
 
 export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: string, paint: Record<string, unknown> = {}): OpResult {
   if (outline.reduce((n, c) => n + c.vertices.length, 0) < MIN_PEN_POINTS) {
@@ -161,7 +162,7 @@ export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: str
   const left = box.x - box.width / 2;
   const top = box.y - box.height / 2;
   const unit = mapOutline(outline, ([x, y]) => [round(box.width ? (x - left) / box.width : 0), round(box.height ? (y - top) / box.height : 0)]);
-  const placed = { x: round(box.x), y: round(box.y), width: round(Math.max(box.width, MIN_SIDE)), height: round(Math.max(box.height, MIN_SIDE)) };
+  const placed = { x: placedRound(box.x), y: placedRound(box.y), width: placedRound(Math.max(box.width, HAIRLINE)), height: placedRound(Math.max(box.height, HAIRLINE)) };
   return place(doc, 'Shape', { shape: ShapeKind.Path, path: pathData(unit), ...paint, ...placed }, frame, id);
 }
 
@@ -214,10 +215,15 @@ const FULL_BOX: DrawBox = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
 const evenSide = (n: number) => Math.max(MIN_DOC_SIDE, Math.round(n / 2) * 2);
 
-function elementPixels(box: CanvasBox): { width: number; height: number } {
+type Sides = { long: number; short: number };
+
+const VIDEO_SIDES: Sides = { long: MAX_SIDE, short: MAX_SHORT_SIDE };
+const STILL_SIDES: Sides = { long: DESIGN_MAX_SIDE, short: DESIGN_MAX_SIDE };
+
+function elementPixels(box: CanvasBox, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
   const long = Math.max(box.width, box.height);
   const short = Math.min(box.width, box.height);
-  const scale = Math.min(PIXELS_PER_CANVAS_PX, MAX_SIDE / long, MAX_SHORT_SIDE / short);
+  const scale = Math.min(PIXELS_PER_CANVAS_PX, sides.long / long, sides.short / short);
   return { width: evenSide(box.width * scale), height: evenSide(box.height * scale) };
 }
 
@@ -227,13 +233,13 @@ export function blankElement(box: CanvasBox): OpResult {
 
 const SURFACE_ID = 'surface';
 
-function sizedFrame(box: CanvasBox, format: MotionFormat): MotionDoc {
-  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) } : newMotionDoc(format);
+function sizedFrame(box: CanvasBox, format: MotionFormat, sides: Sides): MotionDoc {
+  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box, sides) } : newMotionDoc(format);
   return withSurface(doc, SURFACE_ID);
 }
 
 export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.Custom, stillSeconds?: number): MotionDoc {
-  const doc = sizedFrame(box, format);
+  const doc = sizedFrame(box, format, stillSeconds === undefined ? VIDEO_SIDES : STILL_SIDES);
   if (stillSeconds === undefined) {
     return doc;
   }

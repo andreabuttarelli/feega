@@ -226,9 +226,25 @@ function expand(doc: MotionDoc, tracks: readonly MotionTrack[], depth: number): 
     if (!hosts.length) {
       return [track];
     }
-    const rest = { ...track, clips: track.clips.filter((c) => !hosts.includes(c as MotionClip)) };
-    const groups = hosts.flatMap((host) => EXPANDERS[host.component]!(doc, track, host, depth));
-    return [...groups, rest];
+    const topFirst: MotionTrack[] = [];
+    let run: MotionClip[] = [];
+    let runs = 0;
+    const flush = () => {
+      if (run.length) {
+        topFirst.push({ ...track, id: runs++ ? `${track.id}~${runs}` : track.id, clips: [...run].reverse() });
+      }
+      run = [];
+    };
+    for (const clip of [...(track.clips as MotionClip[])].reverse()) {
+      if (!hosts.includes(clip)) {
+        run.push(clip);
+        continue;
+      }
+      flush();
+      topFirst.push(...EXPANDERS[clip.component]!(doc, track, clip, depth));
+    }
+    flush();
+    return topFirst.length ? topFirst : [{ ...track, clips: [] }];
   });
 }
 

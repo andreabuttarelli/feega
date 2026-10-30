@@ -279,7 +279,7 @@ export function pathData(outline: Outline): string {
     .filter((c) => c.vertices.length)
     .map((c) => {
       const moves = segmentsOf(c).map((s) => (straight(s) ? `L${pair(s[1].p)}` : `C${pair(s[0].out)} ${pair(s[1].in)} ${pair(s[1].p)}`));
-      const closing = c.closed ? moves.pop()! : '';
+      const closing = c.closed ? (moves.pop() ?? '') : '';
       const tail = c.closed ? `${closing.startsWith('C') ? closing : ''}Z` : '';
       return `M${pair(c.vertices[0].p)}${moves.join('')}${tail}`;
     })

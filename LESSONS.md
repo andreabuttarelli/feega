@@ -3498,3 +3498,7 @@ Signal: `Test Files 1 failed`, `Tests no tests`, `collect 0ms`; the suite file l
 
 ### `goto` resolves but the page does not change
 Signal: after an action lands, `goto(newUrl)` resolves without error, no navigation happens, and it worked a day earlier. Cause: an `invalidate(...)` started just before (the runner's idle refresh) is batched on a microtask and supersedes the navigation token, cancelling the `goto` silently. Move: navigate only after that invalidation settles (`canvasPages.run` awaits its re-read before answering), and check the URL after `goto`: a realtime `invalidate` (a new canvas row arriving) can still cancel it, so `canvasPages.open` retries until the path matches.
+
+## A tall still export misses layers that are in the DOM
+
+**Signal:** a still taller than ~4 000 px exports with text or whole sections missing; the same clips render in a small doc; a clip screenshot of the missing area right after load shows them, a later one does not. **Move:** every clip of the HTML render is a `will-change` layer the size of the frame, and a full-height viewport makes Chrome drop composited layers. Open the page with a band-sized viewport and translate `#root` per band (`pictureOf` in `chromium-frames.ts`); never resize the viewport after load and never use `captureBeyondViewport` there (it resizes, the player re-lays out).
