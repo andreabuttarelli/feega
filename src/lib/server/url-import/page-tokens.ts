@@ -128,7 +128,7 @@ const above = (left: TextCluster[], body: TextCluster | undefined) => left.filte
 const below = (left: TextCluster[], body: TextCluster | undefined) => left.filter((c) => body && c.style.sizePx < body.style.sizePx);
 
 const TEXT_RULES: TextRule[] = [
-  { name: 'Body', pick: (left) => left.filter((c) => !c.heading && !c.button).sort((a, b) => b.chars - a.chars)[0] },
+  { name: 'Body', pick: (left) => left.filter((c) => !c.heading && !c.button).sort((a, b) => b.uses - a.uses || b.chars - a.chars)[0] },
   { name: 'Button', pick: (left) => left.filter((c) => c.button > 0).sort((a, b) => b.button - a.button)[0] },
   { name: 'Display', pick: (left, body) => largest(above(left, body).filter((c) => c.style.sizePx >= DISPLAY_PX)) },
   { name: 'H1', pick: (left, body) => largest(above(left, body)) },

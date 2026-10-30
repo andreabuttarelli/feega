@@ -188,13 +188,18 @@ type Plan = { collection: Collection; styles: Record<string, Style>; colourOf: M
 
 const styleName = (site: string, name: string) => `${site} ${name}`;
 
+const LEADING_PLACES = 2;
+const TRACKING_PLACES = 3;
+
+const rounded = (value: number, places: number) => Number(value.toFixed(places));
+
 function planOf(tokens: Tokens, site: string, root: MotionDoc, units: Units): Plan {
   const number = (value: number) => ({ type: VarType.Number, values: { [DEFAULT_MODE]: value } });
   const vars = {
     ...Object.fromEntries(tokens.colours.map((c) => [c.name, { type: VarType.Colour, values: { [DEFAULT_MODE]: c.hex } }])),
     ...Object.fromEntries([...tokens.radii, ...tokens.spacing].map((n) => [n.name, number(n.value)]))
   };
-  const text = (s: TextStyle): Style => ({ kind: StyleKind.Text, font: s.font, weight: s.weight, size: (s.sizePx * units.docPerPx) / root.width, tracking: s.tracking, textCase: s.textCase, ...(s.leading === null ? {} : { leading: s.leading }) });
+  const text = (s: TextStyle): Style => ({ kind: StyleKind.Text, font: s.font, weight: s.weight, size: (s.sizePx * units.docPerPx) / root.width, tracking: rounded(s.tracking, TRACKING_PLACES), textCase: s.textCase, ...(s.leading === null ? {} : { leading: rounded(s.leading, LEADING_PLACES) }) });
   const candidates: [string, Style][] = [
     ...tokens.texts.map((t): [string, Style] => [styleName(site, t.name), text(t.style)]),
     ...tokens.effects.map((e): [string, Style] => [styleName(site, e.name), { kind: StyleKind.Effect, effects: JSON.parse(e.key).map((fx: Omit<Effect, 'id'>, i: number) => ({ id: `fx${i + 1}`, ...fx })) }]),
