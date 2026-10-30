@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cacheOutlines, canvasHeads, frameHead, headsParam, missingHeads, outlinesFor, parseHeads, parseParts, partIds, partsParam, posterHeads } from './frame-outlines';
-import { LayerKind, type LayerRow } from './layers';
+import { cacheOutlines, canvasHeads, frameHead, headsParam, missingHeads, outlinesFor, outlinesNow, unbuilt, parseHeads, parseParts, partIds, partsParam, posterHeads } from './frame-outlines';
+import { LayerKind, frameRows, type LayerRow } from './layers';
+import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 
 const row = (id: string, nodeId: string): LayerRow => ({ id, key: id, kind: LayerKind.Clip, depth: 2, label: id, type: 'Title', nodeId, hidden: false, locked: false, nested: false });
 
@@ -60,5 +61,28 @@ describe('closed posters list their parts', () => {
 
   it('carries the parts of one frame through the query and back', () => {
     expect(parseParts(partsParam('m1', { p: ['lines:0'] }))).toEqual({ m1: { p: ['lines:0'] } });
+  });
+});
+
+describe('the tree from what the canvas already holds', () => {
+  const heads = [{ nodeId: 'm1', version: 3 }, { nodeId: 'm2', version: 1 }];
+  const doc = newMotionDoc(MotionFormat.Landscape);
+
+  it('builds a frame loaded in memory with no fetch, the moment the tree opens', () => {
+    const now = outlinesNow(heads, {}, new Map([['m1', doc]]));
+
+    expect(now.m1).toEqual(frameRows(doc, 'm1'));
+    expect(now.m2).toBeUndefined();
+  });
+
+  it('prefers the outline already read for that revision over rebuilding it', () => {
+    const cache = cacheOutlines({}, [heads[0]], { m1: [row('t1', 'm1')] });
+
+    expect(outlinesNow(heads, cache, new Map([['m1', doc]])).m1).toEqual([row('t1', 'm1')]);
+  });
+
+  it('does not ask the server for a frame it can already build', () => {
+    expect(unbuilt(heads, {}, new Map([['m1', doc]]))).toEqual([heads[1]]);
+    expect(unbuilt(heads, cacheOutlines({}, [heads[1]], { m2: [] }), new Map([['m1', doc]]))).toEqual([]);
   });
 });

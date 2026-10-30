@@ -39,6 +39,14 @@ describe('Pages: the canvases of the project', () => {
   });
 });
 
+describe('the current page', () => {
+  it('is marked with a dot, aria-current and the Layers selection colour', () => {
+    expect(pages).toMatch(/aria-current={isCurrent \? 'page' : undefined}/);
+    expect(pages).toMatch(/data-testid="current-dot"/);
+    expect(pages).toMatch(/\.page-row\.is-current \{[^}]*background: var\(--ui-selected\)/);
+  });
+});
+
 describe('where Pages lives', () => {
   it('sits above Layers in the left panel', () => {
     expect(leftPanel).toMatch(/<PagesList[\s\S]*<LayersPanel/);
