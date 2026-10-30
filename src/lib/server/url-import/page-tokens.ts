@@ -48,7 +48,9 @@ function labOf(hex: string): Lab {
 
 const distance = (a: Lab, b: Lab) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
-export const sameColour = (a: string, b: string) => distance(labOf(a), labOf(b)) <= SAME_COLOUR;
+export const colourDistance = (a: string, b: string) => distance(labOf(a), labOf(b));
+
+export const sameColour = (a: string, b: string) => colourDistance(a, b) <= SAME_COLOUR;
 
 const chromatic = (c: Cluster) => Math.hypot(c.lab[1], c.lab[2]) > CHROMATIC;
 

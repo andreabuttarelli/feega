@@ -4,6 +4,8 @@ import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { VarType } from '@feega/motion-core/motion/variables-model';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import { defineVariable } from '$lib/motion/variables';
+import { colourDistance } from './page-tokens';
+import { State, stateShade } from './component-kit';
 import { FULL_SHAPE, urlPlan, type UrlPlan } from './url-doc';
 import type { PageTree } from './page-tree';
 
@@ -114,6 +116,13 @@ describe('repeated blocks of an imported page become a component kit', () => {
 
     expect(backdrop.component).toBe('Shape');
     expect(backdrop.bind?.fill).toBe('Acme/Background');
+  });
+});
+
+describe('hover and pressed shades are visibly different from their base', () => {
+  it.each(['#62666d', '#7a7a7a', '#1c1d1f', '#f7f8f8', '#ffffff', '#000000', '#5e6ad2'])('%s: hover moves at least 6, pressed at least 12', (base) => {
+    expect(colourDistance(base, stateShade(base, State.Hover))).toBeGreaterThanOrEqual(6);
+    expect(colourDistance(base, stateShade(base, State.Pressed))).toBeGreaterThanOrEqual(12);
   });
 });
 
