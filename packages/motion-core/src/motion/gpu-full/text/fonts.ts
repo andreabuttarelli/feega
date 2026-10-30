@@ -8,7 +8,7 @@ export type Axes = Record<string, [min: number, max: number, fallback: number]>;
 export type Source = { axes: Axes; covers: (codePoint: number) => boolean; at: (coords: Record<string, number>) => Face };
 
 const BLOCK = /@font-face\s*\{([^}]*)\}/g;
-const DESCRIPTOR = /([a-z-]+)\s*:\s*([^;]+)/g;
+const DESCRIPTOR = /([a-z-]+)\s*:\s*((?:url\([^)]*\)|"[^"]*"|'[^']*'|[^;"'])+)/g;
 const URL = /url\(\s*["']?([^"')]+)["']?\s*\)/;
 const RANGE = /U\+([0-9A-F?]+)(?:-([0-9A-F]+))?/gi;
 const ALL: [number, number] = [0, 0x10ffff];
