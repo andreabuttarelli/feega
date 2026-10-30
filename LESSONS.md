@@ -3502,3 +3502,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A tall still export misses layers that are in the DOM
 
 **Signal:** a still taller than ~4 000 px exports with text or whole sections missing; the same clips render in a small doc; a clip screenshot of the missing area right after load shows them, a later one does not. **Move:** every clip of the HTML render is a `will-change` layer the size of the frame, and a full-height viewport makes Chrome drop composited layers. Open the page with a band-sized viewport and translate `#root` per band (`pictureOf` in `chromium-frames.ts`); never resize the viewport after load and never use `captureBeyondViewport` there (it resizes, the player re-lays out).
+
+## A URL-import reference screenshot does not match the tree it was taken with
+
+**Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame. **Move:** `captureBeyondViewport` and scroll-based snapshots fire resize, scroll and IntersectionObserver callbacks. Freeze the page first (`revealPage(RevealMode.Still)`: timers, rAF, `play()`, transitions), report every observed element as in view from the first script (`everythingInView`), and take the reference screenshot after the tree, with a second freeze, as `url-capture.browser.test.ts` does.

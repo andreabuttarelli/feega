@@ -47,7 +47,7 @@ function codePlanner(names: string[]): Planner {
     prepare: async (tab) => {
       uses = await tab.marks(names);
     },
-    plan: (tree, newId) => codePlan(tree, uses, newId)
+    plan: (tree, newId, fonts) => codePlan(tree, uses, newId, fonts)
   };
 }
 

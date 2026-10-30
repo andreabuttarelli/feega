@@ -3,7 +3,9 @@ import { RequestVerdict, requestVerdict } from './screenshot';
 import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
 import { OVERLAY_SELECTOR, type Overlay } from './overlays';
-import { pageTreeOf, TREE_LIMITS } from '$lib/server/url-import/page-tree';
+import { SnapMode, TREE_LIMITS, treeScript, type PageSnap, type PageTree } from '$lib/server/url-import/page-tree';
+import { everythingInView, revealPage, type RevealMode, type Revealed } from '$lib/server/url-import/page-reveal';
+import { snapped } from '$lib/server/url-import/page-snaps';
 import { componentMarksOf, MARK_LIMITS, type ComponentUse } from '$lib/server/code-import/component-marks';
 
 export type Target = { selector?: string; text?: string };
@@ -37,6 +39,9 @@ export type AppTab = Tab & {
   ui: () => Promise<UiDigest>;
   vector: () => Promise<unknown>;
   tree: () => Promise<unknown>;
+  reveal: (mode: RevealMode) => Promise<Revealed>;
+  seeAll: () => Promise<void>;
+  settle: (ms: number) => Promise<void>;
   marks: (names: string[]) => Promise<ComponentUse[]>;
   overlay: () => Promise<Overlay | null>;
   press: (key: string) => Promise<void>;
@@ -99,6 +104,7 @@ async function gate(request: HTTPRequest): Promise<void> {
 
 async function fenced(page: Page): Promise<void> {
   await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 });
+  await page.setBypassCSP(true);
   await page.setRequestInterception(true);
   page.on('request', (request) => void gate(request));
   const cdp = await page.createCDPSession();
@@ -198,6 +204,46 @@ function labelOf(el: Element): string {
   return `${(el as HTMLElement).innerText ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('title') ?? ''} ${(el as HTMLInputElement).value ?? ''}`.replace(/\s+/g, ' ').trim();
 }
 
+const IDLE_MS = 500;
+
+const HIDE = `[${TREE_LIMITS.hideAttr}]`;
+const hiddenWithin = (scope: string) => `${scope}${HIDE},${scope}${HIDE} *{visibility:hidden!important}`;
+const shown = (target: string) => `${target},${target} *{visibility:visible!important}`;
+
+const SNAP_CSS: Record<SnapMode, (target: string) => string> = {
+  [SnapMode.Isolated]: (target) => `html,body{background:transparent!important}body *{visibility:hidden!important}${shown(target)}${hiddenWithin(`${target} `)}`,
+  [SnapMode.Own]: (target) => `html,body{background:transparent!important}body *{visibility:hidden!important}${target}{visibility:visible!important}`,
+  [SnapMode.Backdrop]: (target) => `${hiddenWithin('')}${shown(target)}${hiddenWithin(`${target} `)}`
+};
+
+async function shotInView(page: Page, snap: PageSnap): Promise<Buffer> {
+  const { height } = page.viewport() ?? VIEWPORT;
+  const pieces: { input: Buffer; top: number; left: number }[] = [];
+  for (let top = snap.box.y; top < snap.box.y + snap.box.height; top += height) {
+    const piece = { x: snap.box.x, y: top, width: snap.box.width, height: Math.min(height, snap.box.y + snap.box.height - top) };
+    await page.evaluate((y) => window.scrollTo(0, y), top + piece.height <= height ? 0 : top);
+    pieces.push({ input: Buffer.from(await page.screenshot({ type: 'png', clip: piece, captureBeyondViewport: false, omitBackground: snap.mode !== SnapMode.Backdrop })), top: Math.round(top - snap.box.y), left: 0 });
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  if (pieces.length === 1) {
+    return pieces[0].input;
+  }
+  const { default: sharp } = await import('sharp');
+  const size = { width: Math.round(snap.box.width), height: Math.round(snap.box.height) };
+  return sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(pieces).png().toBuffer();
+}
+
+async function shoot(page: Page, snap: PageSnap): Promise<string | null> {
+  const css = SNAP_CSS[snap.mode](`[${TREE_LIMITS.snapAttr}="${snap.ref}"]`);
+  const style = css ? await page.addStyleTag({ content: css }) : null;
+  try {
+    return `data:image/png;base64,${(await shotInView(page, snap)).toString('base64')}`;
+  } finally {
+    await style?.evaluate((el) => el.remove()).catch(() => undefined);
+    await style?.dispose();
+  }
+}
+
 function tabOf(page: Page, close: () => Promise<number>): AppTab {
   return {
     goto: async (url) => (await page.goto(url, { waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS }))?.status() ?? null,
@@ -238,7 +284,15 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     },
     ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
     vector: () => vectorOfPage(page),
-    tree: () => page.evaluate(pageTreeOf, TREE_LIMITS),
+    tree: async () => snapped((await page.evaluate(treeScript(TREE_LIMITS))) as PageTree, (snap) => shoot(page, snap)),
+    reveal: (mode) => page.evaluate(revealPage, mode),
+    seeAll: async () => {
+      await page.evaluateOnNewDocument(everythingInView);
+    },
+    settle: async (ms) => {
+      await page.waitForNetworkIdle({ idleTime: IDLE_MS, timeout: ms }).catch(() => undefined);
+      await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, 3_000))])).catch(() => undefined);
+    },
     marks: (names) => page.evaluate(componentMarksOf, { names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr }),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
     press: (key) => page.keyboard.press(key as Parameters<Page['keyboard']['press']>[0]),

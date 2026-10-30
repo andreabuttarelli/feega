@@ -5,19 +5,26 @@ sidebar:
   order: 4
 ---
 
-Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text, flex rows and columns become stacks, backgrounds, borders, corners and shadows become fills, strokes and effects, pictures are copied into your project, inline SVG icons become vector paths. It is not a screenshot.
+Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text in the page's own fonts, flex rows and columns become stacks where that keeps every layer in place, backgrounds, gradients, borders, corners, shadows and blurs become fills, strokes and effects, pictures are copied into your project, SVG icons and logos become vector paths. It is not a screenshot: only what a frame cannot hold as layers (a video, a canvas, an embedded page, a masked or blended block) comes in as a picture of itself.
 
 ## In the app
 
 Open the insert menu (**+**), go to **Import**, choose **From URL…**, paste the address and press **Import**. The frame lands in the middle of the view, named after the page title.
 
+## What the import does before reading
+
+The page is scrolled to the bottom and back so lazy pictures load and scroll-revealed blocks show; running animations are finished, videos are stopped on their last frame, and cookie banners are hidden.
+
+## Fonts
+
+Web fonts the page loads are copied into your workspace's uploaded fonts and used by the frame, so text wraps where it wraps on the page. Text set in system fonts uses the closest free face (Inter for the system UI font, Arimo for Helvetica and Arial, Tinos for Times, Gelasio for Georgia, JetBrains Mono for monospace).
+
 ## Limits
 
 - Public `http`/`https` pages only. Private network addresses and pages behind a login are refused.
-- The page is read at desktop width (1280 px), down to 3840 px from the top, up to 1500 layers.
-- Fonts that Google Fonts does not have fall back to Inter.
+- The page is read at desktop width (1280 px), down to 65 536 px from the top, up to 10 000 layers. A page taller than 16 384 px comes in as frames stacked one under the other.
 - Four imports a minute per person.
-- Not yet: tablet and phone layouts as breakpoints, gradients.
+- Not yet: tablet and phone layouts as breakpoints.
 
 ## Components
 

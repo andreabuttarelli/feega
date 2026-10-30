@@ -9,9 +9,13 @@ export const FALLBACK_FAMILY = 'Inter';
 
 const VARIANT = /\s*(variable|var|vf|display|text)$/i;
 
-export function familyFor(family: string, catalogue: readonly string[]): string {
+export function catalogueFamily(family: string, catalogue: readonly string[]): string | null {
   const wanted = family.replace(/["']/g, '').replace(/[-_]/g, ' ').replace(VARIANT, '').trim().toLowerCase();
-  return catalogue.find((f) => f.toLowerCase() === wanted) ?? FALLBACK_FAMILY;
+  return catalogue.find((f) => f.toLowerCase() === wanted) ?? null;
+}
+
+export function familyFor(family: string, catalogue: readonly string[]): string {
+  return catalogueFamily(family, catalogue) ?? FALLBACK_FAMILY;
 }
 
 export function withFonts(ui: VectorUi, catalogue: readonly string[]): VectorUi {

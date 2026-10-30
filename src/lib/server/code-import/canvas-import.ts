@@ -1,13 +1,12 @@
 import { env } from '$env/dynamic/private';
 import type { Db } from '$lib/server/db/client';
-import { importCanvasLink } from '$lib/server/canvas/upload';
-import { UPLOAD_MAX_BYTES } from '$lib/canvas/upload-kind';
 import { frameStore } from '$lib/server/motion/move-element';
 import { farmAccess } from '$lib/server/motion/vercel-farm';
 import type { Actor } from '$lib/server/repos/actor';
 import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
+import { pageAssets } from '$lib/server/url-import/canvas-import';
 import { CodeImportOutcome, importCodeAt, type CodeImported } from './import-code';
 import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
@@ -45,7 +44,6 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
   }
 
   const access = farmAccess(env);
-  const importImage = async (url: string) => (await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.projectId, url, maxBytes: UPLOAD_MAX_BYTES.image })).asset.id;
 
   return importCodeAt({
     ...ask,
@@ -54,7 +52,7 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
     place: { projectId: scope.projectId, canvasId },
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),
     guard: (url) => assertPublicUrl(url),
-    importImage,
+    ...pageAssets(scope),
     newId: () => crypto.randomUUID().slice(0, 8)
   });
 }
