@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-Paste a public GitHub repository and one or more page paths, or a Storybook link. Feega reads the running app or the stories and draws them as an editable frame, like [Import from URL](/integrations/import-from-url/), with one difference: components keep their identity.
+Paste a GitHub repository and one or more page paths, or a Storybook link. Feega reads the running app or the stories and draws them as an editable frame, like [Import from URL](/integrations/import-from-url/), with one difference: components keep their identity.
 
 - Every component of the code rendered on the page becomes a **main component**, named as in the code.
 - Every other use of it is an **instance** linked to that main. Different labels become text overrides.
@@ -20,6 +20,7 @@ Export the frame back to code (React or Svelte) and you get the same names and p
 Open the insert menu (**+**), go to **Import**, choose **From code…**.
 
 - **GitHub**: paste `https://github.com/owner/repo` (or `…/tree/<branch>`), type the page paths separated by spaces (default `/`, up to 8) and press **Import**. Starting the app takes 15 to 60 seconds.
+- **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 24 stories, spread across components, become boards. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
 
 ## What works
@@ -36,7 +37,7 @@ Open the insert menu (**+**), go to **Import**, choose **From code…**.
 ## Limits
 
 - The app runs without any environment variables: pages that need secrets or a login show what they show without them.
-- Public repositories only.
+- Private repositories need GitHub connected; up to 200 MB of code.
 - A Storybook must be public; its stories are read as they render, without the controls panel.
 - The app has 6 minutes to install and start; each page then follows the URL import limits (1280 px wide, 1500 layers).
 - Two imports every ten minutes per person.
@@ -46,13 +47,17 @@ Open the insert menu (**+**), go to **Import**, choose **From code…**.
 ```bash
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / /settings /users --canvas <canvas> --x 0 --y 0
 feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <canvas> --x 0 --y 0
+feega canvas github $PROJECT connect      # prints a link to open in the browser
+feega canvas github $PROJECT repos
+feega canvas github $PROJECT branches owner/repo
 ```
 
 The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` and `skipped` (what stayed plain layers, pages that could not be opened, and why).
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, x, y } })`, or `{ canvasId, storybook, stories?, x, y }`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
 Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, x, y }` (`routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
 
+GitHub: `GET /api/v1/projects/{projectId}/github` (`{ configured, connected, label }`), `POST …/github/connect` (`{ url }` to open), `GET …/github/repos`, `GET …/github/branches?repo=owner/name`, `DELETE …/github`. `not_configured` (501) when the server has no GitHub connection set up, `not_connected` (409) before you connect.

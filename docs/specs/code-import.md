@@ -78,6 +78,26 @@ route was discarded: an instance cannot point at another frame's main.
 
 Code import skips URL import's `repeatedOf`: identity comes from the code, not from look-alikes.
 
+## Private repositories
+
+The user connects GitHub through Composio (Platform, managed auth): `POST …/github/connect` opens a
+Composio session for the owner `<orgId>:<userId>` and answers its Connect Link, with a callback
+carrying a sealed state (`APP_SECRET`, 15 min). `GET /api/v1/github/callback` checks the signed-in
+user against the state and the `connected_account_id` against the pending row, asks Composio the
+account status, reads `/user` for the login and marks the row active. Only the connected account
+id is stored (`user_connected_accounts`, per org and user, RLS own rows); tokens stay at Composio.
+
+At import, with an active account: `GET /repos/:owner/:repo` through Composio's proxy; a private
+repo's tarball (`/tarball/:ref`) is downloaded on our server from the proxy's binary link (or
+GitHub's redirect) and written into the sandbox with `writeFiles`, then unpacked. The sandbox
+never sees a token or a signed URL. Public repos keep the shallow clone, connected or not. Up to
+200 MB. Repo and branch pickers use the same proxy (`/user/repos`, `/repos/:o/:r/branches`).
+
+The port is `AccountLinks` (`src/lib/server/connections`): link, status, call, forget; the
+Composio adapter is REST v3.1 over `fetch`, no SDK (the SDK pulls `openai`, `pusher-js` and a
+second `@types/json-schema` that breaks the `ai` package's types). Without `COMPOSIO_API_KEY` it
+is `null` and the UI says GitHub is not set up. Drive and Dropbox can move behind the same port.
+
 ## Storybook
 
 `storybook` instead of `repo`: `index.json` (Storybook 7+) or `stories.json` (6), stories only
@@ -144,7 +164,6 @@ Sandbox up and capture: 44–67 s per app (4 routes ~67 s); Storybook 16 stories
 
 ## Not yet
 
-- Private repositories (next entry: Composio GitHub connection, archive fetched server-side).
 - Svelte props (Svelte 5 keeps none in the browser): Svelte components have no variants.
 - Storybook controls: only the args each story renders with.
 - Components not rendered on any imported route or story; environment variables the app needs.

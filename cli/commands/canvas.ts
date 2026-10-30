@@ -74,6 +74,18 @@ export async function cmdCanvasImportStorybook(project: string, storybook: strin
   console.log(JSON.stringify(result, null, 2));
 }
 
+const GITHUB_OPS: Record<string, string> = { status: 'github_status', connect: 'github_connect', repos: 'github_repos', branches: 'github_branches', disconnect: 'github_disconnect' };
+
+export async function cmdCanvasGithub(project: string, action: string, repo: string | undefined, opts: { org?: string }) {
+  const op = GITHUB_OPS[action];
+  if (!op) {
+    console.error(`Unknown action ${action}: ${Object.keys(GITHUB_OPS).join(', ')}`);
+    process.exit(1);
+  }
+  const result = await canvasApi.run(await token(), { project, op, input: repo ? { repo } : {} }, opts.org);
+  console.log(JSON.stringify(result, null, 2));
+}
+
 type FrameOpts = { canvas: string; x: number; y: number; w: number; h?: number; format?: string; org?: string };
 
 export async function cmdCanvasFrame(project: string, opts: FrameOpts) {

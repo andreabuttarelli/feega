@@ -599,7 +599,7 @@ canvas
 
 canvas
   .command('import-code <projectId> <repo>')
-  .description('Run a public GitHub React, Vue or Svelte app in a sandbox and draw its pages as boards of one frame: components become main components, usages instances, props variants')
+  .description('Run a GitHub React, Vue or Svelte app in a sandbox (private repos once `canvas github connect` is done) and draw its pages as boards of one frame: components become main components, usages instances, props variants')
   .requiredOption('--canvas <id>', 'The canvas')
   .option('--route <paths...>', 'The pages of the app to import (up to 8): one frame, a board per page, components shared', ['/'])
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
@@ -621,6 +621,15 @@ canvas
   .action(async (projectId: string, url: string, opts) => {
     const { cmdCanvasImportStorybook } = await import('./commands/canvas.ts');
     await cmdCanvasImportStorybook(projectId, url, opts);
+  });
+
+canvas
+  .command('github <projectId> <action> [repo]')
+  .description('Your GitHub connection for importing private repos: status | connect | repos | branches <owner/name> | disconnect')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, action: string, repo: string | undefined, opts) => {
+    const { cmdCanvasGithub } = await import('./commands/canvas.ts');
+    await cmdCanvasGithub(projectId, action, repo, opts);
   });
 
 canvas

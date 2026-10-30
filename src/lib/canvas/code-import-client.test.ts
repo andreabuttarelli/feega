@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { importCode } from './code-import-client';
+import { githubBranches, githubConnect, githubStatus, importCode, repoLink } from './code-import-client';
 
 const ASK = { projectId: 'p1', canvasId: 'c1', target: { repo: 'https://github.com/a/b', routes: ['/x', '/y'] }, at: { x: 1, y: 2 } };
 
@@ -28,5 +28,22 @@ describe('importCode', () => {
     const fetchFn = answering({ error: 'run_failed', detail: 'install_failed: x' }, 422);
 
     expect(await importCode(ASK, fetchFn as unknown as typeof fetch)).toEqual({ ok: false, error: 'run_failed', detail: 'install_failed: x' });
+  });
+});
+
+describe('GitHub', () => {
+  it('stato, collegamento e rami passano per le route del progetto', async () => {
+    const fetchFn = answering({ configured: true, connected: false, label: null });
+
+    expect(await githubStatus('p1', fetchFn as unknown as typeof fetch)).toEqual({ ok: true, value: { configured: true, connected: false, label: null } });
+    await githubConnect('p1', '/p/p1/c/c1', fetchFn as unknown as typeof fetch);
+    await githubBranches('p1', 'acme/app', fetchFn as unknown as typeof fetch);
+
+    expect(fetchFn.mock.calls.map((c) => c[0])).toEqual(['/api/v1/projects/p1/github', '/api/v1/projects/p1/github/connect', '/api/v1/projects/p1/github/branches?repo=acme%2Fapp']);
+  });
+
+  it('il link del repo porta il ramo scelto', () => {
+    expect(repoLink('acme/app', 'dev')).toBe('https://github.com/acme/app/tree/dev');
+    expect(repoLink('acme/app', null)).toBe('https://github.com/acme/app');
   });
 });

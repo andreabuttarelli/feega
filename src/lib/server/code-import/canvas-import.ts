@@ -11,6 +11,7 @@ import { CodeImportOutcome, importCodeAt, type CodeImported, type LandAsk } from
 import { importStorybookAt } from './import-storybook';
 import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
+import { githubFor } from './github-runtime';
 
 const IMPORT_WINDOW_MS = 10 * 60_000;
 const IMPORTS_PER_WINDOW = 2;
@@ -62,5 +63,5 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
   }
 
   const access = farmAccess(env);
-  return importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, runner: access ? metered(sandboxRunner(access), scope) : null });
+  return importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, runner: access ? metered(sandboxRunner(access), scope) : null, archive: githubFor(scope.db, scope).archive });
 }

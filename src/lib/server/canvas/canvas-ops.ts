@@ -78,7 +78,10 @@ import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import'
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
 import { importCodeInto } from '$lib/server/code-import/canvas-import';
-import { askedRoutes, MAX_ROUTES } from '$lib/server/code-import/repo';
+import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
+import { githubFor } from '$lib/server/code-import/github-runtime';
+import { libsOrigin } from '$lib/server/motion/libs-origin';
+import { GithubRefusal } from '$lib/server/code-import/github-http';
 import { MAX_STORIES } from '$lib/server/code-import/storybook';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
@@ -255,7 +258,7 @@ const importFigmaInput = z
   })
   .strict();
 
-const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a public https://github.com/<owner>/<repo> link, optionally /tree/<ref>'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const importUrlInput = z.object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite() }).strict();
 
@@ -997,6 +1000,46 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importCodeInput,
     run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, routes: askedRoutes(input.route, input.routes), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
+  }),
+
+  github_status: op({
+    access: Access.Read,
+    input: z.object({}).strict(),
+    run: async (ctx) => githubFor(ctx.db, ctx).status()
+  }),
+
+  github_connect: op({
+    access: Access.Write,
+    input: z.object({}).strict(),
+    run: async (ctx) => (await githubFor(ctx.db, ctx).connect(libsOrigin(), '/')) ?? { error: GithubRefusal.NotConfigured }
+  }),
+
+  github_disconnect: op({
+    access: Access.Write,
+    input: z.object({}).strict(),
+    run: async (ctx) => {
+      await githubFor(ctx.db, ctx).disconnect();
+      return { connected: false };
+    }
+  }),
+
+  github_repos: op({
+    access: Access.Read,
+    input: z.object({}).strict(),
+    run: async (ctx) => {
+      const repos = await githubFor(ctx.db, ctx).repos();
+      return repos ? { repos } : { error: GithubRefusal.NotConnected };
+    }
+  }),
+
+  github_branches: op({
+    access: Access.Read,
+    input: z.object({ repo: z.string().max(200).describe('owner/name') }).strict(),
+    run: async (ctx, input) => {
+      const repo = repoOf(`https://github.com/${input.repo}`);
+      const branches = repo ? await githubFor(ctx.db, ctx).branches(repo) : null;
+      return branches ? { branches } : { error: repo ? GithubRefusal.NotConnected : GithubRefusal.Invalid };
+    }
   }),
 
   draw_frame: op({
