@@ -5,6 +5,7 @@ import type { Box, FrameOnCanvas } from './canvas-scene';
 import { cardItems } from './cards';
 import type { CardIcons } from './card-kit';
 import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
+import { labelScale } from './label-size';
 import type { CoreTheme } from './overlay';
 
 export type CardTile = {
@@ -16,9 +17,12 @@ export type CardTile = {
   label: string | null;
   icon: number[][] | null;
   tag?: string | null;
+  zoom?: number;
 };
 
 export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
+
+const reachTop = (t: Pick<CardTile, 'zoom'>): number => Math.ceil(CHROME_REACH.top * Math.max(1, labelScale(t.zoom ?? 1)));
 
 export const ringColour = (t: Pick<CardTile, 'outputs'>, theme: Pick<CoreTheme, 'accent'>): string => (t.outputs.length ? CONNECTOR_STYLE[t.outputs[0].type].color : theme.accent);
 
@@ -28,11 +32,11 @@ export enum CardLayer {
 }
 
 export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null, layer = CardLayer.Whole): FrameOnCanvas {
-  const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
+  const [x, y] = [CHROME_REACH.side, reachTop(t)];
   const w = t.box.w + 2 * CHROME_REACH.side;
-  const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;
+  const h = t.box.h + y + CHROME_REACH.bottom;
   const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons);
-  const chrome = layer === CardLayer.Face ? [] : tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon, tag: t.tag }, glyphs);
+  const chrome = layer === CardLayer.Face ? [] : tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon, tag: t.tag, zoom: t.zoom }, glyphs);
   return {
     id: t.id,
     box: { x: t.box.x - x, y: t.box.y - y, w, h },
@@ -47,7 +51,7 @@ export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = g
     const hit = drawn.get(t.id);
     const frame = hit?.key === key ? hit.frame : cardOnCanvas(t, theme, glyphs, bold, icons, layer);
     drawn.set(t.id, { key, frame });
-    return { ...frame, box: { ...frame.box, x: t.box.x - CHROME_REACH.side, y: t.box.y - CHROME_REACH.top } };
+    return { ...frame, box: { ...frame.box, x: t.box.x - CHROME_REACH.side, y: t.box.y - reachTop(t) } };
   };
 }
 
@@ -64,5 +68,5 @@ export function portMarks(t: PortTile): { inputs: PortMark[]; outputs: PortMark[
 }
 
 export function cardKey(t: CardTile): string {
-  return `${t.id}:${JSON.stringify([t.box.w, t.box.h, t.face, t.inputs, t.outputs, t.label, t.tag])}`;
+  return `${t.id}:${JSON.stringify([t.box.w, t.box.h, t.face, t.inputs, t.outputs, t.label, t.tag, t.zoom])}`;
 }
