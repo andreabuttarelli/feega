@@ -403,6 +403,12 @@ function autoLayoutOf(n: FigmaRawNode, report: Report): AutoLayout | null {
 
 const itemOf = (n: FigmaRawNode): ChildItem => ({ grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE' });
 
+const SPACING_PX: Record<string, (value: number, size: number) => number> = { PIXELS: (v) => v, PERCENT: (v, size) => (v / PERCENT) * size, RAW: (v, size) => v * size };
+
+const spacingPx = (u: { value: number; units: string } | undefined, size: number) => (u && SPACING_PX[u.units] ? SPACING_PX[u.units](u.value, size) : 0);
+
+const SPACING_STEP = 0.01;
+
 function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: number; color: string }, report: Report): TextRun[] {
   const ids = n.textData?.characterStyleIDs ?? [];
   const table = new Map((n.textData?.styleOverrideTable ?? []).map((s) => [s.styleID ?? 0, s]));
@@ -430,6 +436,11 @@ function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: num
       }
       if (fill && fill.color !== base.color) {
         run.color = fill.color;
+      }
+      const size = positive(style.fontSize) ? style.fontSize : base.size;
+      const spacing = spacingPx(style.letterSpacing, size);
+      if (style.letterSpacing && Math.abs(spacing - spacingPx(n.letterSpacing, base.size)) > SPACING_STEP) {
+        run.tracking = spacing / size;
       }
       if (Object.keys(run).length > 2) {
         runs.push(run);

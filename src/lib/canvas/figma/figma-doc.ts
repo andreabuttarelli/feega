@@ -313,7 +313,7 @@ function laidOut(built: Built, container: Root, layer: FrameLayer, flow: AutoLay
   const children = kids.flatMap((kid): Step[] => [(d) => setParent(d, kid.id, container.id, { at: p.frame }), (d) => setLayoutItem(d, kid.id, itemFor(kid.layer, flow))]);
   const clipped: Step[] = layer.clip === Clip.Content ? [(d) => editClip(d, container.id, (c) => ({ ...c, clipContent: true }))] : [];
   const doc = applied(built.doc, [...own, ...children, ...clipped], p, `auto layout of ${layer.name}`);
-  return { ...built, doc: faded(doc, [container.id, ...kids.map((k) => k.id)], layer.opacity, p), roots: [container] };
+  return { ...built, doc: faded(doc, [container.id], layer.opacity, p), roots: [container] };
 }
 
 function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Built {

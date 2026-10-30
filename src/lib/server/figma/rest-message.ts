@@ -207,7 +207,8 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     styleID: Number(id),
     fontName: fontOf(style),
     fontSize: style.fontSize,
-    fillPaints: paintsOf(style.fills)
+    fillPaints: paintsOf(style.fills),
+    ...(style.letterSpacing !== undefined ? { letterSpacing: { value: style.letterSpacing, units: 'PIXELS' } } : {})
   }));
   const style = n.style;
   return {
