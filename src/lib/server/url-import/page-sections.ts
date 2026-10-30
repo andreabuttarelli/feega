@@ -19,7 +19,6 @@ export enum SectionName {
   UseCases = 'Use cases',
   Security = 'Security',
   Team = 'Team',
-  Ai = 'AI',
   Footer = 'Footer'
 }
 
@@ -54,21 +53,20 @@ const SECTION_NAMES: { name: SectionName; when: (f: Facts) => boolean }[] = [
   { name: SectionName.Nav, when: (f) => navLike(f) && f.top < NAV_ZONE_PX && f.height <= NAV_MAX_PX },
   { name: SectionName.Footer, when: (f) => f.tag === 'footer' || f.role === 'contentinfo' || /\bfooter\b/.test(f.words) },
   { name: SectionName.Hero, when: (f) => (f.h1 || /\bhero\b/.test(f.words)) && f.top < HERO_ZONE_PX },
-  { name: SectionName.Faq, when: (f) => /\bfaqs?\b|frequently asked|questions/.test(text(f)) || f.toggles >= FAQ_TOGGLES },
-  { name: SectionName.Pricing, when: (f) => /\bpricing\b|\bplans\b|\bprices?\b/.test(text(f)) },
-  { name: SectionName.Testimonials, when: (f) => /testimonial|\breviews\b|what .* say|loved by|case stud/.test(text(f)) || f.quotes >= QUOTES },
-  { name: SectionName.Logos, when: (f) => /\blogos?\b|trusted by|\bbrands\b|partners|clients/.test(text(f)) || (f.pictures >= LOGO_PICTURES && f.height <= LOGO_STRIP_PX && !f.heading) },
-  { name: SectionName.Stats, when: (f) => /\bstats?\b|statistic|metrics/.test(text(f)) },
-  { name: SectionName.News, when: (f) => /\bnews\b|\bblog\b|changelog|\bupdates\b|\bevents?\b|recently shipped|\blatest\b|\bblog\b/.test(text(f)) },
-  { name: SectionName.Cta, when: (f) => /get started|start (building|for free|now|today)|try .*free|sign up|contact sales|ready to|available today|book a demo|\bjoin\b/.test(f.heading) && f.height <= CTA_MAX_PX },
-  { name: SectionName.Customers, when: (f) => /\bcustomers?\b/.test(text(f)) },
-  { name: SectionName.Integrations, when: (f) => /\bintegrations?\b/.test(text(f)) },
-  { name: SectionName.HowItWorks, when: (f) => /how it works/.test(text(f)) },
-  { name: SectionName.UseCases, when: (f) => /use cases?/.test(text(f)) },
-  { name: SectionName.Security, when: (f) => /\bsecurity\b|\bsecure\b|compliance/.test(text(f)) },
-  { name: SectionName.Team, when: (f) => /meet the team|our team|^team\b/.test(f.heading) },
-  { name: SectionName.Ai, when: (f) => /\bai\b|\bagents?\b/.test(f.heading) },
-  { name: SectionName.Features, when: (f) => /feature|benefit|capabilit|solution|how it works/.test(text(f)) }
+  { name: SectionName.Faq, when: (f) => /\bfaqs?\b|frequently asked|questions|domande frequenti|preguntas frecuentes|questions fréquentes|häufig gestellte fragen|perguntas frequentes/.test(text(f)) || f.toggles >= FAQ_TOGGLES },
+  { name: SectionName.Pricing, when: (f) => /\bpricing\b|\bplans\b|\bprices?\b|\bprezzi\b|\bprecios\b|\btarifs?\b|\bpreise\b|preços|\bpiani\b|\bplanes\b/.test(text(f)) },
+  { name: SectionName.Testimonials, when: (f) => /testimonial|testimonianz|testimonios|témoignages|erfahrungsberichte|depoimentos|\breviews\b|recensioni|what .* say|loved by|case stud/.test(text(f)) || f.quotes >= QUOTES },
+  { name: SectionName.Logos, when: (f) => /\blogos?\b|trusted by|\bbrands\b|partners|clients/.test(f.words) || /\blogos?\b|trusted by|\bbrands\b|partners/.test(f.heading) || (f.pictures >= LOGO_PICTURES && f.height <= LOGO_STRIP_PX && !f.heading) },
+  { name: SectionName.Stats, when: (f) => /\bstats?\b|statistic|metrics|statistiche|estadísticas|statistiques|statistiken|estatísticas/.test(text(f)) },
+  { name: SectionName.News, when: (f) => /\bnews\b|\bblog\b|changelog|\bupdates\b|\bevents?\b|recently shipped|\blatest\b|novità|aggiornamenti|novedades|noticias|actualités|nouveautés|neuigkeiten|aktuelles|novidades|notícias/.test(text(f)) },
+  { name: SectionName.Cta, when: (f) => /get started|start (building|for free|now|today)|try .*free|sign up|contact sales|ready to|available today|book a demo|\bjoin\b|inizia|prova gratis|registrati|empieza|comienza|prueba gratis|commencez|essayez|jetzt starten|kostenlos testen|loslegen|comece|experimente/.test(f.heading) && f.height <= CTA_MAX_PX },
+  { name: SectionName.Customers, when: (f) => /\bcustomers?\b|\bclienti\b|\bclientes\b|\bkunden\b/.test(text(f)) },
+  { name: SectionName.Integrations, when: (f) => /\bintegrations?\b|integrazioni|integraciones|intégrations|integrationen|integrações/.test(text(f)) },
+  { name: SectionName.HowItWorks, when: (f) => /how it works|come funziona|cómo funciona|como funciona|comment ça marche|comment ça fonctionne|so funktioniert|wie es funktioniert/.test(text(f)) },
+  { name: SectionName.UseCases, when: (f) => /use cases?|casi d'uso|casos de uso|cas d'usage|cas d'utilisation|anwendungsfälle/.test(text(f)) },
+  { name: SectionName.Security, when: (f) => /\bsecurity\b|\bsecure\b|compliance|sicurezza|seguridad|sécurité|sicherheit|segurança/.test(text(f)) },
+  { name: SectionName.Team, when: (f) => /meet the team|our team|^team\b|il nostro team|nuestro equipo|notre équipe|unser team|nossa equipe/.test(f.heading) },
+  { name: SectionName.Features, when: (f) => /feature|benefit|capabilit|solution|funzionalità|caratteristiche|funcionalidades|características|fonctionnalités|funktionen|recursos/.test(text(f)) || (Boolean(f.heading) && f.pictures > 0) }
 ];
 
 const bottomOf = (b: OutlineBox) => b.y + b.height;
@@ -134,7 +132,7 @@ function mergedRuns(blocks: Block[]): Block[] {
     const tiny = block.box.height < MIN_SECTION_PX && !nameOf(block);
     const continues = !landmark(block.from) && !landmark(last?.from ?? block.from) && !block.from.heading && !nameOf(block) && gap < LARGE_GAP_PX && block.background === last?.background;
     if (last && (tiny || continues)) {
-      runs[runs.length - 1] = { ...last, box: { ...last.box, height: Math.max(bottomOf(last.box), bottomOf(block.box)) - last.box.y } };
+      runs[runs.length - 1] = { ...last, from: { ...last.from, pictures: (last.from.pictures ?? 0) + (block.from.pictures ?? 0) || undefined }, box: { ...last.box, height: Math.max(bottomOf(last.box), bottomOf(block.box)) - last.box.y } };
       continue;
     }
     runs.push(block);

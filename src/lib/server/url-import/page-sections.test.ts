@@ -11,9 +11,9 @@ const block = (tag: string, y: number, height: number, more: Partial<OutlineBloc
 
 describe('sectionsOf', () => {
   it.each([
-    ['stripe', ['Nav', 'Hero', 'Features', 'Section 4', 'Stats', 'Testimonials', 'Section 7', 'News', 'Section 9', 'Footer'], [0, 76, 693, 2906, 3466, 4436, 9019, 11442, 13309, 13689]],
-    ['linear', ['Nav', 'Hero', 'Logos', 'AI', 'Integrations', 'Section 6', 'AI 2', 'Section 8', 'News', 'Customers', 'CTA', 'Footer'], [0, 73, 1298, 1390, 2095, 3491, 4730, 5972, 7202, 7781, 8505, 8901]],
-    ['vercel', ['Nav', 'Hero', 'AI', 'News', 'AI 2', 'Footer'], [0, 64, 800, 3210, 4136, 4824]]
+    ['stripe', ['Nav', 'Hero', 'Features', 'Section 4', 'Stats', 'Testimonials', 'Features 2', 'News', 'Section 9', 'Footer'], [0, 76, 693, 2906, 3466, 4436, 9019, 11442, 13309, 13689]],
+    ['linear', ['Nav', 'Hero', 'Logos', 'Features', 'Integrations', 'Features 2', 'Features 3', 'Features 4', 'News', 'Customers', 'CTA', 'Footer'], [0, 73, 1298, 1390, 2095, 3491, 4730, 5972, 7202, 7781, 8505, 8901]],
+    ['vercel', ['Nav', 'Hero', 'Features', 'News', 'Features 2', 'Footer'], [0, 64, 800, 3210, 4136, 4824]]
   ])('%s si divide nelle sezioni della pagina, coi loro nomi', (name, names, tops) => {
     const found = sectionsOf(outlineOf(name));
 
@@ -70,6 +70,44 @@ describe('sectionsOf', () => {
     ['Connect your integrations', 'Integrations']
   ])('il titolo "%s" dà il nome %s', (heading, name) => {
     expect(sectionsOf(page([block('section', 0, 3000, { heading })]))[0].name).toBe(name);
+  });
+
+  it.each([
+    ['Prezzi', 'Pricing'],
+    ['Precios', 'Pricing'],
+    ['Tarifs', 'Pricing'],
+    ['Preise', 'Pricing'],
+    ['Preços', 'Pricing'],
+    ['Domande frequenti', 'FAQ'],
+    ['Preguntas frecuentes', 'FAQ'],
+    ['Questions fréquentes', 'FAQ'],
+    ['Häufig gestellte Fragen', 'FAQ'],
+    ['Perguntas frequentes', 'FAQ'],
+    ['I nostri clienti', 'Customers'],
+    ['Nuestros clientes', 'Customers'],
+    ['Kunden', 'Customers'],
+    ['Novità e aggiornamenti', 'News'],
+    ['Come funziona', 'How it works'],
+    ['Cómo funciona', 'How it works'],
+    ['Comment ça marche', 'How it works'],
+    ['So funktioniert es', 'How it works'],
+    ['Sicurezza', 'Security'],
+    ['Sicherheit', 'Security'],
+    ['Integrazioni', 'Integrations'],
+    ['Funzionalità', 'Features'],
+    ['Fonctionnalités', 'Features'],
+    ['Inizia ora', 'CTA'],
+    ['Empieza gratis', 'CTA'],
+    ['Testimonianze', 'Testimonials'],
+    ['Il nostro team', 'Team']
+  ])('in un\'altra lingua "%s" dà %s', (heading, name) => {
+    expect(sectionsOf(page([block('nav', 0, 60), block('section', 60, 600, { heading })]))[1].name).toBe(name);
+  });
+
+  it('un titolo di argomento non è un nome: con titolo e immagini è Features, senza immagini Section N', () => {
+    const found = sectionsOf(page([block('section', 0, 1500, { heading: 'AI and automations', pictures: 4 }), block('section', 1500, 1500, { heading: 'Agents everywhere' })]));
+
+    expect(found.map((s) => s.name)).toEqual(['Features', 'Section 2']);
   });
 
   it('una pagina senza blocchi riconoscibili resta una sezione sola', () => {
