@@ -96,6 +96,21 @@ describe('page tokens', () => {
     expect(tokens.texts.find((t) => t.name === 'H1')?.style.sizePx).toBe(56);
   });
 
+  it('colours past the named roles are named by hue or by what they paint, never by number', () => {
+    const twice = (hex: string, paint: ColourPaint, weight = 10) => [colour(hex, paint, weight), colour(hex, paint, weight)];
+    const tokens = tokensOf({ ...PAGE, colours: [...PAGE.colours, ...twice('#22c55e', ColourPaint.Fill), ...twice('#3b82f6', ColourPaint.Fill), ...twice('#eeeeee', ColourPaint.Fill, 500), ...twice('#999999', ColourPaint.Text)] });
+
+    expect(tokens.colours.map((c) => c.name).filter((n) => !Object.keys(names(PAGE)).includes(n)).sort()).toEqual(['Blue', 'Green', 'Surface 2', 'Text 2']);
+  });
+
+  it('text styles past the named roles are named by heading level, case or size, never by number', () => {
+    const body = text({ chars: 4_000 });
+    const tokens = tokensOf({ ...EMPTY, texts: [body, body, text({ sizePx: 48, heading: 1 }), text({ sizePx: 32, heading: 2 }), text({ sizePx: 24, heading: 3 }), text({ sizePx: 20, heading: 4 }), text({ sizePx: 14 }), text({ sizePx: 14 }), text({ sizePx: 12 }), text({ sizePx: 12 }), text({ sizePx: 13, textCase: 'upper' }), text({ sizePx: 13, textCase: 'upper' }), text({ sizePx: 18 }), text({ sizePx: 18 })] });
+
+    expect(tokens.texts.map((t) => t.name).some((n) => /^Text \d/.test(n))).toBe(false);
+    expect(tokens.texts.map((t) => t.name)).toEqual(expect.arrayContaining(['H4', 'Label', 'Body large']));
+  });
+
   it('shadows, radii and spacing become a named scale', () => {
     const shadow = (blur: number) => ({ key: `s${blur}`, blur, shadow: true });
     const tokens = tokensOf({ ...EMPTY, effects: [shadow(4), shadow(4), shadow(24), shadow(24)], radii: [4, 4, 8, 8, 9999, 9999, 3], spacing: [8, 8, 16, 16, 24, 24, 5] });

@@ -94,9 +94,49 @@ const COLOUR_ROLES: ColourRole[] = [
   { name: 'Surface', paints: [ColourPaint.Fill], score: (c) => (chromatic(c) ? 0 : c.fill) },
   { name: 'Text muted', paints: [ColourPaint.Text], score: (c) => c.text },
   { name: 'Border', paints: [ColourPaint.Border], score: (c) => c.border },
-  { name: 'Accent', paints: ALL_PAINTS, score: (c) => (chromatic(c) && c.uses >= MIN_USES ? c.uses : 0) },
-  ...Array.from({ length: MAX_COLOURS }, (_, i) => ({ name: `Colour ${i + 1}`, paints: ALL_PAINTS, score: (c: Cluster) => (c.uses >= MIN_USES ? c.uses : 0) }))
+  { name: 'Accent', paints: ALL_PAINTS, score: (c) => (chromatic(c) && c.uses >= MIN_USES ? c.uses : 0) }
 ];
+
+const HUES: [number, string][] = [
+  [20, 'Pink'],
+  [50, 'Red'],
+  [75, 'Orange'],
+  [105, 'Yellow'],
+  [165, 'Green'],
+  [230, 'Teal'],
+  [300, 'Blue'],
+  [330, 'Purple'],
+  [360, 'Pink']
+];
+
+const PAINT_NAME: Record<ColourPaint, string> = {
+  [ColourPaint.Fill]: 'Surface',
+  [ColourPaint.Text]: 'Text',
+  [ColourPaint.Border]: 'Border'
+};
+
+function hueName(c: Cluster): string {
+  const angle = ((Math.atan2(c.lab[2], c.lab[1]) * 180) / Math.PI + 360) % 360;
+  return HUES.find(([upTo]) => angle < upTo)![1];
+}
+
+function paintName(c: Cluster): string {
+  const [paint] = Object.values(ColourPaint).sort((a, b) => c[PAINT_SCORE[b]] - c[PAINT_SCORE[a]]);
+  return PAINT_NAME[paint];
+}
+
+const extraName = (c: Cluster) => (chromatic(c) ? hueName(c) : paintName(c));
+
+function unique(name: string, taken: readonly string[]): string {
+  if (!taken.includes(name)) {
+    return name;
+  }
+  let n = 2;
+  while (taken.includes(`${name} ${n}`)) {
+    n++;
+  }
+  return `${name} ${n}`;
+}
 
 function pulledToBrand(c: Cluster, brand: SiteBrand | undefined): string {
   const near = (brand?.palette ?? []).map((hex) => hex.toLowerCase()).find((hex) => distance(labOf(hex), c.lab) <= BRAND_PULL);
@@ -115,6 +155,10 @@ function coloursOf(uses: ColourUse[], brand: SiteBrand | undefined): ColourToken
     }
     role.paints.forEach((p) => claimed.get(best.c)!.add(p));
     named.push({ name: role.name, hex: pulledToBrand(best.c, brand), members: [...best.c.members.keys()].sort(), paints: role.paints });
+  }
+  const extras = clusters.filter((c) => claimed.get(c)!.size === 0 && c.uses >= MIN_USES).sort((a, b) => b.uses - a.uses);
+  for (const c of extras.slice(0, Math.max(0, MAX_COLOURS - named.length))) {
+    named.push({ name: unique(extraName(c), named.map((t) => t.name)), hex: pulledToBrand(c, brand), members: [...c.members.keys()].sort(), paints: ALL_PAINTS });
   }
   return named;
 }
@@ -148,9 +192,21 @@ const TEXT_RULES: TextRule[] = [
   { name: 'H2', pick: (left, body) => largest(above(left, body)) },
   { name: 'H3', pick: (left, body) => largest(above(left, body)) },
   { name: 'Small', pick: (left, body) => largest(below(left, body)) },
-  { name: 'Caption', pick: (left, body) => smallest(below(left, body)) },
-  ...Array.from({ length: MAX_TEXTS }, (_, i) => ({ name: `Text ${i + 1}`, pick: (left: TextCluster[]) => left[0] }))
+  { name: 'Caption', pick: (left, body) => smallest(below(left, body)) }
 ];
+
+const SPOKEN_CASES = new Set<TextCase>(['upper', 'small-caps']);
+
+const TEXT_NAMES: { name: (c: TextCluster) => string; when: (c: TextCluster, body: TextCluster | undefined) => boolean }[] = [
+  { name: (c) => `H${Math.min(...c.levels)}`, when: (c) => c.levels.size > 0 },
+  { name: () => 'Button', when: (c) => c.button > 0 },
+  { name: () => 'Label', when: (c) => SPOKEN_CASES.has(c.style.textCase) },
+  { name: () => 'Body large', when: (c, body) => c.style.sizePx > (body?.style.sizePx ?? Infinity) },
+  { name: () => 'Body small', when: (c, body) => c.style.sizePx < (body?.style.sizePx ?? 0) },
+  { name: () => 'Body', when: () => true }
+];
+
+const textName = (c: TextCluster, body: TextCluster | undefined) => TEXT_NAMES.find((r) => r.when(c, body))!.name(c);
 
 function textsOf(uses: TextUse[]): TextToken[] {
   const left = textClustersOf(uses);
@@ -164,6 +220,9 @@ function textsOf(uses: TextUse[]): TextToken[] {
     body ??= rule.name === 'Body' ? picked : undefined;
     left.splice(left.indexOf(picked), 1);
     named.push({ name: rule.name, key: picked.key, style: picked.style });
+  }
+  for (const c of left.slice(0, Math.max(0, MAX_TEXTS - named.length))) {
+    named.push({ name: unique(textName(c, body), named.map((t) => t.name)), key: c.key, style: c.style });
   }
   return named;
 }
