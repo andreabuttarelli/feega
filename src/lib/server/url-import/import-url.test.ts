@@ -3,7 +3,7 @@ import type { AppTab } from '$lib/server/web/browser';
 import type { FrameStore } from '$lib/server/motion/move-element';
 import type { PageTree } from './page-tree';
 import { importPageAt, UrlImportOutcome } from './import-url';
-import { Sectioning } from './url-doc';
+import { PLAIN_SHAPE } from './url-doc';
 
 const TREE: PageTree = {
   title: 'Acme — ship faster',
@@ -93,7 +93,7 @@ describe('importPageAt', () => {
   });
 
   it('con le sezioni spente la pagina arriva come prima', async () => {
-    const { ask, docs, tab } = askOf({ sectioning: Sectioning.Off });
+    const { ask, docs, tab } = askOf({ shape: PLAIN_SHAPE });
     vi.mocked(tab.tree).mockResolvedValue(OUTLINED as never);
 
     await importPageAt(ask);
@@ -172,5 +172,40 @@ describe('importPageAt', () => {
 
     expect(ask.importImage).toHaveBeenCalledWith('https://acme.test/hero.png');
     expect(JSON.stringify(docs.get('frame-1')?.doc)).toContain('asset-1');
+  });
+
+  it('i font della pagina arrivano al planner e il testo usa la loro famiglia vera', async () => {
+    const importFont = vi.fn(async () => 'font-asset-1');
+    const { ask, docs, tab } = askOf({ importFont });
+    const sohne = { ...TREE.root.children![0], style: { fontFamily: 'Sohne', fontSize: 48, fontWeight: 600 } };
+    vi.mocked(tab.tree).mockResolvedValue({ ...TREE, root: { ...TREE.root, children: [sohne] }, fonts: [{ family: 'Sohne', weight: '600', style: 'normal', url: 'https://acme.test/sohne.woff2' }] } as never);
+
+    await importPageAt(ask);
+
+    expect(importFont).toHaveBeenCalledWith('https://acme.test/sohne.woff2');
+    const doc = docs.get('frame-1')!.doc as { fonts: { family: string }[] };
+    expect(doc.fonts.map((f) => f.family)).toContain('Sohne');
+    expect(JSON.stringify(doc)).toContain('font-asset-1');
+  });
+
+  it('i font dichiarati in un foglio di stile che la pagina non può leggere arrivano lo stesso', async () => {
+    const importFont = vi.fn(async () => 'font-asset-2');
+    const fetchText = vi.fn(async () => "@font-face{font-family:'sohne-var';src:url(../fonts/sohne.woff2) format('woff2');font-weight:300 700;font-style:normal}");
+    const { ask, docs, tab } = askOf({ importFont, fetchText });
+    const sohne = { ...TREE.root.children![0], style: { fontFamily: 'sohne-var', fontSize: 48, fontWeight: 400 } };
+    vi.mocked(tab.tree).mockResolvedValue({ ...TREE, root: { ...TREE.root, children: [sohne] }, fonts: [], sheets: ['https://cdn.acme.test/css/app.css'] } as never);
+
+    await importPageAt(ask);
+
+    expect(fetchText).toHaveBeenCalledWith('https://cdn.acme.test/css/app.css');
+    expect(importFont).toHaveBeenCalledWith('https://cdn.acme.test/fonts/sohne.woff2');
+    expect(JSON.stringify(docs.get('frame-1')!.doc)).toContain('font-asset-2');
+  });
+
+  it('un campo che l\'albero non dichiara è illeggibile, non scartato in silenzio', async () => {
+    const { ask, tab } = askOf();
+    vi.mocked(tab.tree).mockResolvedValue({ ...TREE, mystery: 1 } as never);
+
+    expect((await importPageAt(ask)).outcome).toBe(UrlImportOutcome.Unreadable);
   });
 });

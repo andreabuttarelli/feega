@@ -29,13 +29,14 @@
   let message = $state<string | null>(null);
   let site = $state<string | null>(null);
   let sections = $state(true);
+  let tokens = $state(true);
 
   const title = $derived(site ? (busy ? `Importing ${site}…` : `Couldn't import ${site}`) : 'Import from URL');
 
   async function bring(typed: string, extent?: ImportExtent) {
     busy = true;
     message = null;
-    const got = await importPage({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent, sections });
+    const got = await importPage({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent, sections, tokens });
     busy = false;
     if (!got.ok) {
       message = REFUSALS[got.error] ?? FALLBACK_REFUSAL;
@@ -72,6 +73,7 @@
       <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !url.trim()} data-testid="url-import-run">{busy ? 'Importing…' : site ? 'Try another URL' : 'Import'}</button>
     </form>
     <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={sections} data-testid="url-import-sections" /> Split into sections (Nav, Hero, Footer…)</label>
+    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={tokens} data-testid="url-import-tokens" /> Extract styles and variables (colours, type, effects)</label>
     {/if}
     {#if message}
       <p class="ui-note" role="alert" data-testid="url-import-message">{message}</p>

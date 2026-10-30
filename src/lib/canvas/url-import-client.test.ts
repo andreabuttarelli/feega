@@ -27,6 +27,14 @@ describe('importPage', () => {
     expect(JSON.parse(String((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toMatchObject({ sections: false });
   });
 
+  it('can ask for raw values, without tokens', async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ nodes: [], undo: [], skipped: [], truncated: false })));
+
+    await importPage({ ...ASK, tokens: false }, fetchFn as unknown as typeof fetch);
+
+    expect(JSON.parse(String((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toMatchObject({ tokens: false });
+  });
+
   it('can ask for the top of the page only', async () => {
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({ nodes: [], undo: [], skipped: [], truncated: true })));
 

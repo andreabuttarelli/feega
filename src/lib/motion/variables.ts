@@ -1,7 +1,8 @@
 import { Control } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
 import { fillReplaces } from '@feega/motion-core/motion/fill/elements';
-import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { findClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { mapEveryTrack } from './doc-scopes';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { DEFAULT_MODE, VarType, keyOf, splitKey, variableSchema, variablesSchema, type Collection, type VarAlias, type VarInput, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 
@@ -149,7 +150,7 @@ export function resolveVariables(doc: MotionDoc): MotionDoc {
   if (!variables) {
     return doc;
   }
-  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.bind ? resolvedClip(variables, c as MotionClip) : c)) })) };
+  return mapEveryTrack(doc, (tracks) => tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.bind ? resolvedClip(variables, c as MotionClip) : c)) })));
 }
 
 export function defineVariable(doc: MotionDoc, collection: string, name: string, input: VarInput, modes?: readonly string[]): OpResult {
@@ -176,15 +177,18 @@ export function setActiveMode(doc: MotionDoc, collection: string, mode: string):
 type Bind = Record<string, string>;
 
 function rebound(doc: MotionDoc, change: (clip: MotionClip) => Bind): MotionDoc {
-  const tracks = doc.tracks.map((t) => ({
+  return mapEveryTrack(doc, (tracks) => reboundTracks(tracks, change));
+}
+
+function reboundTracks(tracks: MotionTrack[], change: (clip: MotionClip) => Bind): MotionTrack[] {
+  return tracks.map((t) => ({
     ...t,
     clips: t.clips.map((c) => {
       const bind = change(c as MotionClip);
       const { bind: _old, ...rest } = c;
       return Object.keys(bind).length ? { ...rest, bind } : rest;
     })
-  }));
-  return { ...doc, tracks } as MotionDoc;
+  })) as MotionTrack[];
 }
 
 const withTarget = (doc: MotionDoc, clipId: string, edit: (bind: Bind) => Bind) => rebound(doc, (c) => (c.id === clipId ? edit(c.bind ?? {}) : (c.bind ?? {})));

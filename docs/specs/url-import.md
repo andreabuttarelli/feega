@@ -91,6 +91,14 @@ direct children become section frames in a vertical auto layout, top to bottom.
 - Rendering: an instance with overrides is laid out again after they apply (`instanceTracks`), a group's size in a flow is the size of what it shows (instances
   included), and a frame without auto layout inside a flow keeps its box as an invisible background.
 
+## Tokens
+
+On by default (`tokens`, CLI `--no-tokens`). `page-tokens.ts` clusters and names colours, text
+styles, shadows, radii and spacing by rule tables (`COLOUR_ROLES`, `TEXT_RULES`); `token-bind.ts`
+writes them as the frame's variable collection (named after the site) and styles (`<Site> Body`)
+and binds the layers whose value matches. A brand of the same host pulls close colours to its
+palette. Borders, radii and the frame background are listed, not bound.
+
 ## Not yet
 
 - Tablet/phone captures as breakpoint overrides (ADR 0022).

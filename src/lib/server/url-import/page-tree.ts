@@ -21,7 +21,7 @@ export type PageBox = { x: number; y: number; width: number; height: number };
 export type PageFont = { family: string; weight: string; style: string; url: string };
 export type PageSnap = { ref: string; box: PageBox; mode: SnapMode };
 
-export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; snaps?: PageSnap[]; outline?: PageOutline };
+export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; snaps?: PageSnap[]; outline?: PageOutline };
 
 export const treeScript = (limits: TreeLimits) =>
   `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})()).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
@@ -1055,7 +1055,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   };
 
   pseudoElements();
-  const fonts = await fontsOf();
+  const { fonts, sheets } = fontsOf();
   fonts.forEach((f) => declaredFamilies.add(f.family.toLowerCase()));
   await svgImages();
 
@@ -1073,6 +1073,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     height,
     truncated,
     fonts,
+    sheets,
     snaps: snaps.map((s) => ({ ...s, mode: s.mode as SnapMode })),
     root: { id: id(), type: 'FRAME', name: document.title.trim() || location.hostname, absoluteBoundingBox: { x: 0, y: 0, width, height }, fills: ground.length ? ground : [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], clipsContent: true, children }
   };
@@ -1172,7 +1173,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     );
   }
 
-  async function fontsOf(): Promise<PageFont[]> {
+  function fontsOf(): { fonts: PageFont[]; sheets: string[] } {
     const faces: (PageFont & { latin: boolean })[] = [];
     const add = (family: string, src: string, weight: string, style: string, range: string, base: string) => {
       const urls = [...src.matchAll(/url\(["']?([^"')]+)["']?\)\s*(?:format\(["']?([\w-]+)["']?\))?/g)].map((m) => ({ url: new URL(m[1], base).href, format: m[2] ?? '' }));
@@ -1209,17 +1210,6 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
       }
     };
     [...document.styleSheets].forEach(readSheet);
-    await Promise.all(
-      unread.map(async (href) => {
-        const text = await fetch(href)
-          .then((r) => (r.ok ? r.text() : ''))
-          .catch(() => '');
-        for (const block of text.match(/@font-face\s*{[^}]*}/g) ?? []) {
-          const get = (prop: string) => block.match(new RegExp(`${prop}\\s*:\\s*([^;}]+)`))?.[1]?.trim() ?? '';
-          add(get('font-family'), get('src'), get('font-weight'), get('font-style'), get('unicode-range'), href);
-        }
-      })
-    );
     const best = new Map<string, PageFont & { latin: boolean }>();
     for (const f of faces) {
       const key = `${f.family.toLowerCase()}|${f.weight}|${f.style}`;
@@ -1228,6 +1218,6 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         best.set(key, f);
       }
     }
-    return [...best.values()].map(({ latin: _latin, ...face }) => face);
+    return { fonts: [...best.values()].map(({ latin: _latin, ...face }) => face), sheets: [...new Set(unread)] };
   }
 }

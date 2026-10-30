@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { MotionClip } from '@feega/motion-core/motion/doc';
 import type { PageTree } from './page-tree';
 import type { PageOutline } from './page-outline';
-import { Sectioning, urlPlan } from './url-doc';
+import { FULL_SHAPE, PLAIN_SHAPE, Sectioning, urlPlan } from './url-doc';
 
 const FIXTURES = ['linear', 'stripe', 'vercel'];
 
@@ -27,24 +27,24 @@ describe('urlPlan', () => {
     ['linear', ['Nav', 'Hero', 'Logos', 'Features', 'Integrations', 'Features 2']],
     ['vercel', ['Nav', 'Hero', 'Features', 'News']]
   ])('con le sezioni, i figli del frame di %s sono le sezioni con nome', (name, names) => {
-    expect(topNames(urlPlan(outlined(name), newId, undefined, {}, Sectioning.On)!)).toEqual(names);
+    expect(topNames(urlPlan(outlined(name), newId, undefined, {}, FULL_SHAPE)!)).toEqual(names);
   });
 
   it.each(FIXTURES)('il pannello livelli di %s mostra il nome della sezione, non "Group N"', (name) => {
-    const doc = urlPlan(outlined(name), newId, undefined, {}, Sectioning.On)!.plan.items[0].doc;
+    const doc = urlPlan(outlined(name), newId, undefined, {}, FULL_SHAPE)!.plan.items[0].doc;
     const sections = doc.tracks.flatMap((t) => t.clips.filter((c) => c.props.comp));
 
     expect(sections.map((c) => doc.comps[String(c.props.comp)].name)).toEqual(sections.map((c) => c.name));
   });
 
   it.each(FIXTURES)('senza sezioni %s resta l\'albero di prima', (name) => {
-    const names = topNames(urlPlan(outlined(name), newId, undefined, {}, Sectioning.Off)!);
+    const names = topNames(urlPlan(outlined(name), newId, undefined, {}, PLAIN_SHAPE)!);
 
     expect(names).not.toContain('Hero');
   });
 
   it.each(FIXTURES)('le sezioni non cambiano il testo che %s mostra', (name) => {
-    const texts = (sectioning: Sectioning) => clipsOf(urlPlan(outlined(name), newId, undefined, {}, sectioning)!).flatMap((c) => (typeof c.props.text === 'string' ? [c.props.text] : [])).sort();
+    const texts = (sectioning: Sectioning) => clipsOf(urlPlan(outlined(name), newId, undefined, {}, { sectioning })!).flatMap((c) => (typeof c.props.text === 'string' ? [c.props.text] : [])).sort();
 
     expect(texts(Sectioning.On)).toEqual(texts(Sectioning.Off));
   });

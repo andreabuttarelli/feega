@@ -848,7 +848,15 @@ Login che funzionava dieci minuti prima risponde «Wrong email or password»; `a
 `pageTreeAt` valida l'albero con uno `z.object` senza `.passthrough()` sulla radice: zod **toglie** le
 chiavi che lo schema non nomina. `outline` arrivava dal browser e non arrivava a `urlPlan`; anche
 `fonts` oggi si perde lì. Segnale: un campo presente in `tab.tree()` e `undefined` nel planner. Mossa:
-ogni campo nuovo di `PageTree` va nominato in `TREE_SHAPE`.
+ogni campo nuovo di `PageTree` va nominato in `TREE_SHAPE`. Dal 30/10/2026 `TREE_SHAPE` è `.strict()`:
+un campo non nominato rende l'albero `unreadable` invece di sparire.
+
+### Uno stile o una variabile modificati non arrivano ai layer dentro le composizioni
+`defineStyle` e `resolveVariables` guardavano solo `doc.tracks`; sezioni, gruppi e componenti di un
+import vivono in `doc.comps`. I test con clip al primo livello erano verdi. Segnale: la modifica
+cambia il pannello ma non la pagina. Mossa: ogni operazione su clip collegati passa da
+`inEveryScope`/`mapEveryTrack` (`src/lib/motion/doc-scopes.ts`), e il test mette il clip in una
+composizione.
 
 ### Un valore nuovo per una colonna «libera» muore su un CHECK che le migration non hanno
 `platform = 'upload'` su `products`: i test con repo finti verdi, in produzione `23514 products_platform_check`. Lo stesso per `nodes.data.type` di un nodo `products` (`nodes_data_shape_check`). Quei CHECK vivono sul database e non in `supabase/migrations`: la lista vera è `src/lib/server/org-data/checks.ts` e le `canvas-migrations`. Segnale: `23514` al primo giro reale di un valore che nessun test ha mai scritto su Postgres. Mossa: prima di inventare un valore di enum, `grep` del nome della colonna in `org-data/checks.ts` e nelle `canvas-migrations`; se serve davvero, è una migration da applicare, non un cast.
