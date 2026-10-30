@@ -3,6 +3,7 @@ import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
+import { labelScale, labelShown } from './label-size';
 import { circle, line, rect, reverse, roundRect, solid } from './shapes';
 
 export enum ChromePart {
@@ -44,6 +45,7 @@ export type ChromeTile = {
   tag?: string | null;
   addBeside?: boolean;
   radius?: number;
+  zoom?: number;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; hovered: boolean; ringColor: string; names: boolean };
@@ -151,10 +153,12 @@ function handles(t: StateTile): PathItem[] {
 
 const shift = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)));
 
+const scaled = (contours: number[][], k: number) => contours.map((c) => c.map((v) => v * k));
+
 const LABEL_SET: TextSet = { leading: LABEL_LEADING, tracking: 0 };
 
-function fitted(text: string, room: number, glyphs: Glyphs) {
-  const whole = glyphs(text, LABEL_SIZE, LABEL_SET);
+function fitted(text: string, room: number, glyphs: Glyphs, size: number) {
+  const whole = glyphs(text, size, LABEL_SET);
   if (whole.width <= room) {
     return whole;
   }
@@ -162,29 +166,36 @@ function fitted(text: string, room: number, glyphs: Glyphs) {
   let cut = whole;
   while (kept > 0 && cut.width > room) {
     kept -= 1;
-    cut = glyphs(text.slice(0, kept).trimEnd() + ELLIPSIS, LABEL_SIZE, LABEL_SET);
+    cut = glyphs(text.slice(0, kept).trimEnd() + ELLIPSIS, size, LABEL_SET);
   }
   return cut;
 }
 
+const labelK = (t: ChromeTile) => labelScale(t.zoom ?? 1);
+
+const labelHidden = (t: ChromeTile) => !labelShown(t.zoom ?? 1, t.width);
+
 function tag(t: ChromeTile): PathItem[] {
-  if (!t.tag) {
+  if (!t.tag || labelHidden(t)) {
     return [];
   }
-  const row = LABEL_SIZE * LABEL_LEADING;
-  const centre = t.y - LABEL_GAP - LABEL_PAD - row / 2;
-  return [item(t, ChromePart.Tag, circle(t.x + t.width - TAG_RADIUS, centre, TAG_RADIUS), t.tag)];
+  const k = labelK(t);
+  const row = LABEL_SIZE * LABEL_LEADING * k;
+  const centre = t.y - (LABEL_GAP + LABEL_PAD) * k - row / 2;
+  return [item(t, ChromePart.Tag, circle(t.x + t.width - TAG_RADIUS * k, centre, TAG_RADIUS * k), t.tag)];
 }
 
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
-  if (!t.label) {
+  if (!t.label || labelHidden(t)) {
     return [];
   }
-  const line = LABEL_SIZE * LABEL_LEADING;
-  const top = t.y - LABEL_GAP - LABEL_PAD - line;
-  const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
-  const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
-  const text = fitted(t.label, t.x + t.width - left, glyphs);
+  const k = labelK(t);
+  const line = LABEL_SIZE * LABEL_LEADING * k;
+  const top = t.y - (LABEL_GAP + LABEL_PAD) * k - line;
+  const iconSize = ICON_SIZE * k;
+  const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(scaled(t.icon, k), t.x, top + (line - iconSize) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
+  const left = t.icon ? t.x + (ICON_SIZE + ICON_GAP) * k : t.x;
+  const text = fitted(t.label, t.x + t.width - left, glyphs, LABEL_SIZE * k);
   return [...icon, item(t, ChromePart.Label, shift(text.contours, left, top), LABEL_COLOR)];
 }
 

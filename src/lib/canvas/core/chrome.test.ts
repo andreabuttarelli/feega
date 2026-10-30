@@ -38,6 +38,35 @@ const parts = (t: StateTile) => [...tileChrome(t, glyphs), ...stateChrome(t, gly
 const ofPart = (t: StateTile, part: ChromePart) => parts(t).filter((i) => i.clip === `n1:${part}`);
 const clips = (items: { clip: string }[]) => [...new Set(items.map((i) => i.clip.split(':')[1]))];
 
+describe('label at a distance', () => {
+  const at = (zoom: number, over: Partial<StateTile> = {}) => box(ofPart(tile({ label: 'Image', zoom, width: 3000, ...over }), ChromePart.Label)[0].contours);
+
+  it('grows in world units so the screen size shrinks only gently', () => {
+    const [x0, , x1] = at(0.1);
+
+    expect((x1 - x0) * 0.1).toBeCloseTo(5 * 12 * 0.8, 0);
+  });
+
+  it('keeps the label anchored to the left of the tile and a constant screen distance above it', () => {
+    const [x0, , , y1] = at(0.1);
+
+    expect(x0).toBe(100);
+    expect((200 - y1) * 0.1).toBeCloseTo(9.6 * 0.8, 0);
+  });
+
+  it('scales the icon with the label', () => {
+    const [i0, , i1] = box(ofPart(tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]], zoom: 0.1 }), ChromePart.Icon)[0].contours);
+
+    expect((i1 - i0) * 0.1).toBeCloseTo(12 * 0.8, 0);
+  });
+
+  it('hides label, icon and tag when the frame is under 24px wide on screen', () => {
+    const narrow = tile({ label: 'Image', icon: [[0, 0, 12, 0, 12, 12, 0, 12]], tag: '#e5484d', zoom: 0.05, width: 300 });
+
+    expect(parts(narrow).filter((i) => [ChromePart.Label, ChromePart.Icon, ChromePart.Tag].some((p) => i.clip === `n1:${p}`))).toEqual([]);
+  });
+});
+
 describe('tileChrome', () => {
   it('draws nothing for an idle tile without ports or label', () => {
     expect(parts(tile())).toEqual([]);
