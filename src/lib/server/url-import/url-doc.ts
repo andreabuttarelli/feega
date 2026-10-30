@@ -11,6 +11,8 @@ import { sectionsOf } from './page-sections';
 import { sectionFramed } from './section-frames';
 import { tokensOf, type SiteBrand } from './page-tokens';
 import { samplesOf, siteName, tokenised } from './token-bind';
+import { componentKit } from './component-kit';
+import { componentSheet } from './component-sheet';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -25,7 +27,7 @@ const UNSAFE_FAMILY = /[^A-Za-z0-9 \-.']+/g;
 export type ImageRefs = Record<string, string>;
 export type FontAssets = Record<string, string>;
 export type ComponentCount = { components: number; instances: number };
-export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string; components: ComponentCount };
+export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string; components: ComponentCount; homes: Record<number, number> };
 
 const FAMILIES = GOOGLE_FONTS.map((f) => f.f);
 
@@ -139,8 +141,8 @@ function mapped(n: RestNode, keyOf: Map<string, string>, family: (raw: string) =
 function countOf(doc: MotionDoc): ComponentCount {
   const mains = new Set(Object.entries(doc.comps).flatMap(([id, c]) => (c.component ? [id] : [])));
   const clips = [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips);
-  const uses = clips.filter((c) => mains.has(String(c.props.comp))).length;
-  return { components: mains.size, instances: uses - mains.size };
+  const used = clips.filter((c) => mains.has(String(c.props.comp)));
+  return { components: mains.size, instances: used.length - new Set(used.map((c) => c.props.comp)).size };
 }
 
 const SLICE = DESIGN_MAX_SIDE;
@@ -191,16 +193,35 @@ export const PLAIN_SHAPE: PageShape = { sectioning: Sectioning.Off, tokening: To
 
 export const FULL_SHAPE: PageShape = { sectioning: Sectioning.On, tokening: Tokening.On };
 
-type Tokenise = (plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined) => FigmaPlan;
+type Tokenise = (plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined, newId: () => string) => FigmaPlan;
 
-function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined): FigmaPlan {
+function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined, newId: () => string): FigmaPlan {
   const docs = plan.items.map((item) => item.doc);
   const images = new Set(plan.items.flatMap((item) => item.images.flatMap((image) => [image.clipId, ...(image.innerId ? [image.innerId] : [])])));
   const units = { docPerPx: (docs[0]?.width ?? tree.width) / tree.width, images };
   const tokens = tokensOf(samplesOf(docs, root, units), brand);
   const site = siteName(tree.url);
-  return { ...plan, items: plan.items.map((item) => ({ ...item, doc: tokenised(item.doc, tokens, site, units) })) };
+  return { ...plan, items: plan.items.map((item) => ({ ...item, doc: componentKit(tokenised(item.doc, tokens, site, units), site, newId) })) };
 }
+
+type Sheeted = { plan: FigmaPlan; homes: Record<number, number> };
+
+function withSheets(plan: FigmaPlan, newId: () => string): Sheeted {
+  const items = [...plan.items];
+  const homes: Record<number, number> = {};
+  plan.items.forEach((item, i) => {
+    const sheet = componentSheet(item, newId);
+    if (sheet) {
+      homes[i] = items.push(sheet) - 1;
+    }
+  });
+  return { plan: { ...plan, items }, homes };
+}
+
+const SHEETED: Record<Tokening, (plan: FigmaPlan, newId: () => string) => Sheeted> = {
+  [Tokening.On]: withSheets,
+  [Tokening.Off]: (plan) => ({ plan, homes: {} })
+};
 
 const TOKENISED: Record<Tokening, Tokenise> = {
   [Tokening.On]: withTokens,
@@ -225,7 +246,9 @@ export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPE
   if (!stack) {
     return null;
   }
-  const plan = TOKENISED[shape.tokening ?? Tokening.Off](stack, tree, root, shape.brand);
-  const counts = plan.items.map((item) => countOf(item.doc));
-  return { plan, images, name, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
+  const tokening = shape.tokening ?? Tokening.Off;
+  const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
+  const counts = tokened.items.map((item) => countOf(item.doc));
+  const { plan, homes } = SHEETED[tokening](tokened, newId);
+  return { plan, images, name, homes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
 }

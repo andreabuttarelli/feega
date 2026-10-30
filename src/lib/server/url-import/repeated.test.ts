@@ -77,4 +77,19 @@ describe('repeatedOf', () => {
 
     expect(found.components.map((c) => c.name)).toEqual(['Card']);
   });
+
+  it('buttons of the same style and different heights are Size variants of one set', () => {
+    const tall = (label: string, x: number): RestNode => ({ ...button(label, x, BLUE), absoluteBoundingBox: { x, y: 20, width: 160, height: 56 } });
+    const { root, components } = repeatedOf(page([button('Start', 0, BLUE), button('Go', 140, BLUE), tall('Buy', 280), tall('Try', 460), button('Docs', 640, BLACK), button('Help', 780, BLACK)]));
+
+    expect(components).toHaveLength(1);
+    expect(new Set(root.children!.map((c) => c.name))).toEqual(new Set(['Button / Style=Primary, Size=Small', 'Button / Style=Primary, Size=Large', 'Button / Style=Secondary, Size=Small', 'Button']));
+  });
+
+  it('only buttons and links split by height: logos of many heights stay one main without a Size', () => {
+    const logo = (x: number, height: number): RestNode => ({ id: id(), type: 'FRAME', name: 'div', absoluteBoundingBox: { x, y: 400, width: 100, height }, children: [{ id: id(), type: 'RECTANGLE', name: 'img', absoluteBoundingBox: { x, y: 400, width: 100, height }, fills: [{ type: 'IMAGE', imageRef: `https://a/${x}.png` }] }, { id: id(), type: 'VECTOR', absoluteBoundingBox: { x, y: 400, width: 10, height: 10 }, fills: [{ type: 'SOLID', color: BLACK }] }] });
+    const { root } = repeatedOf(page([logo(0, 20), logo(120, 28), logo(240, 36), logo(360, 44)]));
+
+    expect(root.children!.map((c) => c.name).filter((n) => n?.includes('Size'))).toEqual([]);
+  });
 });

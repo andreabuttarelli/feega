@@ -14,7 +14,7 @@ export enum StepState {
   Failed = 'failed'
 }
 
-export const START_STEPS: readonly StartStep[] = [StartStep.Read, StartStep.Import, StartStep.Brand, StartStep.Open];
+export const START_STEPS: readonly StartStep[] = [StartStep.Read, StartStep.Brand, StartStep.Import, StartStep.Open];
 
 export const STEP_LABEL: Record<StartStep, Record<'running' | 'failed', (host: string) => string>> = {
   [StartStep.Read]: { running: (host) => `Reading ${host}…`, failed: (host) => `Couldn't open a project for ${host}.` },
@@ -60,8 +60,8 @@ export async function runStart(url: string, ports: StartPorts, report: Report): 
     return { scope: null, imported: false, branded: false, next: DASHBOARD };
   }
 
-  const imported = (await step(StartStep.Import, report, () => ports.importPage(scope, url), Boolean)) === true;
   const branded = await runBrandStep(scope, url, ports, report);
+  const imported = (await step(StartStep.Import, report, () => ports.importPage(scope, url), Boolean)) === true;
   if (branded) {
     report(StartStep.Open, StepState.Running);
   }

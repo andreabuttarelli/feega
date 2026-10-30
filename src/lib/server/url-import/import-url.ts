@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { imagesFilled, type ImageAssets } from '$lib/canvas/figma/images';
 import { placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import type { UndoItem } from '$lib/canvas/undo-plan';
+import { homed } from '$lib/motion/canvas-components';
 import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
 import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
@@ -71,6 +72,7 @@ const NETWORK_IDLE_MS = 6_000;
 const HTTP_ERROR = 400;
 const WEB_SCHEMES = ['http:', 'https:'];
 const FILLED_SUMMARY = 'Filled page images';
+const HOMED_SUMMARY = 'Linked components to their sheet';
 
 const BOX_SHAPE = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
 
@@ -163,6 +165,16 @@ async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
+async function homedOnSheets(store: FrameStore, frameIds: string[], homes: UrlPlan['homes']): Promise<void> {
+  for (const [page, sheet] of Object.entries(homes)) {
+    const [pageId, sheetId] = [frameIds[Number(page)], frameIds[sheet]];
+    const frame = pageId && sheetId ? await store.read(pageId) : null;
+    if (frame) {
+      await store.write(pageId, frame.version, homed(frame.doc, sheetId), HOMED_SUMMARY);
+    }
+  }
+}
+
 export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   const url = await publicUrl(ask.url, ask.guard);
   if (!url) {
@@ -186,6 +198,7 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   }
 
   const placed = await placeFigmaPlan(ask.store, ask.place, made.plan, ask.at);
+  await homedOnSheets(ask.store, placed.frameIds, made.homes);
   const assets = await imported(ask, made.images);
   for (const [i, frameId] of placed.frameIds.entries()) {
     const frame = await ask.store.read(frameId);

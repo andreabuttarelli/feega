@@ -5,7 +5,7 @@ const colour = (hex: string, paint: ColourPaint, weight = 1, button = false) => 
 
 const text = (over: Partial<TextUse>): TextUse => ({ font: 'Inter', weight: 400, sizePx: 16, leading: 1.5, tracking: 0, textCase: 'as-typed', chars: 40, heading: 0, button: false, ...over });
 
-const EMPTY: Samples = { colours: [], texts: [], effects: [], gradients: [], radii: [], spacing: [] };
+const EMPTY: Samples = { colours: [], texts: [], effects: [], gradients: [], radii: [], spacing: [], ctas: [] };
 
 const PAGE: Samples = {
   ...EMPTY,
@@ -50,6 +50,30 @@ describe('page tokens', () => {
     expect(names({ ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1e6), colour('#111111', ColourPaint.Text, 1e4), ...orange, ...purple] }).Primary).toBe('#533afd');
   });
 
+  it('Primary is the fill of the main buttons, not the most used colour', () => {
+    const yellow = Array.from({ length: 8 }, () => colour('#f2c94c', ColourPaint.Fill, 400));
+    const indigo = [colour('#5e6ad2', ColourPaint.Fill, 60), colour('#5e6ad2', ColourPaint.Fill, 60)];
+
+    expect(names({ ...EMPTY, colours: [colour('#08090a', ColourPaint.Fill, 1e6), colour('#f7f8f8', ColourPaint.Text, 1e4), ...yellow, ...indigo], ctas: [{ hex: '#5e6ad2', area: 6000 }] }).Primary).toBe('#5e6ad2');
+  });
+
+  it('a monochrome site gets the button that stands out from the page as Primary, and keeps it as Text too', () => {
+    const blue = [colour('#0070f3', ColourPaint.Fill, 30), colour('#0070f3', ColourPaint.Fill, 30)];
+    const buttons = [colour('#171717', ColourPaint.Fill, 60), colour('#171717', ColourPaint.Fill, 60)];
+    const ctas = [{ hex: '#ffffff', area: 10_000 }, { hex: '#171717', area: 7_000 }];
+    const found = names({ ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1e6), colour('#171717', ColourPaint.Text, 1e4), colour('#4d4d4d', ColourPaint.Text, 900), ...blue, ...buttons], ctas });
+
+    expect([found.Primary, found.Text]).toEqual(['#171717', '#171717']);
+  });
+
+  it('with no coloured button, the brand colour found on the page is Primary', () => {
+    const yellow = Array.from({ length: 8 }, () => colour('#f0bf00', ColourPaint.Fill, 400));
+    const indigo = [colour('#5e6ad2', ColourPaint.Fill, 20), colour('#5e6ad2', ColourPaint.Fill, 20)];
+    const page = { ...EMPTY, colours: [colour('#08090a', ColourPaint.Fill, 1e6), colour('#f7f8f8', ColourPaint.Text, 1e4), colour('#e5e5e6', ColourPaint.Fill, 30), colour('#e5e5e6', ColourPaint.Fill, 30), ...yellow, ...indigo], ctas: [{ hex: '#e5e5e6', area: 2_000 }] };
+
+    expect(Object.fromEntries(tokensOf(page, { palette: ['#5E6AD2', '#08090A'] }).colours.map((c) => [c.name, c.hex])).Primary).toBe('#5e6ad2');
+  });
+
   it('a colour used once and with no role is not a token', () => {
     const once = tokensOf({ ...PAGE, colours: [...PAGE.colours, colour('#123456', ColourPaint.Fill, 1)] });
 
@@ -66,12 +90,34 @@ describe('page tokens', () => {
     expect(tokens.texts.map((t) => [t.name, t.style.sizePx])).toEqual([
       ['Body', 16],
       ['Button', 14],
-      ['Display', 64],
-      ['H1', 40],
-      ['H2', 24],
+      ['H1', 64],
+      ['H2', 40],
+      ['H3', 24],
       ['Small', 14],
       ['Caption', 12]
     ]);
+  });
+
+  it('the h1 is H1 even when its style is shared with other headings and text', () => {
+    const big = { sizePx: 56, weight: 500 };
+    const tokens = tokensOf({ ...EMPTY, texts: [text({ chars: 4_000 }), text({ chars: 4_000 }), text({ ...big, heading: 2 }), text({ ...big, heading: 1 }), text(big), text({ sizePx: 32, heading: 2 })] });
+
+    expect(tokens.texts.find((t) => t.name === 'H1')?.style.sizePx).toBe(56);
+  });
+
+  it('colours past the named roles are named by hue or by what they paint, never by number', () => {
+    const twice = (hex: string, paint: ColourPaint, weight = 10) => [colour(hex, paint, weight), colour(hex, paint, weight)];
+    const tokens = tokensOf({ ...PAGE, colours: [...PAGE.colours, ...twice('#22c55e', ColourPaint.Fill), ...twice('#3b82f6', ColourPaint.Fill), ...twice('#eeeeee', ColourPaint.Fill, 500), ...twice('#999999', ColourPaint.Text)] });
+
+    expect(tokens.colours.map((c) => c.name).filter((n) => !Object.keys(names(PAGE)).includes(n)).sort()).toEqual(['Blue', 'Green', 'Surface 2', 'Text 2']);
+  });
+
+  it('text styles past the named roles are named by heading level, case or size, never by number', () => {
+    const body = text({ chars: 4_000 });
+    const tokens = tokensOf({ ...EMPTY, texts: [body, body, text({ sizePx: 48, heading: 1 }), text({ sizePx: 32, heading: 2 }), text({ sizePx: 24, heading: 3 }), text({ sizePx: 20, heading: 4 }), text({ sizePx: 14 }), text({ sizePx: 14 }), text({ sizePx: 12 }), text({ sizePx: 12 }), text({ sizePx: 13, textCase: 'upper' }), text({ sizePx: 13, textCase: 'upper' }), text({ sizePx: 18 }), text({ sizePx: 18 })] });
+
+    expect(tokens.texts.map((t) => t.name).some((n) => /^Text \d/.test(n))).toBe(false);
+    expect(tokens.texts.map((t) => t.name)).toEqual(expect.arrayContaining(['H4', 'Label', 'Body large']));
   });
 
   it('shadows, radii and spacing become a named scale', () => {
