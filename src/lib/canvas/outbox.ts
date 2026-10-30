@@ -23,22 +23,26 @@ function request<T>(asked: IDBRequest<T>): Promise<T> {
   });
 }
 
-export function idbShelf(factory: IDBFactory = indexedDB): Shelf {
+export type ShelfPlace = { db: string; store: string };
+
+const OUTBOX_PLACE: ShelfPlace = { db: DB_NAME, store: STORE };
+
+export function idbShelf(factory: IDBFactory = indexedDB, place: ShelfPlace = OUTBOX_PLACE): Shelf {
   let opened: Promise<IDBDatabase> | null = null;
 
   function db(): Promise<IDBDatabase> {
     if (opened) {
       return opened;
     }
-    const asked = factory.open(DB_NAME, 1);
-    asked.onupgradeneeded = () => asked.result.createObjectStore(STORE);
+    const asked = factory.open(place.db, 1);
+    asked.onupgradeneeded = () => asked.result.createObjectStore(place.store);
     opened = request(asked);
     return opened;
   }
 
   return {
-    read: async (key) => request((await db()).transaction(STORE).objectStore(STORE).get(key)),
-    write: async (key, value) => { await request((await db()).transaction(STORE, 'readwrite').objectStore(STORE).put(value, key)); }
+    read: async (key) => request((await db()).transaction(place.store).objectStore(place.store).get(key)),
+    write: async (key, value) => { await request((await db()).transaction(place.store, 'readwrite').objectStore(place.store).put(value, key)); }
   };
 }
 
