@@ -22,6 +22,7 @@ const GAP_TARGET = 'autoLayout.gap';
 const TEXT_COMPONENTS = new Set(['Text', 'Title', 'Kicker', 'Caption']);
 const FILL_TARGET = 'fill';
 const TEXT_COLOUR_TARGET = 'color';
+const STROKE_TARGET = 'stroke';
 
 export function siteName(url: string): string {
   const host = URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, '') : 'Site';
@@ -70,6 +71,13 @@ const solidOf = (fills: Fill[] | undefined): string | null => {
   return fills.length === 1 && only.type === FillType.Solid && only.visible !== false && (only.opacity ?? 1) === 1 && (only.blend ?? SOLID_BLEND) === SOLID_BLEND ? only.color.toLowerCase() : null;
 };
 
+type StrokePaint = { paint?: { type?: string; color?: string; opacity?: number }; visible?: boolean };
+
+function strokeColour(strokes: StrokePaint[] | undefined): string | null {
+  const [only] = strokes ?? [];
+  return strokes?.length === 1 && only.paint?.type === FillType.Solid && only.visible !== false && (only.paint.opacity ?? 1) === 1 && only.paint.color ? only.paint.color.toLowerCase() : null;
+}
+
 function textColour(clip: MotionClip): string | null {
   const fills = (clip.props as Paints).fills;
   const color = String(clip.props.color ?? '').toLowerCase();
@@ -103,7 +111,7 @@ function textStyleOf(clip: MotionClip, view: MotionDoc, units: Units): TextStyle
 
 function lookOf(clip: MotionClip, view: MotionDoc, units: Units): Look {
   const fills = (clip.props as Paints).fills;
-  const strokes = clip.props.strokes as Fill[] | undefined;
+  const strokes = clip.props.strokes as StrokePaint[] | undefined;
   const shape = clip.component === 'Shape';
   const width = Number(clip.props.width ?? 0) * view.width;
   const height = Number(clip.props.height ?? 0) * view.height;
@@ -112,7 +120,7 @@ function lookOf(clip: MotionClip, view: MotionDoc, units: Units): Look {
     text: textStyleOf(clip, view, units),
     textColour: isText(clip) ? textColour(clip) : null,
     fill: shape ? solidOf(fills) : null,
-    border: shape ? solidOf(strokes?.length ? strokes : undefined) : null,
+    border: shape ? strokeColour(strokes) : null,
     gradient: shape ? gradientOf(fills) : null,
     effects,
     gap: clip.autoLayout && clip.autoLayout.gap > 0 ? Math.round(clip.autoLayout.gap) : null,
@@ -225,6 +233,10 @@ function boundClip(clip: MotionClip, look: Look, plan: Plan): MotionClip {
   const colour = plan.colourOf.get(look.textColour ? paintKey(ColourPaint.Text, look.textColour) : paintKey(ColourPaint.Fill, look.fill ?? ''));
   if (colour) {
     bind[look.textColour ? TEXT_COLOUR_TARGET : FILL_TARGET] = colour;
+  }
+  const border = look.border ? plan.colourOf.get(paintKey(ColourPaint.Border, look.border)) : undefined;
+  if (border) {
+    bind[STROKE_TARGET] = border;
   }
   const gap = look.gap === null ? undefined : plan.gapOf.get(look.gap);
   if (gap) {

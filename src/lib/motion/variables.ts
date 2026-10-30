@@ -1,6 +1,7 @@
 import { Control } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
 import { fillReplaces } from '@feega/motion-core/motion/fill/elements';
+import { FillType } from '@feega/motion-core/motion/fill/model';
 import { findClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
 import { mapEveryTrack } from './doc-scopes';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -131,6 +132,16 @@ function ownedFill(clip: MotionClip, target: string): MotionClip['props'] {
   return rest;
 }
 
+type Props = MotionClip['props'];
+
+type StackPaint = { paint?: { type?: string; color?: string } };
+
+const PAINT_STACKS: Record<string, (props: Props, value: VarLiteral) => Props> = {
+  stroke: (props, value) => (Array.isArray(props.strokes) ? { ...props, strokes: (props.strokes as StackPaint[]).map((s) => (s.paint?.type === FillType.Solid ? { ...s, paint: { ...s.paint, color: value } } : s)) } : props)
+};
+
+const stacked = (props: Props, target: string, value: VarLiteral): Props => PAINT_STACKS[target]?.(props, value) ?? props;
+
 export const fillTarget = (clip: MotionClip): string | undefined => bindableTargets(clip, VarType.Colour).find((t) => fillReplaces(clip.component, t));
 
 function resolvedClip(variables: Variables, clip: MotionClip): MotionClip {
@@ -140,7 +151,7 @@ function resolvedClip(variables: Variables, clip: MotionClip): MotionClip {
     if (value === undefined) {
       continue;
     }
-    next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: { ...ownedFill(next, target), [target]: clamped(next, target, value) } };
+    next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: stacked({ ...ownedFill(next, target), [target]: clamped(next, target, value) }, target, value) };
   }
   return next;
 }
