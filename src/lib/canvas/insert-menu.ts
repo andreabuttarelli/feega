@@ -1,4 +1,5 @@
-import { BarContext } from './bottom-bar';
+import { BarContext, BarSlot, MODE_SLOTS } from './bottom-bar';
+import type { EditorMode } from './editor-mode.svelte';
 
 export enum InsertSection {
   Tools = 'tools',
@@ -25,7 +26,17 @@ const SECTIONS: Record<BarContext, readonly InsertSection[]> = {
   [BarContext.Frame]: [...CANVAS_SECTIONS, InsertSection.Frame]
 };
 
-export const insertSections = (context: BarContext): readonly InsertSection[] => SECTIONS[context];
+const PINNED_SLOT: Partial<Record<InsertSection, BarSlot>> = {
+  [InsertSection.Tools]: BarSlot.Draw,
+  [InsertSection.Generate]: BarSlot.Generate
+};
+
+const shownIn = (mode: EditorMode) => (section: InsertSection) => {
+  const slot = PINNED_SLOT[section];
+  return slot === undefined || MODE_SLOTS[mode].has(slot);
+};
+
+export const insertSections = (context: BarContext, mode: EditorMode): readonly InsertSection[] => SECTIONS[context].filter(shownIn(mode));
 
 const MENU_EDGE_MARGIN_PX = 12;
 const MENU_GAP_PX = 10;
