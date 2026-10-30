@@ -12,6 +12,7 @@ import {
   canvasPath,
   enterApp,
   homePathFor,
+  startPathFor,
   workspaceNameFor
 } from '$lib/server/tenancy/entry';
 import type { Db } from '$lib/server/db/client';
@@ -258,5 +259,30 @@ describe('a landing campaign lands with its template', () => {
     const d = deps({ seedWelcome: vi.fn(async () => false) });
 
     expect(await homePathFor(db, d, user, null, null, 'claymation-ai')).toBe(`/p/${PROJECT}/c/${CANVAS}`);
+  });
+});
+
+describe('arriving from the website opens a new project with the site on it', () => {
+  it("creates a project named after the host and hands the url to the canvas", async () => {
+    const site = { ...project, id: 'site-project', name: 'stripe.com' };
+    const d = deps({ createProject: vi.fn(async () => site), createCanvas: vi.fn(async () => ({ ...canvas, id: 'site-canvas', projectId: site.id })) });
+
+    const path = await startPathFor(db, d, user, null, 'https://www.stripe.com/');
+
+    expect(d.createProject).toHaveBeenCalledWith(db, expect.objectContaining({ orgId: ORG, name: 'stripe.com', brandId: null }));
+    expect(d.createCanvas).toHaveBeenCalledWith(db, { orgId: ORG, projectId: site.id, name: DEFAULT_CANVAS_NAME });
+    expect(path).toBe(`${canvasPath(site.id, 'site-canvas')}?start_url=${encodeURIComponent('https://www.stripe.com/')}`);
+  });
+
+  it('a brand-new user gets the org first, and no extra Untitled project', async () => {
+    const site = { ...project, id: 'site-project', name: 'stripe.com' };
+    const d = deps({ listMemberships: vi.fn(async () => []), createProject: vi.fn(async () => site) });
+
+    await startPathFor(db, d, user, null, 'https://stripe.com/');
+
+    expect(d.ensureProfile).toHaveBeenCalledOnce();
+    expect(d.createFirstOrg).toHaveBeenCalledOnce();
+    expect(d.createProject).toHaveBeenCalledOnce();
+    expect(d.listProjects).not.toHaveBeenCalled();
   });
 });

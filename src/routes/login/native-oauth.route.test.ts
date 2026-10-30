@@ -16,6 +16,7 @@ async function redirectToFor(userAgent: string, form: Record<string, string> = {
   let redirectTo = '';
   const event = {
     url: new URL('https://oh.feega.app/login'),
+    cookies: { get: () => undefined },
     request: new Request('https://oh.feega.app/login', { method: 'POST', body, headers: { 'user-agent': userAgent } }),
     locals: {
       supabase: {

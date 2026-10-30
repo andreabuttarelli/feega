@@ -36,7 +36,7 @@ export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'pr
   };
 }
 
-export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number } }): Promise<UrlImported> {
+export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number }): Promise<UrlImported> {
   if (!limiter.allow(scope.userId)) {
     return { outcome: UrlImportOutcome.RateLimited };
   }

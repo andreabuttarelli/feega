@@ -18,6 +18,18 @@ export enum UrlImportOutcome {
   RateLimited = 'rate_limited'
 }
 
+export enum PageExtent {
+  Top = 'top',
+  Full = 'full'
+}
+
+const FIRST_SCREENS_PX = 1800;
+
+export const PAGE_EXTENT_HEIGHT: Record<PageExtent, number | undefined> = {
+  [PageExtent.Top]: FIRST_SCREENS_PX,
+  [PageExtent.Full]: undefined
+};
+
 export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcome.Ok>, number> = {
   [UrlImportOutcome.Invalid]: 400,
   [UrlImportOutcome.NotPublic]: 400,
@@ -45,6 +57,7 @@ export type PageAsk = {
   newId: () => string;
   settleMs?: number;
   planner?: Planner;
+  maxHeight?: number;
 };
 
 const SETTLE_MS = 1_200;
@@ -72,7 +85,7 @@ async function publicUrl(raw: string, guard: PageAsk['guard']): Promise<URL | nu
   );
 }
 
-export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, planner: Planner): Promise<UrlImported | null> {
+export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, planner: Planner, maxHeight = TREE_LIMITS.height): Promise<UrlImported | null> {
   await tab.seeAll().catch(() => undefined);
   const status = await tab.goto(url.toString()).catch(() => null);
   if (status !== null && status >= HTTP_ERROR) {
@@ -80,7 +93,7 @@ export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, plan
   }
   await tab.settle(NETWORK_IDLE_MS);
   const { height } = await tab.reveal(RevealMode.Moving).catch(() => ({ height: TREE_LIMITS.height }));
-  const steps = Math.ceil(Math.min(height, TREE_LIMITS.height) / SCROLL_STEP_PX);
+  const steps = Math.ceil(Math.min(height, maxHeight) / SCROLL_STEP_PX);
   for (let i = 0; i < steps; i++) {
     await tab.scroll({ px: SCROLL_STEP_PX }).catch(() => undefined);
     await pause(settleMs / SCROLL_PAUSES);
@@ -97,12 +110,12 @@ export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, plan
   return null;
 }
 
-export async function pageTreeAt(tab: AppTab, url: URL, settleMs: number, planner: Planner): Promise<PageTree | UrlImported> {
-  const refusal = await pagePrepared(tab, url, settleMs, planner);
+export async function pageTreeAt(tab: AppTab, url: URL, settleMs: number, planner: Planner, maxHeight?: number): Promise<PageTree | UrlImported> {
+  const refusal = await pagePrepared(tab, url, settleMs, planner, maxHeight);
   if (refusal) {
     return refusal;
   }
-  const parsed = TREE_SHAPE.safeParse(await tab.tree().catch(() => null));
+  const parsed = TREE_SHAPE.safeParse(await tab.tree(maxHeight).catch(() => null));
   return parsed.success ? (parsed.data as unknown as PageTree) : refused(UrlImportOutcome.Unreadable);
 }
 
@@ -131,7 +144,7 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
 
   const tab = await ask.open();
   const planner = ask.planner ?? PLAIN_PLANNER;
-  const tree = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner).finally(() => tab.close());
+  const tree = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
   if ('outcome' in tree) {
     return tree;
   }
