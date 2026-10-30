@@ -5,7 +5,7 @@ const colour = (hex: string, paint: ColourPaint, weight = 1, button = false) => 
 
 const text = (over: Partial<TextUse>): TextUse => ({ font: 'Inter', weight: 400, sizePx: 16, leading: 1.5, tracking: 0, textCase: 'as-typed', chars: 40, heading: 0, button: false, ...over });
 
-const EMPTY: Samples = { colours: [], texts: [], effects: [], gradients: [], radii: [], spacing: [] };
+const EMPTY: Samples = { colours: [], texts: [], effects: [], gradients: [], radii: [], spacing: [], ctas: [] };
 
 const PAGE: Samples = {
   ...EMPTY,
@@ -52,17 +52,26 @@ describe('page tokens', () => {
 
   it('Primary is the fill of the main buttons, not the most used colour', () => {
     const yellow = Array.from({ length: 8 }, () => colour('#f2c94c', ColourPaint.Fill, 400));
-    const indigo = [colour('#5e6ad2', ColourPaint.Fill, 60, true), colour('#5e6ad2', ColourPaint.Fill, 60, true)];
+    const indigo = [colour('#5e6ad2', ColourPaint.Fill, 60), colour('#5e6ad2', ColourPaint.Fill, 60)];
 
-    expect(names({ ...EMPTY, colours: [colour('#08090a', ColourPaint.Fill, 1e6), colour('#f7f8f8', ColourPaint.Text, 1e4), ...yellow, ...indigo] }).Primary).toBe('#5e6ad2');
+    expect(names({ ...EMPTY, colours: [colour('#08090a', ColourPaint.Fill, 1e6), colour('#f7f8f8', ColourPaint.Text, 1e4), ...yellow, ...indigo], ctas: [{ hex: '#5e6ad2', area: 6000 }] }).Primary).toBe('#5e6ad2');
   });
 
-  it('a monochrome site gets its button colour as Primary, and keeps it as Text too', () => {
+  it('a monochrome site gets the button that stands out from the page as Primary, and keeps it as Text too', () => {
     const blue = [colour('#0070f3', ColourPaint.Fill, 30), colour('#0070f3', ColourPaint.Fill, 30)];
-    const button = [colour('#171717', ColourPaint.Fill, 60, true), colour('#171717', ColourPaint.Fill, 60, true)];
-    const found = names({ ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1e6), colour('#171717', ColourPaint.Text, 1e4), colour('#4d4d4d', ColourPaint.Text, 900), ...blue, ...button] });
+    const buttons = [colour('#171717', ColourPaint.Fill, 60), colour('#171717', ColourPaint.Fill, 60)];
+    const ctas = [{ hex: '#ffffff', area: 10_000 }, { hex: '#171717', area: 7_000 }];
+    const found = names({ ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1e6), colour('#171717', ColourPaint.Text, 1e4), colour('#4d4d4d', ColourPaint.Text, 900), ...blue, ...buttons], ctas });
 
     expect([found.Primary, found.Text]).toEqual(['#171717', '#171717']);
+  });
+
+  it('with no coloured button, the brand colour found on the page is Primary', () => {
+    const yellow = Array.from({ length: 8 }, () => colour('#f0bf00', ColourPaint.Fill, 400));
+    const indigo = [colour('#5e6ad2', ColourPaint.Fill, 20), colour('#5e6ad2', ColourPaint.Fill, 20)];
+    const page = { ...EMPTY, colours: [colour('#08090a', ColourPaint.Fill, 1e6), colour('#f7f8f8', ColourPaint.Text, 1e4), colour('#e5e5e6', ColourPaint.Fill, 30), colour('#e5e5e6', ColourPaint.Fill, 30), ...yellow, ...indigo], ctas: [{ hex: '#e5e5e6', area: 2_000 }] };
+
+    expect(Object.fromEntries(tokensOf(page, { palette: ['#5E6AD2', '#08090A'] }).colours.map((c) => [c.name, c.hex])).Primary).toBe('#5e6ad2');
   });
 
   it('a colour used once and with no role is not a token', () => {
