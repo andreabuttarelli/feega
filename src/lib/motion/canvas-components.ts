@@ -12,9 +12,12 @@ const fail = (error: string): OpResult => ({ ok: false, error });
 
 export function componentGroups(frames: readonly FrameDoc[]): ComponentGroup[] {
   const seen = new Set<string>();
+  const present = new Set(frames.map((f) => f.id));
   return frames.flatMap(({ id, doc }) =>
     Object.entries(doc.comps).flatMap(([compId, comp]) => {
-      if (!comp.component || seen.has(compId)) {
+      const home = comp.component?.home;
+      const followed = Boolean(home && home !== id && present.has(home));
+      if (!comp.component || followed || seen.has(compId)) {
         return [];
       }
       const members = setMembers(doc, compId);
