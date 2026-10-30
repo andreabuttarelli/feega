@@ -6,6 +6,9 @@ import { DESIGN_MAX_SIDE, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import type { PageFont, PageTree } from './page-tree';
 import { repeatedOf } from './repeated';
+import { windowed } from './page-window';
+import { sectionsOf } from './page-sections';
+import { sectionFramed } from './section-frames';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -139,33 +142,6 @@ function countOf(doc: MotionDoc): ComponentCount {
 }
 
 const SLICE = DESIGN_MAX_SIDE;
-const WHOLE = new Set(['TEXT', 'VECTOR']);
-const CENTRED_EDGE = 0.5;
-
-type Window = { left: number; top: number; right: number; bottom: number };
-
-const edgeOf = (cutStart: boolean, cutEnd: boolean) => (cutStart ? 1 : cutEnd ? 0 : CENTRED_EDGE);
-
-function cutPaints(fills: RestPaint[] | undefined, focus: RestPaint['imageFocus']): RestPaint[] | undefined {
-  return fills?.map((p) => (p.imageRef ? { ...p, scaleMode: 'FILL', imageFocus: focus } : p));
-}
-
-function windowed(n: RestNode, w: Window): RestNode | null {
-  const b = n.absoluteBoundingBox!;
-  if (WHOLE.has(n.type)) {
-    return b.y >= w.top && b.y < w.bottom && b.x < w.right && b.x + b.width > w.left ? n : null;
-  }
-  const kids = n.children?.flatMap((c) => windowed(c, w) ?? []);
-  const overlaps = b.y < w.bottom && b.y + b.height > w.top && b.x < w.right && b.x + b.width > w.left;
-  if (!overlaps && !kids?.length) {
-    return null;
-  }
-  const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
-  const [x0, x1, y0, y1] = [clamp(b.x, w.left, w.right), clamp(b.x + b.width, w.left, w.right), clamp(b.y, w.top, w.bottom), clamp(b.y + b.height, w.top, w.bottom)];
-  const [cutLeft, cutRight, cutTop, cutBottom] = [x0 > b.x, x1 < b.x + b.width, y0 > b.y, y1 < b.y + b.height];
-  const cut = cutLeft || cutRight || cutTop || cutBottom ? { layoutMode: undefined, fills: cutPaints(n.fills, { x: edgeOf(cutLeft, cutRight), y: edgeOf(cutTop, cutBottom) }) } : {};
-  return { ...n, absoluteBoundingBox: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, ...cut, ...(n.children ? { children: kids } : {}) };
-}
 
 function lifted(n: RestNode, by: number): RestNode {
   const b = n.absoluteBoundingBox!;
@@ -193,15 +169,27 @@ function stacked(slices: { root: RestNode; top: number }[], newId: () => string,
 
 export type Marker = (root: RestNode) => RestNode;
 
+export enum Sectioning {
+  On = 'on',
+  Off = 'off'
+}
+
+export const sectioningOf = (sections: boolean) => (sections ? Sectioning.On : Sectioning.Off);
+
+const SECTIONED: Record<Sectioning, (tree: PageTree) => RestNode> = {
+  [Sectioning.On]: (tree) => (tree.outline ? sectionFramed(tree.root, sectionsOf({ ...tree.outline, height: tree.height })) : tree.root),
+  [Sectioning.Off]: (tree) => tree.root
+};
+
 const REPEATED: Marker = (root) => repeatedOf(root).root;
 
-export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}): UrlPlan | null {
+export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, sectioning = Sectioning.Off): UrlPlan | null {
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
   const images = refsOf(tree.root);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
-  const root = mapped({ ...mark(tree.root), name }, keyOf, family);
+  const root = mapped({ ...mark(SECTIONED[sectioning](tree)), name }, keyOf, family);
   const plan = stacked(slicesOf(root), newId, uploads);
   if (!plan) {
     return null;

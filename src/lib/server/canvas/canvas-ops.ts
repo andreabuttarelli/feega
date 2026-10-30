@@ -77,6 +77,7 @@ import { pasteNodes } from '$lib/server/canvas/paste';
 import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
+import { sectioningOf } from '$lib/server/url-import/url-doc';
 import { importCodeInto } from '$lib/server/code-import/canvas-import';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
@@ -255,7 +256,9 @@ const importFigmaInput = z
 
 const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).describe('a public https://github.com/<owner>/<repo> link, optionally /tree/<ref>'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), x: z.number().finite(), y: z.number().finite() }).strict();
 
-const importUrlInput = z.object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importUrlInput = z
+  .object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite(), sections: z.boolean().default(true).describe('split the page into named section frames (Nav, Hero, Features, Footer…); false keeps one layer tree') })
+  .strict();
 
 const drawFrameInput = z
   .object({
@@ -988,7 +991,7 @@ export const CANVAS_OPS = {
   import_url: op({
     access: Access.Write,
     input: importUrlInput,
-    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y }, sectioning: sectioningOf(input.sections) })
   }),
 
   import_code: op({

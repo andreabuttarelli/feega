@@ -844,6 +844,12 @@ Login che funzionava dieci minuti prima risponde «Wrong email or password»; `a
 
 ## Codice
 
+### Un campo nuovo di `PageTree` sparisce al `TREE_SHAPE.safeParse`
+`pageTreeAt` valida l'albero con uno `z.object` senza `.passthrough()` sulla radice: zod **toglie** le
+chiavi che lo schema non nomina. `outline` arrivava dal browser e non arrivava a `urlPlan`; anche
+`fonts` oggi si perde lì. Segnale: un campo presente in `tab.tree()` e `undefined` nel planner. Mossa:
+ogni campo nuovo di `PageTree` va nominato in `TREE_SHAPE`.
+
 ### Un valore nuovo per una colonna «libera» muore su un CHECK che le migration non hanno
 `platform = 'upload'` su `products`: i test con repo finti verdi, in produzione `23514 products_platform_check`. Lo stesso per `nodes.data.type` di un nodo `products` (`nodes_data_shape_check`). Quei CHECK vivono sul database e non in `supabase/migrations`: la lista vera è `src/lib/server/org-data/checks.ts` e le `canvas-migrations`. Segnale: `23514` al primo giro reale di un valore che nessun test ha mai scritto su Postgres. Mossa: prima di inventare un valore di enum, `grep` del nome della colonna in `org-data/checks.ts` e nelle `canvas-migrations`; se serve davvero, è una migration da applicare, non un cast.
 

@@ -19,6 +19,14 @@ describe('importPage', () => {
     expect(await importPage(ASK, fetchFn as unknown as typeof fetch)).toEqual({ ok: false, error: 'not_public' });
   });
 
+  it('can ask for the page as one tree, without sections', async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ nodes: [], undo: [], skipped: [], truncated: false })));
+
+    await importPage({ ...ASK, sections: false }, fetchFn as unknown as typeof fetch);
+
+    expect(JSON.parse(String((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toMatchObject({ sections: false });
+  });
+
   it('can ask for the top of the page only', async () => {
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({ nodes: [], undo: [], skipped: [], truncated: true })));
 
