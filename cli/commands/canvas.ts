@@ -62,8 +62,14 @@ export async function cmdCanvasImportUrl(project: string, url: string, opts: { c
   console.log(JSON.stringify(result, null, 2));
 }
 
-export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string; x: number; y: number; org?: string }) {
-  const input = { canvasId: opts.canvas, repo, route: opts.route, x: opts.x, y: opts.y };
+export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string[]; x: number; y: number; org?: string }) {
+  const input = { canvasId: opts.canvas, repo, routes: opts.route, x: opts.x, y: opts.y };
+  const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function cmdCanvasImportStorybook(project: string, storybook: string, opts: { canvas: string; story?: string[]; x: number; y: number; org?: string }) {
+  const input = { canvasId: opts.canvas, storybook, stories: opts.story, x: opts.x, y: opts.y };
   const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }

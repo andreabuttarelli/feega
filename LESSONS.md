@@ -3554,3 +3554,6 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A tiny text pushes its stack apart in a tall page
 
 **Signal:** after removing a text's wrapper, a column of 12 px labels in a long imported page spreads out. **Move:** the motion box minimum was a share of the doc (0.002 of the height ≈ 29 px on a 14 000 px slice). `MIN_BOX` in `components.ts` is now small enough; a fixed wrapper had been hiding it.
+## A Next.js app imported from code has no components, a Vite one does
+
+**Signal:** code import of a Next.js 16 app answers `components: 0`; the page in the reference screenshot looks right, `__reactFiber$` keys are missing on every element, the console shows the `/_next/hmr` websocket failing with 500. **Move:** Next dev blocks `/_next/*` requests whose `Origin` is not localhost or in `allowedDevOrigins`, and without the HMR socket the client never hydrates, so there are no fibers to read. The sandbox puts `origin-proxy.ts` in front of the dev server: it rewrites `Host`, `Origin` and `Referer` to `localhost:<devPort>`, HTTP and websocket upgrade alike. Probe with `scripts/code-import/probe.mts <repo> <route>` (counts fibers, Svelte and Vue metas) before blaming the marker.

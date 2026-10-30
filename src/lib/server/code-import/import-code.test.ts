@@ -74,7 +74,7 @@ function askOf(over: Partial<Parameters<typeof importCodeAt>[0]> = {}) {
     stop,
     runner,
     docs,
-    ask: { repo: 'https://github.com/acme/app', route: '/settings', at: { x: 0, y: 0 }, store, place: { projectId: 'p', canvasId: 'c' }, open: async () => tab, runner: runner as RepoRunner, guard: async () => undefined, importImage: async () => null, newId: () => `n${++n}`, settleMs: 0, ...over }
+    ask: { repo: 'https://github.com/acme/app', routes: ['/settings'], at: { x: 0, y: 0 }, store, place: { projectId: 'p', canvasId: 'c' }, open: async () => tab, runner: runner as RepoRunner, guard: async () => undefined, importImage: async () => null, newId: () => `n${++n}`, settleMs: 0, ...over }
   };
 }
 
@@ -85,7 +85,7 @@ describe('importCodeAt', () => {
     const done = await importCodeAt(ask);
 
     expect(done.outcome).toBe(CodeImportOutcome.Ok);
-    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null });
+    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null }, null);
     expect(tab.goto).toHaveBeenCalledWith(`${APP}/settings`);
     expect(tab.marks).toHaveBeenCalledWith(['Button']);
   });
@@ -111,7 +111,7 @@ describe('importCodeAt', () => {
     const { ask, runner } = askOf();
 
     expect((await importCodeAt({ ...ask, repo: 'https://gitlab.com/a/b' })).outcome).toBe(CodeImportOutcome.Invalid);
-    expect((await importCodeAt({ ...ask, route: '/../x' })).outcome).toBe(CodeImportOutcome.Invalid);
+    expect((await importCodeAt({ ...ask, routes: ['/../x'] })).outcome).toBe(CodeImportOutcome.Invalid);
     expect(runner).not.toHaveBeenCalled();
   });
 
@@ -120,6 +120,38 @@ describe('importCodeAt', () => {
     const { ask } = askOf({ runner });
 
     expect(await importCodeAt(ask)).toEqual({ outcome: CodeImportOutcome.RunFailed, error: 'install_failed: ERR' });
+  });
+
+  it('più rotte in un giro: un frame solo, una tavola per rotta, componenti in comune', async () => {
+    const { ask, tab, runner, docs } = askOf({ routes: ['/', '/settings'] });
+
+    const done = await importCodeAt(ask);
+
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(tab.goto).toHaveBeenCalledWith(`${APP}/`);
+    expect(tab.goto).toHaveBeenCalledWith(`${APP}/settings`);
+    expect(docs.size).toBe(1);
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/', '/settings'], components: 1, variants: 2, instances: 4 });
+  });
+
+  it('una rotta che non si apre resta fuori e lo dice, le altre arrivano', async () => {
+    const { ask, tab } = askOf({ routes: ['/', '/missing'] });
+    tab.goto.mockImplementation(async (url: string) => (url.endsWith('/missing') ? 404 : 200));
+
+    const done = await importCodeAt(ask);
+
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/'] });
+    expect(done.outcome === CodeImportOutcome.Ok && done.skipped).toContain('/missing: could not be opened');
+  });
+
+  it('un repo privato arriva alla sandbox come archivio, scaricato qui', async () => {
+    const archive = vi.fn(async () => new Uint8Array([31, 139]));
+    const { ask, runner } = askOf({ archive });
+
+    await importCodeAt(ask);
+
+    expect(archive).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null });
+    expect(runner).toHaveBeenCalledWith({ owner: 'acme', repo: 'app', ref: null }, new Uint8Array([31, 139]));
   });
 
   it('senza sandbox configurata lo dice', async () => {
