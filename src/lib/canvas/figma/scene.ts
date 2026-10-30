@@ -81,7 +81,7 @@ export type Padding = { top: number; right: number; bottom: number; left: number
 export type AutoLayout = { flow: Flow; wrap: boolean; gap: number; crossGap: number; padding: Padding; justify: Justify; align: Cross; width: Fit; height: Fit };
 export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean };
 
-export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean };
+export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number };
 
 type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem };
 
