@@ -99,10 +99,10 @@ describe('POST /api/v1/view lets an outside agent see the canvas', () => {
     expect(await element.json()).toMatchObject({ error: 'snapshot_unsupported' });
   });
 
-  it('describe lists the four ops with strict schemas; an unknown op is refused', async () => {
+  it('describe lists the five ops with strict schemas; an unknown op is refused', async () => {
     const body = await (await post({ op: 'describe' })).json();
 
-    expect(body.ops.map((o: { name: string }) => o.name)).toEqual(['canvas_summary', 'get', 'activity', 'snapshot']);
+    expect(body.ops.map((o: { name: string }) => o.name)).toEqual(['canvas_summary', 'get', 'activity', 'snapshot', 'list_history']);
     expect(body.schemas[0].input_schema.type).toBe('object');
     expect((await post({ op: 'nope' })).status).toBe(400);
   });

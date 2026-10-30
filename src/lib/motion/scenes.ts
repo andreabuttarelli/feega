@@ -1,5 +1,5 @@
 import { TrackKind } from '@feega/motion-core/motion/components';
-import { newClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
 import { embedMotion, motionCompId } from './embed';
 import type { Junction } from '@feega/motion-core/motion/junction-model';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -162,8 +162,29 @@ function pointed(clip: MotionClip, docs: Readonly<Record<string, MotionDoc>>): M
 
 export function resolveScenes(doc: MotionDoc, docs: Readonly<Record<string, MotionDoc>>): MotionDoc {
   const used = [...new Set(sceneNodeIds(doc))].filter((id) => docs[id]);
-  const latestOnTop = (clips: MotionClip[]) => (clips.some(sceneOf) ? [...clips].sort((a, b) => b.from - a.from) : clips);
+  const latestOnTop = (clips: MotionClip[]) => (clips.some(sceneOf) ? [...clips].sort((a, b) => a.from - b.from) : clips);
   const tracks = doc.tracks.map((t) => ({ ...t, clips: latestOnTop(t.clips as MotionClip[]).flatMap((c) => pointed(c, docs)) }));
 
   return used.reduce((acc, id) => embedMotion(acc, id, docs[id]), { ...doc, tracks });
+}
+
+export type SceneSource = { nodeId: string; doc: MotionDoc };
+export type SceneTile = SceneSource & { at: { x: number; y: number }; height: number };
+
+const FRAME_SPACING = 80;
+
+export function planInsert(target: SceneSource, source: SceneSource, at: number): MotionDoc | null {
+  if (!sceneNodeIds(target.doc).length || sceneNodeIds(source.doc).length || target.nodeId === source.nodeId) {
+    return null;
+  }
+  return insertSceneAt(target.doc, { nodeId: source.nodeId, durationInFrames: source.doc.durationInFrames }, Math.round(at * target.doc.durationInFrames));
+}
+
+export function planCombine(frames: readonly SceneTile[]): { doc: MotionDoc; at: { x: number; y: number } } {
+  const byId = new Map(frames.map((f) => [f.nodeId, f]));
+  const order = scenesLeftToRight(frames.map((f) => ({ id: f.nodeId, x: f.at.x, y: f.at.y })));
+  const first = byId.get(order[0])!;
+  const host = { ...newMotionDoc(MotionFormat.Landscape), width: first.doc.width, height: first.doc.height, fps: first.doc.fps };
+  const doc = sequenceScenes(host, order.map((id) => ({ nodeId: id, durationInFrames: byId.get(id)!.doc.durationInFrames })));
+  return { doc, at: { x: Math.min(...frames.map((f) => f.at.x)), y: Math.max(...frames.map((f) => f.at.y + f.height)) + FRAME_SPACING } };
 }

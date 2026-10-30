@@ -17,7 +17,7 @@ const UNIT = { w: 1, h: 1 };
 const DIGITS = 100;
 
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
-const polygon = (points: readonly Pt[]) => `${points.map(([x, y], i) => `${i ? 'L' : 'M'}${round(x)} ${round(y)}`).join('')}Z`;
+const polygon = (points: readonly (readonly [number, number])[]) => `${points.map(([x, y], i) => `${i ? 'L' : 'M'}${round(x)} ${round(y)}`).join('')}Z`;
 
 function shapeOutline(doc: MotionDoc, clip: MotionClip, frame: number): string {
   const space = pathSpace(doc, clip.id, frame);

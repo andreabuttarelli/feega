@@ -22,6 +22,13 @@ describe('prototype arrows', () => {
     expect(arrow.path.startsWith('M210,220 ')).toBe(true);
   });
 
+  it('starts at the right edge of the linked element when its box is known', () => {
+    const link = { id: 'i1', clip: 'c1', from: 'a', to: 'b', trigger: TriggerKind.Click, action: ActionKind.Navigate };
+    const [arrow] = arrowsFor([link], frames, view, new Map([['a:c1', { x: 10, y: 40, w: 50, h: 20 }]]));
+
+    expect(arrow.path.startsWith('M60,50 ')).toBe(true);
+  });
+
   it('skips a link whose frame is not on screen data', () => {
     expect(arrowsFor([{ id: 'i1', clip: 'c1', from: 'a', to: 'gone', trigger: TriggerKind.Click, action: ActionKind.Navigate }], frames, view)).toEqual([]);
   });

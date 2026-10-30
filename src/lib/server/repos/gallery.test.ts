@@ -14,7 +14,7 @@ function recordingDb(selects: string[]): Db {
 describe('gallery repo', () => {
   it('embeds the origin by the remixed_from column, the hint PostgREST resolves on a self-join', async () => {
     const selects: string[] = [];
-    await listGallery(recordingDb(selects), {});
+    await listGallery(recordingDb(selects), { limit: 10 });
 
     expect(selects[0]).toContain('origin:gallery_items!remixed_from(');
   });

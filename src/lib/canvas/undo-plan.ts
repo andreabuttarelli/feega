@@ -92,7 +92,8 @@ export type StaleReason =
   | 'node_deleted_by_peer'
   | 'node_gained_peer_connections'
   | 'edge_already_gone'
-  | 'edge_missing_endpoint';
+  | 'edge_missing_endpoint'
+  | 'revision_missing';
 
 /**
  * VALE ANCORA APPLICARE QUESTO ITEM? Tre premesse cadono mentre un gesto aspetta nello stack, e

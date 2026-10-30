@@ -13,10 +13,9 @@ import {
   type CanvasNodeRecord
 } from '$lib/server/repos/canvas';
 import { sameValue } from '$lib/canvas/node-patch';
-import { mergeReject, RejectOutcome, type AgentChange, type Choice, type EventConflict, type RejectResult, type Side } from '$lib/canvas/reject-plan';
+import { mergeReject, RejectOutcome, type Choice, type EventConflict, type RejectResult, type Side } from '$lib/canvas/reject-plan';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import type { MoveItem } from '$lib/canvas/move-gesture';
-import { agentChanges } from '$lib/canvas/undo-last';
 
 export type RejectInput = {
   orgId: string;
@@ -225,16 +224,4 @@ export async function rejectChange(db: Db, input: RejectInput): Promise<RejectRe
   }
 
   return { outcome: RejectOutcome.Rejected, undo, moves, reverted: plan.reverted };
-}
-
-const AGENT_CHANGES_SCAN = 200;
-
-export async function listAgentChanges(db: Db, scope: { orgId: string; canvasId: string }): Promise<AgentChange[]> {
-  const events = await listCanvasEvents(db, { ...scope, limit: AGENT_CHANGES_SCAN });
-  return agentChanges(events).map((change) => ({
-    eventIds: change.map((event) => event.id),
-    agent: change[0].agentKey,
-    at: change[0].createdAt,
-    writes: change.map((event) => ({ kind: event.kind, nodeId: event.nodeId, edgeId: event.edgeId }))
-  }));
 }

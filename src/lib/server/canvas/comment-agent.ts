@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { agentInstruction, asksAgent } from '$lib/canvas/comment-agent';
-import { addComment } from '$lib/server/canvas/canvas-comments';
+import { addComment, commentNodeId } from '$lib/server/canvas/canvas-comments';
 
 const REPLY_MAX = 2000;
 
@@ -23,8 +23,7 @@ async function pinnedNode(db: Db, input: Mention): Promise<string | null> {
     return input.nodeId;
   }
 
-  const { data } = await db.from('canvas_comments').select('node_id').eq('org_id', input.orgId).eq('canvas_id', input.canvasId).eq('id', input.parentId).maybeSingle();
-  return (data as { node_id: string | null } | null)?.node_id ?? null;
+  return commentNodeId(db, { orgId: input.orgId, canvasId: input.canvasId, id: input.parentId });
 }
 
 function promptFor(instruction: string, nodeId: string | null): string {

@@ -8,12 +8,15 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import Code from '@lucide/svelte/icons/code';
+import StretchHorizontal from '@lucide/svelte/icons/stretch-horizontal';
+import SquareSplitVertical from '@lucide/svelte/icons/square-split-vertical';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import Ruler from '@lucide/svelte/icons/ruler';
 import PenLine from '@lucide/svelte/icons/pen-line';
 import Combine from '@lucide/svelte/icons/combine';
 import ComponentIcon from '@lucide/svelte/icons/component';
 import Unlink from '@lucide/svelte/icons/unlink';
+import Target from '@lucide/svelte/icons/target';
 import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
 import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 import Scaling from '@lucide/svelte/icons/scaling';
@@ -112,7 +115,6 @@ import Ungroup from '@lucide/svelte/icons/ungroup';
 import Frame from '@lucide/svelte/icons/frame';
 import Shrink from '@lucide/svelte/icons/shrink';
 import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
-import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
 import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -255,7 +257,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.FrameSelection]: { name: 'Frame selection', icon: Frame, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ResizeToFit]: { name: 'Resize to fit', icon: Shrink, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Section]: { name: 'Section selection', icon: LayoutDashboard, group: GuideGroup.Edit, menu: MenuSection.Layer },
-  [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.WrapStack]: { name: 'Wrap with stack', icon: StretchHorizontal, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.RemoveStack]: { name: 'Remove stack', icon: SquareSplitVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.EditAsVector]: { name: 'Edit as vector', icon: PenTool, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -286,6 +289,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.PasteProperties]: { name: 'Paste properties', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.CreateComponent]: { name: 'Create component', icon: ComponentIcon, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.DetachInstance]: { name: 'Detach instance', icon: Unlink, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.GoToMain]: { name: 'Go to main component', icon: Target, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.PushInstance]: { name: 'Push overrides to main', icon: ArrowUpToLine, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ResetInstance]: { name: 'Reset all overrides', icon: RotateCcw, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.FlipVertical]: { name: 'Flip vertical', icon: FlipVertical2, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -349,6 +353,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToolArrow]: { name: 'Arrow tool', icon: MoveUpRight, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag from tail to head' },
   [Command.ToolPencil]: { name: 'Pencil tool', icon: Pencil, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw, hold Shift for straight segments' },
   [Command.ToolShapeBuilder]: { name: 'Shape builder', icon: Combine, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click regions to merge, Alt-click to subtract, Enter to apply' },
+  [Command.ToolStack]: { name: 'Stack tool', icon: StretchHorizontal, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Click or drag to add an empty stack' },
   [Command.ToolFrame]: { name: 'Frame tool', icon: FrameIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag to draw a frame' },
   [Command.ToolScale]: { name: 'Scale tool', icon: Scaling, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
@@ -361,7 +366,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.TogglePixelGrid]: { name: 'Pixel grid', icon: Grid3x3, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleRulers]: { name: 'Rulers', icon: Ruler, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleLayoutGuides]: { name: 'Layout guides', icon: LayoutGrid, group: GuideGroup.View, menu: MenuSection.View },
-  [Command.ToggleDevMode]: { name: 'Coder mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
+  [Command.ToggleDevMode]: { name: 'Code mode', icon: Code, group: GuideGroup.View, menu: MenuSection.View },
   [Command.TogglePivot]: { name: 'Rotation origin', icon: Crosshair, group: GuideGroup.View, menu: MenuSection.View },
   [Command.ToggleOutlines]: { name: 'Outline view', icon: VectorSquare, group: GuideGroup.View, menu: MenuSection.View },
   [Command.PreviewSelection]: { name: 'Zoom to selection', icon: Scan, group: GuideGroup.View, menu: MenuSection.View },

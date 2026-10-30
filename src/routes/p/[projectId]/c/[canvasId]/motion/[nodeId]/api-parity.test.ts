@@ -308,23 +308,6 @@ describe('the frame editor spending actions answer like their ops', () => {
 });
 
 describe('the frame editor history, export and library actions answer like their ops', () => {
-  it('revisions and list_revisions', async () => {
-    const action = await viaAction('revisions', {});
-    const endpoint = await viaEndpoint('list_revisions', {});
-
-    expect(action.status).toBe(200);
-    expect(action.data.revisions).toHaveLength(1);
-    expect(endpoint).toEqual(action);
-  });
-
-  it('restore and restore_revision refuse a version that never existed', async () => {
-    const action = await viaAction('restore', { version: '9' });
-    const endpoint = await viaEndpoint('restore_revision', { version: 9 });
-
-    expect(action).toEqual({ status: 404, data: { error: 'no_such_version' } });
-    expect(endpoint).toEqual(action);
-  });
-
   it('still and export_still refuse an unknown image format', async () => {
     const action = await viaAction('still', { format: 'bmp' });
     const endpoint = await viaEndpoint('export_still', { format: 'bmp' });

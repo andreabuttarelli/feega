@@ -56,13 +56,20 @@ export enum Clip {
 export type Box = { x: number; y: number; width: number; height: number };
 export type Stop = { color: string; pos: number };
 
+export enum PictureFit {
+  Cover = 'cover',
+  Contain = 'contain',
+  Stretch = 'fill',
+  Tile = 'tile'
+}
+
 export type Fill =
   | { kind: FillKind.Solid; color: string; opacity: number }
   | { kind: FillKind.Linear; stops: Stop[]; angle: number; opacity: number }
-  | { kind: FillKind.Radial; stops: Stop[]; opacity: number }
+  | { kind: FillKind.Radial; stops: Stop[]; center: { x: number; y: number }; radius: number; opacity: number }
   | { kind: FillKind.Angular; stops: Stop[]; angle: number; center: { x: number; y: number }; opacity: number }
   | { kind: FillKind.Diamond; stops: Stop[]; opacity: number }
-  | { kind: FillKind.Image; hash: string; opacity: number };
+  | { kind: FillKind.Image; hash: string; opacity: number; fit: PictureFit; focus: { x: number; y: number } };
 
 export type Stroke = { fill: Fill; weight: number; align: string };
 
@@ -78,11 +85,30 @@ export type TextRun = { start: number; end: number; font?: string; weight?: numb
 
 type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem };
 
-export type ComponentRef = { key: string; name: string; inPaste: boolean };
+export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
+
+const VARIANT_NAME = /^(.+?) \/ ([^=,/]+=[^=,/]+(?:, [^=,/]+=[^=,/]+)*)$/;
+
+function namedRef(name: string): Pick<ComponentRef, 'name' | 'variant'> {
+  const found = name.match(VARIANT_NAME);
+  if (!found) {
+    return { name };
+  }
+  return { name: found[1], variant: Object.fromEntries(found[2].split(', ').map((pair) => pair.split('='))) };
+}
 export type FrameLayer = Common & { kind: LayerKind.Frame; component: ComponentRef | null; fills: Fill[]; strokes: Stroke[]; radii: [number, number, number, number]; outline: string; clip: Clip; autoLayout: AutoLayout | null; children: Layer[] };
 export type ShapeLayer = Common & { kind: LayerKind.Shape; path: string; fillRule: FillRule; fills: Fill[]; strokes: Stroke[] };
+export enum Decoration {
+  None = 'none',
+  Underline = 'underline',
+  Strikethrough = 'strikethrough'
+}
+
 export type TextLayer = Common & {
   kind: LayerKind.Text;
+  decoration: Decoration;
+  axes: string;
+  features: string;
   text: string;
   font: string;
   weight: number;
@@ -93,6 +119,7 @@ export type TextLayer = Common & {
   align: 'left' | 'center' | 'right' | 'justify';
   color: string;
   runs: TextRun[];
+  wraps: boolean;
   fills: Fill[];
   strokes: Stroke[];
 };
@@ -149,6 +176,8 @@ const WEIGHTS: [RegExp, number][] = [
 ];
 const REGULAR = 400;
 
+const DECORATION: Record<string, Decoration> = { UNDERLINE: Decoration.Underline, STRIKETHROUGH: Decoration.Strikethrough };
+
 const ALIGN: Record<string, TextLayer['align']> = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'justify' };
 
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
@@ -157,7 +186,16 @@ const channel = (n: number) => Math.round(Math.max(0, Math.min(1, n)) * 255).toS
 
 export const hexOf = (c: Rgba) => `#${channel(c.r)}${channel(c.g)}${channel(c.b)}`;
 
-export const weightOf = (style: string) => WEIGHTS.find(([re]) => re.test(style))?.[1] ?? REGULAR;
+const OPAQUE = 1;
+
+const stopHex = (c: Rgba) => (c.a < OPAQUE ? `${hexOf(c)}${channel(c.a)}` : hexOf(c));
+
+const NUMERIC_WEIGHT = /^(\d{3,4})\b/;
+
+export const weightOf = (style: string) => {
+  const numeric = style.match(NUMERIC_WEIGHT);
+  return numeric ? Number(numeric[1]) : (WEIGHTS.find(([re]) => re.test(style))?.[1] ?? REGULAR);
+};
 
 const hashHex = (hash: Uint8Array | undefined) => Array.from(hash ?? [], (b) => b.toString(16).padStart(2, '0')).join('');
 
@@ -243,44 +281,61 @@ function radiiOf(n: FigmaRawNode): [number, number, number, number] {
   return [n.rectangleTopLeftCornerRadius ?? all, n.rectangleTopRightCornerRadius ?? all, n.rectangleBottomRightCornerRadius ?? all, n.rectangleBottomLeftCornerRadius ?? all];
 }
 
-const stopsOf = (stops: ColorStop[] = []): Stop[] => stops.map((s) => ({ color: hexOf(s.color), pos: round(s.position) }));
+const stopsOf = (stops: ColorStop[] = []): Stop[] => stops.map((s) => ({ color: stopHex(s.color), pos: round(s.position) }));
 
 const QUARTER_TURN = 90;
-
-function axisAngle(t: Matrix | undefined): number {
-  const m = t ?? IDENTITY;
-  const det = m.m00 * m.m11 - m.m01 * m.m10 || 1;
-  return Math.round(((Math.atan2(-m.m10 / det, m.m11 / det) * 180) / Math.PI + 360) % 360);
-}
-
-const sweepAngle = (t: Matrix | undefined) => (axisAngle(t) + QUARTER_TURN) % 360;
-
 const GRADIENT_MIDDLE = 0.5;
+const SQUARE: Vec = { x: 1, y: 1 };
+
 const unitClamp = (n: number) => round(Math.max(0, Math.min(1, n)));
 
-function gradientCentre(t: Matrix | undefined): { x: number; y: number } {
-  const m = t ?? IDENTITY;
+function invert(m: Matrix): Matrix {
   const det = m.m00 * m.m11 - m.m01 * m.m10 || 1;
-  const [gx, gy] = [GRADIENT_MIDDLE - m.m02, GRADIENT_MIDDLE - m.m12];
-  return { x: unitClamp((m.m11 * gx - m.m01 * gy) / det), y: unitClamp((m.m00 * gy - m.m10 * gx) / det) };
+  return { m00: m.m11 / det, m01: -m.m01 / det, m02: (m.m01 * m.m12 - m.m11 * m.m02) / det, m10: -m.m10 / det, m11: m.m00 / det, m12: (m.m10 * m.m02 - m.m00 * m.m12) / det };
 }
+
+const handlesOf = (t: Matrix | undefined) => invert(t ?? IDENTITY);
+
+function axisAngle(t: Matrix | undefined, size: Vec): number {
+  const h = handlesOf(t);
+  return Math.round(((Math.atan2(h.m10 * size.y, h.m00 * size.x) * 180) / Math.PI + 360) % 360);
+}
+
+const sweepAngle = (t: Matrix | undefined, size: Vec) => (axisAngle(t, size) + QUARTER_TURN) % 360;
+
+function gradientCentre(t: Matrix | undefined): { x: number; y: number } {
+  const h = handlesOf(t);
+  return { x: unitClamp(h.m00 * GRADIENT_MIDDLE + h.m01 * GRADIENT_MIDDLE + h.m02), y: unitClamp(h.m10 * GRADIENT_MIDDLE + h.m11 * GRADIENT_MIDDLE + h.m12) };
+}
+
+const MIN_RADIUS = 0.01;
+const MAX_RADIUS = 4;
+
+function radialReach(t: Matrix | undefined, size: Vec): number {
+  const h = handlesOf(t);
+  const [rx, ry] = [Math.hypot((h.m00 / 2) * size.x, (h.m10 / 2) * size.y), Math.hypot((h.m01 / 2) * size.x, (h.m11 / 2) * size.y)];
+  return round(Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, (2 * Math.sqrt(rx * ry)) / Math.max(size.x, size.y))));
+}
+
+const PICTURE_FIT: Record<string, PictureFit> = { FILL: PictureFit.Cover, FIT: PictureFit.Contain, STRETCH: PictureFit.Stretch, TILE: PictureFit.Tile, CROP: PictureFit.Cover };
+const CENTRED = { x: GRADIENT_MIDDLE, y: GRADIENT_MIDDLE };
 
 type Report = (what: string) => void;
 
-const FILLS: Record<string, (p: Paint, report: Report) => Fill | null> = {
+const FILLS: Record<string, (p: Paint, size: Vec) => Fill | null> = {
   SOLID: (p) => ({ kind: FillKind.Solid, color: hexOf(p.color!), opacity: round((p.opacity ?? 1) * (p.color?.a ?? 1)) }),
-  GRADIENT_LINEAR: (p) => ({ kind: FillKind.Linear, stops: stopsOf(p.stops), angle: axisAngle(p.transform), opacity: round(p.opacity ?? 1) }),
-  GRADIENT_RADIAL: (p) => ({ kind: FillKind.Radial, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
+  GRADIENT_LINEAR: (p, size) => ({ kind: FillKind.Linear, stops: stopsOf(p.stops), angle: axisAngle(p.transform, size), opacity: round(p.opacity ?? 1) }),
+  GRADIENT_RADIAL: (p, size) => ({ kind: FillKind.Radial, stops: stopsOf(p.stops), center: gradientCentre(p.transform), radius: radialReach(p.transform, size), opacity: round(p.opacity ?? 1) }),
   GRADIENT_DIAMOND: (p) => ({ kind: FillKind.Diamond, stops: stopsOf(p.stops), opacity: round(p.opacity ?? 1) }),
-  GRADIENT_ANGULAR: (p) => ({ kind: FillKind.Angular, stops: stopsOf(p.stops), angle: sweepAngle(p.transform), center: gradientCentre(p.transform), opacity: round(p.opacity ?? 1) }),
-  IMAGE: (p) => ({ kind: FillKind.Image, hash: hashHex(p.image?.hash), opacity: round(p.opacity ?? 1) })
+  GRADIENT_ANGULAR: (p, size) => ({ kind: FillKind.Angular, stops: stopsOf(p.stops), angle: sweepAngle(p.transform, size), center: gradientCentre(p.transform), opacity: round(p.opacity ?? 1) }),
+  IMAGE: (p) => ({ kind: FillKind.Image, hash: hashHex(p.image?.hash), opacity: round(p.opacity ?? 1), fit: PICTURE_FIT[p.imageScaleMode ?? 'FILL'] ?? PictureFit.Cover, focus: p.focus ?? CENTRED })
 };
 
-function fillsOf(paints: Paint[] | undefined, report: Report): Fill[] {
+function fillsOf(paints: Paint[] | undefined, report: Report, size: Vec = SQUARE): Fill[] {
   return (paints ?? [])
     .filter((p) => p.visible !== false)
     .flatMap((p) => {
-      const made = FILLS[p.type]?.(p, report);
+      const made = FILLS[p.type]?.(p, size);
       if (made === undefined) {
         report(`${p.type.toLowerCase()} paint`);
       }
@@ -291,7 +346,7 @@ function fillsOf(paints: Paint[] | undefined, report: Report): Fill[] {
 const STROKE_KINDS = new Set([FillKind.Solid, FillKind.Linear, FillKind.Radial, FillKind.Angular, FillKind.Diamond]);
 
 function strokesOf(n: FigmaRawNode, report: Report): Stroke[] {
-  return fillsOf(n.strokePaints, report).flatMap((fill) => {
+  return fillsOf(n.strokePaints, report, n.size).flatMap((fill) => {
     if (!STROKE_KINDS.has(fill.kind)) {
       report(`${fill.kind} stroke`);
       return [];
@@ -431,8 +486,9 @@ function patchedNode(n: FigmaRawNode, ctx: Ctx): FigmaRawNode {
   return (ctx.scope.patches.get(key) ?? []).reduce(withPatch, n);
 }
 
-const hasOverrides = (n: FigmaRawNode, symbol: FigmaRawNode) =>
-  Boolean(n.symbolData?.symbolOverrides?.length) || n.size?.x !== symbol.size?.x || n.size?.y !== symbol.size?.y;
+const resized = (n: FigmaRawNode, symbol: FigmaRawNode) => n.size?.x !== symbol.size?.x || n.size?.y !== symbol.size?.y;
+
+const hasOverrides = (n: FigmaRawNode, symbol: FigmaRawNode, drawsOwnLayers: boolean) => Boolean(n.symbolData?.symbolOverrides?.length) || (!drawsOwnLayers && resized(n, symbol));
 
 function scopeOf(n: FigmaRawNode, ctx: Ctx, flattened: boolean): Ctx {
   const here = ctx.scope.inside ? [...ctx.scope.trail, keyOf(n.guid)] : [];
@@ -475,7 +531,7 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
   const font = n.fontName?.family ?? 'Inter';
   const weight = weightOf(n.fontName?.style ?? '');
   const size = effectiveSize(n);
-  const fills = fillsOf(n.fillPaints, ctx.report);
+  const fills = fillsOf(n.fillPaints, ctx.report, n.size);
   const color = fills.find((f) => f.kind === FillKind.Solid);
   const base = { font, weight, size, color: color?.kind === FillKind.Solid ? color.color : '#000000' };
   return {
@@ -488,6 +544,10 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
     letterSpacing: unitOf(n.letterSpacing, '0%'),
     align: ALIGN[n.textAlignHorizontal ?? 'LEFT'] ?? 'left',
     runs: runsOf(n, base, ctx.report),
+    wraps: n.textAutoResize === 'HEIGHT',
+    decoration: DECORATION[n.textDecoration ?? ''] ?? Decoration.None,
+    axes: n.fontAxes ?? '',
+    features: n.fontFeatures ?? '',
     fills,
     strokes: strokesOf(n, ctx.report)
   };
@@ -521,13 +581,18 @@ function placeholderOf(n: FigmaRawNode, m: Matrix, ctx: Ctx, note: string): Laye
 }
 
 function componentOf(n: FigmaRawNode, ctx: Ctx): ComponentRef | null {
+  if (n.codeComponent) {
+    const { key, name, variant, texts } = n.codeComponent;
+    return { key, name, inPaste: true, ...(Object.keys(variant).length ? { variant } : {}), texts };
+  }
   const id = n.symbolData?.symbolID;
   if (n.type !== 'INSTANCE' || !id) {
     return null;
   }
   const main = ctx.byKey.get(keyOf(id));
-  const linked = Boolean(main) && !hasOverrides(n, main!);
-  return { key: keyOf(id), name: main?.name ?? n.name ?? 'Component', inPaste: linked };
+  const drawsOwnLayers = Boolean(ctx.children.get(keyOf(n.guid))?.length);
+  const linked = Boolean(main) && !hasOverrides(n, main!, drawsOwnLayers);
+  return { key: keyOf(id), ...namedRef(main?.name ?? n.name ?? 'Component'), inPaste: linked };
 }
 
 function layerOf(raw: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
@@ -551,7 +616,7 @@ function layerOf(raw: FigmaRawNode, parent: Matrix, ctx: Ctx): Layer | null {
     const path = transformedPath(local.path, m);
     const shaped = common(n, m, ctx);
     const box = isRotated(m) ? pathBox(path) : shaped.box;
-    return { kind: LayerKind.Shape, ...shaped, box, rotation: 0, path, fillRule: local.rule, fills: fillsOf(n.fillPaints, ctx.report), strokes: strokesOf(n, ctx.report) };
+    return { kind: LayerKind.Shape, ...shaped, box, rotation: 0, path, fillRule: local.rule, fills: fillsOf(n.fillPaints, ctx.report, n.size), strokes: strokesOf(n, ctx.report) };
   }
   return placeholderOf(n, m, ctx, `${type.toLowerCase()} ${n.name ?? ''} shown as a placeholder`);
 }
@@ -568,7 +633,7 @@ function frameLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): FrameLayer {
     kind: LayerKind.Frame,
     component: componentOf(n, ctx),
     ...common(n, m, ctx),
-    fills: fillsOf(n.fillPaints, ctx.report),
+    fills: fillsOf(n.fillPaints, ctx.report, n.size),
     strokes: strokesOf(n, ctx.report),
     radii: radiiOf(n),
     outline: transformedPath(roundedRect(n.size ?? { x: 0, y: 0 }, radiiOf(n)), m),

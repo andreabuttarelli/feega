@@ -64,7 +64,9 @@ export function profileFromAuthUser(user: User): Profile {
     id: user.id,
     email: user.email,
     name: firstString(metadata, NAME_KEYS),
-    avatarUrl: firstString(metadata, AVATAR_KEYS)
+    avatarUrl: firstString(metadata, AVATAR_KEYS),
+    termsAcceptedAt: null,
+    termsVersion: null
   };
 }
 
@@ -99,6 +101,21 @@ function emptyFilled(row: ProfileColumns, fromAuth: Profile): Partial<Pick<Profi
     patch.avatar_url = fromAuth.avatarUrl;
   }
   return patch;
+}
+
+export async function listProfileNames(db: Db, userIds: string[]): Promise<Record<string, string>> {
+  if (!userIds.length) {
+    return {};
+  }
+
+  const { data, error } = await db.from('profiles').select('id, name, email').in('id', userIds);
+  if (error) {
+    throw error;
+  }
+  return Object.fromEntries((data ?? []).flatMap((row) => {
+    const name = row.name || row.email;
+    return name ? [[row.id, name]] : [];
+  }));
 }
 
 export async function ensureProfile(db: Db, user: User): Promise<Profile> {

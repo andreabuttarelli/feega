@@ -1,6 +1,9 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { canEditPoints } from '$lib/motion/shape/vector-edit';
+import { EditMode } from '$lib/motion/edit-mode';
+import { positionSpan } from '$lib/motion/motion-trail';
+import { OnionSkin } from './onion-skin.svelte';
 import { FrameView, shows, type FrameViews } from './frame-view';
 
 export enum FrameOverlay {
@@ -16,10 +19,11 @@ export enum FrameOverlay {
   TextPath = 'text-path',
   Outlines = 'outlines',
   Corners = 'corners',
-  MotionPath = 'motion-path'
+  MotionPath = 'motion-path',
+  Onion = 'onion'
 }
 
-type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews };
+type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews; mode: EditMode; onion: OnionSkin };
 
 const MIN_ALIGNED = 2;
 const ALIGN_BAR_PX = { width: 280, height: 42 };
@@ -58,8 +62,13 @@ const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
   [FrameOverlay.TextPath]: (c) => Boolean(c.clip?.textPath),
   [FrameOverlay.Outlines]: (c) => shows(c.views, FrameView.Outlines),
   [FrameOverlay.Corners]: (c) => c.clip?.component === 'Shape' && c.clip.props.shape === 'rect' && c.picks === 1 && c.active,
-  [FrameOverlay.MotionPath]: (c) => Boolean(c.clip?.path) && c.picks === 1
+  [FrameOverlay.MotionPath]: (c) => recording(c) && Boolean(c.clip!.path || positionSpan(c.clip!)),
+  [FrameOverlay.Onion]: (c) => recording(c) && c.onion === OnionSkin.On && Object.values(c.clip!.keyframes).some((track) => track?.length)
 };
+
+function recording(c: Context): boolean {
+  return c.mode === EditMode.Motion && c.picks === 1 && Boolean(c.clip);
+}
 
 function pointsOf(c: Context): FrameOverlay | undefined {
   if (!c.clip || c.clip.id !== c.pointEdit || !c.active || !canEditPoints(c.clip)) {

@@ -56,7 +56,7 @@ import { parseVariantsAsk } from '$lib/canvas/variants';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
-import { RestoreOutcome, listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 import { answerMention } from '$lib/server/canvas/comment-agent';
@@ -77,8 +77,6 @@ import { MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
-import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
-import { Keep } from '$lib/canvas/reject-plan';
 import { writeNodesBatch, type BatchItem } from '$lib/server/canvas/batch-write';
 import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas/paste';
 import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
@@ -97,7 +95,7 @@ import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
-import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupAskSchema, groupElements, stackAskSchema, stackElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { INSERT_STATUS, InsertOutcome, insertAskSchema, insertScene } from '$lib/server/motion/insert-scene';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
@@ -113,7 +111,7 @@ import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-exp
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { importLottieAt } from '$lib/server/motion/lottie-at';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, componentAskSchema, copyElement, placeComponent, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
 import { DropOn, OutputKind } from '$lib/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -153,6 +151,13 @@ function jsonField(fd: FormData, key: string): unknown {
     return null;
   }
 }
+
+const chosenNode = (fd: FormData): string | undefined => {
+  const id = z.string().uuid().safeParse(fd.get('node_id') ?? undefined);
+  return id.success ? id.data : undefined;
+};
+
+const chosenIds = (fd: FormData) => ({ id: fd.get('node_id') ?? undefined, ids: jsonField(fd, 'ids') });
 
 function canvasFrames(scope: Scope) {
   return frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope), projectId: scope.canvas.projectId });
@@ -239,12 +244,6 @@ function rowsRequest(fd: FormData) {
   return parsed.success ? parsed.data : null;
 }
 
-const rejectFields = z.object({
-  eventIds: z.array(z.number().int()).min(1),
-  choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })),
-  confirm: z.boolean()
-});
-
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
@@ -306,6 +305,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 
 const HTTP_BAD_REQUEST = 400;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const copyIdsSchema = z.record(z.string(), z.string().regex(UUID));
 const figmaAtSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
@@ -370,10 +370,11 @@ function templateValues(raw: FormDataEntryValue | null): Record<string, string> 
 }
 
 export const actions: Actions<CanvasParams> = {
-  new_canvas: async ({ params, locals }) => {
+  new_canvas: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const projectId = scope.canvas.projectId;
-    const canvas = await openNewCanvas(scope.db, { orgId: scope.orgId, projectId });
+    const id = z.string().uuid().safeParse((await request.formData()).get('id') ?? undefined);
+    const canvas = await openNewCanvas(scope.db, { orgId: scope.orgId, projectId, id: id.success ? id.data : undefined });
     throw redirect(303, canvasPath(projectId, canvas.id));
   },
 
@@ -574,7 +575,8 @@ export const actions: Actions<CanvasParams> = {
       return await registerCanvasUpload(scope.db, {
         orgId: scope.orgId, projectId: scope.canvas.projectId, canvasId: scope.canvasId,
         path, fileName, mimeType, bytes,
-        x: coord(fd.get('x')) ?? 0, y: coord(fd.get('y')) ?? 0
+        x: coord(fd.get('x')) ?? 0, y: coord(fd.get('y')) ?? 0,
+        nodeId: chosenNode(fd)
       });
     } catch (cause) {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
@@ -1200,7 +1202,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid sharing state' });
     }
 
-    const shareToken = await setCanvasShare(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, state });
+    const shareToken = await setCanvasShare(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, state, token: String(fd.get('token') ?? '') || undefined });
     return { shareToken };
   },
 
@@ -1315,12 +1317,14 @@ export const actions: Actions<CanvasParams> = {
 
   layersToFrame: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const nodeId = String((await request.formData()).get('node_id') ?? '');
+    const fd = await request.formData();
+    const nodeId = String(fd.get('node_id') ?? '');
+    const frameId = z.string().uuid().safeParse(fd.get('frame_id') ?? undefined);
     if (!nodeId) {
       return fail(400, { error: 'invalid request' });
     }
 
-    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId });
+    const made = await layersToFrame(scope.db, layersToFrameDeps(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, actor: userActor(scope) }), { orgId: scope.orgId, nodeId, frameId: frameId.success ? frameId.data : undefined });
     return made.ok ? { outcome: 'done', frameId: made.frameId } : fail(400, { error: made.error });
   },
 
@@ -1338,7 +1342,7 @@ export const actions: Actions<CanvasParams> = {
   combineScenes: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = combineAskSchema.safeParse({ frameIds: jsonField(fd, 'frame_ids') });
+    const ask = combineAskSchema.safeParse({ frameIds: jsonField(fd, 'frame_ids'), id: fd.get('node_id') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'pick two or more frames' });
     }
@@ -1371,7 +1375,7 @@ export const actions: Actions<CanvasParams> = {
   moveElement: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop'), box: jsonField(fd, 'box'), versions: jsonField(fd, 'versions') });
+    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop'), box: jsonField(fd, 'box'), versions: jsonField(fd, 'versions'), ...chosenIds(fd) });
     if (!ask.success) {
       return fail(400, { error: 'spostamento non valido' });
     }
@@ -1381,17 +1385,27 @@ export const actions: Actions<CanvasParams> = {
   copyElement: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop') });
+    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop'), ...chosenIds(fd) });
     if (!ask.success) {
       return fail(400, { error: 'invalid paste' });
     }
     return movedAnswer(await copyElement(canvasFrames(scope), ask.data));
   },
 
+  placeComponent: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = componentAskSchema.safeParse({ sourceNodeId: fd.get('source'), compId: fd.get('comp'), drop: jsonField(fd, 'drop'), ...chosenIds(fd) });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid component drop' });
+    }
+    return movedAnswer(await placeComponent(canvasFrames(scope), { ...ask.data, canvasId: scope.canvasId }));
+  },
+
   moveFree: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop'), ids: jsonField(fd, 'ids') });
     if (!ask.success) {
       return fail(400, { error: 'invalid drop' });
     }
@@ -1401,7 +1415,7 @@ export const actions: Actions<CanvasParams> = {
   copyFree: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop'), ids: jsonField(fd, 'ids') });
     if (!ask.success) {
       return fail(400, { error: 'invalid paste' });
     }
@@ -1416,6 +1430,16 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid group' });
     }
     return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
+  },
+
+  stackElements: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const form = await request.formData();
+    const ask = stackAskSchema.safeParse({ ids: jsonField(form, 'ids'), id: String(form.get('node_id') ?? '') || undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid stack' });
+    }
+    return movedAnswer(await stackElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
   },
 
   wrapSection: async ({ request, params, locals }) => {
@@ -1634,7 +1658,8 @@ export const actions: Actions<CanvasParams> = {
       .split(',')
       .map((id) => id.trim())
       .filter(Boolean);
-    if (!nodeIds.length) {
+    const copyIds = copyIdsSchema.safeParse(fd.has('copy_ids') ? jsonField(fd, 'copy_ids') : {});
+    if (!nodeIds.length || !copyIds.success) {
       return fail(400, { error: 'nothing to duplicate' });
     }
 
@@ -1644,6 +1669,7 @@ export const actions: Actions<CanvasParams> = {
       canvasId: scope.canvasId,
       nodeIds,
       offset: offsetFrom(fd.get('dx'), fd.get('dy')),
+      copyIds: copyIds.data,
       actor: userActor(scope)
     });
 
@@ -1679,18 +1705,6 @@ export const actions: Actions<CanvasParams> = {
     throw redirect(303, canvasPath(projectId, out.canvas.id));
   },
 
-  canvasVersions: async ({ params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
-    return { versions: await listCanvasVersions(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
-  },
-
-  restoreCanvasVersion: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
-    const fd = await request.formData();
-    const out = await restoreCanvasVersion(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, versionId: String(fd.get('version_id') ?? ''), actor: userActor(scope) });
-    return out.outcome === RestoreOutcome.Restored ? out : fail(404, { error: out.outcome });
-  },
-
   canvasComments: async ({ params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     return { threads: await listComments(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }), teammates: await teammates(scope.db, scope.orgId) };
@@ -1706,6 +1720,7 @@ export const actions: Actions<CanvasParams> = {
       orgId: scope.orgId,
       canvasId: scope.canvasId,
       actor: userActor(scope),
+      id: fd.get('id') ? String(fd.get('id')) : undefined,
       body,
       nodeId,
       parentId,
@@ -2015,25 +2030,6 @@ export const actions: Actions<CanvasParams> = {
       return fail(409, { reason: result.reason });
     }
     return { outcome: 'undone', redo: result.redo };
-  },
-
-  agent_changes: async ({ params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
-    return { changes: await listAgentChanges(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId }) };
-  },
-
-  reject_change: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
-    const fd = await request.formData();
-    const parsed = rejectFields.safeParse({
-      eventIds: jsonField(fd, 'event_ids'),
-      choices: jsonField(fd, 'choices') ?? [],
-      confirm: fd.get('confirm') === 'true'
-    });
-    if (!parsed.success) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_change' });
-    }
-    return rejectChange(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, ...parsed.data, actor: userActor(scope) });
   },
 
   /**

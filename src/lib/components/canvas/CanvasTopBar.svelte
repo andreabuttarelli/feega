@@ -1,5 +1,4 @@
 <script lang="ts">
-  import History from '@lucide/svelte/icons/history';
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import { cn } from '$lib/utils';
@@ -11,46 +10,26 @@
   import CanvasShare from './CanvasShare.svelte';
   import CanvasConnect from './CanvasConnect.svelte';
   import ConnectionDot from './ConnectionDot.svelte';
+  import ViewMenu from './ViewMenu.svelte';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { LocalOff, isOff } from '$lib/local-user';
   import { BILLING_PATH } from '$lib/billing-path';
   import { formatLastEdited } from '$lib/canvas/format-last-edited';
-  import { CanvasAction, submitCanvasAction, renameProjectAction } from '$lib/canvas/canvas-list';
-  import Plus from '@lucide/svelte/icons/plus';
+  import { renameProjectAction } from '$lib/canvas/canvas-list';
   import Pencil from '@lucide/svelte/icons/pencil';
-  import Trash from '@lucide/svelte/icons/trash-2';
   import Search from '@lucide/svelte/icons/search';
-  import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import { UNCENSORED_NOTICE } from '$lib/uncensored-lock';
-  import { DropdownMenu as MenuPrimitive } from 'bits-ui';
-  import { Badge } from '$lib/components/ui/badge/index.js';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
-  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-  import FeegaFile from './FeegaFile.svelte';
-  import Download from '@lucide/svelte/icons/download';
-  import Upload from '@lucide/svelte/icons/upload';
   import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
-  type CanvasRow = { id: string; name: string; href: string };
 
-  /**
-   * IL SELETTORE IN ALTO A SINISTRA: `[Project ▾ / Canvas ▾]`. Due menu indipendenti, non uno
-   * annidato — cambiare progetto e cambiare tela sono due decisioni diverse, e un progetto nuovo
-   * non deve costringere a scegliere anche una tela nella stessa tendina.
-   *
-   * DUE RIQUADRI GALLEGGIANTI, non una barra a tutta larghezza: fra loro la tela resta cliccabile
-   * — è per questo che `.canvas-topbar` è `pointer-events: none` e solo i due `.top-box` tornano
-   * `auto`.
-   */
   let {
     projectId,
     projectName,
     projects,
-    canvasName,
     canvasHref,
-    canvases,
     creditBalance,
     chatOpen,
     onToggleChat,
@@ -58,18 +37,12 @@
     onShare,
     profile,
     org,
-    projectMode = ProjectMode.Standard,
-    brandName = null,
-    onVersions = null,
-    onComments = null,
-    commentsUnseen = false
+    projectMode = ProjectMode.Standard
   }: {
     projectId: string;
     projectName: string;
     projects: ProjectRow[];
-    canvasName: string;
     canvasHref: string;
-    canvases: CanvasRow[];
     creditBalance: number;
     chatOpen: boolean;
     onToggleChat: () => void;
@@ -78,10 +51,6 @@
     profile: { name: string | null; email: string; avatarUrl: string | null };
     org: { name: string } | null;
     projectMode?: string;
-    brandName?: string | null;
-    onVersions?: (() => void) | null;
-    onComments?: (() => void) | null;
-    commentsUnseen?: boolean;
   } = $props();
 
   const ICON = 16;
@@ -123,26 +92,8 @@
   const inUncensored = $derived(projectMode === ProjectMode.Uncensored);
   const mode = $derived(modeOf(projectMode));
 
-  let feegaFile = $state<FeegaFile | null>(null);
-
-  let renaming = $state(false);
-  let draftName = $state('');
-  let confirmingDelete = $state(false);
-  const lastCanvas = $derived(canvases.length <= 1);
-
   let renamingProject = $state(false);
   let draftProjectName = $state('');
-
-  function startRename() {
-    draftName = canvasName;
-    renaming = true;
-  }
-
-  async function saveRename(event: SubmitEvent) {
-    event.preventDefault();
-    renaming = false;
-    await submitCanvasAction(canvasHref, CanvasAction.Rename, { name: draftName });
-  }
 
   function startRenameProject() {
     draftProjectName = projectName;
@@ -153,17 +104,6 @@
     event.preventDefault();
     renamingProject = false;
     await renameProjectAction(canvasHref, draftProjectName);
-  }
-
-  function askDeleteCurrent() {
-    if (lastCanvas) {
-      return;
-    }
-    confirmingDelete = true;
-  }
-
-  async function deleteCurrent() {
-    await submitCanvasAction(canvasHref, CanvasAction.Delete);
   }
 
 </script>
@@ -215,120 +155,6 @@
     </DropdownMenu.Root>
     {/if}
 
-    <div class="canvas-title top-group centred" data-testid="canvas-title">
-    <span class="sep">/</span>
-
-    {#if renaming}
-      <form class="rename-form" onsubmit={saveRename}>
-        <input
-          class="rename-input"
-          data-testid="canvas-rename-input"
-          bind:value={draftName}
-          {@attach (el) => el.focus()}
-          onkeydown={(e) => e.key === 'Escape' && (renaming = false)}
-        />
-        <button type="submit" class="rename-save">{$_('app.shell.canvasActions.save')}</button>
-      </form>
-    {:else}
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger class="switcher-btn" data-testid="canvas-switcher" title={canvasName}>
-        <span class="truncate canvas-name">{canvasName}</span>
-        {#if commentsUnseen}<span class="unseen-dot" data-testid="comments-unseen" role="img" aria-label="Unread mention"></span>{/if}
-        <ChevronDown size={ICON} />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="start" collisionPadding={EDGE} class="sw-menu w-[300px]">
-        <div class="sw-head">
-          <span class="sw-head-name" title={projectName}>{projectName}</span>
-          {#if brandName && !isOff(LocalOff.Brand)}
-            <Badge variant="outline" data-testid="switcher-brand">{brandName}</Badge>
-          {/if}
-        </div>
-        <DropdownMenu.Label class="sw-label">{$_('app.shell.mobile.canvases')}</DropdownMenu.Label>
-        {#each canvases as canvas (canvas.id)}
-          {@const current = canvas.name === canvasName}
-          <div class={cn('sw-line', current && 'is-current')} data-testid={current ? 'canvas-row-current' : undefined}>
-            <DropdownMenu.Item class="sw-row">
-              {#snippet child({ props })}
-                <a {...props} href={canvas.href} title={canvas.name}>
-                  <span class="sw-lead">{#if current}<Check size={ICON} />{/if}</span>
-                  <span class="sw-name">{canvas.name}</span>
-                </a>
-              {/snippet}
-            </DropdownMenu.Item>
-            {#if current}
-              <DropdownMenu.Item
-                class="sw-icon"
-                data-testid="canvas-rename"
-                aria-label={$_('app.shell.canvasActions.rename')}
-                title={$_('app.shell.canvasActions.rename')}
-                onSelect={startRename}
-              >
-                <Pencil size={ICON} />
-              </DropdownMenu.Item>
-              <DropdownMenu.Sub>
-                <MenuPrimitive.SubTrigger
-                  class="sw-icon sw-more"
-                  data-testid="canvas-more"
-                  aria-label={$_('app.shell.canvasActions.more')}
-                  title={$_('app.shell.canvasActions.more')}
-                >
-                  <Ellipsis size={ICON} />
-                </MenuPrimitive.SubTrigger>
-                <DropdownMenu.SubContent class="sw-menu w-44" collisionPadding={EDGE}>
-                  <DropdownMenu.Item class="sw-row" onSelect={startRename}>
-                    <span class="sw-lead"><Pencil size={ICON} /></span>
-                    {$_('app.shell.canvasActions.rename')}
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    class="sw-row"
-                    variant="destructive"
-                    data-testid="canvas-delete"
-                    disabled={lastCanvas}
-                    title={lastCanvas ? $_('app.shell.canvasActions.lastCanvas') : undefined}
-                    onSelect={askDeleteCurrent}
-                  >
-                    <span class="sw-lead"><Trash size={ICON} /></span>
-                    {$_('app.shell.canvasActions.delete')}
-                  </DropdownMenu.Item>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Sub>
-            {/if}
-          </div>
-        {/each}
-        <DropdownMenu.Separator />
-        {#if onVersions}
-          <DropdownMenu.Item class="sw-row" data-testid="canvas-versions" onSelect={onVersions}>
-            <span class="sw-lead"><History size={ICON} /></span>
-            Versions…
-          </DropdownMenu.Item>
-        {/if}
-        {#if onComments}
-          <DropdownMenu.Item class="sw-row" data-testid="canvas-comments" onSelect={onComments}>
-            <span class="sw-lead"><MessageSquare size={ICON} /></span>
-            Comments
-            {#if commentsUnseen}<span class="unseen-dot" role="img" aria-label="Unread mention"></span>{/if}
-          </DropdownMenu.Item>
-        {/if}
-        {#if !isOff(LocalOff.NewCanvas)}
-          <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
-            <span class="sw-lead"><Plus size={ICON} /></span>
-            {$_('app.shell.canvasActions.new')}
-          </DropdownMenu.Item>
-        {/if}
-        {#if !isOff(LocalOff.ImportCanvas)}
-          <DropdownMenu.Item class="sw-row" data-testid="canvas-import-feega" onSelect={() => feegaFile?.pick()}>
-          <span class="sw-lead"><Upload size={ICON} /></span>
-          Import .feega…
-        </DropdownMenu.Item>
-        {/if}
-        <DropdownMenu.Item class="sw-row" data-testid="canvas-save-feega" onSelect={() => feegaFile?.save()}>
-          <span class="sw-lead"><Download size={ICON} /></span>
-          Download .feega
-        </DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
-    {/if}
-    </div>
     <CanvasConnect />
   </div>
 
@@ -359,17 +185,6 @@
     </div>
   {/snippet}
 
-  <FeegaFile bind:this={feegaFile} page={canvasHref} />
-
-  <ConfirmDialog
-    bind:open={confirmingDelete}
-    title={$_('app.shell.canvasActions.confirmDeleteTitle')}
-    body={$_('app.shell.canvasActions.confirmDeleteBody')}
-    confirmLabel={$_('app.shell.canvasActions.confirmDeleteCta')}
-    cancelLabel={$_('app.shell.canvasActions.confirmDeleteCancel')}
-    onConfirm={deleteCurrent}
-  />
-
   <div class="top-slot" data-top-slot></div>
   <div class="top-box top-group right">
     <div class="top-peers" data-top-peers></div>
@@ -386,6 +201,8 @@
       <CanvasShare {shareToken} {onShare} />
     {/if}
 
+    <ViewMenu />
+
     <button
       type="button"
       class={cn('chat-toggle', chatOpen && 'is-active')}
@@ -399,15 +216,6 @@
 </header>
 
 <style>
-  .unseen-dot {
-    flex: none;
-    width: 8px;
-    height: 8px;
-    margin-left: 4px;
-    background: #0b6bff;
-    border-radius: 9999px;
-  }
-
   .canvas-topbar {
     position: absolute;
     inset: 0 0 auto;
@@ -457,46 +265,8 @@
     min-width: 0;
   }
 
-  .sep {
-    color: var(--ui-text-disabled);
-  }
-
   .top-peers:empty {
     display: none;
-  }
-
-  .canvas-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .canvas-title.centred {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: auto;
-  }
-
-  .canvas-title.centred .sep {
-    display: none;
-  }
-
-  @media (max-width: 767px) {
-    .canvas-title.centred {
-      position: static;
-      transform: none;
-    }
-    .canvas-title.centred .sep {
-      display: inline;
-    }
-    .canvas-title.top-group {
-      height: auto;
-      background: transparent;
-      box-shadow: none;
-    }
   }
 
   :global(.switcher-btn) {
@@ -607,11 +377,6 @@
     background: var(--ui-wash);
   }
 
-  @media (max-width: 480px) {
-    .canvas-name {
-      max-width: 80px;
-    }
-  }
   .uncensored-badge {
     border: 1px solid var(--color-destructive);
     color: var(--color-destructive);
@@ -628,65 +393,6 @@
     padding: 4px;
     font-size: 13px;
     color: var(--ui-text);
-  }
-  :global(.sw-head) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    padding: 8px 8px 6px;
-  }
-  :global(.sw-head-name) {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-weight: 600;
-  }
-
-  :global(.sw-label) {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 8px 4px;
-    font-size: var(--ui-type-section);
-    font-weight: var(--ui-weight-semibold);
-    letter-spacing: var(--ui-tracking-caps);
-    text-transform: uppercase;
-    color: var(--ui-text-tertiary);
-  }
-  :global(.sw-search) {
-    position: sticky;
-    top: -4px;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: var(--sw-row);
-    margin: -4px -4px 4px;
-    padding: 0 12px;
-    background: var(--ui-panel);
-    border-bottom: 1px solid var(--ui-divider);
-    color: var(--ui-text-tertiary);
-  }
-  :global(.sw-search input) {
-    flex: 1 1 auto;
-    min-width: 0;
-    border: 0;
-    outline: none;
-    background: transparent;
-    font: inherit;
-    color: var(--ui-text);
-  }
-
-  :global(.sw-line) {
-    display: flex;
-    align-items: center;
-    border-radius: var(--ui-radius-sm);
-  }
-  :global(.sw-line:hover) {
-    background: var(--ui-wash);
   }
   :global(.sw-line.is-current) {
     background: var(--ui-selected);

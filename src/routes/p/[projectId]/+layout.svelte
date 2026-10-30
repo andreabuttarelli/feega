@@ -1,6 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
-  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
+  import { historyPanel } from '$lib/canvas/history-panel.svelte';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
@@ -35,8 +35,10 @@
   import { readChatOpen, writeChatOpen } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import { browser } from '$app/environment';
-  import { postCanvasAction } from '$lib/canvas/canvas-api';
-  import type { ShareState } from '$lib/canvas/shared-view';
+  import { ShareState } from '$lib/canvas/shared-view';
+  import { canvasPages } from '$lib/canvas/canvas-pages.svelte';
+  import { PageAction } from '$lib/canvas/page-ops';
+  import { mintShareToken } from '$lib/canvas/share-token';
   import { handoffOf } from '$lib/canvas/chat-handoff';
   import { editingLabel, propertiesRequest, propertiesTarget } from '$lib/canvas/phone-properties';
   import PhoneSheet from '$lib/components/canvas/PhoneSheet.svelte';
@@ -53,7 +55,14 @@
 
   const projectId = $derived(data.project.id);
   const canvasId = $derived(page.params.canvasId ?? '');
-  const currentCanvas = $derived(data.canvases.find((c: { id: string }) => c.id === canvasId));
+  const currentCanvas = $derived(canvasPages.list(data.canvases).find((c: { id: string }) => c.id === canvasId));
+  const pagesProps = $derived({
+    canvases: data.canvases,
+    currentId: canvasId,
+    onHistory: () => historyPanel.show(),
+    onComments: isOff(LocalOff.Comments) ? null : () => commentsPanel.show(),
+    commentsUnseen: commentsPanel.unseen
+  });
   const activeSheetId = $derived(page.state.sheet ? sheetEntryForPath(page.state.sheet.path)?.id ?? null : null);
 
   let leftPanel = $state<LeftPanelKind | null>(null);
@@ -92,20 +101,13 @@
     writeChatOpen(chatOpen);
   }
 
-  let shareWritten = $state<{ canvasId: string; token: string | null } | null>(null);
-  const shareToken = $derived(
-    shareWritten?.canvasId === canvasId ? shareWritten.token : ((page.data.shareToken as string | null | undefined) ?? null)
-  );
+  const shareToken = $derived(canvasPages.token(canvasId, (page.data.shareToken as string | null | undefined) ?? null));
 
   async function onShare(state: ShareState) {
-    const body = new FormData();
-    body.set('state', state);
-    const result = await postCanvasAction({ projectId, canvasId }, 'share_canvas', body);
-    if (result.type !== 'success') {
-      console.error('condivisione della tela fallita', result);
-      return;
+    const href = currentCanvas?.href;
+    if (href) {
+      void canvasPages.run(PageAction.Share, { canvasId, token: state === ShareState.On ? mintShareToken() : null }, data.canvases, href);
     }
-    shareWritten = { canvasId, token: (result.data?.shareToken as string | null) ?? null };
   }
 
   $effect(() => {
@@ -114,6 +116,12 @@
     }
     chatOpen = true;
     showMobile('chat');
+  });
+
+  $effect(() => {
+    if (historyPanel.asked) {
+      leftPanel = 'history';
+    }
   });
 
   $effect(() => {
@@ -266,7 +274,6 @@
   {:else if onCanvasRoute}
     <CanvasTopBar
       {projectId}
-      onVersions={isOff(LocalOff.Versions) ? null : () => versionsPanel.show()}
       projectName={data.project.name}
       projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
         id: p.id,
@@ -276,12 +283,7 @@
         mode: p.mode
       }))}
       projectMode={data.project.mode}
-      brandName={data.brand?.name ?? null}
-      onComments={isOff(LocalOff.Comments) ? null : () => commentsPanel.show()}
-      commentsUnseen={commentsPanel.unseen}
-      canvasName={currentCanvas?.name ?? ''}
       canvasHref={currentCanvas?.href ?? ''}
-      canvases={data.canvases}
       creditBalance={data.creditBalance}
       {chatOpen}
       onToggleChat={toggleChat}
@@ -305,6 +307,7 @@
             {projectId}
             kind={leftPanel}
             labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
+            pages={pagesProps}
             onclose={() => (leftPanel = null)}
           />
         {/await}

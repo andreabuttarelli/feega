@@ -1,7 +1,8 @@
 use vello::kurbo::Rect;
 use web_sys::{WebGl2RenderingContext as Gl, WebGlFramebuffer, WebGlProgram, WebGlTexture};
 
-use crate::gl_passes::{texture, Tex};
+use crate::gl_passes::{texture, Tex, PASS_CAPS};
+use crate::gl_state::isolated;
 use crate::retained::Lookup;
 
 const VERTEX: &str = "#version 300 es
@@ -77,25 +78,23 @@ impl GlReprojector {
         let up = look.bottom_up(source.height as f64, target.height as f64);
         gl.bind_framebuffer(Gl::FRAMEBUFFER, target.fbo);
         gl.viewport(0, 0, target.width as i32, target.height as i32);
-        for cap in [Gl::BLEND, Gl::SCISSOR_TEST, Gl::DEPTH_TEST, Gl::STENCIL_TEST] {
-            gl.disable(cap);
-        }
-        if let Some(r) = target.within {
-            gl.enable(Gl::SCISSOR_TEST);
-            gl.scissor(r.x0 as i32, (target.height as f64 - r.y1) as i32, r.width() as i32, r.height() as i32);
-        }
-        gl.color_mask(true, true, true, true);
-        gl.bind_vertex_array(None);
-        gl.use_program(Some(&self.program));
-        gl.active_texture(Gl::TEXTURE0);
-        gl.bind_texture(Gl::TEXTURE_2D, Some(&source.texture));
-        let at = |name: &str| gl.get_uniform_location(&self.program, name);
-        gl.uniform1i(at("source").as_ref(), 0);
-        gl.uniform2f(at("scale").as_ref(), up.scale as f32, up.scale as f32);
-        gl.uniform2f(at("offset").as_ref(), up.x as f32, up.y as f32);
-        gl.uniform2f(at("size").as_ref(), source.width as f32, source.height as f32);
-        gl.draw_arrays(Gl::TRIANGLES, 0, 3);
-        gl.disable(Gl::SCISSOR_TEST);
+        isolated(gl, &PASS_CAPS, || {
+            if let Some(r) = target.within {
+                gl.enable(Gl::SCISSOR_TEST);
+                gl.scissor(r.x0 as i32, (target.height as f64 - r.y1) as i32, r.width() as i32, r.height() as i32);
+            }
+            gl.color_mask(true, true, true, true);
+            gl.bind_vertex_array(None);
+            gl.use_program(Some(&self.program));
+            gl.active_texture(Gl::TEXTURE0);
+            gl.bind_texture(Gl::TEXTURE_2D, Some(&source.texture));
+            let at = |name: &str| gl.get_uniform_location(&self.program, name);
+            gl.uniform1i(at("source").as_ref(), 0);
+            gl.uniform2f(at("scale").as_ref(), up.scale as f32, up.scale as f32);
+            gl.uniform2f(at("offset").as_ref(), up.x as f32, up.y as f32);
+            gl.uniform2f(at("size").as_ref(), source.width as f32, source.height as f32);
+            gl.draw_arrays(Gl::TRIANGLES, 0, 3);
+        });
         gl.bind_framebuffer(Gl::FRAMEBUFFER, None);
     }
 }

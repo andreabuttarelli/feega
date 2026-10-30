@@ -53,6 +53,19 @@ describe('motion agent tools at another frame rate', () => {
     expect(((await run('get_motion_doc', {})) as { background: string }).background).toBe('transparent');
   });
 
+  it('set_canvas gives the frame its own surface the agent then styles like a layer', async () => {
+    const { session, run } = setup();
+
+    expect((await run('set_canvas', { surface: true })).ok).toBe(true);
+    const surface = ((await run('get_motion_doc', {})) as { surface: string | null }).surface;
+    expect(surface).toBeTruthy();
+    expect((await run('set_props', { clip_id: surface, props: { roundness: 0.1 } })).ok).toBe(true);
+    expect(findClip(session.doc, surface!)?.clip.props.roundness).toBe(0.1);
+
+    expect((await run('set_canvas', { surface: false })).ok).toBe(true);
+    expect(((await run('get_motion_doc', {})) as { surface: string | null }).surface).toBeNull();
+  });
+
   it('set_canvas refuses a rate the renderer does not make', async () => {
     const { schema } = setup();
 

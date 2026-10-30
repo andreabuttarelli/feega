@@ -4,7 +4,11 @@
  * che non disegna niente.
  */
 import ArrowUpToLine from '@lucide/svelte/icons/arrow-up-to-line';
+import EyeOff from '@lucide/svelte/icons/eye-off';
+import Lock from '@lucide/svelte/icons/lock';
+import ClipboardCopy from '@lucide/svelte/icons/clipboard-copy';
 import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
+import Link from '@lucide/svelte/icons/link';
 import Globe from '@lucide/svelte/icons/globe';
 import CodeXml from '@lucide/svelte/icons/code-xml';
 import Eraser from '@lucide/svelte/icons/eraser';
@@ -47,7 +51,6 @@ import Music from '@lucide/svelte/icons/music';
 import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
 import Blocks from '@lucide/svelte/icons/blocks';
 import LayoutTemplate from '@lucide/svelte/icons/layout-template';
-import GitBranch from '@lucide/svelte/icons/git-branch';
 import History from '@lucide/svelte/icons/history';
 import MessageSquareText from '@lucide/svelte/icons/message-square-text';
 import Proportions from '@lucide/svelte/icons/proportions';
@@ -56,7 +59,8 @@ import Frame from '@lucide/svelte/icons/frame';
 import Shrink from '@lucide/svelte/icons/shrink';
 import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 import Rows3 from '@lucide/svelte/icons/rows-3';
-import Columns2 from '@lucide/svelte/icons/columns-2';
+import StretchHorizontal from '@lucide/svelte/icons/stretch-horizontal';
+import SquareSplitVertical from '@lucide/svelte/icons/square-split-vertical';
 import SquaresUnite from '@lucide/svelte/icons/squares-unite';
 import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
 import SquaresIntersect from '@lucide/svelte/icons/squares-intersect';
@@ -64,6 +68,7 @@ import SquaresExclude from '@lucide/svelte/icons/squares-exclude';
 import Combine from '@lucide/svelte/icons/combine';
 import ComponentIcon from '@lucide/svelte/icons/component';
 import Unlink from '@lucide/svelte/icons/unlink';
+import Target from '@lucide/svelte/icons/target';
 import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 import PenLine from '@lucide/svelte/icons/pen-line';
 import TypeIcon from '@lucide/svelte/icons/type';
@@ -90,6 +95,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'split-layers': Layers,
   'layers-to-frame': Frame,
   'copy-id': Hash,
+  'copy-link': Link,
   report: Flag,
   group: Group,
   ungroup: Ungroup,
@@ -117,7 +123,8 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'resize-to-fit': Shrink,
   'section-selection': LayoutDashboard,
   stack: Rows3,
-  'auto-layout': Columns2,
+  'wrap-stack': StretchHorizontal,
+  'remove-stack': SquareSplitVertical,
   'union': SquaresUnite,
   'subtract': SquaresSubtract,
   'intersect': SquaresIntersect,
@@ -127,8 +134,13 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'outline-text': TypeIcon,
   'create-component': ComponentIcon,
   'detach-instance': Unlink,
+  'go-to-main': Target,
   'push-instance': ArrowUpToLine,
   'reset-instance': RotateCcw,
+  hide: EyeOff,
+  lock: Lock,
+  'copy-properties': ClipboardCopy,
+  'paste-properties': ClipboardPaste,
   'create-formats': Proportions,
   'combine-video': Clapperboard,
   export: Download,
@@ -138,7 +150,6 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'frame-interactive': SlidersHorizontal,
   'frame-components': Blocks,
   'frame-templates': LayoutTemplate,
-  'frame-branches': GitBranch,
   'frame-history': History,
   'frame-chat': MessageSquareText,
   'frame-save-template': BookmarkPlus,

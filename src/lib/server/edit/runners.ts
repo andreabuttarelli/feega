@@ -56,7 +56,7 @@ export async function runCanvasOp(caller: OrgCaller, ask: CanvasAsk): Promise<An
     return denied;
   }
 
-  const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId });
+  const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId, agentKey: MCP_AGENT_KEY, sessionId: caller.sessionId });
   return { status: HTTP_OK, body: await op.run(ctx, input.data as never) };
 }
 
@@ -80,7 +80,7 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
     return READ_ONLY_KEY;
   }
 
-  const scope = { orgId: caller.orgId, userId: caller.userId, nodeId: ask.nodeId };
+  const scope = { orgId: caller.orgId, userId: caller.userId, nodeId: ask.nodeId, sessionId: caller.sessionId };
   const gated = async (tools: string[]) => (tools.some((t) => SPENDING_TOOLS.has(t)) ? denial(caller) : undefined);
 
   if (ask.tool === BATCH) {
@@ -132,5 +132,5 @@ export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promis
   }
 
   const gate = async (): Promise<EditorAnswer | null> => (await denial(caller)) as EditorAnswer | null;
-  return runEditorOp(ask.op, { ...scope, actor: agentActor(caller.userId, MCP_AGENT_KEY), gate }, input.data as never);
+  return runEditorOp(ask.op, { ...scope, actor: agentActor(caller.userId, MCP_AGENT_KEY, caller.sessionId), gate }, input.data as never);
 }

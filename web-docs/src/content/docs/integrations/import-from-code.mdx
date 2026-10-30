@@ -1,0 +1,45 @@
+---
+title: Import from code
+description: Turn a page of a GitHub React app into a frame where every code component is a Feega component.
+sidebar:
+  order: 5
+---
+
+Paste a public GitHub repository and a page path. Feega runs the app in a sandbox, opens the page and draws it as an editable frame, like [Import from URL](/integrations/import-from-url/), with one difference: components keep their identity.
+
+- Every component of the repository rendered on the page becomes a **main component**, named as in the code.
+- Every other use of it is an **instance** linked to that main. Different labels become text overrides.
+- Props with a few short lowercase values (`variant="outline"`, `size="sm"`) and boolean props become **variants** of one component set. A prop the code leaves out is the variant `Default`.
+
+Export the frame back to code (React or Svelte) and you get the same names and props: `<Button variant="outline" children="Cancel" />`, with a `Button` component that picks the right variant.
+
+## In the app
+
+Open the insert menu (**+**), go to **Import**, choose **From code…**, paste `https://github.com/owner/repo` (or `…/tree/<branch>`), type the page path (default `/`) and press **Import**. Starting the app takes 15 to 60 seconds.
+
+## What works
+
+- React apps that start with `npm run dev` (Vite, Next.js client components). npm, pnpm, yarn and bun lockfiles.
+- Components declared in the repository's own `.tsx`/`.jsx` files. Components from packages (icons, Radix primitives) stay plain layers.
+- A use that draws something other than its texts differently from the main (another icon, a nested component in another state) stays plain layers; the components inside it are still linked.
+
+## Limits
+
+- Public repositories only. The app runs without any environment variables: pages that need secrets or a login to render show what they show without them.
+- Server components (Next.js App Router pages without `"use client"`), Svelte and Vue are not read yet.
+- The app has 6 minutes to install and start; the page then follows the URL import limits (1280 px wide, 3840 px tall, 1500 layers).
+- Two imports every ten minutes per person.
+
+## CLI
+
+```bash
+feega canvas import-code $PROJECT https://github.com/owner/repo --route /dashboard --canvas <canvas> --x 0 --y 0
+```
+
+The answer has `frameId`, `components`, `variants`, `instances` and `skipped` (what stayed plain layers, and why).
+
+## MCP and API
+
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, route, x, y } })`.
+
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, route?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).

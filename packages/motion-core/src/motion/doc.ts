@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { COMP_CARD, COMP_CARD_LAYOUTS } from './card-layouts';
 import { screenCompOf } from './device-screen';
-import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
+import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, salvageProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
 import { withMediaPickers } from './legacy-media';
@@ -156,7 +156,9 @@ const templateMarkSchema = z.object({
 
 export const propertyDefSchema = z.object({ kind: z.enum(['boolean', 'text', 'swap', 'nested']), target: z.string().min(1).max(80), default: z.union([z.string().max(2000), z.boolean()]).optional(), nested: z.string().min(1).max(40).optional(), preferred: z.array(z.string().min(1).max(80)).max(40).optional() }).strict();
 
-export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional(), properties: z.record(z.string().min(1).max(40), propertyDefSchema).optional() }).strict();
+export const DEFAULT_VARIANT = 'Default';
+
+export const mainComponentSchema = z.object({ name: z.string().min(1).max(60), set: z.string().min(1).max(60).optional(), variant: z.record(z.string().min(1).max(40), z.string().min(1).max(40)).optional(), properties: z.record(z.string().min(1).max(40), propertyDefSchema).optional(), home: z.string().min(1).max(64).optional() }).strict();
 
 const compSchema = z.object({
   template: templateMarkSchema.optional(),
@@ -233,6 +235,7 @@ export const motionDocSchema = z
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
+    surface: z.string().min(1).optional(),
     breakpoints: breakpointsSchema,
     layoutGuides: layoutGuidesSchema,
     userGuides: userGuidesSchema,
@@ -291,7 +294,7 @@ export function byFrame<T extends { frame: number }>(track: readonly T[]): T[] {
 }
 
 export function clipProps(components: CustomComponents, component: ComponentId, props: unknown, strictness: Strictness): PropsVerdict {
-  const base = parseProps(component, props);
+  const base = strictness === Strictness.Lenient ? salvageProps(component, props) : parseProps(component, props);
   if (!base.ok || component !== 'Custom') {
     return base;
   }

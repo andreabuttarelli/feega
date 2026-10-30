@@ -8,6 +8,7 @@ import { TOP_LEFT_ANCHOR, addClip, setJunction, setKeyframes, setTransform, setT
 import { JunctionKind } from '@feega/motion-core/motion/junctions';
 import { LIBRARY_IDS } from '@feega/motion-core/motion/components';
 import { Ease } from '@feega/motion-core/motion/design';
+import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { findClip } from '@feega/motion-core/motion/doc';
 import { Interp, easeName, sampleTrack } from '@feega/motion-core/motion/keyframes';
 import { keyframeTweens } from '@feega/motion-core/motion/hyperframes/animate';
@@ -150,7 +151,7 @@ describe('MotionDoc to HyperFrames composition', () => {
 
   it('a layer with a background blur drops the will-change that would hide what is behind it', () => {
     const blurred = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect' } }, 'card'));
-    const doc = { ...blurred, tracks: blurred.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, effects: [{ id: 'bg', kind: 'background-blur' as const, enabled: true, params: { radius: 8 } }] })) })) };
+    const doc = { ...blurred, tracks: blurred.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, effects: [{ id: 'bg', kind: EffectKind.BackgroundBlur, enabled: true, params: { radius: 8 } }] })) })) };
     const plain = compose(blurred);
     const html = compose(doc);
 

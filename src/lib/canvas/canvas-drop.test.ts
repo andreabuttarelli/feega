@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fractionIn, hostShift, hostTurn, isOutside } from './canvas-drop';
+import { Carry, carryOf, fractionIn, hostShift, hostTurn, isOutside } from './canvas-drop';
 
 describe('where a drop lands inside a frame', () => {
   const stage = { left: 100, top: 50, width: 200, height: 100 };
@@ -20,6 +20,30 @@ describe('an element dragged off its frame', () => {
     expect(isOutside(stage, { x: 100, y: 50 })).toBe(false);
     expect(isOutside(stage, { x: 101, y: 50 })).toBe(true);
     expect(isOutside(stage, { x: 50, y: -1 })).toBe(true);
+  });
+});
+
+describe('a press on an element inside a frame', () => {
+  const frame = { left: 0, top: 0, width: 100, height: 100 };
+  const down = { x: 50, y: 50 };
+  const inside = { x: 50, y: 50 };
+  const outside = { x: 140, y: 50 };
+
+  it('is no drag while the pointer stays within a few screen pixels of where it went down', () => {
+    expect(carryOf({ down, now: { x: 53, y: 52 }, started: false, frame, world: inside })).toBe(Carry.Held);
+  });
+
+  it('a double-click with jitter on a frame drawn elsewhere never carries anything out', () => {
+    expect(carryOf({ down, now: { x: 52, y: 49 }, started: false, frame, world: outside })).toBe(Carry.Held);
+  });
+
+  it('drags inside once the pointer travels past the slop', () => {
+    expect(carryOf({ down, now: { x: 55, y: 50 }, started: false, frame, world: inside })).toBe(Carry.Within);
+  });
+
+  it('carries out only once a started drag leaves the edited frame', () => {
+    expect(carryOf({ down, now: { x: 51, y: 50 }, started: true, frame, world: outside })).toBe(Carry.Out);
+    expect(carryOf({ down, now: { x: 51, y: 50 }, started: true, frame, world: inside })).toBe(Carry.Within);
   });
 });
 

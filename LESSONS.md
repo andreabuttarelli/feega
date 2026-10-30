@@ -192,7 +192,8 @@ altro worktree. Mossa: un dev server tuo su una porta tua e `E2E_BASE_URL`.
 `vite.config.ts` esclude `**/.claude/worktrees/**` dal watcher: un dev server lanciato DENTRO un
 worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallisce su
 un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
-Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright.
+Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright. Vale anche per una misura di
+performance: numeri identici prima e dopo un fix vogliono dire codice vecchio servito, non un fix inutile.
 
 ### Il canvas core diventa vuoto o nero dopo un clic, senza errori
 Segnale: nessun `pageerror`, nessun `liveDocs.set`, `data-painted` aumenta di un `full` e poi il
@@ -3427,6 +3428,14 @@ Signal: inpaint keeps the painted area and regenerates the rest; reframe returns
 
 **Signal:** a WebGPU page that runs smoothly and then gets killed on iPhone; on desktop the GPU memory "leaks" but never crashes. Counting `GPUDevice.createTexture` minus `GPUTexture.destroy` shows thousands of live textures (24 GB after 5 min on the heavy canvas). **Move:** wgpu's WebGPU backend makes `Drop` a no-op for textures and buffers; the memory goes only when JS GC collects the wrapper, and Safari's GC does not see GPU pressure. Call `texture.destroy()` / `buffer.destroy()` (after the last submit that uses it) for every short-lived GPU resource. `scripts/perf/mobile-memory.ts` counts them.
 
+## Blocky holes around glyphs on the canvas: GL state leaked into vello_hybrid
+
+**Signal:** crisp text with a coarse 4×4 px halo in the canvas background colour (dots show through), display list clean, only on some loads; headless Chromium (no WebGPU adapter → WebGL). **Move:** vello_hybrid enables `BLEND` once at creation and never again; any own GL pass that disables it (filters, flip, reproject) makes every later strip draw overwrite instead of blend. Own passes go through `gl_state::isolated`, which restores what they switched off. Reproduce headless with Playwright on a white-on-black text node: holes = pixels equal to the canvas grey inside the black box.
+
+## A new column written before its migration breaks every write, silently in Vercel
+
+**Signal:** every save shows "The server failed to save this change", Vercel logs are empty, `schema-drift-check` lists an unapplied migration. **Move:** new optional columns/RPC args are written with a fallback (retry without on PGRST202/PGRST204/42703), and `handleError` must `console.error` — Sentry's wrapper alone shows nothing in Vercel. Migrations merged to `dev` are applied to production (which `dev` uses) before the user tests `dev`.
+
 ## Desktop native canvas
 
 ### A render thread that reads the camera, then waits for a drawable, shows a stale frame
@@ -3448,3 +3457,56 @@ Signal: the image shows in the frame, the inspector names it, yet no selection b
 
 ### A double-click on a new text does nothing while the playhead is past 0
 Signal: outlined box, no caret; it works with the playhead at 0. Cause: the text started at the playhead and `Text` fades up, so at that frame it is transparent and `pickOwnersAt` skips it. Move: check the clip's `from` against the playhead before blaming the editor.
+
+### A whole frame is blank, other frames draw
+Signal: one frame renders nothing on the canvas, no error on screen. Cause: a stored clip prop a `.strict()` component schema refuses (e.g. `radius` on Shape) made `parseMotionDoc` reject the whole doc. Move: run `parseMotionDoc(doc)` on the stored doc and read `error`; load is Lenient and must drop bad props (`salvageProps`), never refuse the doc.
+
+### A settings error on `/settings/*` that clicking through the routes never reproduces
+Signal: telemetry shows one settings page reading another page's fields (`data.models` on spend), but the route nav is clean. Cause: the URL is the canvas sheet's shallow route; `CanvasSheet.svelte` renders the section page itself. Move: read the session's clicks in PostHog (`elements_chain`) to see which UI was used, then repro from the canvas rail.
+
+### Frame pick always lands on the whole frame
+Signal: hover and click inside a frame outline the entire frame; double-click turns it into a path. Cause: the doc's only layer is a full-frame container (`page`), the top-level element for every point. Move: check `framePage(doc)`; the pick rule must skip it, never select it.
+
+### A worktree's dev server stops seeing edits after `git checkout`
+Signal: a fix green in vitest changes nothing in the browser; a `console.warn` added to a component never prints. Cause: the Vite watcher in a worktree drops after switching commits and keeps serving old modules. Move: restart `vite dev` after every checkout or edit you test in e2e; a bisect on a live server measures only the first commit. In an agent worktree it never sees an edit at all: `vite.config.ts` lists `.claude/worktrees` in `server.watch.ignored`.
+
+### A peer's frame "flashes black" but a dark-pixel probe sees nothing
+Signal: a two-browser probe counting near-black pixels stays green while the user reports a flash. Cause: the flash is the frame's stand-in in the paper colour, black only in dark theme; the probe ran in light theme, on a small doc edited through the API, and never hit it. Move: drive the edit through the UI and flag every sample that matches neither the before nor the after screenshot (`tests/e2e/peer-frame-patch.spec.ts`); then read which layer the chain drew (`chains` in `CoreFrames.svelte`).
+
+### A `.svelte` file calls a name that does not exist and CI is green
+Signal: a click throws `ReferenceError: x is not defined` in a component; the suite and the runtime type gate passed. Cause: `scripts/typecheck-runtime.mjs` runs plain `tsc`, which never reads `.svelte`, and `svelte-check` was not in CI, so its errors piled up to ~380 and real ones (an undefined function, registry tables missing rows, a type that hid a dropped field) drowned in fixture noise. Move: `npm run check` must stay at zero (CI `Type check` step); a new error is read, not silenced. It needs `.env` (from `.env.example`) because `$env` types come from it.
+
+### Clicks inside a breakpoint view move elements out of the frame
+Signal: `motion_revisions` fill with "Moved an element to another frame", one new `element` node per click, then "This node no longer exists". Cause: the element drag tested "outside" against the base frame's DOM stage while the pointer sat on the Tablet/Phone view drawn beside it, and nothing gated a press without movement. Move: a frame drag measures the frame being edited (`at.frame.box`) and starts only past `DRAG_SLOP_PX` (`carryOf` in `canvas-drop.ts`); `canvas-double-click-stays.spec.ts` replays double-clicks with jitter on the frame and its views.
+
+### A canvas e2e fails at its first hover on untouched dev
+Signal: a `@real` spec waits for `frame-hover-box`, `selection-overlay`, `part-box`, `motion-editor` or `.svelte-flow__node` and times out. Cause: those belong to the DOM editor removed when the canvas became the editor; the GPU canvas draws `frame-pick-box`, `frame-selection` (with `data-clip`) and `gpu-node`. Move: grep `src` for the testid before diagnosing a regression; port the spec to the GPU testids (`canvas-nested-pick.spec.ts` is the pattern). `page.mouse.click` takes no `modifiers`: hold ⌘ with `keyboard.down('ControlOrMeta')`.
+
+## An imported page comes out blank but its texts and boxes are in the tree count
+
+**Signal:** URL import of a Tailwind 4 site draws almost nothing; the tree has nodes but no fills and no TEXT. **Move:** Chrome computes Tailwind 4 colours as `oklch()`; a reader that parses only `rgb()` drops them. Paint unknown colour syntax on a 1×1 canvas and read the pixel back (`pageTreeOf`). Check a page with `CHROMIUM_PATH=… npx vitest run src/lib/server/url-import/page-tree.browser.test.ts`.
+
+## An instance in auto layout lands far off, the same instance free on the frame is fine
+
+**Signal:** a component instance whose main contains only another instance is pushed by the size of the whole frame. **Move:** `compBounds` measured top clips by their own box; a Precomp host has none. Ask the instance content (`instanceContent`) for nested hosts. Same family: content past `MAX_COMP_DEPTH` silently disappears from renders.
+
+### A new tile shows its outline at once and its content a second later
+Signal: the selection ring of a drawn or pasted node is there on pointerup, its fill lands 0.5–3 s later and the delay varies run to run. Cause: the tile is in `nodes` but nothing holds its doc, so CoreFrames fetches `/motion/<id>/source` and races the node's own insert (404, worker fallback, second fetch). Move: give the doc to `liveDocs` on the gesture and hold the session's saves until the insert lands; measure with a screenshot-diff loop from pointerup (`page.screenshot({ clip })` every ~30 ms), never with a fixed wait.
+
+### Vitest reports "no tests" for a file that has tests
+Signal: `Test Files 1 failed`, `Tests no tests`, `collect 0ms`; the suite file looks fine. Cause: the disk is full and Vitest cannot write its transform cache (`ENOSPC` in the failure detail, easy to miss). Move: `df -h /System/Volumes/Data` first; free space (idle worktrees' `node_modules`, `test-results/`) before touching the test.
+
+### `goto` resolves but the page does not change
+Signal: after an action lands, `goto(newUrl)` resolves without error, no navigation happens, and it worked a day earlier. Cause: an `invalidate(...)` started just before (the runner's idle refresh) is batched on a microtask and supersedes the navigation token, cancelling the `goto` silently. Move: navigate only after that invalidation settles (`canvasPages.run` awaits its re-read before answering), and check the URL after `goto`: a realtime `invalidate` (a new canvas row arriving) can still cancel it, so `canvasPages.open` retries until the path matches.
+
+## A tall still export misses layers that are in the DOM
+
+**Signal:** a still taller than ~4 000 px exports with text or whole sections missing; the same clips render in a small doc; a clip screenshot of the missing area right after load shows them, a later one does not. **Move:** every clip of the HTML render is a `will-change` layer the size of the frame, and a full-height viewport makes Chrome drop composited layers. Open the page with a band-sized viewport and translate `#root` per band (`pictureOf` in `chromium-frames.ts`); never resize the viewport after load and never use `captureBeyondViewport` there (it resizes, the player re-lays out).
+
+## A URL-import reference screenshot does not match the tree it was taken with
+
+**Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame. **Move:** `captureBeyondViewport` and scroll-based snapshots fire resize, scroll and IntersectionObserver callbacks. Freeze the page first (`revealPage(RevealMode.Still)`: timers, rAF, `play()`, transitions), report every observed element as in view from the first script (`everythingInView`), and take the reference screenshot after the tree, with a second freeze, as `url-capture.browser.test.ts` does.
+
+## A URL import scores well and looks wrong on the canvas
+
+**Signal:** `url-fidelity.browser.test.ts` scores 0.95+, the canvas shows another font, content cut differently or a strip at the top. **Move:** the HTML still is not what the canvas draws. Score the GPU path too: `URL_IMPORT_GPU=<label> npx vite-node --config scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` after the HTML run with the same label, and compare both columns. Read a WebGPU canvas by screenshotting the element, never with `drawImage` after the frame presented (blank).

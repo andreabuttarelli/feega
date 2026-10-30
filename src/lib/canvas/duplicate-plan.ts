@@ -1,3 +1,4 @@
+import { docNodeCopy, holdsDoc } from './motion-node';
 /**
  * COSA NASCE DA UN DUPLICA (⌘D) O DA UN INCOLLA (⌘V): la selezione più le linee che stanno
  * INTERAMENTE dentro di lei — un arco con un solo capo fuori dalla selezione non si duplica, si
@@ -17,9 +18,10 @@
  */
 
 export type DuplicateNode = { id: string; type: string; data: Record<string, unknown>; x: number; y: number };
+export type CopiedNode = DuplicateNode & { width?: number | null; height?: number | null };
 export type DuplicateEdge = { id: string; source: string; target: string; sourceHandle: string | null; targetHandle: string | null };
 
-export type DuplicatedNode = { sourceIndex: number; type: string; data: Record<string, unknown>; x: number; y: number; width?: number; height?: number };
+export type DuplicatedNode = { id?: string; sourceIndex: number; type: string; data: Record<string, unknown>; x: number; y: number; width?: number; height?: number };
 export type DuplicatedEdge = {
   sourceIndex: number;
   targetIndex: number;
@@ -67,6 +69,23 @@ export function planDuplicate(input: {
     }));
 
   return { nodes, edges };
+}
+
+function docCopy(planned: DuplicatedNode, source: CopiedNode): DuplicatedNode {
+  if (!holdsDoc(source.type)) {
+    return planned;
+  }
+  return { ...docNodeCopy(planned), width: source.width ?? undefined, height: source.height ?? undefined };
+}
+
+export type CopyIds = Readonly<Record<string, string>>;
+
+const withId = (planned: DuplicatedNode, id: string | undefined): DuplicatedNode => (id ? { ...planned, id } : planned);
+
+export function copyPlan(input: { ids: string[]; nodes: CopiedNode[]; edges: DuplicateEdge[]; offset: { dx: number; dy: number }; copyIds?: CopyIds }): DuplicatePlan {
+  const plan = planDuplicate(input);
+  const chosen = input.nodes.filter((n) => input.ids.includes(n.id));
+  return { ...plan, nodes: plan.nodes.map((planned) => withId(docCopy(planned, chosen[planned.sourceIndex]), input.copyIds?.[chosen[planned.sourceIndex].id])) };
 }
 
 /** Il passo di ogni duplicato successivo: visibile accanto all'originale, non sopra di lui. */

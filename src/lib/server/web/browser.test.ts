@@ -11,6 +11,7 @@ const KEY = 'secret-key';
 function fakeBrowser() {
   const page = {
     setViewport: vi.fn(async () => undefined),
+    setBypassCSP: vi.fn(async () => undefined),
     setRequestInterception: vi.fn(async () => undefined),
     on: vi.fn(),
     createCDPSession: vi.fn(async () => ({ send: vi.fn(async () => undefined) })),

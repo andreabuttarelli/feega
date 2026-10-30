@@ -57,6 +57,14 @@ describe('recordEvent: ogni scrittura porta org_id e l attore', () => {
     });
   });
 
+  it('the session of the turn lands on the event', async () => {
+    const { db, calls } = fakeDb({ canvas_events: [eventRow] });
+
+    await recordEvent(db, { orgId: ORG, canvasId: CANVAS, kind: 'node.update', nodeId: NODE, actor: { kind: 'agent', id: USER, agentKey: 'claude-code', sessionId: 's-1' } });
+
+    expect(calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ session_id: 's-1' });
+  });
+
   it('before/after arrivano sempre, anche quando nessuno chiederà mai di annullare questo evento', async () => {
     const { db, calls } = fakeDb({ canvas_events: [eventRow] });
 
@@ -96,6 +104,7 @@ describe('recordEvent: ogni scrittura porta org_id e l attore', () => {
       actorKind: 'user',
       actorId: USER,
       agentKey: null,
+      sessionId: null,
       createdAt: '2026-09-22T00:00:00Z'
     });
   });
@@ -108,5 +117,33 @@ describe('listCanvasEvents: l attività di una tela resta dentro la sua org', ()
     await listCanvasEvents(db, { orgId: ORG, canvasId: CANVAS });
 
     expect(filtersOf(calls, 'select')).toMatchObject({ org_id: ORG, canvas_id: CANVAS });
+  });
+});
+
+function beforeSessionsDb() {
+  const missing = { code: '42703', message: 'column canvas_events.session_id does not exist' };
+  const answer = (columns: string) => (columns.includes('session_id') ? { data: null, error: missing } : { data: [eventRow], error: null });
+  const listing = (columns: string) => {
+    const chain = { eq: () => chain, gte: () => chain, order: () => chain, limit: async () => answer(columns) };
+    return chain;
+  };
+  const refused = { data: null, error: { code: 'PGRST204', message: "Could not find the 'session_id' column" } };
+  const inserting = (row: Record<string, unknown>) => ({
+    select: (columns: string) => ({ single: async () => ('session_id' in row ? refused : { data: answer(columns).data?.[0] ?? null, error: answer(columns).error }) })
+  });
+  return { from: () => ({ select: listing, insert: inserting }) } as unknown as Parameters<typeof recordEvent>[0];
+}
+
+describe('canvas events before the session column exists', () => {
+  it('an event is still recorded when the database has no session_id yet', async () => {
+    const event = await recordEvent(beforeSessionsDb(), { orgId: ORG, canvasId: CANVAS, kind: 'node.update', nodeId: NODE, actor: { kind: 'user', id: USER, sessionId: 's-1' } });
+
+    expect(event.sessionId).toBeNull();
+  });
+
+  it('the activity still lists when the database has no session_id yet', async () => {
+    const events = await listCanvasEvents(beforeSessionsDb(), { orgId: ORG, canvasId: CANVAS });
+
+    expect(events).toHaveLength(1);
   });
 });

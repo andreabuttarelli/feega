@@ -11,7 +11,7 @@ const DETECT_PROMPT = `List the ${MAX_LAYERS} most distinct foreground elements 
 
 export async function detectLayers(db: Db, scope: { orgId: string; assetId: string }): Promise<LayerBox[]> {
   const asset = await findAsset(db, scope);
-  if (!asset || asset.type !== 'image') {
+  if (!asset?.url || asset.type !== 'image') {
     return [];
   }
 

@@ -17,7 +17,8 @@ test.describe('comments realtime @real', () => {
       await gotoHydrated(page, path);
       await gotoHydrated(peer, path);
       for (const w of [page, peer]) {
-        await w.getByTestId('canvas-switcher').click();
+        await w.keyboard.press('Alt+1');
+        await w.getByTestId('canvas-more').click();
         await w.getByTestId('canvas-comments').click();
         await expect(w.getByTestId('comments-panel')).toContainText('No comments yet');
       }

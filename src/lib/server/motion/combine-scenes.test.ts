@@ -28,6 +28,15 @@ function memory(frames: StoredFrame[]) {
 }
 
 describe('combine scenes into a video', () => {
+  it('makes the parent under the id the canvas already shows', async () => {
+    const { store, made } = memory([frame(A, 0, 60), frame(B, 1000, 45)]);
+    const id = '5a5a5a5a-5a5a-45a5-85a5-5a5a5a5a5a5a';
+
+    await combineScenes(store, { frameIds: [A, B], id });
+
+    expect(made[0].at).toMatchObject({ id });
+  });
+
   it('makes one parent frame with the scenes sequenced left to right, by reference', async () => {
     const { store, made } = memory([frame(C, 2000, 30), frame(A, 0, 60), frame(B, 1000, 45)]);
 

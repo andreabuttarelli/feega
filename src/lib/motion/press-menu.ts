@@ -42,6 +42,10 @@ export function pressMenu(node: HTMLElement, initial: Open) {
     if (e.pointerType !== TOUCH) {
       return;
     }
+    if (touching) {
+      cancel();
+      return;
+    }
     const at = { x: e.clientX, y: e.clientY };
     from = at;
     touching = true;

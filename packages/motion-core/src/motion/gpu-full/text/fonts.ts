@@ -8,7 +8,7 @@ export type Axes = Record<string, [min: number, max: number, fallback: number]>;
 export type Source = { axes: Axes; covers: (codePoint: number) => boolean; at: (coords: Record<string, number>) => Face };
 
 const BLOCK = /@font-face\s*\{([^}]*)\}/g;
-const DESCRIPTOR = /([a-z-]+)\s*:\s*([^;]+)/g;
+const DESCRIPTOR = /([a-z-]+)\s*:\s*((?:url\([^)]*\)|"[^"]*"|'[^']*'|[^;"'])+)/g;
 const URL = /url\(\s*["']?([^"')]+)["']?\s*\)/;
 const RANGE = /U\+([0-9A-F?]+)(?:-([0-9A-F]+))?/gi;
 const ALL: [number, number] = [0, 0x10ffff];
@@ -90,7 +90,10 @@ export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string
     return rule && group ? { rule, group, skew: request.italic && !styled.length ? SYNTHETIC_OBLIQUE : 0 } : null;
   };
 
-  return (request, codePoint): Resolved | null => {
+  const resolved = new Map<string, Resolved | null>();
+  const lookOf = (request: Parameters<FaceBook>[0], codePoint: number) => `${request.family}|${request.weight}|${request.italic}|${request.size}|${Object.entries(request.axes).join(';')}|${codePoint}`;
+
+  const resolve = (request: Parameters<FaceBook>[0], codePoint: number): Resolved | null => {
     const { family, weight: desired } = resolvedRequest(request, registry);
     const found = [family, familyName(BuiltinFont.Sans, registry), ...SYMBOL_FALLBACKS].reduce<ReturnType<typeof ruleFor>>((hit, f) => hit ?? ruleFor(f, request, desired, codePoint), null);
     if (!found) {
@@ -99,5 +102,15 @@ export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string
     const { rule, group, skew } = found;
     const source = sources.get(rule.url)!;
     return { face: stamped(rule.url, coordsFor(source, clamp(desired, group), request)), skew };
+  };
+
+  return (request, codePoint) => {
+    const look = lookOf(request, codePoint);
+    if (resolved.has(look)) {
+      return resolved.get(look)!;
+    }
+    const found = resolve(request, codePoint);
+    resolved.set(look, found);
+    return found;
   };
 }

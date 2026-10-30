@@ -13,6 +13,10 @@ const NEEDS_PATH: ReadonlySet<string> = new Set([ShapeKind.Rect, ShapeKind.Circl
 
 export const canEditPoints = (clip: Pick<MotionClip, 'component' | 'props'> | null | undefined): boolean => clip?.component === 'Shape' && EDITABLE.has(String(clip.props.shape));
 
+const holdsChildren = (doc: MotionDoc, id: string): boolean => doc.tracks.some((t) => t.clips.some((c) => c.parent === id));
+
+export const editsPoints = (doc: MotionDoc, clip: MotionClip): boolean => canEditPoints(clip) && !holdsChildren(doc, clip.id);
+
 export function enterPointEdit(doc: MotionDoc, clip: MotionClip): OpResult {
   return NEEDS_PATH.has(String(clip.props.shape)) ? setPath(doc, clip.id, shapePath(clip.props as unknown as ShapeParams)) : { ok: true, doc };
 }

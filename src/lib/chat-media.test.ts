@@ -16,7 +16,7 @@ vi.mock('$env/dynamic/public', () => ({
   env: { PUBLIC_SUPABASE_URL: 'https://test.supabase.co' }
 }));
 
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 import {
   normalizeMediaPayload,
   mediaFromToolCall,
@@ -26,7 +26,7 @@ import {
   MAX_CHAT_MEDIA
 } from './chat-media';
 
-const HOST = new URL(PUBLIC_SUPABASE_URL).origin;
+const HOST = new URL(env.PUBLIC_SUPABASE_URL!).origin;
 const img = (n = 'a') => `${HOST}/storage/v1/object/public/media/u/${n}.png`;
 const vid = (n = 'clip') => `${HOST}/storage/v1/object/public/media/u/${n}.mp4`;
 const signed = `${HOST}/storage/v1/object/sign/brand-knowledge/u/b/artifacts/x.jpg?token=abc`;
@@ -110,14 +110,14 @@ describe('normalizeMediaPayload', () => {
     expect(mediaFromToolCall({ output: { media: [{ url: img('live') }] } })).toEqual([
       { url: img('live'), kind: 'image' }
     ]);
-    expect(mediaFromToolCall({ toolName: 'motion_stills', output: { posts: [] } })).toBeNull();
+    expect(mediaFromToolCall({ output: { posts: [] } })).toBeNull();
   });
 });
 
 describe('splitTextMedia', () => {
   // L'indirizzo esatto della segnalazione.
-  const trailer = `${new URL(PUBLIC_SUPABASE_URL).origin}/storage/v1/object/public/media/22bf9fdc-1111-2222-3333-444455556666/motion/59933541-aaaa-bbbb-cccc-ddddeeeeffff.mp4`;
-  const shot = `${new URL(PUBLIC_SUPABASE_URL).origin}/storage/v1/object/public/media/u/shot.png`;
+  const trailer = `${new URL(env.PUBLIC_SUPABASE_URL!).origin}/storage/v1/object/public/media/22bf9fdc-1111-2222-3333-444455556666/motion/59933541-aaaa-bbbb-cccc-ddddeeeeffff.mp4`;
+  const shot = `${new URL(env.PUBLIC_SUPABASE_URL!).origin}/storage/v1/object/public/media/u/shot.png`;
 
   it('promotes a bare storage URL on its own line, and keeps the line that introduces it', () => {
     const out = splitTextMedia(`Link del trailer:\n${trailer}`);
@@ -140,7 +140,7 @@ describe('splitTextMedia', () => {
     for (const url of [
       'https://evil.example.com/pixel.png',
       'https://other-project.supabase.co/storage/v1/object/public/media/a.mp4',
-      `${new URL(PUBLIC_SUPABASE_URL).origin}/storage/v1/object/public/media/u/a.svg`
+      `${new URL(env.PUBLIC_SUPABASE_URL!).origin}/storage/v1/object/public/media/u/a.svg`
     ]) {
       expect(splitTextMedia(`Guarda:\n${url}`)).toEqual({ text: `Guarda:\n${url}`, media: null });
     }

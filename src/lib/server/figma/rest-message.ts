@@ -1,4 +1,4 @@
-import type { ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
+import type { CodeComponent, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
 
 export type RestColor = { r: number; g: number; b: number; a?: number };
 
@@ -8,6 +8,8 @@ export type RestPaint = {
   opacity?: number;
   color?: RestColor;
   imageRef?: string;
+  scaleMode?: string;
+  imageFocus?: Vec;
   gradientHandlePositions?: Vec[];
   gradientStops?: { position: number; color: RestColor }[];
 };
@@ -22,6 +24,9 @@ export type RestStyle = {
   lineHeightUnit?: string;
   lineHeightPx?: number;
   lineHeightPercentFontSize?: number;
+  textDecoration?: string;
+  fontAxes?: string;
+  fontFeatures?: string;
   fills?: RestPaint[];
 };
 
@@ -60,9 +65,13 @@ export type RestNode = {
   fillGeometry?: { path: string; windingRule?: string }[];
   strokeGeometry?: { path: string; windingRule?: string }[];
   characters?: string;
+  textAutoResize?: string;
   style?: RestStyle;
   characterStyleOverrides?: number[];
   styleOverrideTable?: Record<string, RestStyle>;
+  componentId?: string;
+  use?: number;
+  codeComponent?: CodeComponent;
   children?: RestNode[];
 };
 
@@ -133,13 +142,26 @@ function inverse(m: Matrix): Matrix {
   };
 }
 
-function gradientTransform(handles: Vec[] | undefined): Matrix {
-  const [start, end, width] = handles ?? [];
-  if (!start || !end || !width) {
-    return IDENTITY;
-  }
+function linearTransform([start, end, width]: Vec[]): Matrix {
   const [x, y] = [{ x: end.x - start.x, y: end.y - start.y }, { x: 2 * (width.x - start.x), y: 2 * (width.y - start.y) }];
   return inverse({ m00: x.x, m01: y.x, m02: start.x - y.x / 2, m10: x.y, m11: y.y, m12: start.y - y.y / 2 });
+}
+
+function centredTransform([centre, across, down]: Vec[]): Matrix {
+  const [x, y] = [{ x: 2 * (across.x - centre.x), y: 2 * (across.y - centre.y) }, { x: 2 * (down.x - centre.x), y: 2 * (down.y - centre.y) }];
+  return inverse({ m00: x.x, m01: y.x, m02: centre.x - (x.x + y.x) / 2, m10: x.y, m11: y.y, m12: centre.y - (x.y + y.y) / 2 });
+}
+
+const GRADIENT_FRAME: Partial<Record<string, (handles: Vec[]) => Matrix>> = {
+  GRADIENT_LINEAR: linearTransform,
+  GRADIENT_RADIAL: centredTransform,
+  GRADIENT_ANGULAR: centredTransform,
+  GRADIENT_DIAMOND: centredTransform
+};
+
+function gradientTransform(type: string, handles: Vec[] | undefined): Matrix {
+  const frame = GRADIENT_FRAME[type];
+  return frame && handles && handles.length >= 3 ? frame(handles) : IDENTITY;
 }
 
 function paintOf(p: RestPaint): Paint {
@@ -150,8 +172,10 @@ function paintOf(p: RestPaint): Paint {
     opacity: p.opacity,
     color: p.color ? rgba(p.color) : undefined,
     stops,
-    transform: stops ? gradientTransform(p.gradientHandlePositions) : undefined,
-    image: p.imageRef ? { hash: bytesOf(p.imageRef) } : undefined
+    transform: stops ? gradientTransform(p.type, p.gradientHandlePositions) : undefined,
+    image: p.imageRef ? { hash: bytesOf(p.imageRef) } : undefined,
+    imageScaleMode: p.scaleMode,
+    focus: p.imageFocus
   };
 }
 
@@ -163,7 +187,7 @@ function fontOf(style: RestStyle | undefined) {
   if (!style?.fontFamily && !style?.fontWeight) {
     return undefined;
   }
-  const weight = WEIGHT_NAMES[style.fontWeight ?? DEFAULT_WEIGHT] ?? 'Regular';
+  const weight = WEIGHT_NAMES[style.fontWeight ?? DEFAULT_WEIGHT] ?? String(Math.round(style.fontWeight ?? DEFAULT_WEIGHT));
   return { family: style.fontFamily ?? 'Inter', style: style.italic ? `${weight} Italic` : weight };
 }
 
@@ -192,6 +216,10 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     lineHeight: lineHeightOf(style),
     letterSpacing: style?.letterSpacing ? { value: style.letterSpacing, units: 'PIXELS' } : undefined,
     textAlignHorizontal: style?.textAlignHorizontal,
+    textAutoResize: n.textAutoResize,
+    textDecoration: style?.textDecoration,
+    fontAxes: style?.fontAxes,
+    fontFeatures: style?.fontFeatures,
     textData: { characters: n.characters ?? '', characterStyleIDs: n.characterStyleOverrides, styleOverrideTable: overrides }
   };
 }
@@ -237,7 +265,7 @@ const sizeOf = (n: RestNode): Vec => n.size ?? { x: n.absoluteBoundingBox?.width
 
 const positionOf = (index: number) => String(index).padStart(POSITION_DIGITS, '0');
 
-type Build = { nodes: FigmaRawNode[]; blobs: Uint8Array[]; next: () => Guid };
+type Build = { nodes: FigmaRawNode[]; blobs: Uint8Array[]; next: () => Guid; guids: Map<string, Guid> };
 
 function geometryOf(list: { path: string; windingRule?: string }[] | undefined, build: Build): { commandsBlob: number }[] | undefined {
   if (!list?.length) {
@@ -249,6 +277,8 @@ function geometryOf(list: { path: string; windingRule?: string }[] | undefined, 
 
 function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: number, build: Build) {
   const guid = build.next();
+  build.guids.set(n.id, guid);
+  const symbolID = n.componentId ? build.guids.get(n.componentId) : undefined;
   build.nodes.push({
     guid,
     type: n.type,
@@ -268,7 +298,9 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     strokeGeometry: geometryOf(n.strokeGeometry, build),
     ...cornersOf(n),
     ...layoutOf(n),
-    ...(n.type === 'TEXT' ? textOf(n) : {})
+    ...(n.type === 'TEXT' ? textOf(n) : {}),
+    ...(symbolID ? { symbolData: { symbolID } } : {}),
+    ...(n.codeComponent ? { codeComponent: n.codeComponent } : {})
   });
   (n.children ?? []).forEach((child, i) => add(child, { rest: n, guid }, i, build));
 }
@@ -276,7 +308,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
 export function restMessage(frames: RestNode[], fileKey: string): FigmaMessage {
   let counter = PAGE_ID;
   const page: Guid = { sessionID: 0, localID: PAGE_ID };
-  const build: Build = { nodes: [{ guid: page, type: 'CANVAS', name: 'Page' }], blobs: [], next: () => ({ sessionID: 0, localID: ++counter }) };
+  const build: Build = { nodes: [{ guid: page, type: 'CANVAS', name: 'Page' }], blobs: [], next: () => ({ sessionID: 0, localID: ++counter }), guids: new Map() };
   frames.forEach((frame, i) => add(frame, { rest: null, guid: page }, i, build));
   return { meta: { fileKey }, nodes: build.nodes, blobs: build.blobs };
 }

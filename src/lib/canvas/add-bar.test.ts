@@ -62,6 +62,22 @@ describe('la barra per aggiungere un nodo', () => {
   });
 });
 
+describe('il menu +', () => {
+  it('non ha più lo switch Design/Generate', () => {
+    expect(bar).not.toMatch(/radiogroup/);
+    expect(bar).not.toMatch(/BarMode/);
+  });
+
+  it('il menu desktop e il foglio Insert su telefono rendono la stessa fonte', () => {
+    expect(bar).toMatch(/insertSections\(/);
+    expect(bar.match(/@render insertMenu\(\)/g)?.length).toBe(2);
+  });
+
+  it('la percentuale di zoom resta nella barra', () => {
+    expect(bar).toMatch(/data-testid="canvas-zoom"/);
+  });
+});
+
 describe('la tela che riceve il trascinamento', () => {
   it('accetta il rilascio, che senza `preventDefault` il browser rifiuta', () => {
     expect(flow).toMatch(/ondragover=/);

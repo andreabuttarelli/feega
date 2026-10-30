@@ -1,0 +1,658 @@
+<script lang="ts">
+  import UserRound from '@lucide/svelte/icons/user-round';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import Bot from '@lucide/svelte/icons/bot';
+  import Cog from '@lucide/svelte/icons/cog';
+  import Frame from '@lucide/svelte/icons/frame';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Eye from '@lucide/svelte/icons/eye';
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import Tag from '@lucide/svelte/icons/tag';
+  import BookmarkPlus from '@lucide/svelte/icons/bookmark-plus';
+  import GitMerge from '@lucide/svelte/icons/git-merge';
+  import GitBranch from '@lucide/svelte/icons/git-branch';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
+  import Undo2 from '@lucide/svelte/icons/undo-2';
+  import { Side } from '$lib/motion/branch-merge';
+  import { untrack, type Component } from 'svelte';
+  import { SegmentedControl } from '$lib/components/ui/shell';
+  import { canvasSelection } from '$lib/canvas/canvas-selection';
+  import { historyPanel } from '$lib/canvas/history-panel.svelte';
+  import { baseNodeId } from '$lib/canvas/breakpoint-views';
+  import { postPageAction } from '$lib/api/page-action';
+  import { LocalOff, isOff } from '$lib/local-user';
+  import { EntryKind, HistoryAction, HistoryFilter, LaneIcon, actionsOf, branchForks, entryLabel, laneSpans, sessionLabel, type HistoryEntry, type HistoryGraph } from '$lib/canvas/history/timeline';
+  import type { HistoryPreview } from '$lib/server/canvas/history-actions';
+  import { liveRefresh, mergeGraph } from '$lib/canvas/history/live';
+  import { watchHistory } from '$lib/realtime/history-channel';
+  import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { Keep, RejectOutcome, type EventConflict } from '$lib/canvas/reject-plan';
+
+  let { projectId, canvasId }: { projectId: string; canvasId: string } = $props();
+
+  const ICON = 12;
+  const LANE_PX = 12;
+  const ROW_PX = 28;
+  const DOT_R = 3.5;
+
+  const LANE_ICONS: Record<LaneIcon, Component<{ size?: number }>> = {
+    [LaneIcon.Person]: UserRound,
+    [LaneIcon.Chat]: MessageSquare,
+    [LaneIcon.Agent]: Bot,
+    [LaneIcon.System]: Cog
+  };
+
+  const FILTERS = [
+    { value: HistoryFilter.All, label: 'All' },
+    { value: HistoryFilter.Ai, label: 'AI' },
+    { value: HistoryFilter.People, label: 'People' }
+  ];
+
+  const ACTION_UI: Record<HistoryAction, { label: string; icon: Component<{ size?: number }> }> = {
+    [HistoryAction.Preview]: { label: 'Preview', icon: Eye },
+    [HistoryAction.Restore]: { label: 'Restore to here', icon: RotateCcw },
+    [HistoryAction.Name]: { label: 'Name this version', icon: Tag },
+    [HistoryAction.Merge]: { label: 'Merge', icon: GitMerge },
+    [HistoryAction.Drop]: { label: 'Drop', icon: Trash2 },
+    [HistoryAction.Revert]: { label: 'Revert this change', icon: Undo2 }
+  };
+
+  const KEEPS = [
+    { side: Side.Branch, label: 'Keep branch' },
+    { side: Side.Main, label: 'Keep main' }
+  ];
+
+  const ACTION_FAILED = 'That could not be done: reload and try again.';
+
+  let filter = $state(HistoryFilter.All);
+  let oneFrame = $state(historyPanel.frameId !== null);
+  let graph = $state<HistoryGraph | null>(null);
+  let failed = $state(false);
+  let reads = $state(0);
+  let opened = $state<string | null>(null);
+  let preview = $state<HistoryPreview | null>(null);
+  let naming = $state<string | null>(null);
+  let saving = $state(false);
+  let notice = $state('');
+  let conflicts = $state<string[] | null>(null);
+  let branching = $state(false);
+  let expanded = $state<Record<string, boolean>>({});
+  let asking = $state<{ id: string; conflicts: EventConflict[]; picks: Record<string, Keep> } | null>(null);
+  let confirming = $state<string | null>(null);
+
+  let resolving = $state<string | null>(null);
+
+  const CONFLICT_PREFIX = 'conflict:';
+  const SIDES = [
+    { keep: 'mine', label: 'Keep mine' },
+    { keep: 'theirs', label: 'Keep theirs' }
+  ];
+
+  const frameId = $derived(oneFrame && $canvasSelection[0] ? baseNodeId($canvasSelection[0]) : null);
+  const spans = $derived(graph ? laneSpans(graph) : []);
+  const forks = $derived(graph ? branchForks(graph) : []);
+  const gutter = $derived(Math.max(1, graph?.lanes.length ?? 1) * LANE_PX);
+
+  $effect(() => {
+    if (historyPanel.asked) {
+      oneFrame = historyPanel.frameId !== null;
+    }
+  });
+
+  $effect(() => {
+    void reads;
+    const params = new URLSearchParams({ author: filter, ...(frameId ? { frame: frameId } : {}) });
+    const controller = new AbortController();
+    failed = false;
+    fetch(`/p/${projectId}/c/${canvasId}/history?${params}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((read: HistoryGraph) => (graph = mergeGraph(untrack(() => graph), read)))
+      .catch((e: Error) => {
+        if (e.name !== 'AbortError') {
+          failed = true;
+        }
+      });
+    return () => controller.abort();
+  });
+
+  $effect(() => {
+    const live = liveRefresh(() => {
+      if (document.visibilityState === 'visible') {
+        reads += 1;
+      }
+    });
+    const unwatch = watchHistory(createSupabaseBrowserClient(), canvasId, live.changed, live.feed);
+    const focused = () => {
+      if (document.visibilityState === 'visible') {
+        live.focused();
+      }
+    };
+    window.addEventListener('focus', focused);
+    document.addEventListener('visibilitychange', focused);
+    return () => {
+      live.stop();
+      unwatch();
+      window.removeEventListener('focus', focused);
+      document.removeEventListener('visibilitychange', focused);
+    };
+  });
+
+  const pointUrl = (entry: Pick<HistoryEntry, 'id'>) => `/p/${projectId}/c/${canvasId}/history/${encodeURIComponent(entry.id)}`;
+
+  function toggle(entry: HistoryEntry) {
+    opened = opened === entry.id ? null : entry.id;
+    preview = null;
+    naming = null;
+    conflicts = null;
+    notice = '';
+  }
+
+  async function write(entry: HistoryEntry, body: Record<string, string>) {
+    const res = await fetch(pointUrl(entry), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const read = (await res.json().catch(() => ({}))) as { conflicts?: string[] };
+    conflicts = read.conflicts ?? null;
+    notice = res.ok || conflicts ? '' : ACTION_FAILED;
+    reads += 1;
+  }
+
+  const conflictKey = (c: { eventId: number; path: string }) => `${c.eventId}:${c.path}`;
+
+  type Reverted = { outcome: string; conflicts?: EventConflict[] };
+
+  const REVERT_REPLY: Partial<Record<string, (id: string, out: Reverted) => void>> = {
+    [RejectOutcome.Rejected]: () => {
+      notice = 'Reverted.';
+      reads += 1;
+    },
+    [RejectOutcome.Conflict]: (id, out) => {
+      const found = out.conflicts ?? [];
+      asking = { id, conflicts: found, picks: Object.fromEntries(found.map((c) => [conflictKey(c), Keep.Mine])) };
+    },
+    [RejectOutcome.Confirm]: (id) => {
+      confirming = id;
+    }
+  };
+
+  async function revert(id: string, choices: { eventId: number; path: string; keep: Keep }[] = [], confirm = false) {
+    asking = null;
+    confirming = null;
+    const res = await fetch(pointUrl({ id }), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: HistoryAction.Revert, choices, confirm }) });
+    const out = (await res.json().catch(() => ({ outcome: '' }))) as Reverted;
+    const reply = REVERT_REPLY[out.outcome];
+    notice = reply ? '' : ACTION_FAILED;
+    reply?.(id, out);
+  }
+
+  function revertChosen() {
+    if (!asking) {
+      return;
+    }
+    const { id, conflicts: found, picks } = asking;
+    void revert(id, found.map((c) => ({ eventId: c.eventId, path: c.path, keep: picks[conflictKey(c)] })));
+  }
+
+  const RUN: Record<HistoryAction, (entry: HistoryEntry) => Promise<void> | void> = {
+    [HistoryAction.Preview]: async (entry) => {
+      const res = await fetch(pointUrl(entry));
+      const read = res.ok ? ((await res.json()) as { preview: HistoryPreview }) : null;
+      preview = read?.preview ?? null;
+      notice = read ? '' : ACTION_FAILED;
+    },
+    [HistoryAction.Restore]: (entry) => write(entry, { action: HistoryAction.Restore }),
+    [HistoryAction.Name]: (entry) => {
+      naming = entry.summary ?? '';
+    },
+    [HistoryAction.Merge]: (entry) => write(entry, { action: HistoryAction.Merge }),
+    [HistoryAction.Drop]: (entry) => write(entry, { action: HistoryAction.Drop }),
+    [HistoryAction.Revert]: (entry) => revert(entry.id)
+  };
+
+  async function branchFrame(name: string) {
+    const form = new FormData();
+    form.set('name', name);
+    const result = await postPageAction(`/p/${projectId}/c/${canvasId}/motion/${frameId}`, 'createBranch', form);
+    notice = result.type === 'success' ? '' : ACTION_FAILED;
+    branching = false;
+    reads += 1;
+  }
+
+  async function saveVersion(name: string) {
+    const form = new FormData();
+    form.set('name', name);
+    const result = await postPageAction(`/p/${projectId}/c/${canvasId}`, 'saveCanvasVersion', form);
+    notice = result.type === 'success' ? '' : ACTION_FAILED;
+    saving = false;
+    reads += 1;
+  }
+
+  const isFrame = (p: HistoryPreview): p is Extract<HistoryPreview, { frameId: string }> => 'frameId' in p;
+
+  async function resolve(entryId: string, keep: string) {
+    resolving = entryId;
+    const conflictId = entryId.slice(CONFLICT_PREFIX.length);
+    await fetch(`/p/${projectId}/c/${canvasId}/history`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ conflictId, keep }) }).catch(() => null);
+    resolving = null;
+    reads += 1;
+  }
+
+  const timeOf = (at: string) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const laneX = (lane: number) => lane * LANE_PX + LANE_PX / 2;
+</script>
+
+<div class="history" data-testid="history-panel">
+  <div class="filters">
+    <SegmentedControl label="Who" options={FILTERS} value={filter} onchange={(v) => (filter = v as HistoryFilter)} class="flex-1" />
+    <button type="button" class="frame-toggle" class:on={oneFrame} aria-pressed={oneFrame} aria-label="One frame" title="Only the selected frame" disabled={!$canvasSelection.length && !oneFrame} onclick={() => (oneFrame = !oneFrame)} data-testid="history-one-frame">
+      <Frame size={14} />
+    </button>
+    {#if oneFrame && frameId}
+      <button type="button" class="frame-toggle" aria-label="New branch" title="Branch the selected frame" onclick={() => (branching = !branching)} data-testid="history-new-branch">
+        <GitBranch size={14} />
+      </button>
+    {/if}
+    {#if !isOff(LocalOff.Versions)}
+      <button type="button" class="frame-toggle" aria-label="Save version" title="Save the canvas as a version" onclick={() => (saving = !saving)} data-testid="history-save-version">
+        <BookmarkPlus size={14} />
+      </button>
+    {/if}
+  </div>
+
+  {#if saving}
+    <input class="name-input" aria-label="Version name" placeholder="Name this version" data-testid="history-version-name" onkeydown={(e) => e.key === 'Enter' && void saveVersion(e.currentTarget.value)} />
+  {/if}
+
+  {#if branching}
+    <input class="name-input" aria-label="Branch name" placeholder="Name the branch" data-testid="history-branch-name" onkeydown={(e) => e.key === 'Enter' && void branchFrame(e.currentTarget.value)} />
+  {/if}
+
+  {#if notice}
+    <p class="empty" role="status">{notice}</p>
+  {/if}
+
+  {#if asking}
+    <div class="point" data-testid="history-revert-conflicts">
+      <p class="empty">Changed again since. Keep which?</p>
+      {#each asking.conflicts as conflict (conflictKey(conflict))}
+        <div class="conflict">
+          <span class="summary">{conflict.path.replace(/^data\./, '')}</span>
+          <label><input type="radio" bind:group={asking.picks[conflictKey(conflict)]} value={Keep.Mine} /> Now: {JSON.stringify(conflict.mine)}</label>
+          <label><input type="radio" bind:group={asking.picks[conflictKey(conflict)]} value={Keep.Reject} /> Before: {JSON.stringify(conflict.original)}</label>
+        </div>
+      {/each}
+      <div class="point-actions">
+        <button type="button" class="point-action" onclick={() => (asking = null)}>Cancel</button>
+        <button type="button" class="point-action" onclick={revertChosen} data-testid="history-revert-apply">Revert</button>
+      </div>
+    </div>
+  {:else if confirming}
+    <div class="point" data-testid="history-revert-confirm">
+      <p class="empty">Someone else connected or edited what this change created. Revert anyway?</p>
+      <div class="point-actions">
+        <button type="button" class="point-action" onclick={() => (confirming = null)}>Keep it</button>
+        <button type="button" class="point-action" onclick={() => void revert(confirming!, [], true)}>Revert</button>
+      </div>
+    </div>
+  {/if}
+
+  {#if graph && graph.lanes.length}
+    <div class="lanes" data-testid="history-lanes">
+      {#each graph.lanes as lane (lane.key)}
+        {@const Icon = LANE_ICONS[lane.icon]}
+        <span class="lane" style:--lane={lane.colour} title={lane.label}><Icon size={ICON} /><span class="lane-name">{lane.label}</span></span>
+      {/each}
+    </div>
+  {/if}
+
+  {#if failed}
+    <p class="empty">History could not be read.</p>
+  {:else if graph && !graph.rows.length}
+    <p class="empty">Nothing changed here yet.</p>
+  {:else if graph}
+    <ol class="rows">
+      {#each graph.sessions as session, index (session.key)}
+        {@const lane = graph.lanes[session.lane]}
+        {@const Icon = LANE_ICONS[lane.icon]}
+        {#if session.rows.length > 1}
+          <li class="row" data-testid="history-session" data-lane={lane.kind}>
+            {@render graphCell(index, session.lane)}
+            <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
+            <button type="button" class="what toggle" aria-expanded={!!expanded[session.key]} onclick={() => (expanded = { ...expanded, [session.key]: !expanded[session.key] })} data-testid="history-session-toggle">
+              <span class="chevron" class:on={expanded[session.key]}><ChevronRight size={ICON} /></span>{lane.label}: {sessionLabel(session)}
+            </button>
+            <button type="button" class="point-action" title="Revert this session" aria-label="Revert this session" onclick={() => void revert(session.key)} data-testid="history-session-revert"><Undo2 size={ICON} /></button>
+            <time class="when" datetime={session.rows[0].entry.at}>{timeOf(session.rows[0].entry.at)}</time>
+          </li>
+          {#if expanded[session.key]}
+            {#each session.rows as step (step.entry.id)}
+              {@render entryRow(step.entry, index, session.lane, true)}
+            {/each}
+          {/if}
+        {:else}
+          {@render entryRow(session.rows[0].entry, index, session.lane, false)}
+        {/if}
+      {/each}
+    </ol>
+  {/if}
+</div>
+
+{#snippet graphCell(index: number, laneIndex: number)}
+  {#if graph}
+  <svg class="graph" width={gutter} height={ROW_PX} aria-hidden="true">
+    {#each spans as span, l (l)}
+      {#if index >= span.first && index <= span.last}
+        <line x1={laneX(l)} x2={laneX(l)} y1={index === span.first ? ROW_PX / 2 : 0} y2={index === span.last ? ROW_PX / 2 : ROW_PX} stroke={graph.lanes[l].colour} stroke-opacity="0.45" stroke-width="1.5" />
+      {/if}
+    {/each}
+    {#each forks.filter((f) => f.from === index) as fork (fork.to)}
+      <path d={`M ${laneX(laneIndex)} ${ROW_PX / 2} Q ${laneX(fork.lane)} ${ROW_PX / 2} ${laneX(fork.lane)} ${ROW_PX}`} fill="none" stroke={graph.lanes[laneIndex].colour} stroke-width="1.5" stroke-dasharray="3 2" data-testid="history-fork" />
+    {/each}
+    <circle cx={laneX(laneIndex)} cy={ROW_PX / 2} r={DOT_R} fill={graph.lanes[laneIndex].colour} />
+  </svg>
+  {/if}
+{/snippet}
+
+{#snippet entryRow(entry: HistoryEntry, index: number, laneIndex: number, step: boolean)}
+  {@const lane = graph!.lanes[laneIndex]}
+  {@const Icon = LANE_ICONS[lane.icon]}
+  {@const open = entry.kind === EntryKind.ConflictOpen}
+  {@const actions = actionsOf(entry)}
+  <li class="row" class:step class:conflict={open} class:open={opened === entry.id} data-testid="history-row" data-lane={lane.kind} onclick={() => actions.length && toggle(entry)} onkeydown={(e) => e.key === 'Enter' && actions.length && toggle(entry)} role={actions.length ? 'button' : undefined} tabindex={actions.length ? 0 : undefined}>
+    {@render graphCell(index, laneIndex)}
+    <span class="who" style:color={lane.colour} title={lane.label}><Icon size={ICON} /></span>
+    <span class="what">{entryLabel(entry)}{#if entry.summary}<span class="summary"> · {entry.summary}</span>{/if}</span>
+    {#if open}
+      <span class="sides">
+        {#each SIDES as side (side.keep)}
+          <button type="button" class="side" disabled={resolving === entry.id} onclick={(e) => { e.stopPropagation(); void resolve(entry.id, side.keep); }} data-testid="history-keep-{side.keep}">{side.label}</button>
+        {/each}
+      </span>
+    {:else}
+      <time class="when" datetime={entry.at}>{timeOf(entry.at)}</time>
+    {/if}
+  </li>
+  {#if opened === entry.id}
+    <li class="point" data-testid="history-point">
+      <div class="point-actions">
+        {#each actions as action (action)}
+          {@const ui = ACTION_UI[action]}
+          <button type="button" class="point-action" onclick={() => void RUN[action](entry)} data-testid={`history-action-${action}`}><ui.icon size={ICON} />{ui.label}</button>
+        {/each}
+      </div>
+      {#if naming !== null}
+        <input class="name-input" aria-label="Version name" placeholder="Name this version" value={naming} data-testid="history-name-input" onkeydown={(e) => e.key === 'Enter' && void write(entry, { action: HistoryAction.Name, name: e.currentTarget.value }).then(() => (naming = null))} />
+      {/if}
+      {#if conflicts}
+        <div class="preview" data-testid="history-conflicts">
+          <span>{conflicts.length} conflicts with the frame</span>
+          <div class="point-actions">
+            {#each KEEPS as keep (keep.side)}
+              <button type="button" class="point-action" onclick={() => void write(entry, { action: HistoryAction.Merge, keep: keep.side })}>{keep.label}</button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+      {#if preview}
+        <div class="preview" data-testid="history-preview">
+          {#if isFrame(preview)}
+            <span>Frame at version {preview.version}{preview.summary ? ` · ${preview.summary}` : ''}</span>
+            <span class="summary">{preview.clips} clips · {preview.seconds.toFixed(1)} s</span>
+          {:else}
+            <span>{preview.name}</span>
+            <span class="summary">{preview.nodes.length} nodes · {preview.connections} connections</span>
+            <ul class="preview-nodes">
+              {#each preview.nodes as n (n.id)}
+                <li>{n.type}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/if}
+    </li>
+  {/if}
+{/snippet}
+
+<style>
+  .history {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .frame-toggle {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+  }
+
+  .frame-toggle:hover:not(:disabled),
+  .frame-toggle.on {
+    background: var(--ui-hover);
+    color: var(--ui-text);
+  }
+
+  .frame-toggle:disabled {
+    opacity: 0.4;
+  }
+
+  .lanes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 2px;
+  }
+
+  .lane {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--ui-radius-full);
+    background: color-mix(in srgb, var(--lane) 14%, transparent);
+    color: var(--lane);
+    font-size: 11px;
+  }
+
+  .lane-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--ui-row-sm);
+    padding-right: 4px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text);
+  }
+
+  .row:hover,
+  .row.open {
+    background: var(--ui-hover);
+  }
+
+  .row[role='button'] {
+    cursor: pointer;
+  }
+
+  .point {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 4px 8px;
+  }
+
+  .point-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .point-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-divider);
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text);
+    font-size: 11px;
+  }
+
+  .point-action:hover {
+    background: var(--ui-hover);
+  }
+
+  .name-input {
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-divider);
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+
+  .preview {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-wash);
+  }
+
+  .preview-nodes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ui-text-secondary);
+    font-size: 11px;
+  }
+
+  .row.conflict {
+    background: color-mix(in srgb, var(--ui-danger) 10%, transparent);
+    color: var(--ui-danger);
+  }
+
+  .sides {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 2px;
+  }
+
+  .side {
+    height: 20px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+  }
+
+  .side:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+  }
+
+  .side:disabled {
+    opacity: 0.4;
+  }
+
+  .graph {
+    flex: 0 0 auto;
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  .chevron {
+    display: grid;
+    place-items: center;
+    transition: transform 120ms ease;
+  }
+
+  .conflict {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+  }
+
+  .chevron.on {
+    transform: rotate(90deg);
+  }
+
+  .row.step .what {
+    padding-left: 14px;
+    color: var(--ui-text-secondary);
+  }
+
+  .who {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+  }
+
+  .what {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .summary {
+    color: var(--ui-text-secondary);
+  }
+
+  .when {
+    flex: 0 0 auto;
+    color: var(--ui-text-tertiary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .empty {
+    margin: 8px 6px;
+    color: var(--ui-text-secondary);
+  }
+</style>

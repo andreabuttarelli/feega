@@ -19,17 +19,14 @@
   import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
   import TechniqueRowsDialog from '$lib/components/canvas/TechniqueRowsDialog.svelte';
-  import CanvasVersionsDialog from '$lib/components/canvas/CanvasVersionsDialog.svelte';
-  import type { CanvasVersion } from '$lib/server/canvas/canvas-versions';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
   import { svgDrawings } from '$lib/canvas/svg-drawings';
 import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { DeleteMode, SECTION_TYPE, membershipAfter, withMembers } from '$lib/canvas/section';
-  import { stackedLocally, Stack } from '$lib/canvas/stacking';
+  import { Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
   import { TEXT_BOX } from '$lib/canvas/frame-paste';
   import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
@@ -64,7 +61,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
-  import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
+  import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
@@ -79,7 +76,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
+  import { afterNavigate, beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
   import { page, updated } from '$app/state';
   import { track } from '$lib/analytics';
   import { TEMPLATE_AUTO_INSERTED, WELCOME_PARAM, campaignOf } from '$lib/onboarding/campaigns';
@@ -120,15 +117,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
-  import { canvasMediaUploader, projectMedia } from '$lib/canvas/media-uploader';
+  import { canvasMediaUploader, projectMedia, storeFile } from '$lib/canvas/media-uploader';
+  import { MediaKind, kindOfFile } from '$lib/motion/media/pick';
   import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
   import { changedRaw } from '$lib/motion/template/raw-values';
   import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
-  import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
+  import { OpOutcome, createOptimistic, type OptimisticPort } from '$lib/canvas/optimistic-ops';
+  import { CommentAction, commentOp, restoreThreads, runnable } from '$lib/canvas/comment-ops';
+  import { OptimisticAction, Refresh, optimisticOp, refreshOf, requestOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
+  import { replaySent, sentLog, type SentLog } from '$lib/canvas/sent-ops';
   import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
-  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, CopyShown, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
   import { SvelteMap } from 'svelte/reactivity';
@@ -147,22 +148,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
-  import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
+  import { layoutOf, rotateGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
-  import { decoded, painted } from '$lib/canvas/paint-wait';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { frameDocs } from '$lib/canvas/frame-docs';
+  import { NOTHING_SHOWN, freshIds, shownDoc, shownFrame, shownLanding, shownMove, shownPending, snapOf, type Shown } from '$lib/canvas/frame-moves';
+  import { planCombine, planInsert, type SceneTile } from '$lib/motion/scenes';
+  import { layersFramePlace } from '$lib/motion/layers-frame';
+  import { idsFrom, planComponent, planCopy, planFree, planMove, type FrameSnap } from '$lib/motion/move-plan';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
-  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
+  import type { ComponentDrag } from '$lib/canvas/component-drag';
+  import { MAIN_PARAM, mainHref, mainNav, type MainPick } from '$lib/canvas/main-nav.svelte';
+  import { fetchProjectComponents } from '$lib/canvas/project-components';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
@@ -197,7 +205,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { genNodeSize, startRun, unlockRun, type GenNode as GenNodeState, type GenMedium, type ModelChoice } from '$lib/canvas/gen-node';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
-  import { expandSectionEdges, sectionItemsOf, excludedOf, trimNote, type SectionInputs } from '$lib/canvas/section-source';
+  import { expandSectionEdges, sectionItemsOf, sectionItemPatch, trimNote, type SectionInputs } from '$lib/canvas/section-source';
   import { imageModelSpec } from '$lib/image-models';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
@@ -208,7 +216,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
   import { nodeSize } from '$lib/canvas/node-size';
-  import { cleanNodeName } from '$lib/canvas/node-name';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
@@ -234,6 +241,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
   import FigmaImportDialog from '$lib/components/canvas/FigmaImportDialog.svelte';
+  import UrlImportDialog from '$lib/components/canvas/UrlImportDialog.svelte';
+  import CodeImportDialog from '$lib/components/canvas/CodeImportDialog.svelte';
   import InpaintDialog from '$lib/components/canvas/InpaintDialog.svelte';
   import OutpaintDialog from '$lib/components/canvas/OutpaintDialog.svelte';
   import ReframeDialog from '$lib/components/canvas/ReframeDialog.svelte';
@@ -242,8 +251,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import type { Mask } from '$lib/image-mask';
   import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
-  import AgentChangesPanel from '$lib/components/canvas/AgentChangesPanel.svelte';
-  import { RejectOutcome, type AgentChange, type Choice, type RejectResult } from '$lib/canvas/reject-plan';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
   import { ImageTool } from '$lib/image-tools';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
@@ -285,7 +292,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import FigmaNotice from '$lib/components/canvas/FigmaNotice.svelte';
   import { connectionMessage } from '$lib/canvas/connection-messages';
 
-  const LINK_COPIED_MS = 1500;
 
   let { data } = $props();
   const techniqueShelf = techniquesOf(untrack(() => data.projectId));
@@ -316,8 +322,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       focusOn(ids, undefined, FocusMode.Select);
     }
   }
-
-  let linkCopied = $state(false);
 
   let viewing = $state<{ runs: ViewerRun[]; start: number; kind: OutputKind } | null>(null);
 
@@ -396,10 +400,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     cloud = null;
   }
 
-  async function copySelectionLink() {
-    await navigator.clipboard.writeText(selectionLink(page.url, selectedIds));
-    linkCopied = true;
-    setTimeout(() => (linkCopied = false), LINK_COPIED_MS);
+  async function copySelectionLink(ids: string[]) {
+    await navigator.clipboard.writeText(selectionLink(page.url, ids));
   }
 
   function openLinkedFrame() {
@@ -413,15 +415,38 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
+    const compId = page.url.searchParams.get(MAIN_PARAM);
     const clean = new URL(page.url);
     clean.searchParams.delete(FRAME_PARAM);
+    clean.searchParams.delete(MAIN_PARAM);
     replaceState(clean, page.state);
     if (nodes.some((n) => n.id === id)) {
       focusOn([id], undefined, FocusMode.Select);
+      mainPick = compId ? { nodeId: id, compId, key: (mainPick?.key ?? 0) + 1 } : mainPick;
+    }
+  }
+
+  let mainPick = $state<MainPick | null>(null);
+
+  async function showMain(frameId: string, compId: string) {
+    if (nodes.some((n) => n.id === frameId)) {
+      focusOn([frameId], undefined, FocusMode.Select);
+      mainPick = { nodeId: frameId, compId, key: (mainPick?.key ?? 0) + 1 };
+      return;
+    }
+    mainNav.canvases = await fetchProjectComponents(data.projectId);
+    const location = mainNav.where({ compId, home: frameId });
+    if (location) {
+      await goto(mainHref(data.projectId, location, frameId, compId));
     }
   }
 
   onMount(() => {
+    void fetchProjectComponents(data.projectId).then((found) => (mainNav.canvases = found));
+    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null) });
+  });
+
+  afterNavigate(() => {
     requestAnimationFrame(openLinkedFrame);
   });
 
@@ -495,14 +520,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return at ? { on: DropOn.Canvas, x: at.x, y: at.y } : null;
   }
 
-  function landed(res: Record<string, unknown> | null): boolean {
+  async function landed(answer: Promise<Record<string, unknown> | null>): Promise<boolean> {
+    const land = holdGesture();
+    const res = await answer.catch(() => null);
     if (res?.outcome !== 'done') {
+      land(null);
       return false;
     }
-    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    land((res.undo ?? []) as UndoItem[]);
     void refresh();
     return true;
   }
+
+  const generated = (res: Record<string, unknown> | null) => landed(Promise.resolve(res));
 
   const freeElement = (ids: string[]): string | null => {
     const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : null;
@@ -522,12 +552,47 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!id || !frame) {
       return DropVerdict.Ignored;
     }
-    void post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frame.frameId, at: frame.at }) }).then((res) => {
-      if (landed(res)) {
-        nodes = nodes.filter((n) => n.id !== id);
-      }
-    });
+    moveFreeInto(id, { nodeId: frame.frameId, at: frame.at });
     return DropVerdict.Taken;
+  }
+
+  const newClipId = () => freshIds()[0];
+
+  const PLAN_OF_CARRY = { [OptimisticAction.MoveElement]: planMove, [OptimisticAction.CopyElement]: planCopy } as const;
+
+  function snapAt(id: string): FrameSnap | null {
+    const tile = nodes.find((n) => n.id === id);
+    const doc = frameDocs.doc(id);
+    return tile && doc ? snapOf(tile, doc) : null;
+  }
+
+  const placeOf = (id: string) => ({ id, canvasId: data.canvas.id, projectId: data.projectId });
+
+  type CarryAction = OptimisticAction.MoveElement | OptimisticAction.CopyElement | OptimisticAction.PlaceComponent | OptimisticAction.CopyFree | OptimisticAction.InsertScene | OptimisticAction.CombineScenes | OptimisticAction.LayersToFrame;
+
+  function carry(action: CarryAction, fields: Record<string, string>, shown: Shown): Promise<boolean> {
+    const saved = optimistic(action, { fields, made: shown.made, gone: shown.gone }).then((outcome) => outcome === OpOutcome.Landed);
+    shown.docs.forEach((held) => frameDocs.hold(held, saved));
+    return saved;
+  }
+
+  function moveFreeInto(id: string, hold: FrameHold): Promise<boolean> {
+    const ids = freshIds();
+    const [source, target] = [snapAt(id), snapAt(hold.nodeId)];
+    const plan = source && target ? planFree(source, target, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }, idsFrom(ids, newClipId)) : null;
+    const saved = optimistic(OptimisticAction.MoveFree, { id, frameId: hold.nodeId, at: hold.at, ids }).then((outcome) => outcome === OpOutcome.Landed);
+    shownLanding(plan, placeOf(hold.nodeId), id).docs.forEach((held) => frameDocs.hold(held, saved));
+    return saved;
+  }
+
+  function carryElement(action: OptimisticAction.MoveElement | OptimisticAction.CopyElement, ask: { source: string; clip: string; drop: Drop; box?: StageRect | null }) {
+    const ids = freshIds();
+    const made = crypto.randomUUID();
+    const source = snapAt(ask.source);
+    const target = ask.drop.on === DropOn.Frame ? snapAt(ask.drop.nodeId) : null;
+    const planned = source && (ask.drop.on === DropOn.Canvas || target) ? PLAN_OF_CARRY[action](source, target, { clipId: ask.clip, drop: ask.drop, box: ask.box }, idsFrom(ids, newClipId)) : null;
+    const fields = { source: ask.source, clip: ask.clip, drop: JSON.stringify(ask.drop), ...(ask.box ? { box: JSON.stringify(ask.box) } : {}), node_id: made, ids: JSON.stringify(ids) };
+    return carry(action, fields, shownMove(planned, placeOf(made), ask.source));
   }
 
   async function elementOut(source: string, out: ElementOut, phase: DragPhase) {
@@ -536,27 +601,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     if (!drop) {
       return;
     }
-    landed(await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), ...(out.box ? { box: JSON.stringify(out.box) } : {}) }));
-  }
-
-  const regroups = inOrder();
-  let regrouping = 0;
-
-  function regroup(action: string, fields: Record<string, string>, after?: () => Promise<void>) {
-    regrouping += 1;
-    void regroups(async () => {
-      await places.flush();
-      const res = await post(action, fields);
-      if (res?.outcome === 'done') {
-        pushGesture({ items: (res.undo ?? []) as UndoItem[] });
-        await after?.();
-      }
-    }).finally(() => {
-      regrouping -= 1;
-      if (!regrouping) {
-        void refresh();
-      }
-    });
+    await carryElement(OptimisticAction.MoveElement, { source, clip: out.clipId, drop, box: out.box });
   }
 
   function rotateGroupBy(id: string, degrees: number) {
@@ -585,98 +630,104 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     const id = crypto.randomUUID();
-    nodes = groupedLocally(nodes, ids, id, (record) => toTile(record));
-    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id }, after && (() => after(id)));
+    void optimistic(OptimisticAction.Group, { ids, id }).then((outcome) => (outcome === OpOutcome.Landed ? after?.(id) : undefined));
+  }
+
+  function wrapWithStack(ids: string[]) {
+    void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
   function wrapInSection(ids: string[]) {
-    const id = crypto.randomUUID();
-    regroup('wrapSection', { ids: JSON.stringify(ids), node_id: id });
+    void optimistic(OptimisticAction.Section, { ids, id: crypto.randomUUID() });
   }
 
   function ungroupElements(ids: string[]) {
     for (const id of ids) {
-      nodes = ungroupedLocally(nodes, id);
-      regroup('ungroupElement', { id });
+      void optimistic(OptimisticAction.Ungroup, { id });
     }
   }
 
   async function restack(ids: string[], to: Stack) {
-    nodes = stackedLocally(nodes, ids, to);
-    if (!(await post('restack', { ids: JSON.stringify(ids), to }))) {
-      await refresh();
-    }
+    await optimistic(OptimisticAction.Restack, { ids, to });
   }
 
-  async function drawElement(drawn: DrawnWire): Promise<string> {
+  function drawElement(drawn: DrawnWire): Drawing {
     const id = crypto.randomUUID();
     const ghost = drawnTile(id, drawn);
     if (!ghost) {
-      void saveDrawn(id, drawn).then(() => focusOn([id], undefined, FocusMode.Select));
-      return id;
+      const saved = saveDrawn(id, drawn);
+      void saved.then(() => focusOn([id], undefined, FocusMode.Select));
+      return { id, doc: null, saved };
     }
-    await decoded(ghost.look);
     catalogPosters.set(id, ghost.look);
     nodes = [...nodes, toTile(ghost.node)];
     focusOn([id], undefined, FocusMode.Select);
-    void saveDrawn(id, drawn);
-    await painted();
-    return id;
+    return { id, doc: ghost.doc, saved: saveDrawn(id, drawn) };
   }
 
   let lastFrameSide: { width: number; height: number } | null = null;
 
-  async function addFrameBeside(id: string) {
+  function addFrameBeside(id: string): Drawing | null {
     const tile = nodes.find((n) => n.id === id);
-    if (tile) {
-      await drawFrame({ box: besideBox(tile) });
-    }
+    return tile ? drawFrame({ box: besideBox(tile) }) : null;
   }
 
-  async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
+  function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }): Drawing {
     const box = 'box' in target ? target.box : defaultFrameBox(target.at, lastFrameSide);
     lastFrameSide = { width: box.width, height: box.height };
     const id = crypto.randomUUID();
-    nodes = [...nodes, toTile(drawnFrameTile(id, box))];
-    void saveFrame(id, box);
-    await painted();
+    const drawn = drawnFrameTile(id, box);
+    nodes = [...nodes, toTile(drawn.node)];
+    return { id, doc: drawn.doc, saved: saveFrame(id, box) };
   }
 
-  async function saveFrame(id: string, box: CanvasBox) {
+  async function saveFrame(id: string, box: CanvasBox): Promise<boolean> {
+    const land = holdGesture();
     const res = await post('drawFrame', { box: JSON.stringify(box), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
+      land(null);
       nodes = settle(nodes, id, null);
-      return;
+      return false;
     }
-    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     focusOn([id], undefined, FocusMode.Select);
+    return true;
   }
 
-  async function saveDrawn(id: string, drawn: DrawnWire) {
+  async function saveDrawn(id: string, drawn: DrawnWire): Promise<boolean> {
+    const land = holdGesture();
     const res = await post('drawElement', { drawn: JSON.stringify(drawn), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
+      land(null);
       catalogPosters.delete(id);
       nodes = settle(nodes, id, null);
-      return;
+      return false;
     }
-    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     const hold = 'box' in drawn ? frameHolding(nodes, drawn.box) : null;
     if (hold) {
       intoFrame(id, hold);
     }
+    return true;
   }
 
   async function intoFrame(id: string, hold: FrameHold) {
-    const res = await post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }) });
-    if (!landed(res)) {
+    if (!(await moveFreeInto(id, hold))) {
       focusOn([id], undefined, FocusMode.Select);
-      return;
     }
-    nodes = nodes.filter((n) => n.id !== id);
+  }
+
+  async function dropComponent(drag: ComponentDrag, at: { x: number; y: number }) {
+    const ids = freshIds();
+    const made = crypto.randomUUID();
+    const drop = { on: DropOn.Canvas, x: at.x, y: at.y } as const;
+    const source = snapAt(drag.frameId);
+    const planned = source ? planComponent(source, drag.compId, drop, idsFrom(ids, newClipId)) : null;
+    await carry(OptimisticAction.PlaceComponent, { source: drag.frameId, comp: drag.compId, drop: JSON.stringify(drop), node_id: made, ids: JSON.stringify(ids) }, shownMove(planned, placeOf(made), drag.frameId));
   }
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
@@ -685,7 +736,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     if (drop.on !== DropOn.Canvas) {
-      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+      await landed(post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
       return;
     }
 
@@ -697,14 +748,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       catalogPosters.set(id, picture);
     }
     nodes = [...nodes, toTile(pendingOutput(id, drop))];
+    const land = holdGesture();
     const res = await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop), node_id: id });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     nodes = settle(nodes, id, node ? toTile(node) : null);
     if (!node) {
+      land(null);
       catalogPosters.delete(id);
       return;
     }
-    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    land((res?.undo ?? []) as UndoItem[]);
   }
 
   function feedImageOver(client: PointerPoint | null) {
@@ -722,20 +775,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     const ask = { source: drag.nodeId, item_id: drag.itemId, image_index: drag.imageIndex, drop: JSON.stringify(drop) };
     if (drop.on !== DropOn.Canvas) {
-      landed(await post('importFeedImage', ask));
+      await landed(post('importFeedImage', ask));
       return;
     }
 
     const id = crypto.randomUUID();
     catalogPosters.set(id, drag.thumb);
     nodes = [...nodes, toTile(pendingPicture(id, drop, feedImageSize(drag)))];
+    const land = holdGesture();
     const res = await post('importFeedImage', { ...ask, node_id: id });
     const created = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     catalogPosters.delete(id);
     nodes = settle(nodes, id, created ? toTile(created, { select: true }) : null);
-    if (created) {
-      pushGesture(createGesture(created));
-    }
+    land(created ? createGesture(created).items : null);
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -1004,8 +1056,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function setSectionItem(row: Tile, itemId: string, included: boolean) {
-    const kept = excludedOf(row.data).filter((id) => id !== itemId);
-    void saveNodeData(row.id, { sectionExcluded: included ? kept : [...kept, itemId] });
+    void write(row.id, sectionItemPatch(row.data, itemId, included), SaveTiming.Now);
   }
 
   function hasWiredImage(nodeId: string): boolean {
@@ -1496,6 +1547,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const SAVE_DEBOUNCE_MS = 400;
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
+  const FAILED_NOTICE_MS = 8000;
+  const SAVE_GAVE_UP_NOTICE = 'A change could not be saved after several tries and was reloaded from the server.';
   const REMOTE_REFRESH_MS = 250;
   let saveStatus = $state(SaveStatus.Saved);
   let placeStatus = $state(SaveStatus.Saved);
@@ -1505,13 +1558,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const OFFLINE_RUN_NOTICE = 'Offline: generating needs a connection. Your edits are kept and will save when you are back.';
   const LINE_REFUSED_NOTICE = 'A line change was refused by the canvas and was undone.';
   let outbox: Outbox | null = null;
+  let sent: SentLog = sentLog([], () => {});
   const batchWrites = inFlightWrites();
   const saves = createSaveScheduler({
     send: sendSave,
     debounceMs: SAVE_DEBOUNCE_MS,
     maxWaitMs: SAVE_MAX_WAIT_MS,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
-    onStatus: (status) => { saveStatus = status; keepOutbox(); }
+    onStatus: (status) => { saveStatus = status; keepOutbox(); },
+    onGaveUp: () => { failed = SAVE_GAVE_UP_NOTICE; refreshSoon(); }
+  });
+
+  $effect(() => {
+    if (!failed || failedIsCreditsExhausted) {
+      return;
+    }
+    const shown = failed;
+    const timer = setTimeout(() => { if (failed === shown) { failed = null; } }, FAILED_NOTICE_MS);
+    return () => clearTimeout(timer);
   });
 
   const places = createPlaceSaves({
@@ -1550,7 +1614,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     places.restore(opened.places);
     lines.restore(opened.ops);
+    sent = sentLog([...opened.sent, ...sent.all()], (ops) => void outbox?.save({ sent: ops }));
     keepOutbox();
+    if (opened.sent.length) {
+      await replaySent(sent, opened.sent, post);
+      void refresh();
+    }
   }
 
   $effect(() => {
@@ -1592,6 +1661,46 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    *  busta `{ source: 'server', … }` sta in un posto solo. */
   function pushGesture(gesture: Gesture) {
     undoStack.push({ source: 'server', gesture });
+  }
+
+  function holdGesture(): (items: UndoItem[] | null) => void {
+    let land: (entry: StackEntry | null) => void = () => {};
+    undoStack.pushPending(new Promise((resolve) => (land = resolve)));
+    return (items) => land(items?.length ? { source: 'server', gesture: { items } } : null);
+  }
+
+  let refreshDue = false;
+
+  const canvasPort: OptimisticPort<CanvasRows<Tile, FlowEdge>> = {
+      read: () => ({ nodes, edges }),
+      write: (rows) => { nodes = rows.nodes; edges = rows.edges; },
+      reserve: holdGesture,
+      hold: () => {
+        pending += 1;
+        snapshotVersion += 1;
+        return () => { pending -= 1; snapshotVersion += 1; retryMissed(); };
+      },
+      idle: () => {
+        if (refreshDue) {
+          refreshDue = false;
+          void refresh();
+        }
+      },
+      notice: (text) => { failed = text; }
+    };
+
+  const runOptimistic = createOptimistic(canvasPort, restoreCanvas);
+  const runUpload = createOptimistic(canvasPort, restoreCanvas);
+
+  function optimistic<K extends OptimisticAction>(action: K, input: Parameters<typeof optimisticOp<K, Tile, FlowEdge>>[1]): Promise<OpOutcome> {
+    refreshDue ||= refreshOf(action) === Refresh.AfterIdle;
+    const before = { nodes, edges };
+    const kept = { id: crypto.randomUUID(), ...requestOf(action, input) };
+    sent.add(kept);
+    return runOptimistic(optimisticOp(action, input, before, { toTile: (record) => toTile(record), toEdge }, async (name, fields) => {
+      await Promise.all([places.flush(), saves.flush()]);
+      return post(name, fields);
+    })).finally(() => sent.drop(kept.id));
   }
 
   let productsOverride = $state<Record<string, Product[]> | null>(null);
@@ -1644,30 +1753,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  let canvasVersions = $state<CanvasVersion[] | null>(null);
-
-  $effect(() => {
-    if (versionsPanel.open) {
-      void loadVersions();
-    }
-  });
-
-  async function loadVersions() {
-    const res = await post('canvasVersions', {});
-    canvasVersions = (res?.versions as CanvasVersion[] | undefined) ?? [];
-  }
-
-  async function saveVersion(name: string) {
-    await post('saveCanvasVersion', { name });
-    await loadVersions();
-  }
-
-  async function restoreVersion(version: CanvasVersion) {
-    await post('restoreCanvasVersion', { version_id: version.id });
-    versionsPanel.hide();
-    await refresh();
-  }
-
   let commentThreads = $state<CommentThread[] | null>(null);
   let viewCentre = $state({ cx: 0, cy: 0 });
 
@@ -1680,10 +1765,34 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let commentTeam = $state<Teammate[]>([]);
   const me = $derived(data.session?.user?.id ?? '');
 
+  let commentsInFlight = 0;
+
   async function loadComments() {
     const res = await post('canvasComments', {});
-    commentThreads = (res?.threads as CommentThread[] | undefined) ?? [];
     commentTeam = (res?.teammates as Teammate[] | undefined) ?? [];
+    if (commentsInFlight) {
+      return;
+    }
+    commentThreads = (res?.threads as CommentThread[] | undefined) ?? [];
+  }
+
+  const runComment = createOptimistic<CommentThread[], readonly string[]>(
+    {
+      read: () => commentThreads ?? [],
+      write: (threads) => { commentThreads = threads; },
+      reserve: () => () => {},
+      hold: () => {
+        commentsInFlight += 1;
+        return () => { commentsInFlight -= 1; };
+      },
+      idle: () => { void loadComments(); },
+      notice: (text) => { failed = text; }
+    },
+    restoreThreads
+  );
+
+  function comment<K extends CommentAction>(action: K, input: Parameters<typeof commentOp<K>>[1]) {
+    void runComment(runnable(commentOp(action, input, commentThreads ?? [], { me, now: () => new Date().toISOString() }), post));
   }
 
   onMount(() => {
@@ -1731,29 +1840,24 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function addThread(body: string) {
     const at = pinTarget;
-    await post('addComment', { body, x: at.x, y: at.y, ...(at.nodeId ? { node_id: at.nodeId } : {}), ...(at.timeMs === undefined ? {} : { time_ms: at.timeMs }), mention: mentionedIds(body, commentTeam) });
+    comment(CommentAction.Add, { id: crypto.randomUUID(), body, at: { nodeId: at.nodeId, x: at.x, y: at.y, timeMs: at.timeMs }, mentions: mentionedIds(body, commentTeam) });
     commentsPanel.settle();
-    await loadComments();
   }
 
   async function replyTo(threadId: string, body: string) {
-    await post('addComment', { body, parent_id: threadId, mention: mentionedIds(body, commentTeam) });
-    await loadComments();
+    comment(CommentAction.Reply, { id: crypto.randomUUID(), threadId, body, mentions: mentionedIds(body, commentTeam) });
   }
 
   async function editCommentBody(commentId: string, body: string) {
-    await post('editComment', { comment_id: commentId, body, mention: mentionedIds(body, commentTeam) });
-    await loadComments();
+    comment(CommentAction.Edit, { commentId, body, mentions: mentionedIds(body, commentTeam) });
   }
 
   async function deleteCommentById(commentId: string) {
-    await post('deleteComment', { comment_id: commentId });
-    await loadComments();
+    comment(CommentAction.Delete, { commentId });
   }
 
-  async function resolveThread(thread: CommentThread) {
-    await post('resolveComment', { comment_id: thread.id, resolved: thread.resolved ? '0' : '1' });
-    await loadComments();
+  function resolveThread(thread: CommentThread) {
+    comment(CommentAction.Resolve, { threadId: thread.id, resolved: !thread.resolved });
   }
 
   const livePins = (nodeId: string | null) => (commentThreads ?? []).filter((t) => t.nodeId === nodeId && !t.resolved);
@@ -2045,6 +2149,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name}`;
+    if (!hold) {
+      await uploadOnCanvas(file, path, at);
+      return;
+    }
     const up = await supabase.storage
       .from('canvas-assets')
       .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
@@ -2053,20 +2161,29 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    if (hold) {
-      const size = await pictureSize(file);
-      landed(await post('upload', {
-        path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
-        drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
-      }));
-      return;
-    }
+    const size = await pictureSize(file);
+    await landed(post('upload', {
+      path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
+      drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
+    }));
+  }
 
-    const result = await post('upload', {
-      path, file_name: file.name, mime_type: file.type, bytes: file.size, x: at.x, y: at.y
-    });
-    const created = result?.node as CanvasNodeRecord | undefined;
-    if (created) { nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })]; }
+  const uploadProgress = new SvelteMap<string, number>();
+  const UPLOAD_TILE = genNodeSize('image');
+
+  async function uploadOnCanvas(file: File, path: string, at: { x: number; y: number }) {
+    const id = crypto.randomUUID();
+    const local = URL.createObjectURL(file);
+    if (kindOfFile(file.type) === MediaKind.Image) {
+      catalogPosters.set(id, local);
+    }
+    uploadProgress.set(id, 0);
+    const fields = { path, file_name: file.name, mime_type: file.type, bytes: String(file.size), x: String(at.x), y: String(at.y), node_id: id };
+    const stored = storeFile(supabase, path, file, (fraction) => uploadProgress.set(id, fraction));
+    await runUpload(optimisticOp(OptimisticAction.Upload, { record: pendingPicture(id, { x: at.x + UPLOAD_TILE.w / 2, y: at.y + UPLOAD_TILE.h / 2 }, UPLOAD_TILE), fields }, { nodes, edges }, { toTile: (record) => toTile(record), toEdge }, async (name, sent) => ((await stored) ? null : post(name, sent))));
+    uploadProgress.delete(id);
+    catalogPosters.delete(id);
+    URL.revokeObjectURL(local);
   }
 
   const RENDER_VIEW_GAP = 24;
@@ -2657,23 +2774,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void invalidate('app:credits');
   }
 
-  /**
-   * SBLOCCARE UNA CORSA CHE NON TORNA. Ottimista come il trascinamento: subito spento sullo
-   * schermo, e scritto solo alla fine — il nodo altrimenti resterebbe «in corso» a vita quando
-   * il provider non risponde più o la scheda è stata chiusa a metà giro.
-   */
-  /** Rimettere in vetrina un giro di prima: lo decide il server, che sa quale asset è quel giro. */
   async function restore(id: string, gen: GenNodeState, runId: string) {
-    const mediaId = (runsByNode[id] ?? []).find((r) => r.id === runId)?.mediaId;
-    if (mediaId) {
-      nodes = nodes.map((node) =>
-        node.id === id
-          ? { ...node, data: shownOutput(node.data, { id: runId, mediaId }) }
-          : node
-      );
-    }
-    await post('restore', { node_id: id, run_id: runId });
-    await refresh();
+    const mediaId = (runsByNode[id] ?? []).find((r) => r.id === runId)?.mediaId ?? null;
+    await optimistic(OptimisticAction.RestoreRun, { id, runId, mediaId });
   }
 
   /**
@@ -2776,9 +2879,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   };
 
   async function sizeFrameDoc(id: string, picture: { width: number; height: number }, was: { width: number; height: number } | null = null) {
-    const open = layersSource.video;
-    if (open?.nodeId === id) {
-      open.edit(was ? fitElementToNode(keepTextSize(open.doc, was, picture), picture) : fitToNode(open.doc, picture, resizeMode), 'Resized the frame');
+    const mode = resizeMode;
+    if (frameDocs.edit(id, (doc) => (was ? fitElementToNode(keepTextSize(doc, was, picture), picture) : fitToNode(doc, picture, mode)), 'Resized the frame')) {
       return;
     }
     const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: resizeMode });
@@ -2788,20 +2890,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function renameNode(id: string, name: string) {
-    nodes = nodes.map((n) => (n.id === id ? { ...n, displayName: cleanNodeName(name) } : n));
-    void post('rename', { node_id: id, name });
+    void optimistic(OptimisticAction.Rename, { id, name });
   }
 
   async function resize(id: string, width: number, height: number) {
     const group = nodes.find((n) => n.id === id);
     if (group && motionOf(group)?.kind === FrameKind.Group) {
-      const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
-      const scaled = new Map(scaleGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), { w: width, h: height }).map((t) => [t.id, t]));
-      nodes = nodes.map((n) => {
-        const t = scaled.get(n.id);
-        return t ? { ...n, x: t.x, y: t.y, w: t.w, h: t.h, userHeight: t.h } : n;
-      });
-      await post('scaleGroup', { id, width: String(width), height: String(height) });
+      await optimistic(OptimisticAction.ScaleGroup, { id, width, height });
       return;
     }
     const plan = framePlan(id, width, height);
@@ -3008,30 +3103,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return line;
   }
 
-  async function connect(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null = null) {
-    if (nodes.find((n) => n.id === target)?.type !== 'motion') {
-      const line = link(source, target, kind, targetHandle, sourceHandle);
-      pushGesture({ items: [{ kind: 'edge.create', edgeId: line.id, sourceNodeId: source, targetNodeId: target }] });
-      return;
-    }
-    const res = await post('connect', {
-      source_node_id: source,
-      target_node_id: target,
-      kind,
-      ...(targetHandle ? { target_handle: targetHandle } : {}),
-      ...(sourceHandle ? { source_handle: sourceHandle } : {})
-    });
-
-    const created = (res?.connection ?? null) as Connection | null;
-    if (!created) {
-      return;
-    }
-
-    edges = [...edges.filter((edge) => edge.id !== created.id), toEdge(created)];
-    const linked = (res?.linked as { undo?: UndoItem[] } | null)?.undo ?? [];
-    pushGesture({
-      items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }, ...linked]
-    });
+  function connect(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null = null) {
+    const line = link(source, target, kind, targetHandle, sourceHandle);
+    pushGesture({ items: [{ kind: 'edge.create', edgeId: line.id, sourceNodeId: source, targetNodeId: target }] });
   }
 
   /**
@@ -3450,13 +3524,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   /** Fisso o iterate — ottimista come ogni altro campo della linea: subito sullo schermo, e
    *  ripristinato se il server rifiuta (l'arco è caduto nel frattempo, o non è più di quest'org). */
   async function setEdgeMode(connectionId: string, mode: WireMode) {
-    const before = edges.find((e) => e.id === connectionId)?.mode;
-    edges = edges.map((e) => (e.id === connectionId ? { ...e, mode } : e));
-
-    const done = await post('set_edge_mode', { connection_id: connectionId, mode });
-    if (!done) {
-      edges = edges.map((e) => (e.id === connectionId ? { ...e, mode: before } : e));
-    }
+    await optimistic(OptimisticAction.EdgeMode, { connectionId, mode });
   }
 
   /**
@@ -3472,32 +3540,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
 
-    const goneNodes = nodes.filter((n) => plan.itemIds.includes(n.id));
-    const goneEdges = edges.filter((e) => plan.edgeIds.includes(e.id));
-
-    nodes = nodes.filter((n) => !plan.itemIds.includes(n.id));
-    edges = edges.filter((e) => !plan.edgeIds.includes(e.id));
-
-    const done = await post('remove', {
-      node_ids: plan.itemIds.join(','),
-      connection_ids: plan.edgeIds.join(',')
-    });
-    if (!done) {
-      nodes = [...nodes, ...goneNodes];
-      edges = [...edges, ...goneEdges];
-      return;
-    }
-
-    pushGesture({
-      items: [
-        ...goneEdges.map((e): UndoItem => ({ kind: 'edge.delete', edgeId: e.id, sourceNodeId: e.source, targetNodeId: e.target })),
-        ...goneNodes.map((n): UndoItem => ({
-          kind: 'node.delete',
-          nodeId: n.id,
-          before: { type: n.type, position: { x: n.x, y: n.y, z: 0 }, size: { width: n.w, height: n.h }, data: n.data, version: n.version }
-        }))
-      ]
-    });
+    await optimistic(OptimisticAction.Remove, { nodeIds: plan.itemIds, edgeIds: plan.edgeIds });
   }
 
   /**
@@ -3542,59 +3585,74 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function insertSceneDrop(drop: SceneDrop) {
-    await Promise.all([saves.flush(drop.targetId), saves.flush(drop.sourceId)]);
-    landed(await post('insertScene', { target: drop.targetId, source: drop.sourceId, at: drop.at }));
+    const [target, source] = [snapAt(drop.targetId), snapAt(drop.sourceId)];
+    const doc = target && source ? planInsert(target, source, drop.at) : null;
+    await carry(OptimisticAction.InsertScene, { target: drop.targetId, source: drop.sourceId, at: String(drop.at) }, shownDoc(drop.targetId, doc));
+  }
+
+  function sceneTile(id: string): SceneTile[] {
+    const tile = nodes.find((n) => n.id === id);
+    const doc = frameDocs.doc(id);
+    return tile && doc ? [{ nodeId: id, doc, at: { x: tile.x, y: tile.y }, height: tile.h }] : [];
   }
 
   async function combineScenes(frameIds: string[]) {
-    landed(await post('combineScenes', { frame_ids: JSON.stringify(frameIds) }));
+    const made = crypto.randomUUID();
+    const tiles = frameIds.flatMap(sceneTile);
+    const combined = tiles.length === frameIds.length ? planCombine(tiles) : null;
+    await carry(OptimisticAction.CombineScenes, { frame_ids: JSON.stringify(frameIds), node_id: made }, combined ? shownFrame(combined.doc, combined.at, placeOf(made), frameIds[0]) : NOTHING_SHOWN);
   }
 
   async function imageTool(nodeId: string, tool: ImageTool) {
-    landed(await post('imageTool', { node_id: nodeId, tool }));
+    generated(await post('imageTool', { node_id: nodeId, tool }));
     void invalidate('app:credits');
   }
 
   async function inpaint(nodeId: string, prompt: string, mask: Mask) {
-    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
+    generated(await post('imageTool', { node_id: nodeId, tool: ImageTool.Inpaint, prompt, mask: JSON.stringify(mask) }));
     void invalidate('app:credits');
   }
 
   async function outpaint(nodeId: string, prompt: string, extend: Extend) {
-    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
+    generated(await post('imageTool', { node_id: nodeId, tool: ImageTool.Outpaint, prompt, extend: JSON.stringify(extend) }));
     void invalidate('app:credits');
   }
 
   async function reframe(nodeId: string, aspect: string, focus: Focus) {
     const isVideo = nodes.find((n) => n.id === nodeId)?.type === 'video';
     if (isVideo) {
-      landed(await post('videoReframe', { node_id: nodeId, aspect, focus: JSON.stringify(focus) }));
+      generated(await post('videoReframe', { node_id: nodeId, aspect, focus: JSON.stringify(focus) }));
       return;
     }
-    landed(await post('imageTool', { node_id: nodeId, tool: ImageTool.Reframe, aspect }));
+    generated(await post('imageTool', { node_id: nodeId, tool: ImageTool.Reframe, aspect }));
     void invalidate('app:credits');
   }
 
   async function layersToFrame(nodeId: string) {
-    landed(await post('layersToFrame', { node_id: nodeId }));
+    const made = crypto.randomUUID();
+    const tile = nodes.find((n) => n.id === nodeId);
+    const shown = tile ? shownPending(made, layersFramePlace({ x: tile.x, y: tile.y, width: tile.w }), { w: tile.w, h: tile.h }) : NOTHING_SHOWN;
+    await carry(OptimisticAction.LayersToFrame, { node_id: nodeId, frame_id: made }, shown);
   }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
-    landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
+    generated(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
   }
 
   let lastDuplicate: LastDuplicate | null = null;
 
-  async function duplicate(ids: string[], dragged?: Offset) {
+  function duplicate(ids: string[], dragged: Offset | undefined, shown: CopyShown): Duplication | null {
     const offset = dragged ?? repeatOffset(lastDuplicate, ids);
-    const fields: Fields = offset ? { node_ids: ids.join(','), dx: offset.dx, dy: offset.dy } : { node_ids: ids.join(',') };
-    const result = await post('duplicate', fields);
-    const created = (result?.nodes ?? []) as CanvasNodeRecord[];
-    const connected = (result?.connections ?? []) as Connection[];
-    lastDuplicate = offset && created.length ? { ids: created.map((n) => n.id), offset } : null;
-    if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
-    if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
-    if (created.length) { pushGesture(createManyGesture(created, connected)); }
+    const sources = nodes.filter((n) => ids.includes(n.id));
+    if (!sources.length) {
+      return null;
+    }
+    const copyIds = Object.fromEntries(sources.map((n) => [n.id, crypto.randomUUID()]));
+    const copies = sources.map((n) => ({ from: n.id, to: copyIds[n.id] }));
+    const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
+    lastDuplicate = offset ? { ids: copies.map((c) => c.to), offset } : null;
+    const outcome = optimistic(OptimisticAction.Duplicate, { ids: sources.map((n) => n.id), copies: shown === CopyShown.Now ? copiedNodes(plan) : [], copyIds, offset });
+    return { copies, saved: outcome.then((o) => o === OpOutcome.Landed) };
   }
 
   /**
@@ -3677,12 +3735,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let figmaImportAt = $state<{ x: number; y: number } | null>(null);
+  let urlImportAt = $state<{ x: number; y: number } | null>(null);
+  let codeImportAt = $state<{ x: number; y: number } | null>(null);
 
-  function figmaImported(landed: { nodes: unknown[]; undo: unknown[]; skipped: string[] }) {
+  function landImported(landed: { nodes: unknown[]; undo: unknown[] }) {
     const landedNodes = landed.nodes as CanvasNodeRecord[];
     nodes = [...nodes, ...landedNodes.map((n) => toTile(n))];
     pushGesture({ items: landed.undo as UndoItem[] });
     focusOn(landedNodes.map((n) => n.id), undefined, FocusMode.Select);
+  }
+
+  function figmaImported(landed: { nodes: unknown[]; undo: unknown[]; skipped: string[] }) {
+    landImported(landed);
     figmaPasted({ skipped: landed.skipped, images: 0, loading: false });
   }
 
@@ -3764,7 +3828,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
     for (const [i, clip] of copied.clipIds.entries()) {
-      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify(pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER })) }));
+      void carryElement(OptimisticAction.CopyElement, { source: copied.frameId, clip, drop: pastedDrop({ x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER }) });
     }
   }
 
@@ -3773,14 +3837,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   async function pasteElementsIntoEach(frameIds: string[], copied: CopiedElements) {
     for (const nodeId of frameIds) {
       for (const clip of copied.clipIds) {
-        landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Frame, nodeId, at: FRAME_CENTRE }) }));
+        void carryElement(OptimisticAction.CopyElement, { source: copied.frameId, clip, drop: { on: DropOn.Frame, nodeId, at: FRAME_CENTRE } });
       }
     }
   }
 
   async function pasteFreeInto(frameId: string, freeIds: string[]) {
-    for (const source of freeIds) {
-      landed(await post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
+    for (const id of freeIds) {
+      const ids = freshIds();
+      const drop = { on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE } as const;
+      const [source, target] = [snapAt(id), snapAt(frameId)];
+      const planned = source && target ? planFree(source, target, drop, idsFrom(ids, newClipId)) : null;
+      void carry(OptimisticAction.CopyFree, { source: id, drop: JSON.stringify(drop), ids: JSON.stringify(ids) }, shownLanding(planned, placeOf(frameId), id));
     }
   }
 
@@ -3922,28 +3990,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * gesto sono già cadute, e rimetterlo in circolo lo farebbe fallire di nuovo nello stesso modo
    * — `failed` dice perché, in chiaro.
    */
-  async function loadAgentChanges(): Promise<AgentChange[]> {
-    const result = await post('agent_changes', {});
-    return (result?.changes ?? []) as AgentChange[];
-  }
-
-  async function rejectAgentChange(eventIds: number[], choices: Choice[], confirm: boolean): Promise<RejectResult | null> {
-    await Promise.all([lines.drain(), places.flush(), saves.flush()]);
-    const result = (await post('reject_change', { event_ids: JSON.stringify(eventIds), choices: JSON.stringify(choices), confirm: String(confirm) })) as RejectResult | null;
-    if (result?.outcome !== RejectOutcome.Rejected) {
-      return result;
-    }
-    await refresh();
-    if (result.undo.length) { pushGesture({ items: result.undo }); }
-    if (result.moves.length) { undoStack.push({ source: 'move', gesture: { kind: 'move', items: result.moves } }); }
-    return result;
-  }
-
-  const changedNodeName = (nodeId: string | null) => {
-    const node = nodes.find((n) => n.id === nodeId);
-    return node ? (node.displayName ?? node.type) : 'a node';
-  };
-
   async function applyUndo(gesture: Gesture, onAccepted: (redo: Gesture) => void) {
     await Promise.all([lines.drain(), places.flush(), saves.flush()]);
     const result = await post('undo', { items: JSON.stringify(gesture.items) });
@@ -3992,7 +4038,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   const inTurn = (step: () => Promise<void>) => (historyTurn = historyTurn.then(step, step));
 
   async function undo() {
-    const entry = undoStack.popUndo();
+    const entry = await undoStack.popUndo();
     if (!entry) { return; }
     if (entry.source === 'frame') {
       entry.step.back();
@@ -4107,13 +4153,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
   <p class="save-status" role="status" data-status={syncShown.state} aria-label={syncShown.label} title={syncShown.label}></p>
   {#if failed}
-    <!-- Un salvataggio perso in silenzio si scopre alla prossima apertura, quando quel che si era
-         scritto non c'è più e nessuno sa perché. -->
     <p class="warning" role="alert">
       {failed}
       {#if failedIsCreditsExhausted}
         <a href={BILLING_PATH}>Buy credits</a>
       {/if}
+      <button type="button" class="warning-close" aria-label="Dismiss" onclick={() => (failed = null)}>×</button>
     </p>
   {/if}
   {#if figmaShown}
@@ -4142,9 +4187,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <CanvasCommentsPanel threads={commentThreads} {me} team={commentTeam} pinsTo={pinTarget.label} onadd={addThread} onreply={replyTo} onedit={editCommentBody} ondelete={deleteCommentById} onresolve={resolveThread} onclose={() => commentsPanel.hide()} />
   {/if}
 
-  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)}>
-    <AgentChangesPanel load={loadAgentChanges} reject={rejectAgentChange} nameOf={changedNodeName} />
-  </RunsPanel>
+  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
   {#if exportFor}
     <ExportDialog count={exportFor.length} onexport={(rows) => exportFrames(exportFor!, rows)} onclose={() => (exportFor = null)} />
@@ -4163,9 +4206,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       onclose={() => (rowsTechnique = null)}
     />
   {/if}
-  {#if versionsPanel.open}
-    <CanvasVersionsDialog versions={canvasVersions} onsave={saveVersion} onrestore={restoreVersion} onclose={() => versionsPanel.hide()} />
-  {/if}
   {#if outpaintFor}
     <OutpaintDialog onapply={(prompt, extend) => outpaint(outpaintFor!, prompt, extend)} onclose={() => (outpaintFor = null)} />
   {/if}
@@ -4174,6 +4214,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {/if}
   {#if inpaintFor}
     <InpaintDialog src={assetUrl(sourceAssetIdOf(nodes.find((n) => n.id === inpaintFor)?.data ?? {}) ?? '') ?? ''} onapply={(prompt, mask) => inpaint(inpaintFor!, prompt, mask)} onclose={() => (inpaintFor = null)} />
+  {/if}
+  {#if codeImportAt}
+    <CodeImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={codeImportAt} onimported={landImported} onclose={() => (codeImportAt = null)} />
+  {/if}
+  {#if urlImportAt}
+    <UrlImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={urlImportAt} onimported={landImported} onclose={() => (urlImportAt = null)} />
   {/if}
   {#if figmaImportAt}
     <FigmaImportDialog projectId={data.projectId} canvasId={data.canvas.id} at={figmaImportAt} settingsHref="/p/{data.projectId}/settings/profile" onimported={figmaImported} onclose={() => (figmaImportAt = null)} />
@@ -4214,6 +4260,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onNodeDoubled={openOutput}
     onConnect={connect}
     onDelete={remove}
+    onCopyLink={isOff(LocalOff.PublicLinks) ? undefined : copySelectionLink}
     onCreateFormats={(id) => (formatsFor = id)}
     onCombineScenes={combineScenes}
     onInsertScene={insertSceneDrop}
@@ -4229,6 +4276,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
+    onDropComponent={dropComponent}
+    pickMain={mainPick}
     onDropFeedImage={dropFeedImage}
     onFeedImageOver={feedImageOver}
     onDraw={drawElement}
@@ -4242,6 +4291,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCloud={openCloud}
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
+    onWrapStack={wrapWithStack}
     onUngroup={ungroupElements}
     onRestack={restack}
     onTileDragOver={tileDragOver}
@@ -4268,6 +4318,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDetachTechnique={detachTechnique}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
     onFigmaImport={(at) => (figmaImportAt = at)}
+    onUrlImport={(at) => (urlImportAt = at)}
+    onCodeImport={(at) => (codeImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
     onRedo={() => inTurn(redo)}
@@ -4559,7 +4611,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
           />
         {:else if row.type === PENDING_FRAME_TYPE}
           {@const look = catalogPosters.get(id)}
-          <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
+          <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}{#if uploadProgress.has(id)}<span class="upload-progress" data-testid="upload-progress" style:width={`${Math.round((uploadProgress.get(id) ?? 0) * 100)}%`}></span>{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
           <MotionNode node={motion} href={motionNodePath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} {liveHost} liveUrl={motionLivePath(motionAt)} />
@@ -4630,10 +4682,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     <OutputViewer runs={viewing.runs} start={viewing.start} kind={viewing.kind} urlFor={(assetId) => canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full)} onclose={() => (viewing = null)} />
   {/if}
 
-  {#if selectedIds.length && !isOff(LocalOff.PublicLinks)}
-    <button type="button" class="copy-link" data-testid="copy-selection-link" onclick={copySelectionLink}>{linkCopied ? 'Link copied' : 'Copy link to selection'}</button>
-  {/if}
-
   {#if coachOpen}
     <OnboardingCoach
       step={coachStep}
@@ -4690,6 +4738,19 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+
+  .pending-frame {
+    position: relative;
+  }
+
+  .upload-progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--primary);
+    transition: width 120ms linear;
   }
 
   @keyframes pending-pulse {
@@ -4834,6 +4895,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     border-radius: 0;
   }
 
+  .warning-close {
+    margin-left: 8px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
   .warning.reload {
     top: calc(var(--chrome-top, 10px) + 30px);
     color: inherit;
@@ -4876,20 +4947,4 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     border: 1px solid var(--color-destructive);
   }
 
-  .copy-link {
-    position: absolute;
-    top: var(--chrome-top, 12px);
-    left: 50%;
-    z-index: 5;
-    transform: translateX(-50%);
-    height: 28px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: var(--ui-radius-full);
-    background: var(--ui-panel-raised);
-    box-shadow: var(--ui-shadow-float);
-    color: var(--ui-ink);
-    font-size: var(--ui-text-xs);
-    cursor: pointer;
-  }
 </style>

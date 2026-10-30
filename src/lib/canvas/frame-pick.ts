@@ -1,6 +1,6 @@
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { leafRectsAt, pickOwnersAt, pickStackAt, quadOf, rectOf, type FrameRect } from '$lib/motion/gpu/pick';
-import { findClip } from '@feega/motion-core/motion/doc';
+import { isLayer } from '@feega/motion-core/motion/surface';
 import { compileScene, type Scene } from '$lib/motion/gpu/scene';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
 import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
@@ -73,10 +73,10 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
       return frameSpace(box, { width: s.width, height: s.height }, rotation, fit);
     },
     pick(world: World, space: FrameSpace): string | null {
-      return ownersAt(world, space).findLast((id) => findClip(live.doc, id)) ?? null;
+      return ownersAt(world, space).findLast((id) => isLayer(live.doc, id)) ?? null;
     },
     pickHeld(world: World, space: FrameSpace, held: readonly string[]): string | null {
-      const hit = ownersAt(world, space).findLast((id) => findClip(live.doc, id));
+      const hit = ownersAt(world, space).findLast((id) => isLayer(live.doc, id));
       if (hit) {
         return hit;
       }
@@ -86,10 +86,10 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
     stack(world: World, space: FrameSpace): string[] {
       const s = scene();
       const [x, y] = space.toFrame(world);
-      return x < 0 || y < 0 || x > s.width || y > s.height ? [] : pickStackAt(s, [x, y], time()).filter((id) => findClip(live.doc, id));
+      return x < 0 || y < 0 || x > s.width || y > s.height ? [] : pickStackAt(s, [x, y], time()).filter((id) => isLayer(live.doc, id));
     },
     chain(world: World, space: FrameSpace): string[] {
-      return ownersAt(world, space).filter((id) => scopeOf(live.doc, id));
+      return ownersAt(world, space).filter((id) => id !== live.doc.surface && scopeOf(live.doc, id));
     },
     unitAt(world: World, space: FrameSpace): World {
       const s = scene();
@@ -124,12 +124,17 @@ export type FramePicker = ReturnType<typeof framePicker>;
 
 type HeldPicker = { doc: LiveDoc['doc']; assets: LiveDoc['assets']; picker: FramePicker };
 
+export enum Reuse {
+  Changed = 'changed',
+  Held = 'held'
+}
+
 export class FramePickers {
   #held = new Map<string, HeldPicker>();
 
-  of(id: string, live: LiveDoc, playhead: () => number | undefined = () => live.playhead): FramePicker {
+  of(id: string, live: LiveDoc, playhead: () => number | undefined = () => live.playhead, reuse = Reuse.Changed): FramePicker {
     const held = this.#held.get(id);
-    if (held && held.doc === live.doc && held.assets === live.assets) {
+    if (held && (reuse === Reuse.Held || (held.doc === live.doc && held.assets === live.assets))) {
       return held.picker;
     }
     const picker = framePicker(live, playhead);

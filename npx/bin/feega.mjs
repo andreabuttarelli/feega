@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
+import { sendTelemetry } from '../telemetry.mjs';
 import { MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, freePort, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
@@ -133,6 +134,13 @@ async function main() {
   }
 
   const { file, browser } = args;
+  const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  void sendTelemetry({
+    home: homedir(),
+    env: process.env,
+    notify: (line) => console.error(line),
+    info: { version, platform: process.platform, arch: process.arch, node: process.versions.node }
+  });
   const port = await freePort(args.port);
 
   const url = boundUrl(port);

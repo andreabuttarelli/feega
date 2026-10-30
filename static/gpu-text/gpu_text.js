@@ -1,3 +1,5 @@
+/* @ts-self-types="./gpu_text.d.ts" */
+
 export class TextCore {
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;

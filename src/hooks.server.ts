@@ -11,7 +11,7 @@ import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env as privateEnv } from '$env/dynamic/private';
-import type { Handle, ServerInit } from '@sveltejs/kit';
+import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
 import { localModeRefusal, localSession, localStore, serveLocal } from '$lib/server/local/local-mode';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
@@ -268,11 +268,7 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
         name === 'content-range' || name === 'x-supabase-api-version'
     });
 
-  // Brand-scoped AI credit attribution: every request under /app/[brand]/… or
-  // /api/v1/brands/[slug]/… runs inside withBrandContext, so ANY AI call it triggers
-  // (chat tools, post generation, blog actions…) lands in ai_calls with
-  // brand_id and bills the right brand — no per-route wrapping needed.
-  const slug = event.params.brand ?? event.params.slug;
+  const slug = event.params.slug;
 
   // Page-payload cache (see $lib/server/page-cache): anything that can write for this brand
   // drops its cached pages, so the next navigation re-reads. Doing it here — once, on the
@@ -299,7 +295,10 @@ export const handle: Handle = sequence(cors, hostRedirect, marketingRedirect, cs
   }
   return inTool(doResolve);
 });
-export const handleError = Sentry.handleErrorWithSentry(({ error }) => busyAnswer(error));
+export const handleError = Sentry.handleErrorWithSentry((({ error, event, status }) => {
+  console.error('unhandled server error', { route: event.route.id, url: event.url.pathname + event.url.search, status, error });
+  return busyAnswer(error);
+}) satisfies HandleServerError);
 
 async function themePrefFor(event: RequestEvent): Promise<ThemePref> {
   const cookie = event.cookies.get(THEME_COOKIE);

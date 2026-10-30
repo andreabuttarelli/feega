@@ -6,6 +6,7 @@
   import { setAutoLayout } from '$lib/motion/layout/ops';
   import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
   import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
+  import { pastSlop, type PointerPoint } from '$lib/canvas/canvas-drop';
 
   let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip & { autoLayout: AutoLayout }; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -15,7 +16,7 @@
   };
 
   let host = $state<HTMLDivElement | null>(null);
-  let grab = $state<{ strip: Strip; from: Pt } | null>(null);
+  let grab = $state<{ strip: Strip; from: Pt; down: PointerPoint } | null>(null);
   let live = $state<Partial<AutoLayout> | null>(null);
 
   const shown = $derived.by(() => {
@@ -38,11 +39,11 @@
   function begin(e: PointerEvent, strip: Strip) {
     e.stopPropagation();
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    grab = { strip, from: local(e) };
+    grab = { strip, from: local(e), down: { x: e.clientX, y: e.clientY } };
   }
 
   function move(e: PointerEvent) {
-    if (!grab) {
+    if (!grab || (!live && !pastSlop(grab.down, { x: e.clientX, y: e.clientY }))) {
       return;
     }
     const [x, y] = local(e);

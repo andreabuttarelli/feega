@@ -8,6 +8,8 @@ import { findNode, listConnections, listNodes } from '$lib/server/repos/canvas';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
 import { runningRuns } from '$lib/server/repos/node-runs';
 import { readHead } from '$lib/server/repos/motion-revisions';
+import { readHistory } from '$lib/server/canvas/history';
+import { HistoryFilter, sessionLabel, type HistoryGraph } from '$lib/canvas/history/timeline';
 import { FramesFailure, motionFrames } from '$lib/server/motion/agent-frames';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { remoteFramesWhenClosed } from './frames-source';
@@ -29,7 +31,8 @@ export enum ViewOp {
   CanvasSummary = 'canvas_summary',
   Get = 'get',
   Activity = 'activity',
-  Snapshot = 'snapshot'
+  Snapshot = 'snapshot',
+  ListHistory = 'list_history'
 }
 
 const canvasId = z.string().min(1);
@@ -38,7 +41,8 @@ export const VIEW_OPS = {
   [ViewOp.CanvasSummary]: { summary: 'Compact outline of a canvas: every node (id, type, title, place, size, wiring, last run status) and, for each frame, the tree of its elements (id, kind, name, bounds, text).', input: z.object({ canvas_id: canvasId }).strict() },
   [ViewOp.Get]: { summary: 'Full detail of one node (`id`), or of one element of a frame (`id` = element, `frame_id` = its frame): data, props, transform, keyframes.', input: z.object({ id: z.string().min(1), frame_id: z.string().optional() }).strict() },
   [ViewOp.Activity]: { summary: 'What is happening on a canvas now: recent structural events (who, what, when), runs still working, and presence.', input: z.object({ canvas_id: canvasId, since: z.string().optional().describe('ISO time; only newer events') }).strict() },
-  [ViewOp.Snapshot]: { summary: 'An image of one frame at a time (seconds, default 0), returned as an image. Drawn by the server renderer, or by the remote one when this server has none; a whole canvas, a region or a single element cannot be drawn alone: snapshot their frame.', input: z.object({ node_id: z.string().min(1), element_id: z.string().optional(), canvas_id: z.string().optional(), region: z.unknown().optional(), time: z.number().min(0).optional(), width: z.number().int().min(64).optional() }).strict() }
+  [ViewOp.Snapshot]: { summary: 'An image of one frame at a time (seconds, default 0), returned as an image. Drawn by the server renderer, or by the remote one when this server has none; a whole canvas, a region or a single element cannot be drawn alone: snapshot their frame.', input: z.object({ node_id: z.string().min(1), element_id: z.string().optional(), canvas_id: z.string().optional(), region: z.unknown().optional(), time: z.number().min(0).optional(), width: z.number().int().min(64).optional() }).strict() },
+  [ViewOp.ListHistory]: { summary: 'One timeline of everything that changed a canvas, newest first: structural events, named versions, frame revisions and branches, each on its author lane (a person, the sidebar chat, or an outside agent).', input: z.object({ canvas_id: canvasId, author: z.enum(HistoryFilter).optional().describe('all (default), ai or people'), frame_id: z.string().optional().describe('Only changes to this frame'), limit: z.number().int().min(1).max(200).optional() }).strict() }
 } as const;
 
 export const isViewOp = (name: string): name is ViewOp => Object.hasOwn(VIEW_OPS, name);
@@ -111,6 +115,21 @@ async function activity(caller: OrgCaller, input: { canvas_id: string; since?: s
   };
 }
 
+const historyBody = (canvasId: string, graph: HistoryGraph) => ({
+  canvas_id: canvasId,
+  lanes: graph.lanes,
+  sessions: graph.sessions.map((s) => ({ key: s.key, lane: s.lane, label: sessionLabel(s), entries: s.rows.map((r) => r.entry.id) })),
+  entries: graph.rows.map(({ entry, lane }) => ({ id: entry.id, source: entry.source, kind: entry.kind, at: entry.at, lane, node_id: entry.nodeId, frame_id: entry.frameId, subject: entry.subject, session_id: entry.sessionId, summary: entry.summary, author: { kind: entry.author.kind, id: entry.author.id, agent: entry.author.agentKey } }))
+});
+
+async function listHistory(caller: OrgCaller, input: z.infer<(typeof VIEW_OPS)[ViewOp.ListHistory]['input']>): Promise<Answer> {
+  if (!(await openCanvas(caller, input.canvas_id))) {
+    return refusal(HTTP_NOT_FOUND, 'canvas_not_found');
+  }
+  const graph = await readHistory(caller.db, { orgId: caller.orgId, canvasId: input.canvas_id, filter: input.author ?? HistoryFilter.All, frameId: input.frame_id, limit: input.limit });
+  return { status: HTTP_OK, body: historyBody(input.canvas_id, graph) };
+}
+
 export type ViewContext = { bearer: string; ownOrigin: string; org?: string };
 
 async function snapshot(caller: OrgCaller, input: z.infer<(typeof VIEW_OPS)[ViewOp.Snapshot]['input']>, via: ViewContext): Promise<Answer> {
@@ -125,7 +144,7 @@ async function snapshot(caller: OrgCaller, input: z.infer<(typeof VIEW_OPS)[View
   return answer.ok ? { status: HTTP_OK, body: answer.body } : refusal(FRAMES_STATUS[answer.failure], answer.failure, { detail: answer.detail, fix: answer.failure === FramesFailure.Closed ? 'Use canvas_summary for the structure, or open the frame editor.' : undefined });
 }
 
-const RUN = { [ViewOp.CanvasSummary]: canvasSummary, [ViewOp.Get]: getOne, [ViewOp.Activity]: activity, [ViewOp.Snapshot]: snapshot } as Record<ViewOp, (c: OrgCaller, i: never, via: ViewContext) => Promise<Answer>>;
+const RUN = { [ViewOp.CanvasSummary]: canvasSummary, [ViewOp.Get]: getOne, [ViewOp.Activity]: activity, [ViewOp.Snapshot]: snapshot, [ViewOp.ListHistory]: listHistory } as Record<ViewOp, (c: OrgCaller, i: never, via: ViewContext) => Promise<Answer>>;
 
 export async function runView(caller: OrgCaller, op: ViewOp, input: Record<string, unknown>, via: ViewContext): Promise<Answer> {
   const parsed = VIEW_OPS[op].input.safeParse(input);

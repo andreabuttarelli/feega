@@ -9,10 +9,8 @@ test('import frames from a Figma link', async ({ page, session }) => {
   await openCanvas(page, session);
 
   await recordDemo(page, { slug: 'figma-import-link', title: 'import frames from a Figma link' }, async (d) => {
-    const entry = page.getByTestId('figma-import');
-    if (!(await entry.isVisible())) {
-      await d.click(page.locator('[data-testid="bar-mode"] [data-mode="design"]'));
-    }
+    await d.click(page.getByTestId('insert-open'));
+    const entry = page.getByTestId('insert-menu').locator('[data-insert="figma"]');
     await d.click(entry);
     await expect(page.getByTestId('figma-import-dialog')).toBeVisible();
     await d.type(page.getByTestId('figma-import-url'), LINK);

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { authServerUrl, loadEnv } from '../lib/config.ts';
+import { inSession } from '../lib/api.ts';
 import { runWithRequestAuth } from './context.ts';
 import { mcpLog } from './observability.ts';
 import { extractBearer, toAuthInfo, verifyBearerToken } from './verify-token.ts';
@@ -141,9 +142,10 @@ export async function handleMcpFetch(req: Request): Promise<Response> {
   };
 
   try {
+    const connected = () => inSession(req.headers.get('mcp-session-id'), run);
     const res = verified
-      ? await runWithRequestAuth(verified, run)
-      : await run();
+      ? await runWithRequestAuth(verified, connected)
+      : await connected();
     return withCors(res);
   } catch (e) {
     mcpLog({

@@ -84,4 +84,37 @@ describe('a stale-while-revalidate cache for dashboard navigation', () => {
 
     expect(await cache.read('k', async () => 'v2', () => {})).toBe('v2');
   });
+
+  it('a revalidation that lands after clear() does not bring the old answer back', async () => {
+    const time = clock();
+    const cache = new SwrCache(time.now);
+    await cache.read('k', async () => 'v1', () => {});
+    time.advance(10_000);
+    let land: (v: string) => void = () => {};
+    const late = new Promise<string>((r) => (land = r));
+    const fresh = vi.fn();
+    await cache.read('k', () => late, fresh);
+
+    cache.clear();
+    land('stale');
+    await settle();
+
+    expect(fresh).not.toHaveBeenCalled();
+    expect(await cache.read('k', async () => 'v3', () => {})).toBe('v3');
+  });
+
+  it('a late answer for one key never reaches another', async () => {
+    const time = clock();
+    const cache = new SwrCache(time.now);
+    await cache.read('models', async () => 'm1', () => {});
+    await cache.read('spend', async () => 's1', () => {});
+    time.advance(10_000);
+    let land: (v: string) => void = () => {};
+    await cache.read('models', () => new Promise<string>((r) => (land = r)), () => {});
+
+    land('m2');
+    await settle();
+
+    expect(await cache.read('spend', async () => 's1', () => {})).toBe('s1');
+  });
 });

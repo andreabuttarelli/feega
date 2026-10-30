@@ -1,0 +1,142 @@
+---
+title: History
+description: One timeline of everything that changed a canvas, by author.
+sidebar:
+  order: 10
+---
+
+Open **History** from the left rail (`Alt+6`). It lists every change to the current canvas,
+newest first, in one place.
+
+## What it shows
+
+- **Structural changes**: nodes added, changed or removed; connections made or removed.
+- **Named canvas versions** ([Versions](/canvas/versions/)).
+- **Frame revisions**: each saved edit inside a motion frame.
+- **Branches** of a frame.
+- **Conflicts**, in red: a write refused because someone else changed the same node or frame first.
+
+Moves are not recorded.
+
+The list updates live: changes by teammates, the chat or outside agents appear within a
+second. If the live connection drops, the panel rereads every 15 seconds and whenever you
+return to the tab.
+
+## Lanes
+
+Each author has its own lane, colour and icon, drawn as a graph beside the list:
+
+- a **person** (one lane per member);
+- the **chat** in the sidebar;
+- each **outside agent** connected over MCP or the CLI (one lane per agent);
+- **system** writes.
+
+## Sessions
+
+Changes are grouped into sessions, one row each: "claude-code: 12 changes to Landing". Click a
+session to expand it into its single steps. Every row names the node it touched ("Changed Hero
+title", "Removed Image", "Connected Hero title → Image").
+
+- An **outside agent** (MCP or CLI) opens one session per connection or command.
+- The **chat** opens one session per turn.
+- A **person** gets a new session after 10 minutes without changes.
+
+## Filters
+
+- **All**, **AI** (chat and agents) or **People**.
+- **One frame**: select a frame on the canvas, then press the frame button to keep only its
+  changes, revisions and branches.
+
+## Preview, restore, name
+
+Click a saved version or a frame revision to open its actions:
+
+- **Preview**: what the canvas or frame held at that point, read-only.
+- **Restore to here**: puts it back. The present is kept first (a canvas version named
+  *Before restoring …*, or the frame's current revision), so a restore can be undone.
+- **Name this version** (frame revisions): give it a name; an empty name removes it.
+
+## Branches
+
+A branch of a frame is drawn off the frame's lane with a dashed fork. Click it for **Merge**
+(writes the branch into the frame, then removes the branch) or **Drop**. When the branch and
+the frame changed the same thing, Merge asks which side to keep: **Keep branch** or **Keep main**.
+With **One frame** on, the branch button at the top makes a new branch of that frame.
+
+## Revert a change
+
+Any change, by anyone (you, a teammate, the chat or an outside agent), can be reverted: click a
+step and choose **Revert this change**, or press the revert button on a session row to revert the
+whole session. Later edits stay:
+
+- **Edited node**: only the fields that change touched go back, and its position if it moved
+  the node.
+- **Same field edited since**: nothing is written yet. For each field pick **Now** (keep the
+  value there today) or **Before** (the value before the change), then **Revert**.
+- **Created node**: deleted. If someone else connected or edited it since, you are asked first.
+- **Deleted node or line**: restored. **New line**: removed.
+
+The revert is a change on your lane, so it can be reverted too. Saved versions and frame
+revisions use **Restore to here** instead.
+
+The bookmark button at the top saves the whole canvas as a named version. **History** is also in
+the page menu of the Pages panel and in the **More** menu of a selected frame, which opens the
+panel on that frame.
+
+## Conflicts
+
+When two authors change the same node or frame at once, the later write is refused instead of
+overwriting the first. The refused change is kept and shows in red on the lane of whoever was
+refused, with two choices:
+
+- **Keep mine** applies the refused change on top of what is there now, as a new change.
+- **Keep theirs** leaves it as it is and closes the conflict.
+
+A resolved conflict stays in the timeline as *Resolved conflict · mine* or *· theirs*.
+
+## From the CLI
+
+```bash
+feega history <canvasId>            # everything
+feega history <canvasId> --ai       # chat and agents only
+feega history <canvasId> --people   # people only
+feega history <canvasId> --frame <frameId>
+feega history <canvasId> --json     # raw answer, lanes included
+feega history <canvasId> --preview <entryId>
+feega history <canvasId> --restore <entryId>
+feega history <canvasId> --name <entryId> --as "Client review"
+feega history <canvasId> --frame <frameId>          # a frame's revisions and branches
+feega history <canvasId> --merge <entryId> [--keep branch|main]
+feega history <canvasId> --drop <entryId>
+feega resolve-conflict <canvasId> <conflictId> mine|theirs
+feega history <canvasId> --revert <entryId|sessionKey> [--choose data.prompt=mine|reject] [--confirm]
+```
+
+## From the API and MCP
+
+- `GET /api/v1/canvas/{canvasId}/history?author=all|ai|people&frame=<frameId>&limit=<n>`
+- `GET /api/v1/canvas/{canvasId}/history/{entryId}/preview`
+- `POST /api/v1/canvas/{canvasId}/history/{entryId}/restore`
+- `POST /api/v1/canvas/{canvasId}/history/{entryId}/name` `{name}`
+- `POST /api/v1/canvas/{canvasId}/history/{entryId}/merge` `{keep?: branch|main}` and `…/drop`
+- MCP: `view` op `list_history` `{canvas_id, author?, frame_id?, limit?}`; `edit` ops
+  `preview_at`, `restore_to`, `name_version` `{canvasId, entryId, name?}`, `merge_branch_at`
+  `{canvasId, entryId, keep?}`, `drop_branch_at` and `revert_change` `{canvasId, entryId, choices?, confirm?}`.
+- `POST /api/v1/canvas/{canvasId}/conflicts/{conflictId}/resolve` `{keep: mine|theirs}`; MCP `edit` op
+  `resolve_conflict` `{canvasId, conflictId, keep}`.
+
+A conflict entry has `kind` `conflict.open` (or `conflict.resolved`, with the side kept as
+`summary`) and `id` `conflict:<conflictId>`.
+- `POST /api/v1/canvas/{canvasId}/history/{entryId}/revert` `{choices?: [{path, keep: "mine"|"reject", eventId?}], confirm?}`
+  (`entryId` may also be a session `key`)
+
+`revert` answers `outcome`: `rejected` (done; `reverted` lists the paths), `conflict` (per field
+`path`, `mine`, `original`: resend with `choices`), `confirm` (resend with `confirm: true`),
+`stale` (retry), `not_found`, or `not_revertable` (a version or revision: use restore).
+
+Each entry carries `id` (the `entryId` above), `kind`, `at`, `lane` (index into `lanes`), `node_id`, `frame_id`, `subject`
+(the name of what it touched), `session_id`, `summary` and its `author`. `sessions` lists the
+groups, newest first: `key`, `lane`, `label` and the ids of its `entries`.
+
+A client that writes through the API can send its own session as a UUID in the
+`x-feega-session` header; the CLI and the MCP server do it for you.

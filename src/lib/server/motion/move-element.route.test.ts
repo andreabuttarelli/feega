@@ -4,8 +4,13 @@ import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server
 import { fakeDb } from '$lib/server/db/fake-db';
 import { listConnections, listNodes } from '$lib/server/repos/canvas';
 import { canvasFrameInputs } from './move-element';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DropOn } from '$lib/motion/move-element';
+import { idsFrom, planCopy, planFree, planMove } from '$lib/motion/move-plan';
+import { motionNodeSize } from '$lib/canvas/motion-node';
 import { addClip } from '@feega/motion-core/motion/timeline';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { drawnTile } from '$lib/canvas/optimistic-insert';
 import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 
 const SOURCE = '44444444-4444-4444-4444-444444444444';
@@ -120,6 +125,17 @@ describe('upload action over a frame', () => {
   });
 });
 
+describe('upload action on the canvas', () => {
+  it('stores the node under the id of the tile already on screen', async () => {
+    const id = '23232323-2323-4232-8232-232323232323';
+    const input = event({ path: 'org/project/photo.png', file_name: 'photo.png', mime_type: 'image/png', bytes: '10', x: '40', y: '60', node_id: id });
+
+    await actions.upload(input as never);
+
+    expect(input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload).toMatchObject({ id, type: 'image', x: 40, y: 60 });
+  });
+});
+
 describe('a generated output placed on the empty canvas', () => {
   const asset = (type: string, width: number, height: number) => ({ id: ASSET, org_id: 'org', project_id: 'project', type, url: 'x', content: type === 'text' ? 'Hello' : null, mime_type: 'image/png', bytes: 1, width, height, duration_s: type === 'video' ? 3 : null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' });
   const placed = (input: ReturnType<typeof event>) => ({
@@ -185,6 +201,29 @@ describe('undo of a move', () => {
 
     expect(result).toMatchObject({ outcome: 'undone', redo: { items: [{ kind: 'doc.revision', nodeId: SOURCE, before: 2, after: 3 }] } });
     expect(written(input, SOURCE).map((r) => [r.version, clipIds(r.doc)])).toEqual([[3, ['txt']]]);
+  });
+
+  const ELEMENT = '99999999-9999-4999-8999-999999999999';
+  const moveOut = JSON.stringify([
+    { kind: 'node.create', nodeId: ELEMENT, after: { position: { x: 0, y: 0, z: 0 } } },
+    { kind: 'doc.revision', nodeId: SOURCE, before: 1, after: 2 }
+  ]);
+  const elementDeleted = (input: ReturnType<typeof event>) =>
+    input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && (c.payload as { deleted_at?: string }).deleted_at && c.filters.some(([k, v]) => k === 'id' && v === ELEMENT));
+
+  it('a move out of a frame comes back as one gesture: the frame doc restored and the element it made removed', async () => {
+    const input = event({ items: moveOut }, { nodes: [frameRow(SOURCE), { ...frameRow(ELEMENT), type: 'element' }], motion_revisions: [revisionRow(SOURCE, 2, newMotionDoc(MotionFormat.Landscape)), revisionRow(SOURCE, 1, withText())] });
+
+    expect(await actions.undo(input as never)).toMatchObject({ outcome: 'undone' });
+    expect(written(input, SOURCE).map((r) => [r.version, clipIds(r.doc)])).toEqual([[3, ['txt']]]);
+    expect(elementDeleted(input)).toBe(true);
+  });
+
+  it('when the frame doc cannot be restored, the element the move made stays: never half an undo', async () => {
+    const input = event({ items: moveOut }, { nodes: [frameRow(SOURCE), { ...frameRow(ELEMENT), type: 'element' }], motion_revisions: [revisionRow(SOURCE, 2, newMotionDoc(MotionFormat.Landscape))] });
+
+    expect(await actions.undo(input as never)).toMatchObject({ status: 409, data: { reason: 'revision_missing' } });
+    expect(elementDeleted(input)).toBe(false);
   });
 });
 
@@ -272,6 +311,46 @@ describe('elements in and out of frames', () => {
   });
 });
 
+describe('a move the canvas already shows', () => {
+  const CHOSEN = '12121212-1212-4121-8121-121212121212';
+  const IDS = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8'];
+  const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+  const snap = (nodeId: string, doc: MotionDoc, width: number) => ({ nodeId, doc, stage: { width, height: (width * doc.height) / doc.width } });
+  const madeDoc = (input: ReturnType<typeof event>, nodeId: string) => written(input, nodeId)[0]?.doc;
+  const createdAs = (input: ReturnType<typeof event>) => input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { id: string };
+  const firstDoc = (input: ReturnType<typeof event>) => (input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert' && (c.payload as { version: number }).version === 1)?.payload as { doc: MotionDoc }).doc;
+
+  it('dragged out, the new element is stored under the node id and clip ids the canvas picked', async () => {
+    const drop = { on: DropOn.Canvas, x: 900, y: 40 } as const;
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify(drop), node_id: CHOSEN, ids: JSON.stringify(IDS) }, { nodes: [{ ...frameRow(SOURCE), width: 400 }, frameRow(TARGET)] });
+    const shown = planMove(snap(SOURCE, withText(), 400), null, { clipId: 'txt', drop }, idsFrom(IDS, () => 'random'));
+
+    expect(await actions.moveElement(input as never)).toMatchObject({ outcome: 'done', created: true });
+    expect(createdAs(input).id).toBe(CHOSEN);
+    expect(shown.ok && firstDoc(input)).toEqual(shown.ok && shown.landing.doc);
+  });
+
+  it('copied onto the canvas, the copy is stored under the ids the canvas picked', async () => {
+    const drop = { on: DropOn.Canvas, x: 300, y: 300 } as const;
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify(drop), node_id: CHOSEN, ids: JSON.stringify(IDS) }, { nodes: [{ ...frameRow(SOURCE), width: 400 }, frameRow(TARGET)] });
+    const shown = planCopy(snap(SOURCE, withText(), 400), null, { clipId: 'txt', drop }, idsFrom(IDS, () => 'random'));
+
+    expect(await actions.copyElement(input as never)).toMatchObject({ outcome: 'done', created: true });
+    expect(createdAs(input).id).toBe(CHOSEN);
+    expect(shown.ok && firstDoc(input)).toEqual(shown.ok && shown.landing.doc);
+  });
+
+  it('a free element pasted into a frame lands with the clip ids the canvas picked', async () => {
+    const drop = { on: DropOn.Frame, nodeId: TARGET, at: { x: 0.3, y: 0.6 } } as const;
+    const input = event({ source: SOURCE, drop: JSON.stringify(drop), ids: JSON.stringify(IDS) }, { nodes: [element, frameRow(TARGET)] });
+    const target = newMotionDoc(MotionFormat.Vertical);
+    const shown = planFree(snap(SOURCE, withText(), 200), snap(TARGET, target, motionNodeSize(formatOf(target)).w), drop, idsFrom(IDS, () => 'random'));
+
+    expect(await actions.copyFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(shown.ok && madeDoc(input, TARGET)).toEqual(shown.ok && shown.landing.doc);
+  });
+});
+
 describe('drawElement action', () => {
   const inserted = (input: ReturnType<typeof event>) => input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { type: string; x: number; y: number; width: number; height: number; data: Record<string, unknown> });
 
@@ -292,6 +371,17 @@ describe('drawElement action', () => {
 
     expect(await actions.drawElement(input as never)).toMatchObject({ outcome: 'done' });
     expect(inserted(input)).toMatchObject([{ id }]);
+  });
+
+  it('stores the very doc the canvas already drew, so its own edits need no refetch', async () => {
+    const id = '7b0c2f0e-8a51-4d0e-9a8e-2f2f6c1b9a10';
+    const wire = { tool: DrawTool.Rectangle, box: { left: 120, top: 40, width: 300, height: 100 } } as const;
+    const input = event({ drawn: JSON.stringify(wire), node_id: id });
+
+    await actions.drawElement(input as never);
+
+    const stored = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => (c.payload as { doc: MotionDoc }).doc);
+    expect(stored).toEqual([drawnTile(id, wire)?.doc]);
   });
 
   it('a text drawn on a dark canvas is written in light ink', async () => {

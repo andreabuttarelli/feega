@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { canEditPoints, enterPointEdit, landsOn, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
+import { setParent } from '$lib/motion/parent-ops';
+import { canEditPoints, editsPoints, enterPointEdit, landsOn, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -21,6 +22,13 @@ describe('vector edit mode', () => {
 
     expect(['path', 'vector', 'polygon', 'star', 'line', 'rect', 'circle', 'ellipse'].map(can)).toEqual([true, true, true, true, true, true, true, true]);
     expect(canEditPoints({ component: 'Text', props: {} })).toBe(false);
+  });
+
+  it('a shape holding children is a container: its points are not edited', () => {
+    const doc = must(setParent(must(addClip(withShape('rect'), { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Hi' } }, 't')), 't', 's'));
+
+    expect(editsPoints(doc, findClip(doc, 's')!.clip)).toBe(false);
+    expect(editsPoints(withShape('rect'), findClip(withShape('rect'), 's')!.clip)).toBe(true);
   });
 
   it('a rectangle and an ellipse become paths with their own corners on entering', () => {

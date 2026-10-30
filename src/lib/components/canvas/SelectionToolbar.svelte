@@ -5,13 +5,13 @@
   import Columns2 from '@lucide/svelte/icons/columns-2';
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import Square from '@lucide/svelte/icons/square';
-  import { isFrameDialogAction } from '$lib/canvas/frame-dialogs';
-  import { actionsIn, enabledFor, shownFor, toolbarSlots, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { isFrameAction } from '$lib/canvas/frame-dialogs';
+  import { actionsFor, actionsIn, enabledFor, shownFor, toolbarSlots, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
-  import { commonPropertiesOf, dynamicParamsOf, type GenPropertyType } from '$lib/canvas/common-properties';
-  import { effectiveModel } from '$lib/canvas/default-models';
-  import { nodeControlsOf, type SelectionPatch } from '$lib/canvas/node-controls';
+  import type { GenPropertyType } from '$lib/canvas/common-properties';
+  import { genPropertiesOf } from '$lib/canvas/gen-properties';
+  import type { SelectionPatch } from '$lib/canvas/node-controls';
   import { runLabelOf, type RunQuote } from '$lib/canvas/run-quote';
   import { TOOLBAR_HIDE_BELOW_ZOOM, toolbarScale } from '$lib/canvas/toolbar-scale';
   import { TOOLBAR_GAP, toolbarAnchor } from '$lib/canvas/toolbar-position';
@@ -52,6 +52,8 @@
     runQuote = null,
     frameTools = false,
     musicEnabled = false,
+    withheld = [],
+    elementActions = [],
     onrun,
     oncancelvariants,
     variantsInFlight = 0,
@@ -76,6 +78,8 @@
     runQuote?: RunQuote | null;
     frameTools?: boolean;
     musicEnabled?: boolean;
+    withheld?: readonly SelectionActionId[];
+    elementActions?: readonly SelectionActionId[];
     onrun?: () => void;
     oncancelvariants?: () => void;
     variantsInFlight?: number;
@@ -119,27 +123,23 @@
       : null
   );
 
-  const properties = $derived(commonPropertiesOf(nodeSummaries));
+  const gen = $derived(genPropertiesOf(nodeSummaries, choicesFor));
+  const properties = $derived(gen.properties);
   const section = $derived(count === 1 && nodeSummaries[0]?.type === SECTION_TYPE ? nodeSummaries[0] : null);
   const sectionTitle = $derived(typeof section?.data.title === 'string' ? section.data.title : '');
   const sectionFill = $derived(typeof section?.data.fill === 'string' ? section.data.fill : SECTION_DEFAULT_FILL);
-  const choices = $derived(properties.type && choicesFor ? choicesFor(properties.type) : []);
-  const modelValue = $derived(
-    properties.model.kind === 'same' && properties.type ? effectiveModel(properties.type, properties.model.value, choices) : null
-  );
-  const choice = $derived(modelValue ? choices.find((c) => c.id === modelValue) : null);
-  const dynamicValues = $derived(dynamicParamsOf(nodeSummaries, (choice?.params ?? []).map((p) => p.name)));
-  const providerValue = $derived.by(() => {
-    const value = dynamicParamsOf(nodeSummaries, [PROVIDER_PARAM])[PROVIDER_PARAM];
-    return value.kind === 'same' && typeof value.value === 'string' ? value.value : null;
-  });
-  const controls = $derived(nodeControlsOf(properties, choice, dynamicValues));
+  const choices = $derived(gen.choices);
+  const modelValue = $derived(gen.modelValue);
+  const providerValue = $derived(gen.providerValue);
+  const controls = $derived(gen.controls);
 
   const primary = $derived(actionsIn('primary', count));
   const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
-  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameDialogAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
+  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
   const danger = $derived(actionsIn('danger', count));
-  const slots = $derived(toolbarSlots([...secondary, ...overflow, ...danger]));
+  const fixed = $derived(actionsIn('fixed', count).filter((a) => !withheld.includes(a.id)));
+  const picked = $derived(actionsFor(elementActions).filter((a) => !overflow.some((o) => o.id === a.id)));
+  const slots = $derived(toolbarSlots([...fixed, ...secondary, ...picked, ...overflow, ...danger]));
 
   function gateOf(action: SelectionAction) {
     return enabledFor(action.id, nodeSummaries, edges, stale);
@@ -290,6 +290,9 @@
             <Columns2 strokeWidth={1.7} />
           </Button>
         {/if}
+        {#each slots.fixed as action (action.id)}
+          {@render iconAction(action, '')}
+        {/each}
         {#each slots.pinned as action (action.id)}
           {@render iconAction(action, '')}
         {/each}
@@ -305,7 +308,7 @@
             {#each slots.overflow as action (action.id)}
               {@const Icon = SELECTION_ACTION_ICON[action.id]}
               {@const gate = gateOf(action)}
-              <DropdownMenu.Item class="min-h-11 md:min-h-8" disabled={!gate.enabled} title={gate.reason} onSelect={() => onaction?.(action.id)}>
+              <DropdownMenu.Item class="min-h-11 md:min-h-8" disabled={!gate.enabled} title={gate.reason} data-action={action.id} onSelect={() => onaction?.(action.id)}>
                 <Icon strokeWidth={1.7} />
                 {action.label}
               </DropdownMenu.Item>

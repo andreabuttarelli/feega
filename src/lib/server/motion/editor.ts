@@ -1,7 +1,7 @@
 import { isInteractive } from '@feega/motion-core/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
 import { findAssets, listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
-import { findBrandLook } from '$lib/server/repos/brands';
+import { findBrandLook, findFirstBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
@@ -10,6 +10,8 @@ import { docNodeSize, motionOf, type MotionNode } from '$lib/canvas/motion-node'
 import { formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '@feega/motion-core/motion/brand';
+import { mainHomesOf } from '$lib/motion/linked-mains';
+import { linkedHead, nudgeInstances } from './linked-mains';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { fontsFrom } from '@feega/motion-core/motion/fonts/model';
 import { fontFileOf } from '$lib/motion/fonts/library';
@@ -47,11 +49,13 @@ export async function findMotionNode(db: Db, scope: { orgId: string; nodeId: str
 export const newHead = (node: Pick<MotionNode, 'format'>): MotionHead => ({ version: 0, doc: newMotionDoc(node.format), summary: null, actorKind: 'system' });
 
 export async function headOrNew(db: Db, scope: { orgId: string; nodeId: string }, node: Pick<MotionNode, 'format'>): Promise<MotionHead> {
-  return (await readHead(db, scope)) ?? newHead(node);
+  const head = await readHead(db, scope);
+  return head ? linkedHead(db, { ...scope, head }) : newHead(node);
 }
 
 export async function motionTokens(db: Db, input: { orgId: string; brandId: string | null }): Promise<BrandTokens> {
-  const brand = input.brandId ? await findBrandLook(db, { orgId: input.orgId, brandId: input.brandId }) : null;
+  const chosen = input.brandId ? await findBrandLook(db, { orgId: input.orgId, brandId: input.brandId }) : null;
+  const brand = chosen ?? (await findFirstBrandLook(db, input.orgId));
   if (!brand) {
     return FEEGA_TOKENS;
   }
@@ -124,7 +128,10 @@ export function assetUrls(assets: MotionAsset[]): Record<string, string> {
   return Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string]));
 }
 
-export const headPatch = (doc: MotionDoc, version: number) => ({ docHeadRevision: version, format: formatOf(doc), interactive: isInteractive(doc) });
+export const headPatch = (doc: MotionDoc, version: number, nodeId: string) => {
+  const homes = mainHomesOf(doc, nodeId);
+  return { docHeadRevision: version, format: formatOf(doc), interactive: isInteractive(doc), mainHomes: homes.length ? homes : undefined };
+};
 
 export async function saveMotionDoc(
   db: Db,
@@ -138,7 +145,7 @@ export async function saveMotionDoc(
   const patched = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    patch: headPatch(write.head.doc as MotionDoc, write.head.version),
+    patch: headPatch(write.head.doc as MotionDoc, write.head.version, input.nodeId),
     check: DataCheck.Schema,
     actor: input.actor,
     known: input.known
@@ -146,6 +153,7 @@ export async function saveMotionDoc(
   if (patched.outcome === 'written') {
     await followDoc(db, input.orgId, patched.node, write.head.doc as MotionDoc);
   }
+  await nudgeInstances(db, { orgId: input.orgId, nodeId: input.nodeId, doc: write.head.doc as MotionDoc, actor: input.actor });
   return write;
 }
 

@@ -78,26 +78,27 @@ describe('the hub between one channel and the editors that use it', () => {
   });
 });
 
-describe('frame heads: a saved revision reaches peers without polling', () => {
-  const doc = { tracks: [], fps: 30 };
+describe('frame steps: a saved revision reaches peers as its ops', () => {
+  const ops = [{ kind: 'clip.entry', clipId: 'a', field: 'props', key: 'x', value: 0.4 }];
 
-  it('announces the landed head and hears only well-formed heads', () => {
+  it('announces the landed step and hears only well-formed steps', () => {
     const { port, heads } = frameHub({ userId: 'me', name: 'Me' });
     const sent: unknown[] = [];
     const heard: unknown[] = [];
-    heads.attach((head) => sent.push(head));
-    port.onHead((head) => heard.push(head));
+    heads.attach((step) => sent.push(step));
+    port.onHead((step) => heard.push(step));
 
-    port.landed({ nodeId: 'n1', version: 4, doc });
-    heads.receive({ nodeId: 'n1', version: 'x', doc });
-    heads.receive({ nodeId: 'n1', version: 5, doc });
+    port.landed({ nodeId: 'n1', base: 3, version: 4, ops: ops as never });
+    heads.receive({ nodeId: 'n1', base: 3, version: 'x', ops });
+    heads.receive({ nodeId: 'n1', base: 4, version: 5, ops: [{ kind: 'nonsense' }] });
+    heads.receive({ nodeId: 'n1', base: 4, version: 5, ops });
 
-    expect(sent).toEqual([{ nodeId: 'n1', version: 4, doc }]);
-    expect(heard).toEqual([{ nodeId: 'n1', version: 5, doc }]);
+    expect(sent).toEqual([{ nodeId: 'n1', base: 3, version: 4, ops }]);
+    expect(heard).toEqual([{ nodeId: 'n1', base: 4, version: 5, ops }]);
   });
 
   it('says nothing while detached', () => {
     const { port } = frameHub({ userId: 'me', name: 'Me' });
-    expect(() => port.landed({ nodeId: 'n1', version: 4, doc })).not.toThrow();
+    expect(() => port.landed({ nodeId: 'n1', base: 3, version: 4, ops: ops as never })).not.toThrow();
   });
 });

@@ -117,7 +117,7 @@ const FIELD_ROWS: readonly FieldRow[] = [
         return null;
       }
       const kind = enumKindOf(options.length) === 'segmented' ? 'chips' : 'menu';
-      return { kind, valueType: 'string', options: optionsOf(options), ...current(p.resolution, defaultResolution(c)) };
+      return { kind, valueType: 'string', options: optionsOf(options), ...current(p.resolution, defaultResolution(c) ?? null) };
     }
   },
   {

@@ -3,6 +3,7 @@ import { MotionFormat, newClip, newMotionDoc, parseMotionDoc, type MotionClip, t
 import { Align, Direction, Justify, Sizing } from './auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
 import { withAutoLayout } from './resolve';
+import { flattenComps } from '../precomp';
 import { TrackKind } from '../components';
 import { textBaseline, textExtent } from './text-extent';
 
@@ -134,6 +135,49 @@ describe('withAutoLayout', () => {
     const x = (id: string) => Number(out.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!.transform?.x);
     const mainLeft = 0.5;
     expect(x('j') + mainLeft).toBeCloseTo(0.4);
+  });
+
+  it('un componente che mostra solo un altro componente prende la misura di quello, non del frame intero', () => {
+    const button = shape('btn', { x: 0.6, y: 0.6, width: 0.2, height: 0.1 });
+    const inner = newClip({ id: 'in', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'k' } });
+    const host = newClip({ id: 'i', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'wrap' }, parent: 'c' });
+    const comp = (name: string, clip: MotionClip) => ({ name, durationInFrames: 30, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: '', clips: [clip] }] });
+    const doc = {
+      ...docOf([shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }), host, shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow({ gap: 10 }) })]),
+      comps: { k: comp('Button', button), wrap: comp('Link', inner) }
+    } as MotionDoc;
+    const laid = withAutoLayout(doc).tracks.flatMap((t) => t.clips).find((c) => c.id === 'i')!;
+    expect(laid.transform).toMatchObject({ x: -0.39, y: -0.55 });
+  });
+
+  it('a group holding an instance takes the size of what the instance shows, not the whole frame', () => {
+    const button = shape('btn', { x: 0.6, y: 0.6, width: 0.2, height: 0.1 });
+    const instance = newClip({ id: 'i', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'k' }, transform: { x: 0.1 } });
+    const group = newClip({ id: 'g', from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'gk' }, parent: 'c' });
+    const doc = {
+      ...docOf([group, shape('z', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c' }), shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow({ gap: 0 }) })]),
+      comps: {
+        k: { name: 'Button', durationInFrames: 30, component: { name: 'Button' }, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: '', clips: [button] }] },
+        gk: { name: 'Group 1', durationInFrames: 30, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: '', clips: [instance] }] }
+      }
+    } as MotionDoc;
+    const { x, width } = propsOf(withAutoLayout(doc), 'z') as { x: number; width: number };
+
+    expect(x - width / 2).toBeCloseTo(0.2);
+  });
+
+  it('an instance lays its own content out again after its overrides, so a wider child pushes the next one', () => {
+    const row = [shape('a', { x: 0.1, y: 0.1, width: 0.1, height: 0.1 }, { parent: 'c' }), shape('b', { x: 0.2, y: 0.1, width: 0.1, height: 0.1 }, { parent: 'c' }), shape('c', { x: 0.2, y: 0.1, width: 0.6, height: 0.1 }, { autoLayout: flow({ gap: 0 }) })];
+    const host = (id: string, overrides?: object) => newClip({ id, from: 0, durationInFrames: 30, component: 'Precomp', props: { comp: 'k', ...(overrides ? { overrides } : {}) } });
+    const doc = { ...docOf([host('plain'), host('wide', { a: { width: 0.3 } })]), comps: { k: { name: 'Row', durationInFrames: 30, component: { name: 'Row' }, tracks: [{ id: 'v1', kind: TrackKind.Visual, name: '', clips: row }] } } } as MotionDoc;
+    const placed = flattenComps(withAutoLayout(doc)).tracks.flatMap((t) => t.clips);
+    const left = (id: string) => {
+      const { x, width } = placed.find((c) => c.id === id)!.props as { x: number; width: number };
+      return x - width / 2;
+    };
+
+    expect(left('plain__0__b') - left('plain__0__a')).toBeCloseTo(0.1);
+    expect(left('wide__0__b') - left('wide__0__a')).toBeCloseTo(0.3);
   });
 });
 

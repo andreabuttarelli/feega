@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PropertiesView, propertiesFor, sectionsFor } from './properties-view';
+import { PropertiesView, positionShown, propertiesFor, sectionsFor } from './properties-view';
+import { Placement } from '@feega/motion-core/motion/layout/stack';
 import { Section } from './inspector-sections';
 import { ClipFamily } from './track-style';
 import { EditMode } from './edit-mode';
@@ -23,6 +24,22 @@ describe('what Properties shows for the selection', () => {
 });
 
 describe('which sections each selection kind gets', () => {
+  it('a shape gets the Stack section right under layout, above the shared fill, stroke and effects', () => {
+    const sections = sectionsFor(ClipFamily.Shape, PropertiesView.Clip, EditMode.Design);
+    expect(sections.indexOf(Section.Stack)).toBe(sections.indexOf(Section.Layout) + 1);
+    expect(sections.indexOf(Section.Stack)).toBeLessThan(sections.indexOf(Section.Fill));
+  });
+
+  it('the frame itself and a poster part get no Stack section', () => {
+    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).not.toContain(Section.Stack);
+    expect(sectionsFor(ClipFamily.Text, PropertiesView.Part, EditMode.Design)).not.toContain(Section.Stack);
+  });
+
+  it('the frame itself: layer (opacity, corners), fill, stroke and effects, never a shape kind', () => {
+    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toEqual([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
+  });
+
+
   it('a text layer: layout, layer, fill, stroke and text, never a path', () => {
     const sections = sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Motion);
 
@@ -69,5 +86,20 @@ describe('which sections each selection kind gets', () => {
     expect(sections.indexOf(Section.Fill)).toBeLessThan(sections.indexOf(Section.Stroke));
     expect(sections.indexOf(Section.Stroke)).toBeLessThan(sections.indexOf(Section.Effects));
     expect(sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Motion).indexOf(Section.Effects)).toBeLessThan(sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Motion).indexOf(Section.Text));
+  });
+});
+
+describe('a stack child in Properties', () => {
+  it('drops frame alignment and constraints: the stack places it', () => {
+    const sections = sectionsFor(ClipFamily.Shape, PropertiesView.Clip, EditMode.Design, Placement.Flow);
+    expect(sections).not.toContain(Section.Align);
+    expect(sections).not.toContain(Section.Constraints);
+    expect(sections).toContain(Section.Stack);
+  });
+
+  it('hides X and Y unless it is absolute', () => {
+    expect(positionShown(Placement.Free)).toBe(true);
+    expect(positionShown(Placement.Flow)).toBe(false);
+    expect(positionShown(Placement.Absolute)).toBe(true);
   });
 });

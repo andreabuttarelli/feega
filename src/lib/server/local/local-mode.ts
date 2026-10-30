@@ -47,7 +47,6 @@ export const CLOUD_ONLY_ACTIONS: Record<string, string> = {
   deleteComment: `Comments ${CLOUD_ONLY}`,
   resolveComment: `Comments ${CLOUD_ONLY}`,
   saveCanvasVersion: `Saved versions ${CLOUD_ONLY}`,
-  restoreCanvasVersion: `Saved versions ${CLOUD_ONLY}`,
   new_canvas: `More canvases ${CLOUD_ONLY}`,
   delete_canvas: `Deleting the canvas ${CLOUD_ONLY}`
 };

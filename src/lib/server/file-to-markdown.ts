@@ -16,7 +16,7 @@ export type ConvertedMarkdown = {
 
 function asBuffer(buf: ArrayBuffer | Uint8Array | Buffer): Buffer {
   if (Buffer.isBuffer(buf)) return buf;
-  return Buffer.from(buf);
+  return Buffer.from(buf instanceof Uint8Array ? buf : new Uint8Array(buf));
 }
 
 /**

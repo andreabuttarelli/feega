@@ -127,6 +127,16 @@ export async function storeFontFile(db: Db, input: { orgId: string; userId: stri
   return registerFont(db, { orgId: input.orgId, userId: input.userId, path, bytes: input.bytes });
 }
 
+export async function storeFontBytes(db: Db, input: { orgId: string; userId: string | null; name: string; bytes: Uint8Array }): Promise<FontSaved> {
+  const meta = readFontMeta(input.bytes);
+  const known = meta ? (await listOrgFonts(db, input.orgId)).find((f) => f.family === meta.family && f.weight === meta.weight && (f.style === FontStyle.Italic) === meta.italic) : undefined;
+  const format = fontFormatOf(input.bytes);
+  if (known && format) {
+    return { ok: true, assetId: known.id, format, font: fileOf(known) };
+  }
+  return storeFontFile(db, input);
+}
+
 export async function orgFontFaces(db: Db, orgId: string, sign: (paths: string[]) => Promise<Map<string, string>>): Promise<OrgFontFace[]> {
   const fonts = await listOrgFonts(db, orgId);
   const urls = await sign(fonts.map((f) => f.path));

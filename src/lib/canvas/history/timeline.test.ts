@@ -1,0 +1,181 @@
+import { describe, expect, it } from 'vitest';
+import { EntryKind, HistoryAction, HistoryFilter, HistorySource, LaneKind, actionsOf, branchForks, entryLabel, entryRef, historyGraph, laneOf, laneSpans, sessionLabel, type HistoryEntry } from './timeline';
+
+const entry = (id: string, at: string, author: HistoryEntry['author'], extra: Partial<HistoryEntry> = {}): HistoryEntry => ({
+  id,
+  source: HistorySource.Event,
+  kind: EntryKind.NodeUpdate,
+  at,
+  author,
+  nodeId: null,
+  frameId: null,
+  summary: null,
+  sessionId: null,
+  subject: null,
+  ...extra
+});
+
+const marco = { kind: 'user' as const, id: 'u-marco', agentKey: null };
+const chat = { kind: 'agent' as const, id: 'u-marco', agentKey: 'sidebar' };
+const claude = { kind: 'agent' as const, id: 'u-marco', agentKey: 'claude-code' };
+const system = { kind: 'system' as const, id: null, agentKey: null };
+
+describe('laneOf gives every author its own lane', () => {
+  it('a person, the sidebar chat, an outside agent and the system are four kinds', () => {
+    expect([marco, chat, claude, system].map((a) => laneOf(a, {}).kind)).toEqual([LaneKind.Person, LaneKind.Chat, LaneKind.Agent, LaneKind.System]);
+  });
+
+  it('two people are two lanes, the same agent key is one lane whoever runs it', () => {
+    expect(laneOf(marco, {}).key).not.toBe(laneOf({ ...marco, id: 'u-anna' }, {}).key);
+    expect(laneOf(claude, {}).key).toBe(laneOf({ ...claude, id: 'u-anna' }, {}).key);
+  });
+
+  it('a lane keeps its colour across reads', () => {
+    expect(laneOf(claude, {}).colour).toBe(laneOf(claude, {}).colour);
+  });
+});
+
+describe('historyGraph merges every source into one newest-first timeline', () => {
+  const entries = [
+    entry('a', '2026-10-29T10:00:00Z', marco),
+    entry('b', '2026-10-29T12:00:00Z', claude, { source: HistorySource.Revision, frameId: 'f1' }),
+    entry('c', '2026-10-29T11:00:00Z', chat, { nodeId: 'f1' }),
+    entry('d', '2026-10-29T09:00:00Z', system)
+  ];
+
+  it('orders by time and puts each row on its author lane', () => {
+    const graph = historyGraph(entries, { filter: HistoryFilter.All, names: { 'u-marco': 'Marco' } });
+
+    expect(graph.rows.map((r) => r.entry.id)).toEqual(['b', 'c', 'a', 'd']);
+    expect(graph.lanes.map((l) => l.label)).toEqual(['claude-code', 'Chat', 'Marco', 'System']);
+    expect(graph.rows.map((r) => r.lane)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('AI keeps chat and agents, People keeps people', () => {
+    const ai = historyGraph(entries, { filter: HistoryFilter.Ai, names: {} });
+    const people = historyGraph(entries, { filter: HistoryFilter.People, names: {} });
+
+    expect(ai.rows.map((r) => r.entry.id)).toEqual(['b', 'c']);
+    expect(people.rows.map((r) => r.entry.id)).toEqual(['a']);
+  });
+
+  it('one frame keeps the changes to that frame and inside it', () => {
+    const graph = historyGraph(entries, { filter: HistoryFilter.All, frameId: 'f1', names: {} });
+
+    expect(graph.rows.map((r) => r.entry.id)).toEqual(['b', 'c']);
+  });
+
+  it('a limit keeps the newest', () => {
+    expect(historyGraph(entries, { filter: HistoryFilter.All, names: {}, limit: 1 }).rows.map((r) => r.entry.id)).toEqual(['b']);
+  });
+});
+
+describe('laneSpans draws each lane from its newest to its oldest row', () => {
+  it('a lane is live between its first and last row, and only there', () => {
+    const graph = historyGraph(
+      [entry('a', '2026-10-29T12:00:00Z', marco), entry('b', '2026-10-29T11:00:00Z', claude), entry('c', '2026-10-29T10:00:00Z', marco)],
+      { filter: HistoryFilter.All, names: {} }
+    );
+
+    expect(laneSpans(graph)).toEqual([{ first: 0, last: 2 }, { first: 1, last: 1 }]);
+  });
+});
+
+describe('actionsOf says what a point in history can do', () => {
+  it('a saved version and a frame revision can be previewed and restored; only a revision takes a name', () => {
+    expect(actionsOf(entry('version:v1', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Version }))).toEqual([HistoryAction.Preview, HistoryAction.Restore]);
+    expect(actionsOf(entry('revision:f:4', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Revision }))).toEqual([HistoryAction.Preview, HistoryAction.Restore, HistoryAction.Name]);
+  });
+
+  it('a branch can be merged back or dropped', () => {
+    expect(actionsOf(entry('branch:b:1', '2026-10-29T10:00:00Z', marco, { source: HistorySource.Branch }))).toEqual([HistoryAction.Merge, HistoryAction.Drop]);
+  });
+
+  it('a structural event can only be reverted', () => {
+    expect(actionsOf(entry('event:7', '2026-10-29T10:00:00Z', marco))).toEqual([HistoryAction.Revert]);
+  });
+});
+
+describe('branchForks draws each branch off the lane of its frame', () => {
+  it('a branch links to the next older revision of its frame, on that row lane', () => {
+    const graph = historyGraph(
+      [
+        entry('branch:b:1', '2026-10-29T13:00:00Z', chat, { source: HistorySource.Branch, kind: EntryKind.BranchCreate, nodeId: 'b', frameId: 'f' }),
+        entry('event:1', '2026-10-29T12:00:00Z', claude),
+        entry('revision:f:3', '2026-10-29T11:00:00Z', marco, { source: HistorySource.Revision, kind: EntryKind.RevisionCommit, nodeId: 'f', frameId: 'f' })
+      ],
+      { filter: HistoryFilter.All, names: {} }
+    );
+
+    expect(branchForks(graph)).toEqual([{ from: 0, to: 2, lane: 2 }]);
+  });
+
+  it('a branch whose frame has no revision on screen draws no fork', () => {
+    const graph = historyGraph([entry('branch:b:1', '2026-10-29T13:00:00Z', chat, { source: HistorySource.Branch, nodeId: 'b', frameId: 'f' })], { filter: HistoryFilter.All, names: {} });
+
+    expect(branchForks(graph)).toEqual([]);
+  });
+});
+
+describe('entryRef reads back the id of an entry', () => {
+  it('a version id, a revision of a frame, and nonsense', () => {
+    expect(entryRef('version:v1')).toEqual({ source: HistorySource.Version, key: 'v1', version: null });
+    expect(entryRef('revision:frame-1:4')).toEqual({ source: HistorySource.Revision, key: 'frame-1', version: 4 });
+    expect(entryRef('nope')).toBeNull();
+  });
+});
+
+describe('historyGraph groups rows into sessions', () => {
+  it('one agent turn is one session, whatever the gap between its steps', () => {
+    const graph = historyGraph(
+      [
+        entry('a', '2026-10-29T12:00:00Z', claude, { sessionId: 's-1' }),
+        entry('b', '2026-10-29T11:00:00Z', claude, { sessionId: 's-1' }),
+        entry('c', '2026-10-29T10:59:00Z', claude, { sessionId: 's-2' })
+      ],
+      { filter: HistoryFilter.All, names: {} }
+    );
+
+    expect(graph.sessions.map((s) => s.rows.map((r) => r.entry.id))).toEqual([['a', 'b'], ['c']]);
+  });
+
+  it('a person without a session id is grouped by idle gap on their own lane', () => {
+    const graph = historyGraph(
+      [
+        entry('a', '2026-10-29T12:00:00Z', marco),
+        entry('b', '2026-10-29T11:58:00Z', claude),
+        entry('c', '2026-10-29T11:57:00Z', marco),
+        entry('d', '2026-10-29T10:00:00Z', marco)
+      ],
+      { filter: HistoryFilter.All, names: {} }
+    );
+
+    expect(graph.sessions.map((s) => s.rows.map((r) => r.entry.id))).toEqual([['a', 'c'], ['b'], ['d']]);
+  });
+});
+
+describe('a session key names the same session whatever the filter', () => {
+  it('a person session keeps its key under All and People', () => {
+    const entries = [entry('a', '2026-10-29T12:00:00Z', claude), entry('b', '2026-10-29T11:00:00Z', marco)];
+
+    const all = historyGraph(entries, { filter: HistoryFilter.All, names: {} });
+    const people = historyGraph(entries, { filter: HistoryFilter.People, names: {} });
+
+    expect(people.sessions[0].key).toBe(all.sessions[1].key);
+  });
+});
+
+describe('a row names what it touched', () => {
+  it('a step says the verb and the node', () => {
+    expect(entryLabel(entry('a', '2026-10-29T12:00:00Z', marco, { subject: 'Hero title' }))).toBe('Changed Hero title');
+    expect(entryLabel(entry('a', '2026-10-29T12:00:00Z', marco, { kind: EntryKind.NodeDelete, subject: 'Image' }))).toBe('Removed Image');
+  });
+
+  it('a session counts its steps and names the node when they share one', () => {
+    const one = historyGraph([entry('a', '2026-10-29T12:00:00Z', claude, { sessionId: 's', subject: 'Landing' }), entry('b', '2026-10-29T11:59:00Z', claude, { sessionId: 's', subject: 'Landing' })], { filter: HistoryFilter.All, names: {} });
+    const many = historyGraph([entry('a', '2026-10-29T12:00:00Z', claude, { sessionId: 's', subject: 'Landing' }), entry('b', '2026-10-29T11:59:00Z', claude, { sessionId: 's', subject: 'Logo' })], { filter: HistoryFilter.All, names: {} });
+
+    expect(sessionLabel(one.sessions[0])).toBe('2 changes to Landing');
+    expect(sessionLabel(many.sessions[0])).toBe('2 changes');
+  });
+});

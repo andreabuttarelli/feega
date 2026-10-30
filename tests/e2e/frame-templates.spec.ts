@@ -1,3 +1,4 @@
+import { openInsert } from './fixtures/canvas-bar';
 import type { Page } from '@playwright/test';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
@@ -8,7 +9,7 @@ const CARD_TEMPLATES = ['framed-reveal', 'showcase-scatter', 'card-cascade'];
 const OCTOBER_POSTERS = ['diagonal-pills', 'blue-trails', 'step-blobs', 'metaball-listing', 'pixel-burst', 'acid-strokes', 'glyph-specimen', 'stencil-steps'];
 
 const VIEWPORTS = [
-  { name: 'desktop', width: 1440, height: 900, open: (page: Page) => page.getByTestId('frame-templates').click() },
+  { name: 'desktop', width: 1440, height: 900, open: async (page: Page) => (await openInsert(page)).locator('[data-insert="frame-templates"]').click() },
   { name: 'phone', width: 390, height: 844, open: (page: Page) => page.locator('[data-empty-action="frame"]').click() }
 ];
 
@@ -65,7 +66,7 @@ test.describe('frame templates @real', () => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('frame-templates').click();
+    await (await openInsert(page)).locator('[data-insert="frame-templates"]').click();
     const picker = page.getByRole('dialog', { name: 'Frame templates' });
     await picker.getByRole('radio', { name: 'Still', exact: true }).click();
     for (const name of OCTOBER_POSTERS) {
@@ -85,7 +86,7 @@ test.describe('frame templates @real', () => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('frame-templates').click();
+    await (await openInsert(page)).locator('[data-insert="frame-templates"]').click();
     const picker = page.getByRole('dialog', { name: 'Frame templates' });
     for (const id of CARD_TEMPLATES) {
       await expect(picker.locator(`[data-component="builtin:${id}"][data-mode="video"]`)).toHaveCount(1);
@@ -104,7 +105,7 @@ test.describe('frame templates @real', () => {
   test('desktop: one preview plays at a time, keyboard moves and Escape closes', async ({ page, session }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('frame-templates').click();
+    await (await openInsert(page)).locator('[data-insert="frame-templates"]').click();
     const picker = page.getByRole('dialog', { name: 'Frame templates' });
     const search = picker.getByTestId('component-search');
     await expect(search).toBeFocused();

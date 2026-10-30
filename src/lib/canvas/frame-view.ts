@@ -3,14 +3,15 @@ export enum FrameView {
   Guides = 'guides',
   Outlines = 'outlines',
   Pivot = 'pivot',
-  Dev = 'dev',
   Rulers = 'rulers'
 }
 
 export type FrameViews = Readonly<Record<FrameView, boolean>>;
 
-export const FRAME_VIEW_DEFAULT: FrameViews = { [FrameView.PixelGrid]: true, [FrameView.Guides]: true, [FrameView.Outlines]: false, [FrameView.Pivot]: false, [FrameView.Dev]: false, [FrameView.Rulers]: false };
+export const FRAME_VIEW_DEFAULT: FrameViews = { [FrameView.PixelGrid]: true, [FrameView.Guides]: true, [FrameView.Outlines]: false, [FrameView.Pivot]: false, [FrameView.Rulers]: false };
 
 export const shows = (views: FrameViews, view: FrameView): boolean => views[view];
 
 export const flipView = (views: FrameViews, view: FrameView): FrameViews => ({ ...views, [view]: !views[view] });
+
+export const contentViews = (views: FrameViews): FrameViews => ({ ...views, [FrameView.Rulers]: false, [FrameView.Pivot]: false });

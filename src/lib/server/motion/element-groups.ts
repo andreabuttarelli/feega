@@ -7,11 +7,16 @@ import { clipCentre, elementBox, frameOf, liftElement, placeElement, type Elemen
 import { docMode } from '@feega/motion-core/motion/still';
 import { elementName } from '$lib/motion/element-name';
 import type { UndoItem } from '$lib/canvas/undo-plan';
+import { wrapWithStack } from '$lib/motion/layout/ops';
+import { freeStackFit } from '$lib/motion/layout/stack-fit';
 import { MoveOutcome, created, deleted, refused, type FrameStore, type Moved, type Place, type StoredFrame } from './move-element';
 
 export const groupAskSchema = z.object({ ids: z.array(z.string().min(1)).min(2).max(50), id: z.string().uuid().optional() }).strict();
 
+export const stackAskSchema = groupAskSchema.extend({ ids: z.array(z.string().min(1)).min(1).max(50) });
+
 const GROUP_NAME = 'Group';
+const STACK_NAME = 'Stack';
 
 const newId = () => crypto.randomUUID().slice(0, 8);
 
@@ -102,6 +107,32 @@ export async function groupElements(store: FrameStore, members: Members, place: 
   }
   const joins = (await Promise.all(joined.map((m) => members.join(m.id, groupId)))).filter((u): u is UndoItem => u !== null);
   return { outcome: MoveOutcome.Done, frameId: groupId, clipId: '', created: true, versions: { [groupId]: 1 }, undo: [created(groupId, at), ...sources.map(deleted), ...joins] };
+}
+
+export async function stackElements(store: FrameStore, place: Place, ids: readonly string[], id?: string): Promise<Moved> {
+  const sources = await readFree(store, ids);
+  if (!sources || sources.some((s) => s.kind === FrameKind.Group)) {
+    return refused(MoveOutcome.Invalid, 'pick free elements on the canvas to wrap with a stack');
+  }
+  const bounds = union(sources.map((s) => s.box));
+  const sheet = blankElement(bounds);
+  const placed = sheet.ok ? placeAll(sheet.doc, sources, bounds) : sheet.error;
+  if (typeof placed === 'string') {
+    return refused(MoveOutcome.Invalid, placed);
+  }
+  const { result } = wrapWithStack(placed, topClips(placed).map((c) => c.id), newId);
+  if (!result.ok) {
+    return refused(MoveOutcome.Invalid, result.error);
+  }
+
+  const fit = freeStackFit(result.doc);
+  const doc = fit?.doc ?? result.doc;
+  const box = { ...bounds, width: bounds.width * (fit?.share.width ?? 1), height: bounds.height * (fit?.share.height ?? 1) };
+  const shaped = elementNodeOf(box);
+  const at = { x: box.left, y: box.top };
+  const stackId = await store.create({ ...place, ...at, id }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: STACK_NAME });
+  await Promise.all(sources.map((s) => store.remove(s.nodeId)));
+  return { outcome: MoveOutcome.Done, frameId: stackId, clipId: '', created: true, versions: { [stackId]: 1 }, undo: [created(stackId, at), ...sources.map(deleted)] };
 }
 
 export async function ungroupElement(store: FrameStore, members: Members, place: Place, id: string): Promise<Moved> {

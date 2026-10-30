@@ -1,6 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { FRAME_DIALOG_ACTIONS } from './frame-dialogs';
-import { CANVAS_MENU, SELECTION_ACTIONS, actionsIn, enabledFor, menuFor, shownFor, toolbarSlots } from './selection-actions';
+import { CANVAS_MENU, FRAME_PANEL_ACTIONS, SELECTION_ACTIONS, actionsIn, enabledFor, menuFor, panelActionsFor, shownFor, toolbarSlots } from './selection-actions';
+
+describe('right bar of a canvas selection', () => {
+  const image = { id: 'i', type: 'image', data: { refId: 'r1' } };
+
+  it('offers the generated-image tools of the toolbar', () => {
+    const ids = panelActionsFor([image]).map((a) => a.id);
+
+    expect(ids).toEqual(expect.arrayContaining(['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers']));
+    expect(ids).not.toContain('layers-to-frame');
+  });
+
+  it('offers reframe on a generated video', () => {
+    expect(panelActionsFor([{ type: 'video', data: { refId: 'r1' } }]).map((a) => a.id)).toContain('reframe');
+  });
+
+  it('gives every frame "…" entry a home in the frame right bar', () => {
+    const home = new Set(FRAME_PANEL_ACTIONS.map((a) => a.id));
+    const motionPanel = new Set(['frame-voice', 'frame-music', 'frame-code']);
+    const elsewhere = new Set(['copy-link', 'wrap-stack']);
+    const overflow = SELECTION_ACTIONS.filter((a) => (a.group === 'overflow' || a.group === 'fixed') && !motionPanel.has(a.id) && !elsewhere.has(a.id));
+
+    expect(overflow.filter((a) => !home.has(a.id)).map((a) => a.id)).toEqual([]);
+  });
+
+  it('offers no media tool on a node without output', () => {
+    expect(panelActionsFor([{ type: 'text', data: {} }]).map((a) => a.id)).not.toContain('upscale-image');
+  });
+});
 
 describe('group and ungroup', () => {
   const box = { id: '1', type: 'motion', data: { kind: 'element' } };
@@ -28,6 +56,8 @@ describe('group and ungroup', () => {
       ['export', null],
       ['copy', 'Mod+C'],
       ['paste', 'Mod+V'],
+      ['copy-properties', 'Mod+Alt+C'],
+      ['paste-properties', 'Mod+Alt+V'],
       ['bring-front', 'Mod+]'],
       ['send-back', 'Mod+['],
       ['align-left', 'Alt+A'],
@@ -37,7 +67,7 @@ describe('group and ungroup', () => {
       ['align-middle', 'Alt+V'],
       ['align-bottom', 'Alt+S'],
       ['tidy-up', 'Mod+Alt+T'],
-      ['stack', 'Shift+A'],
+      ['stack', null],
       ['section-selection', 'Shift+S'],
       ['run-technique-rows', null],
       ['edit-technique', null],
@@ -54,7 +84,8 @@ describe('group and ungroup', () => {
       ['select-same-effect', null],
       ['frame-selection', 'Mod+Alt+G'],
       ['resize-to-fit', 'Mod+Alt+Shift+R'],
-      ['auto-layout', 'Shift+A'],
+      ['wrap-stack', 'Shift+A'],
+      ['remove-stack', 'Alt+Shift+A'],
       ['union', 'Alt+Shift+U'],
       ['subtract', 'Alt+Shift+S'],
       ['intersect', 'Alt+Shift+I'],
@@ -62,6 +93,13 @@ describe('group and ungroup', () => {
       ['flatten', 'Mod+E'],
       ['outline-stroke', 'Mod+Alt+O'],
       ['outline-text', 'Mod+Shift+O'],
+      ['create-component', 'Mod+Alt+K'],
+      ['go-to-main', null],
+      ['detach-instance', null],
+      ['push-instance', null],
+      ['reset-instance', null],
+      ['hide', 'Mod+Shift+H'],
+      ['lock', 'Mod+Shift+L'],
       ['delete', 'Backspace']
     ]);
   });
@@ -123,7 +161,7 @@ describe('group and ungroup', () => {
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
     expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame']);
-    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['export', ...Object.keys(FRAME_DIALOG_ACTIONS), 'copy-id', 'report']);
+    expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['wrap-stack', 'export', 'frame-code', 'frame-voice', 'frame-music', 'frame-interactive', 'frame-components', 'frame-templates', 'frame-history', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
 
@@ -231,5 +269,23 @@ describe('the selection bar shows a few actions and folds the rest', () => {
     expect(slots.pinned.map((a) => a.id)).toEqual(['duplicate', 'run-downstream', 'upscale-image']);
     expect(slots.overflow.map((a) => a.id)).toEqual(['remove-background', 'connect-new', 'export']);
     expect(slots.danger.map((a) => a.id)).toEqual(['delete']);
+  });
+
+  it('keeps copy link as a fixed icon and also lists it in the overflow', () => {
+    const slots = toolbarSlots(byId(['copy-link', 'duplicate', 'export', 'delete']));
+
+    expect(slots.fixed.map((a) => a.id)).toEqual(['copy-link']);
+    expect(slots.pinned.map((a) => a.id)).toEqual(['duplicate']);
+    expect(slots.overflow.map((a) => a.id)).toEqual(['copy-link', 'export']);
+  });
+});
+
+describe('editor modes: the context menu reaches every layer op', () => {
+  it('lists instance ops, hide, lock and copy/paste properties in its order', () => {
+    const ids: string[] = CANVAS_MENU.map((a) => a.id);
+
+    for (const id of ['create-component', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties']) {
+      expect(ids).toContain(id);
+    }
   });
 });

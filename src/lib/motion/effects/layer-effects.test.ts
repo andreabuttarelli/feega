@@ -39,6 +39,13 @@ describe('layer effects', () => {
     expect(html).not.toMatch(/[";]filter:blur/);
   });
 
+  it('a background blur only reaches what is behind the layer box, not the whole frame', () => {
+    const doc = ok(addEffect(base(), 'card', EffectKind.BackgroundBlur, 'bg', { radius: 12 }));
+    const html = effectLayer(clipOf(doc), frame, plain, '<i></i>', { left: 100, top: 50, width: 400, height: 80 });
+
+    expect(html).toContain('clip-path:inset(50px 1420px 950px 100px)');
+  });
+
   it('a hidden background blur leaves the layer as it was', () => {
     const doc = ok(addEffect(base(), 'card', EffectKind.BackgroundBlur, 'bg'));
     const hidden = { ...clipOf(doc), effects: clipOf(doc).effects.map((e) => ({ ...e, enabled: false })) };

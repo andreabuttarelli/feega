@@ -1,4 +1,7 @@
 import { withAutoLayout } from '../layout/resolve';
+import { perDoc } from '../per-doc';
+import { estimatedText, type TextMeasure } from '../layout/text-extent';
+import { clipRadii, frameFadeAt, unfaded } from '../surface';
 import { withStacking } from '../layout/stacking';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
@@ -117,7 +120,7 @@ export enum Target {
 
 export type Inlined = Partial<Record<Script, string>>;
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues; only?: ReadonlySet<string> };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues; only?: ReadonlySet<string>; measure?: TextMeasure };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -611,6 +614,17 @@ function hotScript(script: string): string {
   return script.replace('<script>', HOT_SCRIPT).replace('<script type="module">', HOT_MODULE);
 }
 
+function rootCorners(doc: MotionDoc): string {
+  const radii = clipRadii(doc);
+  const side = Math.min(doc.width, doc.height);
+  return radii ? `#root{border-radius:${radii.map((r) => pxOf(r * side)).join(' ')}}` : '';
+}
+
+function rootFade(doc: MotionDoc): string {
+  const fade = frameFadeAt(doc, 0);
+  return fade < 1 ? `#root{opacity:${fade}}` : '';
+}
+
 function zoomed(doc: MotionDoc, scale: number): string {
   return `#root{width:${doc.width}px;height:${doc.height}px${scale === 1 ? '' : `;zoom:${scale}`}}`;
 }
@@ -625,7 +639,11 @@ function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): Motio
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
 }
 
-const shownDoc = (raw: ComposeInput): MotionDoc => withStacking(withAutoLayout(withoutHidden(withoutMutedLanes(boundDoc(withVars(raw.doc, raw.vars))))));
+const bound = perDoc((doc: MotionDoc, vars: VarValues | undefined): MotionDoc => withoutHidden(withoutMutedLanes(boundDoc(withVars(doc, vars)))));
+
+const laidOut = perDoc((doc: MotionDoc, measure: TextMeasure): MotionDoc => withStacking(withAutoLayout(doc, measure)));
+
+const shownDoc = (raw: ComposeInput): MotionDoc => laidOut(bound(raw.doc, raw.vars), raw.measure ?? estimatedText);
 
 const liveDoc = (raw: ComposeInput, shown: MotionDoc): MotionDoc => bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
 
@@ -647,7 +665,7 @@ export const junctionMovesOf = (raw: ComposeInput): JunctionMove[] => {
 export function composeHtml(raw: ComposeInput): string {
   const shown = shownDoc(raw);
   const junctions = junctionTweens(shown, junctionPairs(shown));
-  const prepared = liveDoc(raw, shown);
+  const prepared = liveDoc(raw, unfaded(shown));
   const input = { ...raw, doc: bakedDoc(raw, prepared) };
   const { doc, tokens } = input;
   const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {}, runtime: raw.runtime ?? RuntimeDelivery.Inline };
@@ -773,7 +791,7 @@ export function composeHtml(raw: ComposeInput): string {
     fitScript(),
     hotRuntime(),
     fontLinks(doc, input.assets),
-    `<style>${BASE_CSS}#root{background:${esc(background)}}${zoomed(doc, scale)}${stage ? STAGE_CSS : ''}</style>`,
+    `<style>${BASE_CSS}#root{background:${esc(background)}}${rootCorners(doc)}${rootFade(raw.doc)}${zoomed(doc, scale)}${stage ? STAGE_CSS : ''}</style>`,
     '</head><body>',
     `<div id="root" data-composition-id="${COMPOSITION_ID}" data-start="0" data-width="${frame.width}" data-height="${frame.height}" data-duration="${duration}" data-fps="${doc.fps}">`,
     HOT_OPEN,

@@ -8,16 +8,19 @@ import { depthOf, turnedInDepth } from './depth';
 import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
+import { placedBox } from '../effects/paint-area';
 import type { AudioAnalysis } from '../audio-analysis';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
+import { shapedText } from './text/measure';
 import type { JunctionMove } from '../junctions';
 import { renderAt } from '../effects/render';
 import { effectOfKey } from '../effects/model';
 import { cssFunctions, FilterKind, unsupportedPrimitive, type Filter, type Linear } from './filters';
 import { BlendMode } from '../blend';
-import { MASK_KEYS } from '../mask';
+import { MASK_KEYS, MaskMode } from '../mask';
+import { clipRadii, frameFadeAt } from '../surface';
 import { mattePairs, MATTE_READ } from '../matte';
-import { maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
+import { CoverKind, maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
 import { FillType, cropOf, fillsOf, type Fill, type FillOf } from '../fill/model';
 import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
@@ -416,6 +419,20 @@ function animatorsAt(clip: MotionClip, frame: number, colour: (v: string) => str
 
 const GROUP_COMPONENT = 'Precomp';
 
+function contentCut(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, size: Size): MaskLayer | null {
+  const chain = ancestorsOf(doc, clip.id).flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  const inside = chain.slice(chain.findLastIndex((c) => c.component === GROUP_COMPONENT) + 1);
+  const boxes = inside.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, size));
+  if (!boxes.length || boxes.some((b) => !b)) {
+    return null;
+  }
+  const left = Math.max(...boxes.map((b) => b!.left));
+  const top = Math.max(...boxes.map((b) => b!.top));
+  const right = Math.min(...boxes.map((b) => b!.left + b!.width));
+  const bottom = Math.min(...boxes.map((b) => b!.top + b!.height));
+  return { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[left, top, right, top, right, bottom, left, bottom]], matrix: IDENTITY } };
+}
+
 function enclosingGroups(doc: MotionDoc): Map<string, string[]> {
   const enclosing = new Map<string, string[]>();
   doc.tracks.forEach((track, at) => {
@@ -473,7 +490,7 @@ const dimmed = (filters: Filter[], pose: Pose): Filter[] => (pose.dim < 1 ? [...
 const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
 
 export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<string, string> = {}, typeset: Typeset = NO_TYPESET, analyses?: Record<string, AudioAnalysis>): Prepared {
-  return { doc: preparedDoc({ doc, tokens, assets, analyses }), tokens, assets, typeset, moves: junctionMovesOf({ doc, tokens, assets }) };
+  return { doc: preparedDoc({ doc, tokens, assets, analyses, measure: shapedText(typeset) }), tokens, assets, typeset, moves: junctionMovesOf({ doc, tokens, assets, measure: shapedText(typeset) }) };
 }
 
 const NO_READS: DomReads = new Map();
@@ -529,7 +546,9 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
       return Unsupported.Space3d;
     }
     const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));
-    const masks = maskLayers(clip, frame, size, world, asset);
+    const own = maskLayers(clip, frame, size, world, asset);
+    const cut = contentCut(doc, clip, byId, size);
+    const masks = own && cut ? [...own, cut] : own;
     const found = filtersOf(clip, frame, doc.fps, size, css);
     if (typeof found === 'string') {
       return found;
@@ -575,8 +594,30 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     }
     unsupported.push({ clip: clip.id, component: clip.component, reason: drawn });
   }
-  const background = doc.background === Background.Transparent ? null : colour('brand.background');
-  return { ...size, background, items, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+  const background = doc.surface ? CLEAR : doc.background === Background.Transparent ? null : colour('brand.background');
+  const cut = frameCut(doc);
+  const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;
+  return { ...size, background, items: faded(doc, framed, frameFadeAt(doc, frame)), unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+}
+
+const CLEAR: Rgba = [0, 0, 0, 0];
+
+function faded(doc: MotionDoc, items: Item[], fade: number): Item[] {
+  if (!doc.surface || fade >= 1) {
+    return items;
+  }
+  const surface = items.filter((i) => i.clip === doc.surface);
+  const layers = items.filter((i) => i.clip !== doc.surface);
+  return [...surface, { kind: ItemKind.Group, clip: doc.surface, items: layers, opacity: fade, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal }];
+}
+
+function frameCut(doc: MotionDoc): MaskLayer | null {
+  const radii = clipRadii(doc);
+  if (!radii) {
+    return null;
+  }
+  const contours = rectOutline(radii, { w: doc.width, h: doc.height }).map((c) => flatten(c).flatMap(([x, y]) => [x, y]));
+  return { mode: MaskMode.Add, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours, matrix: IDENTITY } };
 }
 
 const REST_WINDOW_SECONDS = 2;

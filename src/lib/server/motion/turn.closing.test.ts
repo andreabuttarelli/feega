@@ -1,3 +1,4 @@
+import { ProjectMode } from '$lib/project-mode';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import { DEFAULT_SECONDS, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
@@ -292,7 +293,7 @@ type DocEdited = import('$lib/motion/frames-request').DocEdited;
 async function turn(reasoning: string | null = 'low', browser = Browser.Attached, landingMs?: number, stopPollMs = 3000) {
   const db = { storage: { from: () => draftBucket } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null, budgetRaisedUsd: world.raised } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: world.message, selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null, mode: ProjectMode.Standard }, motion, message: world.message, selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }
@@ -310,7 +311,7 @@ async function turn(reasoning: string | null = 'low', browser = Browser.Attached
 async function leftAfterFirstChunk(browser = Browser.Absent) {
   const db = { storage: { from: () => ({}) } } as never;
   const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
-  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser });
+  const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null, mode: ProjectMode.Standard }, motion, message: 'make it pop', selection: [], model: 'anthropic/claude-opus-5.5', reasoning: 'low', requester: { kind: 'user', id: 'u-1' }, browser });
   if (started instanceof Response) {
     throw new Error('turn refused');
   }

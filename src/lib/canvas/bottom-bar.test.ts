@@ -1,28 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { BarContext, BarMode, BarSlot, barContextFor, barSlots, readBarMode } from './bottom-bar';
+import { BarContext, BarSlot, BarWidth, PINNED_GENERATE, PINNED_TOOLS, barContextFor, barSlots } from './bottom-bar';
+import { EditorMode } from './editor-mode.svelte';
+import { DrawTool } from '$lib/motion/draw-tool';
 
-describe('one bottom bar, its tools by selection', () => {
-  it('a selected frame is the only selection that changes the bar', () => {
+describe('one bottom bar, everything else behind +', () => {
+  it('a selected frame is the only selection that changes the insert menu', () => {
     expect(barContextFor(null)).toBe(BarContext.Canvas);
     expect(barContextFor('frame-1')).toBe(BarContext.Frame);
   });
+});
 
-  it('on the canvas a switch picks one short set: Design draws, Generate adds generation nodes', () => {
-    expect(barSlots(BarContext.Canvas, BarMode.Design)).toEqual([BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.Comment, BarSlot.FrameTemplates]);
-    expect(barSlots(BarContext.Canvas, BarMode.Generate)).toEqual([BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.Comment, BarSlot.FrameTemplates]);
+describe('the pinned essentials', () => {
+  it('pins rectangle, ellipse, text, pen and frame, in that order', () => {
+    expect(PINNED_TOOLS).toEqual([DrawTool.Rectangle, DrawTool.Ellipse, DrawTool.Text, DrawTool.Pen, DrawTool.Frame]);
   });
 
-  it('a selected frame adds Insert image and Templates for this frame and keeps every Generate tool', () => {
-    for (const mode of Object.values(BarMode)) {
-      const base = barSlots(BarContext.Canvas, mode);
-      expect(barSlots(BarContext.Frame, mode)).toEqual([...base, BarSlot.Image, BarSlot.FrameLibrary]);
-    }
-    expect(barSlots(BarContext.Frame, BarMode.Generate)).toContain(BarSlot.Generate);
+  it('pins generate text, image, video and sound', () => {
+    expect(PINNED_GENERATE).toEqual(['text', 'image', 'video', 'audio']);
+  });
+});
+
+describe('which slots the bar shows', () => {
+  it('Design and Motion show everything, in bar order', () => {
+    const all = [BarSlot.Select, BarSlot.Draw, BarSlot.Generate, BarSlot.Insert, BarSlot.Comment];
+    expect(barSlots(EditorMode.Design, BarWidth.Wide)).toEqual(all);
+    expect(barSlots(EditorMode.Motion, BarWidth.Wide)).toEqual(all);
   });
 
-  it('reads a remembered mode, and opens on Design for anything else', () => {
-    expect(readBarMode('generate')).toBe(BarMode.Generate);
-    expect(readBarMode(null)).toBe(BarMode.Design);
-    expect(readBarMode('nope')).toBe(BarMode.Design);
+  it('Play and Code are read-only: no drawing tools, no generate', () => {
+    const readOnly = [BarSlot.Select, BarSlot.Insert, BarSlot.Comment];
+    expect(barSlots(EditorMode.Play, BarWidth.Wide)).toEqual(readOnly);
+    expect(barSlots(EditorMode.Code, BarWidth.Wide)).toEqual(readOnly);
+  });
+
+  it('a narrow bar collapses both groups into +', () => {
+    expect(barSlots(EditorMode.Design, BarWidth.Compact)).toEqual([BarSlot.Select, BarSlot.Insert, BarSlot.Comment]);
   });
 });

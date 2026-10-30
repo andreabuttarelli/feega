@@ -13,12 +13,12 @@ const panel = readFileSync('src/lib/components/canvas/FrameInspectorPanel.svelte
 const flow = readFileSync('src/lib/components/canvas/gpu/GpuFlow.svelte', 'utf8');
 
 describe('the dev inspector', () => {
-  it('shows the measures, the CSS, the Tailwind classes and the brand variable of a layer', () => {
+  it('shows the measures, the grouped properties and the brand variable of a layer', () => {
     const body = render(DevInspector, { props: { doc, clipId: 'card', brand: FEEGA_TOKENS, onexport: () => {} } }).body;
 
     expect(body).toContain('data-testid="dev-measures"');
-    expect(body).toContain('width: 480px;');
-    expect(body).toContain('w-[480px]');
+    expect(body).toContain('480');
+    expect(body).toContain('data-testid="dev-snippets-toggle"');
     expect(body).toContain('brand.accent');
     expect(body).toContain('data-testid="dev-export"');
   });
@@ -27,12 +27,12 @@ describe('the dev inspector', () => {
     expect(render(DevInspector, { props: { doc, clipId: 'ghost', brand: null } }).body).not.toContain('dev-inspector');
   });
 
-  it('replaces the editable properties while coder mode is on', () => {
-    expect(panel).toMatch(/\{#if frameProperties\.dev && session && doc\}[\s\S]*<DevInspector[\s\S]*\{:else if session && doc && tokens && !session\.selection\.length\}/);
+  it('replaces the editable properties in Code mode', () => {
+    expect(panel).toMatch(/\{:else if editorMode\.spec\.inspector === ModeInspector\.Code && session && doc\}[\s\S]*<DevInspector[\s\S]*\{:else if session && doc && tokens && !session\.selection\.length\}/);
   });
 
-  it('the frame turns hover measures on for coder mode and hands the panel its export', () => {
-    expect(flow).toMatch(/\(altHeld \|\| shows\(frameViews, FrameView\.Dev\)\)/);
+  it('the frame turns hover measures on in Code mode and hands the panel its export', () => {
+    expect(flow).toMatch(/\(altHeld \|\| editorMode\.spec\.inspector === ModeInspector\.Code\)/);
     expect(flow).toMatch(/frameProperties\.exportPicks = \(\) => props\.onExportElements\?\.\(panelNodeId, picks\)/);
   });
 });

@@ -11,6 +11,7 @@ const store = vi.hoisted(() => ({
   viewport: null as null | { width: number; height: number; scale: number }
 }));
 
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
   const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
   return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };

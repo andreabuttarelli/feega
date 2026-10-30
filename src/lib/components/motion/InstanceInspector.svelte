@@ -2,6 +2,8 @@
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import Diamond from '@lucide/svelte/icons/diamond';
+  import Target from '@lucide/svelte/icons/target';
+  import { mainNav } from '$lib/canvas/main-nav.svelte';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { Paint, instanceElements, instanceOf, instanceTexts, overrideInstance, recolorInstance, resetOverride } from '$lib/motion/main-component';
   import { Action, type ActionId } from '$lib/motion/actions';
@@ -13,10 +15,12 @@
   let { doc, clipId, onchange, onrun }: { doc: MotionDoc; clipId: string; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();
 
   const instance = $derived(instanceOf(doc, clipId));
+  const mainRequest = $derived(instance ? { compId: instance.compId, home: instance.comp.component?.home ?? null } : null);
+  const mainLocation = $derived(mainRequest ? mainNav.where(mainRequest) : null);
   const texts = $derived(instanceTexts(doc, clipId));
   const elements = $derived(instanceElements(doc, clipId));
   const images = $derived(doc.assets.filter((a) => a.kind === 'image'));
-  const props = $derived(instance ? variantProps(doc, instance.compId) : {});
+  const variantValues = $derived(instance ? variantProps(doc, instance.compId) : {});
   const mains = $derived(Object.entries(doc.comps).filter(([, c]) => c.component));
   const VARIANT_KEY = 'Variant';
 
@@ -30,8 +34,8 @@
     if (!instance) {
       return;
     }
-    const key = Object.keys(props)[0] ?? VARIANT_KEY;
-    const count = (props[key]?.length ?? 1) + 1;
+    const key = Object.keys(variantValues)[0] ?? VARIANT_KEY;
+    const count = (variantValues[key]?.length ?? 1) + 1;
     applied(addVariant(doc, instance.compId, { [key]: `${VARIANT_KEY} ${count}` }, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
   }
 
@@ -75,6 +79,9 @@
     <header>
       <Diamond size={14} />
       <span class="name">{instance.comp.component?.name}</span>
+      <button type="button" class="go-main" data-testid="instance-go-main" aria-label="Go to main component" title={mainLocation ? `Go to main component: ${mainLocation.label}` : 'Go to main component'} onclick={() => mainRequest && mainNav.go(mainRequest)}>
+        <Target size={14} />
+      </button>
     </header>
     {#each properties as p (p.key)}
       <label class="field" data-testid="instance-property" data-key={p.key}>
@@ -137,7 +144,7 @@
           <label class="field">
             <span class:overridden={el.overridden.includes('assetId')}>Image</span>
             <select value={el.assetId} data-testid="instance-image" onchange={(e) => override(el.innerId, { assetId: e.currentTarget.value })}>
-              {#each images as a (a.id)}<option value={a.id}>{a.label ?? a.id}</option>{/each}
+              {#each images as a (a.id)}<option value={a.id}>{a.name || a.id}</option>{/each}
             </select>
             {#if el.overridden.includes('assetId')}<button type="button" class="reset" data-testid="instance-reset-assetId" onclick={() => reset(el.innerId, 'assetId')}>Reset</button>{/if}
           </label>
@@ -161,7 +168,7 @@
         {/if}
       </div>
     {/each}
-    {#each Object.entries(props) as [key, values] (key)}
+    {#each Object.entries(variantValues) as [key, values] (key)}
       <label class="field">
         <span>{key}</span>
         <select data-testid="instance-variant" value={instance.comp.component?.variant?.[key]} onchange={(e) => applied(pickVariant(doc, clipId, key, e.currentTarget.value), 'Changed variant')}>
@@ -204,6 +211,23 @@
   }
 
   .name {
+    flex: 1 1 auto;
+    color: var(--ui-text);
+  }
+
+  .go-main {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text-secondary);
+  }
+
+  .go-main:hover {
+    background: var(--ui-hover);
     color: var(--ui-text);
   }
 

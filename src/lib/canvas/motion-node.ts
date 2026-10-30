@@ -80,14 +80,18 @@ export const motionNodeSchema = z.object({
   budgetRaisedUsd: z.number().min(0).optional(),
   kind: z.enum(FrameKind).optional(),
   versionNames: versionNamesSchema.optional(),
-  interactive: z.boolean().default(false)
+  interactive: z.boolean().default(false),
+  mainHomes: z.array(z.string()).optional(),
+  linked: z.record(z.string(), z.string()).optional()
 });
 
 export const elementNodeSchema = z.object({
   docHeadRevision: z.number().int().min(0),
   posterRevision: z.number().int().min(0).optional(),
   kind: z.literal(FrameKind.Group).optional(),
-  interactive: z.boolean().default(false)
+  interactive: z.boolean().default(false),
+  mainHomes: z.array(z.string()).optional(),
+  linked: z.record(z.string(), z.string()).optional()
 });
 
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {

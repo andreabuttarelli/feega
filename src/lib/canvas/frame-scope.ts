@@ -3,7 +3,7 @@ import { MAX_COMP_DEPTH, SEPARATOR, viewOf, type CompPath } from '@feega/motion-
 import { mergeScope, scopeView } from '$lib/motion/instance-view';
 import { apply2d, invert2d, worldAt } from '@feega/motion-core/motion/parent';
 import type { Pt } from '$lib/motion/scene-select';
-import { Reach, clickTarget } from './frame-select';
+import { Reach, clickTarget, framePage } from './frame-select';
 
 export type Scope = { path: CompPath; prefix: string; hosts: string[]; parents: string[] };
 
@@ -66,25 +66,38 @@ export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: numbe
 
 const prefixOf = (doc: MotionDoc, id: string) => scopeOf(doc, id)?.scope.prefix;
 
-export function chainTarget(doc: MotionDoc, chain: readonly string[], picks: readonly string[], reach: Reach): string | null {
+const contextsOf = (doc: MotionDoc, pick: string | undefined): string[] => {
+  const scope = pick ? scopeOf(doc, pick)?.scope : null;
+  return scope ? [scope.prefix, ...scope.parents.map((id) => scopeOf(doc, id)?.scope.prefix ?? '').reverse()].filter(Boolean) : [];
+};
+
+export function pickTarget(doc: MotionDoc, chain: readonly string[], picks: readonly string[], reach: Reach): string | null {
   if (!chain.length) {
     return null;
   }
   if (reach === Reach.Deep) {
     return chain[chain.length - 1];
   }
-  const level = picks.length ? prefixOf(doc, picks[0]) : undefined;
-  const sibling = level ? chain.find((id) => prefixOf(doc, id) === level) : undefined;
-  if (sibling) {
-    return sibling;
+  for (const level of contextsOf(doc, picks[0])) {
+    const sibling = chain.find((id) => prefixOf(doc, id) === level);
+    if (sibling) {
+      return sibling;
+    }
   }
   const top = chain.filter((id) => findClip(doc, id)).at(-1);
   return top ? clickTarget(doc, top, picks, Reach.Top) : null;
 }
+
+export const reachOf = (keys: { metaKey: boolean; ctrlKey: boolean }): Reach => (keys.metaKey || keys.ctrlKey ? Reach.Deep : Reach.Top);
 
 export function enteredFrom(chain: readonly string[], picks: readonly string[]): string | null {
   const at = picks.length === 1 ? chain.indexOf(picks[0]) : -1;
   return at >= 0 ? (chain[at + 1] ?? null) : null;
 }
 
-export const parentPick = (doc: MotionDoc, sceneId: string): string | null => scopeOf(doc, sceneId)?.scope.parents.at(-1) ?? null;
+function linkedParent(doc: MotionDoc, id: string): string | null {
+  const up = findClip(doc, id)?.clip.parent ?? null;
+  return up && up !== framePage(doc) ? up : null;
+}
+
+export const parentPick = (doc: MotionDoc, sceneId: string): string | null => linkedParent(doc, sceneId) ?? scopeOf(doc, sceneId)?.scope.parents.at(-1) ?? null;

@@ -130,7 +130,7 @@ const MAPPERS: Record<string, Mapper> = {
   'flex-direction': keyword({ column: 'flex-col', row: 'flex-row' }, 'flex-direction'),
   'flex-wrap': keyword({ wrap: 'flex-wrap' }, 'flex-wrap'),
   'justify-content': keyword({ center: 'justify-center', 'flex-end': 'justify-end', 'space-between': 'justify-between', 'space-around': 'justify-around', 'space-evenly': 'justify-evenly' }, 'justify-content'),
-  'align-items': keyword({ 'flex-start': 'items-start', center: 'items-center', 'flex-end': 'items-end', baseline: 'items-baseline' }, 'align-items'),
+  'align-items': keyword({ 'flex-start': 'items-start', center: 'items-center', 'flex-end': 'items-end', baseline: 'items-baseline', stretch: 'items-stretch' }, 'align-items'),
   'align-self': keyword({ stretch: 'self-stretch', start: 'self-start', center: 'self-center', end: 'self-end', baseline: 'self-baseline' }, 'align-self'),
   'justify-self': keyword({ start: 'justify-self-start', center: 'justify-self-center', end: 'justify-self-end' }, 'justify-self'),
   flex: keyword({ '1 1 0': 'flex-1' }, 'flex'),

@@ -1,0 +1,47 @@
+---
+title: Import from URL
+description: Turn a public web page into an editable frame.
+sidebar:
+  order: 4
+---
+
+Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text in the page's own fonts, flex rows and columns become stacks where that keeps every layer in place, backgrounds, gradients, borders, corners, shadows and blurs become fills, strokes and effects, pictures are copied into your project, SVG icons and logos become vector paths. It is not a screenshot: only what a frame cannot hold as layers (a video, a canvas, an embedded page, a masked or blended block) comes in as a picture of itself.
+
+## In the app
+
+Open the insert menu (**+**), go to **Import**, choose **From URL…**, paste the address and press **Import**. The frame lands in the middle of the view, named after the page title.
+
+## What the import does before reading
+
+The page is scrolled to the bottom and back so lazy pictures load and scroll-revealed blocks show; running animations are finished, videos are stopped on their last frame, and cookie banners are hidden.
+
+## Fonts
+
+Web fonts the page loads are copied into your workspace's uploaded fonts and used by the frame, so text wraps where it wraps on the page. Text set in system fonts uses the closest free face (Inter for the system UI font, Arimo for Helvetica and Arial, Tinos for Times, Gelasio for Georgia, JetBrains Mono for monospace).
+
+## Limits
+
+- Public `http`/`https` pages only. Private network addresses and pages behind a login are refused.
+- The page is read at desktop width (1280 px), down to 65 536 px from the top, up to 10 000 layers. A page taller than 16 384 px comes in as frames stacked one under the other.
+- Four imports a minute per person.
+- Not yet: tablet and phone layouts as breakpoints.
+
+## Components
+
+Blocks the page repeats (cards, logos, buttons, list items) become one main component and linked instances. Each instance keeps its own text, pictures and colours as overrides, so editing the main updates every copy and **Reset** brings one back to the main. Blocks with the same structure but a different background, border or shadow become variants of one component (`Style=Primary`, `Style=Secondary`). Names come from what the block is: button, card, feature card, nav link, logo. Find them in the **Components** panel.
+
+A block is turned into a component when it repeats at least twice, is at least 16 px on each side and has a background, a picture or an icon. Sidebar rows, nav links and buttons inside auto layout rows count too. Copies of a different size, or with a different icon or spacing, stay linked: the difference is an override on that instance, as in Figma. Each component shows a preview of itself in the **Components** panel.
+
+## CLI
+
+```bash
+feega canvas import-url $PROJECT https://example.com --canvas <canvas> --x 0 --y 0
+```
+
+`x` and `y` are the canvas position of the frame centre. The answer has `frame_id` and `truncated` (true when the page hit the layer or height cap).
+
+## MCP and API
+
+Over MCP: `canvas_tool({ project_id, op: "import_url", input: { canvasId, url, x, y } })`.
+
+Over HTTP: `POST /api/v1/projects/{projectId}/url-import` with `{ canvasId, url, x, y }`. Errors: `not_public` (400), `failed` (502, the page answered with an error), `unreadable` (422), `rate_limited` (429), `no_browser` (503).

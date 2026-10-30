@@ -129,6 +129,7 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
       },
       {
         "align": "left",
+        "axes": "",
         "box": {
           "height": 398,
           "width": 489,
@@ -136,7 +137,9 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
           "y": 341,
         },
         "color": "#ffffff",
+        "decoration": "none",
         "effects": [],
+        "features": "",
         "fills": [
           {
             "color": "#ffffff",
@@ -163,6 +166,7 @@ exports[`a real Figma clipboard > maps the copied frame to one frame placement w
         "text": "dal 
 nulla",
         "weight": 700,
+        "wraps": false,
       },
     ],
     "clip": "clip",
@@ -327,6 +331,7 @@ nulla",
           },
           {
             "align": "left",
+            "axes": "",
             "box": {
               "height": 398,
               "width": 489,
@@ -334,7 +339,9 @@ nulla",
               "y": 341,
             },
             "color": "#ffffff",
+            "decoration": "none",
             "effects": [],
+            "features": "",
             "fills": [
               {
                 "color": "#ffffff",
@@ -361,6 +368,7 @@ nulla",
             "text": "dal 
 nulla",
             "weight": 700,
+            "wraps": false,
           },
         ],
         "clip": "clip",

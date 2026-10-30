@@ -12,3 +12,10 @@ export function parseComponentDrag(raw: string): ComponentDrag | null {
     return null;
   }
 }
+
+const CLIP_PREFIX = 'feega-component:';
+
+export const componentClipText = (drag: ComponentDrag): string => `${CLIP_PREFIX}${serializeComponentDrag(drag)}`;
+
+export const parseComponentClip = (text: string): ComponentDrag | null =>
+  text.startsWith(CLIP_PREFIX) ? parseComponentDrag(text.slice(CLIP_PREFIX.length)) : null;

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, stillFrame } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stillFrame, toFetch } from './frame-source';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -17,6 +17,14 @@ describe('frames on canvas', () => {
   it('a rotated tile turns its frame about the tile centre', () => {
     const [f] = framesOnCanvas([{ ...tile('a'), rotation: 20 }], () => ({ kind: FrameKind.Element, docHeadRevision: 1 }));
     expect(f.turn).toEqual({ degrees: 20, about: { x: 160, y: 120 } });
+  });
+
+  it('a frame holding instances is fetched again when one of their mains changes', () => {
+    const before = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Frame, docHeadRevision: 4, linked: { home: 'x1' } }))[0];
+    const after = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Frame, docHeadRevision: 4, linked: { home: 'x2' } }))[0];
+
+    expect(before.linked).toBeTruthy();
+    expect(after.linked).not.toBe(before.linked);
   });
 
   it('elements and groups have no bar', () => {
@@ -41,7 +49,7 @@ describe('handing a frame to the core', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     logGaps('f1', list(0));
-    logGaps('f1', { ...list(0), unsupported: [{ clip: 'c', component: 'Custom', reason: 'dom', detail: 'mask div.x ×2' }] } as never);
+    logGaps('f1', { ...(list(0) as object), unsupported: [{ clip: 'c', component: 'Custom', reason: 'dom', detail: 'mask div.x ×2' }] } as never);
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0].join(' ')).toContain('c (Custom): mask div.x ×2');
@@ -111,5 +119,52 @@ describe('a transparent doc on the canvas', () => {
   it('elements and groups stay see-through, and an opaque doc keeps its own colour', () => {
     expect(onStage(list(null), FrameKind.Element).background).toBeNull();
     expect(onStage(list([1, 0, 0, 1]), FrameKind.Frame).background).toEqual([1, 0, 0, 1]);
+  });
+});
+
+describe('frames to fetch', () => {
+  const at = (id: string, revision: number) => ({ id, kind: FrameKind.Frame, revision, box: { x: 0, y: 0, w: 10, h: 10 } });
+  const keyOf = (f: { id: string; revision: number }) => `${f.id}:${f.revision}`;
+
+  it('a frame drawn from its live doc is not fetched again when a save bumps its revision', () => {
+    const frames = [at('edited', 8), at('other', 3)];
+
+    expect(toFetch(frames, keyOf, new Set(['edited:7']), new Set(['edited'])).map((f) => f.id)).toEqual(['other']);
+  });
+
+  it('a frame already asked for at this revision is not fetched twice', () => {
+    expect(toFetch([at('a', 2)], keyOf, new Set(['a:2']), new Set())).toEqual([]);
+  });
+});
+
+describe('same live doc', () => {
+  const doc = newMotionDoc(MotionFormat.Landscape);
+  const live = { doc, tokens: {} as never, assets: {}, playhead: 3 };
+
+  it('a save that hands back the same doc is no new picture to draw', () => {
+    expect(sameLive(live, { ...live })).toBe(true);
+  });
+
+  it('a new doc, files or playhead is', () => {
+    expect(sameLive(live, { ...live, doc: { ...doc } })).toBe(false);
+    expect(sameLive(live, { ...live, assets: {} })).toBe(false);
+    expect(sameLive(live, { ...live, playhead: 4 })).toBe(false);
+    expect(sameLive(undefined, live)).toBe(false);
+  });
+});
+
+describe('the picture a frame shows while a new revision loads', () => {
+  const has = (...groups: string[]) => (g: string) => groups.includes(g);
+
+  it('keeps the revision it showed until the new one is built, never a stand-in', () => {
+    expect(shownGroup('a:2', 'a:1', has('a:1'))).toBe('a:1');
+  });
+
+  it('swaps to the new revision once it is built', () => {
+    expect(shownGroup('a:2', 'a:1', has('a:1', 'a:2'))).toBe('a:2');
+  });
+
+  it('a frame never built has nothing to show', () => {
+    expect(shownGroup('a:1', undefined, has())).toBeNull();
   });
 });

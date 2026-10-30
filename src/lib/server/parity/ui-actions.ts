@@ -69,14 +69,13 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   connect: canvas('connect_nodes'),
   moveElement: canvas('move_frame_element'),
   copyElement: canvas('copy_frame_element'),
+  placeComponent: canvas('place_component'),
   frameSize: motion('set_canvas'),
   exportSelection: canvas('export_selection'),
   saveCanvasVersion: canvas('save_canvas_version'),
   export_canvas_file: canvas('export_canvas_file'),
   request_canvas_import: canvas('request_canvas_import'),
   import_canvas_file: canvas('import_canvas_file'),
-  canvasVersions: canvas('list_canvas_versions'),
-  restoreCanvasVersion: canvas('restore_canvas_version'),
   canvasComments: canvas('list_canvas_comments'),
   exportCode: canvas('export_code_frame'),
   addComment: canvas('add_canvas_comment'),
@@ -97,6 +96,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveFree: canvas('move_frame_element'),
   copyFree: canvas('copy_frame_element'),
   groupElements: canvas('group_elements'),
+  stackElements: canvas('stack_elements'),
   wrapSection: canvas('group_elements'),
   restack: canvas('move_node'),
   ungroupElement: canvas('ungroup_element'),
@@ -122,8 +122,6 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   detach_technique: canvas('detach_technique'),
   open_technique: canvas('open_technique'),
   undo: canvas('undo_gesture'),
-  agent_changes: canvas('agent_changes'),
-  reject_change: canvas('reject_change'),
   suggestNextStep: canvas('suggest_next_steps')
 };
 
@@ -131,9 +129,6 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   save: editor('save_doc'),
   ops: editor('apply_ops'),
   head: editor('read_head'),
-  revisions: tool('list_motion_revisions'),
-  restore: tool('restore_motion_revision'),
-  nameVersion: tool('motion_editor_op'),
   exported: editor('record_export'),
   poster: uiOnly('thumbnail the browser captures after a save (POST /api/v1/motion/{node}/poster, multipart); export_image makes stills for agents'),
   still: motion('export_image'),
@@ -153,11 +148,7 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   batchStatus: editor('batch_status'),
   cancelRender: canvas('cancel_render'),
   renderStatus: editor('render_status'),
-  branches: editor('list_branches'),
-  createBranch: editor('create_branch'),
-  reviewBranch: editor('review_branch'),
-  mergeBranch: editor('merge_branch'),
-  dropBranch: editor('drop_branch')
+  createBranch: editor('create_branch')
 };
 
 const OPACITY_PARITY = Object.fromEntries(OPACITY_KEYS.map((o) => [o.command, motion('set_transform')])) as Record<(typeof OPACITY_KEYS)[number]['command'], Parity>;
@@ -231,7 +222,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Precompose]: motion('precompose'),
   [Command.Group]: motion('frame_clips'),
   [Command.Ungroup]: motion('ungroup'),
-  [Command.AutoLayout]: motion('add_auto_layout'),
+  [Command.WrapStack]: motion('wrap_in_stack'),
+  [Command.RemoveStack]: motion('remove_stack'),
   [Command.Section]: canvas('group_elements'),
   [Command.FrameSelection]: motion('frame_clips'),
   [Command.ResizeToFit]: motion('resize_to_fit'),
@@ -268,10 +260,12 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.DetachInstance]: motion('component'),
   [Command.ResetInstance]: motion('component'),
   [Command.PushInstance]: motion('component'),
+  [Command.GoToMain]: NAVIGATION,
   [Command.ToolSelect]: VIEW,
   [Command.ToolText]: motion('add_clip'),
   [Command.ToolRectangle]: motion('add_shape'),
   [Command.ToolFrame]: motion('add_shape'),
+  [Command.ToolStack]: motion('wrap_in_stack'),
   [Command.ToolEllipse]: motion('add_shape'),
   [Command.ToolPolygon]: motion('add_shape'),
   [Command.ToolStar]: motion('add_shape'),
@@ -354,6 +348,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'split-layers': canvas('image_tool'),
   'layers-to-frame': canvas('layers_to_frame'),
   'copy-id': CLIPBOARD,
+  'copy-link': CLIPBOARD,
   report: uiOnly('a person reports abuse to us; not an edit'),
   group: canvas('group_elements'),
   ungroup: canvas('ungroup_element'),
@@ -381,7 +376,8 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'select-same-effect': VIEW,
   'frame-selection': motion('frame_clips'),
   'resize-to-fit': motion('resize_to_fit'),
-  'auto-layout': motion('add_auto_layout'),
+  'wrap-stack': motion('wrap_in_stack'),
+  'remove-stack': motion('remove_stack'),
   union: motion('combine_shapes'),
   subtract: motion('combine_shapes'),
   intersect: motion('combine_shapes'),
@@ -391,8 +387,13 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'outline-text': motion('text_to_path'),
   'create-component': motion('component'),
   'detach-instance': motion('component'),
+  'go-to-main': NAVIGATION,
   'reset-instance': motion('component'),
   'push-instance': motion('component'),
+  hide: motion('set_visibility'),
+  lock: motion('set_visibility'),
+  'copy-properties': VIEW,
+  'paste-properties': motion('set_props'),
   'create-formats': canvas('create_formats'),
   'combine-video': canvas('combine_scenes'),
   export: canvas('export_selection'),
@@ -402,8 +403,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'frame-interactive': motion('declare_var'),
   'frame-components': motion('add_template'),
   'frame-templates': motion('add_template'),
-  'frame-branches': editor('list_branches'),
-  'frame-history': tool('list_motion_revisions'),
+  'frame-history': canvas('restore_to'),
   'frame-chat': tool('ask_motion_agent'),
   'frame-save-template': editor('save_template'),
   'frame-publish': tool('publish_to_gallery'),
@@ -421,7 +421,8 @@ export const LAYER_PANEL: Record<LayerAction, Parity> = {
 export const CANVAS_LIST: Record<CanvasAction, Parity> = {
   [CanvasAction.New]: canvas('create_canvas'),
   [CanvasAction.Rename]: canvas('rename_canvas'),
-  [CanvasAction.Delete]: canvas('delete_canvas')
+  [CanvasAction.Delete]: canvas('delete_canvas'),
+  [CanvasAction.RenameProject]: canvas('rename_project')
 };
 
 export const CLIP_BUTTONS: Record<ClipOp, Parity> = {

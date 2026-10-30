@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Align, AlignContent, AutoFlow, DEFAULT_COLUMNS, Direction, Justify, Sizing, TrackType } from './auto-layout';
+import { MAX_FILL_WEIGHT, MAX_PERCENT } from './size-entry';
 
 export const MAX_LAYOUT_PX = 4000;
 export const MAX_LAYOUT_CHILDREN = 200;
@@ -15,6 +16,8 @@ const AUTO_FLOWS = Object.values(AutoFlow) as [AutoFlow, ...AutoFlow[]];
 export const SIZINGS = Object.values(Sizing) as [Sizing, ...Sizing[]];
 
 const px = z.number().min(0).max(MAX_LAYOUT_PX);
+const weight = z.number().positive().max(MAX_FILL_WEIGHT);
+const percent = z.number().positive().max(MAX_PERCENT);
 const signedPx = z.number().min(-MAX_LAYOUT_PX).max(MAX_LAYOUT_PX);
 
 export const trackSchema = z.object({ type: z.enum(TRACK_TYPES), value: px.default(1) });
@@ -45,6 +48,11 @@ export const autoLayoutSchema = z.object({
 export const layoutItemSchema = z.object({
   width: z.enum(SIZINGS).default(Sizing.Fixed),
   height: z.enum(SIZINGS).default(Sizing.Fixed),
+  widthGrow: weight.optional(),
+  heightGrow: weight.optional(),
+  widthPercent: percent.optional(),
+  heightPercent: percent.optional(),
+  alignSelf: z.enum(ALIGNS).optional(),
   minWidth: px.optional(),
   maxWidth: px.optional(),
   minHeight: px.optional(),

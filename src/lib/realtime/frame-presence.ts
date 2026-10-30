@@ -1,5 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import { z } from 'zod';
+import { opsSchema, type DocOp } from '$lib/motion/doc-ops';
+import type { PeerStep } from '$lib/motion/frame-step';
 
 export type FrameCursor = { x: number; y: number };
 
@@ -11,14 +13,12 @@ export type FrameSelf = { userId: string; name: string };
 
 export type FrameState = Pick<FrameMark, 'nodeId' | 'cursor' | 'selection'>;
 
-export type FrameHead = { nodeId: string; version: number; doc: unknown };
-
 export type FramePresence = {
   self: FrameSelf;
   send: (state: FrameState) => void;
   listen: (on: (mark: FrameMark) => void) => () => void;
-  landed: (head: FrameHead) => void;
-  onHead: (on: (head: FrameHead) => void) => () => void;
+  landed: (step: PeerStep) => void;
+  onHead: (on: (step: PeerStep) => void) => () => void;
 };
 
 export const FRAME_EVENT = 'frame';
@@ -35,7 +35,7 @@ const markSchema = z.object({
   at: z.number().finite()
 });
 
-const headSchema = z.object({ nodeId: z.string().min(1), version: z.number().int().min(0), doc: z.record(z.string(), z.unknown()) });
+const stepSchema = z.object({ nodeId: z.string().min(1), base: z.number().int().min(0), version: z.number().int().min(1), ops: opsSchema });
 
 export function toMark(raw: unknown): FrameMark | null {
   const parsed = markSchema.safeParse(raw);
@@ -71,13 +71,13 @@ export function peersIn(marks: Map<string, FrameMark>, nodeId: string, selfId: s
 
 export type FrameLine = { receive: (payload: unknown) => void; attach: (send: ((mark: FrameMark) => void) | null) => void };
 
-export type HeadLine = { receive: (payload: unknown) => void; attach: (send: ((head: FrameHead) => void) | null) => void };
+export type HeadLine = { receive: (payload: unknown) => void; attach: (send: ((step: PeerStep) => void) | null) => void };
 
 export function frameHub(self: FrameSelf, now: () => number = Date.now): { port: FramePresence; line: FrameLine; heads: HeadLine } {
   const listeners = new Set<(mark: FrameMark) => void>();
-  const headListeners = new Set<(head: FrameHead) => void>();
+  const headListeners = new Set<(step: PeerStep) => void>();
   let transmit: ((mark: FrameMark) => void) | null = null;
-  let announce: ((head: FrameHead) => void) | null = null;
+  let announce: ((step: PeerStep) => void) | null = null;
 
   const port: FramePresence = {
     self,
@@ -86,7 +86,7 @@ export function frameHub(self: FrameSelf, now: () => number = Date.now): { port:
       listeners.add(on);
       return () => listeners.delete(on);
     },
-    landed: (head) => announce?.(head),
+    landed: (step) => announce?.(step),
     onHead: (on) => {
       headListeners.add(on);
       return () => headListeners.delete(on);
@@ -97,9 +97,10 @@ export function frameHub(self: FrameSelf, now: () => number = Date.now): { port:
       announce = send;
     },
     receive: (raw) => {
-      const parsed = headSchema.safeParse(raw);
+      const parsed = stepSchema.safeParse(raw);
       if (parsed.success) {
-        headListeners.forEach((on) => on(parsed.data));
+        const step = { ...parsed.data, ops: parsed.data.ops as DocOp[] };
+        headListeners.forEach((on) => on(step));
       }
     }
   };

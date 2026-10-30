@@ -169,7 +169,7 @@ export function renameStyle(doc: MotionDoc, from: string, to: string): OpResult 
   if (doc.styles?.[to]) {
     return { ok: false, error: `a style ${to} already exists` };
   }
-  const { [from]: _old, ...others } = doc.styles;
+  const { [from]: _old, ...others } = doc.styles ?? {};
   const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => renamedRefs(c, from, to)) }));
   return { ok: true, doc: { ...doc, tracks, styles: { ...others, [to]: style } } };
 }

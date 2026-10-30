@@ -34,7 +34,8 @@ test.describe('comment edit, delete and mentions @real', () => {
     await expect(page.getByTestId('comments-unseen')).toBeVisible({ timeout: 20_000 });
     await page.screenshot({ path: `${SHOTS}/comments3-unseen-dot.png` });
 
-    await page.getByTestId('canvas-switcher').click();
+    await page.keyboard.press('Alt+1');
+    await page.getByTestId('canvas-more').click();
     await page.getByTestId('canvas-comments').click();
     await expect(page.getByTestId('comments-panel')).toBeVisible();
     await expect(page.getByTestId('comments-unseen')).toHaveCount(0);
@@ -64,7 +65,7 @@ test.describe('comment edit, delete and mentions @real', () => {
 
     await page.reload();
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('canvas-switcher')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('project-switcher')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('comments-unseen')).toHaveCount(0);
   });
 });

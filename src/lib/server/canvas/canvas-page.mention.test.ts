@@ -52,6 +52,14 @@ describe('adding a comment from the canvas page', () => {
     expect(inserts(fake)).toHaveLength(1);
   });
 
+  it('stores the comment under the id the canvas already shows', async () => {
+    const fake = thread();
+    const id = '6a1d3f0e-2b8c-4f55-8e0a-5d2f7c9b1a44';
+
+    expect(await post(fake, { id, body: 'looks good', node_id: 'n1' })).toMatchObject({ id });
+    expect(inserts(fake)[0]).toMatchObject({ id });
+  });
+
   it('a refused comment does not wake it either', async () => {
     const fake = thread();
 

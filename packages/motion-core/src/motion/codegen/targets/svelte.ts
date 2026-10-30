@@ -1,4 +1,4 @@
-import { isProp, NodeKind, PropType, type Bound, type CodeNode, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode } from '../ir';
+import { axisCondition, axisType, fallbackMember, isFlagAxis, isProp, NodeKind, PropType, type SetSpec, type Bound, type CodeNode, type ComponentSpec, type PropSpec, type ElementNode, type PageSpec, type SvgNode, type UseNode } from '../ir';
 import { kebab } from '../naming';
 import type { CodeFile } from '../model';
 import { BASE_CSS, fontLinks, lookupOf, mediaBlocks, ruleBlock, tokensCss, type TokenLookup } from './css';
@@ -30,11 +30,13 @@ function attrs(node: ElementNode): string {
 
 const styles = (node: ElementNode) => node.styleBinds.map((b) => ` style:${b.property}={${b.prop}}`).join('');
 
+const variantAttrs = (node: UseNode) => (node.set?.variant ?? []).map((v) => (isFlagAxis([v.value]) ? ` ${v.name}={${v.value}}` : ` ${v.name}="${v.value}"`)).join('');
+
 function useLines(node: UseNode, depth: number, ctx: Ctx): string[] {
   const cls = node.rules.length ? ` class="${instanceClass(ctx.file, node.className)}"` : '';
   const props = node.props.map((p) => (typeof p.value === 'boolean' ? ` ${p.name}={${p.value}}` : ` ${p.name}=${attrValue({ literal: p.value })}`)).join('');
   const forwards = node.forwards.map((f) => ` ${f.name}={${f.prop}}`).join('');
-  return [`${pad(depth)}<${node.component}${cls}${props}${forwards} />`];
+  return [`${pad(depth)}<${node.set?.name ?? node.component}${cls}${variantAttrs(node)}${props}${forwards} />`];
 }
 
 const svgOf = (node: SvgNode) => `<svg class="${node.className}"${inView(node) ? ' use:inview' : ''} width="${node.width}" height="${node.height}" viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${node.markup}</svg>`;
@@ -92,6 +94,27 @@ function componentFile(spec: ComponentSpec, tokens: TokenLookup): CodeFile {
   return { path: `src/lib/components/${spec.name}.svelte`, content };
 }
 
+function setFile(set: SetSpec): CodeFile {
+  const fallback = fallbackMember(set);
+  const others = set.members.filter((m) => m !== fallback);
+  const fields = [...set.axes.map((a) => `${a.name}?: ${axisType(a.values)};`), ...set.props.map((p) => `${p.name}?: ${p.type};`), 'class?: string;'];
+  const branches = others.flatMap((m, i) => [`${i === 0 ? '{#if' : '{:else if'} ${axisCondition(set, m.variant)}}`, `  <${m.component} {...props} />`]);
+  const fallbackLine = `<${fallback.component} {...props} />`;
+  const body = others.length ? [...branches, '{:else}', `  ${fallbackLine}`, '{/if}'] : [fallbackLine];
+  const content = [
+    '<script lang="ts">',
+    ...set.members.map((m) => `  import ${m.component} from './${m.component}.svelte';`),
+    `  type Props = { ${fields.join(' ')} };`,
+    '',
+    `  let { ${set.axes.map((a) => a.name).join(', ')}, ...props }: Props = $props();`,
+    '</script>',
+    '',
+    ...body,
+    ''
+  ].join('\n');
+  return { path: `src/lib/components/${set.name}.svelte`, content };
+}
+
 function pageFile(page: PageSpec, tokens: TokenLookup): CodeFile {
   const ctx: Ctx = { tokens, root: null, file: kebab(page.name) };
   const lines = imports(page.uses, '$lib/components/', page.root);
@@ -126,6 +149,7 @@ export function svelteProject(page: PageSpec, slug: string): CodeFile[] {
     { path: 'src/lib/styles/tokens.css', content: tokensCss(page.tokens) },
     { path: 'src/routes/+layout.svelte', content: ['<script lang="ts">', "  import '../app.css';", '', '  let { children } = $props();', '</script>', '', '{@render children()}', ''].join('\n') },
     pageFile(page, tokens),
-    ...page.components.map((c) => componentFile(c, tokens))
+    ...page.components.map((c) => componentFile(c, tokens)),
+    ...page.sets.map(setFile)
   ];
 }

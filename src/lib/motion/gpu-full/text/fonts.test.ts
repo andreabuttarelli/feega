@@ -60,6 +60,13 @@ describe('faceRules', () => {
     expect(rules[1]).toEqual({ family: 'Inter', italic: false, weight: [100, 900], url: 'https://fonts.gstatic.com/inter.woff2', ranges: [[0, 0xff], [0x131, 0x131]] });
     expect(rules[2]).toMatchObject({ family: 'Brand', weight: [700, 700], url: 'https://x.test/brand-700.otf', ranges: [[0, 0x10ffff]] });
   });
+
+  it('reads a font file given inline as a data URL, whose semicolon is not the end of src', () => {
+    const inline = 'data:font/woff2;base64,d09GMgABAAAA';
+    const [rule] = faceRules(`@font-face{font-family:'Geist';src:url(${JSON.stringify(inline)});font-weight:450;font-style:normal;font-display:block}`);
+
+    expect(rule).toMatchObject({ family: 'Geist', url: inline, weight: [450, 450] });
+  });
 });
 
 describe('faceBook', () => {
@@ -104,6 +111,22 @@ describe('faceBook', () => {
     const withSans = faceBook([...rules, ...sans], new Map([...sources, ['https://x.test/dm-sans.woff2', source('dm-sans')]]), registry);
     const gone = withSans({ family: 'Deleted Upload', weight: 400, italic: false, size: 20, axes: {} }, 0x41);
     expect(gone?.face.key?.font).toBe('https://x.test/dm-sans.woff2');
+  });
+
+  it('resolves a character once per look, so laying the same text out again reads no rules', () => {
+    let checks = 0;
+    const counted = new Map([...sources].map(([url, s]) => [url, { ...s, covers: () => (checks++, true) }]));
+    const once = faceBook(rules, counted, registry);
+    const look = { family: 'Inter', weight: 400, italic: false, size: 20, axes: {} };
+
+    const first = once(look, 65);
+    const checked = checks;
+    const again = once({ ...look }, 65);
+
+    expect(again).toEqual(first);
+    expect(checks).toBe(checked);
+    expect(once({ ...look, weight: 700 }, 65)).not.toBeNull();
+    expect(checks).toBeGreaterThan(checked);
   });
 });
 

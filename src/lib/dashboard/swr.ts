@@ -5,6 +5,7 @@ type Entry = { value: unknown; json: string; at: number; revalidating: boolean }
 export class SwrCache {
   private entries = new Map<string, Entry>();
   private warming = new Map<string, Promise<unknown>>();
+  private generation = 0;
 
   constructor(private now: () => number = Date.now) {}
 
@@ -30,6 +31,7 @@ export class SwrCache {
   }
 
   clear(): void {
+    this.generation++;
     this.entries.clear();
     this.warming.clear();
   }
@@ -50,8 +52,13 @@ export class SwrCache {
 
   private revalidate<T>(key: string, entry: Entry, fetcher: () => Promise<T>, onFresh: () => void): void {
     entry.revalidating = true;
+    const started = this.generation;
     fetcher().then(
       (value) => {
+        if (started !== this.generation) {
+          return;
+        }
+
         const changed = JSON.stringify(value) !== entry.json;
         this.store(key, value);
         if (changed) {

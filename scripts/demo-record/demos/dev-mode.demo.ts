@@ -45,7 +45,7 @@ test('dev mode', async ({ page, session, admin, seedNode }) => {
     await d.wait(READ_MS);
     await d.key('Escape');
 
-    await d.click(page.getByTestId('dev-toggle'));
+    await d.click(page.getByTestId('editor-mode-switch').getByRole('radio', { name: 'Code' }));
     await d.wait(1200);
   });
 });

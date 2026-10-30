@@ -36,9 +36,12 @@ export type Binding = { key: PropKey; spec: PropSpec };
 
 export type Forward = { name: string; prop: string };
 
+export type SetMark = { name: string; variant: Record<string, string> };
+
 export type ComponentPlan = {
   compId: string;
   name: string;
+  set: SetMark | null;
   block: string;
   comp: MotionComp;
   bindings: Map<string, Binding[]>;
@@ -64,8 +67,13 @@ function declaredNames(comp: MotionComp): Map<string, string> {
 
 const same = (a: unknown, b: unknown) => a === b;
 
+const setOf = (comp: MotionComp): SetMark | null => (comp.component?.set && Object.keys(comp.component.variant ?? {}).length ? { name: pascal(comp.component.set), variant: comp.component.variant! } : null);
+
+const memberName = (comp: MotionComp, set: SetMark | null) => pascal(set ? `${set.name} ${Object.values(set.variant).join(' ')}` : (comp.component?.name ?? comp.name));
+
 function planOne(compId: string, comp: MotionComp, hosts: MotionClip[], names: NameBook, resolve: (key: PropKey, value: string | boolean) => string | boolean): ComponentPlan {
-  const name = names.unique(pascal(comp.component?.name ?? comp.name));
+  const set = setOf(comp);
+  const name = names.unique(memberName(comp, set));
   const masters = comp.tracks.flatMap((t) => t.clips as MotionClip[]);
   const effective = hosts.map((h) => [h.id, effectiveClips(comp, h)] as const);
   const declared = declaredNames(comp);
@@ -94,7 +102,7 @@ function planOne(compId: string, comp: MotionComp, hosts: MotionClip[], names: N
       }
     }
   }
-  return { compId, name, block: kebab(name), comp, bindings, values, exposed: [], forwards: new Map(), propNames };
+  return { compId, name, set, block: kebab(name), comp, bindings, values, exposed: [], forwards: new Map(), propNames };
 }
 
 export const specsOf = (plan: ComponentPlan): PropSpec[] => [...[...plan.bindings.values()].flat().map((b) => b.spec), ...plan.exposed];
@@ -149,6 +157,7 @@ export function planComponents(doc: MotionDoc, resolve: (key: PropKey, value: st
   const hosts = [...real, ...nestedHosts(doc, real)];
   const names = new NameBook('');
   const ids = [...new Set(hosts.map((h) => compOf(h)!))].sort((a, b) => doc.comps[a].name.localeCompare(doc.comps[b].name) || a.localeCompare(b));
+  new Set(ids.flatMap((id) => setOf(doc.comps[id])?.name ?? [])).forEach((set) => names.unique(set));
   const plans = new Map(ids.map((id) => [id, planOne(id, doc.comps[id], hosts.filter((h) => compOf(h) === id), names, resolve)]));
   const done = new Set<string>();
   plans.forEach((plan) => expose(plan, plans, done));

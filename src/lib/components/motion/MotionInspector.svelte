@@ -70,7 +70,10 @@
   import InOutPresetsSection from './InOutPresetsSection.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
-  import AutoLayoutSection from './AutoLayoutSection.svelte';
+  import StackSection from './StackSection.svelte';
+  import { layoutParent, removeStack } from '$lib/motion/layout/ops';
+  import { LAYOUT_KIND_LABEL, layoutKind, placementOf } from '@feega/motion-core/motion/layout/stack';
+  import Minus from '@lucide/svelte/icons/minus';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
   import BindChip from './BindChip.svelte';
@@ -131,6 +134,7 @@
     lead,
     actions,
     mode = EditMode.Motion,
+    as = null,
     onalign
   }: {
     doc: MotionDoc;
@@ -154,6 +158,7 @@
     lead?: Snippet;
     actions?: Snippet;
     mode?: EditMode;
+    as?: PropertiesView | null;
     onalign?: (edge: AlignEdge) => void;
   } = $props();
 
@@ -224,6 +229,8 @@
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
   const positioned = $derived(transformProps.length > 0);
   const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
+  const stackParent = $derived(layoutParent(doc, clip));
+  const placement = $derived(placementOf(clip, stackParent));
   const PLACED_KEYS: ReadonlySet<string> = new Set(['x', 'y']);
   const NO_SKIP: ReadonlySet<string> = new Set();
   const RADIUS_KEYS: ReadonlySet<string> = new Set(['roundness', 'corners']);
@@ -233,13 +240,14 @@
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
-  const headKind = $derived(customName ? 'Component' : spec.label);
+  const stackKind = $derived(layoutKind(clip));
+  const headKind = $derived(customName ? 'Component' : stackKind ? LAYOUT_KIND_LABEL[stackKind] : spec.label);
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
+  const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const textFields = $derived(fieldsIn(Section.Text));
   const textField = (key: string) => textFields.find((f) => f.key === key);
   const decorationNow = $derived(clip.props.decoration);
-  const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const roundnessField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'roundness') ?? null);
   const cornersField = $derived(fieldsIn(Section.Layer).find((f) => f.key === 'corners') ?? null);
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
@@ -471,10 +479,12 @@
   const pulseShown = $derived(pulsable.length > 0 && shows(Part.Pulse, family) && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio')));
   const visual = $derived(spec.track === TrackKind.Visual);
 
-  const view = $derived(focus ? PropertiesView.Part : PropertiesView.Clip);
+  const view = $derived(as ?? (focus ? PropertiesView.Part : PropertiesView.Clip));
+  const layerExtras = $derived(visual && view !== PropertiesView.Frame);
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
     [Section.Layout]: positioned || fieldsIn(Section.Layout).length > 0,
+    [Section.Stack]: layerExtras && (!!clip.autoLayout || layoutParent(doc, clip) !== null),
     [Section.Align]: positioned && visual,
     [Section.Constraints]: pinnable,
     [Section.Transform]: layoutProps.length > 0,
@@ -490,11 +500,12 @@
     [Section.Parent]: visual || maskProps.length > 0
   });
 
-  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
+  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(clip.autoLayout ? { [Section.Stack]: removeStackButton } : {}), ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
 
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
     [Section.Layout]: layoutBody,
+    [Section.Stack]: stackBody,
     [Section.Align]: alignBody,
     [Section.Constraints]: constraintsBody,
     [Section.Transform]: transformBody,
@@ -532,7 +543,7 @@
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
     {@render lead?.()}
-    {#each sectionsFor(family, view, mode).filter((s) => has[s]) as section (section)}
+    {#each sectionsFor(family, view, mode, placement).filter((s) => has[s]) as section (section)}
       <InspectorSection actions={SECTION_ACTIONS[section]} title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && (fieldsIn(section).length > 0 || (section === Section.Fill && !!partFill)))} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
@@ -543,9 +554,8 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
-    {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
-    {#if visual}<VariablesSection {doc} {clip} {commit} />{/if}
-    {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<VariablesSection {doc} {clip} {commit} />{/if}
   {/if}
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -570,6 +580,7 @@
   {@const look = fieldLook(prop.key, prop.source)}
   {@const range = slider(prop)}
   <NumberField
+    {gesture}
     label={named ? prop.label : (look.short ?? prop.label)}
     kind={named || !look.short ? FieldKind.Named : FieldKind.Glyph}
     name={prop.label}
@@ -607,6 +618,7 @@
   {@const look = fieldLook(field.key)}
   {@const range = fieldSlider(field)}
   <NumberField
+    {gesture}
     label={look.short ?? field.label}
     kind={look.short ? FieldKind.Glyph : FieldKind.Named}
     name={field.label}
@@ -809,7 +821,7 @@
 {/snippet}
 
 {#snippet layoutBody()}
-  {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
   {@render groupFields(Section.Layout, positioned ? PLACED_KEYS : NO_SKIP)}
   {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
 {/snippet}
@@ -840,7 +852,7 @@
   {#if roundnessField}{@render radiusControl(roundnessField)}{/if}
   {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
-    {#if hasChildren}
+    {#if hasChildren || view === PropertiesView.Frame}
       <div class="line" data-prop="clipContent">
         <span class="label">Clip content</span>
         <SegmentedField name="Clip content" options={YES_NO} value={answerOf(clip.clipContent)} onchange={(v) => commit(setClipFlags(doc, clip.id, { clipContent: v === Answer.Yes }), 'Changed clip content')} />
@@ -989,7 +1001,7 @@
         {@const physics = clip.physics}
         {#each PHYSICS_KEYS as key (key)}
           <div class="stack" data-physics={key}>
-            <NumberField label={PHYSICS[key].label} kind={FieldKind.Named} name={PHYSICS[key].label} value={physics[key]} range={PHYSICS[key]} onchange={(v) => setPhysicsValue(key, v)} />
+            <NumberField {gesture} label={PHYSICS[key].label} kind={FieldKind.Named} name={PHYSICS[key].label} value={physics[key]} range={PHYSICS[key]} onchange={(v) => setPhysicsValue(key, v)} />
           </div>
         {/each}
         <div class="line">
@@ -1017,6 +1029,14 @@
       {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type) }), 'Add fill')} />{/each}
     </MenuContent>
   </Menu>
+{/snippet}
+
+{#snippet stackBody()}
+  <StackSection {doc} {clip} {commit} />
+{/snippet}
+
+{#snippet removeStackButton()}
+  <ShellIconButton label="Remove stack" shortcut="⌥⇧A" data-testid="auto-layout-remove" onclick={() => commit(removeStack(doc, clip.id), 'Removed the stack')}><Minus /></ShellIconButton>
 {/snippet}
 
 {#snippet addStrokeButton()}
@@ -1090,7 +1110,7 @@
   {#if spec.track === TrackKind.Visual}
     <div class="stackable" data-testid="depth-section">
       <div class="stack">
-        <NumberField label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
+        <NumberField {gesture} label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
       </div>
       <label class="check"><input type="checkbox" data-testid="screen-space" checked={clip.space === Space.Screen} onchange={(e) => commit(setClipDepth(doc, clip.id, { space: e.currentTarget.checked ? Space.Screen : Space.World }), 'Changed space')} />Screen space: ignores the camera</label>
       {#if doc.camera && clip.component !== 'Light'}

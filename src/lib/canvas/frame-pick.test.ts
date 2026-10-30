@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
+import { withSurface } from '@feega/motion-core/motion/surface';
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { toWorld } from '$lib/canvas/gpu/camera';
-import { FrameFit, FramePickers, framePicker, frameSpace } from './frame-pick';
+import { FrameFit, FramePickers, Reuse, framePicker, frameSpace } from './frame-pick';
 import { addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { groupClips } from '$lib/motion/group';
@@ -195,10 +196,30 @@ describe('an image inserted in a frame', () => {
     expect(pickers.of('frame', arrived).pick(centre, stage)).toBe('img');
   });
 
+  it('keeps the held picker through a live gesture, so a scrub never recompiles the frame', () => {
+    const pickers = new FramePickers();
+    const live = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };
+    const held = pickers.of('frame', live);
+    const scrubbed = { ...live, doc: { ...placed.doc } };
+
+    expect(pickers.of('frame', scrubbed, undefined, Reuse.Held)).toBe(held);
+    expect(pickers.of('frame', scrubbed)).not.toBe(held);
+  });
+
   it('reuses the picker while neither the doc nor the files change', () => {
     const pickers = new FramePickers();
     const live = { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} };
 
     expect(pickers.of('frame', live)).toBe(pickers.of('frame', { ...live }));
+  });
+});
+
+describe('the frame surface', () => {
+  it('is never picked: a click on the empty frame selects nothing', () => {
+    const surfaced = framePicker({ ...live, doc: withSurface(live.doc, 'surface') });
+    const corner = space.pointToWorld([20, 20]);
+
+    expect(surfaced.pick(corner, space)).toBeNull();
+    expect(surfaced.stack(corner, space)).toEqual([]);
   });
 });

@@ -7,16 +7,17 @@ sidebar:
 
 import DemoVideo from '../../../components/DemoVideo.astro';
 
-<DemoVideo name="export-code" caption="Export a landing page frame as React + Tailwind, switch to Svelte, download the project." />
+<DemoVideo name="export-code" caption="Export a landing page frame, switch React, Svelte and HTML, download the project and open it in a browser: the breakpoints reflow at phone width." />
 
 **Export code** turns a whole frame, with every nested frame, text, image, vector and component instance inside it, into a project a developer can keep. Keyframed animation comes along: Motion for React, CSS `@keyframes` for HTML and Svelte.
 
 ## Use it
 
-1. Select a frame on the canvas.
-2. Open the **…** menu and choose **Export code…**.
-3. Pick a target: **React + Tailwind** (default), **HTML + CSS** or **SvelteKit**.
-4. Click a file to read it, **Copy file** to copy it, **Download .zip** for the whole project.
+1. Select a frame, or any layer inside it. Code mode always exports the frame that contains the selection.
+2. Switch to **Code** in the mode switch at the left end of the bottom bar (`Shift+D`), or open the **…** menu and choose **Export code…**: both open Code mode.
+3. With a layer picked, its CSS sits at the top of the right bar and the frame's code below it. Pick a target in the framework dropdown: **React + Tailwind** (default), **HTML + CSS** or **SvelteKit**.
+4. The header has **Copy** and **Download .zip** icon buttons; a floating copy button also sits on the code. Two dropdowns above the code pick the framework and the file; it opens on the main file. Code is syntax-highlighted in light and dark.
+5. With a layer picked, its section lists size, layout, typography, fill and variables as rows: click a value to copy it. The **CSS** toggle shows the CSS and Tailwind snippets. The page title and the zip are named after the frame (`Landing page` gives `landing-page-react.zip`).
 
 ## What you get
 
@@ -25,10 +26,11 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 | Auto layout (horizontal, vertical) | `display: flex` with `gap`, padding, alignment and wrap |
 | Auto layout grid | `display: grid` with its columns (`grid-cols-12`) and column/row spans |
 | Fill, hug, fixed sizing | `flex: 1`, `align-self: stretch`, no size, or a width (fluid with `max-width` from 320 px) |
-| A frame without auto layout | `position: relative`, its layers `position: absolute`, pinned by their constraints |
+| A frame without a stack | `position: relative`, its layers `position: absolute`, pinned by their constraints |
 | Components and instances | one file per component; text, images, colours and visibility that differ between instances become typed props; an override on an instance nested inside another component becomes a prop of the outer one (`feature1LabelColor`) forwarded to the inner one |
 | Text | `h1` for the largest heading on the page, then `h2`/`h3` by size and weight, `p` for body copy, `a` for linked text |
 | Layers named Nav, Header, Footer, Hero, Features, Pricing, Card… | `nav`, `header`, `footer`, `section`, `article` |
+| Component sets with variants | one component named after the set with a prop per variant (`variant?: 'outline'`, `disabled?: boolean`), picking one file per variant (`ButtonOutline`); instances write `<Button variant="outline" />` and leave out `Default` values (React and Svelte; HTML writes each variant inline) |
 | Components named Button or Link | `button type="button"` and `a href` |
 | Colours, fonts, radii, spacing | a tokens file (`@theme` for Tailwind, CSS variables otherwise); colour variables keep their names |
 | Images | `img` pointing at the image URL at export time |
@@ -57,7 +59,7 @@ Position moves are written as `translate` (CSS variables `--tx`/`--ty` registere
 - Shaders, 3D, particles and video effects are not exported.
 - Animation of anything but position, scale, rotation, opacity and text colour (blur, skew, 3D rotation, fills, masks, effect parameters…) is listed under **Not exported**, as is animation on a whole component instance: animate the layers inside it.
 - Scroll-scrubbed and paused playback play on load instead.
-- A frame without auto layout stays absolutely positioned: it does not reflow on a phone. Add auto layout before exporting for responsive code.
+- A frame without a stack stays absolutely positioned: it does not reflow on a phone. Wrap the layers with a stack (`Shift+A`) before exporting for responsive code.
 - Image URLs from your project are signed and expire: download the files into the project before shipping.
 
 ## From the CLI and agents

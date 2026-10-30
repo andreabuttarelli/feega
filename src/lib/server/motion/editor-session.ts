@@ -3,6 +3,7 @@ import { forkOf } from './branch-store';
 import { canvasScope, motionOrThrow, nodeLookup, type CanvasScope } from './editor-scope';
 import { motionAssets, motionTokens, newHead } from './editor';
 import { headCache, readHead } from '$lib/server/repos/motion-revisions';
+import { linkedHead } from './linked-mains';
 import { serverTiming, type Phases } from '$lib/server/server-timing';
 import { knownRenderLimit, motionRenderFarm } from './renderer';
 import { batchView, renderView } from './render-run';
@@ -47,7 +48,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
     phases.time('fonts', orgFontFamilies(db, found.orgId))
   ]);
   const scope = motionOrThrow(canvas, lookup);
-  const head = savedHead ?? newHead(scope.motion.node);
+  const head = savedHead ? await phases.time('mains', linkedHead(db, { ...nodeScope, head: savedHead })) : newHead(scope.motion.node);
 
   return {
     projectId: params.projectId,

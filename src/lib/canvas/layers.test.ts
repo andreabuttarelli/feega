@@ -1,5 +1,13 @@
+import { withSurface } from '@feega/motion-core/motion/surface';
 import { describe, expect, it } from 'vitest';
-import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { layerMenuActions } from './frame-inspector';
+import { wrapInStack } from '$lib/motion/layout/ops';
+import { LayoutKind } from '@feega/motion-core/motion/layout/stack';
+import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
+import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { findClip } from '@feega/motion-core/motion/doc';
+import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -33,6 +41,12 @@ const ok = (r: ReturnType<typeof layerEdit>) => {
 };
 
 describe('layer rows', () => {
+  it('never list the frame surface: it is the frame, not a layer', () => {
+    const doc = withSurface(video(), 'surface');
+
+    expect(layerRows(NODES, { nodeId: 'm1', doc }).some((r) => r.id === 'surface')).toBe(false);
+  });
+
   it('mark a component instance so the panel draws its diamond', () => {
     const made = createComponent(video(), ['t1'], (() => {
       let n = 0;
@@ -83,6 +97,36 @@ describe('layer rows', () => {
     expect(elementGlyph({ component: 'Shape', props: { shape: 'ellipse' } })).toBe('ellipse');
     expect(elementGlyph({ component: 'Text', props: {} })).toBe('Text');
     expect(elementGlyph(undefined)).toBeUndefined();
+  });
+
+  it('shows a stack as a stack, on the free element and on its row in a frame', () => {
+    const stack = { component: 'Shape', props: { shape: 'rect' }, autoLayout: { ...DEFAULT_AUTO_LAYOUT, direction: Direction.Vertical } };
+    expect(elementGlyph(stack)).toBe(LayoutKind.Stack);
+
+    const texted = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 't'));
+    const doc = ok(wrapInStack(texted, ['t'], 'st', 'lane'));
+    expect(frameRows(doc, 'm1').find((r) => r.id === 'st')).toMatchObject({ type: LayoutKind.Stack, label: 'Stack' });
+  });
+
+  const stackedText = () => ok(wrapInStack(ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Hi', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 't')), ['t'], 'st', 'lane'));
+
+  it('nests a wrapped text under its new stack in a frame, and the text keeps its own icon', () => {
+    const rows = frameRows(stackedText(), 'm1');
+
+    expect(rows.map((r) => [r.id, r.label, r.type, r.depth])).toEqual([
+      ['st', 'Stack', LayoutKind.Stack, 1],
+      ['t', 'Text', 'Text', 2]
+    ]);
+  });
+
+  it('shows a free stack as the Stack row with its text indented under it', () => {
+    const doc = stackedText();
+    const rows = layerRows([{ id: 'e1', type: 'motion', name: 'Stack', element: true, glyph: LayoutKind.Stack }], { nodeId: 'e1', doc }, { e1: frameRows(doc, 'e1') });
+
+    expect(rows.map((r) => [r.id, r.label, r.type, r.depth])).toEqual([
+      ['e1', 'Stack', LayoutKind.Stack, 0],
+      ['t', 'Text', 'Text', 1]
+    ]);
   });
 
   it('picks the one element row while its shape is selected inside it', () => {
@@ -530,7 +574,7 @@ describe('a mask in Layers', () => {
   });
 
   it('the right-click menu offers use as mask on a free stack and remove mask on a masked one', () => {
-    const offered = (doc: MotionDoc, ids: string[]) => LAYER_MENU.filter((item) => item.op(doc, ids).ok).map((item) => item.command);
+    const offered = (doc: MotionDoc, ids: string[]) => layerMenuActions(doc, ids).filter((id) => id === Command.UseAsMask || id === Command.RemoveMask);
 
     expect(offered(masked(), ['photo'])).toEqual([Command.RemoveMask]);
     expect(offered(ok(dropLayer(masked(), 'photo', 'note', Place.Above)), ['note', 'photo'])).toEqual([Command.UseAsMask]);
@@ -582,5 +626,25 @@ describe('the frame ring while the pointer is on one of its elements', () => {
   it('still rings for a layer row hovered elsewhere, or for the frame itself', () => {
     expect(frameRinged({ nodeId: 'm1', id: 't1' }, 'm1', null, null)).toBe(true);
     expect(frameRinged({ nodeId: 'm1', id: 'm1' }, 'm1', null, 'm1')).toBe(true);
+  });
+});
+
+describe('dropTool: a tile dragged from the add menu into the layers', () => {
+  const DROP_BOX = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
+
+  it('lands a new element next to the row it is dropped on', () => {
+    const doc = ok(dropTool(video(), DrawTool.Rectangle, 't1', Place.Above, 'new1', DROP_BOX));
+
+    expect(findClip(doc, 'new1')!.clip.component).toBe('Shape');
+  });
+
+  it('draws a stack with its auto layout', () => {
+    const doc = ok(dropTool(video(), DrawTool.Stack, 't1', Place.Below, 'new1', DROP_BOX));
+
+    expect(findClip(doc, 'new1')!.clip.autoLayout).toBeTruthy();
+  });
+
+  it('refuses a tool that draws no box', () => {
+    expect(dropTool(video(), DrawTool.Pen, 't1', Place.Above, 'new1', DROP_BOX).ok).toBe(false);
   });
 });

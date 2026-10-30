@@ -4,6 +4,6 @@ export enum Density {
 }
 
 export const ROW_STEP_PX: Record<Density, number> = {
-  [Density.Pointer]: 33,
+  [Density.Pointer]: 29,
   [Density.Touch]: 45
 };

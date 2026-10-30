@@ -1,4 +1,6 @@
-import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
+import { layerTracks } from '@feega/motion-core/motion/surface';
 import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
 import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feega/motion-core/motion/timeline';
 import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
@@ -6,11 +8,16 @@ import { isLockedComp } from '$lib/motion/template/library';
 import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
 import { TrackKind } from '@feega/motion-core/motion/components';
-import { joinMask, leaveMask, maskMembers, maskOf, releaseMasks, useAsMask } from '$lib/motion/mask-group';
-import { Command } from '$lib/motion/shortcuts';
+import { joinMask, leaveMask, maskMembers, maskOf } from '$lib/motion/mask-group';
 import { NODE_KIND_LABEL } from './node-label';
 import { elementName } from '$lib/motion/element-name';
+import { layoutKind } from '@feega/motion-core/motion/layout/stack';
+import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import type { NodeType } from './node-data';
+import { drawClip } from '$lib/motion/draw-create';
+import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
+
+const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
 
 export enum LayerKind {
   Node = 'node',
@@ -45,7 +52,11 @@ export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string,
 
 const FRAME_TYPE = 'motion';
 
-export const elementGlyph = (clip: { component: string; props: Record<string, unknown> } | undefined): string | undefined => (clip?.component === 'Shape' ? String(clip.props.shape) : clip?.component);
+type Glyphed = { component: string; props: Record<string, unknown>; autoLayout?: { direction: AutoLayout['direction'] } | null };
+
+const shapeGlyph = (clip: Glyphed): string => (clip.component === 'Shape' ? String(clip.props.shape) : clip.component);
+
+export const elementGlyph = (clip: Glyphed | undefined): string | undefined => (clip ? (layoutKind(clip) ?? shapeGlyph(clip)) : undefined);
 
 export const nodeIcon = (node: { type: string; still?: boolean }): string => (node.type === FRAME_TYPE ? (node.still ? NodeIcon.Still : NodeIcon.Video) : node.type);
 type Parts = Record<string, readonly string[]>;
@@ -94,7 +105,7 @@ function groupLabel(track: Track, index: number): string {
 }
 
 type Masks = ReadonlyMap<string, readonly string[]>;
-type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string>; folded: ReadonlySet<string> };
+type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string>; folded: ReadonlySet<string>; scope?: readonly Clip[] };
 
 const NO_MASKS = { masks: new Map(), masked: new Set<string>() };
 
@@ -105,13 +116,27 @@ function masksOf(doc: MotionDoc): { masks: Masks; masked: ReadonlySet<string> } 
 
 const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
 
-function trackRows(walk: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
-  return tracks.flatMap((track, index) => {
+function kidsOf(walk: Walk, clip: Clip): Clip[] {
+  const scope = walk.scope ?? [];
+  if (clip.autoLayout) {
+    return childrenInOrder(scope as MotionClip[], clip as MotionClip & { autoLayout: AutoLayout });
+  }
+  return scope.filter((c) => c.parent === clip.id);
+}
+
+function trackRows(source: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
+  const shown = layerTracks(source.doc, tracks);
+  const scope = shown.flatMap((t) => t.clips);
+  const held = new Set(scope.map((c) => c.id));
+  const walk = { ...source, scope };
+  const topOf = (track: Track) => track.clips.filter((c) => !c.parent || !held.has(c.parent));
+
+  return shown.flatMap((track, index) => {
     if (!groupsTrack(track, walk.mode)) {
-      return track.clips.flatMap((clip) => clipRows(walk, clip, depth));
+      return topOf(track).flatMap((clip) => clipRows(walk, clip, depth));
     }
     const group: LayerRow = { id: track.id, key: `${walk.path}${track.id}`, kind: LayerKind.Track, depth, label: groupLabel(track, index), type: track.kind, nodeId: walk.nodeId, hidden: !!track.hidden, locked: !!track.locked, nested: walk.nested };
-    return [group, ...track.clips.flatMap((clip) => clipRows(walk, clip, depth + 1))];
+    return [group, ...topOf(track).flatMap((clip) => clipRows(walk, clip, depth + 1))];
   });
 }
 
@@ -138,7 +163,7 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     kind: kindOf(walk, clip, template),
     depth,
     label: doc.comps[comp]?.name ?? clipLabel(clip),
-    type: clip.component,
+    type: layoutKind(clip) ?? clip.component,
     nodeId,
     hidden: !!clip.hidden,
     locked: template || !!clip.locked,
@@ -146,10 +171,13 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     ...(doc.comps[comp]?.component ? { instance: true } : {})
   };
   const nests = comp !== '' && !template;
-  row.foldable = nests || undefined;
-  const inside = nests && !walk.folded.has(key) ? (doc.comps[comp]?.tracks ?? []) : [];
+  const kids = kidsOf(walk, clip);
+  row.foldable = nests || kids.length > 0 || undefined;
+  const open = !walk.folded.has(key);
+  const inside = nests && open ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
-  return [row, ...own, ...trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1), ...maskedRows(walk, clip.id, depth + 1)];
+  const held = open ? kids.flatMap((kid) => clipRows(walk, kid, depth + 1)) : [];
+  return [row, ...own, ...held, ...trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1), ...maskedRows(walk, clip.id, depth + 1)];
 }
 
 function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number, clipKey: string): LayerRow {
@@ -181,10 +209,22 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
 
+function elementRows(rows: readonly LayerRow[]): LayerRow[] {
+  const roots = rows.filter((r) => r.depth === TRACK_DEPTH);
+  if (roots.length !== 1) {
+    return [];
+  }
+  return rows.filter((r) => r.depth > TRACK_DEPTH).map((r) => ({ ...r, depth: r.depth - 1 }));
+}
+
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
     const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? (node.glyph ?? NodeIcon.Element) : nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
-    return folded.has(node.id) || node.element ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
+    if (folded.has(node.id)) {
+      return [row];
+    }
+    const inside = childRows(node.id, open, outlines, folded);
+    return [row, ...(node.element ? elementRows(inside) : inside)];
   });
 }
 
@@ -272,13 +312,6 @@ const DROP: Record<LayerKind, (at: number) => Place> = {
 
 export const dropPlace = (kind: LayerKind, at: number): Place => DROP[kind](at);
 
-export type LayerMenuItem = { command: Command.UseAsMask | Command.RemoveMask; summary: string; op: (doc: MotionDoc, ids: readonly string[]) => OpResult };
-
-export const LAYER_MENU: readonly LayerMenuItem[] = [
-  { command: Command.UseAsMask, summary: 'Used as mask', op: useAsMask },
-  { command: Command.RemoveMask, summary: 'Removed a mask', op: releaseMasks }
-];
-
 export function dropLayer(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId): OpResult {
   const into = place === Place.Into && maskMembers(doc).has(target);
   const moved = restack(doc, dragged, target, into ? Place.Above : place, newId);
@@ -287,6 +320,11 @@ export function dropLayer(doc: MotionDoc, dragged: string, target: string, place
   }
   const mask = into ? target : maskOf(doc, target);
   return mask && mask !== dragged ? joinMask(moved.doc, dragged, mask) : leaveMask(moved.doc, dragged);
+}
+
+export function dropTool(doc: MotionDoc, tool: DrawTool, target: string, place: Place, id: string, box: DrawBox = DROP_BOX): OpResult {
+  const drawn = drawClip(doc, tool, box, 0, id);
+  return drawn.ok ? dropLayer(drawn.doc, id, target, place) : drawn;
 }
 
 export function dropLayers(doc: MotionDoc, dragged: readonly string[], target: string, place: Place, topFirst: readonly string[], newId: NewId = newTrackId): OpResult {

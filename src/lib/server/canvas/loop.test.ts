@@ -110,7 +110,7 @@ describe('planLoop — il preventivo, senza girare niente', () => {
 
     expect(out.combinations).toHaveLength(3);
     expect(out.safety.verdict).toBe('run');
-    expect(out.cost.total).toBe(out.cost.perRun * 3);
+    expect(out.cost.total).toBe((out.cost.perRun ?? Number.NaN) * 3);
     expect(runGenNode).not.toHaveBeenCalled();
   });
 

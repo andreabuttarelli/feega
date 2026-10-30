@@ -1,6 +1,7 @@
 import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import type { DocOp } from './doc-ops';
-import { EditMode, nextMode } from './edit-mode';
+import { applyOps, type DocOp } from './doc-ops';
+import type { PeerStep } from './frame-step';
+import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
 import { landed, outgoing, remote, type Revision, type Synced } from './frame-sync';
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
@@ -21,11 +22,16 @@ export type SessionPort = {
   recorded: () => void;
   stepped: () => void;
   playhead: () => number;
-  moded: (mode: EditMode) => void;
   saved: (head: Revision) => void;
+  landed: (from: Revision, to: Revision) => void;
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
 };
+
+export enum DocAccess {
+  Write = 'write',
+  Read = 'read'
+}
 
 export type SessionStart = { head: Revision; selection: string[]; mode?: EditMode };
 
@@ -35,6 +41,7 @@ export class FrameEditSession {
   selection = $state<string[]>([]);
   breakpoint = $state<string>(BASE_BREAKPOINT);
   mode = $state<EditMode>(EditMode.Design);
+  access = $state<DocAccess>(DocAccess.Write);
   saveState = $state<SaveState>(SaveState.Saved);
   notice = $state('');
   readonly live: LiveEdits<MotionDoc>;
@@ -66,16 +73,14 @@ export class FrameEditSession {
     return this.port.playhead();
   }
 
-  toggleMode() {
-    this.mode = nextMode(this.mode);
-    this.port.moded(this.mode);
-  }
-
   select(ids: string[]) {
     this.selection = ids;
   }
 
   edit(next: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.live.edit(next, summary);
   }
 
@@ -89,6 +94,9 @@ export class FrameEditSession {
   }
 
   recordEdit(next: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.port.recorded();
     const now = Date.now();
     const root = settleGroups(mergeView(this.history.present, this.port.viewPath(), next));
@@ -107,22 +115,34 @@ export class FrameEditSession {
   }
 
   amendRoot(root: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = amend(this.history, root);
     this.scheduleSave(summary);
   }
 
   recordRoot(root: MotionDoc, summary: string) {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = record(this.history, root);
     this.port.stepped();
     this.scheduleSave(summary);
   }
 
   undo() {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = undo(this.history);
     this.scheduleSave('Undo');
   }
 
   redo() {
+    if (this.access === DocAccess.Read) {
+      return;
+    }
     this.history = redo(this.history);
     this.scheduleSave('Redo');
   }
@@ -181,6 +201,13 @@ export class FrameEditSession {
     return next !== null;
   }
 
+  followStep(step: PeerStep): boolean {
+    if (step.base !== this.version) {
+      return false;
+    }
+    return this.takeRemote({ version: step.version, doc: applyOps(this.baseDoc, step.ops) });
+  }
+
   holdSave(until: Promise<unknown>) {
     const hold = until.catch(() => undefined).finally(() => {
       if (this.held === hold) {
@@ -208,6 +235,9 @@ export class FrameEditSession {
     const result = await this.port.send(outgoing(base, sent), this.version, this.unsavedSummary);
     this.saving = false;
 
+    if (result.ok && result.doc) {
+      this.port.landed(base, { version: result.version, doc: result.doc });
+    }
     if (result.ok) {
       this.follow(landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc }));
       this.saveState = SaveState.Saved;
@@ -229,11 +259,10 @@ export class FrameEditSession {
   private follow(next: Synced) {
     this.baseDoc = next.base.doc;
     this.version = next.base.version;
-    this.port.saved(next.base);
-    if (next.present === this.history.present) {
-      return;
+    if (next.present !== this.history.present) {
+      this.history = followHead(this.history, next.present);
+      this.selection = this.selection.filter((id) => findClip(next.present, id));
     }
-    this.history = followHead(this.history, next.present);
-    this.selection = this.selection.filter((id) => findClip(next.present, id));
+    this.port.saved(next.base);
   }
 }

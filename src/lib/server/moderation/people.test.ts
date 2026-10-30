@@ -9,7 +9,7 @@ function detectorSaying(verdicts: Record<string, PeopleVerdict>) {
 }
 
 describe('references with people in uncensored projects', () => {
-  it.each([
+  it.each<{ refs: string[]; verdicts: Record<string, PeopleVerdict>; ok: boolean }>([
     { refs: ['landscape'], verdicts: { landscape: PeopleVerdict.Absent }, ok: true },
     { refs: ['product', 'landscape'], verdicts: { product: PeopleVerdict.Absent, landscape: PeopleVerdict.Absent }, ok: true },
     { refs: ['person'], verdicts: { person: PeopleVerdict.Present }, ok: false },

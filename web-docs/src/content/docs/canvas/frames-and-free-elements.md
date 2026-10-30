@@ -11,7 +11,7 @@ A **free element** is a shape, text, image or SVG placed directly on the canvas.
 
 ## Moving things
 
-- Drag an element out of a frame into another frame or onto the canvas.
+- Drag an element out of a frame into another frame or onto the canvas. Both frames, and the new element, change at once; saving continues in the background, and a move that cannot be saved is put back with a notice.
 - Drag a generated image or video from its node into a frame.
 - `Delete` or `Backspace` on a free shape removes it entirely; no empty frame is left behind.
 - Paste an element into several selected frames at once.
@@ -19,9 +19,24 @@ A **free element** is a shape, text, image or SVG placed directly on the canvas.
 - New layers are pinned left and top, so resizing a frame keeps their size and distance from the edges.
 - `Resize to fit` (`⌥⇧⌘R`) fits a frame to its contents.
 
+## Styling the frame
+
+With nothing inside the frame selected, the right bar shows the frame's own look, with the same controls as a layer:
+
+- **Frame size** preset, **W** and **H**, and **Layout grid**.
+- **Appearance**: opacity (fades the frame and every layer in it; at 0% the canvas shows through), blend mode, corner radius (uniform or per corner) and **Clip content**.
+- **Fill**: several fills, each a colour, gradient or image.
+- **Stroke**: colour, width, inside/center/outside, per side.
+- **Effects**: drop and inner shadows, layer and background blur.
+
+The first edit gives the frame a surface: a locked full-frame layer under every other, named `Frame`, that replaces the brand background. It is not listed in Layers and a click on it selects nothing. **Clip content** is on by default: layers are cut to the frame's rounded corners in the editor, the player and exports. Code export paints the page root with it. Agents add it with `set_canvas` `surface: true` and style it with `set_props`.
+
+Scenes, camera, breakpoints, prototype flow, styles and variables sit in the folded **Frame settings** group below.
+
 ## Selecting
 
 - Right-click on stacked layers lists them so you can pick the one underneath.
+- Right-click a layer to hide (`⇧⌘H`), lock (`⇧⌘L`), copy properties (`⌥⌘C`) or paste them (`⌥⌘V`).
 - Hold `Cmd`/`Ctrl` and drag across a frame to select elements inside groups, not the groups.
 - `Cmd+F` finds any node by name, text or prompt.
 

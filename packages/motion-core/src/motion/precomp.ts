@@ -10,12 +10,12 @@ import { RING_LAYOUT, ringCards, ringRadiusPx, ringSliceId, slicesFor } from './
 import { BENTO_LAYOUT, bentoCellId, heldCell, type BentoCard } from './bento/model';
 import { facesOf, screenCompOf, screenHostId } from './device-screen';
 import type { Device } from './devices';
-import { overridden } from './instance-overrides';
+import { instanceTracks } from './layout/resolve';
 
 export type CompPath = readonly string[];
 export type GroupProps = { span?: number };
 
-export const MAX_COMP_DEPTH = 8;
+export const MAX_COMP_DEPTH = 24;
 const MAX_LOOPS = 600;
 export const SEPARATOR = '__';
 export { CLIP_LEVEL_OVERRIDES, overridden, withOverride } from './instance-overrides';
@@ -159,7 +159,8 @@ function combinedInside(doc: MotionDoc, tracks: MotionTrack[], op: unknown): Mot
 
 function precompTracks(doc: MotionDoc, track: MotionTrack, host: MotionClip, depth: number): MotionTrack[] {
   const comp = doc.comps[compOf(host)!];
-  const inner = combinedInside(doc, expand(doc, withoutHidden({ ...doc, tracks: overridden(comp.tracks, host, comp.component) }).tracks, depth + 1), host.props.boolean);
+  const own = instanceTracks(doc, host, comp, { width: doc.width, height: doc.height });
+  const inner = combinedInside(doc, expand(doc, withoutHidden({ ...doc, tracks: own }).tracks, depth + 1), host.props.boolean);
   const laid = placed(host, comp, inner);
   const group: MotionClip = { ...host, props: { ...host.props, span: laid.length } };
   return [{ ...track, id: `${host.id}${SEPARATOR}group`, clips: [group] }, ...laid];
@@ -225,9 +226,25 @@ function expand(doc: MotionDoc, tracks: readonly MotionTrack[], depth: number): 
     if (!hosts.length) {
       return [track];
     }
-    const rest = { ...track, clips: track.clips.filter((c) => !hosts.includes(c as MotionClip)) };
-    const groups = hosts.flatMap((host) => EXPANDERS[host.component]!(doc, track, host, depth));
-    return [...groups, rest];
+    const topFirst: MotionTrack[] = [];
+    let run: MotionClip[] = [];
+    let runs = 0;
+    const flush = () => {
+      if (run.length) {
+        topFirst.push({ ...track, id: runs++ ? `${track.id}~${runs}` : track.id, clips: [...run].reverse() });
+      }
+      run = [];
+    };
+    for (const clip of [...(track.clips as MotionClip[])].reverse()) {
+      if (!hosts.includes(clip)) {
+        run.push(clip);
+        continue;
+      }
+      flush();
+      topFirst.push(...EXPANDERS[clip.component]!(doc, track, clip, depth));
+    }
+    flush();
+    return topFirst.length ? topFirst : [{ ...track, clips: [] }];
   });
 }
 

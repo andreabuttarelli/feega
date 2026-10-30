@@ -67,10 +67,9 @@
     },
     "inapp": {
       "title": "Open in your browser",
-      "subApp": "Google sign-in doesn't work inside {app}. Open this page in your browser to continue.",
-      "sub": "Google sign-in doesn't work in this browser. Open this page in your phone's browser to continue.",
+      "subApp": "Google and GitHub block sign-in inside {app}. Follow these steps, or sign in with email.",
+      "sub": "Google and GitHub block sign-in inside this app. Follow these steps, or sign in with email.",
       "openButton": "Open in browser",
-      "iosHint": "Tap the menu ({menu}) in the top-right corner and choose “Open in Safari”.",
       "copy": "Copy link",
       "copied": "Link copied",
       "dismiss": "Dismiss"
@@ -104,6 +103,8 @@
   "app": {
     "nav2": {
       "layers": "Layers",
+      "components": "Components",
+      "history": "History",
       "materials": "Assets",
       "brands": "Brands",
       "influencers": "Influencers",
@@ -125,6 +126,7 @@
     },
     "shell": {
       "rail": "Sections",
+      "pages": "Pages",
       "closePanel": "Close panel",
       "resizeChat": "Resize chat",
       "collapseChat": "Collapse chat",
@@ -147,8 +149,7 @@
         "properties": "Properties",
         "backToCanvas": "Back to canvas",
         "switchView": "Canvas, properties or chat",
-        "projects": "Projects",
-        "canvases": "Canvases"
+        "projects": "Projects"
       },
       "canvasActions": {
         "new": "New canvas",

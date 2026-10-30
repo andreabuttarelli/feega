@@ -12,6 +12,7 @@
   import { Action, Tool, type ActionId } from '$lib/motion/actions';
   import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { proxySetting } from '$lib/motion/gpu/proxy-setting.svelte';
+  import { OnionSkin, onionSetting } from '$lib/canvas/onion-skin.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { frameBarActions } from '$lib/canvas/frame-inspector';
   import { EditMode, MODE_LABEL } from '$lib/motion/edit-mode';
@@ -150,6 +151,7 @@
     {#if onpin}<button type="button" class="pin-here" data-testid="frame-timeline-pin" onclick={onpin}>Comment here</button>{/if}
     <span class="spacer"></span>
     <button type="button" class="pin-here" data-testid="frame-timeline-proxies" aria-pressed={proxySetting.on} title="Play and scrub a light copy of large videos. Export always uses the original." onclick={() => proxySetting.toggle()}>Use proxies</button>
+    {#if mode === EditMode.Motion}<button type="button" class="pin-here" data-testid="frame-timeline-onion" aria-pressed={onionSetting.skin === OnionSkin.On} title="Show faint copies of the selected layer at its previous and next keyframes" onclick={() => onionSetting.toggle()}>Onion skin</button>{/if}
     <IconButton action={Action.ToggleEditMode} size={14} pressed={mode === EditMode.Motion} label={MODE_LABEL[mode]} data-testid="frame-timeline-mode" data-mode={mode} onclick={onmode} />
     <IconButton action={Action.GraphMode} size={14} pressed={graphOpen} onclick={() => (graphOpen = !graphOpen)} />
   </div>

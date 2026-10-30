@@ -1,3 +1,4 @@
+import { openInsert } from './fixtures/canvas-bar';
 import type { Locator, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
@@ -65,7 +66,7 @@ test.describe('media picker @real', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
 
-    await page.getByTestId('frame-templates').click();
+    await (await openInsert(page)).locator('[data-insert="frame-templates"]').click();
     const library = page.getByRole('dialog', { name: 'Frame templates' });
     await library.getByTestId('component-search').fill('split headline');
     await library.getByRole('button', { name: 'Customise Split headline' }).click();

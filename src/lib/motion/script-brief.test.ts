@@ -3,7 +3,7 @@ import { BRIEF_AUTO_GO_S, GO_MESSAGE, briefAwaits, pendingBoard, pendingBrief, p
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { toolsForMirror } from '$lib/chat-stream-events';
 
-const written = { toolName: 'write_script', status: 'done' as const, output: { ok: true, brief: '**Research**\n- For: makers' } };
+const written = { toolCallId: 'c1', toolName: 'write_script', status: 'done' as const, output: { ok: true, brief: '**Research**\n- For: makers' } };
 const refused = { toolName: 'write_script', status: 'done' as const, output: { ok: false, error: 'read the site first' } };
 
 describe('script brief', () => {
@@ -60,7 +60,7 @@ describe('screening the go message', () => {
 
 describe('the storyboard next to the brief', () => {
   const outline = [{ act: 'problem', intensity: 0.3, branch: false }];
-  const board = { toolName: 'write_storyboard', output: { ok: true, canvas_id: 'board', outline } };
+  const board = { toolCallId: 'c2', toolName: 'write_storyboard', output: { ok: true, canvas_id: 'board', outline } };
 
   it('reads the board the same turn wrote, even through the mirrored row', () => {
     expect(pendingBoard([{ role: 'assistant', content: '', tools: toolsForMirror([board, written]) }])).toEqual({ canvasId: 'board', outline });

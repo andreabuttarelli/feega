@@ -20,12 +20,14 @@
   import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { placeBox, setPropAcross, sharedConstraint, sharedFields, type BoxPatch } from '$lib/motion/selection-props';
-  import { documentColours, isBrandToken, recolour, selectionColours } from '$lib/motion/selection-colours';
-  import { BRAND_COLORS, Control } from '@feega/motion-core/motion/components';
+  import { documentColours, recolour, selectionColours } from '$lib/motion/selection-colours';
+  import { Control } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
+  import ColourRow from './ColourRow.svelte';
   import NumberField from './NumberField.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
 
-  let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, gesture = null, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const BOX_FIELDS = [
     { key: 'x', label: 'X', of: (b: Bounds) => b.left },
@@ -136,7 +138,7 @@
         <div class="grid2">
           {#each BOX_FIELDS as f (f.key)}
             <div data-prop={f.key}>
-              <NumberField label={f.label} kind={FieldKind.Glyph} name={`Selection ${f.key}`} value={Math.round(f.of(bounds) * 100) / 100} range={BOX_RANGE} unit="px" onchange={(v) => setBox({ [f.key]: v })} />
+              <NumberField {gesture} label={f.label} kind={FieldKind.Glyph} name={`Selection ${f.key}`} value={Math.round(f.of(bounds) * 100) / 100} range={BOX_RANGE} unit="px" onchange={(v) => setBox({ [f.key]: v })} />
             </div>
           {/each}
         </div>
@@ -147,7 +149,7 @@
       <div class="grid2">
         {#each GAP_FIELDS as f (f.axis)}
           <div data-prop={`gap-${f.axis}`}>
-            <NumberField label={f.label} kind={FieldKind.Glyph} name={f.name} value={gapShown(f.axis)} range={GAP_RANGE} unit="px" onchange={(v) => setGap(f.axis, v)} />
+            <NumberField {gesture} label={f.label} kind={FieldKind.Glyph} name={f.name} value={gapShown(f.axis)} range={GAP_RANGE} unit="px" onchange={(v) => setGap(f.axis, v)} />
           </div>
         {/each}
       </div>
@@ -159,7 +161,7 @@
           {@const look = fieldLook(key)}
           {@const range = sliderOf(first.component, { key, ...TRANSFORM[key] }, doc)}
           <div data-prop={key}>
-            <NumberField label={look.short ?? TRANSFORM[key].label} kind={FieldKind.Glyph} name={TRANSFORM[key].label} value={valueOf(key)} {range} unit={range.unit ?? look.unit} onchange={(v) => setNumber(key, v)} />
+            <NumberField {gesture} label={look.short ?? TRANSFORM[key].label} kind={FieldKind.Glyph} name={TRANSFORM[key].label} value={valueOf(key)} {range} unit={range.unit ?? look.unit} onchange={(v) => setNumber(key, v)} />
           </div>
         {/each}
       </div>
@@ -170,7 +172,7 @@
         {#each styleFields as { field: f, value } (f.key)}
           {#if f.control === Control.Range}
             <div data-prop={f.key}>
-              <NumberField label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
+              <NumberField {gesture} label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
             </div>
           {:else if f.control === Control.Color}
             <label class="line" data-prop={f.key}>
@@ -204,17 +206,7 @@
       <section class="section ui-section" data-section="colours">
         <h3>Selection colours</h3>
         {#each colours as { colour, count } (colour)}
-          <label class="line" data-colour={colour}>
-            <span>{colour}</span>
-            <span class="count">{count}</span>
-            {#if isBrandToken(colour)}
-              <select aria-label={`Replace ${colour}`} data-testid="token-swap" value={colour} onchange={(e) => swapColour(colour, e.currentTarget.value)}>
-                {#each BRAND_COLORS as token (token)}<option value={token}>{token}</option>{/each}
-              </select>
-            {:else}
-              <ColorField name={`Replace ${colour}`} display={ColourDisplay.Chip} value={colour.slice(0, 7)} palette={() => documentColours(doc)} onchange={(v) => swapColour(colour, v)} />
-            {/if}
-          </label>
+          <ColourRow {colour} {count} palette={() => documentColours(doc)} onchange={(to) => swapColour(colour, to)} />
         {/each}
       </section>
     {/if}

@@ -1,6 +1,7 @@
 import { SECTION_ORDER, Section } from './inspector-sections';
 import { ClipFamily } from './track-style';
 import { EditMode } from './edit-mode';
+import { Placement } from '@feega/motion-core/motion/layout/stack';
 
 export enum PropertiesView {
   Frame = 'frame',
@@ -21,7 +22,7 @@ export function propertiesFor(selection: { count: number; clip: string | null; p
 }
 
 const ALL: readonly Section[] = SECTION_ORDER;
-const PLACED = [Section.Layout, Section.Align, Section.Constraints, Section.Transform];
+const PLACED = [Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Transform];
 const VISUAL = [Section.Content, ...PLACED, Section.Layer, Section.Fill, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
 const PICTURE = [Section.Content, ...PLACED, Section.Layer, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
 
@@ -41,13 +42,25 @@ const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
 };
 
 const PART_SECTIONS: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Transform, Section.Layer, Section.Fill, Section.Stroke, Section.Text]);
+const FRAME_SECTIONS: ReadonlySet<Section> = new Set([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
+
+const VIEW_KEEPS: Partial<Record<PropertiesView, ReadonlySet<Section>>> = { [PropertiesView.Part]: PART_SECTIONS, [PropertiesView.Frame]: FRAME_SECTIONS };
 
 const MODE_HIDES: Record<EditMode, ReadonlySet<Section>> = {
   [EditMode.Motion]: new Set(),
   [EditMode.Design]: new Set([Section.Animate])
 };
 
-export function sectionsFor(family: ClipFamily, view: PropertiesView, mode: EditMode): Section[] {
+const PLACEMENT: Record<Placement, { hides: ReadonlySet<Section>; position: boolean }> = {
+  [Placement.Free]: { hides: new Set(), position: true },
+  [Placement.Flow]: { hides: new Set([Section.Align, Section.Constraints]), position: false },
+  [Placement.Absolute]: { hides: new Set([Section.Constraints]), position: true }
+};
+
+export const positionShown = (placement: Placement): boolean => PLACEMENT[placement].position;
+
+export function sectionsFor(family: ClipFamily, view: PropertiesView, mode: EditMode, placement: Placement = Placement.Free): Section[] {
   const allowed = new Set(FAMILY_SECTIONS[family]);
-  return SECTION_ORDER.filter((s) => allowed.has(s) && !MODE_HIDES[mode].has(s) && (view !== PropertiesView.Part || PART_SECTIONS.has(s)));
+  const hidden = (s: Section) => MODE_HIDES[mode].has(s) || PLACEMENT[placement].hides.has(s);
+  return SECTION_ORDER.filter((s) => allowed.has(s) && !hidden(s) && (VIEW_KEEPS[view]?.has(s) ?? true));
 }

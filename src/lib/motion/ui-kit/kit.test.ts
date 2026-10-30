@@ -103,8 +103,9 @@ describe('corners', () => {
 });
 
 describe('placeholders', () => {
-  const box = (className: string, text = '', children: ReturnType<typeof row>[] = []) => ({ tag: 'div', className, textContent: text, innerHTML: '', style: {}, attrs: {}, children });
-  const row = (text = '') => box('bar', '', [box('chip'), box('stroke', text)]);
+  type Box = { tag: string; className: string; textContent: string; innerHTML: string; style: Record<string, string>; attrs: Record<string, string>; children: Box[] };
+  const box = (className: string, text = '', children: Box[] = []): Box => ({ tag: 'div', className, textContent: text, innerHTML: '', style: {}, attrs: {}, children });
+  const row = (text = ''): Box => box('bar', '', [box('chip'), box('stroke', text)]);
 
   it('names three or more rows with no text, and a card with only shapes', () => {
     expect(placeholders(box('main', '', [row(), row(), row()]))).toEqual(['3 rows "bar" with no text']);

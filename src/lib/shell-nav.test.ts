@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { NAV_ENTRIES, navEntriesByGroup, navHref, sheetEntryForPath, BURGER_ENTRIES, mobileNavHref, directLoadMode, panelForShortcut } from './shell-nav';
 
 describe('la rail: due gruppi, un comportamento a testa', () => {
-  it('il gruppo "panel" è Assets, Brands e Influencers, in quest\'ordine', () => {
-    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers']);
+  it('the "panel" group is Assets, Brands, Influencers, Components and History, in this order', () => {
+    expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers', 'components', 'history']);
   });
 
   it('the "canvas" group is Layers: a panel beside the canvas, never a burger link to a page that does not exist', () => {
@@ -11,14 +11,14 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(BURGER_ENTRIES.map((e) => e.id)).not.toContain('layers');
   });
 
-  it('the rail toggles panels and sheets only: the photo studio, a page of its own, lives in the burger', () => {
-    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['settings']);
+  it('the desktop rail reaches the photo studio next to settings', () => {
+    expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['studio', 'settings']);
     expect(BURGER_ENTRIES.map((e) => e.id)).toContain('studio');
   });
 
   it('every rail panel has an Alt+digit shortcut, in rail order', () => {
     const rail = [...navEntriesByGroup('canvas'), ...navEntriesByGroup('panel')];
-    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4']);
+    expect(rail.map((e) => e.shortcut)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6']);
   });
 
   it('Alt+digit resolves to the panel that carries it, nothing else does', () => {
@@ -73,7 +73,7 @@ describe('sheetEntryForPath: quale voce apre il foglio', () => {
 describe('il burger mobile legge la stessa tabella della rail', () => {
   it('offre ogni voce della rail, nello stesso ordine', () => {
     const rail = [...navEntriesByGroup('panel'), ...navEntriesByGroup('workbench')];
-    expect(BURGER_ENTRIES.map((e) => e.id)).toEqual([...rail.map((e) => e.id), 'studio']);
+    expect(BURGER_ENTRIES.map((e) => e.id)).toEqual(rail.map((e) => e.id));
   });
 });
 

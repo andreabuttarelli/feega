@@ -1,4 +1,5 @@
-import { Background, compOf, type MotionClip, type MotionDoc, type MotionTrack } from '../doc';
+import { Background, compOf, DEFAULT_VARIANT, type MotionClip, type MotionDoc, type MotionTrack } from '../doc';
+import { clipRadii, clipsContent } from '../surface';
 import type { BrandTokens } from '../brand';
 import { parseProps, type ComponentId } from '../components';
 import { childrenInOrder, compBounds } from '../layout/resolve';
@@ -12,7 +13,7 @@ import { ShapeKind } from '../shape/schema';
 import { pivotBox, type Size } from '../parent';
 import type { Box } from '../layout';
 import { kebab, NameBook } from './naming';
-import { literal, NodeKind, type Attr, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type Rule, type StyleBind } from './ir';
+import { literal, NodeKind, type Attr, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type SetSpec, type Rule, type StyleBind } from './ir';
 import { absoluteRules, containerRules, flowItemRules, isFlowChild, px, Shape } from './place';
 import { backgroundRules, borderRules, effectRules, radiusRules, typeRules, type Painter } from './paint';
 import { ColourRole, TokenBook } from './tokens';
@@ -314,7 +315,7 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
     return null;
   }
   ensureComponent(plan, scope.shared);
-  scope.uses.add(plan.name);
+  scope.uses.add(plan.set?.name ?? plan.name);
   if (Object.keys(clip.keyframes).length) {
     scope.shared.notes.add(`${layerName(clip)}: animation on a component instance is not exported; animate the layers inside the component.`);
   }
@@ -326,6 +327,7 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
     kind: NodeKind.Use,
     clipId: clip.id,
     component: plan.name,
+    ...(plan.set ? { set: { name: plan.set.name, variant: Object.entries(plan.set.variant).filter(([, v]) => v !== DEFAULT_VARIANT).map(([name, value]) => ({ name, value })) } } : {}),
     className: scope.names.unique(kebab(layerName(clip))),
     rules: placement(clip, parent, scope),
     props: values.map(([name, value]) => ({ name, value })),
@@ -380,6 +382,15 @@ function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, pl
   return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf, timeline };
 }
 
+const HIDDEN: Rule[] = [['overflow', 'hidden']];
+
+function pageCut(doc: MotionDoc): Rule[] {
+  const radii = clipRadii(doc);
+  const side = Math.min(doc.width, doc.height);
+  const rounded: Rule[] = radii ? [['border-radius', radii.map((r) => px(r * side)).join(' ')]] : [];
+  return [...(clipsContent(doc) ? HIDDEN : []), ...rounded];
+}
+
 function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): ElementNode {
   const top = childrenOf(null, scope);
   const visual = top.filter((c) => c.component !== 'BrandBackground');
@@ -393,7 +404,8 @@ function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): Element
       return root;
     }
   }
-  const rules: Rule[] = [['position', 'relative'], ...own, ...framed, ['min-height', px(scope.space.height)], ['overflow', 'hidden']];
+  const cut = scope.plan ? HIDDEN : pageCut(scope.shared.doc);
+  const rules: Rule[] = [['position', 'relative'], ...own, ...framed, ['min-height', px(scope.space.height)], ...cut];
   const children = top.flatMap((c) => nodeOf(c, null, scope, tag) ?? []);
   return { kind: NodeKind.Element, tag, className: '', rules, attrs: [], children, styleBinds: [] };
 }
@@ -428,6 +440,16 @@ function contentOf(doc: MotionDoc): Map<string, Box> {
   }));
 }
 
+function setsOf(plans: ComponentPlan[], built: Map<string, ComponentSpec>): SetSpec[] {
+  const bySet = Map.groupBy(plans.filter((p) => p.set && built.has(p.compId)), (p) => p.set!.name);
+  return [...bySet].map(([name, members]) => {
+    const keys = [...new Set(members.flatMap((m) => Object.keys(m.set!.variant)))];
+    const axes = keys.map((key) => ({ name: key, values: [...new Set(members.map((m) => m.set!.variant[key] ?? DEFAULT_VARIANT))] }));
+    const props = [...new Map(members.flatMap((m) => built.get(m.compId)!.props).map((p) => [p.name, p])).values()];
+    return { name, axes, members: members.map((m) => ({ component: m.name, variant: m.set!.variant })), props };
+  });
+}
+
 const pageBackground = (doc: MotionDoc, tokens: TokenBook): Rule[] => (doc.background === Background.Transparent ? [] : [['background-color', tokens.colour('brand.background', ColourRole.Page)]]);
 
 export function buildPage(input: BuildInput): PageSpec {
@@ -449,6 +471,7 @@ export function buildPage(input: BuildInput): PageSpec {
     root,
     uses: [...scope.uses].sort(),
     components: order,
+    sets: setsOf([...shared.plans.values()], shared.built),
     tokens: tokens.tokens(),
     assets: [...shared.assets.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([id, url]) => ({ id, url })),
     notes: [...shared.notes].sort()

@@ -18,6 +18,10 @@ export function viewOf(id: string): { nodeId: string; breakpointId: string } | n
   return { nodeId: id.slice(0, at), breakpointId: id.slice(at + SEPARATOR.length) };
 }
 
+export const baseNodeId = (id: string) => viewOf(id)?.nodeId ?? id;
+
+export const withoutViews = <T extends { id: string }>(frames: readonly T[]): T[] => frames.filter((f) => !viewOf(f.id));
+
 function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
   const scale = frame.box.w / doc.width;
   let x = frame.box.x + frame.box.w + VIEW_GAP;
@@ -32,11 +36,28 @@ function viewsOfFrame(frame: FrameAt, doc: MotionDoc): BreakpointView[] {
     });
 }
 
-export function breakpointViews(frames: readonly FrameAt[], docOf: (id: string) => MotionDoc | null | undefined): BreakpointView[] {
-  return frames.flatMap((frame) => {
-    const doc = docOf(frame.id);
-    return doc?.breakpoints?.length ? viewsOfFrame(frame, doc) : [];
-  });
+type Held = { stamp: string; doc: MotionDoc; views: BreakpointView[] };
+
+const stampOf = ({ kind, revision, box }: FrameAt) => `${kind}|${revision}|${box.x}|${box.y}|${box.w}|${box.h}`;
+
+export function heldViews() {
+  const held = new Map<string, Held>();
+
+  return (frames: readonly FrameAt[], docOf: (id: string) => MotionDoc | null | undefined): BreakpointView[] =>
+    frames.flatMap((frame) => {
+      const doc = docOf(frame.id);
+      if (!doc?.breakpoints?.length) {
+        return [];
+      }
+      const known = held.get(frame.id);
+      const stamp = stampOf(frame);
+      if (known && known.doc === doc && known.stamp === stamp) {
+        return known.views;
+      }
+      const views = viewsOfFrame(frame, doc);
+      held.set(frame.id, { stamp, doc, views });
+      return views;
+    });
 }
 
 export function viewAt(views: readonly BreakpointView[], p: { x: number; y: number }): BreakpointView | null {

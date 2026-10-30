@@ -53,36 +53,10 @@ export const actions: Actions<EditorParams> = {
 
   head: async ({ locals, params }) => answered(await runEditorOp('read_head', editorCtx(await scopeFor(locals, params)), {})),
 
-  revisions: async ({ locals, params }) => answered(await runEditorOp('list_revisions', editorCtx(await scopeFor(locals, params)), {})),
-
-  branches: async ({ locals, params }) => answered(await runEditorOp('list_branches', editorCtx(await scopeFor(locals, params)), {})),
-
   createBranch: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const input = EDITOR_OPS.create_branch.input.safeParse({ name: (await request.formData()).get('name') });
     return input.success ? answered(await runEditorOp('create_branch', editorCtx(scope), input.data)) : fail(HTTP_BAD_REQUEST, { error: 'invalid_branch_name' });
-  },
-
-  reviewBranch: async ({ locals, params }) => answered(await runEditorOp('review_branch', editorCtx(await scopeFor(locals, params)), {})),
-
-  mergeBranch: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const input = EDITOR_OPS.merge_branch.input.safeParse({ choices: parsedJson(String((await request.formData()).get('choices') ?? '{}')) });
-    return input.success ? answered(await runEditorOp('merge_branch', editorCtx(scope), input.data)) : fail(HTTP_BAD_REQUEST, { error: 'invalid_choices' });
-  },
-
-  dropBranch: async ({ locals, params }) => answered(await runEditorOp('drop_branch', editorCtx(await scopeFor(locals, params)), {})),
-
-  restore: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const version = Number((await request.formData()).get('version'));
-    return answered(await runEditorOp('restore_revision', editorCtx(scope), { version }));
-  },
-
-  nameVersion: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    return answered(await runEditorOp('name_revision', editorCtx(scope), { version: Number(form.get('version')), name: String(form.get('name') ?? '') }));
   },
 
   exported: async ({ locals, params, request }) => {

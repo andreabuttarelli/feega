@@ -18,7 +18,7 @@ import type { PostCompositionNode } from './post-composition';
 import { FrameKind, docKindOf, holdsDoc } from './motion-node';
 import { sourceAssetIdOf } from './image-source';
 import { Edge } from '$lib/motion/space';
-import { FRAME_DIALOG_ACTIONS, isFrameDialogAction, type FrameDialogActionId } from './frame-dialogs';
+import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, isFrameAction, type FrameDialogActionId, type FrameModeActionId } from './frame-dialogs';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
@@ -41,6 +41,7 @@ export type SelectionActionId =
   | 'split-layers'
   | 'layers-to-frame'
   | 'copy-id'
+  | 'copy-link'
   | 'report'
   | 'group'
   | 'ungroup'
@@ -68,7 +69,8 @@ export type SelectionActionId =
   | 'frame-selection'
   | 'resize-to-fit'
   | 'section-selection'
-  | 'auto-layout'
+  | 'wrap-stack'
+  | 'remove-stack'
   | 'union'
   | 'subtract'
   | 'intersect'
@@ -78,15 +80,22 @@ export type SelectionActionId =
   | 'outline-text'
   | 'create-component'
   | 'detach-instance'
+  | 'go-to-main'
   | 'reset-instance'
   | 'push-instance'
+  | 'hide'
+  | 'lock'
+  | 'copy-properties'
+  | 'paste-properties'
   | 'create-formats'
   | 'combine-video'
   | 'export'
   | 'delete'
-  | FrameDialogActionId;
+  | 'frame-history'
+  | FrameDialogActionId
+  | FrameModeActionId;
 
-export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
+export type SelectionActionGroup = 'fixed' | 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
 
 export type SelectionAction = {
   id: SelectionActionId;
@@ -128,7 +137,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'align-middle', label: 'Align vertical centres', group: 'menu', minNodes: 1, shortcut: 'Alt+V' },
   { id: 'align-bottom', label: 'Align bottom', group: 'menu', minNodes: 1, shortcut: 'Alt+S' },
   { id: 'tidy-up', label: 'Tidy up', group: 'menu', minNodes: 2, shortcut: 'Mod+Alt+T' },
-  { id: 'stack', label: 'Stack', group: 'menu', minNodes: 2, shortcut: 'Shift+A' },
+  { id: 'stack', label: 'Stack tiles', group: 'menu', minNodes: 2 },
   { id: 'flip-horizontal', label: 'Flip horizontal', group: 'menu', minNodes: 1, shortcut: 'Shift+H' },
   { id: 'flip-vertical', label: 'Flip vertical', group: 'menu', minNodes: 1, shortcut: 'Shift+V' },
   { id: 'use-as-mask', label: 'Use as mask', group: 'menu', minNodes: 1, shortcut: 'Mod+Ctrl+M' },
@@ -141,7 +150,8 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'frame-selection', label: 'Frame selection', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+G' },
   { id: 'resize-to-fit', label: 'Resize to fit', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+Shift+R' },
   { id: 'section-selection', label: 'Section selection', group: 'menu', minNodes: 1, shortcut: 'Shift+S' },
-  { id: 'auto-layout', label: 'Add auto layout', group: 'menu', minNodes: 1, shortcut: 'Shift+A' },
+  { id: 'wrap-stack', label: 'Wrap with stack', group: 'overflow', minNodes: 1, shortcut: 'Shift+A' },
+  { id: 'remove-stack', label: 'Remove stack', group: 'menu', minNodes: 1, shortcut: 'Alt+Shift+A' },
   { id: 'union', label: 'Union', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+U' },
   { id: 'subtract', label: 'Subtract', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+S' },
   { id: 'intersect', label: 'Intersect', group: 'menu', minNodes: 2, shortcut: 'Alt+Shift+I' },
@@ -151,8 +161,13 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'outline-text', label: 'Outline text', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+O' },
   { id: 'create-component', label: 'Create component', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+K' },
   { id: 'detach-instance', label: 'Detach instance', group: 'menu', minNodes: 1 },
+  { id: 'go-to-main', label: 'Go to main component', group: 'menu', minNodes: 1 },
   { id: 'push-instance', label: 'Push overrides to main', group: 'menu', minNodes: 1 },
   { id: 'reset-instance', label: 'Reset all overrides', group: 'menu', minNodes: 1 },
+  { id: 'hide', label: 'Hide / show', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+H' },
+  { id: 'lock', label: 'Lock / unlock', group: 'menu', minNodes: 1, shortcut: 'Mod+Shift+L' },
+  { id: 'copy-properties', label: 'Copy properties', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+C' },
+  { id: 'paste-properties', label: 'Paste properties', group: 'menu', minNodes: 1, shortcut: 'Mod+Alt+V' },
   { id: 'create-formats', label: 'Create formats…', group: 'menu', minNodes: 1 },
   { id: 'combine-video', label: 'Combine into video', group: 'menu', minNodes: 2 },
   { id: 'export', label: 'Export…', group: 'overflow', minNodes: 1 },
@@ -162,11 +177,11 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'frame-interactive', label: 'Interactive…', group: 'overflow', minNodes: 1 },
   { id: 'frame-components', label: 'Components…', group: 'overflow', minNodes: 1 },
   { id: 'frame-templates', label: 'Templates…', group: 'overflow', minNodes: 1 },
-  { id: 'frame-branches', label: 'Branches…', group: 'overflow', minNodes: 1 },
-  { id: 'frame-history', label: 'Version history…', group: 'overflow', minNodes: 1 },
+  { id: 'frame-history', label: 'History', group: 'overflow', minNodes: 1 },
   { id: 'frame-chat', label: 'Chat history…', group: 'overflow', minNodes: 1 },
   { id: 'frame-save-template', label: 'Save as template…', group: 'overflow', minNodes: 1 },
   { id: 'frame-publish', label: 'Publish to gallery…', group: 'overflow', minNodes: 1 },
+  { id: 'copy-link', label: 'Copy link to selection', group: 'fixed', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }
@@ -185,7 +200,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'copy-properties', 'paste-properties', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'wrap-stack', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -199,9 +214,13 @@ const isDrawn = (n: Summary) => kindOf(n) !== null && kindOf(n) !== FrameKind.Gr
 
 const isFrame = (n: Summary) => kindOf(n) === FrameKind.Frame;
 
+const CLIP = 'clip';
+
+const isGraphic = (n: Summary) => n.type === CLIP || (kindOf(n) !== null && !isFrame(n));
+
 const isOneFrame = (summaries: readonly Summary[]) => summaries.length === 1 && isFrame(summaries[0]);
 
-const FRAME_DIALOG_SHOWN = Object.fromEntries((Object.keys(FRAME_DIALOG_ACTIONS) as FrameDialogActionId[]).map((id) => [id, isOneFrame]));
+const FRAME_DIALOG_SHOWN = Object.fromEntries([...Object.keys(FRAME_MODE_ACTIONS), ...Object.keys(FRAME_DIALOG_ACTIONS)].map((id) => [id, isOneFrame]));
 
 const isOneFinishedImage = (summaries: readonly Summary[]) => summaries.length === 1 && summaries[0].type === 'image' && Boolean(sourceAssetIdOf(summaries[0].data));
 
@@ -211,6 +230,7 @@ const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1
 
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ...FRAME_DIALOG_SHOWN,
+  'frame-history': isOneFrame,
   'run-technique': isOneTechnique,
   'run-technique-rows': isOneTechnique,
   'edit-technique': isOneTechnique,
@@ -225,20 +245,21 @@ const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) =
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
   'combine-video': (summaries) => summaries.length > 1 && summaries.every(isFrame),
-  export: (summaries) => summaries.length > 0 && summaries.every(isDrawn)
+  export: (summaries) => summaries.length > 0 && summaries.every(isDrawn),
+  'wrap-stack': (summaries) => summaries.length > 0 && summaries.every(isGraphic)
 };
 
 export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): boolean {
   return SHOWN[id]?.(summaries) ?? true;
 }
 
-export type FrameOnlyActionId = 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'auto-layout' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
+export type FrameOnlyActionId = 'create-component' | 'go-to-main' | 'detach-instance' | 'push-instance' | 'reset-instance' | 'hide' | 'lock' | 'copy-properties' | 'paste-properties' | 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'remove-stack' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
 
-export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId>;
+export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId | FrameModeActionId>;
 
-const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'auto-layout', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
+const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
 
-export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameDialogAction(id);
+export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameAction(id);
 
 const MIN_ALIGNED_TILES = 2;
 
@@ -250,6 +271,20 @@ export function canvasMenuIds(count: number): ReadonlySet<SelectionActionId> {
 export function menuFor(available: ReadonlySet<SelectionActionId>, summaries: readonly Summary[]): SelectionAction[] {
   return CANVAS_MENU.filter((a) => available.has(a.id) && summaries.length >= a.minNodes && shownFor(a.id, summaries));
 }
+
+const PANEL_ORDER: readonly SelectionActionId[] = ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame', 'duplicate', 'group', 'ungroup', 'wrap-stack', 'tidy-up', 'export'];
+
+const PANEL_ACTIONS: readonly SelectionAction[] = PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
+
+const FRAME_PANEL_ORDER: readonly SelectionActionId[] = ['export', 'frame-components', 'frame-templates', 'frame-history', 'frame-interactive', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report'];
+
+export const FRAME_PANEL_ACTIONS: readonly SelectionAction[] = FRAME_PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
+
+export function panelActionsFor(summaries: readonly Summary[]): SelectionAction[] {
+  return PANEL_ACTIONS.filter((a) => summaries.length >= a.minNodes && shownFor(a.id, summaries));
+}
+
+export const actionsFor = (ids: readonly SelectionActionId[]): SelectionAction[] => SELECTION_ACTIONS.filter((a) => ids.includes(a.id)).map((a) => ({ ...a, group: 'overflow' }));
 
 export function actionsIn(group: SelectionActionGroup, count: number): SelectionAction[] {
   return SELECTION_ACTIONS.filter((a) => a.group === group && count >= a.minNodes);
@@ -318,13 +353,16 @@ const rankOf = (id: SelectionActionId) => {
   return at === -1 ? TOOLBAR_PRIORITY.length : at;
 };
 
-export type ToolbarSlots = { pinned: SelectionAction[]; overflow: SelectionAction[]; danger: SelectionAction[] };
+export type ToolbarSlots = { fixed: SelectionAction[]; pinned: SelectionAction[]; overflow: SelectionAction[]; danger: SelectionAction[] };
 
 export function toolbarSlots(actions: readonly SelectionAction[]): ToolbarSlots {
   const ranked = actions.filter((a) => a.group === 'secondary').sort((a, b) => rankOf(a.id) - rankOf(b.id));
+  const fixed = actions.filter((a) => a.group === 'fixed');
+
   return {
+    fixed,
     pinned: ranked.slice(0, PINNED_LIMIT),
-    overflow: [...ranked.slice(PINNED_LIMIT), ...actions.filter((a) => a.group === 'overflow')],
+    overflow: [...fixed, ...ranked.slice(PINNED_LIMIT), ...actions.filter((a) => a.group === 'overflow')],
     danger: actions.filter((a) => a.group === 'danger')
   };
 }

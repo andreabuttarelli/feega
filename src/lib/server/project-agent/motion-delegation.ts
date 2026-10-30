@@ -53,7 +53,7 @@ export const MOTION_DELEGATION_TOOLS = [
   'get_play_link'
 ] as const;
 
-export type MotionDelegationDeps = { db: Db; orgId: string; projectId: string; userId: string; origin: string; model?: string; canvasId?: string | null; pollMs?: number };
+export type MotionDelegationDeps = { db: Db; orgId: string; projectId: string; userId: string; sessionId?: string | null; origin: string; model?: string; canvasId?: string | null; pollMs?: number };
 
 const POLL_MS = 2000;
 const MAX_WAIT_S = 90;
@@ -97,7 +97,7 @@ const mediaLine = (media: Asset[]) => `Media from the canvas to use (asset ids i
 
 export function motionRows(deps: MotionDelegationDeps): ToolRow[] {
   const { db, orgId, projectId, userId } = deps;
-  const actor = agentActor(userId, SIDEBAR_AGENT_KEY);
+  const actor = agentActor(userId, SIDEBAR_AGENT_KEY, deps.sessionId);
   const pollMs = deps.pollMs ?? POLL_MS;
   const drawnByCall = new Map<string, DrawnFrame[]>();
 

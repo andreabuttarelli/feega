@@ -23,7 +23,7 @@ import type { Face, FaceBook, Features, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
 import { caretLines, type CaretLine } from './caret';
-import { Justify, layOut, NO_LIMIT, NO_LISTS, PLAIN_PARAGRAPH, Trim, Wrap, NO_EXTRA, Shaping, Spaces, type ListMark, type Paragraph, type Extra, type Flow, type Glyph, type Laid, type Line, type Look as RunLook, type RequestAt, type Type } from './layout';
+import { Justify, layOut, NO_LIMIT, NO_LISTS, PLAIN_PARAGRAPH, Trim, Wrap, NO_EXTRA, Shaping, Spaces, type ListMark, type Paragraph, type Extra, type Block, type Flow, type Glyph, type Laid, type Line, type Look as RunLook, type RequestAt, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, type Rect } from './outline';
@@ -576,15 +576,32 @@ function runsOf(glyphs: Positioned[], size: number): GlyphRun[] | null {
   return [...byFace].map(([face, own]) => ({ font: face.key!.font, coords: face.key!.coords, size, glyphs: own.map((g): [number, number, number] => [g.glyph, g.x, g.y]) }));
 }
 
+function gapOf(laid: Laid): TextGap | null {
+  if (!laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0) {
+    return TextGap.Font;
+  }
+  return laid.missing ? TextGap.Glyph : null;
+}
+
+type LineAt = { x: number; top: number; baseline: number };
+
+const lineAt = (plan: TextPlan, block: Block, line: Line, room: number, rise: number): LineAt => ({
+  x: block.inset + (room - block.inset - line.width) * plan.align,
+  top: block.top + line.top + rise,
+  baseline: block.top + line.baseline + rise - SMOOTHING[plan.smoothing].rise
+});
+
+type Drawn = { g: Glyph; at: number; marked: boolean };
+
+const drawnOf = (block: Block, line: Line, l: number, x: number): Drawn[] => [...(l === 0 ? block.marker.map((g) => ({ g, at: 0, marked: true })) : []), ...line.glyphs.map((g) => ({ g, at: x, marked: false }))];
+
 export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = TextOutput.Outlines): Painted | TextGap {
   const { laid, type, room } = place(plan, fonts);
   const run = plan.animation;
   const slots = run ? slotsOf(plan.text, plan.paragraphs, run.finest) : null;
-  if (!laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0) {
-    return TextGap.Font;
-  }
-  if (laid.missing) {
-    return TextGap.Glyph;
+  const gap = gapOf(laid);
+  if (gap) {
+    return gap;
   }
   const smoothing = SMOOTHING[plan.smoothing];
   const { left } = plan.frame;
@@ -600,9 +617,7 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
     const ruleInk: number[][] = [];
     const units = new Map<string, Unit>();
     block.lines.forEach((line, l) => {
-      const x = block.inset + (room - block.inset - line.width) * plan.align;
-      const top = block.top + line.top + rise;
-      const baseline = block.top + line.baseline + rise - smoothing.rise;
+      const { x, top, baseline } = lineAt(plan, block, line, room, rise);
       const start = x + (line.glyphs[0]?.pen ?? 0);
       const areas: Record<Area, Rect> = {
         [Area.Line]: [start - strip, block.top + line.baseline + rise - laid.ascent, start - strip + stripWidth, block.top + line.baseline + rise + laid.descent],
@@ -613,8 +628,7 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
       if (plan.backdrop) {
         backdrop.push(rect([x, baseline - laid.ascent - CAPTION_PAD_EM * type.size, x + line.width, baseline + laid.descent + CAPTION_PAD_EM * type.size]));
       }
-      const drawn = [...(l === 0 ? block.marker.map((g) => ({ g, at: 0, marked: true })) : []), ...line.glyphs.map((g) => ({ g, at: x, marked: false }))];
-      for (const { g, at, marked } of drawn) {
+      for (const { g, at, marked } of drawnOf(block, line, l, x)) {
         const slot = slots && g.word >= 0 ? slots(i, g) : null;
         const style = marked ? null : runOf(plan, i, g.char);
         const gradient = style?.fill ? style.start : null;
@@ -660,6 +674,34 @@ export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = Tex
   return { inks: inks.filter((i) => i.opacity > 0), frame: rendered };
 }
 
+export type OutlinedGlyph = { face: Face; glyph: number; size: number; skew: number; x: number; y: number };
+
+export type Outlined = { glyphs: OutlinedGlyph[]; bars: number[][] };
+
+export function outlinesOf(plan: TextPlan, fonts: FaceBook): Outlined | TextGap {
+  const { laid, room } = place(plan, fonts);
+  const gap = gapOf(laid);
+  if (gap) {
+    return gap;
+  }
+  const left = plan.frame.left;
+  const top = topOf(plan, laid);
+  const glyphs: OutlinedGlyph[] = [];
+  const bars: number[][] = [];
+  laid.blocks.forEach((block, i) =>
+    block.lines.forEach((line, l) => {
+      const { x, baseline } = lineAt(plan, block, line, room, 0);
+      for (const { g, at, marked } of drawnOf(block, line, l, x)) {
+        const y = baseline - g.dy;
+        const shape = moved(glyphContours(g.face, g.glyph, g.size, g.skew, 0), at + g.x, y);
+        glyphs.push({ face: g.face, glyph: g.glyph, size: g.size, skew: g.skew, x: left + at + g.x, y: top + y });
+        bars.push(...moved([...decorations(marked ? null : runOf(plan, i, g.char), g, at, baseline), ...ruled(plan.typography.rule, g, at, baseline, shape)], left, top));
+      }
+    })
+  );
+  return { glyphs, bars };
+}
+
 export function paintText(env: TextEnv): Painted | TextGap {
   const plan = planOf(env);
   return typeof plan === 'string' ? plan : inksOf(plan, env.fonts, env.output);
@@ -672,15 +714,18 @@ function spaceOf(laid: Laid, paragraphs: string[], size: number): number {
   return glyphs[0]?.advance ?? size * SPACE_EM;
 }
 
+export function laidExtent(plan: TextPlan, fonts: FaceBook): { width: number; height: number } | null {
+  const { laid } = place(plan, fonts);
+  return gapOf(laid) ? null : { width: laid.width, height: laid.height };
+}
+
 export type Caret = { lines: CaretLine[]; left: number; top: number; width: number; height: number; size: number; vertical: number };
 
 export function caretOf(plan: TextPlan, fonts: FaceBook): Caret | TextGap {
   const { laid, room, type } = place(plan, fonts);
-  if (!laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0) {
-    return TextGap.Font;
-  }
-  if (laid.missing) {
-    return TextGap.Glyph;
+  const gap = gapOf(laid);
+  if (gap) {
+    return gap;
   }
   const top = topOf(plan, laid);
   return {

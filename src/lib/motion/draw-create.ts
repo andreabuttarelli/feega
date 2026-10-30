@@ -1,17 +1,21 @@
-import { COMPONENTS, TYPE_SIZE, type ComponentId } from '@feega/motion-core/motion/components';
+import { withSurface } from '@feega/motion-core/motion/surface';
+import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
+import { COMPONENTS, HAIRLINE, TYPE_SIZE, type ComponentId } from '@feega/motion-core/motion/components';
 import { NEW_TEXT_SIZING, TextSizing } from '@feega/motion-core/motion/text-sizing';
-import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Background, DESIGN_MAX_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool, type DragPoint, type DrawBox } from './draw-tool';
 import { corner, mapOutline, parsePath, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
 import { FillKind, ShapeKind, StrokeKind } from '@feega/motion-core/motion/shape/schema';
 import type { SvgFillRule, SvgGradient } from './shape/svg-import';
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { setClipFlags } from '@feega/motion-core/motion/organize';
+import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { setAutoLayout, setLayoutItem } from './layout/ops';
 import { EditMode } from './edit-mode';
 import { DocMode, docMode, setStill, settledStill } from '@feega/motion-core/motion/still';
 import { TOP_LEFT_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
-type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame;
+type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame | DrawTool.Stack;
 
 const FRAME_FILL = '#ffffff';
 
@@ -25,11 +29,13 @@ const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, 
   [DrawTool.Ellipse]: { component: 'Shape', props: { shape: ShapeKind.Ellipse } },
   [DrawTool.Polygon]: { component: 'Shape', props: { shape: ShapeKind.Polygon, sides: 3 } },
   [DrawTool.Star]: { component: 'Shape', props: { shape: ShapeKind.Star, points: 5 } },
-  [DrawTool.Frame]: { component: 'Shape', props: { shape: ShapeKind.Rect, fills: [{ type: FillType.Solid, color: FRAME_FILL }] } }
+  [DrawTool.Frame]: { component: 'Shape', props: { shape: ShapeKind.Rect, fills: [{ type: FillType.Solid, color: FRAME_FILL }] } },
+  [DrawTool.Stack]: { component: 'Shape', props: { shape: ShapeKind.Rect, fill: 'transparent' } }
 };
 
+export const drawsBox = (tool: DrawTool): boolean => tool in BOX_CLIP;
+
 const MIN_PEN_POINTS = 2;
-const MIN_SIDE = 0.001;
 
 const SPAN: Record<DocMode, (doc: MotionDoc, frame: number, component: ComponentId) => { from: number; durationInFrames: number }> = {
   [DocMode.Still]: (doc) => ({ from: 0, durationInFrames: doc.durationInFrames }),
@@ -42,6 +48,22 @@ const SPAN: Record<DocMode, (doc: MotionDoc, frame: number, component: Component
 const DRAW_START: Record<EditMode, (playhead: number) => number> = {
   [EditMode.Design]: () => 0,
   [EditMode.Motion]: (playhead) => playhead
+};
+
+export const DRAW_SUMMARY: Record<DrawTool, string> = {
+  [DrawTool.Select]: '',
+  [DrawTool.Text]: 'Drew a text',
+  [DrawTool.Rectangle]: 'Drew a rectangle',
+  [DrawTool.Ellipse]: 'Drew an ellipse',
+  [DrawTool.Polygon]: 'Drew a polygon',
+  [DrawTool.Star]: 'Drew a star',
+  [DrawTool.Line]: 'Drew a line',
+  [DrawTool.Arrow]: 'Drew an arrow',
+  [DrawTool.Pen]: 'Drew a path',
+  [DrawTool.Pencil]: 'Drew a path',
+  [DrawTool.ShapeBuilder]: '',
+  [DrawTool.Frame]: 'Drew a frame',
+  [DrawTool.Stack]: 'Drew a stack'
 };
 
 export const drawStart = (mode: EditMode, playhead: number): number => DRAW_START[mode](playhead);
@@ -66,7 +88,20 @@ const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizi
   [DrawTool.Ellipse]: () => ({}),
   [DrawTool.Polygon]: () => ({}),
   [DrawTool.Star]: () => ({}),
-  [DrawTool.Frame]: () => ({})
+  [DrawTool.Frame]: () => ({}),
+  [DrawTool.Stack]: () => ({})
+};
+
+const STACK_LAYOUT = { direction: Direction.Vertical, gap: 8, padding: { top: 16, right: 16, bottom: 16, left: 16 } };
+
+function finishStack(doc: MotionDoc, id: string): OpResult {
+  const laid = setAutoLayout(doc, id, STACK_LAYOUT);
+  return laid.ok ? setLayoutItem(laid.doc, id, { width: Sizing.Hug, height: Sizing.Hug }) : laid;
+}
+
+const FINISH: Partial<Record<BoxTool, (doc: MotionDoc, id: string) => OpResult>> = {
+  [DrawTool.Frame]: (doc, id) => setClipFlags(doc, id, { clipContent: true }),
+  [DrawTool.Stack]: finishStack
 };
 
 export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = NEW_TEXT_SIZING, extra: Record<string, unknown> = {}): OpResult {
@@ -75,7 +110,7 @@ export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: nu
     return fail(`${tool} does not draw a box`);
   }
   const placed = place(doc, made.component, { ...made.props, ...extra, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
-  return placed.ok && tool === DrawTool.Frame ? setClipFlags(placed.doc, id, { clipContent: true }) : placed;
+  return placed.ok ? FINISH[tool as BoxTool]?.(placed.doc, id) ?? placed : placed;
 }
 
 const ARROW_HEAD = { length: 0.2, minLength: 12, maxLength: 80, spread: Math.PI / 7 };
@@ -115,7 +150,9 @@ function boundsOf(outline: Outline): DrawBox {
 }
 
 const PRECISION = 10000;
+const PLACE_PRECISION = 1_000_000;
 const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
+const placedRound = (n: number) => Math.round(n * PLACE_PRECISION) / PLACE_PRECISION;
 
 export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: string, paint: Record<string, unknown> = {}): OpResult {
   if (outline.reduce((n, c) => n + c.vertices.length, 0) < MIN_PEN_POINTS) {
@@ -125,7 +162,7 @@ export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: str
   const left = box.x - box.width / 2;
   const top = box.y - box.height / 2;
   const unit = mapOutline(outline, ([x, y]) => [round(box.width ? (x - left) / box.width : 0), round(box.height ? (y - top) / box.height : 0)]);
-  const placed = { x: round(box.x), y: round(box.y), width: round(Math.max(box.width, MIN_SIDE)), height: round(Math.max(box.height, MIN_SIDE)) };
+  const placed = { x: placedRound(box.x), y: placedRound(box.y), width: placedRound(Math.max(box.width, HAIRLINE)), height: placedRound(Math.max(box.height, HAIRLINE)) };
   return place(doc, 'Shape', { shape: ShapeKind.Path, path: pathData(unit), ...paint, ...placed }, frame, id);
 }
 
@@ -178,26 +215,35 @@ const FULL_BOX: DrawBox = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
 const evenSide = (n: number) => Math.max(MIN_DOC_SIDE, Math.round(n / 2) * 2);
 
-function elementPixels(box: CanvasBox): { width: number; height: number } {
+const evenFloor = (n: number) => Math.max(MIN_DOC_SIDE, Math.floor(n / 2) * 2);
+
+type Sides = { long: number; short: number };
+
+const VIDEO_SIDES: Sides = { long: MAX_SIDE, short: MAX_SHORT_SIDE };
+const STILL_SIDES: Sides = { long: DESIGN_MAX_SIDE, short: DESIGN_MAX_SIDE };
+
+function elementPixels(box: CanvasBox, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
   const long = Math.max(box.width, box.height);
   const short = Math.min(box.width, box.height);
-  const scale = Math.min(PIXELS_PER_CANVAS_PX, MAX_SIDE / long, MAX_SHORT_SIDE / short);
-  return { width: evenSide(box.width * scale), height: evenSide(box.height * scale) };
+  const scale = Math.min(PIXELS_PER_CANVAS_PX, sides.long / long, sides.short / short);
+  const shortSide = evenFloor(short * scale);
+  const longSide = Math.min(evenSide((long * shortSide) / short), evenSide(long * scale));
+  return box.width >= box.height ? { width: longSide, height: shortSide } : { width: shortSide, height: longSide };
 }
 
 export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
 }
 
-function sizedFrame(box: CanvasBox, format: MotionFormat): MotionDoc {
-  if (format !== MotionFormat.Custom) {
-    return newMotionDoc(format);
-  }
-  return { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) };
+const SURFACE_ID = 'surface';
+
+function sizedFrame(box: CanvasBox, format: MotionFormat, sides: Sides): MotionDoc {
+  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box, sides) } : newMotionDoc(format);
+  return withSurface(doc, SURFACE_ID);
 }
 
 export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.Custom, stillSeconds?: number): MotionDoc {
-  const doc = sizedFrame(box, format);
+  const doc = sizedFrame(box, format, stillSeconds === undefined ? VIDEO_SIDES : STILL_SIDES);
   if (stillSeconds === undefined) {
     return doc;
   }
@@ -233,7 +279,7 @@ export function drawnElement(drawn: Drawn, id: string): DrawnElement {
 }
 
 export const CANVAS_INK: Record<CanvasTheme, string> = { [CanvasTheme.Light]: '#111111', [CanvasTheme.Dark]: '#f5f5f5' };
-const BRAND_TEXT = 'brand.text';
+
 
 function defaultColor(component: string): unknown {
   const parsed = COMPONENTS[component as ComponentId]?.schema.safeParse({});
@@ -241,7 +287,7 @@ function defaultColor(component: string): unknown {
 }
 
 function inked(doc: MotionDoc, ink: string): MotionDoc {
-  const brandInk = (c: MotionDoc['tracks'][number]['clips'][number]) => (c.props.color ?? defaultColor(c.component)) === BRAND_TEXT;
+  const brandInk = (c: MotionDoc['tracks'][number]['clips'][number]) => (c.props.color ?? defaultColor(c.component)) === DEFAULT_COLOUR.ink;
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (brandInk(c) ? { ...c, props: { ...c.props, color: ink } } : c)) })) };
 }
 

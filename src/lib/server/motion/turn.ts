@@ -26,6 +26,7 @@ import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { drawFrames, firstFrames } from '$lib/server/motion/server-frames';
 import { fontAdvance } from '$lib/server/motion/font-advance';
+import { letteringOf } from '$lib/motion/text-outline-run';
 import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
@@ -107,7 +108,7 @@ export const startMotionTurn = (input: MotionTurnInput): Promise<MotionTurn | Re
 async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
   const startedAt = Date.now();
   const { db, userId, orgId, project, motion, message, attachments = [], selection, model, reasoning, requester, browser, timing = PLATFORM_TIMING } = input;
-  const actor = agentActor(userId, MOTION_AGENT_KEY);
+  const actor = agentActor(userId, MOTION_AGENT_KEY, crypto.randomUUID());
   const nodeScope = { orgId, nodeId: motion.record.id };
 
   const [head, tokens, threadId] = await Promise.all([
@@ -120,7 +121,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     return blockedPrompt(screened.error);
   }
 
-  const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id });
+  const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId });
   const turns = await loadTurns(db, { orgId, threadId });
   const history = promptHistory(turns);
   const pick = readAnswer(message) ?? latestAnswer(turns);
@@ -199,6 +200,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
     fontAdvance: readFontAdvance,
+    lettering: letteringOf(tokens, assetUrls(assets)),
     trackReader: ffmpegLumas,
     fonts: () => orgFontFamilies(db, orgId),
     inspect: frameStats,
@@ -264,7 +266,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };
       }
-      const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id }, SIGNED_URL_TTL_S.render);
+      const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId }, SIGNED_URL_TTL_S.render);
       const made = rowRequests(head, rows, { tokens, assets: assetUrls(renderAssets) }, settingsOf(Preset.Social));
       if (!made.ok) {
         return made;

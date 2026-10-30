@@ -22,6 +22,9 @@
   import Diamond from '@lucide/svelte/icons/diamond';
   import Rows3 from '@lucide/svelte/icons/rows-3';
   import Contrast from '@lucide/svelte/icons/contrast';
+  import StretchHorizontal from '@lucide/svelte/icons/stretch-horizontal';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import { LayoutKind } from '@feega/motion-core/motion/layout/stack';
   import { ACTIONS, shortcutOf } from '$lib/motion/actions';
   import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -34,14 +37,20 @@
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import { Density, ROW_STEP_PX } from '$lib/canvas/layer-density';
-  import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { layerMenuActions } from '$lib/canvas/frame-inspector';
+  import type { ActionId } from '$lib/motion/actions';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
+  import type { DrawTool } from '$lib/motion/draw-tool';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
-  const INDENT_PX = 14;
-  const FOLD_GUTTER = 24;
+  const INDENT_PX = 12;
+  const FOLD_GUTTER = 20;
+  const FOLD_ICON = 12;
   const PROBE_LANES = 6;
-  let { density = Density.Pointer }: { density?: Density } = $props();
+  let { density = Density.Pointer, searching = true }: { density?: Density; searching?: boolean } = $props();
   const rowStep = $derived(ROW_STEP_PX[density]);
   const OVERSCAN = 8;
   const FALLBACK_VIEW_PX = 1000;
@@ -155,7 +164,8 @@
   let landing = $state<{ key: string; place: Place } | null>(null);
 
   function over(row: LayerRow, e: DragEvent) {
-    if (!dragged || !editable(row) || block.includes(row.id)) {
+    const tool = e.dataTransfer?.types.includes(CANVAS_DRAG_TOOL);
+    if ((!dragged && !tool) || !editable(row) || block.includes(row.id)) {
       landing = null;
       return;
     }
@@ -164,7 +174,7 @@
     landing = { key: row.key, place: dropPlace(row.kind, (e.clientY - box.top) / box.height) };
   }
 
-  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard };
+  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard, [LayoutKind.Stack]: StretchHorizontal, [LayoutKind.Grid]: LayoutGrid };
   const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3, [LayerKind.Mask]: Contrast };
   const EYE_LABEL: Record<'mask' | 'layer', [string, string]> = { mask: ['Turn mask off', 'Turn mask on'], layer: ['Hide', 'Show'] };
   const eyeLabel = (row: LayerRow) => EYE_LABEL[row.kind === LayerKind.Mask ? 'mask' : 'layer'][row.hidden ? 1 : 0];
@@ -174,7 +184,6 @@
   const shown = $derived(searchRows(rows, query));
   const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
-  const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
   const renamable = (row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
@@ -254,13 +263,23 @@
     }
   }
 
-  function drop(row: LayerRow) {
+  function dropFromMenu(row: LayerRow, tool: DrawTool, place: Place) {
+    const result = dropTool(video!.doc, tool, row.id, place, crypto.randomUUID().slice(0, 8));
+    video!.edit(result, 'Added a layer');
+  }
+
+  function drop(row: LayerRow, e: DragEvent) {
     const from = dragged;
     const place = landing?.place;
     const moving = block;
+    const tool = e.dataTransfer?.getData(CANVAS_DRAG_TOOL) as DrawTool | undefined;
     dragged = null;
     block = [];
     landing = null;
+    if (video && tool && place) {
+      dropFromMenu(row, tool, place);
+      return;
+    }
     if (!video || !from || !place || moving.includes(row.id)) {
       return;
     }
@@ -280,11 +299,15 @@
     menu = { x: e.clientX, y: e.clientY };
   }
 
-  function runMenu(item: (typeof LAYER_MENU)[number]) {
+  function runMenu(id: ActionId) {
     menu = null;
-    if (video) {
-      video.edit(item.op(video.doc, video.selection), item.summary);
-    }
+    video?.run(id);
+  }
+
+  function renameFromMenu() {
+    const [id] = video?.selection ?? [];
+    menu = null;
+    renaming = id ?? null;
   }
 </script>
 
@@ -294,7 +317,10 @@
   {/each}
 {/if}
 
-<input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
+{#if searching}
+  <!-- svelte-ignore a11y_autofocus -->
+  <input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" autofocus={density === Density.Pointer} bind:value={query} onkeydown={(e) => e.stopPropagation()} />
+{/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" class:touch={density === Density.Touch} bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * rowStep}px`} style:padding-bottom={`${(shown.length - span.end) * rowStep}px`} onkeydown={onKey}>
@@ -324,18 +350,18 @@
       ondragover={(e) => over(row, e)}
       ondragleave={() => landing?.key === row.key && (landing = null)}
       ondragend={() => ((dragged = null), (block = []), (landing = null))}
-      ondrop={() => drop(row)}
+      ondrop={(e) => drop(row, e)}
       oncontextmenu={(e) => openMenu(row, e)}
     >
       {#if (row.kind === LayerKind.Node && frames.has(row.id)) || row.foldable}
         <button type="button" class="fold" aria-label={folds.has(row.key) ? 'Unfold' : 'Fold'} aria-expanded={!folds.has(row.key)} data-testid="layer-fold" onclick={(e) => (e.stopPropagation(), fold(row.key))}>
-          {#if folds.has(row.key)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
+          {#if folds.has(row.key)}<ChevronRight size={FOLD_ICON} />{:else}<ChevronDown size={FOLD_ICON} />{/if}
         </button>
       {/if}
       {#if row.thumb}
         <img class="thumb" src={row.thumb} alt="" loading="lazy" decoding="async" data-testid="layer-thumb" />
       {/if}
-      <span class="icon" class:instance={row.instance} data-instance={row.instance || undefined} style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
+      <span class="icon" data-instance={row.instance || undefined}><RowIcon size={ICON} strokeWidth={1.75} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
         <input class="name-input" value={row.label} autofocus aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
@@ -347,12 +373,14 @@
         <IconButton size={IconSize.Sm} label="Send backward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Down, SUMMARY[LayerAction.Down]))}><ChevronDown /></IconButton>
       {/if}
       {#if editable(row)}
+        <span class="toggles" class:held={row.hidden || row.locked}>
         <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
           {#if row.hidden}<EyeOff />{:else}<Eye />{/if}
         </IconButton>
         <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
           {#if row.locked}<Lock />{:else}<LockOpen />{/if}
         </IconButton>
+        </span>
       {/if}
     </div>
   {:else}
@@ -364,13 +392,18 @@
 
 {#if menu && video}
   <div class={MENU_CONTENT} role="menu" data-testid="layer-menu" style={`position: fixed; left: ${menu.x}px; top: ${menu.y}px`}>
-    {#each LAYER_MENU as item (item.command)}
-      {@const Icon = ACTIONS[item.command].icon}
-      {@const allowed = item.op(video.doc, video.selection).ok}
-      <button type="button" role="menuitem" class={MENU_ITEM} disabled={!allowed} data-disabled={allowed ? undefined : ''} onclick={() => runMenu(item)}>
+    {#if video.selection.length === 1}
+      <button type="button" role="menuitem" class={MENU_ITEM} data-action="rename" onclick={renameFromMenu}>
+        <Pencil aria-hidden="true" />
+        <span class="min-w-0 flex-1 truncate">Rename</span>
+      </button>
+    {/if}
+    {#each layerMenuActions(video.doc, video.selection) as id (id)}
+      {@const Icon = ACTIONS[id].icon}
+      <button type="button" role="menuitem" class={MENU_ITEM} data-action={id} onclick={() => runMenu(id)}>
         <Icon aria-hidden="true" />
-        <span class="min-w-0 flex-1 truncate">{ACTIONS[item.command].name}</span>
-        {#if shortcutOf(item.command)}<Kbd shortcut={shortcutOf(item.command)} class="text-ui-text-3" />{/if}
+        <span class="min-w-0 flex-1 truncate">{ACTIONS[id].name}</span>
+        {#if shortcutOf(id)}<Kbd shortcut={shortcutOf(id)} class="text-ui-text-3" />{/if}
       </button>
     {/each}
   </div>
@@ -378,12 +411,13 @@
 
 <style>
   .search {
+    box-sizing: border-box;
     width: 100%;
-    height: var(--ui-row);
-    margin-bottom: 8px;
-    padding: 0 10px;
+    height: var(--ui-row-sm);
+    margin-bottom: 4px;
+    padding: 0 8px;
     border: 0;
-    border-radius: var(--ui-radius-md);
+    border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
     color: var(--ui-text);
     font: inherit;
@@ -408,16 +442,16 @@
     flex-direction: column;
     gap: 1px;
     outline: none;
-    font-size: var(--ui-type-label);
+    font-size: 12px;
   }
 
   .row {
     display: flex;
     align-items: center;
     gap: 8px;
-    height: var(--ui-row);
-    padding-right: 6px;
-    border-radius: var(--ui-radius-md);
+    height: var(--ui-row-sm);
+    padding-right: 4px;
+    border-radius: var(--ui-radius-sm);
     color: var(--ui-text);
     cursor: default;
     user-select: none;
@@ -425,7 +459,7 @@
   }
 
   .layers.touch {
-    --ui-row: 44px;
+    --ui-row-sm: 44px;
   }
 
   .layers.touch :global(button) {
@@ -438,7 +472,7 @@
   }
 
   .row:hover {
-    background: var(--ui-wash);
+    background: var(--ui-hover);
   }
 
   .row[data-drop='above'] {
@@ -458,14 +492,11 @@
   }
 
   .row.picked {
-    background: var(--ui-accent-solid);
-    color: var(--ui-on-accent);
-    font-weight: var(--ui-weight-medium);
+    background: var(--ui-selected);
   }
 
-  .row.picked .icon,
-  .row.picked .flag {
-    color: var(--ui-on-accent);
+  .row.picked .icon {
+    color: var(--ui-text);
   }
 
   .row.inside {
@@ -488,11 +519,19 @@
   .icon {
     display: grid;
     place-items: center;
-    color: var(--hue, var(--ui-icon-ink));
+    color: var(--ui-icon-ink);
   }
 
-  .icon.instance {
-    color: #9747ff;
+  .toggles {
+    display: flex;
+    opacity: 0;
+  }
+
+  .row:hover .toggles,
+  .row:focus-within .toggles,
+  .toggles.held,
+  .layers.touch .toggles {
+    opacity: 1;
   }
 
   .thumb {
@@ -530,12 +569,12 @@
     place-items: center;
     width: 16px;
     height: 16px;
-    margin-left: -22px;
+    margin-left: -18px;
     padding: 0;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-xs);
     background: transparent;
-    color: var(--ui-text-3);
+    color: var(--ui-text-tertiary);
   }
 
   .fold:hover {

@@ -1,3 +1,4 @@
+import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Locator, Page } from '@playwright/test';
 import poster from './fixtures/poster-type-grid.json' with { type: 'json' };
@@ -34,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('draw polish inside a frame @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
-  async function open({ page, session, admin, seedNode }: { page: Page; session: { orgId: string; userId: string; projectId: string; canvasId: string }; admin: import('@supabase/supabase-js').SupabaseClient; seedNode: (n: Record<string, unknown>) => Promise<{ id: string }> }) {
+  async function open({ page, session, admin, seedNode }: { page: Page; session: { orgId: string; userId: string; projectId: string; canvasId: string }; admin: import('@supabase/supabase-js').SupabaseClient; seedNode: (n: { type: string } & Record<string, unknown>) => Promise<{ id: string }> }) {
     const node = await seedNode({ type: 'motion', x: 80, y: 80, data: PORTRAIT });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: poster, actor_kind: 'user', actor_id: session.userId });
     expect(error).toBeNull();
@@ -62,7 +63,7 @@ test.describe('draw polish inside a frame @real', () => {
     }
 
     async function rect(from: Pt, to: Pt, count: number) {
-      await page.getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+      await pickBarTool(page, 'rectangle');
       await drag(from, to);
       await expect.poll(async () => (await shapes('rect')).length, { timeout: 10_000 }).toBe(count);
     }
@@ -98,7 +99,7 @@ test.describe('draw polish inside a frame @real', () => {
     const { shapes, at } = await open({ page, session, admin, seedNode });
     const points = async () => (String((await shapes('path'))[0]?.props.path ?? '').match(/[ML]/g) ?? []).length;
 
-    await page.getByTestId('draw-tools').locator('[data-tool="pen"]').click();
+    await pickBarTool(page, 'pen');
     for (const [fx, fy] of [
       [0.2, 0.2],
       [0.8, 0.2],
@@ -128,7 +129,7 @@ test.describe('draw polish inside a frame @real', () => {
     const { shapes, at, drag } = await open({ page, session, admin, seedNode });
     const TOLERANCE_PX = 2;
 
-    await page.getByTestId('draw-tools').locator('[data-tool="pen"]').click();
+    await pickBarTool(page, 'pen');
     for (const [fx, fy] of [
       [0.1, 0.1],
       [0.7, 0.1],

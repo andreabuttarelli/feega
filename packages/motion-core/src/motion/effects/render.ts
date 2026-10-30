@@ -94,6 +94,11 @@ function filterMarkup(clip: EffectClip, effect: Effect, out: Rendered, area: Box
 const backdropOf = (layers: { out: Rendered }[]) => layers.map((r) => r.out.backdrop ?? '').filter(Boolean).join(' ');
 const backdropStyle = (backdrop: string) => (backdrop ? `;backdrop-filter:${esc(backdrop)};-webkit-backdrop-filter:${esc(backdrop)}` : '');
 
+const BEHIND_ONLY = /^(none)?$/;
+
+const backdropArea = (backdrop: string, filter: string, area: Box | null, frame: Frame) =>
+  backdrop && area && BEHIND_ONLY.test(filter.trim()) ? `;clip-path:inset(${px(area.top)}px ${px(frame.width - area.left - area.width)}px ${px(frame.height - area.top - area.height)}px ${px(area.left)}px)` : '';
+
 export function effectLayer(clip: EffectClip, frame: Frame, resolve: Resolve, inner: string, area: Box | null = null): string {
   const layers = renderAt(clip, frame, 0, resolve, area);
   if (!layers.length) {
@@ -102,7 +107,8 @@ export function effectLayer(clip: EffectClip, frame: Frame, resolve: Resolve, in
   const filter = layers.map((r) => r.out.filter).join(' ');
   const defs = layers.map((r) => filterMarkup(clip, r.effect, r.out, area, resolve)).join('');
   const svg = defs ? `<svg class="efd" aria-hidden="true"><defs>${defs}</defs></svg>` : '';
-  return `<div class="ef" id="${layerId(clip)}" style="filter:${esc(filter)}${backdropStyle(backdropOf(layers))}">${svg}${inner}</div>`;
+  const backdrop = backdropOf(layers);
+  return `<div class="ef" id="${layerId(clip)}" style="filter:${esc(filter)}${backdropStyle(backdrop)}${backdropArea(backdrop, filter, area, frame)}">${svg}${inner}</div>`;
 }
 
 type Adjusting = EffectClip & { blend: string };

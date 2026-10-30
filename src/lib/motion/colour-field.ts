@@ -93,7 +93,8 @@ export function remember(recent: readonly string[], hex: string, store: LayoutSt
 
 export enum ColourDisplay {
   Field = 'field',
-  Chip = 'chip'
+  Chip = 'chip',
+  Row = 'row'
 }
 
 export enum ColourFormat {

@@ -1,6 +1,8 @@
 import type { ActionResult } from '@sveltejs/kit';
 import type { Snippet } from 'svelte';
 import type { Offset } from '$lib/canvas/duplicate-plan';
+import type { ComponentDrag } from '$lib/canvas/component-drag';
+import type { MainPick } from '$lib/canvas/main-nav.svelte';
 import type { FocusRequest } from '$lib/canvas/free-area';
 import type { GenPropertyType } from '$lib/canvas/common-properties';
 import type { ColourTag } from '$lib/canvas/node-colour';
@@ -10,6 +12,7 @@ import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
 import type { BarContext } from '$lib/canvas/bottom-bar';
 import type { NameTag } from '$lib/canvas/node-label';
 import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
+import type { CopyShown, Drawing, Duplication } from '$lib/canvas/optimistic-insert';
 import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
 import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
 import type { FeedImageDrag } from '$lib/canvas/feed-image';
@@ -72,6 +75,7 @@ export type FlowProps = {
     sourceHandle: string | null,
   ) => void;
   onDelete?: (ids: string[], mode?: DeleteMode) => void;
+  onCopyLink?: (ids: string[]) => void;
   onSection?: (ids: string[]) => void;
   onColourChange?: (ids: string[], tag: ColourTag | null) => void;
   onSectionChange?: (id: string, patch: { title?: string; fill?: string }) => void;
@@ -96,26 +100,31 @@ export type FlowProps = {
     client: PointerPoint,
     at: { x: number; y: number },
   ) => void;
+  onDropComponent?: (drag: ComponentDrag, at: { x: number; y: number }) => void;
+  pickMain?: MainPick | null;
   onFlow?: (
     toFlow: (p: { x: number; y: number }) => { x: number; y: number },
   ) => void;
   onUpload?: (file: File, at?: { x: number; y: number }) => void;
-  onDuplicate?: (ids: string[], offset?: Offset) => void;
+  onDuplicate?: (ids: string[], offset: Offset | undefined, shown: CopyShown) => Duplication | null;
   onCopy?: (ids: string[]) => void;
   onPaste?: (at: { x: number; y: number }) => void;
   onTemplate?: (id: string, at: { x: number; y: number }) => void;
   onFrameTemplates?: (at: { x: number; y: number }) => void;
   onFigmaImport?: (at: { x: number; y: number }) => void;
+  onUrlImport?: (at: { x: number; y: number }) => void;
+  onCodeImport?: (at: { x: number; y: number }) => void;
   onNodeClicked?: (id: string) => void;
   onNodeDoubled?: (id: string) => void;
   barContext?: BarContext;
-  onDraw?: (drawn: DrawnWire) => Promise<string>;
+  onDraw?: (drawn: DrawnWire) => Drawing;
   onDrawFrame?: (
     target: { box: CanvasBox } | { at: { x: number; y: number } },
-  ) => Promise<void>;
+  ) => Drawing;
   onRotate?: (id: string, degrees: number) => void;
-  onAddBeside?: (id: string) => void;
+  onAddBeside?: (id: string) => Drawing | null;
   onGroup?: (ids: string[]) => void;
+  onWrapStack?: (ids: string[]) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;
   onUndo?: () => void;
@@ -138,7 +147,7 @@ export type FlowProps = {
   onViewOutput?: (id: string) => void;
   variantsInFlightFor?: (id: string) => number;
   onCancelVariants?: (id: string) => void;
-  historyFor?: (id: string) => { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void } | null;
+  historyFor?: (id: string) => { items: HistoryItem[]; urlOf: (mediaId: string) => string | null; onshow: (runId: string) => void; oncompare: (a: string, b: string) => void } | null;
   onCancelRun?: (id: string) => void;
   onCompareOutputs?: (ids: string[]) => void;
   onCloud?: (provider: CloudProviderId, mode: CloudMode, nodeId: string | null, at: { x: number; y: number }) => void;

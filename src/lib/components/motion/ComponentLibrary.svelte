@@ -52,7 +52,8 @@
     [MotionFormat.Portrait]: 180,
     [MotionFormat.Poster]: 170,
     [MotionFormat.Square]: 200,
-    [MotionFormat.SquareLarge]: 200
+    [MotionFormat.SquareLarge]: 200,
+    [MotionFormat.Custom]: 200
   };
 
   const PHONE_COLUMNS: Record<MotionFormat, string> = {
@@ -61,7 +62,8 @@
     [MotionFormat.Portrait]: 'max-sm:grid-cols-2',
     [MotionFormat.Poster]: 'max-sm:grid-cols-2',
     [MotionFormat.Square]: 'max-sm:grid-cols-2',
-    [MotionFormat.SquareLarge]: 'max-sm:grid-cols-2'
+    [MotionFormat.SquareLarge]: 'max-sm:grid-cols-2',
+    [MotionFormat.Custom]: 'max-sm:grid-cols-2'
   };
 
   const HOVER = '(hover: hover)';

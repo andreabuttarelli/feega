@@ -50,8 +50,4 @@ describe('ai output limits', () => {
       expect(maxOutputTokensFor(p), p).toBe(65_536);
     }
   });
-
-  it('ignores modelId for providers that serve one family', () => {
-    expect(maxOutputTokensFor('gemini', 'gpt-5-6-sol')).toBe(GEMINI_MAX_OUTPUT_TOKENS);
-  });
 });

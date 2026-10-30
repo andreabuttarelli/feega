@@ -331,14 +331,22 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
   });
 
-  it('⇧A stacks the selected tiles', () => {
-    expect(matchCanvasShortcut(ev('A', { shiftKey: true }))).toEqual({ id: 'stack' });
+  it('⇧A wraps the selection with a stack', () => {
+    expect(matchCanvasShortcut(ev('A', { shiftKey: true }))).toEqual({ id: 'wrap-stack' });
     expect(matchCanvasShortcut(ev('a'))).toBeNull();
   });
 
-  it('E switches between Design and Animate', () => {
+  it('⌘J shows or hides the timeline', () => {
+    expect(matchCanvasShortcut(ev('j', { metaKey: true }))).toEqual({ id: 'timeline' });
+  });
+
+  it('E switches between Design and Motion', () => {
     expect(matchCanvasShortcut(ev('e'))).toEqual({ id: 'edit-mode' });
     expect(matchCanvasShortcut(ev('e', { metaKey: true }))).toBeNull();
+  });
+
+  it('⇧D enters Code mode, not a frame view', () => {
+    expect(matchCanvasShortcut(ev('D', { shiftKey: true, code: 'KeyD' }))).toEqual({ id: 'code-mode' });
   });
 
   it('zoom keys by physical digit: ⇧0 is 100%, ⇧1 fits everything, ⇧2 zooms to the selection', () => {

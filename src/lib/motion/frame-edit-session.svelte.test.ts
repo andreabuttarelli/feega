@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
-import { FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
+import { DocAccess, FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
 import { outgoing } from './frame-sync';
+import { OpKind } from './doc-ops';
+import { addClip } from '@feega/motion-core/motion/timeline';
 
 const base = newMotionDoc(MotionFormat.Landscape);
 const longer = (frames: number): MotionDoc => ({ ...base, durationInFrames: frames });
@@ -17,8 +19,8 @@ function open(send: SessionPort['send'] = accepted) {
     recorded: vi.fn(),
     stepped: vi.fn(),
     playhead: () => 12,
-    moded: vi.fn(),
     saved: vi.fn(),
+    landed: vi.fn(),
     pull: vi.fn(async () => {}),
     send: vi.fn(send)
   };
@@ -35,16 +37,8 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('the edit mode and the playhead', () => {
-  it('starts in Design, flips to Motion and back, and tells the host each time', () => {
-    const { session, port } = open();
-
-    expect(session.mode).toBe(EditMode.Design);
-    session.toggleMode();
-    session.toggleMode();
-
-    expect(port.moded).toHaveBeenNthCalledWith(1, EditMode.Motion);
-    expect(port.moded).toHaveBeenNthCalledWith(2, EditMode.Design);
-    expect(session.mode).toBe(EditMode.Design);
+  it('starts in Design', () => {
+    expect(open().session.mode).toBe(EditMode.Design);
   });
 
   it('opens in the mode the host remembered', () => {
@@ -67,6 +61,18 @@ describe('telling the host about a new undo step', () => {
     session.apply({ ok: true, doc: longer(80) }, 'Other');
 
     expect(port.stepped).toHaveBeenCalledTimes(2);
+  });
+
+  it('a read-only session ignores edits, undo and redo', () => {
+    const { session, port } = open();
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    session.access = DocAccess.Read;
+
+    session.apply({ ok: true, doc: longer(90) }, 'Longest');
+    session.undo();
+
+    expect(session.history.present.durationInFrames).toBe(60);
+    expect(port.stepped).toHaveBeenCalledTimes(1);
   });
 
   it('undo and redo are not new steps', () => {
@@ -223,6 +229,43 @@ describe('remote heads', () => {
     expect(port.saved).toHaveBeenCalled();
   });
 
+  it('a teammate step on the revision this session holds is followed, keeping the selection', () => {
+    const clipped = addClip(base, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'a' } }, 'kept');
+    const { port } = open();
+    const session = new FrameEditSession({ head: { version: 1, doc: clipped.ok ? clipped.doc : base }, selection: ['kept'] }, port);
+
+    expect(session.followStep({ nodeId: 'n1', base: 1, version: 2, ops: [{ kind: OpKind.DocSet, field: 'durationInFrames', value: 99 }] })).toBe(true);
+
+    expect(session.version).toBe(2);
+    expect(session.history.present.durationInFrames).toBe(99);
+    expect(session.selection).toEqual(['kept']);
+  });
+
+  it('the host hears of a followed head once the session already holds it, so it shows the new doc', () => {
+    const { session, port } = open();
+    const shown: MotionDoc[] = [];
+    vi.mocked(port.saved).mockImplementation(() => shown.push(session.history.present));
+
+    session.takeRemote({ version: 2, doc: longer(99) });
+
+    expect(shown.map((d) => d.durationInFrames)).toEqual([99]);
+  });
+
+  it('a step from another revision is left for the head fetch', () => {
+    const { session } = open();
+
+    expect(session.followStep({ nodeId: 'n1', base: 4, version: 5, ops: [{ kind: OpKind.DocSet, field: 'durationInFrames', value: 99 }] })).toBe(false);
+    expect(session.version).toBe(1);
+  });
+
+  it('a landed save tells the host which revision it came from, so peers get the step', async () => {
+    const { session, port } = open();
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(port.landed).toHaveBeenCalledWith({ version: 1, doc: base }, { version: 2, doc: longer(60) });
+  });
+
   it('a head arriving mid-save is held and pulled after the save', async () => {
     const hold = held();
     const { session, port } = open(hold.send);
@@ -272,5 +315,26 @@ describe('holding the save until an upload is done', () => {
 
     expect(port.send).toHaveBeenCalledTimes(1);
     expect(vi.mocked(port.send).mock.calls[0][0]).toEqual(outgoing({ version: 1, doc: base }, longer(90)));
+  });
+});
+
+describe('a scrub saves once', () => {
+  it('a slow scrub of many ticks under a live gesture sends one save, after release', async () => {
+    const { session, port } = open();
+    const TICKS = 40;
+    const SLOWER_THAN_THE_DEBOUNCE_MS = 400;
+
+    session.live.begin();
+    for (let i = 1; i <= TICKS; i++) {
+      session.edit(longer(60 + i), 'Edited opacity');
+      await vi.advanceTimersByTimeAsync(SLOWER_THAN_THE_DEBOUNCE_MS);
+    }
+    expect(port.send).not.toHaveBeenCalled();
+
+    session.live.release();
+    await vi.runAllTimersAsync();
+
+    expect(port.send).toHaveBeenCalledTimes(1);
+    expect(port.recorded).toHaveBeenCalledTimes(1);
   });
 });

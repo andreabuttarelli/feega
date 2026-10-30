@@ -9,7 +9,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
   const [head, tokens, assets] = await Promise.all([
     headOrNew(scope.db, { orgId: scope.orgId, nodeId }, scope.motion.node),
     motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
-    motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId })
+    motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id })
   ]);
 
   const page = livePage({ doc: head.doc, tokens, assets: assetUrls(assets), title: scope.motion.record.displayName ?? 'Frame' }, url.origin);

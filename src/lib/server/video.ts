@@ -632,8 +632,6 @@ export async function prepareVideoRender(
     script,
     instructions: opts.instructions,
     prompt: opts.prompt,
-    durationSeconds,
-    // Il modello è già stato risolto sopra: le note di mestiere sono sue, non del brief.
     model
   });
 

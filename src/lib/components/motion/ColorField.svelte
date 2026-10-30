@@ -5,6 +5,7 @@
   import { parseColour } from '$lib/motion/colour-field';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { sidePlacement, SideMode, type SidePlace } from '$lib/components/ui/shell/side-popover';
+  import { isBrandToken } from '$lib/motion/selection-colours';
   import ColorPicker from './ColorPicker.svelte';
 
   const NO_COLOURS = () => [];
@@ -32,7 +33,8 @@
   let place = $state<SidePlace | null>(null);
 
   let swatches = $state<readonly string[]>([]);
-  const raw = $derived(typeof value === 'string' ? value : '');
+  let picked = $state<string | null>(null);
+  const raw = $derived(picked ?? (typeof value === 'string' ? value : ''));
   const shown = $derived(resolveColor(raw || undefined, tokens));
   const hasAlpha = $derived(alpha !== null || !!onalpha);
 
@@ -58,7 +60,13 @@
     }
   });
 
+  $effect(() => {
+    void value;
+    picked = null;
+  });
+
   function pick(next: string, nextAlpha?: number) {
+    picked = next;
     if (nextAlpha !== undefined && onalpha) {
       onalpha(nextAlpha);
       return;
@@ -105,7 +113,19 @@
 <svelte:window onpointerdown={closeOutside} onresize={measure} />
 
 <div class="colour" data-display={display} bind:this={root} data-colour={name} role="group" aria-label={name} onkeydown={closeOnEscape}>
+  {#if display === ColourDisplay.Row}
+    <button type="button" class="row" aria-label={`Edit ${name}`} aria-expanded={open} onclick={() => (open = !open)}>
+      <span class="swatch" style={`--c: ${shown};`}></span>
+      {#if isBrandToken(raw)}
+        <svg class="token-glyph" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M6 1.5 10.5 6 6 10.5 1.5 6Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
+        <span class="label">{colourLabel(raw)}</span>
+      {:else}
+        <span class="label mono">#{colourLabel(raw)}</span>
+      {/if}
+    </button>
+  {:else}
   <button type="button" class="chip" style={`--c: ${shown};`} aria-label={`Pick ${name}`} aria-expanded={open} onclick={() => (open = !open)}></button>
+  {/if}
   {#if display === ColourDisplay.Field}<input {id} class="hex" type="text" spellcheck="false" aria-label={name} value={colourLabel(raw)} onchange={(e) => typed(e.currentTarget)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />{/if}
   {#if onalpha && display === ColourDisplay.Field}<input class="alpha" type="text" inputmode="decimal" aria-label={`${name} opacity`} value={`${Math.round((alpha ?? 1) * PERCENT)}%`} onchange={(e) => setAlpha(e.currentTarget.value)} />{/if}
   {#if open}
@@ -141,6 +161,70 @@
   .colour[data-display='chip'] .chip {
     width: 24px;
     height: 24px;
+  }
+
+  .colour[data-display='row'] {
+    flex: 1;
+    display: flex;
+    height: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+
+  .row {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    height: 100%;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-sm, 12px);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .row:hover {
+    background: var(--ui-hover);
+  }
+
+  .row:focus-visible,
+  .row[aria-expanded='true'] {
+    outline: none;
+    border-color: var(--ui-accent);
+  }
+
+  .swatch {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: var(--ui-radius-sm);
+    background: var(--c);
+  }
+
+  .token-glyph {
+    flex-shrink: 0;
+    color: var(--ui-ink-3);
+  }
+
+  .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mono {
+    font-family: var(--ui-mono, ui-monospace, monospace);
+    font-variant-numeric: tabular-nums;
   }
 
   .colour:hover {

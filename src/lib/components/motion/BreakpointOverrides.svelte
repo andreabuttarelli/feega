@@ -1,18 +1,20 @@
 <script lang="ts">
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { BASE_BREAKPOINT, clearOverride, overrideLabel, overridesAt, stackOn, viewsOf } from '@feega/motion-core/motion/breakpoints/model';
+  import { BASE_BREAKPOINT, clearOverride, OVERRIDE_KEYS, overrideLabel, overridesAt, BASE_NAME, stackOn, viewsOf } from '@feega/motion-core/motion/breakpoints/model';
 
   let { doc, clipId, active, onchange }: { doc: MotionDoc; clipId: string; active: string; onchange: (result: OpResult, summary: string) => void } = $props();
 
   const view = $derived(viewsOf(doc).find((v) => v.id === active));
   const keys = $derived(active === BASE_BREAKPOINT ? [] : overridesAt(doc, clipId, active));
+  const varies = OVERRIDE_KEYS.map(overrideLabel).join(', ');
   const container = $derived(doc.tracks.some((t) => t.clips.some((c) => c.id === clipId && c.autoLayout)));
 </script>
 
 {#if view && active !== BASE_BREAKPOINT}
   <div class="overrides" data-testid="breakpoint-overrides">
-    <header>Editing {view.name} {view.width}</header>
+    <header><span class="badge" data-testid="editing-breakpoint">Editing: {view.name}</span> {view.width}px</header>
+    <p class="note" data-testid="breakpoint-varies">Only {varies} change on {view.name}. Other properties stay as on {BASE_NAME}: edit them there.</p>
     {#each keys as key (key)}
       <div class="row" data-testid="breakpoint-override">
         <span>{overrideLabel(key)} overridden in {view.name}</span>
@@ -38,6 +40,18 @@
   header {
     color: var(--ui-ink);
     font-weight: 500;
+  }
+
+  .badge {
+    padding: 1px 6px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+  }
+
+  .note {
+    margin: 0;
+    color: var(--ui-text-secondary);
   }
 
   .row {

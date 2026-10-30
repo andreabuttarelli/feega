@@ -1,3 +1,4 @@
+import { Ease } from '@feega/motion-core/motion/design';
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -23,7 +24,7 @@ type CoverOf = NonNullable<PathItem['masks']>[number]['cover'];
 
 describe('keyframed masks', () => {
   it('draws a mask whose box is keyframed, sampled at the frame', () => {
-    const masked = patch(withCard, 'card', { mask: mask({ kind: MaskKind.Rect, x: 0.5, y: 0.5, width: 1, height: 1 }), keyframes: { maskWidth: [{ frame: 0, value: 0, ease: 'linear' }, { frame: 10, value: 1, ease: 'linear' }] } });
+    const masked = patch(withCard, 'card', { mask: mask({ kind: MaskKind.Rect, x: 0.5, y: 0.5, width: 1, height: 1 }), keyframes: { maskWidth: [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 10, value: 1, ease: Ease.Linear }] } });
     const drawn = displayListAt(masked, 5, FEEGA_TOKENS);
     const cover = card(masked, 5)?.masks?.[0].cover as Extract<CoverOf, { kind: CoverKind.Path }>;
 
@@ -70,5 +71,28 @@ describe('track mattes', () => {
     expect(drawn.items.map((i) => i.clip)).not.toContain('hole');
     expect(card(doc)?.matte).toMatchObject({ luma: true, invert: true });
     expect(card(doc)?.matte?.items.map((i) => i.clip)).toEqual(['hole']);
+  });
+});
+
+describe('content clipped by a parent', () => {
+  const frameBox = { shape: 'rect', x: 0.5, y: 0.5, width: 0.5, height: 0.5, fill: '#00ff00' };
+  const framed = must(addClip(withCard, { component: 'Shape', from: 0, durationInFrames: 90, props: frameBox }, 'frame'));
+  const wide = patch(patch(framed, 'card', { parent: 'frame', props: { ...withCard.tracks[0].clips[0].props, width: 0.8 } }), 'frame', { clipContent: true });
+  const extentOf = (cover: CoverOf) => {
+    const path = cover as Extract<CoverOf, { kind: CoverKind.Path }>;
+    const points = path.contours.flatMap((c) => c.filter((_, i) => i % 2 === 0).map((x, i) => apply2d(path.matrix, [x, c[i * 2 + 1]])));
+    return [Math.min(...points.map((p) => p[0])), Math.min(...points.map((p) => p[1])), Math.max(...points.map((p) => p[0])), Math.max(...points.map((p) => p[1]))];
+  };
+
+  it('cuts a child to the box of a parent that clips its content, as the HTML render does', () => {
+    const masks = card(wide)?.masks ?? [];
+
+    expect(masks).toHaveLength(1);
+    expect(masks[0]).toMatchObject({ mode: MaskMode.Intersect, invert: false, level: 1, feather: 0 });
+    expect(extentOf(masks[0].cover)).toEqual([480, 270, 1440, 810]);
+  });
+
+  it('leaves a child alone when its parent does not clip', () => {
+    expect(card(patch(wide, 'frame', { clipContent: false }))?.masks).toBeUndefined();
   });
 });

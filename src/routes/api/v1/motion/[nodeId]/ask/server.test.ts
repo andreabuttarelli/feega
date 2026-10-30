@@ -64,6 +64,7 @@ const store = vi.hoisted(() => ({
   history: [] as unknown[]
 }));
 
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: async () => null, findFirstBrandLook: async () => null }));
 vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
   const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
   return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
@@ -205,7 +206,7 @@ describe('POST /api/v1/motion/[nodeId]/ask', () => {
     expect(run.cost_usd).toBeGreaterThan(0);
     expect(run.editor_url).toBe(`/p/${PROJECT}/c/${CANVAS}?frame=${NODE}`);
     expect(store.revisions).toHaveLength(1);
-    expect(store.revisions[0].actor).toEqual({ kind: 'agent', id: USER, agentKey: 'motion' });
+    expect(store.revisions[0].actor).toEqual({ kind: 'agent', id: USER, agentKey: 'motion', sessionId: expect.any(String) });
   });
 
   it('writes the request into the editor thread as the agent acting for the user', async () => {

@@ -1,7 +1,8 @@
 import { exportCodeNode } from '$lib/server/canvas/code-export-node';
+import { listProjectComponents } from './project-components';
 import { ExportMode } from '$lib/canvas/code-frame';
 import { codeVarsError } from '$lib/server/canvas/code-source';
-import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, stackElements, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { wrapInSection } from './section';
 import { z } from 'zod';
@@ -43,7 +44,7 @@ import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-v
 import { importLottieAt } from '$lib/server/motion/lottie-at';
 import { lottieSource } from '$lib/motion/import-lottie';
 import { SafeFetchError, safeFetchBytes } from '$lib/server/tool-guard';
-import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
+import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeComponent, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { NODE_NAME_MAX } from '$lib/canvas/node-name';
@@ -55,7 +56,12 @@ import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motio
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
-import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
+import { actAt, previewAt } from '$lib/server/canvas/history-actions';
+import { HistoryAction } from '$lib/canvas/history/timeline';
+import { Side } from '$lib/motion/branch-merge';
+import { ResolveOutcome, resolveConflict } from '$lib/server/canvas/conflicts';
+import { Resolution } from '$lib/server/repos/canvas-conflicts';
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
@@ -70,6 +76,8 @@ import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
 import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
+import { importUrlInto } from '$lib/server/url-import/canvas-import';
+import { importCodeInto } from '$lib/server/code-import/canvas-import';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
@@ -79,7 +87,7 @@ import { arrangeNodes } from '$lib/server/canvas/arrange';
 import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileBox, type TileMove } from '$lib/canvas/align';
 import { Axis, Edge } from '$lib/motion/space';
 import { listCanvasEvents } from '$lib/server/repos/canvas-events';
-import { listAgentChanges, rejectChange } from '$lib/server/canvas/reject';
+import { revertChange } from '$lib/server/canvas/revert';
 import { Keep } from '$lib/canvas/reject-plan';
 import { lastGesture } from '$lib/canvas/undo-last';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
@@ -115,6 +123,8 @@ export type CanvasDeps = {
   projectId: string;
   userId: string;
   brandId?: string | null;
+  agentKey?: string;
+  sessionId?: string | null;
 };
 
 export type CanvasCtx = CanvasDeps & {
@@ -125,7 +135,7 @@ export type CanvasCtx = CanvasDeps & {
 export function canvasCtx(deps: CanvasDeps): CanvasCtx {
   const billed = <T>(fn: () => Promise<T>): Promise<T> =>
     deps.brandId ? withBrandContext(deps.brandId, fn) : withOrgContext(deps.orgId, fn);
-  return { ...deps, actor: agentActor(deps.userId), billed };
+  return { ...deps, actor: agentActor(deps.userId, deps.agentKey, deps.sessionId), billed };
 }
 
 const EXPORT_MAX_FRAMES = 50;
@@ -225,7 +235,8 @@ const frameTarget = {
   canvasY: z.number().optional()
 };
 const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame node the element is in'), elementId: z.string().describe('the clip id inside that frame'), ...frameTarget }).strict();
-const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
+const placeComponentInput = z.object({ canvasId: z.string(), frameId: z.string().describe('the Frame node holding the main component'), compId: z.string().describe('the main component id'), x: z.number().finite(), y: z.number().finite() }).strict();
+const placeInFrameInput =z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
 const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, {tool:line|arrow, from:{x,y}, to:{x,y}, stroke?:#hex}, or {tool:pen, path:SVG d}, in canvas units') })
@@ -241,6 +252,10 @@ const importFigmaInput = z
     y: z.number().finite()
   })
   .strict();
+
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).describe('a public https://github.com/<owner>/<repo> link, optionally /tree/<ref>'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), x: z.number().finite(), y: z.number().finite() }).strict();
+
+const importUrlInput = z.object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const drawFrameInput = z
   .object({
@@ -298,6 +313,7 @@ const createdSize = (type: string, data: Record<string, unknown>) => {
 };
 
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 2; or any nodes with section true'), section: z.boolean().optional().describe('wrap the nodes in a Section instead of a Group') }).strict();
+const stackElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 1') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
@@ -448,11 +464,11 @@ const distributeNodesInput = arrangeInput.extend({ axis: z.enum(Object.values(Ax
 const stackNodesInput = arrangeInput.extend({ gap: z.number().min(0).default(STACK_GAP).describe('space between nodes in canvas units') }).strict();
 const undoLastInput = z.object({ canvasId: z.string() }).strict();
 const UNDO_LOOKBACK = 50;
-const rejectChangeInput = z
+const revertChangeInput = z
   .object({
     canvasId: z.string(),
-    eventIds: z.array(z.number().int()).min(1).describe('canvas_events ids of one change, from agent_changes or view activity'),
-    choices: z.array(z.object({ eventId: z.number().int(), path: z.string(), keep: z.enum(Keep) })).optional().describe('one per conflict: keep mine, or take the reject'),
+    entryId: z.string().min(1).describe('an entry id (event:<n>) or a session key from list_history'),
+    choices: z.array(z.object({ path: z.string(), keep: z.enum(Keep), eventId: z.number().int().optional() })).optional().describe('one per conflict: keep mine (the value there now), or reject (the value before the change)'),
     confirm: z.boolean().optional().describe('delete a created node even though someone else connected or edited it')
   })
   .strict();
@@ -518,6 +534,8 @@ const cloneVoiceInput = z
   .strict();
 const voiceIdInput = z.object({ id: z.string().describe('a custom voice id from list_voices') }).strict();
 
+const historyPoint = z.object({ canvasId: z.string(), entryId: z.string().describe('an entry id from list_history, e.g. "version:<id>" or "revision:<frameId>:<n>"') }).strict();
+
 const NOT_IN_PROJECT = { error: 'canvas_not_found', message: 'No canvas with that id in this project.' };
 const LAST_CANVAS = { error: 'last_canvas', message: 'A project keeps at least one canvas.' };
 const NO_FARM = { error: 'rendering_not_configured' };
@@ -574,6 +592,12 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: listCanvasesInput,
     run: async (ctx) => ({ canvases: await listCanvases(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId }) })
+  }),
+
+  list_project_components: op({
+    access: Access.Read,
+    input: listCanvasesInput,
+    run: async (ctx) => ({ canvases: await listProjectComponents(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId }) })
   }),
 
   export_code_frame: op({
@@ -805,25 +829,14 @@ export const CANVAS_OPS = {
     }
   }),
 
-  agent_changes: op({
-    access: Access.Read,
-    input: canvasIdInput,
-    run: async (ctx, input) => {
-      if (!(await inProject(ctx, input.canvasId))) {
-        return NOT_IN_PROJECT;
-      }
-      return { changes: await listAgentChanges(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) };
-    }
-  }),
-
-  reject_change: op({
+  revert_change: op({
     access: Access.Write,
-    input: rejectChangeInput,
+    input: revertChangeInput,
     run: async (ctx, input) => {
       if (!(await inProject(ctx, input.canvasId))) {
         return NOT_IN_PROJECT;
       }
-      return rejectChange(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor });
+      return revertChange(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor });
     }
   }),
 
@@ -948,6 +961,12 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameAnswer(await copyElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
   }),
 
+  place_component: op({
+    access: Access.Write,
+    input: placeComponentInput,
+    run: async (ctx, input) => frameAnswer(await placeComponent(framesOf(ctx), { sourceNodeId: input.frameId, compId: input.compId, canvasId: input.canvasId, drop: { on: DropOn.Canvas, x: input.x, y: input.y } }))
+  }),
+
   draw_element: op({
     access: Access.Write,
     input: drawElementInput,
@@ -964,6 +983,18 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importFigmaInput,
     run: async (ctx, input) => importFigmaInto(figmaScope(ctx), input.canvasId, { url: input.url, nodeIds: input.frameIds ?? null, at: { x: input.x, y: input.y } })
+  }),
+
+  import_url: op({
+    access: Access.Write,
+    input: importUrlInput,
+    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y } })
+  }),
+
+  import_code: op({
+    access: Access.Write,
+    input: importCodeInput,
+    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, route: input.route, at: { x: input.x, y: input.y } })
   }),
 
   draw_frame: op({
@@ -999,6 +1030,12 @@ export const CANVAS_OPS = {
       }
       return frameAnswer(await groupElements(framesOf(ctx), membersOf(ctx, input.canvasId), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds));
     }
+  }),
+
+  stack_elements: op({
+    access: Access.Write,
+    input: stackElementsInput,
+    run: async (ctx, input) => frameAnswer(await stackElements(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
   }),
 
   ungroup_element: op({
@@ -1328,6 +1365,18 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? saveCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, name: input.name, actor: ctx.actor }) : NOT_IN_PROJECT)
   }),
 
+  resolve_conflict: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), conflictId: z.string().describe('the id after `conflict:` in list_history'), keep: z.enum(Resolution) }).strict(),
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const out = await resolveConflict(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, conflictId: input.conflictId, resolution: input.keep, actor: ctx.actor });
+      return out.outcome === ResolveOutcome.Resolved ? { resolved: true, keep: input.keep } : { error: out.outcome, ...(out.error ? { message: out.error } : {}) };
+    }
+  }),
+
   export_canvas_file: op({
     access: Access.Read,
     audience: Audience.BytesSenders,
@@ -1356,16 +1405,34 @@ export const CANVAS_OPS = {
     }
   }),
 
-  list_canvas_versions: op({
+  preview_at: op({
     access: Access.Read,
-    input: z.object({ canvasId: z.string() }).strict(),
-    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { versions: await listCanvasVersions(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) } : NOT_IN_PROJECT)
+    input: historyPoint,
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? previewAt(ctx.db, { orgId: ctx.orgId, ...input }) : NOT_IN_PROJECT)
   }),
 
-  restore_canvas_version: op({
+  restore_to: op({
     access: Access.Write,
-    input: z.object({ canvasId: z.string(), versionId: z.string().describe('from list_canvas_versions') }).strict(),
-    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? restoreCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, versionId: input.versionId, actor: ctx.actor }) : NOT_IN_PROJECT)
+    input: historyPoint,
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Restore, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  merge_branch_at: op({
+    access: Access.Write,
+    input: historyPoint.extend({ keep: z.enum(Side).optional().describe('which side wins every conflict; without it a conflict is answered, not merged') }),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Merge, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  drop_branch_at: op({
+    access: Access.Write,
+    input: historyPoint,
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Drop, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  name_version: op({
+    access: Access.Write,
+    input: historyPoint.extend({ name: z.string().max(200).describe('empty removes the name') }),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? actAt(ctx.db, { orgId: ctx.orgId, ...input, action: HistoryAction.Name, actor: ctx.actor }) : NOT_IN_PROJECT)
   }),
 
   list_canvas_comments: op({

@@ -6,7 +6,6 @@
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
-  import BranchesMenu from '$lib/components/motion/BranchesMenu.svelte';
   import VarsPanel from '$lib/components/motion/VarsPanel.svelte';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
@@ -15,7 +14,6 @@
   import PublishDialog, { type Listed } from '$lib/components/gallery/PublishDialog.svelte';
   import FrameDialogCard from './FrameDialogCard.svelte';
   import { CardWidth } from './frame-dialog-card';
-  import CodeExport from '$lib/components/motion/CodeExport.svelte';
   import { postPageAction } from '$lib/api/page-action';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { FrameDialog } from '$lib/canvas/frame-dialogs';
@@ -38,9 +36,6 @@
   import { loadScenes, type LoadedScenes } from '$lib/canvas/scene-sources';
   import { resolveScenes, sceneNodeIds } from '$lib/motion/scenes';
 
-  type Branch = { id: string; frameId: string; name: string; baseVersion: number };
-  type Conflict = { path: string; branch: unknown; main: unknown };
-  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number; name: string | null };
   type ImagesMade = { url: string; name: string; files: string[] };
 
   const ID_LENGTH = 8;
@@ -60,7 +55,6 @@
     frame,
     onedit,
     onswitch,
-    onfocus,
     onimages,
     onpreview,
     onclose
@@ -75,7 +69,6 @@
     frame: number;
     onedit: (result: OpResult, summary: string) => void;
     onswitch: (next: FrameDialog) => void;
-    onfocus: (nodeId: string) => void;
     onimages: (rows: ExportRow[]) => Promise<ImagesMade | string>;
     onpreview: (doc: MotionDoc | null) => void;
     onclose: () => void;
@@ -197,94 +190,6 @@
   }
 
   let previewVars = $state<VarValues>({});
-
-  const fork = $derived((data?.node as { fork?: Branch | null } | undefined)?.fork ?? null);
-  let branches = $state<Branch[]>([]);
-  let conflicts = $state<Conflict[] | null>(null);
-  let revisions = $state<Revision[]>([]);
-
-  const act = (name: string, form = new FormData()) => postPageAction(editorUrl, name, form);
-
-  async function loadBranches() {
-    const result = await act('branches');
-    branches = result.type === 'success' ? ((result.data as { branches: Branch[] }).branches ?? []) : [];
-  }
-
-  async function createBranch(name: string) {
-    await session.save();
-    const form = new FormData();
-    form.set('name', name);
-    const result = await act('createBranch', form);
-    if (result.type !== 'success') {
-      session.notice = 'The branch could not be created.';
-      return;
-    }
-    await loadBranches();
-  }
-
-  async function reviewBranch() {
-    await session.save();
-    const result = await act('reviewBranch');
-    conflicts = result.type === 'success' ? (result.data as { conflicts: Conflict[] }).conflicts : [];
-  }
-
-  async function mergeBranch(choices: Record<string, string>) {
-    const form = new FormData();
-    form.set('choices', JSON.stringify(choices));
-    const result = await act('mergeBranch', form);
-    if (result.type !== 'success' || !fork) {
-      session.notice = 'The branch could not be merged.';
-      return;
-    }
-    onclose();
-    onfocus(fork.frameId);
-  }
-
-  async function dropBranch() {
-    const result = await act('dropBranch');
-    if (result.type === 'success' && fork) {
-      onclose();
-      onfocus(fork.frameId);
-    }
-  }
-
-  async function loadRevisions() {
-    const result = await act('revisions');
-    revisions = result.type === 'success' ? ((result.data?.revisions as Revision[]) ?? []) : [];
-  }
-
-  async function nameCurrent(name: string) {
-    const form = new FormData();
-    form.set('version', String(session.version));
-    form.set('name', name);
-    const result = await act('nameVersion', form);
-    session.notice = result.type === 'success' ? '' : 'The version could not be named: reload and try again.';
-    await loadRevisions();
-  }
-
-  async function restoreTo(target: number) {
-    await session.flushScheduled();
-    const form = new FormData();
-    form.set('version', String(target));
-    const result = await act('restore', form);
-    if (result.type !== 'success') {
-      session.notice = `Version ${target} could not be restored: reload and try again.`;
-      return;
-    }
-    const head = result.data?.head as { version: number; doc: MotionDoc };
-    session.adopt(head);
-    onedit({ ok: true, doc: head.doc }, `Restored version ${target}`);
-    onclose();
-  }
-
-  $effect(() => {
-    if (dialog === FrameDialog.Branches && !fork) {
-      void loadBranches();
-    }
-    if (dialog === FrameDialog.History) {
-      void loadRevisions();
-    }
-  });
 </script>
 
 <div class="layer">
@@ -358,26 +263,6 @@
     <VarsPanel {doc} bind:values={previewVars} clip={selected} onchange={(next, summary) => onedit({ ok: true, doc: next }, summary)} />
     </div>
   </FrameDialogCard>
-{:else if dialog === FrameDialog.Branches && data}
-  <FrameDialogCard title="Branches" testid="frame-branches" {onclose}>
-    <BranchesMenu {fork} {branches} {conflicts} oncreate={(name) => void createBranch(name)} onopen={(id) => (onclose(), onfocus(id))} onreview={() => void reviewBranch()} onmerge={(c) => void mergeBranch(c)} ondrop={() => void dropBranch()} />
-  </FrameDialogCard>
-{:else if dialog === FrameDialog.History}
-  <FrameDialogCard title="Version history" testid="frame-revisions" {onclose}>
-    <input class="version-name" aria-label="Name the current version" placeholder="Name the current version" data-testid="version-name" onkeydown={(e) => e.key === 'Enter' && void nameCurrent(e.currentTarget.value)} />
-    {#each revisions as r (r.version)}
-      <button type="button" class="revision" data-testid="revision" disabled={r.version === session.version} onclick={() => void restoreTo(r.version)}>
-        <span>{r.name ? `${r.name} · v${r.version}` : `v${r.version}`} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span>
-        <kbd>{r.version === session.version ? 'Current' : 'Restore'}</kbd>
-      </button>
-    {:else}
-      <span class="empty">No saved versions yet</span>
-    {/each}
-  </FrameDialogCard>
-{:else if dialog === FrameDialog.Code}
-  <FrameDialogCard title="Export code" testid="frame-code" width={CardWidth.Wide} {onclose}>
-    <CodeExport doc={played(doc)} name={data?.node.name || 'Frame'} assets={assetUrls} {tokens} />
-  </FrameDialogCard>
 {:else if dialog === FrameDialog.Chat}
   <FrameDialogCard title="Chat history" testid="frame-chat" {onclose}>
     <FrameChatHistory historyUrl={`/api/v1/projects/${projectId}/motion/${nodeId}/agent`} {projectId} open />
@@ -440,37 +325,4 @@
     gap: 6px;
   }
 
-  .version-name {
-    font: inherit;
-    padding: 6px 8px;
-    border: 1px solid var(--ui-divider);
-    background: transparent;
-    color: inherit;
-  }
-
-  .revision {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: var(--ui-row);
-    padding: 0 8px;
-    text-align: left;
-    border-radius: var(--ui-radius-sm);
-    color: var(--ui-text);
-  }
-
-  .revision:hover:not(:disabled) {
-    background: var(--ui-wash);
-  }
-
-  .revision kbd {
-    margin-left: auto;
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
-  }
-
-  .empty {
-    opacity: 0.6;
-  }
 </style>

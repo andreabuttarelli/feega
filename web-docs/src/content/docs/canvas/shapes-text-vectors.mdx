@@ -18,8 +18,11 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 | `L` / `Shift+L` | Line / arrow |
 | `P` | Pen: click points, drag for curves |
 | `Shift+B` | Pencil: freehand, smoothed into editable paths; hold Shift for straight segments |
-| `X` | Shape builder: merge regions of overlapping shapes, Alt-click to remove one, Enter to apply |
+| `X` | Shape builder: merge regions of overlapping shapes, Alt-click to remove one, Enter to apply. Open it from the command palette or the key; it is no longer in the bottom bar |
+| Add bar, Stack | Draw an empty stack: a transparent rectangle with vertical auto layout that hugs what you drop in |
 | `K` | Scale tool: scales size, text, strokes and effects together |
+
+A shape drawn over a frame lands inside that frame; drawn on empty canvas it stays free. Either way it shows the moment you release, and saves in the background.
 
 Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. Gradients can be linear, radial, angular or diamond.
 
@@ -36,6 +39,7 @@ Every colour in the editor opens the same picker: fill (text included), stroke, 
 - The eyedropper samples any pixel on screen. It shows only in browsers that support the EyeDropper API.
 - The format menu switches the value fields between Hex (one field), RGB, HSL and HSB (three fields), with an opacity percentage next to them. Arrow keys nudge a number; Shift nudges by 10.
 - Swatches list the colours already used in the document, the brand colours and the ones you picked recently.
+- New elements start in plain colours: shapes `#D9D9D9`, text and strokes `#000000`, frames `#FFFFFF`. Brand colours apply only when you pick one from the **Brand** swatches, which show the project's brand (or the workspace's first brand) with each name on hover.
 - A fill popover keeps the paint type (Solid, Linear, Radial, Angular, Diamond, Image) at the top. A gradient stop uses the same picker.
 - Dragging updates the canvas live and counts as one undo step.
 
@@ -70,5 +74,5 @@ A shape can morph into any other shape, including hand-drawn paths and shapes wi
 - Weight steps in hundreds, 100 to 900: scrubbing, arrow keys and typed values snap to the nearest 100.
 - Case is five icon buttons: as typed, uppercase, lowercase, title case and small caps. Hover for the name.
 - Width axis, slant axis and other variable-font axes sit under a collapsed **Advanced** row in the Text section.
-- Turn text into editable vector shapes with `Shift+Cmd+O`.
+- Turn text into editable vector shapes with **Outline text** (`Shift+Cmd+O`). The outlines come from the same font file and layout the canvas draws with: family, weight, italic, size, letter spacing, line height, alignment, line breaks, kerning and ligatures stay exactly where they were. Fill, stroke, opacity and transform carry over; per-word colours and text animations do not.
 - Replace a missing or unwanted font in the whole video in one pick.

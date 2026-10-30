@@ -76,7 +76,7 @@ function adminClient(): SupabaseClient {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function checked<T>(result: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<T> {
+async function checked<R extends { data: unknown; error: { message: string } | null }>(result: PromiseLike<R>): Promise<R['data']> {
   const response = await result;
   if (response.error) {
     throw new Error(response.error.message);

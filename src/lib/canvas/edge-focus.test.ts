@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { focusEdges, LINKED_EDGE } from './edge-focus';
 
-const edges = [
+const edges: { id: string; source: string; target: string; class?: string }[] = [
   { id: 'a', source: '1', target: '2' },
   { id: 'b', source: '2', target: '3' },
   { id: 'c', source: '4', target: '5' }

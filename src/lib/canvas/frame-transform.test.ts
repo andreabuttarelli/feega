@@ -9,6 +9,7 @@ import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-se
 import { guessedBoxes } from '$lib/motion/move-element';
 import { transformAt } from '@feega/motion-core/motion/parent';
 import { GuideAlign, GuideKind, newGuide, setLayoutGuides } from '$lib/motion/layout-guides/guides';
+import { wrapInStack } from '$lib/motion/layout/ops';
 import { SnapMode, dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
 
 const must = (r: OpResult): MotionDoc => {
@@ -160,6 +161,23 @@ describe('Design and Animate mode', () => {
     expect(next[1][1]).toBeCloseTo(0.7);
   });
 
+  it('Motion keys an element that was not animated: its start stays, the move lands at the playhead', () => {
+    const moved = must(dragClips(drag({ frame: 20, reach: 0, from: [0, 0], to: [192, 0] })).result);
+    const keys = keysOf(moved);
+
+    expect(keys.map(([frame]) => frame)).toEqual([0, 20]);
+    expect(keys[0][1]).toBeCloseTo(transformAt(findClip(DOC, 'card')!.clip, 'x', 0));
+    expect(keys[1][1]).toBeGreaterThan(Number(keys[0][1]));
+  });
+
+  it('Motion at the start of an element keys only that frame', () => {
+    expect(keysOf(must(dragClips(drag({ frame: 0, reach: 0, from: [0, 0], to: [192, 0] })).result)).map(([frame]) => frame)).toEqual([0]);
+  });
+
+  it('Design moves an element that was not animated without keying it', () => {
+    expect(findClip(must(dragClips(drag({ frame: 20, mode: EditMode.Design, reach: 0, from: [0, 0], to: [192, 0] })).result), 'card')!.clip.keyframes.x).toBeUndefined();
+  });
+
   it('Design nudges an animated element without keying it', () => {
     const next = must(nudgeClips(slide, ['card'], 20, [19.2, 0], EditMode.Design));
 
@@ -210,5 +228,20 @@ describe('measuredGaps', () => {
     expect(after.right).toBeCloseTo(before.right + 50);
     expect(after.top).toBeCloseTo(before.top);
     expect(after.bottom).toBeCloseTo(before.bottom);
+  });
+});
+
+describe('arrow keys on a stack child', () => {
+  const stacked = must(wrapInStack(DOC, ['card', 'side'], 'row', 'lane'));
+  const order = (doc: MotionDoc) => findClip(doc, 'row')?.clip.autoLayout?.order;
+
+  it('reorder it along the stack instead of nudging it', () => {
+    const next = must(nudgeClips(stacked, ['card'], 0, [1, 0], EditMode.Design));
+    expect(order(next)).toEqual(['side', 'card']);
+    expect(findClip(next, 'card')?.clip.props.y).toBe(findClip(stacked, 'card')?.clip.props.y);
+  });
+
+  it('do nothing across the stack', () => {
+    expect(nudgeClips(stacked, ['card'], 0, [0, 1], EditMode.Design).ok).toBe(false);
   });
 });

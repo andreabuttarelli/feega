@@ -374,6 +374,47 @@ program
     await cmdCanvases(projectId);
   });
 
+program
+  .command('history')
+  .argument('<canvasId>')
+  .description('One timeline of everything that changed a canvas, newest first, by author (free)')
+  .option('--ai', 'Only the sidebar chat and outside agents')
+  .option('--people', 'Only people')
+  .option('--frame <id>', 'Only changes to this frame')
+  .option('--preview <entryId>', 'The canvas or frame as it was at this entry, read-only')
+  .option('--restore <entryId>', 'Put the canvas or frame back to this entry; the present is kept first')
+  .option('--name <entryId>', 'Name the frame revision at this entry (with --as)')
+  .option('--as <name>', 'The name for --name; empty removes it')
+  .option('--merge <entryId>', 'Merge this branch back into its frame (with --keep on conflicts)')
+  .option('--keep <side>', 'branch or main: which side wins every conflict of --merge')
+  .option('--drop <entryId>', 'Remove this branch without merging')
+  .option('--revert <entryId>', 'Revert one change or session (an id or session key from --json), keeping later edits')
+  .option('--choose <field=mine|reject...>', 'With --revert: keep the value there now (mine) or the one before the change (reject)')
+  .option('--confirm', 'With --revert: delete a created node even if someone else connected or edited it')
+  .option('--json', 'Print the raw answer, lanes included')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (canvasId: string, opts) => {
+    const { cmdHistory } = await import('./commands/history.ts');
+    await cmdHistory(canvasId, opts);
+  });
+
+program
+  .command('resolve-conflict <canvasId> <conflictId> <keep>')
+  .description('Resolve a refused write from `feega history`: keep mine re-applies it, keep theirs closes it (free)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (canvasId: string, conflictId: string, keep: string, opts) => {
+    const { cmdResolveConflict } = await import('./commands/history.ts');
+    await cmdResolveConflict(canvasId, conflictId, keep, opts);
+  });
+
+program
+  .command('components <projectId>')
+  .description('List the components of every canvas of a project')
+  .action(async (projectId: string) => {
+    const { cmdComponents } = await import('./commands/projects.ts');
+    await cmdComponents(projectId);
+  });
+
 const orgs = program
   .command('orgs')
   .description('List your organisations; * marks the active one')
@@ -542,6 +583,31 @@ canvas
   .action(async (projectId: string, file: string, opts) => {
     const { cmdCanvasImport } = await import('./commands/canvas.ts');
     await cmdCanvasImport(projectId, file, opts);
+  });
+
+canvas
+  .command('import-url <projectId> <url>')
+  .description('Draw a public web page as an editable frame: layers, text, auto layout and images')
+  .requiredOption('--canvas <id>', 'The canvas')
+  .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, url: string, opts) => {
+    const { cmdCanvasImportUrl } = await import('./commands/canvas.ts');
+    await cmdCanvasImportUrl(projectId, url, opts);
+  });
+
+canvas
+  .command('import-code <projectId> <repo>')
+  .description('Run a public GitHub React app in a sandbox and draw a page as a frame: components become main components, usages instances, props variants')
+  .requiredOption('--canvas <id>', 'The canvas')
+  .option('--route <path>', 'The page of the app to import', '/')
+  .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, repo: string, opts) => {
+    const { cmdCanvasImportCode } = await import('./commands/canvas.ts');
+    await cmdCanvasImportCode(projectId, repo, opts);
   });
 
 canvas

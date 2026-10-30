@@ -3,6 +3,7 @@ import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/mot
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { applyTextFit, textAutosize } from './text-autosize';
+import { setAutoLayout, wrapInStack } from '$lib/motion/layout/ops';
 
 function texted(doc: MotionDoc, sizing: string): MotionDoc {
   const added = addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Hello', sizing, x: 0.5, y: 0.5, width: 1, height: 1 } }, 't');
@@ -52,5 +53,35 @@ describe('a fitted text reaches the canvas whole', () => {
     const doc = element(268, 204);
     applyTextFit({ doc, node: { w: 134, h: 102 } }, { amend: () => steps.push('amend'), show: () => steps.push('show'), place: () => steps.push('place') });
     expect(steps).toEqual(['amend', 'show', 'place']);
+  });
+});
+
+describe('a free stack follows the box it hugs', () => {
+  it('resizes its node and its stage when the padding grows', () => {
+    const boxed = addClip(element(400, 100), { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }, 'box');
+    const wrapped = boxed.ok ? wrapInStack(boxed.doc, ['box'], 'stack', 'lane') : boxed;
+    const padded = wrapped.ok ? setAutoLayout(wrapped.doc, 'stack', { padding: { top: 50, right: 0, bottom: 50, left: 0 } }) : wrapped;
+    if (!padded.ok) {
+      throw new Error(padded.error);
+    }
+
+    const fit = textAutosize(padded.doc, {}, FrameKind.Element, { w: 200, h: 50 });
+
+    expect(fit?.node).toEqual({ w: 200, h: 100 });
+    expect({ width: fit?.doc?.width, height: fit?.doc?.height }).toEqual({ width: 400, height: 200 });
+  });
+
+  it('a small node rounded to whole pixels off its stage shape still resizes', () => {
+    const boxed = addClip(element(274, 53), { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }, 'box');
+    const wrapped = boxed.ok ? wrapInStack(boxed.doc, ['box'], 'stack', 'lane') : boxed;
+    const padded = wrapped.ok ? setAutoLayout(wrapped.doc, 'stack', { padding: { top: 10, right: 22, bottom: 10, left: 22 } }) : wrapped;
+    if (!padded.ok) {
+      throw new Error(padded.error);
+    }
+
+    const fit = textAutosize(padded.doc, {}, FrameKind.Element, { w: 137, h: 27 });
+
+    expect({ width: fit?.doc?.width, height: fit?.doc?.height }).toEqual({ width: 318, height: 73 });
+    expect(fit?.node).toEqual({ w: 159, h: 37 });
   });
 });

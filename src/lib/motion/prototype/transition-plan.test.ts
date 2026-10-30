@@ -42,3 +42,11 @@ describe('transitionPlan', () => {
     expect(plan.easing).toMatch(/^cubic-bezier\(/);
   });
 });
+
+describe('a smart animate in the player', () => {
+  it('cross-fades instead of sliding from an undefined direction', () => {
+    const plan = transitionPlan({ kind: TransitionKind.SmartAnimate, easing: Ease.Standard, durationMs: 300 }, false);
+
+    expect(plan.incoming).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+  });
+});

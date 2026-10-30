@@ -207,6 +207,20 @@ genera, crea un post, il calendario), sull'harness condiviso in `tests/e2e/fixtu
 Il 22/09/2026 i connettori tipizzati esistevano nella logica e nessun componente li disegnava, e
 il calendario puntava a colonne mai esistite: la suite era verde in entrambi i casi.
 
+## Ottimista per default (una regola, non un'abitudine)
+
+**Nessuna azione aspetta l'OK del server prima che l'utente veda il risultato.** Ogni azione di
+tela o editor si applica in locale nello stesso frame, si salva in background, riconcilia id e
+`version` quando il server risponde, e torna indietro con un avviso chiaro solo se fallisce.
+
+Il meccanismo è uno: `createOptimistic` (`src/lib/canvas/optimistic-ops.ts`) — applica, riserva
+lo slot di undo, mette in coda la scrittura, a esito atterra l'undo o ripristina le sole righe
+toccate. Ogni azione è **una riga** in `REGISTRY` (`src/lib/canvas/optimistic-registry.ts`):
+applicazione locale, campi del server, cosa tocca, quando conta come atterrata, undo. Un'azione
+nuova si aggiunge con una riga, mai con un `await post(...)` prima di aggiornare lo stato.
+`tests/e2e/canvas-optimistic.spec.ts` rallenta il server di 2 s e pretende il cambiamento entro
+due frame. Il perché sta in `docs/adr/0029-optimistic-op-runner.md`.
+
 ## Two changelogs, always both (a rule, not a habit)
 
 Every change a user can notice updates **two**, in the same commit. Both are **one file per

@@ -88,6 +88,39 @@ async function seek(page: Page, seconds: number) {
 }
 
 const SCREENSHOT_TYPE: Record<string, 'png' | 'jpeg' | 'webp'> = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/webp': 'webp' };
+const BAND_PX = 2048;
+const STAGE_ID = 'root';
+
+async function shiftedTo(page: Page, top: number) {
+  await page.evaluate(
+    async (id, y) => {
+      const stage = document.getElementById(id);
+      if (stage) {
+        stage.style.translate = `0 ${-y}px`;
+      }
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    },
+    STAGE_ID,
+    top
+  );
+}
+
+async function pictureOf(page: Page, full: Viewport, mime: string, quality?: number): Promise<Buffer> {
+  const type = SCREENSHOT_TYPE[mime];
+  if (full.height <= BAND_PX) {
+    return Buffer.from(await page.screenshot({ type, quality, omitBackground: true }));
+  }
+  const bands: { input: Buffer; top: number; left: number }[] = [];
+  for (let top = 0; top < full.height; top += BAND_PX) {
+    await shiftedTo(page, top);
+    const clip = { x: 0, y: 0, width: full.width, height: Math.min(BAND_PX, full.height - top) };
+    bands.push({ input: Buffer.from(await page.screenshot({ type: 'png', omitBackground: true, clip })), top: Math.round(top * full.scale), left: 0 });
+  }
+  await shiftedTo(page, 0);
+  const { default: sharp } = await import('sharp');
+  const sheet = sharp({ create: { width: Math.round(full.width * full.scale), height: Math.round(full.height * full.scale), channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(bands);
+  return sheet.toFormat(type, quality === undefined ? {} : { quality }).toBuffer();
+}
 
 async function openPage(viewport: Viewport): Promise<Page> {
   const page = await (await browser()).newPage();
@@ -96,17 +129,19 @@ async function openPage(viewport: Viewport): Promise<Page> {
   return page;
 }
 
-function stillOf(page: Page): StillPage {
+function stillOf(page: Page, full: Viewport): StillPage {
   return {
     load: (html) => load(page, html),
     seek: (seconds) => seek(page, seconds),
     jpeg: async (quality) => Buffer.from(await page.screenshot({ type: 'jpeg', quality })),
-    picture: async (mime, quality) => Buffer.from(await page.screenshot({ type: SCREENSHOT_TYPE[mime], quality, omitBackground: true })),
+    picture: (mime, quality) => pictureOf(page, full, mime, quality),
     close: () => page.close()
   };
 }
 
-const pageOf = async (viewport: Viewport): Promise<StillPage> => stillOf(await openPage(viewport));
+const banded = (viewport: Viewport): Viewport => ({ ...viewport, height: Math.min(viewport.height, BAND_PX) });
+
+const pageOf = async (viewport: Viewport): Promise<StillPage> => stillOf(await openPage(banded(viewport)), viewport);
 
 async function boxOf(page: Page, clipId: string): Promise<PageBox | null> {
   const found = (await page.evaluate(`(function(){var root=document.getElementById('root');if(!root){return null;}var r=root.getBoundingClientRect();var b=(${measureClips.toString()})(root,${JSON.stringify(kindsOf(Pose.Base))})[${JSON.stringify(clipId)}];return b?{left:b.left*r.width,top:b.top*r.height,width:b.width*r.width,height:b.height*r.height}:null;})()`)) as PageBox | null;
@@ -116,7 +151,7 @@ async function boxOf(page: Page, clipId: string): Promise<PageBox | null> {
 async function exportPageOf(viewport: Viewport): Promise<ExportPage> {
   const page = await openPage(viewport);
   return {
-    ...stillOf(page),
+    ...stillOf(page, viewport),
     boxOf: (clipId) => boxOf(page, clipId),
     shot: async (mime, quality, clip) => Buffer.from(await page.screenshot({ type: SCREENSHOT_TYPE[mime], quality, omitBackground: true, ...(clip ? { clip: { x: clip.left, y: clip.top, width: clip.width, height: clip.height } } : {}) }))
   };

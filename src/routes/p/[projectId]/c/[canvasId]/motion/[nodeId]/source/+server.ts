@@ -6,11 +6,17 @@ import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-serv
 import { findMotionNode, motionTokens } from '$lib/server/motion/editor';
 import { listProjects } from '$lib/server/repos/projects';
 import { motionSource } from '$lib/server/motion/sources';
+import { MEDIA_UUID_RE } from '$lib/media-url';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
+const HTTP_BAD_REQUEST = 400;
 
 export const GET: RequestHandler = async ({ locals, params }) => {
+  if (!MEDIA_UUID_RE.test(params.nodeId)) {
+    throw error(HTTP_BAD_REQUEST, 'Not a node id');
+  }
+
   const { user } = await locals.safeGetSession();
   const db = await locals.db();
   if (!user || !db) {

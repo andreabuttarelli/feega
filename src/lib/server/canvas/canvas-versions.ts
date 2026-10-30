@@ -8,9 +8,11 @@ import { MAX_VERSION_NAME, planCanvasRestore, snapshotSchema, type CanvasSnapsho
 
 type Scope = { orgId: string; canvasId: string };
 
-export type CanvasVersion = { id: string; name: string; createdAt: string; nodes: number };
+export type CanvasVersion = { id: string; name: string; createdAt: string; nodes: number; author: Actor };
 
-type Row = { id: string; name: string; created_at: string; snapshot: unknown };
+type Row = { id: string; name: string; created_at: string; snapshot: unknown; actor_kind?: Actor['kind']; actor_id?: string | null; agent_key?: string | null };
+
+const ROW_COLUMNS = 'id, name, created_at, snapshot, actor_kind, actor_id, agent_key';
 
 type VersionTable = {
   from: (table: 'canvas_versions') => {
@@ -43,7 +45,7 @@ export async function versionSnapshot(db: Db, scope: Scope): Promise<CanvasSnaps
 
 const versionOf = (row: Row): CanvasVersion => {
   const parsed = snapshotSchema.safeParse(row.snapshot);
-  return { id: row.id, name: row.name, createdAt: row.created_at, nodes: parsed.success ? parsed.data.nodes.length : 0 };
+  return { id: row.id, name: row.name, createdAt: row.created_at, nodes: parsed.success ? parsed.data.nodes.length : 0, author: { kind: row.actor_kind ?? 'system', id: row.actor_id ?? null, agentKey: row.agent_key ?? null } };
 };
 
 export async function saveCanvasVersion(db: Db, input: Scope & { name: string; actor: Actor }): Promise<CanvasVersion> {
@@ -52,7 +54,7 @@ export async function saveCanvasVersion(db: Db, input: Scope & { name: string; a
   const { data, error } = await versions(db)
     .from('canvas_versions')
     .insert({ org_id: input.orgId, canvas_id: input.canvasId, name, snapshot, actor_kind: input.actor.kind, actor_id: input.actor.id, agent_key: input.actor.agentKey ?? null })
-    .select('id, name, created_at, snapshot')
+    .select(ROW_COLUMNS)
     .single();
   if (error || !data) {
     throw error ?? new Error('canvas version not saved');
@@ -61,7 +63,7 @@ export async function saveCanvasVersion(db: Db, input: Scope & { name: string; a
 }
 
 export async function listCanvasVersions(db: Db, scope: Scope): Promise<CanvasVersion[]> {
-  const { data, error } = await versions(db).from('canvas_versions').select('id, name, created_at, snapshot').eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId).order('created_at', { ascending: false }).limit(LIST_LIMIT);
+  const { data, error } = await versions(db).from('canvas_versions').select(ROW_COLUMNS).eq('org_id', scope.orgId).eq('canvas_id', scope.canvasId).order('created_at', { ascending: false }).limit(LIST_LIMIT);
   if (error) {
     throw error;
   }
@@ -73,16 +75,23 @@ export enum RestoreOutcome {
   Missing = 'missing'
 }
 
-export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: string; actor: Actor }): Promise<{ outcome: RestoreOutcome; changed?: number }> {
+export type SavedSnapshot = { name: string; snapshot: CanvasSnapshot };
+
+export async function readCanvasVersion(db: Db, input: Scope & { versionId: string }): Promise<SavedSnapshot | null> {
   const { data } = await versions(db).from('canvas_versions').select('id, name, created_at, snapshot').eq('org_id', input.orgId).eq('id', input.versionId).maybeSingle();
-  const target = data ? snapshotSchema.safeParse(data.snapshot) : null;
-  if (!data || !target?.success) {
+  const parsed = data ? snapshotSchema.safeParse(data.snapshot) : null;
+  return data && parsed?.success ? { name: data.name, snapshot: parsed.data } : null;
+}
+
+export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: string; actor: Actor }): Promise<{ outcome: RestoreOutcome; changed?: number }> {
+  const saved = await readCanvasVersion(db, input);
+  if (!saved) {
     return { outcome: RestoreOutcome.Missing };
   }
 
-  await saveCanvasVersion(db, { ...input, name: `${BEFORE_RESTORE} ${data.name}` });
+  await saveCanvasVersion(db, { ...input, name: `${BEFORE_RESTORE} ${saved.name}` });
   const current = await versionSnapshot(db, input);
-  const plan = planCanvasRestore(current, target.data);
+  const plan = planCanvasRestore(current, saved.snapshot);
   const actor = input.actor;
 
   for (const id of plan.disconnect) {
@@ -99,7 +108,7 @@ export async function restoreCanvasVersion(db: Db, input: Scope & { versionId: s
   }
   for (const d of plan.docs) {
     const head = await readHead(db, { orgId: input.orgId, nodeId: d.nodeId });
-    await saveMotionDoc(db, { orgId: input.orgId, nodeId: d.nodeId, expectedVersion: head?.version ?? 0, doc: d.doc, actor, summary: `Restored canvas version ${data.name}` });
+    await saveMotionDoc(db, { orgId: input.orgId, nodeId: d.nodeId, expectedVersion: head?.version ?? 0, doc: d.doc, actor, summary: `Restored canvas version ${saved.name}` });
   }
   return { outcome: RestoreOutcome.Restored, changed: plan.put.length + plan.remove.length + plan.reconnect.length + plan.disconnect.length + plan.docs.length };
 }

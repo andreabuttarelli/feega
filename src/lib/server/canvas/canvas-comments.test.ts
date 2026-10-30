@@ -20,6 +20,20 @@ describe('canvas comments', () => {
     expect(insert?.payload).toMatchObject({ org_id: 'org', canvas_id: 'c', node_id: 'n1', x: 12, y: 34, body: 'tighten the headline', author_id: 'u1', parent_id: null });
   });
 
+  it('a comment keeps the id the client picked, so the one on screen is the one stored', async () => {
+    const fake = open();
+    const id = '0b6f4f53-3c55-4d4c-9a39-0f6c7a2b9e10';
+
+    const out = await addComment(fake.db, { ...scope, id, body: 'hi', actor: user });
+
+    expect(out).toEqual({ outcome: CommentOutcome.Added, id });
+    expect(fake.calls.find((c) => c.table === 'canvas_comments' && c.op === 'insert')?.payload).toMatchObject({ id });
+  });
+
+  it('an id that is not a uuid is refused, not stored', async () => {
+    expect((await addComment(open().db, { ...scope, id: 'not-a-uuid', body: 'hi', actor: user })).outcome).toBe(CommentOutcome.Invalid);
+  });
+
   it('a reply joins an existing thread on the same canvas', async () => {
     const fake = open([stored('a')]);
 

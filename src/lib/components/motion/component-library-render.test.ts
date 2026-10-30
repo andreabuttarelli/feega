@@ -4,14 +4,14 @@ import ComponentLibrary from './ComponentLibrary.svelte';
 import ComponentDetail from './ComponentDetail.svelte';
 import { MotionFormat } from '@feega/motion-core/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from '$lib/motion/template/builtins';
-import { AddTarget, catalogue, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
+import { AddTarget, catalogue, starterDoc } from '$lib/motion/template/catalogue';
 import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
 import { PROMPT_VAR_PREFIX } from '$lib/motion/template/prompt-input/component';
 import { paramVar } from '@feega/motion-core/motion/custom/component';
 
 const items = catalogue(BUILTIN_TEMPLATES);
 
-function draftOf(id: string, format: StarterFormat) {
+function draftOf(id: string, format: MotionFormat) {
   let n = 0;
   const made = starterDoc(builtinTemplate(id)!, format, () => `d${++n}`);
   return made.ok ? { doc: made.doc, clipId: made.clipId } : null;

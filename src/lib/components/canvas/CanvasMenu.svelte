@@ -82,7 +82,7 @@
    * la voce cade — è la sola cosa che il markup legge per raggruppare, così una voce nuova entra
    * con una riga, mai un `if` in più.
    */
-  const CANVAS_MENU_ITEMS: ReadonlyArray<{
+  type MenuItem = {
     id: MenuAction;
     group: MenuGroup;
     labelKey: string;
@@ -93,7 +93,9 @@
     danger?: true;
     desktopOnly?: true;
     local?: true;
-  }> = [
+  };
+
+  const ALL_MENU_ITEMS: MenuItem[] = [
     { id: 'home', group: 'navigate', labelKey: 'app.shell.menu.home', icon: LayoutGrid, href: DASHBOARD_HREF },
     { id: 'settings', group: 'navigate', labelKey: 'app.shell.menu.settings', icon: Settings, sheet: '/settings/project' },
     { id: 'billing', group: 'navigate', labelKey: 'app.shell.menu.billing', icon: CreditCard, href: BILLING_PATH },
@@ -102,7 +104,9 @@
     { id: 'report', group: 'help', labelKey: 'app.shell.menu.report', icon: Flag, href: REPORT_PATH },
     { id: 'legal', group: 'help', labelKey: 'legal.menuLabel', icon: Scale, sub: true },
     { id: 'logout', group: 'account', labelKey: 'app.shell.menu.logout', icon: LogOut, danger: true }
-  ].filter((item) => item.local || !isLocalMode(publicEnv));
+  ];
+
+  const CANVAS_MENU_ITEMS = ALL_MENU_ITEMS.filter((item) => item.local || !isLocalMode(publicEnv));
 
   const ITEMS_THE_RAIL_ALREADY_HAS: ReadonlySet<MenuAction> = new Set(['settings']);
 

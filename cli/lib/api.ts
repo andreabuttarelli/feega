@@ -4,10 +4,12 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHash, randomUUID } from 'node:crypto';
 import { appUrl } from './config.ts';
 import {
   pathFor,
   pathWithoutBrand,
+  SESSION_HEADER,
   TOOL_HEADER,
   type BrandEndpoint,
   type ResourceEndpoint,
@@ -25,18 +27,37 @@ export function asTool<T>(tool: string, fn: () => T): T {
   return toolCall.run(tool, fn);
 }
 
+const sessionCall = new AsyncLocalStorage<string | null>();
+
+const PROCESS_SESSION = randomUUID();
+
+function uuidOf(key: string): string {
+  const h = createHash('sha256').update(key).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+export function inSession<T>(key: string | null, fn: () => T): T {
+  return sessionCall.run(key === null ? null : uuidOf(key), fn);
+}
+
+function callHeaders(): Record<string, string> {
+  const tool = toolCall.getStore();
+  const stored = sessionCall.getStore();
+  const session = stored === undefined ? PROCESS_SESSION : stored;
+  return { ...(tool ? { [TOOL_HEADER]: tool } : {}), ...(session ? { [SESSION_HEADER]: session } : {}) };
+}
+
 export async function request<T>(path: string, token: string, opts?: RequestInit): Promise<T> {
   // Resolved per call, not at import time: loadEnv() sets PUBLIC_APP_URL after the module
   // graph is already loaded, so a module-level constant would freeze the production default
   // and ignore the local dev server.
   const url = `${appUrl()}${path}`;
-  const tool = toolCall.getStore();
   const res = await fetch(url, {
     ...opts,
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      ...(tool ? { [TOOL_HEADER]: tool } : {}),
+      ...callHeaders(),
       ...opts?.headers,
     },
   });
@@ -50,10 +71,9 @@ export async function request<T>(path: string, token: string, opts?: RequestInit
 export type RawAnswer = { status: number; body: unknown };
 
 export async function requestRaw(path: string, token: string, opts?: RequestInit): Promise<RawAnswer> {
-  const tool = toolCall.getStore();
   const res = await fetch(`${appUrl()}${path}`, {
     ...opts,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(tool ? { [TOOL_HEADER]: tool } : {}), ...opts?.headers },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...callHeaders(), ...opts?.headers },
   });
   const text = await res.text().catch(() => '');
   try {

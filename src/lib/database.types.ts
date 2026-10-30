@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -639,6 +639,73 @@ export type Database = {
           },
         ]
       }
+      app_accounts: {
+        Row: {
+          actor_id: string
+          actor_kind: string
+          agent_key: string | null
+          created_at: string
+          email: string
+          login_url: string
+          org_id: string
+          project_id: string
+          session: Json
+          session_until: string | null
+          test_password: string
+          updated_at: string
+        }
+        Insert: {
+          actor_id: string
+          actor_kind: string
+          agent_key?: string | null
+          created_at?: string
+          email: string
+          login_url: string
+          org_id: string
+          project_id: string
+          session?: Json
+          session_until?: string | null
+          test_password: string
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string
+          actor_kind?: string
+          agent_key?: string | null
+          created_at?: string
+          email?: string
+          login_url?: string
+          org_id?: string
+          project_id?: string
+          session?: Json
+          session_until?: string | null
+          test_password?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_accounts_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_accounts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           ai_marked: boolean | null
@@ -714,6 +781,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "assets_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "assets_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -778,17 +852,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "brand_fonts_org_font_fk"
-            columns: ["org_font_id"]
-            isOneToOne: false
-            referencedRelation: "org_fonts"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "brand_fonts_brand_id_fkey"
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brand_fonts_org_font_fk"
+            columns: ["org_font_id"]
+            isOneToOne: false
+            referencedRelation: "org_fonts"
             referencedColumns: ["id"]
           },
           {
@@ -902,6 +976,189 @@ export type Database = {
           },
         ]
       }
+      canvas_comments: {
+        Row: {
+          author_id: string
+          body: string
+          canvas_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          mentions: string[]
+          node_id: string | null
+          org_id: string
+          parent_id: string | null
+          resolved_at: string | null
+          time_ms: number | null
+          x: number
+          y: number
+        }
+        Insert: {
+          author_id: string
+          body: string
+          canvas_id: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          mentions?: string[]
+          node_id?: string | null
+          org_id: string
+          parent_id?: string | null
+          resolved_at?: string | null
+          time_ms?: number | null
+          x?: number
+          y?: number
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          canvas_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          mentions?: string[]
+          node_id?: string | null
+          org_id?: string
+          parent_id?: string | null
+          resolved_at?: string | null
+          time_ms?: number | null
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_comments_canvas_id_fkey"
+            columns: ["canvas_id"]
+            isOneToOne: false
+            referencedRelation: "canvases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_comments_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_comments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "canvas_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      canvas_conflicts: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          actual_version: number | null
+          agent_key: string | null
+          attempt: string
+          attempted: Json
+          canvas_id: string
+          created_at: string
+          expected_version: number | null
+          id: string
+          node_id: string
+          org_id: string
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          winning_event_id: number | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          actual_version?: number | null
+          agent_key?: string | null
+          attempt: string
+          attempted: Json
+          canvas_id: string
+          created_at?: string
+          expected_version?: number | null
+          id?: string
+          node_id: string
+          org_id: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          winning_event_id?: number | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          actual_version?: number | null
+          agent_key?: string | null
+          attempt?: string
+          attempted?: Json
+          canvas_id?: string
+          created_at?: string
+          expected_version?: number | null
+          id?: string
+          node_id?: string
+          org_id?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          winning_event_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_conflicts_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_conflicts_canvas_id_fkey"
+            columns: ["canvas_id"]
+            isOneToOne: false
+            referencedRelation: "canvases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_conflicts_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_conflicts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_conflicts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_conflicts_winning_event_id_fkey"
+            columns: ["winning_event_id"]
+            isOneToOne: false
+            referencedRelation: "canvas_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canvas_events: {
         Row: {
           actor_id: string | null
@@ -916,6 +1173,7 @@ export type Database = {
           kind: string
           node_id: string | null
           org_id: string
+          session_id: string | null
         }
         Insert: {
           actor_id?: string | null
@@ -930,6 +1188,7 @@ export type Database = {
           kind: string
           node_id?: string | null
           org_id: string
+          session_id?: string | null
         }
         Update: {
           actor_id?: string | null
@@ -944,6 +1203,7 @@ export type Database = {
           kind?: string
           node_id?: string | null
           org_id?: string
+          session_id?: string | null
         }
         Relationships: [
           {
@@ -969,6 +1229,57 @@ export type Database = {
           },
         ]
       }
+      canvas_versions: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          agent_key: string | null
+          canvas_id: string
+          created_at: string
+          id: string
+          name: string
+          org_id: string
+          snapshot: Json
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          agent_key?: string | null
+          canvas_id: string
+          created_at?: string
+          id?: string
+          name: string
+          org_id: string
+          snapshot: Json
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          agent_key?: string | null
+          canvas_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          org_id?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_versions_canvas_id_fkey"
+            columns: ["canvas_id"]
+            isOneToOne: false
+            referencedRelation: "canvases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_versions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canvases: {
         Row: {
           created_at: string
@@ -978,6 +1289,7 @@ export type Database = {
           name: string
           org_id: string
           project_id: string
+          share_role: string
           share_token: string | null
           shared_at: string | null
           updated_at: string
@@ -991,6 +1303,7 @@ export type Database = {
           name: string
           org_id: string
           project_id: string
+          share_role?: string
           share_token?: string | null
           shared_at?: string | null
           updated_at?: string
@@ -1004,6 +1317,7 @@ export type Database = {
           name?: string
           org_id?: string
           project_id?: string
+          share_role?: string
           share_token?: string | null
           shared_at?: string | null
           updated_at?: string
@@ -1432,6 +1746,7 @@ export type Database = {
           org_id: string
           social_account_id: string | null
           source: string
+          store_event_id: string | null
           stripe_checkout_id: string | null
           stripe_event_id: string | null
           stripe_invoice_id: string | null
@@ -1449,6 +1764,7 @@ export type Database = {
           org_id: string
           social_account_id?: string | null
           source: string
+          store_event_id?: string | null
           stripe_checkout_id?: string | null
           stripe_event_id?: string | null
           stripe_invoice_id?: string | null
@@ -1466,6 +1782,7 @@ export type Database = {
           org_id?: string
           social_account_id?: string | null
           source?: string
+          store_event_id?: string | null
           stripe_checkout_id?: string | null
           stripe_event_id?: string | null
           stripe_invoice_id?: string | null
@@ -1576,6 +1893,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      effects: {
+        Row: {
+          actor_id: string
+          actor_kind: string
+          agent_key: string | null
+          check_problems: Json
+          check_state: string
+          cost_ms: number | null
+          created_at: string
+          deleted_at: string | null
+          frag: string
+          id: string
+          name: string
+          org_id: string
+          params: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          actor_id: string
+          actor_kind: string
+          agent_key?: string | null
+          check_problems?: Json
+          check_state?: string
+          cost_ms?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          frag: string
+          id?: string
+          name: string
+          org_id: string
+          params?: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          actor_id?: string
+          actor_kind?: string
+          agent_key?: string | null
+          check_problems?: Json
+          check_state?: string
+          cost_ms?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          frag?: string
+          id?: string
+          name?: string
+          org_id?: string
+          params?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "effects_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "effects_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      element_node_migration: {
+        Row: {
+          emptied: boolean
+          legacy_data: Json
+          migrated_at: string
+          node_id: string
+          org_id: string
+        }
+        Insert: {
+          emptied: boolean
+          legacy_data: Json
+          migrated_at?: string
+          node_id: string
+          org_id: string
+        }
+        Update: {
+          emptied?: boolean
+          legacy_data?: Json
+          migrated_at?: string
+          node_id?: string
+          org_id?: string
+        }
+        Relationships: []
       }
       feature_flags: {
         Row: {
@@ -1904,6 +2314,66 @@ export type Database = {
           },
         ]
       }
+      layouts: {
+        Row: {
+          actor_id: string
+          actor_kind: string
+          agent_key: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          kind: string
+          name: string
+          org_id: string
+          spec: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          actor_id: string
+          actor_kind: string
+          agent_key?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          name: string
+          org_id: string
+          spec: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          actor_id?: string
+          actor_kind?: string
+          agent_key?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          org_id?: string
+          spec?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "layouts_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "layouts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       moderation_checks: {
         Row: {
           actor_id: string | null
@@ -1970,6 +2440,8 @@ export type Database = {
           id: string
           node_id: string
           org_id: string
+          sealed: boolean
+          session_id: string | null
           summary: string | null
           version: number
         }
@@ -1982,6 +2454,8 @@ export type Database = {
           id?: string
           node_id: string
           org_id: string
+          sealed?: boolean
+          session_id?: string | null
           summary?: string | null
           version: number
         }
@@ -1994,6 +2468,8 @@ export type Database = {
           id?: string
           node_id?: string
           org_id?: string
+          sealed?: boolean
+          session_id?: string | null
           summary?: string | null
           version?: number
         }
@@ -2360,6 +2836,135 @@ export type Database = {
           },
         ]
       }
+      org_fonts: {
+        Row: {
+          created_at: string
+          family: string
+          id: string
+          org_id: string
+          path: string
+          style: string
+          uploaded_by: string | null
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          family: string
+          id: string
+          org_id: string
+          path: string
+          style?: string
+          uploaded_by?: string | null
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          family?: string
+          id?: string
+          org_id?: string
+          path?: string
+          style?: string
+          uploaded_by?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_fonts_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_fonts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_fonts_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_model_allowlist: {
+        Row: {
+          created_at: string
+          medium: string
+          model_id: string
+          org_id: string
+        }
+        Insert: {
+          created_at?: string
+          medium: string
+          model_id: string
+          org_id: string
+        }
+        Update: {
+          created_at?: string
+          medium?: string
+          model_id?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_model_allowlist_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_spend_caps: {
+        Row: {
+          cap_usd: number
+          created_at: string
+          id: string
+          org_id: string
+          project_id: string | null
+          reset: string
+          scope: string
+        }
+        Insert: {
+          cap_usd: number
+          created_at?: string
+          id?: string
+          org_id: string
+          project_id?: string | null
+          reset?: string
+          scope: string
+        }
+        Update: {
+          cap_usd?: number
+          created_at?: string
+          id?: string
+          org_id?: string
+          project_id?: string | null
+          reset?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_spend_caps_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_spend_caps_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_uncensored_optins: {
         Row: {
           attested_adult: boolean
@@ -2412,60 +3017,15 @@ export type Database = {
           },
         ]
       }
-      org_fonts: {
-        Row: {
-          created_at: string
-          family: string
-          id: string
-          org_id: string
-          path: string
-          style: string
-          uploaded_by: string | null
-          weight: number
-        }
-        Insert: {
-          created_at?: string
-          family: string
-          id: string
-          org_id: string
-          path: string
-          style?: string
-          uploaded_by?: string | null
-          weight?: number
-        }
-        Update: {
-          created_at?: string
-          family?: string
-          id?: string
-          org_id?: string
-          path?: string
-          style?: string
-          uploaded_by?: string | null
-          weight?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "org_fonts_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "assets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_fonts_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       orgs: {
         Row: {
           created_at: string
           id: string
           name: string
           slug: string
+          store_plan_expires_at: string | null
+          store_plan_product: string | null
+          store_plan_store: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string
@@ -2475,6 +3035,9 @@ export type Database = {
           id?: string
           name: string
           slug: string
+          store_plan_expires_at?: string | null
+          store_plan_product?: string | null
+          store_plan_store?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string
@@ -2484,6 +3047,9 @@ export type Database = {
           id?: string
           name?: string
           slug?: string
+          store_plan_expires_at?: string | null
+          store_plan_product?: string | null
+          store_plan_store?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string
@@ -3052,7 +3618,57 @@ export type Database = {
           terms_version?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_active_org_id_fkey"
+            columns: ["active_org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_members: {
+        Row: {
+          created_at: string
+          guest: boolean
+          org_id: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          guest?: boolean
+          org_id: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          guest?: boolean
+          org_id?: string
+          project_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {
@@ -3101,6 +3717,60 @@ export type Database = {
           },
           {
             foreignKeyName: "projects_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prompt_skills: {
+        Row: {
+          actor_id: string
+          actor_kind: string
+          agent_key: string | null
+          body: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          name: string
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          actor_id: string
+          actor_kind: string
+          agent_key?: string | null
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name: string
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string
+          actor_kind?: string
+          agent_key?: string | null
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_skills_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prompt_skills_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -3272,6 +3942,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "social_posts_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "social_posts_node_id_fkey"
             columns: ["node_id"]
             isOneToOne: false
@@ -3290,6 +3967,113 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_events: {
+        Row: {
+          environment: string
+          id: string
+          org_id: string
+          outcome: string
+          payload: Json
+          product_id: string | null
+          received_at: string
+          store: string
+          type: string
+        }
+        Insert: {
+          environment: string
+          id: string
+          org_id: string
+          outcome: string
+          payload: Json
+          product_id?: string | null
+          received_at?: string
+          store: string
+          type: string
+        }
+        Update: {
+          environment?: string
+          id?: string
+          org_id?: string
+          outcome?: string
+          payload?: Json
+          product_id?: string | null
+          received_at?: string
+          store?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      techniques: {
+        Row: {
+          actor_id: string
+          actor_kind: string
+          agent_key: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          inputs: Json
+          name: string
+          org_id: string
+          outputs: Json
+          plan: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          actor_id: string
+          actor_kind: string
+          agent_key?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          inputs?: Json
+          name: string
+          org_id: string
+          outputs?: Json
+          plan: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          actor_id?: string
+          actor_kind?: string
+          agent_key?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          inputs?: Json
+          name?: string
+          org_id?: string
+          outputs?: Json
+          plan?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "techniques_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "techniques_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]
@@ -3327,6 +4111,70 @@ export type Database = {
             foreignKeyName: "user_age_verifications_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_cloud_tokens: {
+        Row: {
+          account_label: string | null
+          created_at: string
+          provider: string
+          tokens_sealed: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_label?: string | null
+          created_at?: string
+          provider: string
+          tokens_sealed: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_label?: string | null
+          created_at?: string
+          provider?: string
+          tokens_sealed?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_cloud_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_figma_tokens: {
+        Row: {
+          created_at: string
+          token_sealed: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          token_sealed: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          token_sealed?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_figma_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -3453,10 +4301,63 @@ export type Database = {
       }
     }
     Functions: {
+      apply_store_event: {
+        Args: {
+          _environment: string
+          _event_id: string
+          _grant_credits: number
+          _grant_expires_at: string
+          _grant_source: string
+          _org_id: string
+          _outcome: string
+          _payload: Json
+          _plan: string
+          _plan_expires_at: string
+          _product_id: string
+          _revoke_credits: number
+          _store: string
+          _type: string
+        }
+        Returns: string
+      }
+      auth_admin_org_ids: { Args: never; Returns: string[] }
+      auth_editor_org_ids: { Args: never; Returns: string[] }
       auth_org_ids: { Args: never; Returns: string[] }
+      auth_project_ids: { Args: never; Returns: string[] }
       billing_grants_ready: { Args: never; Returns: boolean }
+      commit_motion_revision:
+        | {
+            Args: {
+              p_actor_id: string
+              p_actor_kind: string
+              p_agent_key: string
+              p_coalesce_ms: number
+              p_doc: Json
+              p_expected: number
+              p_node_id: string
+              p_org_id: string
+              p_summary: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_actor_id: string
+              p_actor_kind: string
+              p_agent_key: string
+              p_coalesce_ms: number
+              p_doc: Json
+              p_expected: number
+              p_node_id: string
+              p_org_id: string
+              p_session_id: string
+              p_summary: string
+            }
+            Returns: number
+          }
       credits_from_price_id: { Args: { price_id: string }; Returns: number }
       delete_account: { Args: { p_user: string }; Returns: Json }
+      embed_node_writable: { Args: { object_name: string }; Returns: boolean }
       feega_credits: { Args: { _value: string }; Returns: number }
       feega_org_from_metadata: { Args: { _metadata: Json }; Returns: string }
       org_credit_balance: { Args: { _org_id: string }; Returns: number }
@@ -3468,6 +4369,18 @@ export type Database = {
       project_is_uncensored: {
         Args: { p_project_id: string }
         Returns: boolean
+      }
+      storage_write_allowed: {
+        Args: { bucket: string; object_name: string }
+        Returns: boolean
+      }
+      touch_last_edited: {
+        Args: { p_canvas_id: string; p_project_id: string }
+        Returns: undefined
+      }
+      transfer_org_ownership: {
+        Args: { p_org: string; p_to: string }
+        Returns: undefined
       }
       uncensored_switch_refusal: {
         Args: { p_org_id: string; p_user_id: string }

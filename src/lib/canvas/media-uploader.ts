@@ -33,13 +33,14 @@ async function registered(at: At, action: string, fields: Record<string, string>
   return { error: result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed' };
 }
 
+export async function storeFile(supabase: SupabaseClient, path: string, file: File, progress: (fraction: number) => void): Promise<string | null> {
+  const signed = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
+  return signed.error ? signed.error.message : put(signed.data.signedUrl, file, progress);
+}
+
 async function uploadFile(supabase: SupabaseClient, at: At, file: File, progress: (fraction: number) => void): Promise<{ id: string } | { error: string }> {
   const path = `${canvasUploadPrefix(at.orgId, at.projectId)}${crypto.randomUUID()}-${file.name.replace(UNSAFE_NAME, '_')}`;
-  const signed = await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
-  if (signed.error) {
-    return { error: signed.error.message };
-  }
-  const refused = await put(signed.data.signedUrl, file, progress);
+  const refused = await storeFile(supabase, path, file, progress);
   if (refused) {
     return { error: refused };
   }

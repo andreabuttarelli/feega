@@ -24,7 +24,7 @@ vi.mock('$lib/server/repos/canvas', () => ({ findNode: vi.fn(async () => motionR
 vi.mock('$lib/server/repos/motion-revisions', () => ({ readHead: vi.fn(async () => ({ version: 2, doc: composed(), summary: null, actorKind: 'user' })), appendRevision: vi.fn(), RevisionOutcome: { Written: 'written', Conflict: 'conflict', Invalid: 'invalid' } }));
 vi.mock('$lib/server/repos/assets', () => ({ listFontAssets: async () => [], listProjectAssets: vi.fn(async () => []) }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ signAssetPaths: vi.fn(async () => new Map()), createAssetSigningDb: vi.fn() }));
-vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: vi.fn(async () => null) }));
+vi.mock('$lib/server/repos/brands', () => ({ findBrandLook: vi.fn(async () => null), findFirstBrandLook: vi.fn(async () => null) }));
 vi.mock('$lib/server/repos/projects', () => ({ listProjects: vi.fn(async () => [{ id: 'p1', name: 'Launch', brandId: null, mode: ProjectMode.Standard }]) }));
 vi.mock('$lib/server/repos/node-runs', () => ({ listNodeRuns: vi.fn(async () => []) }));
 const registerUploadedAsset = vi.fn(async () => ({ asset: { id: 'up1', type: 'video' }, kind: 'video' }));

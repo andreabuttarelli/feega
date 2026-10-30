@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { parseMotionDoc } from '../doc';
 import { CodeTarget, exportCode, type CodeExport } from './index';
-import { absoluteDoc, featureGridDoc, heroDoc } from './fixtures/small';
+import { Align } from '../layout/auto-layout';
+import { absoluteDoc, featureGridDoc, heroDoc, variantsDoc } from './fixtures/small';
 import { landingDoc, LANDING_ASSETS } from './fixtures/landing';
 
 const file = (out: CodeExport, path: string) => {
@@ -164,5 +165,57 @@ describe('an override on an instance nested inside another component', () => {
   it('forwards in Svelte too', () => {
     const tier = file(exportCode(landingDoc(), { name: 'Landing', target: CodeTarget.Svelte }), 'src/lib/components/PricingTier.svelte');
     expect(tier).toContain('labelColor={feature1LabelColor}');
+  });
+});
+
+describe('a Stack exports as a flex div', () => {
+  const stretched = () => {
+    const doc = heroDoc();
+    return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.autoLayout ? { ...c, autoLayout: { ...c.autoLayout, align: Align.Stretch } } : c)) })) };
+  };
+  const all = (out: CodeExport) => out.files.map((f) => f.content).join('\n');
+
+  it.each([
+    [CodeTarget.React, 'items-stretch'],
+    [CodeTarget.Html, 'align-items: stretch'],
+    [CodeTarget.Svelte, 'align-items: stretch']
+  ])('%s keeps the cross-axis stretch', (target, rule) => {
+    const out = all(exportCode(stretched(), { name: 'Landing', target }));
+    expect(out).toContain(rule);
+    expect(out).not.toContain('[align-items:stretch]');
+  });
+
+  it.each([CodeTarget.Html, CodeTarget.Svelte])('%s writes display flex, direction and gap', (target) => {
+    const out = all(exportCode(heroDoc(), { name: 'Landing', target }));
+    expect(out).toContain('display: flex');
+    expect(out).toContain('flex-direction: column');
+    expect(out).toMatch(/gap: (var\(--space-\d+\)|\d+px)/);
+  });
+});
+
+describe('a variant set exported back to code', () => {
+  const react = exportCode(variantsDoc(), { name: 'Toolbar' });
+  const svelte = exportCode(variantsDoc(), { name: 'Toolbar', target: CodeTarget.Svelte });
+
+  it('instances keep the component name and pass the variant as a prop, never the Default value', () => {
+    const page = file(react, 'src/pages/Toolbar.tsx');
+    expect(page).toContain("import { Button } from '../components/Button';");
+    expect(page).toMatch(/<Button[^>]*variant="outline"[^>]*children="Cancel"/);
+    expect(page).not.toContain('variant="Default"');
+    expect(page).not.toContain('ButtonOutline');
+  });
+
+  it('the set is one component that picks the variant implementation', () => {
+    const button = file(react, 'src/components/Button.tsx');
+    expect(button).toContain("import { ButtonOutline } from './ButtonOutline';");
+    expect(button).toContain("variant?: 'outline';");
+    expect(button).toContain("if (variant === 'outline') {");
+    expect(button).toContain('return <ButtonDefault {...props} />;');
+    expect(file(react, 'src/components/ButtonOutline.tsx')).toContain('export function ButtonOutline(');
+  });
+
+  it('Svelte gets the same dispatching component', () => {
+    expect(file(svelte, 'src/routes/+page.svelte')).toMatch(/import Button from '[^']*components\/Button\.svelte';/);
+    expect(file(svelte, 'src/lib/components/Button.svelte')).toContain("{#if variant === 'outline'}");
   });
 });

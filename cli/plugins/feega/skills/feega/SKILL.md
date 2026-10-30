@@ -244,7 +244,7 @@ answers `closed` / "frames unavailable".
 real font file; `approximate: true` when the font could not be read) to place things next to it.
 
 A frame becomes a code project with `export_code` ({node_id, target?}): react (React + Tailwind,
-default), html or svelte. Auto layout becomes flex/grid, each component one file with typed props
+default), html or svelte. Stacks (auto layout) become flex/grid, each component one file with typed props
 for what differs between instances, colours and fonts a tokens file. Static only, free, no AI.
 CLI: `feega motion code <nodeId> [--target svelte] [--out ./site]`.
 
@@ -303,7 +303,7 @@ batch status) run through `motion_editor_op` `{ node_id, op, input }` with the s
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.
 
 Graphic elements (Text, Box, Ellipse, Path, Image) live in frames or free on the canvas; Generate
-text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element, `import_lottie` turns a Lottie (JSON or https URL) into an editable frame,
+text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element, `import_url` turns a public web page into an editable frame (`feega canvas import-url`), `import_code` turns a page of a public GitHub React app into a frame whose code components are main components with variants (`feega canvas import-code`), `import_lottie` turns a Lottie (JSON or https URL) into an editable frame,
 `group_elements` / `ungroup_element` group free elements; `move_frame_element` moves an element
 into another frame (or onto the canvas as a free element) keeping props and keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
 motion `motion_tool` `move_to_frame` does the same from inside a video. A frame takes no inputs: a line into it is refused. CLI:

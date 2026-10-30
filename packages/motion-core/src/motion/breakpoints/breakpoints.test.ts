@@ -135,10 +135,10 @@ describe('an edit made on a breakpoint view', () => {
     expect(viewsOf(doc)).toHaveLength(3);
   });
 
-  it('content changes go to every view', () => {
+  it('a change that cannot vary per breakpoint leaves the base untouched', () => {
     const doc = edit(withViews(), 'ph', (r) => patchClip(r, 'title', (c) => ({ props: { ...c.props, text: 'New' } })));
 
-    expect(clipOf(doc, 'title').props.text).toBe('New');
+    expect(clipOf(doc, 'title').props.text).toBe('title');
     expect(clipOf(doc, 'title').overrides).toBeUndefined();
   });
 

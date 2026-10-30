@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { isOwnEcho } from './node-save';
-import { FRAME_GAP, besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from './optimistic-insert';
+import { FRAME_GAP, besideBox, copiedNodes, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle } from './optimistic-insert';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
+import { CANVAS_INK, CanvasTheme, drawnFrame } from '$lib/motion/draw-create';
+import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 
 const doc = { width: 1080, height: 1350 };
 const placed = placedFrame({ id: 'f1', canvasId: 'c', projectId: 'p', name: 'Checker', at: { x: 10, y: 20 }, doc });
@@ -57,12 +59,30 @@ describe('a shape drawn on the canvas before the server answers', () => {
     expect(drawn?.look).toMatch(/^data:image\/svg\+xml,/);
   });
 
+  it('a stack stands at once on the drawn box', () => {
+    const drawn = drawnTile('s1', { tool: DrawTool.Stack, box: { left: 5, top: 6, width: 200, height: 80 } });
+
+    expect(drawn?.node).toMatchObject({ id: 's1', position: { x: 5, y: 6 }, size: { width: 200, height: 80 } });
+  });
+
+  it('a line stands as the stroke that was drawn', () => {
+    const look = decodeURIComponent(drawnTile('l1', { tool: DrawTool.Line, from: { x: 0, y: 0 }, to: { x: 200, y: 80 } })?.look ?? '');
+
+    expect(look).toContain('<path');
+  });
+
   it('a text stands as its words in the ink of the canvas, not as a grey box', () => {
     const look = decodeURIComponent(drawnTile('t1', { tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 }, theme: CanvasTheme.Dark })?.look ?? '');
 
     expect(look).toContain('>Text</text>');
     expect(look).toContain(`fill="${CANVAS_INK[CanvasTheme.Dark]}"`);
     expect(look).not.toContain('<rect');
+  });
+
+  it('carries the doc the gpu draws its fill from, on the gesture, before any network', () => {
+    const drawn = drawnTile('e1', { tool: DrawTool.Rectangle, box: { left: 120, top: 40, width: 300, height: 100 } });
+
+    expect(drawFrame(prepare(drawn!.doc, FEEGA_TOKENS), 0).items.map((i) => i.clip)).toContain('e1');
   });
 
   it('places a pen path at the box of its points', () => {
@@ -72,7 +92,13 @@ describe('a shape drawn on the canvas before the server answers', () => {
 
 describe('a frame drawn on the canvas before the server answers', () => {
   it('stands on the dragged box, as a frame with its bar', () => {
-    expect(drawnFrameTile('f9', { left: 100, top: 50, width: 400, height: 300 })).toMatchObject({ id: 'f9', type: 'motion', position: { x: 100, y: 50 }, size: { width: 400 }, data: { docHeadRevision: 1 } });
+    expect(drawnFrameTile('f9', { left: 100, top: 50, width: 400, height: 300 }).node).toMatchObject({ id: 'f9', type: 'motion', position: { x: 100, y: 50 }, size: { width: 400 }, data: { docHeadRevision: 1 } });
+  });
+
+  it('carries the doc the server stores for it, so its body is drawn before the save lands', () => {
+    const box = { left: 100, top: 50, width: 400, height: 300 };
+
+    expect(drawnFrameTile('f9', box).doc).toEqual(drawnFrame(box));
   });
 });
 
@@ -89,5 +115,16 @@ describe('where a clicked frame lands and how big it is', () => {
 
   it('the plus beside a frame makes a blank one of the same size to its right', () => {
     expect(besideBox({ x: 100, y: 50, w: 400, h: 300 })).toEqual({ left: 100 + 400 + FRAME_GAP, top: 50, width: 400, height: 300 });
+  });
+});
+
+describe('a duplicate before the server answers', () => {
+  it('stands where the server writes each copy, under the id it will have', () => {
+    const plan = { nodes: [{ id: 'c1', sourceIndex: 0, type: 'motion', data: { docHeadRevision: 1 }, x: 42, y: 52, width: 400, height: 300 }, { id: 'c2', sourceIndex: 1, type: 'text', data: { prompt: 'p' }, x: 0, y: 0 }], edges: [] };
+
+    expect(copiedNodes(plan)).toEqual([
+      expect.objectContaining({ id: 'c1', type: 'motion', position: { x: 42, y: 52, z: 0 }, size: { width: 400, height: 300 }, data: { docHeadRevision: 1 }, version: 0 }),
+      expect.objectContaining({ id: 'c2', type: 'text', size: { width: null, height: null } })
+    ]);
   });
 });

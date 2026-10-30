@@ -6,7 +6,7 @@
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { isPlanKey, planByKey } from '$lib/plans';
-  import { detectInAppBrowser, androidIntentUrl, type InAppBrowser } from '$lib/in-app-browser';
+  import { detectInAppBrowser, androidIntentUrl, guideFor, type InAppBrowser } from '$lib/in-app-browser';
   import { sanitizeWebsiteParam } from '$lib/website-param';
   import { legalHref } from '$lib/legal-links';
   import { nativeAppleSignIn, NativeAppleOutcome, type AppleIdToken } from '$lib/apple-sign-in/native';
@@ -31,11 +31,6 @@
     mode = 'signup';
   });
 
-  // In-app browsers (Instagram, Facebook, TikTok, LinkedIn, …) make Google/GitHub reject OAuth
-  // with `disallowed_useragent`. We detect them on mount and, instead of submitting the OAuth
-  // form in-place, bounce the user out to their real default browser — automatically on Android
-  // via an intent:// URL, with copy-link + instructions as the fallback (notably on iOS, where
-  // webviews can't be escaped programmatically).
   let inApp = $state<InAppBrowser | null>(null);
   let showOpenInBrowser = $state(false);
   let copied = $state(false);
@@ -44,8 +39,6 @@
     const detected = detectInAppBrowser();
     if (detected.isInApp) {
       inApp = detected;
-      // Inside in-app browsers OAuth is unavailable, so people sign up with email/password.
-      // Lead with the create-account form instead of sign-in (unless they're mid forgot-password).
       if (mode === 'signin') mode = 'signup';
     }
   });
@@ -55,19 +48,13 @@
     modeLocked = next === 'forgot' || next === 'signin';
   }
 
-  // Intercepts an OAuth button inside an in-app browser. Returns true when handled (so the
-  // caller cancels the normal form submit), false to let the form submit as usual.
   function handleOAuthInApp(e: Event): boolean {
-    if (!inApp?.isInApp) return false;
-    e.preventDefault();
-    const target = window.location.href;
-    if (inApp.os === 'android') {
-      window.location.href = androidIntentUrl(target);
-      // Keep the fallback ready in case no browser handles the intent.
-      showOpenInBrowser = true;
-    } else {
-      showOpenInBrowser = true;
+    if (!inApp?.isInApp) {
+      return false;
     }
+
+    e.preventDefault();
+    showOpenInBrowser = true;
     return true;
   }
 
@@ -107,13 +94,15 @@
       copied = true;
       setTimeout(() => (copied = false), 2000);
     } catch {
-      // Clipboard can be blocked in some webviews; the visible URL is the fallback.
     }
   }
 
   // When arriving from a /pricing plan CTA or the homepage URL CTA we carry the intent
   // (+ plan/cycle/website) through the magic-link round-trip, so after sign-in the user
   // lands straight in new-brand onboarding.
+  const guide = $derived(inApp ? guideFor(inApp) : null);
+  const oauthLabel = (label: string) => (inApp?.isInApp ? $_('login.inapp.title') : label);
+
   const startFlow = $derived($page.url.searchParams.get('next') === 'onboarding');
   const planParam = $derived($page.url.searchParams.get('plan') ?? '');
   const cycleParam = $derived($page.url.searchParams.get('cycle') ?? '');
@@ -201,7 +190,7 @@
             <svg class="gh" viewBox="0 0 17 20" width="16" height="19" aria-hidden="true">
               <path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4 1-1.4 1.3-2.7 1.4-2.8-.1 0-2.6-1-2.6-4ZM11.6 3c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4Z" />
             </svg>
-            {$_('login.form.apple')}
+            {oauthLabel($_('login.form.apple'))}
           </button>
         </form>
         {/if}
@@ -221,7 +210,7 @@
               <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z" />
               <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.42 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
             </svg>
-            {$_('login.form.google')}
+            {oauthLabel($_('login.form.google'))}
           </button>
         </form>
 
@@ -240,7 +229,7 @@
                 d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
               />
             </svg>
-            {$_('login.form.github')}
+            {oauthLabel($_('login.form.github'))}
           </button>
         </form>
 
@@ -359,10 +348,17 @@
           : $_('login.inapp.sub')}
       </p>
 
+      {#if guide}
+        <p class="iab-steps-title">{guide.title}</p>
+        <ol class="iab-steps">
+          {#each guide.steps as step}
+            <li>{step}</li>
+          {/each}
+        </ol>
+      {/if}
+
       {#if inApp.os === 'android'}
         <a class="iab-primary" href={androidIntentUrl($page.url.href)}>{$_('login.inapp.openButton')}</a>
-      {:else if inApp.os === 'ios'}
-        <p class="iab-hint">{$_('login.inapp.iosHint', { values: { menu: '•••' } })}</p>
       {/if}
 
       <div class="iab-link">{$page.url.href}</div>
@@ -653,6 +649,10 @@
     color: var(--ui-text, #1d1d1f);
     padding: 24px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border-radius: var(--ui-radius-lg);
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .iab-card h2 {
     font-size: 1.3rem;
@@ -664,20 +664,32 @@
     line-height: 1.5;
     margin: 0 0 16px;
   }
-  .iab-hint {
-    font-size: 14px;
+  .iab-steps-title {
+    font-weight: 600;
+    color: var(--ui-text, #1d1d1f);
+    margin: 0 0 6px;
+  }
+  .iab-steps {
+    margin: 0 0 16px;
+    padding-left: 20px;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .iab-steps li::marker {
+    font-weight: 600;
   }
   .iab-primary {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--accent, #7c5cff);
+    background: var(--ui-text, #1d1d1f);
     color: #fff;
     padding: 14px 22px;
     font-size: 15px;
     font-weight: 600;
     text-decoration: none;
     margin-bottom: 12px;
+    border-radius: var(--ui-radius-sm);
   }
   .iab-link {
     font-size: 13px;

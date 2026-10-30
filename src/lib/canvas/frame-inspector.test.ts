@@ -9,7 +9,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
 import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
 import { precompose } from '@feega/motion-core/motion/precomp';
-import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor } from './frame-inspector';
+import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor, stacksWholeElement } from './frame-inspector';
 import { findClip } from '@feega/motion-core/motion/doc';
 import { copyElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
@@ -141,12 +141,21 @@ describe('barAction', () => {
     expect(findClip(done!.doc, 's1')?.clip.parent).toBe(done?.selection[0]);
   });
 
-  it('adds auto layout around the selection, and a second run removes it', () => {
-    const added = barAction(Action.AutoLayout, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
-    const container = added.selection[0];
+  it('wraps the selection with a stack, and Remove stack unwraps it', () => {
+    const added = barAction(Action.WrapStack, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const stack = added.selection[0];
 
-    expect(findClip(added.doc, container)?.clip.autoLayout).toBeTruthy();
-    expect(findClip(barAction(Action.AutoLayout, { doc: added.doc, selection: [container], frame: 0, newId: fresh() })!.doc, container)?.clip.autoLayout).toBeFalsy();
+    expect(findClip(added.doc, stack)?.clip.autoLayout).toBeTruthy();
+    const removed = barAction(Action.RemoveStack, { doc: added.doc, selection: [stack], frame: 0, newId: fresh() })!;
+    expect(findClip(removed.doc, stack)).toBeNull();
+    expect([...removed.selection].sort()).toEqual(['bottom', 'top']);
+  });
+
+  it('wraps a stack in another stack on a second run', () => {
+    const added = barAction(Action.WrapStack, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const again = barAction(Action.WrapStack, { doc: added.doc, selection: added.selection, frame: 0, newId: () => `w${added.doc.tracks.length}${Math.random().toString(36).slice(2, 6)}` })!;
+
+    expect(findClip(again.doc, added.selection[0])?.clip.parent).toBe(again.selection[0]);
   });
 
   it('unites two shapes into a live group that keeps both editable', () => {
@@ -250,6 +259,15 @@ describe('frameKeyAction', () => {
     expect(findClip(done.doc, done.selection[0])!.clip.props.text).toBe('One');
   });
 
+  it('⌘D on a picked element copies the element inside its frame, not the whole frame', () => {
+    const duplicate = frameKeyAction(press('d', { meta: true }));
+    const doc = fixture();
+
+    const done = barAction(duplicate!, { doc, selection: ['a'], frame: 0, newId: ids() })!;
+    expect(done.doc.tracks.flatMap((t) => t.clips)).toHaveLength(doc.tracks.flatMap((t) => t.clips).length + 1);
+    expect(done.selection).not.toEqual(['a']);
+  });
+
   it('⌥⌘C copies the properties of one element and ⌥⌘V pastes them on another', () => {
     const ctx = (doc: MotionDoc, id: string) => ({ doc, selection: [id], frame: 0, newId: () => 'x' });
     const copy = frameKeyAction(press('c', { meta: true, alt: true }))!;
@@ -329,5 +347,44 @@ describe('FRAME_ELEMENT_MENU', () => {
     expect(FRAME_ELEMENT_MENU.has('flip-vertical')).toBe(true);
     expect(frameMenuAction('flip-horizontal')).toBe(Action.FlipHorizontal);
     expect(frameBarActions(shapes(), ['top'])).toEqual(expect.arrayContaining([Action.FlipHorizontal, Action.FlipVertical]));
+  });
+});
+
+describe('editor modes: no layer op lives only in a key', () => {
+  it('the frame context menu offers instance ops, hide, lock and copy/paste properties', () => {
+    for (const id of ['create-component', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties'] as const) {
+      expect(FRAME_ELEMENT_MENU.has(id)).toBe(true);
+    }
+  });
+});
+
+describe('use as mask inside a canvas frame', () => {
+  const members = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips).filter((c) => c.matteFrom && c.matte !== 'none');
+
+  it('the frame context menu and the right bar offer it', () => {
+    expect(FRAME_ELEMENT_MENU.has('use-as-mask')).toBe(true);
+    expect(FRAME_ELEMENT_MENU.has('release-mask')).toBe(true);
+    expect(frameBarActions(fixture(), ['a', 'b'])).toContain(Command.UseAsMask);
+    expect(frameBarActions(fixture(), ['a'])).not.toContain(Command.UseAsMask);
+  });
+
+  it('masks the layers above the bottom-most pick, then releases them', () => {
+    const masked = barAction(Command.UseAsMask, { doc: fixture(), selection: ['a', 'b'], frame: 0, newId: ids() });
+
+    expect(members(masked!.doc)).toHaveLength(1);
+    expect(frameBarActions(masked!.doc, ['a'])).toContain(Command.RemoveMask);
+
+    const released = barAction(Command.RemoveMask, { doc: masked!.doc, selection: ['a', 'b'], frame: 0, newId: ids() });
+    expect(members(released!.doc)).toEqual([]);
+  });
+});
+
+describe('wrap with stack on a free element', () => {
+  it('wraps the whole element as a new canvas stack, never turning its own clip into one', () => {
+    const doc = fixture();
+
+    expect(stacksWholeElement(Action.WrapStack, doc, ['a', 'b'])).toBe(true);
+    expect(stacksWholeElement(Action.WrapStack, doc, ['a'])).toBe(false);
+    expect(stacksWholeElement(Action.Group, doc, ['a', 'b'])).toBe(false);
   });
 });

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { findClip, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { findClip, MotionFormat, newClip, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { ListKind } from '@feega/motion-core/motion/text-lists';
 import { anchorShift, commitText, editBody, editCss, editLayout, editsText, hideText, listsOfClip, runsOfClip, textEditStyle } from './frame-text-edit';
 import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
+import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 
 function withText() {
   const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Hello', size: 0.1 } }, 'title');
@@ -29,8 +32,22 @@ describe('text editing inside a core frame', () => {
   });
 
   it('hides only the glyphs of the edited clip while the caret is open', () => {
-    expect(textOf(hideText(withText(), 'title'))).toBe('');
+    expect(findClip(hideText(withText(), 'title'), 'title')!.clip.props.opacity).toBe(0);
     expect(textOf(withText())).toBe('Hello');
+  });
+
+  it('a paragraph being edited keeps its height in the auto layout column', () => {
+    const base = newMotionDoc(MotionFormat.Square);
+    const hug = { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fill, height: Sizing.Hug };
+    const clips: MotionClip[] = [
+      newClip({ id: 'col', from: 0, durationInFrames: 30, component: 'Shape', props: { x: 0.25, y: 0.1, width: 0.4, height: 0.05 }, autoLayout: { ...DEFAULT_AUTO_LAYOUT, direction: Direction.Vertical }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fixed, height: Sizing.Hug } }),
+      newClip({ id: 'title', from: 0, durationInFrames: 30, component: 'Text', parent: 'col', props: { text: 'Every step of month-end in one place your auditors can read.', size: 0.044, leading: 1.1, x: 0, y: 0, width: 0.1, height: 0.05 }, layoutItem: hug }),
+      newClip({ id: 'button', from: 0, durationInFrames: 30, component: 'Shape', parent: 'col', props: { x: 0, y: 0, width: 0.2, height: 0.05 }, layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fixed, height: Sizing.Fixed } })
+    ];
+    const doc: MotionDoc = { ...base, tracks: clips.map((c, i) => ({ id: `t${i}`, kind: base.tracks[0].kind, name: '', clips: [c] })) };
+    const buttonY = (d: MotionDoc) => findClip(withAutoLayout(d), 'button')!.clip.props.y;
+
+    expect(buttonY(hideText(doc, 'title'))).toBeCloseTo(Number(buttonY(doc)));
   });
 
   it('commits the typed text as an op the history can take back', () => {

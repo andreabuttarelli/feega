@@ -10,6 +10,8 @@
   import LayoutGuidesOverlay from '$lib/components/motion/LayoutGuidesOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
+  import OnionOverlay from '$lib/components/motion/OnionOverlay.svelte';
+  import { onionSetting } from '$lib/canvas/onion-skin.svelte';
   import OutlineOverlay from '$lib/components/motion/OutlineOverlay.svelte';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
@@ -18,7 +20,7 @@
   import { EditMode } from '$lib/motion/edit-mode';
   import { drawStart } from '$lib/motion/draw-create';
   import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
-  import { canEditPoints, enterPointEdit, landsOn } from '$lib/motion/shape/vector-edit';
+  import { editsPoints, enterPointEdit, landsOn } from '$lib/motion/shape/vector-edit';
   import type { Pt } from '@feega/motion-core/motion/shape/geometry';
   import { isTyping } from '$lib/motion/shortcuts';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -64,7 +66,7 @@
 
   const only = $derived(picks.length === 1 ? (findClip(doc, picks[0])?.clip ?? null) : null);
   const fit = $derived(containFit(size, { width: doc.width, height: doc.height }));
-  const shown = $derived(shownOverlays({ doc, clip: only, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views }));
+  const shown = $derived(shownOverlays({ doc, clip: only, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views, mode, onion: onionSetting.skin }));
   const laidOut = $derived(only && shown.has(FrameOverlay.Corners) ? (findClip(withAutoLayout(doc), only.id)?.clip ?? only) : null);
 
   $effect(() => {
@@ -96,7 +98,7 @@
     pointEdit = clip.id;
   }
 
-  const editable = (e: Event) => (tool === DrawTool.Select && !pointEdit && only && canEditPoints(only) && !isTyping(e.target as HTMLElement | null) ? only : null);
+  const editable = (e: Event) => (tool === DrawTool.Select && !pointEdit && only && editsPoints(doc, only) && !isTyping(e.target as HTMLElement | null) ? only : null);
 
   function enter(e: KeyboardEvent) {
     const clip = e.key === 'Enter' ? editable(e) : null;
@@ -131,6 +133,7 @@
   {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
   {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}
+  {#if only && shown.has(FrameOverlay.Onion)}<OnionOverlay {doc} clip={only} {frame} {boxes} />{/if}
   {#if only && shown.has(FrameOverlay.MotionPath)}<MotionPathOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if shown.has(FrameOverlay.ShapeBuilder)}<ShapeBuilderOverlay {doc} {frame} {picks} onchange={apply} onexit={onleave} />{/if}
   {#if shown.has(FrameOverlay.Draw)}

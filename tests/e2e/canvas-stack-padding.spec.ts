@@ -14,6 +14,16 @@ const sheet = (color: string) => ({
   still: { frame: 0 },
   tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 's', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1, fills: [{ type: 'solid', color }] } }] }]
 });
+const textSheet = {
+  version: 5,
+  fps: 30,
+  width: 240,
+  height: 80,
+  durationInFrames: 150,
+  background: 'transparent',
+  still: { frame: 0 },
+  tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 't', from: 0, durationInFrames: 150, component: 'Text', props: { text: 'Launch day', x: 0.5, y: 0.5, width: 1, height: 1, color: '#111111' } }] }]
+};
 const AUTO_LAYOUT = { direction: 'horizontal', wrap: false, gap: 0, crossGap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 }, justify: 'start', align: 'start', columns: 2, order: [] };
 const box = { id: 'box', from: 0, durationInFrames: 150, component: 'Shape', autoLayout: AUTO_LAYOUT, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.8, height: 0.5, fills: [{ type: 'solid', color: '#e8e8e8' }] } };
 const kid = { id: 'kid', from: 0, durationInFrames: 150, component: 'Shape', parent: 'box', props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2, fills: [{ type: 'solid', color: '#1f5aff' }] } };
@@ -26,7 +36,7 @@ async function shot(page: Page, name: string) {
 test.describe('stack and padding shorthand @real', () => {
   test.skip(!REAL_STACK, 'needs E2E_REAL_STACK=1');
 
-  test('Shift+A stacks three selected tiles into a row', async ({ page, session, admin, seedNode }) => {
+  test('Shift+A wraps three free elements in one free Stack', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(150_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     const ids: string[] = [];
@@ -36,7 +46,7 @@ test.describe('stack and padding shorthand @real', () => {
       await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: sheet(color), actor_kind: 'user', actor_id: session.userId });
       ids.push(node.id);
     }
-    const rowOf = async (id: string) => (await admin.from('nodes').select('x, y').eq('id', id).single()).data!;
+    const live = async () => (await admin.from('nodes').select('id, display_name').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? [];
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.waitForTimeout(SETTLE_MS);
@@ -45,13 +55,41 @@ test.describe('stack and padding shorthand @real', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Shift+A');
 
-    await expect.poll(async () => (await rowOf(ids[1])).y, { timeout: 10_000 }).toBe((await rowOf(ids[0])).y);
-    const [a, b, c] = await Promise.all(ids.map(rowOf));
-    expect(a.y).toBe(c.y);
-    expect(b.x - a.x).toBe(144);
-    expect(c.x - b.x).toBe(144);
+    await expect.poll(async () => (await live()).map((n) => n.display_name), { timeout: 10_000 }).toEqual(['Stack']);
+    expect((await live()).some((n) => ids.includes(n.id))).toBe(false);
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, 'stack-after');
+  });
+
+  test('Wrap with stack on one free text makes a new Stack holding it, and Layers nests the text', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const node = await seedNode({ type: 'motion', x: 200, y: 200, data: ELEMENT });
+    await admin.from('nodes').update({ width: 240, height: 80, display_name: 'Text' }).eq('id', node.id);
+    await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: textSheet, actor_kind: 'user', actor_id: session.userId });
+    const live = async () => (await admin.from('nodes').select('id, display_name').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? [];
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.waitForTimeout(SETTLE_MS);
+    const tile = (await page.locator(`[data-frame="${node.id}"]`).boundingBox())!;
+    await page.mouse.click(tile.x + tile.width / 2, tile.y + tile.height / 2);
+    await page.getByRole('button', { name: 'More actions', exact: true }).click();
+    await page.locator('[data-action="wrap-stack"]').click();
+
+    await expect.poll(async () => (await live()).map((n) => n.display_name), { timeout: 10_000 }).toEqual(['Stack']);
+    const [stack] = await live();
+    const { data: head } = await admin.from('motion_revisions').select('doc').eq('node_id', stack.id).order('version', { ascending: false }).limit(1).single();
+    const clips = (head!.doc as typeof textSheet).tracks.flatMap((t) => t.clips) as { id: string; component: string; parent?: string; autoLayout?: unknown }[];
+    const root = clips.find((c) => !c.parent)!;
+    expect(root.autoLayout).toBeTruthy();
+    expect(clips.find((c) => c.id === 't')).toMatchObject({ component: 'Text', parent: root.id });
+
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+    const layers = page.getByTestId('layers');
+    await expect(layers.locator(`[data-layer="${stack.id}"]`)).toContainText('Stack');
+    await expect(layers.locator('[data-layer="t"]')).toContainText('Text');
+    await page.waitForTimeout(SETTLE_MS);
+    await shot(page, 'stack-one-text');
   });
 
   test('padding takes CSS shorthand', async ({ page, session, admin, seedNode }) => {

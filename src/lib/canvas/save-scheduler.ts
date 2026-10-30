@@ -34,10 +34,15 @@ type SchedulerOptions = {
   debounceMs: number;
   maxWaitMs: number;
   backoffMs: (failures: number) => number;
+  maxFailures?: number;
+  onGaveUp?: (id: string) => void;
   onStatus?: (status: SaveStatus) => void;
 };
 
+export const SAVE_MAX_FAILURES = 8;
+
 export function createSaveScheduler(options: SchedulerOptions) {
+  const maxFailures = options.maxFailures ?? SAVE_MAX_FAILURES;
   const nodes = new Map<string, NodeSaves>();
   const held = new Set<string>();
   let lastStatus = SaveStatus.Saved;
@@ -95,6 +100,17 @@ export function createSaveScheduler(options: SchedulerOptions) {
     }
   }
 
+  function giveUp(id: string, state: NodeSaves) {
+    const waiters = state.pendingWaiters;
+    state.pending = null;
+    state.pendingWaiters = [];
+    state.firstEditAt = null;
+    state.failures = 0;
+    settle(waiters, false);
+    options.onGaveUp?.(id);
+    announce();
+  }
+
   async function fire(id: string) {
     const state = stateOf(id);
     if (state.timer) {
@@ -122,6 +138,10 @@ export function createSaveScheduler(options: SchedulerOptions) {
       state.pending = { ...sent, ...(state.pending ?? {}) };
       state.pendingWaiters = [...waiters, ...state.pendingWaiters];
       state.failures += 1;
+      if (state.failures >= maxFailures) {
+        giveUp(id, state);
+        return;
+      }
       arm(id, options.backoffMs(state.failures));
       announce();
       return;

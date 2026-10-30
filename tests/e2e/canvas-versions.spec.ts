@@ -14,7 +14,8 @@ test.describe('canvas versions @real', () => {
     const positionX = async () => (await admin.from('nodes').select('x').eq('id', node.id).single()).data?.x;
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('canvas-switcher').click();
+    await page.keyboard.press('Alt+1');
+    await page.getByTestId('canvas-more').click();
     await page.getByTestId('canvas-versions').click();
     const dialog = page.getByTestId('canvas-versions-dialog');
     await expect(dialog).toContainText('No saved versions yet');

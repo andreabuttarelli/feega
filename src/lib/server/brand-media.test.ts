@@ -16,6 +16,7 @@ function row(partial: Partial<BrandMediaRow> & { id: string }): BrandMediaRow {
     kind: 'image',
     storage_path: 'p',
     url: 'p',
+    short_code: null,
     source: 'upload',
     source_ref: null,
     mime: 'image/jpeg',

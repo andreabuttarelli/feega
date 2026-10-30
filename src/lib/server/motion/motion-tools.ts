@@ -1,4 +1,5 @@
 import { ungroupClip } from '$lib/motion/group';
+import { dropSurface, withSurface } from '@feega/motion-core/motion/surface';
 import { addBreakpoint, BreakpointPreset, clearOverride, OVERRIDE_KEYS, OverrideKey, removeBreakpoint, setOverride, stackOn } from '@feega/motion-core/motion/breakpoints/model';
 import { groupLight, settleGroups, ungroupLight } from '$lib/motion/light-group';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
@@ -179,7 +180,7 @@ import { ParentOpacity } from '@feega/motion-core/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
 import { releaseMask, useAsMask } from '$lib/motion/mask-group';
 import { FRAME_PRESETS, PRESET_SIZE } from '$lib/motion/frame-presets';
-import { leaveAutoLayout, removeAutoLayout, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInAutoLayout, wrapInFrame } from '$lib/motion/layout/ops';
+import { leaveStack, stackPositionProblem, freezeLayout, removeStack, reorderChild, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
 import { expressionToKeys, setCameraExpression, setExpression } from '@feega/motion-core/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
@@ -257,8 +258,8 @@ import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type
 import type { BreakdownAnswer } from '$lib/server/video-reference';
 import { guessedAdvance, measureText, type Advance } from '$lib/motion/text-measure';
 import { textLook } from '$lib/motion/text-look';
-import { loadOutliner } from '$lib/motion/fonts/outliner';
-import { outlineTexts, type OutlinerLoader } from '$lib/motion/text-outline-run';
+import { letteringOf, outlineTexts, type LetteringLoader } from '$lib/motion/text-outline-run';
+import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { outlineUrl } from '@feega/motion-core/motion/fonts/outline';
 import { pivotBox } from '@feega/motion-core/motion/parent';
@@ -296,7 +297,7 @@ export type MotionToolDeps = {
   sfx?: (sfx: Sfx) => Promise<SfxAsset>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   fontAdvance?: (fontUrl: string) => Promise<Advance | null>;
-  fontOutliner?: OutlinerLoader;
+  lettering?: LetteringLoader;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   probe?: (times: number[]) => Promise<FrameStat[]>;
   seam?: () => Promise<number | null>;
@@ -419,6 +420,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     height: doc.height,
     fps: doc.fps,
     background: doc.background,
+    surface: doc.surface ?? null,
     motionBlur: doc.motionBlur,
     duration: secs(doc.durationInFrames),
     still: doc.still ? { time: secs(doc.still.frame) } : null,
@@ -935,7 +937,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     const withAssets = Object.values(ids).reduce<OpResult>((r, assetId) => registered(r, assetId), { ok: true, doc: session.doc });
     const laid = apply(withAssets.ok ? placeSfx(withAssets.doc, cues, ids, deps.newId) : withAssets, `laid ${cues.length} sound effects`);
-    return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
+    return laid.ok ? `${cues.length} sound effects on the SFX track` : (laid.error ?? null);
   };
 
   type StyleInput = { name?: string; to?: string; style?: unknown; clip_ids?: string[]; kind?: StyleKind; slot?: StyleSlot };
@@ -1055,6 +1057,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const input = { ...raw, props: editFromPx(raw.clip_id, raw.props) };
         if (!assetKnown(input.props.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        const placed = stackPositionProblem(session.doc, input.clip_id, Object.keys(input.props));
+        if (placed) {
+          return { ok: false, error: placed };
         }
         const component = findClip(session.doc, input.clip_id)?.clip.component;
         const outside = component ? shownProblem(session.doc, component, input.props) : null;
@@ -1874,8 +1880,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    add_auto_layout: tool({
-      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+    wrap_in_stack: tool({
+      description: 'Wrap with stack, like the editor ⇧A: a Stack is a flexbox-style container (auto layout). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
       inputSchema: z.object({
         clip_ids: z.array(z.string()).min(1).optional(),
         children: z.array(layoutItemPatchSchema.extend({ clip_id: z.string() })).min(1).optional().describe('in place of clip_ids: each child with its sizing, as set_layout_item takes it'),
@@ -1892,7 +1898,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const ids = children?.map((c) => c.clip_id) ?? clip_ids ?? [];
         const sized = (children ?? []).reduce<OpResult>((r, { clip_id: child, ...item }) => (r.ok ? setLayoutItem(r.doc, child, item) : r), { ok: true, doc: session.doc });
         const id = deps.newId();
-        const out = apply(styled(sized.ok ? wrapInAutoLayout(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in an auto layout`);
+        const out = apply(styled(sized.ok ? wrapInStack(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in a stack`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -1914,14 +1920,14 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async ({ clip_id }) => apply(resizeToFit(session.doc, clip_id), `fitted ${clip_id} to its children`)
     }),
 
-    set_auto_layout: tool({
-      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge), order (child ids, first to last), alignContent auto|space-between (wrap: space-between spreads the lines over the container height, needs a fixed cross size), firstOnTop true draws the first child of the order above the others (visual only, default false keeps the track order), strokesIncluded true (default on a new container) counts the inside strokes of the container as padding so children sit inside them. Only the fields given change. off true removes the auto layout (children keep their parent and the boxes the layout gave them).',
+    set_stack: tool({
+      description: 'Change a Stack (an auto layout container): direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline|stretch on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge; stretch: children that hug the cross axis take the whole line, fixed ones keep their size), order (child ids, first to last), alignContent auto|space-between (wrap: space-between spreads the lines over the container height, needs a fixed cross size), firstOnTop true draws the first child of the order above the others (visual only, default false keeps the track order), strokesIncluded true (default on a new container) counts the inside strokes of the container as padding so children sit inside them. Only the fields given change. off true turns the layout off and keeps the container (children keep their parent and the boxes the layout gave them); remove_stack unwraps instead.',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
-      execute: async ({ clip_id, off, ...patch }) => apply(off ? removeAutoLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
+      execute: async ({ clip_id, off, ...patch }) => apply(off ? freezeLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
 
     set_layout_item: tool({
-      description: 'How a clip sizes inside its auto layout, per axis (in a grid also: column/row 0-based anchor cell, columnSpan/rowSpan, cellX/cellY start|center|end align it in its cell over the grid justify/align; a fill child takes the spanned area): fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default for older clips; clips added since are left/top); vertical top, bottom, top_bottom, center or scale. Not the pivot (anchorX/anchorY), which is the rotation origin.',
+      description: 'How a clip sizes inside its auto layout, per axis (in a grid also: column/row 0-based anchor cell, columnSpan/rowSpan, cellX/cellY start|center|end align it in its cell over the grid justify/align; a fill child takes the spanned area): fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left by widthGrow/heightGrow weight, default 1: weights 1 and 2 split it 1:2; on a clip not yet in a container it applies once it is parented), percent (widthPercent/heightPercent 1..100 of the container). alignSelf start|center|end|stretch overrides the stack align for this child. minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A child in the flow is placed by its stack: set_props x/y on it is refused, reorder it with reorder_stack. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default for older clips; clips added since are left/top); vertical top, bottom, top_bottom, center or scale. Not the pivot (anchorX/anchorY), which is the rotation origin.',
       inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string(), constraints: z.object({ horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }).optional() }),
       execute: async ({ clip_id, constraints, ...patch }) => {
         const pinned = constraints ? setConstraints(session.doc, [clip_id], constraints) : ({ ok: true, doc: session.doc } as OpResult);
@@ -1974,16 +1980,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async ({ clip_id, part, fills }) => apply(fills ? setPartFills(session.doc, clip_id, part, fills) : setPartStyle(session.doc, clip_id, part, null), `coloured ${part} of ${clip_id}`)
     }),
 
-    reorder_auto_layout: tool({
-      description: 'Move a child of an auto layout to position index (0 = first) in its container.',
+    reorder_stack: tool({
+      description: 'Move a child of a Stack to position index (0 = first) in it.',
       inputSchema: z.object({ container_id: z.string(), clip_id: z.string(), index: z.number().int().min(0) }),
       execute: async (input) => apply(reorderChild(session.doc, input.container_id, input.clip_id, input.index), `moved ${input.clip_id} to ${input.index}`)
     }),
 
-    leave_auto_layout: tool({
-      description: 'Take a clip out of its auto layout: it is unparented and keeps the box it was laid out in.',
+    remove_stack: tool({
+      description: 'Remove a stack (an auto layout container), like the editor Remove stack (⌥⇧A): its children keep the boxes the layout gave them and move to the stack\'s parent, in its place when that parent is a stack too; the stack itself is deleted. To keep the container and only turn its layout off use set_stack off.',
       inputSchema: z.object({ clip_id: z.string() }),
-      execute: async (input) => apply(leaveAutoLayout(session.doc, input.clip_id), `took ${input.clip_id} out of its auto layout`)
+      execute: async ({ clip_id }) => apply(removeStack(session.doc, clip_id), `removed the stack ${clip_id}`)
+    }),
+
+    leave_stack: tool({
+      description: 'Take a clip out of its Stack: it is unparented and keeps the box it was laid out in.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(leaveStack(session.doc, input.clip_id), `took ${input.clip_id} out of its stack`)
     }),
 
     set_expression: tool({
@@ -2095,7 +2107,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     text_to_path: tool({
       description: 'Turn Title, Text or Kicker clips into free path shapes that look the same: glyph outlines from the font with its size, tracking, leading, alignment and wrapping as rendered. Fill, stroke, opacity, transform and constraints stay; keyframes on font props and text animators are dropped. The text is no longer editable afterwards.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async (input) => apply(await outlineTexts(session.doc, input.clip_ids, deps.fontOutliner ?? loadOutliner), `outlined ${input.clip_ids.join(', ')}`)
+      execute: async (input) => apply(await outlineTexts(session.doc, input.clip_ids, deps.lettering ?? letteringOf(FEEGA_TOKENS, {})), `outlined ${input.clip_ids.join(', ')}`)
     }),
 
     set_vector_network: tool({
@@ -2618,7 +2630,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         fps: z.literal(FRAME_RATES).optional(),
         background: z.enum([Background.Brand, Background.Transparent]).optional(),
         still: z.union([z.number().min(0), z.literal(false)]).optional(),
-        layout_guides: z.array(layoutGuideSchema).max(MAX_LAYOUT_GUIDES).optional()
+        layout_guides: z.array(layoutGuideSchema).max(MAX_LAYOUT_GUIDES).optional(),
+        surface: z.boolean().optional().describe('true gives the frame its own surface, a locked full-frame Shape under every layer (its id is `surface` in get_motion_doc): style it with set_props like any Shape (fills, strokes, roundness/corners) and effects for shadows and blur; false removes it and brings back the brand background')
       }),
       execute: async (input) => {
         const stretched = input.duration !== undefined && session.doc.script ? durationProblem(input.duration, session.doc.script) : null;
@@ -2631,7 +2644,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.preset ? PRESET_SIZE[input.preset] : input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
-        return apply(guided, 'changed the canvas');
+        const surfaced: OpResult = guided.ok && input.surface !== undefined ? { ok: true, doc: input.surface ? withSurface(guided.doc, deps.newId()) : dropSurface(guided.doc) } : guided;
+        return apply(surfaced, 'changed the canvas');
       }
     }),
 
@@ -3333,7 +3347,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return { ...withFrames(oneAtATime(lookFirst(tools, session)), session), ...(deps.web ? createWebTools(deps.web) : {}) };
+  return { ...withFrames(oneAtATime(lookFirst(withRenamed(tools), session)), session), ...(deps.web ? createWebTools(deps.web) : {}) };
+}
+
+const RENAMED_TOOLS: Record<string, string> = {
+  add_auto_layout: 'wrap_in_stack',
+  set_auto_layout: 'set_stack',
+  reorder_auto_layout: 'reorder_stack',
+  leave_auto_layout: 'leave_stack'
+};
+
+function withRenamed(tools: Record<string, Tool>): Record<string, Tool> {
+  const aliases = Object.entries(RENAMED_TOOLS).map(([old, now]) => [old, { ...tools[now], description: `Deprecated: use ${now}, this name goes in the next release. ${tools[now].description}` }]);
+  return { ...tools, ...Object.fromEntries(aliases) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;
