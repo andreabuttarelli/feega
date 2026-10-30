@@ -104,7 +104,15 @@ describe('repeated blocks of an imported page become a component kit', () => {
 
     expect(sheet).toBeDefined();
     expect(sheet!.centre.x).toBeGreaterThan(plan.plan.items[0].size.width / 2);
-    expect(sheet!.doc.tracks.flatMap((t) => t.clips).map((c) => c.props.comp).sort()).toEqual(mainsOf(pageOf(plan)).map(([id]) => id).sort());
+    expect(sheet!.doc.tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Precomp').map((c) => c.props.comp).sort()).toEqual(mainsOf(pageOf(plan)).map(([id]) => id).sort());
     expect(plan.homes).toEqual({ 0: plan.plan.items.indexOf(sheet!) });
+  });
+
+  it('the Components frame is painted with the page Background variable, so light text stays readable', () => {
+    const sheet = planned().plan.items.find((item) => item.name === 'Components')!;
+    const [backdrop] = sheet.doc.tracks.flatMap((t) => t.clips);
+
+    expect(backdrop.component).toBe('Shape');
+    expect(backdrop.bind?.fill).toBe('Acme/Background');
   });
 });

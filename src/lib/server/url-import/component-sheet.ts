@@ -8,6 +8,7 @@ export const SHEET_NAME = 'Components';
 const MARGIN_PX = 80;
 const GAP_PX = 48;
 const BESIDE_PX = 240;
+const BACKGROUND = /\/Background$/;
 
 type Box = { left: number; top: number; right: number; bottom: number };
 
@@ -45,6 +46,14 @@ function insideComps(doc: MotionDoc): Set<string> {
   return new Set(Object.values(doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((clip) => clip.id))));
 }
 
+const areaOf = (c: MotionClip) => Number(c.props.width ?? 0) * Number(c.props.height ?? 0);
+
+function backdropped(source: MotionDoc): MotionDoc['tracks'] {
+  const painted = source.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.component === 'Shape' && BACKGROUND.test(c.bind?.fill ?? '')).map((clip) => ({ track: t.id, clip })));
+  const backdrop = painted.sort((a, b) => areaOf(b.clip) - areaOf(a.clip))[0];
+  return source.tracks.map((t) => ({ ...t, clips: backdrop?.track === t.id ? [{ ...backdrop.clip, parent: null }] : [] }));
+}
+
 export function componentSheet(item: PlanItem, newId: NewId): PlanItem | null {
   const source = item.doc;
   const mains = mainsOf(source);
@@ -52,7 +61,7 @@ export function componentSheet(item: PlanItem, newId: NewId): PlanItem | null {
     return null;
   }
   const [mx, my, gx, gy] = [MARGIN_PX / source.width, MARGIN_PX / source.height, GAP_PX / source.width, GAP_PX / source.height];
-  let doc: MotionDoc = { ...source, tracks: source.tracks.map((t) => ({ ...t, clips: [] })), comps: {} };
+  let doc: MotionDoc = { ...source, tracks: backdropped(source), comps: {} };
   let top = my;
   for (const row of rowsOf(mains)) {
     let left = mx;
