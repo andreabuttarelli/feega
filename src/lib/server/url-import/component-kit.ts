@@ -42,7 +42,11 @@ function textNames(count: number, labelled: boolean): string[] {
   return Array.from({ length: count }, (_, i) => (i === 0 ? 'Title' : i === 1 ? 'Text' : `Text ${i}`));
 }
 
-function propertiesOf(comp: MotionComp, doc: MotionDoc): Record<string, PropertyDef> {
+type Properties = NonNullable<NonNullable<MotionComp['component']>['properties']>;
+
+const stored = (def: PropertyDef): Properties[string] => ({ ...def, kind: `${def.kind}` });
+
+function propertiesOf(comp: MotionComp, doc: MotionDoc): Properties {
   const direct = clipsOf(comp).filter((c) => !c.parent);
   const texts = direct.filter((c) => TEXT_COMPONENTS.has(c.component)).sort((a, b) => top(a) - top(b));
   const names = textNames(texts.length, LABELLED.test(comp.component!.name));
@@ -52,7 +56,7 @@ function propertiesOf(comp: MotionComp, doc: MotionDoc): Record<string, Property
   for (const [name, def] of [...text, ...toggles]) {
     unique.set(unique.has(name) ? `${name} ${unique.size + 1}`.slice(0, MAX_PROPERTY) : name, def);
   }
-  return { ...comp.component!.properties, ...Object.fromEntries(unique) };
+  return { ...comp.component!.properties, ...Object.fromEntries([...unique].map(([name, def]) => [name, stored(def)])) };
 }
 
 function shaded(hex: string, by: number): string {
