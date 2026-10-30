@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { fieldsOf } from './inspector';
+import { inEveryScope } from './doc-scopes';
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { FILLED, elementFills } from '@feega/motion-core/motion/fill/elements';
 import { effectOfKey, effectsProblem, type Effect } from '@feega/motion-core/motion/effects/model';
@@ -52,9 +53,13 @@ const REFUSAL: Record<StyleKind, (component: ComponentId) => string | null> = {
   [StyleKind.Effect]: (component) => (COMPONENTS[component].track === TrackKind.Visual ? null : 'effects go on a visual clip')
 };
 
+const MEASURE_OF: Record<string, string> = { leading: 'lineHeight', tracking: 'letterSpacing' };
+
 function textPatch(style: z.infer<typeof textStyleSchema>, keys: Set<string>): Record<string, unknown> {
   const { kind: _kind, ...props } = style;
-  return Object.fromEntries(Object.entries(props).filter(([k, v]) => v !== undefined && keys.has(k)));
+  const own = Object.entries(props).filter(([k, v]) => v !== undefined && keys.has(k));
+  const measures = own.flatMap(([k]) => (MEASURE_OF[k] && keys.has(MEASURE_OF[k]) ? [[MEASURE_OF[k], '']] : []));
+  return Object.fromEntries([...own, ...measures]);
 }
 
 function colourPatch(style: z.infer<typeof colourStyleSchema>, keys: Set<string>): Record<string, unknown> {
@@ -129,8 +134,11 @@ export function defineStyle(doc: MotionDoc, name: string, input: unknown): OpRes
   if (!checked.success) {
     return { ok: false, error: checked.error.issues[0].message };
   }
-  return paint({ ...doc, styles }, linked(doc, name), parsed.data);
+  const style = parsed.data;
+  return inEveryScope({ ...doc, styles }, (view, rootUnit) => paint(view, linked(view, name), inScope(style, rootUnit)));
 }
+
+const inScope = (style: Style, rootUnit: number): Style => (style.kind === StyleKind.Text && style.size !== undefined ? { ...style, size: style.size * rootUnit } : style);
 
 export function applyStyle(doc: MotionDoc, ids: readonly string[], name: string): OpResult {
   const style = doc.styles?.[name];
@@ -174,7 +182,7 @@ export function renameStyle(doc: MotionDoc, from: string, to: string): OpResult 
   return { ok: true, doc: { ...doc, tracks, styles: { ...others, [to]: style } } };
 }
 
-const TEXT_PROPS = ['font', 'size', 'weight', 'tracking', 'leading', 'color'] as const;
+const TEXT_PROPS = ['font', 'size', 'weight', 'tracking', 'leading', 'textCase', 'color'] as const;
 
 function colourOf(props: Record<string, unknown>): unknown {
   const fills = props.fills as { color?: string }[] | undefined;
