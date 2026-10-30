@@ -77,6 +77,45 @@ describe('a page becomes a frame that looks like the page', () => {
     expect(image?.focus.x).toBe(1);
   });
 
+  it('a picture wider than the page on both sides shows the part the page showed, not its right end (apple: the laptops slid left)', () => {
+    const tree = pageOf([rect([{ type: 'IMAGE', imageRef: 'https://example.com/hero.png', scaleMode: 'STRETCH' }], { x: -224, y: 100, width: 1728, height: 667 })]);
+    let n = 0;
+    const made = urlPlan(tree, () => `c${++n}`)!;
+    const item = made.plan.items[0];
+    const doc = imagesFilled(item.doc, item.images, Object.fromEntries(Object.keys(made.images).map((k) => [k, 'asset-1'])));
+    const image = fillsOf(doc).find((f) => f.type === 'image') as { focus: { x: number } } | undefined;
+
+    expect(image?.focus.x).toBeCloseTo(0.5, 3);
+  });
+
+  it('the room an inline chip takes on each side stays, as spacing after the letter before it and after its last letter (blog: text after every code chip slid left)', () => {
+    const chipped = text('aa bb cc', { characterStyleOverrides: [0, 0, 1, 0, 2, 0, 0, 0], styleOverrideTable: { 1: { letterSpacing: 7 }, 2: { letterSpacing: 7 } } });
+    const clip = clipsOf(docOf(pageOf([chipped]))).find((c) => c.props.text === 'aa bb cc')!;
+    const runs = clip.props.runs as { start: number; end: number; tracking?: number }[];
+
+    expect(runs.map((r) => [r.start, r.end, r.tracking])).toEqual([
+      [2, 3, 7 / 16],
+      [4, 5, 7 / 16]
+    ]);
+  });
+
+  it('a half see-through block in auto layout shows its contents half see-through, not a quarter (framer: faded cards came in twice as faded)', () => {
+    const flow = { layoutMode: 'VERTICAL', itemSpacing: 0, paddingTop: 20, paddingRight: 20, paddingBottom: 20, paddingLeft: 20, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED' };
+    const block = (extra: Partial<RestNode>): RestNode => ({ id: id(), type: 'FRAME', name: 'block', opacity: 0.5, absoluteBoundingBox: { x: 100, y: 100, width: 200, height: 200 }, fills: [{ type: 'SOLID', color: BLACK }], ...extra, children: [{ id: id(), type: 'FRAME', name: 'inner', absoluteBoundingBox: { x: 120, y: 120, width: 100, height: 100 }, fills: [{ type: 'SOLID', color: WHITE }], clipsContent: false, children: [] }] });
+    const seen = (extra: Partial<RestNode>) => {
+      const clips = clipsOf(docOf(pageOf([block(extra)])));
+      const byId = new Map(clips.map((c) => [c.id, c]));
+      const inner = clips.find((c) => c.name === 'inner')!;
+      let opacity = 1;
+      for (let at: MotionClip | undefined = inner; at; at = at.parent ? byId.get(at.parent) : undefined) {
+        opacity *= Number(at.transform?.opacity ?? 1);
+      }
+      return opacity;
+    };
+
+    expect(seen({ ...flow, clipsContent: false })).toBeCloseTo(0.5, 3);
+  });
+
   it('a one pixel rule on a long page stays one pixel thin', () => {
     const height = 14_535;
     const rule = rect([{ type: 'SOLID', color: BLACK }], { x: 0, y: 692, width: 1280, height: 1 });
