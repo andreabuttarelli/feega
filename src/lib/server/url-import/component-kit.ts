@@ -48,7 +48,7 @@ const stored = (def: PropertyDef): Properties[string] => ({ ...def, kind: `${def
 
 function propertiesOf(comp: MotionComp, doc: MotionDoc): Properties {
   const direct = clipsOf(comp).filter((c) => !c.parent);
-  const texts = direct.filter((c) => TEXT_COMPONENTS.has(c.component)).sort((a, b) => top(a) - top(b));
+  const texts = clipsOf(comp).filter((c) => TEXT_COMPONENTS.has(c.component)).sort((a, b) => top(a) - top(b));
   const names = textNames(texts.length, LABELLED.test(comp.component!.name));
   const text = texts.map((c, i): [string, PropertyDef] => [names[i], { kind: PropertyKind.Text, target: c.id, default: String(c.props.text ?? '') }]);
   const toggles = direct.flatMap((c): [string, PropertyDef][] => (isImage(c) ? [['Show image', { kind: PropertyKind.Boolean, target: c.id, default: true }]] : isIcon(c, doc) ? [['Show icon', { kind: PropertyKind.Boolean, target: c.id, default: true }]] : []));
