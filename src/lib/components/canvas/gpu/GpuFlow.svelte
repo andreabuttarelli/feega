@@ -145,6 +145,8 @@
   import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
+  import { nodeHitRects } from '$lib/canvas/core/node-hit';
+  import type { ChromeTile, Glyphs } from '$lib/canvas/core/chrome';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
   import Repeat from '@lucide/svelte/icons/repeat';
@@ -766,7 +768,17 @@
     return { x: e.clientX - s.left, y: e.clientY - s.top };
   }
 
-  const hitIndex = $derived(new SpatialIndex(placed.map((t) => (t.tag === NameTag.Hidden ? t : { id: t.id, x: t.x, y: t.y - LABEL_CLEARANCE, w: t.w, h: t.h + LABEL_CLEARANCE }))));
+  const NO_GLYPHS: Glyphs = () => ({ contours: [], width: 0, height: 0 });
+  const hitRects = $derived(
+    placed.map((t) => {
+      const glyphs = coreType?.glyphs;
+      const tile: ChromeTile = { id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, inputs: [], outputs: [], label: glyphs ? labelOf(t) : null, icon: coreType?.icons.get(t.kind as NodeType) ?? null, tag: glyphs ? tagHexOf(t.id) : null, zoom: labelZoom };
+      const [body, ...labels] = nodeHitRects(tile, glyphs ?? NO_GLYPHS);
+      return { body, labels };
+    })
+  );
+  const hitIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => [r.body, ...r.labels])));
+  const labelIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => r.labels)));
 
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
@@ -823,8 +835,8 @@
   });
 
   function titledAt(world: Point): Tile | null {
-    const hit = placed.findLast((t) => t.tag !== NameTag.Hidden && world.x >= t.x && world.x <= t.x + t.w && world.y >= t.y - LABEL_CLEARANCE && world.y < t.y);
-    return hit ?? null;
+    const id = labelIndex.topAt(world);
+    return id ? (byId.get(id) ?? null) : null;
   }
 
   function startNaming(tile: Tile) {
