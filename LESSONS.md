@@ -3521,3 +3521,10 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## An export fails on every frame locally, or only on imported ones
 
 **Signal:** "Export failed" with `Waiting failed: 20000ms exceeded` on any frame, a 1080×1080 one too; or `Invalid key: …/exports/…` only on frames whose name has a non-ASCII character (an import's page title); or PDF `Timed out after waiting 30000ms` on a long import. **Move:** reproduce through the real action, not a unit test: log in as the test account, `POST /api/v1/projects/<p>/canvases/<c>?action=exportSelection` and the frame dialog's `motion/<id>?action=still`, and read the JSON body — the dialog used to swallow it. The first is the render page waiting for `/motion-libs` from `PUBLIC_APP_URL` (a dead or older host); the second is Storage refusing the key (`storageName`); the third is a full-frame SVG `<mask>` the PDF printer rasterises (write hard masks as clips).
+## A poster draws in Chrome and comes out scrambled in Safari
+
+**Signal:** an SVG-built poster (pills, strokes, shapes placed with `<g transform>`) is right in Chromium and wrong in WebKit: shapes piled at the top left, the rest of the frame bare. **Move:** WebKit's computed `transform` of an SVG element ignores its `transform` attribute and answers `none`; Chromium folds the attribute in. Never trust the computed style alone for SVG geometry: the probe reads the attribute when the computed value is unset (`svgTransformOf` in `probe.ts`). Diff the raw trees of both engines (capture `feega:dom-read-reply` with an init script) before suspecting the GPU.
+
+## A frame inserted a moment ago stays blank for good
+
+**Signal:** after inserting templates in quick succession, one frame stays empty (paper colour, or dark in dark mode) until reload; the console shows a 404 from `/motion/<id>/source`. **Move:** the node row and the frame source are not saved at the same instant, and the core asked once. A source that is not there yet is retried (`untilFound` in `frame-source.ts`), as the pick-doc fetch already did. Reproduce by inserting the whole poster gallery with a 400 ms gap, not one poster at a time.

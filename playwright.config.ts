@@ -23,7 +23,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-webgl/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline|dashboard-nav|gpu-canvas-no-scroll/, use: { ...devices['Desktop Safari'] } }] : []),
+    ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-webgl/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline|dashboard-nav|gpu-canvas-no-scroll|poster-templates-gpu/, use: { ...devices['Desktop Safari'] } }] : []),
     ...(process.env.E2E_HEAVY_PHONE === '1' ? [{ name: 'webkit-iphone-heavy', testMatch: /phone-heavy-frame-memory|ipad-playback-fps|landing-edit-latency/ }] : []),
     ...(process.env.FLUID_TOUCH === '1' ? [{ name: 'webkit-touch', testMatch: /fluidity-touch/ }] : []),
     ...(process.env.E2E_PERF === '1' ? [{ name: 'webkit-perf', testMatch: /editor-scrub|fluidity-scorecard|canvas-core-perf/, use: { ...devices['Desktop Safari'] } }, { name: 'webkit-iphone-perf', testMatch: /canvas-core-perf/, use: { ...devices['iPhone 15'] } }] : [])
