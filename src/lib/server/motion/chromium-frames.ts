@@ -1,10 +1,13 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Browser, Page } from 'puppeteer-core';
 import shaderRuntime from 'virtual:motion-shader-fx';
 import type { ExportPage, ExportPort, PageBox, StillPage, StillPort, Viewport } from './server-frames';
 import { Pose, kindsOf, measureClips } from '@feega/motion-core/motion/hyperframes/measure';
 import type { GlPage } from '$lib/server/effects/check';
 import { extraChromiumArgs } from './chromium-args';
+import { LOCAL_LIBS_DIR, localLib } from './local-libs';
+import { libsOrigin } from './libs-origin';
 
 const CHROMIUM_VERSION = '153.0.0';
 const CHROMIUM_PACK = `https://github.com/Sparticuz/chromium/releases/download/v${CHROMIUM_VERSION}/chromium-v${CHROMIUM_VERSION}-pack.x64.tar`;
@@ -125,8 +128,20 @@ async function pictureOf(page: Page, full: Viewport, mime: string, quality?: num
   return sheet.toFormat(type, quality === undefined ? {} : { quality }).toBuffer();
 }
 
+async function libsFromCheckout(page: Page) {
+  const root = resolve(LOCAL_LIBS_DIR);
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    const lib = localLib(request.url(), libsOrigin(), root);
+    void (lib ? request.respond({ status: 200, contentType: lib.type, headers: { 'access-control-allow-origin': '*' }, body: readFileSync(lib.path) }) : request.continue());
+  });
+}
+
 async function openPage(viewport: Viewport): Promise<Page> {
   const page = await (await browser()).newPage();
+  if (localChromium()) {
+    await libsFromCheckout(page);
+  }
   page.setDefaultTimeout(SEEK_TIMEOUT_MS);
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: viewport.scale });
   return page;

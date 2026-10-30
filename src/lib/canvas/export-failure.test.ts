@@ -6,6 +6,10 @@ describe('exportFailure', () => {
     expect(exportFailure({ type: 'failure', status: 502, data: { error: 'the images could not be drawn: Target closed' } })).toBe('Export failed: the images could not be drawn: Target closed');
   });
 
+  it('says why when the API twin turns the 502 into an error answer', () => {
+    expect(exportFailure({ type: 'error', status: 502, error: { message: 'the images could not be drawn: Invalid key: a/b.png' } })).toBe('Export failed: the images could not be drawn: Invalid key: a/b.png');
+  });
+
   it('a lost connection asks to try again', () => {
     expect(exportFailure({ type: 'network' })).toMatch(/connection/);
   });

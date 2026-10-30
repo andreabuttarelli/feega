@@ -3514,3 +3514,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A tall frame exports as "Export failed", or as an image that repeats
 
 **Signal:** image export of a frame several thousand px tall (an imported page) fails, or at 2× the bottom repeats the top, or WebP is 0 bytes. **Move:** never screenshot a viewport taller than a band: Chromium paints at most ~16384 device px and the serverless build less. Draw in `BAND_PX` bands with `pictureOf` and stitch; WebP itself stops at 16383 px per side (`rowSize` fits it).
+
+## An export fails on every frame locally, or only on imported ones
+
+**Signal:** "Export failed" with `Waiting failed: 20000ms exceeded` on any frame, a 1080×1080 one too; or `Invalid key: …/exports/…` only on frames whose name has a non-ASCII character (an import's page title); or PDF `Timed out after waiting 30000ms` on a long import. **Move:** reproduce through the real action, not a unit test: log in as the test account, `POST /api/v1/projects/<p>/canvases/<c>?action=exportSelection` and the frame dialog's `motion/<id>?action=still`, and read the JSON body — the dialog used to swallow it. The first is the render page waiting for `/motion-libs` from `PUBLIC_APP_URL` (a dead or older host); the second is Storage refusing the key (`storageName`); the third is a full-frame SVG `<mask>` the PDF printer rasterises (write hard masks as clips).

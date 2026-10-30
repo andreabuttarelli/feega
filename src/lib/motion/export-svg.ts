@@ -117,6 +117,21 @@ function maskOf(w: Writer, layer: MaskLayer): string {
   return id;
 }
 
+const isHard = (layer: MaskLayer) => {
+  const { outside, inside } = maskShade(layer);
+  return layer.feather === 0 && outside === 0 && inside === 1;
+};
+
+function coverAttr(w: Writer, layer: MaskLayer): string {
+  const cover = layer.cover;
+  if (cover.kind !== CoverKind.Path || !isHard(layer)) {
+    return `mask="url(#${maskOf(w, layer)})"`;
+  }
+  const id = w.nextId('c');
+  w.defs.push(`<clipPath id="${id}"><path d="${pathData(cover.contours)}" transform="matrix(${matrixOf(cover.matrix)})"/></clipPath>`);
+  return `clip-path="url(#${id})"`;
+}
+
 const PRODUCT_MODES: ReadonlySet<MaskMode> = new Set([MaskMode.Intersect, MaskMode.Subtract]);
 
 function masked(w: Writer, layers: MaskLayer[], inner: string): string {
@@ -132,7 +147,7 @@ function masked(w: Writer, layers: MaskLayer[], inner: string): string {
     w.defs.push(`<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${w.frame.width}" height="${w.frame.height}">${union}</mask>`);
     return `<g mask="url(#${id})">${inner}</g>`;
   }
-  return layers.reduceRight((markup, layer) => `<g mask="url(#${maskOf(w, layer)})">${markup}</g>`, inner);
+  return layers.reduceRight((markup, layer) => `<g ${coverAttr(w, layer)}>${markup}</g>`, inner);
 }
 
 function dressed(w: Writer, item: Item, inner: string, opacity: number): string {
