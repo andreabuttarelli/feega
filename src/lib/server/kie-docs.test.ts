@@ -47,6 +47,13 @@ describe('a kie model doc', () => {
     expect(specOfDoc(doc('Ext', 'acme/extend', optional))).toBeNull();
   });
 
+  it('takes a keyframe or reference model whose media is optional', () => {
+    const optional = { prompt: { type: 'string' }, first_frame_url: { type: 'string' }, image_urls: { type: 'array', items: { type: 'string' } } };
+
+    expect(specOfDoc(doc('K4', 'acme-4.0/keyframe-to-video', optional))).toMatchObject({ model: 'acme-4.0/keyframe-to-video' });
+    expect(specOfDoc(doc('R4', 'acme-4.0/reference-to-video', optional))).toMatchObject({ model: 'acme-4.0/reference-to-video' });
+  });
+
   it('takes a required image as a media input the node supplies', () => {
     const spec = specOfDoc(doc('Edit', 'acme/edit', { prompt: { type: 'string' }, image_url: { type: 'string' } }, ['prompt', 'image_url']));
 
