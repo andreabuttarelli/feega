@@ -991,7 +991,7 @@ export const CANVAS_OPS = {
   import_url: op({
     access: Access.Write,
     input: importUrlInput,
-    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y }, sectioning: sectioningOf(input.sections) })
+    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y }, shape: { sectioning: sectioningOf(input.sections) } })
   }),
 
   import_code: op({

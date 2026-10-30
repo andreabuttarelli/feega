@@ -20,7 +20,7 @@ export const POST: RequestHandler = async (event) => {
     return json({ error: UrlImportOutcome.Invalid }, { status: URL_IMPORT_STATUS[UrlImportOutcome.Invalid] });
   }
 
-  const done = await importUrlInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, ask.data.canvasId, { url: ask.data.url, at: { x: ask.data.x, y: ask.data.y }, maxHeight: PAGE_EXTENT_HEIGHT[ask.data.extent], sectioning: sectioningOf(ask.data.sections) });
+  const done = await importUrlInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, ask.data.canvasId, { url: ask.data.url, at: { x: ask.data.x, y: ask.data.y }, maxHeight: PAGE_EXTENT_HEIGHT[ask.data.extent], shape: { sectioning: sectioningOf(ask.data.sections) } });
   if (done.outcome !== UrlImportOutcome.Ok) {
     return json({ error: done.outcome }, { status: URL_IMPORT_STATUS[done.outcome] });
   }

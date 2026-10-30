@@ -176,6 +176,12 @@ export enum Sectioning {
 
 export const sectioningOf = (sections: boolean) => (sections ? Sectioning.On : Sectioning.Off);
 
+export type PageShape = { sectioning: Sectioning };
+
+export const PLAIN_SHAPE: PageShape = { sectioning: Sectioning.Off };
+
+export const FULL_SHAPE: PageShape = { sectioning: Sectioning.On };
+
 const SECTIONED: Record<Sectioning, (tree: PageTree) => RestNode> = {
   [Sectioning.On]: (tree) => (tree.outline ? sectionFramed(tree.root, sectionsOf({ ...tree.outline, height: tree.height })) : tree.root),
   [Sectioning.Off]: (tree) => tree.root
@@ -183,13 +189,13 @@ const SECTIONED: Record<Sectioning, (tree: PageTree) => RestNode> = {
 
 const REPEATED: Marker = (root) => repeatedOf(root).root;
 
-export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, sectioning = Sectioning.Off): UrlPlan | null {
+export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, shape: PageShape = PLAIN_SHAPE): UrlPlan | null {
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
   const images = refsOf(tree.root);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
-  const root = mapped({ ...mark(SECTIONED[sectioning](tree)), name }, keyOf, family);
+  const root = mapped({ ...mark(SECTIONED[shape.sectioning](tree)), name }, keyOf, family);
   const plan = stacked(slicesOf(root), newId, uploads);
   if (!plan) {
     return null;

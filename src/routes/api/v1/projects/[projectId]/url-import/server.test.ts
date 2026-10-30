@@ -47,7 +47,7 @@ describe('POST /api/v1/projects/:id/url-import', () => {
     await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-sections-on');
     await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0, sections: false }, 'u-sections-off');
 
-    expect(importPageAt.mock.calls.map((c) => c[0].sectioning)).toEqual(['on', 'off']);
+    expect(importPageAt.mock.calls.map((c) => c[0].shape?.sectioning)).toEqual(['on', 'off']);
   });
 
   it('un indirizzo privato torna 400 not_public', async () => {

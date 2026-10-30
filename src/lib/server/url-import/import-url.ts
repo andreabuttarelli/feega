@@ -7,7 +7,7 @@ import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
 import type { PageOutline } from './page-outline';
-import { fontsWanted, Sectioning, urlPlan, type FontAssets, type UrlPlan } from './url-doc';
+import { FULL_SHAPE, fontsWanted, urlPlan, type FontAssets, type PageShape, type UrlPlan } from './url-doc';
 
 export enum UrlImportOutcome {
   Ok = 'ok',
@@ -42,9 +42,9 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
 
 export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
 
-export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, sectioning: Sectioning) => UrlPlan | null };
+export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, shape: PageShape) => UrlPlan | null };
 
-export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts, sectioning) => urlPlan(tree, newId, undefined, fonts, sectioning) };
+export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts, shape) => urlPlan(tree, newId, undefined, fonts, shape) };
 
 export type PageAsk = {
   url: string;
@@ -59,7 +59,7 @@ export type PageAsk = {
   settleMs?: number;
   planner?: Planner;
   maxHeight?: number;
-  sectioning?: Sectioning;
+  shape?: PageShape;
 };
 
 const SETTLE_MS = 1_200;
@@ -169,7 +169,7 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     return tree;
   }
 
-  const made = planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.sectioning ?? Sectioning.On);
+  const made = planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE);
   if (!made?.plan.items.length) {
     return refused(UrlImportOutcome.Unreadable);
   }

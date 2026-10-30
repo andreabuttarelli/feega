@@ -8,7 +8,7 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { importPageAt, UrlImportOutcome, type UrlImported } from './import-url';
-import type { Sectioning } from './url-doc';
+import type { PageShape } from './url-doc';
 
 const MS_PER_MINUTE = 60_000;
 const IMPORTS_PER_MINUTE = 4;
@@ -37,7 +37,7 @@ export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'pr
   };
 }
 
-export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; sectioning?: Sectioning }): Promise<UrlImported> {
+export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape }): Promise<UrlImported> {
   if (!limiter.allow(scope.userId)) {
     return { outcome: UrlImportOutcome.RateLimited };
   }

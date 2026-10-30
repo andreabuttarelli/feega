@@ -3,7 +3,7 @@ import type { AppTab } from '$lib/server/web/browser';
 import type { FrameStore } from '$lib/server/motion/move-element';
 import type { PageTree } from './page-tree';
 import { importPageAt, UrlImportOutcome } from './import-url';
-import { Sectioning } from './url-doc';
+import { PLAIN_SHAPE } from './url-doc';
 
 const TREE: PageTree = {
   title: 'Acme — ship faster',
@@ -93,7 +93,7 @@ describe('importPageAt', () => {
   });
 
   it('con le sezioni spente la pagina arriva come prima', async () => {
-    const { ask, docs, tab } = askOf({ sectioning: Sectioning.Off });
+    const { ask, docs, tab } = askOf({ shape: PLAIN_SHAPE });
     vi.mocked(tab.tree).mockResolvedValue(OUTLINED as never);
 
     await importPageAt(ask);
