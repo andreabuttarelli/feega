@@ -14,4 +14,12 @@ describe('fontkitSource', () => {
     expect(shaped.advance).toBe(600);
     expect(commands.map((c) => c.op)).toContain(Op.Cubic);
   });
+
+  it('widens glyphs along a variable axis that moves advances through gvar alone, as the browser does', () => {
+    const gvar = fontkitSource(new Uint8Array(readFileSync('src/lib/motion/fixtures/gvar-box.woff2')));
+    const advances = (wght: number) => gvar.at({ wght }).shape('A A', Ligatures.On).map((g) => g.advance);
+
+    expect(advances(400)).toEqual([600, 300, 600]);
+    expect(advances(900)).toEqual([700, 500, 700]);
+  });
 });
