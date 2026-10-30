@@ -37,6 +37,7 @@ import { constraintsSchema } from './constraints/model';
 import { breakpointsSchema, overridesSchema } from './breakpoints/model';
 import { flowSchema } from './prototype/flow';
 import { interactionsSchema } from './prototype/model';
+import { statesSchema } from './states/model';
 import { layoutGuidesSchema } from './layout-guides/model';
 import { userGuidesSchema } from './user-guides/model';
 
@@ -128,6 +129,7 @@ const clipSchema = z.object({
   constraints: constraintsSchema.optional(),
   overrides: overridesSchema,
   interactions: interactionsSchema.optional(),
+  states: statesSchema.optional(),
   lockRatio: z.boolean().optional(),
   acceptsLights: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
