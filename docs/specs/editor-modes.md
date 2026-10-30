@@ -60,7 +60,7 @@ keeps only project switcher + burger.
   in Design mode and via touch long-press. Menu actions missing from the menu order
   (create/detach/push/reset instance) get a home.
 - Generated image/video nodes get right-bar properties.
-- Studio reachable on desktop (rail). Connect available on mobile.
+- Studio reachable on desktop (burger menu). Connect available on mobile.
 
 ## Feature → today → new home
 
@@ -73,7 +73,7 @@ keeps only project switcher + burger.
 | Project switcher | top bar | top-left (unchanged) |
 | Share, peers, credits, chat toggle | top bar | top bar right (unchanged) |
 | Connect (agent) | top bar, desktop only | top bar; mobile burger |
-| Studio | burger only | rail + burger |
+| Studio | burger only | burger only |
 | Layers panel | rail / mobile segment | left panel Layers |
 | Assets / Brands / Influencers | rail, ⌥1–4 | unchanged |
 | Shortcuts reference | burger submenu (desktop), `?` | one list, both entries, mobile sheet |

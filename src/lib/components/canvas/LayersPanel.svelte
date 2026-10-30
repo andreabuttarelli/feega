@@ -30,8 +30,9 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
   import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
-  import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
+  import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesNow, partIds, partsParam, posterHeads, type FrameHead } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
+  import { whenIdle } from '$lib/canvas/when-idle';
   import PartsProbe from './PartsProbe.svelte';
   import { rowWindow } from '$lib/canvas/row-window';
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
@@ -58,12 +59,12 @@
   const canvas = $derived(layersSource.canvas);
   const video = $derived(layersSource.video);
   const heads = $derived(canvasHeads(canvas?.nodes ?? []));
-  let outlines = $state.raw<OutlineCache>({});
-  const known = $derived(outlines);
+  const known = $derived(layersSource.outlines);
+  const held = $derived(layersSource.docs);
   let opening = $state<{ nodeId: string; id: string } | null>(null);
   let folds = $state.raw<Set<string>>(localStore() ? readFolds(localStore()!) : new Set());
 
-  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesFor(heads, known), folds));
+  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesNow(heads, known, held), folds));
   const elements = $derived(new Set((canvas?.nodes ?? []).filter((n) => n.element).map((n) => n.id)));
   const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])].filter((id) => !elements.has(id))));
   const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
@@ -81,7 +82,7 @@
     const query = `${HEADS_PARAM}=${encodeURIComponent(headsParam([head]))}&${PARTS_PARAM}=${encodeURIComponent(partsParam(head.nodeId, parts))}`;
     void fetch(`${url}?${query}`)
       .then((res) => (res.ok ? res.json() : {}))
-      .then((answer) => (outlines = cacheOutlines(outlines, [head], answer)))
+      .then((answer) => layersSource.setOutlines(cacheOutlines(layersSource.outlines, [head], answer)))
       .catch(() => {});
   }
 
@@ -91,10 +92,12 @@
     if (!url || !missing.length) {
       return;
     }
-    void fetch(`${url}?${HEADS_PARAM}=${encodeURIComponent(headsParam(missing))}`)
-      .then((res) => (res.ok ? res.json() : {}))
-      .then((answer) => (outlines = cacheOutlines(outlines, missing, answer)))
-      .catch(() => {});
+    return whenIdle(() =>
+      void fetch(`${url}?${HEADS_PARAM}=${encodeURIComponent(headsParam(missing))}`)
+        .then((res) => (res.ok ? res.json() : {}))
+        .then((answer) => layersSource.setOutlines(cacheOutlines(layersSource.outlines, missing, answer)))
+        .catch(() => {})
+    );
   });
 
   $effect(() => {

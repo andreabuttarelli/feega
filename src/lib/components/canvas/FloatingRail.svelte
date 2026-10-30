@@ -2,7 +2,7 @@
   import { _ } from 'svelte-i18n';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { cn } from '$lib/utils';
-  import { navEntriesByGroup, type NavEntry, type NavFamily } from '$lib/shell-nav';
+  import { navEntriesByGroup, railEntries, type NavEntry, type NavFamily } from '$lib/shell-nav';
   import { prefetchEntry } from '$lib/canvas/chrome-loaders';
   import { NAV_ICONS } from './nav-icons';
   import { ProjectMode, sectionAllowed } from '$lib/project-mode';
@@ -31,7 +31,7 @@
     mode?: ProjectMode;
   } = $props();
 
-  const sheets = $derived(navEntriesByGroup('workbench').filter((entry) => sectionAllowed(mode, entry.id)));
+  const sheets = $derived(railEntries('workbench').filter((entry) => sectionAllowed(mode, entry.id)));
 
   const OPEN: Record<NavFamily, (entry: NavEntry) => void> = {
     panel: (entry) => onPanel(entry),
