@@ -3,7 +3,7 @@ import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import { FillRule } from '@feega/motion-core/motion/gpu-full/paint';
-import { labelScale, labelShown } from './label-size';
+import { HANDLE_SCREEN_PX, HOVER_SCREEN_PX, SELECT_SCREEN_PX, labelScale, labelShown, strokeWorld } from './label-size';
 import { circle, line, rect, reverse, roundRect, solid } from './shapes';
 
 export enum ChromePart {
@@ -46,19 +46,18 @@ export type ChromeTile = {
   addBeside?: boolean;
   radius?: number;
   zoom?: number;
+  strokeZoom?: number;
 };
 
 export type ChromeState = { ring: NodeChrome; handles: boolean; hovered: boolean; ringColor: string; names: boolean };
 
 export type StateTile = ChromeTile & ChromeState;
 
-const RING_WIDTH = 2;
 const RING_OFFSET = 1;
-const EDITING_WIDTH = 1;
+const EDITING_SCREEN_PX = 1;
 const EDITING_OPACITY = 0.5;
 const DASH = 4;
 const PORT_SIZE = 10;
-const HANDLE_SIZE = 8;
 const HANDLE_BORDER = 1;
 const LABEL_SIZE = 12;
 const LABEL_GAP = 4;
@@ -86,14 +85,18 @@ const PORT_LOOK: Record<PortState, { opacity: number; ring: boolean; named: bool
 
 const item = (t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem => solid(`${t.id}:${part}`, contours, color, opacity);
 
+const unit = (t: ChromeTile, screenPx: number): number => screenPx / (t.strokeZoom ?? 1);
+
+const widthOf = (t: ChromeTile, screenPx: number): number => strokeWorld(screenPx, t.strokeZoom ?? 1);
+
 function outline(t: ChromeTile, width: number): number[] {
-  const inset = RING_OFFSET + width / 2;
+  const inset = unit(t, RING_OFFSET) + width / 2;
   return rect(t.x - inset, t.y - inset, t.width + 2 * inset, t.height + 2 * inset);
 }
 
 function roundBand(t: ChromeTile, width: number, radius: number): number[][] {
-  const inner = RING_OFFSET;
-  const outer = RING_OFFSET + width;
+  const inner = unit(t, RING_OFFSET);
+  const outer = inner + width;
   return [
     ...roundRect(t.x - outer, t.y - outer, t.width + 2 * outer, t.height + 2 * outer, radius + outer),
     ...roundRect(t.x - inner, t.y - inner, t.width + 2 * inner, t.height + 2 * inner, radius + inner).map(reverse)
@@ -106,13 +109,13 @@ function hover(t: StateTile): PathItem[] {
   if (!t.hovered || t.ring !== NodeChrome.None) {
     return [];
   }
-  return [item(t, ChromePart.Hover, band(t, RING_WIDTH), HOVER_COLOR)];
+  return [item(t, ChromePart.Hover, band(t, widthOf(t, HOVER_SCREEN_PX)), HOVER_COLOR)];
 }
 
 const RINGS: Record<NodeChrome, (t: StateTile) => PathItem[]> = {
   [NodeChrome.None]: () => [],
-  [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, RING_WIDTH), t.ringColor)],
-  [NodeChrome.Editing]: (t) => [item(t, ChromePart.Ring, dashes(outline(t, EDITING_WIDTH), true, [DASH, DASH]).flatMap((d) => line(d, EDITING_WIDTH)), t.ringColor, EDITING_OPACITY)]
+  [NodeChrome.Selected]: (t) => [item(t, ChromePart.Ring, band(t, widthOf(t, SELECT_SCREEN_PX)), t.ringColor)],
+  [NodeChrome.Editing]: (t) => [item(t, ChromePart.Ring, dashes(outline(t, unit(t, EDITING_SCREEN_PX)), true, [unit(t, DASH), unit(t, DASH)]).flatMap((d) => line(d, unit(t, EDITING_SCREEN_PX))), t.ringColor, EDITING_OPACITY)]
 };
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
@@ -137,8 +140,10 @@ function handles(t: StateTile): PathItem[] {
   if (!t.handles || t.ring !== NodeChrome.Selected) {
     return [];
   }
-  const half = HANDLE_SIZE / 2;
-  const out = RING_OFFSET + RING_WIDTH / 2;
+  const size = unit(t, HANDLE_SCREEN_PX);
+  const border = unit(t, HANDLE_BORDER);
+  const half = size / 2;
+  const out = unit(t, RING_OFFSET) + widthOf(t, SELECT_SCREEN_PX) / 2;
   const corners = [
     [t.x - out, t.y - out],
     [t.x + t.width + out, t.y - out],
@@ -146,8 +151,8 @@ function handles(t: StateTile): PathItem[] {
     [t.x + t.width + out, t.y + t.height + out]
   ];
   return corners.flatMap(([cx, cy]) => [
-    item(t, ChromePart.Handle, [rect(cx - half, cy - half, HANDLE_SIZE, HANDLE_SIZE)], t.ringColor),
-    item(t, ChromePart.Handle, [rect(cx - half + HANDLE_BORDER, cy - half + HANDLE_BORDER, HANDLE_SIZE - 2 * HANDLE_BORDER, HANDLE_SIZE - 2 * HANDLE_BORDER)], HANDLE_FILL)
+    item(t, ChromePart.Handle, [rect(cx - half, cy - half, size, size)], t.ringColor),
+    item(t, ChromePart.Handle, [rect(cx - half + border, cy - half + border, size - 2 * border, size - 2 * border)], HANDLE_FILL)
   ]);
 }
 

@@ -67,6 +67,33 @@ describe('label at a distance', () => {
   });
 });
 
+describe('outlines at a distance', () => {
+  const widthAt = (zoom: number, over: Partial<StateTile>) => {
+    const [x0, , x1] = box(ofPart(tile({ strokeZoom: zoom, width: 1000, ...over }), ChromePart.Ring)[0].contours);
+    return { x0, x1 };
+  };
+
+  it('keeps the selection ring 2px on screen at 10%', () => {
+    const near = widthAt(1, { ring: NodeChrome.Selected });
+    const far = widthAt(0.1, { ring: NodeChrome.Selected });
+
+    expect(((far.x1 - far.x0) - 1000) * 0.1).toBeGreaterThan(((near.x1 - near.x0) - 1000) * 1);
+  });
+
+  it('draws the hover outline thinner than the selection', () => {
+    const hover = box(ofPart(tile({ hovered: true }), ChromePart.Hover)[0].contours);
+    const ring = box(ofPart(tile({ ring: NodeChrome.Selected }), ChromePart.Ring)[0].contours);
+
+    expect(hover[2] - hover[0]).toBeLessThan(ring[2] - ring[0]);
+  });
+
+  it('keeps the handles 8px on screen', () => {
+    const handle = box(ofPart(tile({ ring: NodeChrome.Selected, handles: true, strokeZoom: 0.25 }), ChromePart.Handle)[0].contours);
+
+    expect((handle[2] - handle[0]) * 0.25).toBeCloseTo(8, 0);
+  });
+});
+
 describe('tileChrome', () => {
   it('draws nothing for an idle tile without ports or label', () => {
     expect(parts(tile())).toEqual([]);

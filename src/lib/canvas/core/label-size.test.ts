@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LABEL_HIDE_FRAME_PX, LABEL_MIN_FACTOR, LABEL_SCREEN_PX, labelScale, labelScreenPx, labelShown, labelZoomStep } from './label-size';
+import { FAR_BOOST, HOVER_SCREEN_PX, SELECT_SCREEN_PX, strokeWorld, strokeZoomStep, LABEL_HIDE_FRAME_PX, LABEL_MIN_FACTOR, LABEL_SCREEN_PX, labelScale, labelScreenPx, labelShown, labelZoomStep } from './label-size';
 
 describe('labelScreenPx', () => {
   it('stays at the normal size at 100% and above', () => {
@@ -57,5 +57,38 @@ describe('labelShown', () => {
   it('shows it from the threshold up', () => {
     expect(labelShown(0.1, LABEL_HIDE_FRAME_PX / 0.1)).toBe(true);
     expect(labelShown(1, 300)).toBe(true);
+  });
+});
+
+describe('outline widths', () => {
+  it('keep the screen width at 100% and above', () => {
+    for (const z of [1, 2, 8]) {
+      expect(strokeWorld(HOVER_SCREEN_PX, z) * z).toBeCloseTo(HOVER_SCREEN_PX, 5);
+      expect(strokeWorld(SELECT_SCREEN_PX, z) * z).toBeCloseTo(SELECT_SCREEN_PX, 5);
+    }
+  });
+
+  it('keep the screen width from 25% up to 100%', () => {
+    expect(strokeWorld(SELECT_SCREEN_PX, 0.25) * 0.25).toBeCloseTo(SELECT_SCREEN_PX, 5);
+  });
+
+  it('never get thinner on screen as the zoom drops', () => {
+    let last = 0;
+    for (const z of [2, 1, 0.5, 0.25, 0.1, 0.05, 0.01]) {
+      const px = strokeWorld(SELECT_SCREEN_PX, z) * z;
+      expect(px).toBeGreaterThanOrEqual(last);
+      last = px;
+    }
+  });
+
+  it('grow by at most the far boost', () => {
+    expect(strokeWorld(SELECT_SCREEN_PX, 0.001) * 0.001).toBeCloseTo(SELECT_SCREEN_PX * FAR_BOOST, 5);
+  });
+
+  it('are stepped finely, and tied to the real zoom within 3%', () => {
+    for (const z of [0.05, 0.3, 1.7, 6]) {
+      expect(Math.abs(strokeZoomStep(z) / z - 1)).toBeLessThan(0.03);
+    }
+    expect(strokeZoomStep(0.2)).toBe(strokeZoomStep(0.2001));
   });
 });
