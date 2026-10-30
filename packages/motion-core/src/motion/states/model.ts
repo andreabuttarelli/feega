@@ -18,23 +18,49 @@ export const STATE_LABEL: Record<ElementState, string> = {
 
 export const OVERRIDABLE_STATES = [ElementState.Hover, ElementState.Pressed, ElementState.Focus] as const;
 
-export enum OverrideTarget {
-  Transform = 'transform',
-  Props = 'props'
-}
+type Parts = { transform: Record<string, unknown>; props: Record<string, unknown> };
+type Slot = { read: (p: Parts) => unknown; write: (p: Parts, value: unknown) => void };
+
+const transformSlot = (key: keyof typeof TRANSFORM): Slot => ({
+  read: (p) => p.transform[key] ?? TRANSFORM[key].fallback,
+  write: (p, value) => (p.transform[key] = value)
+});
+
+const propSlot = (key: string): Slot => ({ read: (p) => p.props[key], write: (p, value) => (p.props[key] = value) });
+
+type Painted = { color?: unknown };
+const firstOf = (p: Parts, list: string) => (Array.isArray(p.props[list]) && p.props[list].length ? (p.props[list] as unknown[]) : null);
+
+const paintSlot = (list: string, flat: string, paintOf: (item: Record<string, unknown>) => Painted, repaint: (item: Record<string, unknown>, color: unknown) => Record<string, unknown>): Slot => ({
+  read: (p) => {
+    const items = firstOf(p, list);
+    return items ? paintOf(items[0] as Record<string, unknown>).color : p.props[flat];
+  },
+  write: (p, value) => {
+    const items = firstOf(p, list);
+    if (items) {
+      p.props[list] = [repaint(items[0] as Record<string, unknown>, value), ...items.slice(1)];
+      return;
+    }
+    p.props[flat] = value;
+  }
+});
+
+const fillSlot = paintSlot('fills', 'fill', (f) => f, (f, color) => ({ ...f, color }));
+const strokeSlot = paintSlot('strokes', 'stroke', (s) => (s.paint ?? {}) as Painted, (s, color) => ({ ...s, paint: { ...(s.paint as object), color } }));
 
 const colour = z.string().min(1).max(64);
 const unit = (key: 'opacity' | 'scale' | 'rotateZ' | 'blur') => z.number().min(TRANSFORM[key].min).max(TRANSFORM[key].max);
 
 export const STATE_OVERRIDES = {
-  opacity: { target: OverrideTarget.Transform, schema: unit('opacity') },
-  scale: { target: OverrideTarget.Transform, schema: unit('scale') },
-  rotateZ: { target: OverrideTarget.Transform, schema: unit('rotateZ') },
-  blur: { target: OverrideTarget.Transform, schema: unit('blur') },
-  fill: { target: OverrideTarget.Props, schema: colour },
-  stroke: { target: OverrideTarget.Props, schema: colour },
-  strokeWidth: { target: OverrideTarget.Props, schema: z.number().min(0).max(1) },
-  cornerRadius: { target: OverrideTarget.Props, schema: z.number().min(0).max(1000) }
+  opacity: { slot: transformSlot('opacity'), schema: unit('opacity') },
+  scale: { slot: transformSlot('scale'), schema: unit('scale') },
+  rotateZ: { slot: transformSlot('rotateZ'), schema: unit('rotateZ') },
+  blur: { slot: transformSlot('blur'), schema: unit('blur') },
+  fill: { slot: fillSlot, schema: colour },
+  stroke: { slot: strokeSlot, schema: colour },
+  strokeWidth: { slot: propSlot('strokeWidth'), schema: z.number().min(0).max(1) },
+  cornerRadius: { slot: propSlot('cornerRadius'), schema: z.number().min(0).max(1000) }
 } as const;
 
 export type OverrideKey = keyof typeof STATE_OVERRIDES;
@@ -69,26 +95,7 @@ export type StateOverrides = StateRow['overrides'];
 
 type Stateful = { transform: Record<string, unknown>; props: Record<string, unknown>; states?: StateRow[] };
 
-export function resolveState<C extends Stateful>(clip: C, state: ElementState): Pick<C, 'transform' | 'props'> {
-  const row = clip.states?.find((r) => r.state === state);
-  if (!row) {
-    return { transform: clip.transform, props: clip.props };
-  }
-
-  const transform = { ...clip.transform };
-  const props = { ...clip.props };
-  const targets = { [OverrideTarget.Transform]: transform, [OverrideTarget.Props]: props };
-  for (const [key, value] of Object.entries(row.overrides)) {
-    targets[STATE_OVERRIDES[key as OverrideKey].target][key] = value;
-  }
-  return { transform, props } as Pick<C, 'transform' | 'props'>;
-}
-
-const baseOf = (clip: Stateful, key: OverrideKey): unknown => {
-  const target = STATE_OVERRIDES[key].target;
-  const own = target === OverrideTarget.Transform ? clip.transform[key] : clip.props[key];
-  return own ?? (key in TRANSFORM ? TRANSFORM[key as keyof typeof TRANSFORM].fallback : undefined);
-};
+export const readOverride = (clip: Parts, key: OverrideKey): unknown => STATE_OVERRIDES[key].slot.read(clip);
 
 function mixValue(from: unknown, to: unknown, amount: number): unknown {
   if (typeof from === 'number' && typeof to === 'number') {
@@ -100,21 +107,20 @@ function mixValue(from: unknown, to: unknown, amount: number): unknown {
   return amount < 1 && from !== undefined ? from : to;
 }
 
-export function mixState<C extends Stateful>(clip: C, state: ElementState, amount: number): Pick<C, 'transform' | 'props'> {
-  if (amount <= 0) {
-    return resolveState(clip, ElementState.Default);
-  }
-  if (amount >= 1) {
-    return resolveState(clip, state);
+function applied<C extends Stateful>(clip: C, state: ElementState, amount: number): Pick<C, 'transform' | 'props'> {
+  const row = clip.states?.find((r) => r.state === state);
+  if (!row || amount <= 0) {
+    return { transform: clip.transform, props: clip.props };
   }
 
-  const row = clip.states?.find((r) => r.state === state);
-  const transform = { ...clip.transform };
-  const props = { ...clip.props };
-  const targets = { [OverrideTarget.Transform]: transform, [OverrideTarget.Props]: props };
-  for (const [key, value] of Object.entries(row?.overrides ?? {})) {
-    const k = key as OverrideKey;
-    targets[STATE_OVERRIDES[k].target][k] = mixValue(baseOf(clip, k), value, amount);
+  const parts: Parts = { transform: { ...clip.transform }, props: { ...clip.props } };
+  for (const [key, value] of Object.entries(row.overrides)) {
+    const slot = STATE_OVERRIDES[key as OverrideKey].slot;
+    slot.write(parts, amount >= 1 ? value : mixValue(slot.read(clip), value, amount));
   }
-  return { transform, props } as Pick<C, 'transform' | 'props'>;
+  return parts as Pick<C, 'transform' | 'props'>;
 }
+
+export const resolveState = <C extends Stateful>(clip: C, state: ElementState): Pick<C, 'transform' | 'props'> => applied(clip, state, 1);
+
+export const mixState = <C extends Stateful>(clip: C, state: ElementState, amount: number): Pick<C, 'transform' | 'props'> => applied(clip, state, amount);

@@ -27,6 +27,26 @@ describe('element states', () => {
   });
 });
 
+describe('layers painted with fill and stroke lists', () => {
+  const layered = {
+    transform: {},
+    props: { fills: [{ type: 'solid', color: '#2b5cff', opacity: 1 }], strokes: [{ paint: { type: 'solid', color: '#000000' }, width: 2 }] },
+    states: statesSchema.parse([{ state: ElementState.Hover, overrides: { fill: '#ff0000', stroke: '#00ff00' } }])
+  };
+
+  it('a state recolours the first fill and stroke instead of adding a loose prop', () => {
+    const props = resolveState(layered, ElementState.Hover).props as typeof layered.props;
+    expect(props.fills[0].color).toBe('#ff0000');
+    expect(props.strokes[0].paint.color).toBe('#00ff00');
+    expect('fill' in props).toBe(false);
+  });
+
+  it('halfway mixes the fill list colour', () => {
+    const props = mixState(layered, ElementState.Hover, 0.5).props as typeof layered.props;
+    expect(props.fills[0].color).toBe('#952e80');
+  });
+});
+
 describe('mixing into a state', () => {
   it('halfway mixes numbers and colours between default and the state', () => {
     const half = mixState(clip, ElementState.Hover, 0.5);
