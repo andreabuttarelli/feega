@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ElementState, resolveState, statesSchema } from './model';
+import { ElementState, mixState, resolveState, statesSchema } from './model';
 
 const clip = { transform: { opacity: 1 }, props: { fill: '#111111', stroke: '#000000' }, states: statesSchema.parse([{ state: ElementState.Hover, overrides: { opacity: 0.6, fill: '#ff0000' } }]) };
 
@@ -24,5 +24,18 @@ describe('element states', () => {
   it('refuses two rows for the same state and an unknown override', () => {
     expect(statesSchema.safeParse([{ state: 'hover', overrides: {} }, { state: 'hover', overrides: {} }]).success).toBe(false);
     expect(statesSchema.safeParse([{ state: 'hover', overrides: { width: 3 } }]).success).toBe(false);
+  });
+});
+
+describe('mixing into a state', () => {
+  it('halfway mixes numbers and colours between default and the state', () => {
+    const half = mixState(clip, ElementState.Hover, 0.5);
+    expect(half.transform.opacity).toBeCloseTo(0.8);
+    expect(half.props.fill).toBe('#880909');
+  });
+
+  it('amount 1 is the resolved state and 0 is the element as drawn', () => {
+    expect(mixState(clip, ElementState.Hover, 1)).toEqual(resolveState(clip, ElementState.Hover));
+    expect(mixState(clip, ElementState.Hover, 0)).toEqual(resolveState(clip, ElementState.Default));
   });
 });

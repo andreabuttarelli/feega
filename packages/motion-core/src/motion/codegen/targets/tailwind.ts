@@ -1,3 +1,4 @@
+import type { StateStyle } from '../states';
 import { isRef, type CssValue, type MediaRules, type Ref, type Rule } from '../ir';
 import { tokenKey } from '../tokens';
 import type { TokenLookup } from './css';
@@ -170,6 +171,9 @@ const classesOf = (rules: readonly Rule[], tokens: TokenLookup) => rules.flatMap
 
 const variant = ({ maxWidth, rules }: MediaRules, tokens: TokenLookup) => classesOf(rules, tokens).map((c) => `max-[${maxWidth}px]:${c}`);
 
-export function tailwindOf(rules: readonly Rule[], tokens: TokenLookup, media: readonly MediaRules[] = []): string {
-  return [...new Set([...classesOf(rules, tokens), ...media.flatMap((m) => variant(m, tokens))])].join(' ');
+const stateClasses = (style: StateStyle | undefined, tokens: TokenLookup) =>
+  style ? [...classesOf(style.base, tokens), ...style.rows.flatMap((row) => classesOf(row.rules, tokens).map((c) => `${row.variant}:${c}`))] : [];
+
+export function tailwindOf(rules: readonly Rule[], tokens: TokenLookup, media: readonly MediaRules[] = [], states?: StateStyle): string {
+  return [...new Set([...classesOf(rules, tokens), ...media.flatMap((m) => variant(m, tokens)), ...stateClasses(states, tokens)])].join(' ');
 }

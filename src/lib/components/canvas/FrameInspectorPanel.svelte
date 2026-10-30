@@ -11,6 +11,8 @@
   import InstanceInspector from '$lib/components/motion/InstanceInspector.svelte';
   import RangeTextInspector from '$lib/components/motion/RangeTextInspector.svelte';
   import PrototypeSection from '$lib/components/motion/PrototypeSection.svelte';
+  import StatesSection from '$lib/components/motion/StatesSection.svelte';
+  import { statePreview } from '$lib/canvas/state-preview.svelte';
   import FlowSection from '$lib/components/motion/FlowSection.svelte';
   import VariablesLibrarySection from '$lib/components/motion/VariablesLibrarySection.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
@@ -164,6 +166,10 @@
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
       <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
+      {#if frameProperties.nodeId}
+        {@const nodeId = frameProperties.nodeId}
+        <StatesSection doc={shownDoc!} clip={shown.clip} current={statePreview.stateOf(nodeId, shown.clip.id)} commit={commitShown} onpreview={(next) => statePreview.pick(nodeId, shown.clip.id, next)} />
+      {/if}
       <PrototypeSection doc={shownDoc!} clip={shown.clip} commit={commitShown} />
       {#if Presets}<Presets doc={shownDoc!} clip={shown.clip} onchange={editShown} />{/if}
       {#if THREE_D_COMPONENTS.includes(shown.clip.component)}<LookInspector gesture={session.live} {doc} onchange={edit} />{/if}

@@ -3,7 +3,7 @@ import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc }
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { createComponent, overrideInstance } from './main-component';
-import { addVariant, defineVariantProp, pickVariant, setVariant, swapInstance, variantMatrix, variantProps } from './variants';
+import { addVariant, appendVariant, defineVariantProp, pickVariant, setVariant, swapInstance, variantMatrix, variantProps } from './variants';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -31,6 +31,14 @@ describe('variants and instance swap', () => {
     expect(variantProps(next, mainId)).toEqual({ State: ['Default', 'Hover'] });
     const ids = Object.values(next.comps).map((c) => c.tracks.flatMap((t) => t.clips.map((x) => x.id)));
     expect(ids).toEqual([['label'], ['label']]);
+  });
+
+  it('the canvas plus adds the next numbered value of the first property, as Figma does', () => {
+    const { doc, mainId } = made();
+    const once = must(appendVariant(doc, mainId, newId));
+    const twice = must(appendVariant(once, mainId, newId));
+
+    expect(variantProps(twice, mainId)).toEqual({ Variant: ['Default', 'Variant 2', 'Variant 3'] });
   });
 
   it('picking a variant swaps the instance and keeps its overrides', () => {

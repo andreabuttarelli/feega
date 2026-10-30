@@ -36,6 +36,14 @@ describe('element states in exported code', () => {
     expect(css(exportCode(doc, { name: 'Poster', target: CodeTarget.Html }))).toMatch(/\.caption:hover \{\n {2}color: #00ff00;/);
   });
 
+  it('React prefixes the state classes with hover: and active:', () => {
+    const page = exportCode(badge(), { name: 'Poster' }).files.find((f) => f.path === 'src/pages/Poster.tsx')!.content;
+
+    expect(page).toContain('hover:opacity-');
+    expect(page).toContain('active:');
+    expect(page).toMatch(/\[transition:opacity_250ms_cubic-bezier\(0\.16,_?1,_?0\.3,_?1\)/);
+  });
+
   it('Svelte scopes the same rules in its style tag', () => {
     expect(css(exportCode(badge(), { name: 'Poster', target: CodeTarget.Svelte }))).toContain('.badge:hover {');
   });

@@ -129,6 +129,11 @@
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { statePreview } from '$lib/canvas/state-preview.svelte';
+  import { previewDoc } from '$lib/motion/states/preview';
+  import { instanceOf } from '$lib/motion/main-component';
+  import { appendVariant } from '$lib/motion/variants';
+  import VariantPlus from '../VariantPlus.svelte';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
@@ -1313,13 +1318,13 @@
       {
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
-        show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
+        show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(doc, statePreview.picksOf(nodeId)) }),
         recorded: () => {
           settle.edited(nodeId);
           autosize(nodeId);
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
-        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
+        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) }),
         landed: (from, to) => {
           const step = stepOf(nodeId, from, to);
           if (step) {
@@ -1533,7 +1538,31 @@
     const session = saverOf(nodeId);
     session?.apply(result, summary);
     if (session && result.ok) {
-      liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) });
+    }
+  }
+
+  $effect(() => {
+    for (const [nodeId, picks] of statePreview.byNode) {
+      const session = untrack(() => savers.get(nodeId));
+      const live = untrack(() => liveOf(nodeId));
+      if (session && live) {
+        untrack(() => liveDocs.set(nodeId, { ...live, doc: previewDoc(session.history.present, picks) }));
+      }
+    }
+  });
+
+  function variantMark(nodeId: string) {
+    const mark = picks.length === 1 && !typing ? selectionMarks(nodeId)[0] : null;
+    const saver = mark ? saverOf(nodeId) : null;
+    const instance = mark && saver ? instanceOf(saver.history.present, mark.clip) : null;
+    return mark && instance ? { rect: quadBox(mark.quad), compId: instance.compId } : null;
+  }
+
+  function addVariantAt(nodeId: string, compId: string) {
+    const saver = saverOf(nodeId);
+    if (saver) {
+      commit(nodeId, appendVariant(saver.history.present, compId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
     }
   }
 
@@ -3436,6 +3465,10 @@
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
           <GradientHandles rect={gradient.rect} fill={gradient.fill} onchange={(f) => dragGradient(frame.id, gradient.clip, gradient.index, f)} ondone={(f) => dropGradient(frame.id, gradient.clip, gradient.index, f)} />
+        {/if}
+        {@const plus = variantMark(frame.id)}
+        {#if plus}
+          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.compId)} />
         {/if}
         {@const crop = cropMark(frame.id)}
         {#if crop}

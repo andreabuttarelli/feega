@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { EASE_IDS, Ease } from '../design';
-import { TRANSFORM } from '../keyframes';
+import { Ease } from '../design';
+import { TRANSFORM, easeSchema, mixColor } from '../keyframes';
 
 export enum ElementState {
   Default = 'default',
@@ -48,7 +48,7 @@ const overridesSchema = z
   .strict();
 
 export const stateTransitionSchema = z.object({
-  easing: z.enum(EASE_IDS).default(Ease.Standard),
+  easing: easeSchema.default(Ease.Standard),
   durationMs: z.number().int().min(0).max(MAX_STATE_MS).default(DEFAULT_STATE_MS)
 });
 
@@ -80,6 +80,41 @@ export function resolveState<C extends Stateful>(clip: C, state: ElementState): 
   const targets = { [OverrideTarget.Transform]: transform, [OverrideTarget.Props]: props };
   for (const [key, value] of Object.entries(row.overrides)) {
     targets[STATE_OVERRIDES[key as OverrideKey].target][key] = value;
+  }
+  return { transform, props } as Pick<C, 'transform' | 'props'>;
+}
+
+const baseOf = (clip: Stateful, key: OverrideKey): unknown => {
+  const target = STATE_OVERRIDES[key].target;
+  const own = target === OverrideTarget.Transform ? clip.transform[key] : clip.props[key];
+  return own ?? (key in TRANSFORM ? TRANSFORM[key as keyof typeof TRANSFORM].fallback : undefined);
+};
+
+function mixValue(from: unknown, to: unknown, amount: number): unknown {
+  if (typeof from === 'number' && typeof to === 'number') {
+    return from + (to - from) * amount;
+  }
+  if (typeof from === 'string' && typeof to === 'string' && from.startsWith('#') && to.startsWith('#')) {
+    return mixColor(from, to, amount);
+  }
+  return amount < 1 && from !== undefined ? from : to;
+}
+
+export function mixState<C extends Stateful>(clip: C, state: ElementState, amount: number): Pick<C, 'transform' | 'props'> {
+  if (amount <= 0) {
+    return resolveState(clip, ElementState.Default);
+  }
+  if (amount >= 1) {
+    return resolveState(clip, state);
+  }
+
+  const row = clip.states?.find((r) => r.state === state);
+  const transform = { ...clip.transform };
+  const props = { ...clip.props };
+  const targets = { [OverrideTarget.Transform]: transform, [OverrideTarget.Props]: props };
+  for (const [key, value] of Object.entries(row?.overrides ?? {})) {
+    const k = key as OverrideKey;
+    targets[STATE_OVERRIDES[k].target][k] = mixValue(baseOf(clip, k), value, amount);
   }
   return { transform, props } as Pick<C, 'transform' | 'props'>;
 }
