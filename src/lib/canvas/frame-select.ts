@@ -105,3 +105,14 @@ export function siblingsOf(doc: MotionDoc, picks: readonly string[]): string[] {
 }
 
 export const grabbedInstead = (picks: readonly string[], under: string | null): string | null => (picks.length === 1 && under && under !== picks[0] ? under : null);
+
+export enum Press {
+  Child = 'child',
+  Host = 'host'
+}
+
+export type Held = { selected: readonly string[]; inside: string | null; picks: readonly string[] };
+
+const heldWhole = (held: Held, node: string): boolean => held.selected.includes(node) && (held.inside !== node || !held.picks.length);
+
+export const pressOn = (held: Held, node: string, reach: Reach): Press => (reach === Reach.Top && heldWhole(held, node) ? Press.Host : Press.Child);
