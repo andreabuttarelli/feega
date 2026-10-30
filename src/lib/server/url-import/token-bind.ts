@@ -1,6 +1,6 @@
 import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { AUTO, leadingOf, trackingOf } from '@feega/motion-core/motion/type-units';
-import { DEFAULT_MODE, VarType, keyOf, type Collection } from '@feega/motion-core/motion/variables-model';
+import { DEFAULT_MODE, VarType, keyOf, splitKey, type Collection } from '@feega/motion-core/motion/variables-model';
 import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
 import type { Effect } from '@feega/motion-core/motion/effects/model';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
@@ -10,7 +10,7 @@ import { inEveryScope } from '$lib/motion/doc-scopes';
 import { defineStyle } from '$lib/motion/styles';
 import { resolveVariables } from '$lib/motion/variables';
 import type { RestNode } from '$lib/server/figma/rest-message';
-import { ColourPaint, textKey, type Samples, type TextCase, type TextStyle, type Tokens } from './page-tokens';
+import { ColourPaint, sameColour, textKey, type Samples, type TextCase, type TextStyle, type Tokens } from './page-tokens';
 
 export type Units = { docPerPx: number; images: ReadonlySet<string> };
 
@@ -252,9 +252,45 @@ function linked(doc: MotionDoc, plan: Plan, units: Units): OpResult {
   return inEveryScope(doc, (view) => ({ ok: true, doc: { ...view, tracks: view.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (units.images.has(c.id) ? c : boundClip(c, lookOf(c, view, units), plan))) })) } }));
 }
 
+type Overrides = Record<string, Record<string, unknown>>;
+
+const OVERRIDE_PAINTS: { key: string; paint: ColourPaint; target: string; hex: (value: unknown) => string | null }[] = [
+  { key: 'color', paint: ColourPaint.Text, target: TEXT_COLOUR_TARGET, hex: (value) => (typeof value === 'string' ? value.toLowerCase() : null) },
+  { key: 'fill', paint: ColourPaint.Fill, target: FILL_TARGET, hex: (value) => (typeof value === 'string' ? value.toLowerCase() : null) },
+  { key: 'fills', paint: ColourPaint.Fill, target: FILL_TARGET, hex: (value) => solidOf(value as Fill[] | undefined) }
+];
+
+function inheritedPaints(override: Record<string, unknown>, main: MotionClip | undefined, plan: Plan): Record<string, unknown> {
+  const inherits = (rule: (typeof OVERRIDE_PAINTS)[number]) => {
+    const hex = rule.hex(override[rule.key]);
+    const bound = main?.bind?.[rule.target];
+    const name = bound ? splitKey(bound)?.[1] : undefined;
+    const value = name ? plan.collection.vars[name]?.values[DEFAULT_MODE] : undefined;
+    return Boolean(hex && bound && (plan.colourOf.get(paintKey(rule.paint, hex)) === bound || (typeof value === 'string' && sameColour(hex, value))));
+  };
+  const dropped = new Set(OVERRIDE_PAINTS.filter((rule) => rule.key in override && inherits(rule)).map((rule) => rule.key));
+  return Object.fromEntries(Object.entries(override).filter(([key]) => !dropped.has(key)));
+}
+
+function keepingBindings(clip: MotionClip, doc: MotionDoc, plan: Plan): MotionClip {
+  const overrides = clip.props.overrides as Overrides | undefined;
+  const comp = compOf(clip) ? doc.comps[compOf(clip)!] : undefined;
+  if (!overrides || !comp) {
+    return clip;
+  }
+  const inner = new Map(comp.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
+  const kept = Object.fromEntries(Object.entries(overrides).map(([id, o]) => [id, inheritedPaints(o, inner.get(id), plan)]).filter(([, o]) => Object.keys(o as object).length));
+  return { ...clip, props: { ...clip.props, overrides: kept } };
+}
+
+function overridesBound(doc: MotionDoc, plan: Plan): OpResult {
+  return inEveryScope(doc, (view) => ({ ok: true, doc: { ...view, tracks: view.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => keepingBindings(c, doc, plan)) })) } }));
+}
+
 export function tokenised(doc: MotionDoc, tokens: Tokens, site: string, units: Units): MotionDoc {
   const plan = planOf(tokens, site, doc, units);
-  const bound = linked({ ...doc, variables: { ...doc.variables, [site]: plan.collection } }, plan, units);
+  const linkedDoc = linked({ ...doc, variables: { ...doc.variables, [site]: plan.collection } }, plan, units);
+  const bound = linkedDoc.ok ? overridesBound(linkedDoc.doc, plan) : linkedDoc;
   if (!bound.ok) {
     return doc;
   }

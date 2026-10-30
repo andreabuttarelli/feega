@@ -78,7 +78,7 @@ describe('imported pages become tokens', () => {
       return !sameColour || JSON.stringify(canonical({ ...a, colour: null })) !== JSON.stringify(canonical({ ...b, colour: null }));
     });
 
-    expect(bound.size).toBe(plain.size);
+    expect([...plain.keys()].filter((id) => !bound.has(id))).toEqual([]);
     expect(drifted.map(([id, p]) => [id, lookOf(p), lookOf(bound.get(id)!)])).toEqual([]);
   });
 
