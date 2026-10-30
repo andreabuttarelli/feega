@@ -113,6 +113,16 @@ describe('the home of a main component', () => {
     expect(mainClipOf(doc, compId)).toBe(instanceId);
     expect(mainClipOf(doc, 'nope')).toBeNull();
   });
+
+  it('a main inside a group is found through the group clip that holds it', () => {
+    const { doc, compId } = frameWithButton();
+    const instance = doc.tracks.flatMap((t) => t.clips)[0] as MotionClip;
+    const groupComp = { name: 'Group', durationInFrames: doc.durationInFrames, tracks: doc.tracks };
+    const group = { ...instance, id: 'group', component: 'Precomp', props: { comp: 'g' } } as MotionClip;
+    const nested = { ...doc, tracks: [{ ...doc.tracks[0], clips: [group] }], comps: { ...doc.comps, g: groupComp } } as MotionDoc;
+
+    expect(mainClipOf(nested, compId)).toBe('group');
+  });
 });
 
 describe('a component carried to another canvas', () => {

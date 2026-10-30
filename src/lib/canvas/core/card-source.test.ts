@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { faceOf } from '$lib/canvas/gpu/card-face';
-import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
+import { SELECT_BLUE } from '$lib/canvas/highlight';
 import { CHROME_REACH, CardLayer, cardKey, cardOnCanvas, cardsOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
 import { PortState, type Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
@@ -58,9 +58,8 @@ describe('card group', () => {
 });
 
 describe('selection ring colour', () => {
-  it('rings in the output colour, the accent when there is none', () => {
-    expect(ringColour(tile, theme)).toBe(CONNECTOR_STYLE.text.color);
-    expect(ringColour({ ...tile, outputs: [] }, theme)).toBe(theme.accent);
+  it('rings in the selection blue whatever the output', () => {
+    expect(ringColour()).toBe(SELECT_BLUE);
   });
 });
 

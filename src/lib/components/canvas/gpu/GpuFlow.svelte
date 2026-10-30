@@ -24,6 +24,7 @@
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
+  import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
   import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
@@ -291,7 +292,7 @@
     addLingerTimer = setTimeout(() => (addLinger = null), ADD_LINGER_MS);
     return () => clearTimeout(addLingerTimer);
   });
-  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[]; at: string } | null>(null);
+  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[]; at: string; highlight: HighlightKind } | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
@@ -420,7 +421,7 @@
       const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const { x, y, w, h } = v.frame.box;
-      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, ring: on ? chrome.ring : NodeChrome.None, handles: false, hovered: false, ringColor: ringColour({ outputs: [] }, look), names: false, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
+      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, ring: on ? chrome.ring : NodeChrome.None, handles: false, hovered: false, ringColor: ringColour(), names: false, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
     });
     const tiles = placed.flatMap((t) => {
       const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
@@ -436,7 +437,7 @@
       }
       const marks = portMarks(t);
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
     return [...tiles, ...views];
   });
@@ -1030,7 +1031,7 @@
   function hoverElement(w: Point, reach: Reach) {
     const hit = elementAt(w, reach);
     const quad = hit ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
-    pickHover = hit && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id } : null;
+    pickHover = hit && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id, highlight: highlightOf(liveOf(hit.nodeId)!.doc, hit.clip) } : null;
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
@@ -1652,7 +1653,7 @@
       const quad = at.picker.outlineQuad(clip, at.space);
       const own = findClip(at.live.doc, clip)?.clip;
       const pivot: [number, number] = [own?.transform.anchorX ?? TRANSFORM.anchorX.fallback, own?.transform.anchorY ?? TRANSFORM.anchorY.fallback];
-      return quad ? [{ clip, kind, pivot, quad: quad.map(onScreen) }] : [];
+      return quad ? [{ clip, kind, pivot, highlight: highlightOf(at.live.doc, clip), quad: quad.map(onScreen) }] : [];
     });
   }
 
@@ -3406,7 +3407,7 @@
           <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
@@ -3426,7 +3427,7 @@
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} drop={frameGuides?.nodeId === frame.id ? (frameGuides.drop ?? null) : null} measured={measuredGapsIn} />
         {/if}
         {#if pickHover?.at === frame.id}
-          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
         {@const live = peering ? liveOf(frame.id) : null}
         {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
@@ -3447,10 +3448,10 @@
       {#snippet children(frame)}
         {@const nodeId = baseNodeId(frame.id)}
         {#each typing || cropping?.nodeId === nodeId ? [] : marksIn(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={null} turn={0} ongrab={(grip, handle, e) => grab(nodeId, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={null} turn={0} ongrab={(grip, handle, e) => grab(nodeId, mark.clip, grip, handle, e)} />
         {/each}
         {#if pickHover?.at === frame.id}
-          <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+          <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
         {@const viewLive = inside?.nodeId === nodeId ? viewLives.get(frame.id) : null}
         {#if viewLive}
@@ -3777,7 +3778,7 @@
   .pick-outline {
     position: absolute;
     box-sizing: border-box;
-    border: 1px solid var(--ui-hover-outline, var(--ui-accent));
+    border: 1px solid var(--highlight, var(--ui-highlight));
     pointer-events: none;
     transform-origin: 0 0;
   }

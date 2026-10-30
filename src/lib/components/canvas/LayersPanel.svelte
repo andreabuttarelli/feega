@@ -42,6 +42,7 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
   import type { DrawTool } from '$lib/motion/draw-tool';
+  import { highlightStyle, rowHighlight } from '$lib/canvas/highlight';
   import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
@@ -337,7 +338,8 @@
       tabindex="-1"
       data-layer={row.id}
       data-kind={row.kind}
-      style={`padding-left: ${FOLD_GUTTER + row.depth * INDENT_PX}px`}
+      data-highlight={rowHighlight(row)}
+      style={`padding-left: ${FOLD_GUTTER + row.depth * INDENT_PX}px;${highlightStyle(rowHighlight(row))}`}
       draggable={editable(row)}
       class:hovered={layersSource.hovered?.id === row.id && layersSource.hovered?.nodeId === row.nodeId}
       onclick={(e) => choose(row, e)}
@@ -488,11 +490,17 @@
   }
 
   .row.hovered {
-    box-shadow: inset 0 0 0 1px var(--ui-hover-outline);
+    box-shadow: inset 0 0 0 1px var(--highlight);
   }
 
   .row.picked {
-    background: var(--ui-selected);
+    background: color-mix(in srgb, var(--highlight) 12%, transparent);
+  }
+
+  .row[data-highlight='component'] .icon,
+  .row[data-highlight='component'] .name,
+  .row[data-highlight='component'].picked .icon {
+    color: var(--highlight);
   }
 
   .row.picked .icon {
@@ -500,12 +508,12 @@
   }
 
   .row.inside {
-    background: var(--ui-selected);
+    background: color-mix(in srgb, var(--highlight) 12%, transparent);
     border-radius: 0;
   }
 
   .row.inside .icon {
-    color: var(--ui-accent-text);
+    color: var(--highlight);
   }
 
   .row.muted .name {

@@ -56,7 +56,23 @@ export function homed(source: MotionDoc, frameId: string): MotionDoc {
 
 export const mainHome = (doc: MotionDoc, compId: string, frameId: string): string => doc.comps[compId]?.component?.home ?? frameId;
 
-export const mainClipOf = (doc: MotionDoc, compId: string): string | null => doc.tracks.flatMap((t) => t.clips).find((c) => c.props.comp === compId)?.id ?? null;
+const holdsMain = (doc: MotionDoc, clip: MotionClip, compId: string, seen: Set<string>): boolean => {
+  const comp = clip.props.comp;
+  if (comp === compId) {
+    return true;
+  }
+  if (typeof comp !== 'string' || seen.has(comp)) {
+    return false;
+  }
+  seen.add(comp);
+  return (doc.comps[comp]?.tracks ?? []).flatMap((t) => t.clips as MotionClip[]).some((inner) => holdsMain(doc, inner, compId, seen));
+};
+
+export const mainClipOf = (doc: MotionDoc, compId: string): string | null => {
+  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
+  const shown = clips.find((c) => c.props.comp === compId) ?? clips.find((c) => holdsMain(doc, c, compId, new Set()));
+  return shown?.id ?? null;
+};
 
 export function placeInstance(target: MotionDoc, source: MotionDoc, compId: string, newId: NewId, at?: Offset): OpResult {
   const main = source.comps[compId];
