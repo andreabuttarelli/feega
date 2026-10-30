@@ -641,7 +641,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function homeComponents(nodeId: string) {
-    void post('homeComponents', { node_id: nodeId });
+    void post('homeComponents', { node_id: nodeId }).then(() => invalidate(CANVAS_LIST_DEPENDENCY));
   }
 
   function wrapInSection(ids: string[]) {
@@ -3767,6 +3767,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
     landImported(landed);
+    void invalidate(CANVAS_LIST_DEPENDENCY);
     if (startUrl && landed.truncated) {
       failed = `Imported the top of ${startHost(startUrl)}.`;
     }
