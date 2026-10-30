@@ -38,6 +38,7 @@ function tabOf() {
     reveal: vi.fn(async () => ({ height: 900, hidden: 0 })),
     settle: vi.fn(async () => undefined),
     seeAll: vi.fn(async () => undefined),
+    sample: vi.fn(async () => 0),
     overlay: vi.fn(async () => null),
     click: vi.fn(async () => undefined),
     press: vi.fn(async () => undefined),

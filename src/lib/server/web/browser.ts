@@ -4,7 +4,7 @@ import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
 import { OVERLAY_SELECTOR, type Overlay } from './overlays';
 import { SnapMode, TREE_LIMITS, treeScript, type PageSnap, type PageTree } from '$lib/server/url-import/page-tree';
-import { everythingInView, revealPage, type RevealMode, type Revealed } from '$lib/server/url-import/page-reveal';
+import { everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed } from '$lib/server/url-import/page-reveal';
 import { snapped } from '$lib/server/url-import/page-snaps';
 import { componentMarksOf, MARK_LIMITS, type ComponentUse } from '$lib/server/code-import/component-marks';
 
@@ -41,6 +41,7 @@ export type AppTab = Tab & {
   tree: (maxHeight?: number) => Promise<unknown>;
   reveal: (mode: RevealMode) => Promise<Revealed>;
   seeAll: () => Promise<void>;
+  sample: () => Promise<number>;
   settle: (ms: number) => Promise<void>;
   marks: (names: string[]) => Promise<ComponentUse[]>;
   overlay: () => Promise<Overlay | null>;
@@ -210,9 +211,11 @@ const HIDE = `[${TREE_LIMITS.hideAttr}]`;
 const hiddenWithin = (scope: string) => `${scope}${HIDE},${scope}${HIDE} *{visibility:hidden!important}`;
 const shown = (target: string) => `${target},${target} *{visibility:visible!important}`;
 
+const PAINT_SOURCES = 'clipPath,clipPath *,mask,mask *{visibility:visible!important}';
+
 const SNAP_CSS: Record<SnapMode, (target: string) => string> = {
-  [SnapMode.Isolated]: (target) => `html,body{background:transparent!important}body *{visibility:hidden!important}${shown(target)}${hiddenWithin(`${target} `)}`,
-  [SnapMode.Own]: (target) => `html,body{background:transparent!important}body *{visibility:hidden!important}${target}{visibility:visible!important}`,
+  [SnapMode.Isolated]: (target) => `html,body{background:transparent!important}body *{visibility:hidden!important}${PAINT_SOURCES}${shown(target)}${hiddenWithin(`${target} `)}`,
+  [SnapMode.Own]: (target) => `html,body{background:transparent!important}body *{visibility:hidden!important}${PAINT_SOURCES}${target}{visibility:visible!important}`,
   [SnapMode.Backdrop]: (target) => `${hiddenWithin('')}${shown(target)}${hiddenWithin(`${target} `)}`
 };
 
@@ -233,11 +236,33 @@ async function shotInView(page: Page, snap: PageSnap): Promise<Buffer> {
   return sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(pieces).png().toBuffer();
 }
 
+function heldOn(target: string, picture: string, box: PageSnap['box']): void {
+  const LIVE = /^(CANVAS|VIDEO|IFRAME|EMBED|OBJECT)$/;
+  const SAME_PX = 1;
+  const el = document.querySelector<HTMLElement>(target);
+  if (!el || !LIVE.test(el.tagName)) {
+    return;
+  }
+  const r = el.getBoundingClientRect();
+  const whole = Math.abs(r.width - box.width) <= SAME_PX && Math.abs(r.height - box.height) <= SAME_PX;
+  if (!whole) {
+    return;
+  }
+  const still = document.createElement('img');
+  still.src = picture;
+  still.className = el.className;
+  still.style.cssText = `${el.style.cssText};width:${r.width}px;height:${r.height}px;object-fit:fill`;
+  el.replaceWith(still);
+}
+
 async function shoot(page: Page, snap: PageSnap): Promise<string | null> {
-  const css = SNAP_CSS[snap.mode](`[${TREE_LIMITS.snapAttr}="${snap.ref}"]`);
+  const target = `[${TREE_LIMITS.snapAttr}="${snap.ref}"]`;
+  const css = SNAP_CSS[snap.mode](target);
   const style = css ? await page.addStyleTag({ content: css }) : null;
   try {
-    return `data:image/png;base64,${(await shotInView(page, snap)).toString('base64')}`;
+    const picture = `data:image/png;base64,${(await shotInView(page, snap)).toString('base64')}`;
+    await page.evaluate(heldOn, target, picture, snap.box).catch(() => undefined);
+    return picture;
   } finally {
     await style?.evaluate((el) => el.remove()).catch(() => undefined);
     await style?.dispose();
@@ -288,7 +313,9 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     reveal: (mode) => page.evaluate(revealPage, mode),
     seeAll: async () => {
       await page.evaluateOnNewDocument(everythingInView);
+      await page.evaluateOnNewDocument(heldStill);
     },
+    sample: () => page.evaluate(inViewSampled),
     settle: async (ms) => {
       await page.waitForNetworkIdle({ idleTime: IDLE_MS, timeout: ms }).catch(() => undefined);
       await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, 3_000))])).catch(() => undefined);

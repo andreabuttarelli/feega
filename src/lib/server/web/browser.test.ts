@@ -102,3 +102,4 @@ describe('the Origin a form post carries', () => {
     expect(originHeaders('POST', { origin: 'https://app.example' }, 'https://app.example/x')).toBeNull();
   });
 });
+
