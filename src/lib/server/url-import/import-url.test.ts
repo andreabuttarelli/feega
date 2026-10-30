@@ -187,7 +187,7 @@ describe('importPageAt', () => {
 
     await importPageAt(ask);
 
-    expect(importFont).toHaveBeenCalledWith('https://acme.test/sohne.woff2');
+    expect(importFont).toHaveBeenCalledWith('https://acme.test/sohne.woff2', 'https://acme.test/');
     const doc = docs.get('frame-1')!.doc as { fonts: { family: string }[] };
     expect(doc.fonts.map((f) => f.family)).toContain('Sohne');
     expect(JSON.stringify(doc)).toContain('font-asset-1');
@@ -203,7 +203,7 @@ describe('importPageAt', () => {
     await importPageAt(ask);
 
     expect(fetchText).toHaveBeenCalledWith('https://cdn.acme.test/css/app.css');
-    expect(importFont).toHaveBeenCalledWith('https://cdn.acme.test/fonts/sohne.woff2');
+    expect(importFont).toHaveBeenCalledWith('https://cdn.acme.test/fonts/sohne.woff2', 'https://acme.test/');
     expect(JSON.stringify(docs.get('frame-1')!.doc)).toContain('font-asset-2');
   });
 

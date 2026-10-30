@@ -5,7 +5,7 @@ const safeFetchBytes = vi.fn();
 
 vi.mock('$lib/server/tool-guard', async (importOriginal) => ({ ...(await importOriginal<object>()), safeFetchBytes: (...a: unknown[]) => safeFetchBytes(...a) }));
 
-const { importCanvasLink, UploadError } = await import('./upload');
+const { fetchCanvasLink, importCanvasLink, UploadError } = await import('./upload');
 
 const scope = { orgId: 'org', projectId: 'project' };
 const LINK = 'https://cdn.test/blue.png';
@@ -54,5 +54,13 @@ describe('copying a link into the project', () => {
     const { db } = fakeDb();
 
     await expect(importCanvasLink(db, { ...scope, url: LINK })).rejects.toBeInstanceOf(UploadError);
+  });
+
+  it('asks for a file as the page that uses it would, for hosts that refuse a fetch without a referer', async () => {
+    safeFetchBytes.mockResolvedValue({ url: LINK, status: 200, ok: true, mime: 'font/woff2', bytes: PNG });
+
+    await fetchCanvasLink({ url: LINK, referer: 'https://www.apple.com/macbook-air/' });
+
+    expect(safeFetchBytes).toHaveBeenCalledWith(LINK, expect.objectContaining({ headers: { Referer: 'https://www.apple.com/macbook-air/' } }));
   });
 });
