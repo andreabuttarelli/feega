@@ -10,12 +10,12 @@ https://oh.feega.app/?start_url=<encodeURIComponent(url)>
 |---|---|
 | Parameter | `start_url` |
 | Encoding | percent-encoded once (`encodeURIComponent`) |
-| Scheme | `http` or `https` only |
+| Scheme | `http` or `https`; a bare domain or scheme-less URL (`stripe.com`, `www.stripe.com/pricing`, surrounding spaces) gets `https://` prepended |
 | Length | at most 2000 characters, decoded |
 | Refused | `javascript:`, `data:`, other schemes, credentials in the URL, `localhost`, `*.local`, `*.internal`, IP literals in private ranges, single-label hosts. The import re-checks DNS against private addresses before opening the page. |
 | Also accepted on | `/login`, `/app` (same parameter) |
 
-A refused value is ignored silently: the visitor lands as if no parameter was given.
+A refused value is ignored: the visitor lands as if no parameter was given, and the server logs a warning with the reason.
 
 ## What happens
 
