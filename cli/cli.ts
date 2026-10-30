@@ -592,6 +592,7 @@ canvas
   .option('--x <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--y <n>', 'Canvas position of the frame centre', Number, 0)
   .option('--no-sections', 'Keep the page as one layer tree instead of named sections')
+  .option('--no-tokens', 'Keep raw values instead of shared colour variables and text, effect and gradient styles')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (projectId: string, url: string, opts) => {
     const { cmdCanvasImportUrl } = await import('./commands/canvas.ts');

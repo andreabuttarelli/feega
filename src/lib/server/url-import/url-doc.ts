@@ -9,6 +9,8 @@ import { repeatedOf } from './repeated';
 import { windowed } from './page-window';
 import { sectionsOf } from './page-sections';
 import { sectionFramed } from './section-frames';
+import { tokensOf, type SiteBrand } from './page-tokens';
+import { samplesOf, siteName, tokenised } from './token-bind';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -176,11 +178,34 @@ export enum Sectioning {
 
 export const sectioningOf = (sections: boolean) => (sections ? Sectioning.On : Sectioning.Off);
 
-export type PageShape = { sectioning: Sectioning };
+export enum Tokening {
+  On = 'on',
+  Off = 'off'
+}
 
-export const PLAIN_SHAPE: PageShape = { sectioning: Sectioning.Off };
+export const tokeningOf = (tokens: boolean) => (tokens ? Tokening.On : Tokening.Off);
 
-export const FULL_SHAPE: PageShape = { sectioning: Sectioning.On };
+export type PageShape = { sectioning: Sectioning; tokening?: Tokening; brand?: SiteBrand };
+
+export const PLAIN_SHAPE: PageShape = { sectioning: Sectioning.Off, tokening: Tokening.Off };
+
+export const FULL_SHAPE: PageShape = { sectioning: Sectioning.On, tokening: Tokening.On };
+
+type Tokenise = (plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined) => FigmaPlan;
+
+function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined): FigmaPlan {
+  const docs = plan.items.map((item) => item.doc);
+  const images = new Set(plan.items.flatMap((item) => item.images.flatMap((image) => [image.clipId, ...(image.innerId ? [image.innerId] : [])])));
+  const units = { docPerPx: (docs[0]?.width ?? tree.width) / tree.width, images };
+  const tokens = tokensOf(samplesOf(docs, root, units), brand);
+  const site = siteName(tree.url);
+  return { ...plan, items: plan.items.map((item) => ({ ...item, doc: tokenised(item.doc, tokens, site, units) })) };
+}
+
+const TOKENISED: Record<Tokening, Tokenise> = {
+  [Tokening.On]: withTokens,
+  [Tokening.Off]: (plan) => plan
+};
 
 const SECTIONED: Record<Sectioning, (tree: PageTree) => RestNode> = {
   [Sectioning.On]: (tree) => (tree.outline ? sectionFramed(tree.root, sectionsOf({ ...tree.outline, height: tree.height })) : tree.root),
@@ -196,10 +221,11 @@ export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPE
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
   const root = mapped({ ...mark(SECTIONED[shape.sectioning](tree)), name }, keyOf, family);
-  const plan = stacked(slicesOf(root), newId, uploads);
-  if (!plan) {
+  const stack = stacked(slicesOf(root), newId, uploads);
+  if (!stack) {
     return null;
   }
+  const plan = TOKENISED[shape.tokening ?? Tokening.Off](stack, tree, root, shape.brand);
   const counts = plan.items.map((item) => countOf(item.doc));
   return { plan, images, name, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
 }

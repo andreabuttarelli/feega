@@ -8,7 +8,10 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { importPageAt, UrlImportOutcome, type UrlImported } from './import-url';
-import type { PageShape } from './url-doc';
+import { Tokening, type PageShape } from './url-doc';
+import type { SiteBrand } from './page-tokens';
+import { findSiteBrand } from '$lib/server/start/site-brand';
+import { startHost } from '$lib/start-url';
 
 const MS_PER_MINUTE = 60_000;
 const IMPORTS_PER_MINUTE = 4;
@@ -37,6 +40,22 @@ export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'pr
   };
 }
 
+async function brandOf(scope: UrlScope, url: string): Promise<SiteBrand | undefined> {
+  if (!URL.canParse(url)) {
+    return undefined;
+  }
+  const brand = await findSiteBrand(scope.db, scope.orgId, startHost(url)).catch(() => null);
+  return brand ? { palette: brand.kit.palette.map((swatch) => swatch.hex) } : undefined;
+}
+
+async function shapeFor(scope: UrlScope, url: string, shape: PageShape | undefined): Promise<PageShape | undefined> {
+  if (shape?.tokening !== Tokening.On) {
+    return shape;
+  }
+  const brand = await brandOf(scope, url);
+  return brand ? { ...shape, brand } : shape;
+}
+
 export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape }): Promise<UrlImported> {
   if (!limiter.allow(scope.userId)) {
     return { outcome: UrlImportOutcome.RateLimited };
@@ -44,6 +63,7 @@ export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { ur
 
   return importPageAt({
     ...ask,
+    shape: await shapeFor(scope, ask.url, ask.shape),
     store: frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId }),
     place: { projectId: scope.projectId, canvasId },
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),

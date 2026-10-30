@@ -56,8 +56,8 @@ export async function cmdCanvasImport(project: string, file: string, opts: { org
   console.log(JSON.stringify(result, null, 2));
 }
 
-export async function cmdCanvasImportUrl(project: string, url: string, opts: { canvas: string; x: number; y: number; sections: boolean; org?: string }) {
-  const input = { canvasId: opts.canvas, url, x: opts.x, y: opts.y, sections: opts.sections };
+export async function cmdCanvasImportUrl(project: string, url: string, opts: { canvas: string; x: number; y: number; sections: boolean; tokens: boolean; org?: string }) {
+  const input = { canvasId: opts.canvas, url, x: opts.x, y: opts.y, sections: opts.sections, tokens: opts.tokens };
   const result = await canvasApi.run(await token(), { project, op: 'import_url', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }
