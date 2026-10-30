@@ -24,8 +24,8 @@ describe('project mode', () => {
     }
   );
 
-  it('wiro models live only in uncensored projects', () => {
-    expect(modelAllowedIn(ProjectMode.Standard, 'wiro/some-model')).toBe(false);
+  it('wiro models run in every project', () => {
+    expect(modelAllowedIn(ProjectMode.Standard, 'wiro/some-model')).toBe(true);
     expect(modelAllowedIn(ProjectMode.Uncensored, 'wiro/some-model')).toBe(true);
     expect(modelAllowedIn(ProjectMode.Standard, 'google/gemini-image')).toBe(true);
     expect(modelAllowedIn(ProjectMode.Uncensored, 'google/gemini-image')).toBe(true);
@@ -40,12 +40,11 @@ describe('project mode', () => {
     }
   );
 
-  it('the menu of a standard project carries no wiro model', () => {
-    const choices = [{ id: 'wiro/a' }, { id: 'openai/b' }];
-    expect(offerableIn(ProjectMode.Standard, choices).map((c) => c.id)).toEqual(['openai/b']);
-    expect(offerableIn(ProjectMode.Uncensored, choices).map((c) => c.id)).toEqual(['wiro/a', 'openai/b']);
+  it('the menu of a standard project carries wiro models that are not uncensored', () => {
+    const choices = [{ id: 'wiro/a' }, { id: 'wiro/u', uncensored: true }, { id: 'openai/b' }];
+    expect(offerableIn(ProjectMode.Standard, choices).map((c) => c.id)).toEqual(['wiro/a', 'openai/b']);
+    expect(offerableIn(ProjectMode.Uncensored, choices).map((c) => c.id)).toEqual(['wiro/a', 'wiro/u', 'openai/b']);
   });
-
 });
 
 describe('an uncensored model from any provider', () => {
@@ -61,10 +60,10 @@ describe('an uncensored model from any provider', () => {
 });
 
 describe('catalogueIn', () => {
-  it('drops wiro choices and recommendations from every medium of a standard project', () => {
+  it('drops uncensored choices and recommendations from every medium of a standard project', () => {
     const catalogue = {
-      image: { choices: [{ id: 'wiro/a' }, { id: 'openai/b' }], recommended: [{ id: 'wiro/a' }, { id: 'openai/b' }], candidates: [{ id: 'wiro/a' }] },
-      video: { choices: [{ id: 'wiro/v' }], recommended: [] }
+      image: { choices: [{ id: 'wiro/a', uncensored: true }, { id: 'openai/b' }], recommended: [{ id: 'wiro/a', uncensored: true }, { id: 'openai/b' }], candidates: [{ id: 'wiro/a', uncensored: true }] },
+      video: { choices: [{ id: 'wiro/v', uncensored: true }], recommended: [] }
     };
     const standard = catalogueIn(ProjectMode.Standard, catalogue);
     expect(standard.image.choices.map((c) => c.id)).toEqual(['openai/b']);

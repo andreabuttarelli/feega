@@ -4,8 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
-import { uncensoredAccess } from '$lib/server/uncensored-access';
-import { modelRefusal, modeOf, ProjectMode } from '$lib/project-mode';
+import { isUncensoredModel, uncensoredAccess } from '$lib/server/uncensored-access';
+import { Capability, MODE_REFUSAL, modelRefusal, modeOf, ProjectMode } from '$lib/project-mode';
 import { uncensoredLock, UncensoredLock, type UncensoredFacts } from '$lib/uncensored-lock';
 import { VerifierSetting, recordAdult, verifierFor, type AgeVerificationStore, type AgeVerifier } from './age-verification';
 import { AgeVerdict, DIDIT_PROVIDER, diditFromEnv, diditVerifier, type Didit, type DiditResult } from './didit';
@@ -114,7 +114,7 @@ export async function generationRefusal(
     return refused;
   }
   if (mode !== ProjectMode.Uncensored) {
-    return null;
+    return (await isUncensoredModel(db, input.model)) ? MODE_REFUSAL[Capability.WiroModels] : null;
   }
   return (await uncensoredLockFor(db, input)) === UncensoredLock.Open ? null : UNCENSORED_LOCKED;
 }
