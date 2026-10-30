@@ -13,6 +13,13 @@ export enum SectionName {
   Stats = 'Stats',
   News = 'News',
   Cta = 'CTA',
+  Customers = 'Customers',
+  Integrations = 'Integrations',
+  HowItWorks = 'How it works',
+  UseCases = 'Use cases',
+  Security = 'Security',
+  Team = 'Team',
+  Ai = 'AI',
   Footer = 'Footer'
 }
 
@@ -49,11 +56,18 @@ const SECTION_NAMES: { name: SectionName; when: (f: Facts) => boolean }[] = [
   { name: SectionName.Hero, when: (f) => (f.h1 || /\bhero\b/.test(f.words)) && f.top < HERO_ZONE_PX },
   { name: SectionName.Faq, when: (f) => /\bfaqs?\b|frequently asked|questions/.test(text(f)) || f.toggles >= FAQ_TOGGLES },
   { name: SectionName.Pricing, when: (f) => /\bpricing\b|\bplans\b|\bprices?\b/.test(text(f)) },
-  { name: SectionName.Testimonials, when: (f) => /testimonial|\breviews\b|what .* say|loved by|\bcustomers?\b|case stud/.test(text(f)) || f.quotes >= QUOTES },
+  { name: SectionName.Testimonials, when: (f) => /testimonial|\breviews\b|what .* say|loved by|case stud/.test(text(f)) || f.quotes >= QUOTES },
   { name: SectionName.Logos, when: (f) => /\blogos?\b|trusted by|\bbrands\b|partners|clients/.test(text(f)) || (f.pictures >= LOGO_PICTURES && f.height <= LOGO_STRIP_PX && !f.heading) },
   { name: SectionName.Stats, when: (f) => /\bstats?\b|statistic|metrics/.test(text(f)) },
-  { name: SectionName.News, when: (f) => /\bnews\b|\bblog\b|changelog|\bupdates\b|\bevents?\b|recently shipped|\blatest\b/.test(text(f)) },
+  { name: SectionName.News, when: (f) => /\bnews\b|\bblog\b|changelog|\bupdates\b|\bevents?\b|recently shipped|\blatest\b|\bblog\b/.test(text(f)) },
   { name: SectionName.Cta, when: (f) => /get started|start (building|for free|now|today)|try .*free|sign up|contact sales|ready to|available today|book a demo|\bjoin\b/.test(f.heading) && f.height <= CTA_MAX_PX },
+  { name: SectionName.Customers, when: (f) => /\bcustomers?\b/.test(text(f)) },
+  { name: SectionName.Integrations, when: (f) => /\bintegrations?\b/.test(text(f)) },
+  { name: SectionName.HowItWorks, when: (f) => /how it works/.test(text(f)) },
+  { name: SectionName.UseCases, when: (f) => /use cases?/.test(text(f)) },
+  { name: SectionName.Security, when: (f) => /\bsecurity\b|\bsecure\b|compliance/.test(text(f)) },
+  { name: SectionName.Team, when: (f) => /meet the team|our team|^team\b/.test(f.heading) },
+  { name: SectionName.Ai, when: (f) => /\bai\b|\bagents?\b/.test(f.heading) },
   { name: SectionName.Features, when: (f) => /feature|benefit|capabilit|solution|how it works/.test(text(f)) }
 ];
 

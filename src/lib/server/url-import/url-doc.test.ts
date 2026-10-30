@@ -24,8 +24,8 @@ const newId = () => `id${++counter}`;
 describe('urlPlan', () => {
   it.each([
     ['stripe', ['Nav', 'Hero', 'Features', 'Section 4', 'Stats']],
-    ['linear', ['Nav', 'Hero', 'Logos', 'Section 4', 'Section 5', 'Section 6']],
-    ['vercel', ['Nav', 'Hero', 'Section 3', 'News']]
+    ['linear', ['Nav', 'Hero', 'Logos', 'AI', 'Integrations', 'Section 6']],
+    ['vercel', ['Nav', 'Hero', 'AI', 'News']]
   ])('con le sezioni, i figli del frame di %s sono le sezioni con nome', (name, names) => {
     expect(topNames(urlPlan(outlined(name), newId, undefined, {}, Sectioning.On)!)).toEqual(names);
   });
