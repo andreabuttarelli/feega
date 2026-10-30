@@ -38,7 +38,7 @@ export async function stacked(parts: { png: Buffer; height: number }[]): Promise
   const placed: { input: Buffer; top: number; left: number }[] = [];
   let top = 0;
   for (const part of parts) {
-    placed.push({ input: await sharp(part.png).resize({ width: FOLD.width, height: part.height }).png().toBuffer(), top, left: 0 });
+    placed.push({ input: await sharp(part.png).resize({ width: FOLD.width, height: part.height, fit: 'fill' }).png().toBuffer(), top, left: 0 });
     top += part.height;
   }
   return sharp({ create: { width: FOLD.width, height: top, channels: 3, background: WHITE } }).composite(placed).png().toBuffer();

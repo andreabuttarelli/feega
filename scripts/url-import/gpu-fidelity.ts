@@ -129,7 +129,7 @@ for (const name of names) {
   const local = Object.fromEntries((await Promise.all(Object.entries(assets).map(async ([id, url]) => [id, await served(url)] as const))).filter((e): e is readonly [string, string] => Boolean(e[1])).map(([id, url]) => [id, url.startsWith('/') ? `${server.origin}${url}` : url]));
   let top = 0;
   const items = made.plan.items.map((item) => {
-    const placed = { doc: imagesFilled(item.doc, item.images, assetOf), top, width: item.size.width };
+    const placed = { doc: imagesFilled(item.doc, item.images, assetOf), top, ...item.size };
     top += item.size.height;
     return placed;
   });

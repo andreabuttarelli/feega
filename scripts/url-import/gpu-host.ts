@@ -43,8 +43,8 @@ async function worldOpen(input: WorldInput): Promise<void> {
     const group = `frame-${i}`;
     raster.putGroup(group, list, media.pictures);
     lists.push(list);
-    const k = item.width / list.width;
-    uses.push({ kind: 'use', clip: group, group, matrix: [k, 0, 0, k, 0, item.top] });
+    const box = [item.width / list.width, item.height / list.height];
+    uses.push({ kind: 'use', clip: group, group, matrix: [box[0], 0, 0, box[1], 0, item.top] });
   }
   for (let tries = 0; tries < SETTLE_FRAMES && !lists.every((list) => raster.upload(list, media.pictures, UPLOADS_PER_FRAME)); tries++) {
     await nextFrame();
