@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Background, DESIGN_MAX_SIDE, MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setStill } from '@feega/motion-core/motion/still';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
@@ -290,6 +290,15 @@ describe('drawing a frame in a chosen format', () => {
 
   it('a still second makes it a still graphic holding that frame', () => {
     expect(drawnFrame(box, MotionFormat.Square, 1).still).toEqual({ frame: 30 });
+  });
+
+  it('a tall still keeps the shape of its box, so a page drawn into it is not letterboxed', () => {
+    const tall = { left: 0, top: 0, width: 1280, height: 14535 };
+    const doc = drawnFrame(tall, MotionFormat.Custom, 0);
+    const drawnHeight = (doc.width * tall.height) / tall.width;
+
+    expect(Math.abs(doc.height - drawnHeight)).toBeLessThanOrEqual(1);
+    expect(doc.height).toBeLessThanOrEqual(DESIGN_MAX_SIDE);
   });
 
   it('a new frame is filled plain white, not with the brand background', () => {
