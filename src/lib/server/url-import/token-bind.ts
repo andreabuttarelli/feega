@@ -188,6 +188,8 @@ type Plan = { collection: Collection; styles: Record<string, Style>; colourOf: M
 
 const styleName = (site: string, name: string) => `${site} ${name}`;
 
+const paintKey = (paint: ColourPaint, hex: string) => `${paint}|${hex}`;
+
 const LEADING_PLACES = 2;
 const TRACKING_PLACES = 3;
 
@@ -210,7 +212,7 @@ function planOf(tokens: Tokens, site: string, root: MotionDoc, units: Units): Pl
   return {
     collection: { modes: [DEFAULT_MODE], vars },
     styles,
-    colourOf: new Map(tokens.colours.flatMap((c) => c.members.map((hex) => [hex, keyOf(site, c.name)] as const))),
+    colourOf: new Map(tokens.colours.flatMap((c) => c.paints.flatMap((paint) => c.members.map((hex) => [paintKey(paint, hex), keyOf(site, c.name)] as const)))),
     textOf: new Map(tokens.texts.flatMap((t) => kept(styleName(site, t.name)).map((n) => [t.key, n] as const))),
     effectOf: new Map(tokens.effects.flatMap((e) => kept(styleName(site, e.name)).map((n) => [e.key, n] as const))),
     gradientOf: new Map(tokens.gradients.flatMap((g) => kept(styleName(site, g.name)).map((n) => [g.key, n] as const))),
@@ -220,7 +222,7 @@ function planOf(tokens: Tokens, site: string, root: MotionDoc, units: Units): Pl
 
 function boundClip(clip: MotionClip, look: Look, plan: Plan): MotionClip {
   const bind: Record<string, string> = { ...clip.bind };
-  const colour = plan.colourOf.get(look.textColour ?? look.fill ?? '');
+  const colour = plan.colourOf.get(look.textColour ? paintKey(ColourPaint.Text, look.textColour) : paintKey(ColourPaint.Fill, look.fill ?? ''));
   if (colour) {
     bind[look.textColour ? TEXT_COLOUR_TARGET : FILL_TARGET] = colour;
   }

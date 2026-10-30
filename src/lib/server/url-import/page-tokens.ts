@@ -13,7 +13,7 @@ export type Samples = { colours: ColourUse[]; texts: TextUse[]; effects: EffectU
 export type SiteBrand = { palette: string[] };
 
 export type TextStyle = Omit<TextUse, 'chars' | 'heading' | 'button'>;
-export type ColourToken = { name: string; hex: string; members: string[] };
+export type ColourToken = { name: string; hex: string; members: string[]; paints: ColourPaint[] };
 export type TextToken = { name: string; key: string; style: TextStyle };
 export type KeyToken = { name: string; key: string };
 export type NumberToken = { name: string; value: number };
@@ -31,10 +31,13 @@ const MAX_GRADIENTS = 4;
 const MAX_SPACING = 10;
 const DISPLAY_PX = 48;
 const FULL_RADIUS = 999;
+const BUTTON_TIER = 1e12;
+const CHROMATIC_BUTTON = 2;
+const ALL_PAINTS = Object.values(ColourPaint);
 
 type Lab = [number, number, number];
 
-type Cluster = { hex: string; lab: Lab; members: Map<string, number>; fill: number; text: number; border: number; button: number; fills: number; uses: number };
+type Cluster = { hex: string; lab: Lab; members: Map<string, number>; fill: number; text: number; border: number; button: number; buttonFill: number; fills: number; uses: number };
 
 function labOf(hex: string): Lab {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92));
@@ -62,11 +65,12 @@ function clustersOf(uses: ColourUse[]): Cluster[] {
   const clusters: Cluster[] = [];
   for (const [hex, list] of heaviest) {
     const lab = labOf(hex);
-    const home = clusters.find((c) => distance(c.lab, lab) <= SAME_COLOUR) ?? clusters[clusters.push({ hex, lab, members: new Map(), fill: 0, text: 0, border: 0, button: 0, fills: 0, uses: 0 }) - 1];
+    const home = clusters.find((c) => distance(c.lab, lab) <= SAME_COLOUR) ?? clusters[clusters.push({ hex, lab, members: new Map(), fill: 0, text: 0, border: 0, button: 0, buttonFill: 0, fills: 0, uses: 0 }) - 1];
     home.members.set(hex, list.length);
     for (const use of list) {
       home[PAINT_SCORE[use.paint]] += use.weight;
       home.button += use.button ? 1 : 0;
+      home.buttonFill += use.button && use.paint === ColourPaint.Fill ? use.weight : 0;
       home.fills += use.paint === ColourPaint.Fill ? 1 : 0;
       home.uses += 1;
     }
@@ -76,15 +80,22 @@ function clustersOf(uses: ColourUse[]): Cluster[] {
 
 const total = (list: ColourUse[]) => list.reduce((s, u) => s + u.weight, 0);
 
-const COLOUR_ROLES: { name: string; score: (c: Cluster) => number }[] = [
-  { name: 'Background', score: (c) => c.fill },
-  { name: 'Text', score: (c) => c.text },
-  { name: 'Primary', score: (c) => (chromatic(c) && c.uses >= MIN_USES ? c.fills * FILL_FIRST + c.button + c.uses : 0) },
-  { name: 'Surface', score: (c) => (chromatic(c) ? 0 : c.fill) },
-  { name: 'Text muted', score: (c) => c.text },
-  { name: 'Border', score: (c) => c.border },
-  { name: 'Accent', score: (c) => (chromatic(c) && c.uses >= MIN_USES ? c.uses : 0) },
-  ...Array.from({ length: MAX_COLOURS }, (_, i) => ({ name: `Colour ${i + 1}`, score: (c: Cluster) => (c.uses >= MIN_USES ? c.uses : 0) }))
+type ColourRole = { name: string; paints: ColourPaint[]; score: (c: Cluster) => number };
+
+const filledPrimary = (c: Cluster) => (chromatic(c) && c.uses >= MIN_USES ? c.fills * FILL_FIRST + c.button + c.uses : 0);
+
+const buttonPrimary = (c: Cluster) => (c.buttonFill > 0 ? (chromatic(c) ? CHROMATIC_BUTTON : 1) * BUTTON_TIER + Math.min(c.buttonFill, BUTTON_TIER - 1) : 0);
+
+const COLOUR_ROLES: ColourRole[] = [
+  { name: 'Primary', paints: [ColourPaint.Fill], score: buttonPrimary },
+  { name: 'Background', paints: [ColourPaint.Fill], score: (c) => c.fill },
+  { name: 'Text', paints: [ColourPaint.Text], score: (c) => c.text },
+  { name: 'Primary', paints: [ColourPaint.Fill], score: filledPrimary },
+  { name: 'Surface', paints: [ColourPaint.Fill], score: (c) => (chromatic(c) ? 0 : c.fill) },
+  { name: 'Text muted', paints: [ColourPaint.Text], score: (c) => c.text },
+  { name: 'Border', paints: [ColourPaint.Border], score: (c) => c.border },
+  { name: 'Accent', paints: ALL_PAINTS, score: (c) => (chromatic(c) && c.uses >= MIN_USES ? c.uses : 0) },
+  ...Array.from({ length: MAX_COLOURS }, (_, i) => ({ name: `Colour ${i + 1}`, paints: ALL_PAINTS, score: (c: Cluster) => (c.uses >= MIN_USES ? c.uses : 0) }))
 ];
 
 function pulledToBrand(c: Cluster, brand: SiteBrand | undefined): string {
@@ -93,15 +104,17 @@ function pulledToBrand(c: Cluster, brand: SiteBrand | undefined): string {
 }
 
 function coloursOf(uses: ColourUse[], brand: SiteBrand | undefined): ColourToken[] {
-  const left = clustersOf(uses);
+  const clusters = clustersOf(uses);
+  const claimed = new Map<Cluster, Set<ColourPaint>>(clusters.map((c) => [c, new Set()]));
   const named: ColourToken[] = [];
   for (const role of COLOUR_ROLES) {
-    const best = left.map((c) => ({ c, score: role.score(c) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score)[0];
-    if (!best || named.length >= MAX_COLOURS) {
+    const free = (c: Cluster) => role.paints.every((p) => !claimed.get(c)!.has(p)) && (role.paints !== ALL_PAINTS || claimed.get(c)!.size === 0);
+    const best = clusters.filter(free).map((c) => ({ c, score: role.score(c) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score)[0];
+    if (!best || named.length >= MAX_COLOURS || named.some((t) => t.name === role.name)) {
       continue;
     }
-    left.splice(left.indexOf(best.c), 1);
-    named.push({ name: role.name, hex: pulledToBrand(best.c, brand), members: [...best.c.members.keys()].sort() });
+    role.paints.forEach((p) => claimed.get(best.c)!.add(p));
+    named.push({ name: role.name, hex: pulledToBrand(best.c, brand), members: [...best.c.members.keys()].sort(), paints: role.paints });
   }
   return named;
 }

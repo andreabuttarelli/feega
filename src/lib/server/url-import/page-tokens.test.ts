@@ -50,6 +50,21 @@ describe('page tokens', () => {
     expect(names({ ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1e6), colour('#111111', ColourPaint.Text, 1e4), ...orange, ...purple] }).Primary).toBe('#533afd');
   });
 
+  it('Primary is the fill of the main buttons, not the most used colour', () => {
+    const yellow = Array.from({ length: 8 }, () => colour('#f2c94c', ColourPaint.Fill, 400));
+    const indigo = [colour('#5e6ad2', ColourPaint.Fill, 60, true), colour('#5e6ad2', ColourPaint.Fill, 60, true)];
+
+    expect(names({ ...EMPTY, colours: [colour('#08090a', ColourPaint.Fill, 1e6), colour('#f7f8f8', ColourPaint.Text, 1e4), ...yellow, ...indigo] }).Primary).toBe('#5e6ad2');
+  });
+
+  it('a monochrome site gets its button colour as Primary, and keeps it as Text too', () => {
+    const blue = [colour('#0070f3', ColourPaint.Fill, 30), colour('#0070f3', ColourPaint.Fill, 30)];
+    const button = [colour('#171717', ColourPaint.Fill, 60, true), colour('#171717', ColourPaint.Fill, 60, true)];
+    const found = names({ ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1e6), colour('#171717', ColourPaint.Text, 1e4), colour('#4d4d4d', ColourPaint.Text, 900), ...blue, ...button] });
+
+    expect([found.Primary, found.Text]).toEqual(['#171717', '#171717']);
+  });
+
   it('a colour used once and with no role is not a token', () => {
     const once = tokensOf({ ...PAGE, colours: [...PAGE.colours, colour('#123456', ColourPaint.Fill, 1)] });
 
