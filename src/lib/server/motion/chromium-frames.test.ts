@@ -70,3 +70,35 @@ describe('chromium launch', () => {
     expect(launches[0]).toMatchObject({ executablePath: '/chrome', args: LAMBDA_ARGS });
   });
 });
+
+describe('chromiumExport on a frame taller than one screenshot', () => {
+  it('draws a 2542×10628 frame in bands no taller than the browser can paint and stitches them whole', async () => {
+    vi.resetModules();
+    const { default: sharp } = await import('sharp');
+    const viewports: { width: number; height: number }[] = [];
+    const page = {
+      setDefaultTimeout: () => {},
+      setViewport: async (v: { width: number; height: number }) => viewports.push(v),
+      evaluate: async () => {},
+      screenshot: async (o: { clip?: { width: number; height: number } }) => {
+        const size = o.clip ?? viewports.at(-1)!;
+        return sharp({ create: { width: size.width, height: size.height, channels: 4, background: { r: 0, g: 0, b: 255, alpha: 1 } } }).png().toBuffer();
+      },
+      close: async () => {}
+    };
+    const puppeteer = await import('puppeteer-core');
+    vi.spyOn(puppeteer.default, 'launch').mockResolvedValue({ connected: true, newPage: async () => page } as never);
+    vi.stubEnv('CHROMIUM_PATH', '/Applications/Chrome');
+    const { chromiumExport } = await import('./chromium-frames');
+
+    const opened = await chromiumExport.open({ width: 2542, height: 10628, scale: 1 });
+    const bytes = await opened.shot('image/png', undefined, null);
+    const { width, height } = await sharp(bytes).metadata();
+    const bottom = await sharp(bytes).extract({ left: 0, top: 10600, width: 1, height: 1 }).raw().toBuffer();
+
+    expect(Math.max(...viewports.map((v) => v.height))).toBeLessThanOrEqual(2048);
+    expect({ width, height }).toEqual({ width: 2542, height: 10628 });
+    expect([...bottom]).toEqual([0, 0, 255, 255]);
+    vi.unstubAllEnvs();
+  });
+});

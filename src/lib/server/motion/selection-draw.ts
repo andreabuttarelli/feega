@@ -1,4 +1,4 @@
-import { Drawing, FILE, FileFormat, rowSize, type ExportRow } from '$lib/motion/export-rows';
+import { Drawing, FILE, FileFormat, rowSize, sizeNote, type ExportRow } from '$lib/motion/export-rows';
 import { printDocument, type Crop } from '$lib/motion/export-vector';
 import { boundsOfClips, svgOf } from '$lib/motion/export-svg';
 import { dotLottieOf, lottieOf } from '$lib/motion/export-lottie';
@@ -52,7 +52,7 @@ async function animated(vector: VectorPort, target: DrawTarget, row: ExportRow):
 }
 
 const DRAW: Record<Drawing, (ports: DrawPorts, targets: DrawTarget[], row: ExportRow) => Promise<Drawn>> = {
-  [Drawing.Raster]: async ({ port, compose }, [target], row) => ({ bytes: await opened(port, compose, target, row, (o) => o.page.shot(FILE[row.format].mime, row.quality ?? FILE[row.format].quality, o.crop)), skipped: [] }),
+  [Drawing.Raster]: async ({ port, compose }, [target], row) => ({ bytes: await opened(port, compose, target, row, (o) => o.page.shot(FILE[row.format].mime, row.quality ?? FILE[row.format].quality, o.crop)), skipped: [sizeNote(row, target.doc)].filter((note) => note !== null) }),
   [Drawing.Vector]: async ({ vector }, [target], row) => {
     const { svg, skipped } = await vectored(vector, target, row);
     return { bytes: Buffer.from(svg), skipped };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Bundle, EXPORT_PRESETS, FILE, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, needsBrowser, rowSize } from './export-rows';
+import { Bundle, EXPORT_PRESETS, FILE, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, needsBrowser, rowSize, sizeNote } from './export-rows';
 
 const frame = { width: 1080, height: 1350 };
 
@@ -8,6 +8,15 @@ describe('export rows', () => {
     expect(rowSize({ format: FileFormat.Png, by: SizeBy.Scale, value: 0.5, suffix: '', transparent: false }, frame)).toEqual({ width: 540, height: 675, scale: 0.5 });
     expect(rowSize({ format: FileFormat.Png, by: SizeBy.Width, value: 540, suffix: '', transparent: false }, frame)).toEqual({ width: 540, height: 675, scale: 0.5 });
     expect(rowSize({ format: FileFormat.Png, by: SizeBy.Height, value: 2700, suffix: '', transparent: false }, frame)).toEqual({ width: 2160, height: 2700, scale: 2 });
+  });
+
+  it('a WebP taller than the format allows is scaled to fit and says so, a PNG keeps its size', () => {
+    const tall = { width: 2542, height: 10628 };
+    const webp = rowSize({ format: FileFormat.Webp, by: SizeBy.Scale, value: 2, suffix: '', transparent: false }, tall);
+    expect(webp.height).toBeLessThanOrEqual(16383);
+    expect(sizeNote({ format: FileFormat.Webp, by: SizeBy.Scale, value: 2, suffix: '', transparent: false }, tall)).toMatch(/PNG/);
+    expect(rowSize({ format: FileFormat.Png, by: SizeBy.Scale, value: 2, suffix: '', transparent: false }, tall)).toEqual({ width: 5084, height: 21256, scale: 2 });
+    expect(sizeNote({ format: FileFormat.Webp, by: SizeBy.Scale, value: 1, suffix: '', transparent: false }, tall)).toBeNull();
   });
 
   it('refuses a scale outside 0.5–4× and a lossless format with a quality', () => {
