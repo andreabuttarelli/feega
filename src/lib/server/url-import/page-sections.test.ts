@@ -12,8 +12,8 @@ const block = (tag: string, y: number, height: number, more: Partial<OutlineBloc
 describe('sectionsOf', () => {
   it.each([
     ['stripe', ['Nav', 'Hero', 'Features', 'Section 4', 'Stats', 'Testimonials', 'Section 7', 'News', 'Section 9', 'Footer'], [0, 76, 693, 2906, 3466, 4436, 9019, 11442, 13309, 13689]],
-    ['linear', ['Nav', 'Hero', 'Logos', 'Section 4', 'Section 5', 'Section 6', 'Section 7', 'Section 8', 'News', 'Testimonials', 'CTA', 'Footer'], [0, 73, 1298, 1390, 2095, 3491, 4730, 5972, 7202, 7781, 8505, 8901]],
-    ['vercel', ['Nav', 'Hero', 'Section 3', 'News', 'Section 5', 'Footer'], [0, 64, 800, 3210, 4136, 4824]]
+    ['linear', ['Nav', 'Hero', 'Logos', 'AI', 'Integrations', 'Section 6', 'AI 2', 'Section 8', 'News', 'Customers', 'CTA', 'Footer'], [0, 73, 1298, 1390, 2095, 3491, 4730, 5972, 7202, 7781, 8505, 8901]],
+    ['vercel', ['Nav', 'Hero', 'AI', 'News', 'AI 2', 'Footer'], [0, 64, 800, 3210, 4136, 4824]]
   ])('%s si divide nelle sezioni della pagina, coi loro nomi', (name, names, tops) => {
     const found = sectionsOf(outlineOf(name));
 
@@ -37,7 +37,7 @@ describe('sectionsOf', () => {
   });
 
   it('un blocco senza titolo, sullo stesso sfondo e vicino, resta nella sezione sopra', () => {
-    const found = sectionsOf(page([block('div', 0, 1000, { h1: true, heading: 'Hello' }), block('div', 1100, 400, { heading: 'Team', background: 'rgb(0, 0, 0)' }), block('div', 1540, 400, { background: 'rgb(0, 0, 0)' }), block('div', 2000, 1000)]));
+    const found = sectionsOf(page([block('div', 0, 1000, { h1: true, heading: 'Hello' }), block('div', 1100, 400, { heading: 'Company', background: 'rgb(0, 0, 0)' }), block('div', 1540, 400, { background: 'rgb(0, 0, 0)' }), block('div', 2000, 1000)]));
 
     expect(found.map((s) => [s.name, s.top])).toEqual([['Hero', 0], ['Section 2', 1000], ['Section 3', 1940]]);
   });
@@ -58,6 +58,18 @@ describe('sectionsOf', () => {
     const found = sectionsOf(page([block('section', 0, 1000, { heading: 'Our features' }), block('section', 1000, 1000, { heading: 'More features' }), block('section', 2000, 1000)]));
 
     expect(found.map((s) => s.name)).toEqual(['Features', 'Features 2', 'Section 3']);
+  });
+
+  it.each([
+    ['How it works', 'How it works'],
+    ['Use cases for every team', 'Use cases'],
+    ['Enterprise-grade security', 'Security'],
+    ['Meet the team', 'Team'],
+    ['From the blog', 'News'],
+    ['Our customers', 'Customers'],
+    ['Connect your integrations', 'Integrations']
+  ])('il titolo "%s" dà il nome %s', (heading, name) => {
+    expect(sectionsOf(page([block('section', 0, 3000, { heading })]))[0].name).toBe(name);
   });
 
   it('una pagina senza blocchi riconoscibili resta una sezione sola', () => {
