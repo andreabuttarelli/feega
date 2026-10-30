@@ -81,12 +81,19 @@ describe('page tokens', () => {
     expect(tokens.texts.map((t) => [t.name, t.style.sizePx])).toEqual([
       ['Body', 16],
       ['Button', 14],
-      ['Display', 64],
-      ['H1', 40],
-      ['H2', 24],
+      ['H1', 64],
+      ['H2', 40],
+      ['H3', 24],
       ['Small', 14],
       ['Caption', 12]
     ]);
+  });
+
+  it('the h1 is H1 even when its style is shared with other headings and text', () => {
+    const big = { sizePx: 56, weight: 500 };
+    const tokens = tokensOf({ ...EMPTY, texts: [text({ chars: 4_000 }), text({ chars: 4_000 }), text({ ...big, heading: 2 }), text({ ...big, heading: 1 }), text(big), text({ sizePx: 32, heading: 2 })] });
+
+    expect(tokens.texts.find((t) => t.name === 'H1')?.style.sizePx).toBe(56);
   });
 
   it('shadows, radii and spacing become a named scale', () => {

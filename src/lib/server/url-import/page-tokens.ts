@@ -121,14 +121,14 @@ function coloursOf(uses: ColourUse[], brand: SiteBrand | undefined): ColourToken
 
 export const textKey = (t: TextStyle) => [t.font, t.weight, Math.round(t.sizePx), t.leading === null ? 'auto' : t.leading.toFixed(2), t.tracking.toFixed(3), t.textCase].join('|');
 
-type TextCluster = { key: string; style: TextStyle; uses: number; chars: number; heading: number; button: number };
+type TextCluster = { key: string; style: TextStyle; uses: number; chars: number; heading: number; levels: Set<number>; button: number };
 
 function textClustersOf(uses: TextUse[]): TextCluster[] {
   const byKey = new Map<string, TextCluster>();
   for (const { chars, heading, button, ...style } of uses) {
     const key = textKey(style);
-    const c = byKey.get(key) ?? { key, style, uses: 0, chars: 0, heading: 0, button: 0 };
-    byKey.set(key, { ...c, uses: c.uses + 1, chars: c.chars + chars, heading: c.heading || heading, button: c.button + (button ? 1 : 0) });
+    const c = byKey.get(key) ?? { key, style, uses: 0, chars: 0, heading: 0, levels: new Set<number>(), button: 0 };
+    byKey.set(key, { ...c, uses: c.uses + 1, chars: c.chars + chars, heading: c.heading || heading, levels: heading ? new Set([...c.levels, heading]) : c.levels, button: c.button + (button ? 1 : 0) });
   }
   return [...byKey.values()].filter((c) => c.uses >= MIN_USES || c.heading > 0);
 }
@@ -143,8 +143,8 @@ const below = (left: TextCluster[], body: TextCluster | undefined) => left.filte
 const TEXT_RULES: TextRule[] = [
   { name: 'Body', pick: (left) => left.filter((c) => !c.heading && !c.button).sort((a, b) => b.uses - a.uses || b.chars - a.chars)[0] },
   { name: 'Button', pick: (left) => left.filter((c) => c.button > 0).sort((a, b) => b.button - a.button)[0] },
+  { name: 'H1', pick: (left, body) => largest(left.filter((c) => c.levels.has(1))) ?? largest(above(left, body)) },
   { name: 'Display', pick: (left, body) => largest(above(left, body).filter((c) => c.style.sizePx >= DISPLAY_PX)) },
-  { name: 'H1', pick: (left, body) => largest(above(left, body)) },
   { name: 'H2', pick: (left, body) => largest(above(left, body)) },
   { name: 'H3', pick: (left, body) => largest(above(left, body)) },
   { name: 'Small', pick: (left, body) => largest(below(left, body)) },
