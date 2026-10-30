@@ -80,15 +80,20 @@ export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, plan
   }
   await tab.settle(NETWORK_IDLE_MS);
   const { height } = await tab.reveal(RevealMode.Moving).catch(() => ({ height: TREE_LIMITS.height }));
+  await tab.sample().catch(() => 0);
   const steps = Math.ceil(Math.min(height, TREE_LIMITS.height) / SCROLL_STEP_PX);
   for (let i = 0; i < steps; i++) {
     await tab.scroll({ px: SCROLL_STEP_PX }).catch(() => undefined);
     await pause(settleMs / SCROLL_PAUSES);
+    await tab.sample().catch(() => 0);
   }
   await tab.settle(NETWORK_IDLE_MS);
   await tab.scroll({ to: 'top' }).catch(() => undefined);
   await pause(settleMs);
   await tab.reveal(RevealMode.Moving).catch(() => undefined);
+  await tab.sample().catch(() => 0);
+  await pause(settleMs / SCROLL_PAUSES);
+  await tab.sample().catch(() => 0);
   await dismissOverlays(tab).catch(() => []);
   await planner.prepare(tab).catch(() => undefined);
   await tab.settle(NETWORK_IDLE_MS);

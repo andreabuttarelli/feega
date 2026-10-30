@@ -24,12 +24,34 @@ CLI `feega import-url`) → `importUrlInto` (`src/lib/server/url-import/canvas-i
 
 ## Capture
 
-`pagePrepared` (`import-url.ts`): every IntersectionObserver reports its targets in view from the
-first script (`everythingInView`), the page settles, scrolls to the bottom and back, finishes
-animations, stops videos on their last frame, hides cookie banners (`revealPage`), then freezes
-timers, rAF, `play()` and transitions (`RevealMode.Still`). `tab.tree()` runs `treeScript` and then
-takes the raster snapshots the tree asked for (`page-snaps.ts`, isolated from the rest of the page).
+The page is read once, frozen, and the tree, the raster snapshots and the fidelity reference
+screenshot all come from that same frozen state.
 
+`pagePrepared` (`import-url.ts`):
+
+1. Before the first script (`tab.seeAll`): every IntersectionObserver reports its targets in view
+   (`everythingInView`); `heldStill` makes every shadow root open, and gates rAF, scroll / resize /
+   pointer / focus / visibility listeners, `matchMedia` listeners and ResizeObserver callbacks on
+   `__feegaStill`, so nothing the page registered can move it once frozen.
+2. The page settles, scrolls to the bottom in 700 px steps and back. At each step `inViewSampled`
+   records, for every element with an animation or inline transform/opacity/filter/clip/visibility,
+   the state it reached while on screen: the most visible one (highest opacity, then closest to the
+   centre) among the steps where at least half of it was in view.
+3. Back at the top, two samples a beat apart mark as restless what moves without scrolling
+   (tickers, rAF loops): those are never pinned.
+4. `revealPage(Moving)` finishes animations, puts infinite ones and GSAP loops at their start,
+   carousels (Swiper, Splide, Flickity, Slick) on their first slide, stops videos, hides cookie
+   banners (also under `<html>` and in shadow roots).
+5. `revealPage(Still)` sets `__feegaStill`, clears timers, pins every sampled element to its
+   in-view state with inline `!important` values, keeps cookie banners hidden as they appear
+   (a MutationObserver on the document and on every shadow root), and pauses infinite animations
+   created later at their start.
+
+`tab.tree()` runs `treeScript` with the `@font-face` rules of cross-origin stylesheets read from
+the network responses (the page cannot read or fetch them), then takes the raster snapshots
+(`page-snaps.ts`); a canvas, video or iframe is replaced by its own snapshot afterwards, so
+anything read later sees the same frame. Snapshots see `clipPath` and `mask` sources even when
+the rest of the page is hidden.
 ## DOM → doc
 
 The page is serialized as a Figma REST-shaped tree, then the existing Figma importer builds the
@@ -37,7 +59,7 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 
 | DOM | Tree | Doc |
 |---|---|---|
-| inline formatting context (text + `span`/`a`/`code`…) | one TEXT with styled runs; one TEXT per line when lines do not share an edge; inline backgrounds as rectangles under it | Text clip with runs |
+| inline formatting context (text + `span`/`a`/`code`…) | one TEXT with styled runs; one TEXT per line when lines do not share an edge; inline backgrounds and borders as rectangles under it; an inline box's margin + border + padding as letter spacing after the letter before it and after its last letter; box width halfway between the widest line and where the next word would have fit, so the same lines break | Text clip with runs (run `tracking`) |
 | `font-variation-settings`, optical size, `font-feature-settings`, `text-transform`, `letter-spacing`, line height | `fontAxes`, `fontFeatures`, transformed characters, px values | `axes`, `features`, `lineHeight`, `letterSpacing` |
 | `@font-face` the text uses | `tree.fonts` → org fonts | uploaded font faces, one variant per used weight |
 | flex container whose items sit exactly where the gap, padding and alignment put them (±0.5 px), no item spilling out of its box | FRAME + `layoutMode`; items as boxes | auto layout |
@@ -47,11 +69,11 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 | background colour, linear/radial/conic gradients, `background-clip: text` | SOLID / GRADIENT_* paints (handles in the box) | fills |
 | `background-image: url()` cover/contain, positioned | IMAGE paint with `scaleMode` and `imageFocus`; other sizes as a positioned rectangle; tiled → snapshot of the element's own paint | image fill |
 | `<img>` with `object-fit` / `object-position` | IMAGE paint with fit and focus | image fill |
-| inline SVG, `<img src=*.svg>` | VECTOR per shape with the exact path (arcs, `use`, symbols, gradients, `currentColor`) | Shape path |
+| inline SVG, `<img src=*.svg>` | VECTOR per shape with the exact path (arcs, `use`, symbols, gradients, `currentColor`); a `clip-path` to a single unrotated `rect` as a clipping FRAME | Shape path |
 | borders per side, outline, box-shadow (inset too), `filter: blur`, `backdrop-filter: blur`, radius per corner | strokes or side rectangles, effects | strokes, effects |
 | `::before` / `::after` | real elements before the walk | as any element |
 | video, canvas, iframe, masked / blended / filtered / rotated blocks, native controls | snapshot RECTANGLE | image fill |
-| an element partly off the page | box cut at the edge, picture anchored to it | — |
+| an element partly off the page | box cut at the edge, picture focused on the part that was showing | — |
 
 ## Components
 

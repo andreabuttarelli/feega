@@ -4,7 +4,7 @@ vi.mock('$env/static/public', () => ({ PUBLIC_SUPABASE_URL: 'https://example.sup
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 
 import type { Browser } from 'puppeteer-core';
-import { BROWSERLESS_UNIT_USD, browserless, browserlessEndpoint, originHeaders } from './browser';
+import { BROWSERLESS_UNIT_USD, browserless, browserlessEndpoint, localBrowser, originHeaders } from './browser';
 
 const KEY = 'secret-key';
 
@@ -14,6 +14,7 @@ function fakeBrowser() {
     setBypassCSP: vi.fn(async () => undefined),
     setRequestInterception: vi.fn(async () => undefined),
     on: vi.fn(),
+    evaluate: vi.fn(async () => ({ root: { id: '1', type: 'FRAME' }, snaps: [] })),
     createCDPSession: vi.fn(async () => ({ send: vi.fn(async () => undefined) })),
     close: vi.fn(async () => undefined)
   };
@@ -94,5 +95,22 @@ describe('the Origin a form post carries', () => {
   it('leaves a GET, or a post that already has one, alone', () => {
     expect(originHeaders('GET', { a: '1' }, 'https://app.example/x')).toBeNull();
     expect(originHeaders('POST', { origin: 'https://app.example' }, 'https://app.example/x')).toBeNull();
+  });
+});
+
+describe('the fonts a cross-origin stylesheet declares', () => {
+  it('reach the tree even though the page cannot read or fetch that sheet (stripe: sohne-var came in as a fallback font)', async () => {
+    const { page } = fakeBrowser();
+    const tab = await localBrowser(async () => page as never)();
+    const [, onResponse] = page.on.mock.calls.find(([event]) => event === 'response') as unknown as [string, (r: unknown) => Promise<void>];
+    const sheet = '.a{color:red}@font-face{font-family:sohne-var;src:url(Sohne.woff2) format("woff2")}';
+    await onResponse({ url: () => 'https://cdn.example/site.css', ok: () => true, text: async () => sheet, request: () => ({ resourceType: () => 'stylesheet' }) });
+
+    await tab.tree();
+
+    const script = String((page.evaluate.mock.calls[0] as unknown[])[0]);
+    expect(script).toContain('https://cdn.example/site.css');
+    expect(script).toContain('@font-face{font-family:sohne-var;src:url(Sohne.woff2) format(\\"woff2\\")}');
+    expect(script).not.toContain('.a{color:red}');
   });
 });
