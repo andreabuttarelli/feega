@@ -7,6 +7,6 @@ export function exportFailure(answer: ActionAnswer): string {
   if (answer.type === 'network') {
     return NO_CONNECTION;
   }
-  const reason = (answer.data as { error?: unknown } | undefined)?.error;
+  const reason = (answer.data as { error?: unknown } | undefined)?.error ?? answer.error?.message;
   return typeof reason === 'string' && reason ? `Export failed: ${reason}` : SERVER_GAVE_UP;
 }

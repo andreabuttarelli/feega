@@ -2,6 +2,7 @@
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import { postPageAction } from '$lib/api/page-action';
+  import { exportFailure } from '$lib/canvas/export-failure';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, attachmentUrl, stillExport } from '@feega/motion-core/motion/still-model';
 
@@ -29,7 +30,7 @@
       made = result.data as Made;
       return;
     }
-    error = result.type === 'failure' ? String(result.data?.error ?? 'Export failed') : 'Export failed';
+    error = exportFailure(result);
   }
 </script>
 
