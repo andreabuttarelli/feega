@@ -31,3 +31,9 @@ Animate) and Framer's Hover and Pressed variants, without making a component or 
 
 The agent uses `set_element_state` and `remove_element_state`; MCP clients reach them through
 `edit`.
+
+## In exported code
+
+HTML and Svelte exports turn each state into a CSS rule — Hover is `:hover`, Pressed is
+`:active`, Focus is `:focus-visible` — with a `transition` using the state's easing and
+duration. React export does not include states yet.

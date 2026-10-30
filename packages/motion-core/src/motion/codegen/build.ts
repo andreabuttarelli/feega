@@ -18,6 +18,7 @@ import { absoluteRules, containerRules, flowItemRules, isFlowChild, px, Shape } 
 import { backgroundRules, borderRules, effectRules, radiusRules, typeRules, type Painter } from './paint';
 import { ColourRole, TokenBook } from './tokens';
 import { animationOf, timelineOf, type Timeline } from './animate';
+import { stateStyleOf } from './states';
 import { planComponents, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
 
 export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; brand: BrandTokens | null };
@@ -166,7 +167,8 @@ function element(tag: string, clip: MotionClip, rules: Rule[], scope: Scope, ext
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
   const animation = animated(clip, scope);
-  return { kind: NodeKind.Element, tag, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...(animation ? { animation } : {}), ...extra };
+  const states = stateStyleOf(clip, scope.painter.unit);
+  return { kind: NodeKind.Element, tag, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...(animation ? { animation } : {}), ...(states ? { states } : {}), ...extra };
 }
 
 const animated = (clip: MotionClip, scope: Scope) => animationOf(clip, { timeline: scope.timeline, space: scope.space, notes: scope.shared.notes, label: layerName(clip) });
@@ -306,7 +308,8 @@ function svgNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
   const animation = animated(clip, scope);
-  return { ...(animation ? { animation } : {}), kind: NodeKind.Svg, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
+  const states = stateStyleOf(clip, scope.painter.unit);
+  return { ...(animation ? { animation } : {}), ...(states ? { states } : {}), kind: NodeKind.Svg, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
 }
 
 function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): CodeNode | null {
