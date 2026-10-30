@@ -193,6 +193,11 @@
     cursor: pointer;
   }
 
+  .picker {
+    position: relative;
+    min-height: 260px;
+  }
+
   .transition .remove {
     margin-left: auto;
   }
