@@ -3505,8 +3505,16 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ## A URL-import reference screenshot does not match the tree it was taken with
 
-**Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame. **Move:** `captureBeyondViewport` and scroll-based snapshots fire resize, scroll and IntersectionObserver callbacks. Freeze the page first (`revealPage(RevealMode.Still)`: timers, rAF, `play()`, transitions), report every observed element as in view from the first script (`everythingInView`), and take the reference screenshot after the tree, with a second freeze, as `url-capture.browser.test.ts` does.
+**Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame, a section that is fine in a viewport screenshot is half empty in the banded one. **Move:** `captureBeyondViewport` resizes the viewport for the shot: resize, scroll, `matchMedia` (`orientation`) and ResizeObserver callbacks fire, and libraries that captured `requestAnimationFrame` at load keep running. Gate them from the first script (`heldStill`), pin scroll-driven blocks to their sampled in-view state (`inViewSampled`, then `revealPage(RevealMode.Still)`), and replace canvases and videos with their own snapshot once read. Check a fix with the probe that matters: a viewport shot, a full-page shot and the banded shot of the same frozen page must agree.
+
+## A cookie banner is hidden by the import and still in the reference
+
+**Signal:** the import has no banner, the reference screenshot does; `querySelectorAll('body *')` finds no element with the banner text. **Move:** consent managers (Transcend on webflow.com) mount on `<html>`, inside a closed shadow root, and render into it after load; their `textContent` is mostly `<style>`. Open every shadow root from the first script, scan `html > :not(head, body)` too, read shadow text from non-style children, and watch shadow roots with the same MutationObserver as the document.
 
 ## A URL import scores well and looks wrong on the canvas
 
 **Signal:** `url-fidelity.browser.test.ts` scores 0.95+, the canvas shows another font, content cut differently or a strip at the top. **Move:** the HTML still is not what the canvas draws. Score the GPU path too: `URL_IMPORT_GPU=<label> npx vite-node --config scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` after the HTML run with the same label, and compare both columns. Read a WebGPU canvas by screenshotting the element, never with `drawImage` after the frame presented (blank).
+
+## A see-through block in auto layout comes in twice as faded
+
+**Signal:** an imported card at opacity 0.64 is visibly darker than the page; the same card without auto layout is right. **Move:** `laidOut` (`figma-doc.ts`) parented the children to the container and then faded container and children; parent opacity is inherited, so children got it twice. Fade only the container. Measure with mean brightness of the same region in source and import before blaming text rendering.
