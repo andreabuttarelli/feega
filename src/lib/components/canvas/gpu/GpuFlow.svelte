@@ -1338,7 +1338,7 @@
     if (held || !session) {
       return held ?? null;
     }
-    const made = new FrameExtras({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId }, createSupabaseBrowserClient(), () => session.history.present);
+    const made = new FrameExtras({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId }, createSupabaseBrowserClient(), () => session.history.present, drawSaves.get(nodeId) ?? Promise.resolve(true));
     extras.set(nodeId, made);
     return made;
   }
