@@ -158,7 +158,7 @@ function radiiIn(root: RestNode): number[] {
   return found;
 }
 
-const CTA_TAGS = new Set(['a', 'button']);
+const CTA_NAME = /^(a|button)( \d+)?(\s*\/.*)?$/i;
 const CTA_HEIGHT = 64;
 
 const textsIn = (n: RestNode): number => (n.type === 'TEXT' ? 1 : 0) + (n.children ?? []).reduce((sum, c) => sum + textsIn(c), 0);
@@ -168,7 +168,7 @@ const channel = (v: number) => Math.round(v * 255).toString(16).padStart(2, '0')
 function ctaOf(n: RestNode): CtaUse | null {
   const box = n.absoluteBoundingBox;
   const solid = n.fills?.filter((f) => f.type === 'SOLID' && f.visible !== false && (f.opacity ?? 1) === 1 && (f.color?.a ?? 1) === 1) ?? [];
-  if (!box || !CTA_TAGS.has((n.name ?? '').toLowerCase()) || box.height > CTA_HEIGHT || solid.length !== 1 || n.fills!.length !== 1 || textsIn(n) !== 1) {
+  if (!box || !CTA_NAME.test(n.name ?? '') || box.height > CTA_HEIGHT || solid.length !== 1 || n.fills!.length !== 1 || textsIn(n) !== 1) {
     return null;
   }
   const { r, g, b } = solid[0].color!;
