@@ -51,6 +51,20 @@ describe('importStorybookAt', () => {
     expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['Button / Primary', 'Button / Ghost'], components: 1, variants: 1, instances: 1 });
   });
 
+  it('oltre il tempo concesso le storie restanti restano fuori e lo dice', async () => {
+    let clock = 0;
+    const { ask, tab } = askOf({ budgetMs: 1_000, now: () => clock });
+    tab.goto.mockImplementation(async () => {
+      clock += 1_500;
+      return 200;
+    });
+
+    const done = await importStorybookAt(ask);
+
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['Button / Primary'] });
+    expect(done.outcome === CodeImportOutcome.Ok && done.skipped).toContain('Button / Ghost: left out, the import ran out of time');
+  });
+
   it('un link che non è una Storybook non apre il browser', async () => {
     const { ask, tab } = askOf({ fetchFn: vi.fn(async () => new Response('', { status: 404 })) });
 
