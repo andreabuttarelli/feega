@@ -53,6 +53,22 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 | video, canvas, iframe, masked / blended / filtered / rotated blocks, native controls | snapshot RECTANGLE | image fill |
 | an element partly off the page | box cut at the edge, picture anchored to it | — |
 
+## Sections
+
+On by default (`sections: false` / `--no-sections` / the dialog checkbox turn it off). The page frame's
+direct children become section frames in a vertical auto layout, top to bottom.
+
+- `page-outline.ts` reads, after the tree, the full-width blocks (≥50% wide): tag, role, aria-label,
+  id/class words, first h1–h3, background, picture/blockquote/details counts, fixed/sticky.
+- `page-sections.ts` (pure, outline → `{ name, top, bottom }[]`): opens `main`/`body`, the wrapper
+  spine, wrappers over 1200 px or with one child; stops at landmarks; drops blocks contained in a
+  sibling (overlays, cookie bars); a top nav may overlap the next block. Adjacent generic blocks merge
+  unless the later one has a heading, a name, another background, or a gap ≥160 px. Names come from
+  `SECTION_NAMES`, one row per name; else `Section N`.
+- `section-frames.ts` cuts the tree per band with `windowed`: text and vectors go whole to the band of
+  their top, the rest is cut, so every box stays where it was. Empty bands join the next.
+- `import_code` keeps one tree.
+
 ## Components
 
 `repeatedOf` (`src/lib/server/url-import/repeated.ts`) runs on the tree before `restMessage`.

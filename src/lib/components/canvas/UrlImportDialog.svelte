@@ -28,13 +28,14 @@
   let busy = $state(false);
   let message = $state<string | null>(null);
   let site = $state<string | null>(null);
+  let sections = $state(true);
 
   const title = $derived(site ? (busy ? `Importing ${site}…` : `Couldn't import ${site}`) : 'Import from URL');
 
   async function bring(typed: string, extent?: ImportExtent) {
     busy = true;
     message = null;
-    const got = await importPage({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent });
+    const got = await importPage({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent, sections });
     busy = false;
     if (!got.ok) {
       message = REFUSALS[got.error] ?? FALLBACK_REFUSAL;
@@ -70,6 +71,7 @@
       <input class="rounded-sm" type="text" inputmode="url" placeholder="https://example.com" aria-label="Page address" bind:value={url} data-testid="url-import-url" />
       <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !url.trim()} data-testid="url-import-run">{busy ? 'Importing…' : site ? 'Try another URL' : 'Import'}</button>
     </form>
+    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={sections} data-testid="url-import-sections" /> Split into sections (Nav, Hero, Footer…)</label>
     {/if}
     {#if message}
       <p class="ui-note" role="alert" data-testid="url-import-message">{message}</p>
@@ -85,6 +87,7 @@
   .ui-link input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line, #e3e3e6); background: var(--paper, #fff); color: var(--ink, #1d1d1f); }
   .ui-progress { height: 2px; background: linear-gradient(90deg, transparent, var(--ink, #1d1d1f), transparent) 0 0 / 40% 100% no-repeat var(--line, #e3e3e6); animation: ui-progress 1.2s ease-in-out infinite; }
   @keyframes ui-progress { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+  .ui-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft, #6e6e73); }
   .ui-note { margin: 0; font-size: 13px; color: var(--ink-soft, #6e6e73); }
   .ui-btn { font: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 14px; cursor: pointer; border: 1px solid var(--line, #e3e3e6); }
   .ui-btn.primary { background: var(--ink, #1d1d1f); color: var(--paper, #fff); }

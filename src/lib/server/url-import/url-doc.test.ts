@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { MotionClip } from '@feega/motion-core/motion/doc';
 import type { PageTree } from './page-tree';
-import { urlPlan } from './url-doc';
+import type { PageOutline } from './page-outline';
+import { Sectioning, urlPlan } from './url-doc';
 
 const FIXTURES = ['linear', 'stripe', 'vercel'];
 
@@ -13,10 +14,41 @@ const clipsOf = (plan: NonNullable<ReturnType<typeof urlPlan>>) => {
   return [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips) as MotionClip[];
 };
 
+const outlined = (name: string): PageTree => ({ ...treeOf(name), outline: JSON.parse(readFileSync(new URL(`./fixtures/outlines/${name}.json`, import.meta.url), 'utf8')) as PageOutline });
+
+const topNames = (plan: NonNullable<ReturnType<typeof urlPlan>>) => plan.plan.items[0].doc.tracks.flatMap((t) => t.clips.filter((c) => c.props.comp).map((c) => c.name));
+
 let counter = 0;
 const newId = () => `id${++counter}`;
 
 describe('urlPlan', () => {
+  it.each([
+    ['stripe', ['Nav', 'Hero', 'Features', 'Section 4', 'Stats']],
+    ['linear', ['Nav', 'Hero', 'Logos', 'Section 4', 'Section 5', 'Section 6']],
+    ['vercel', ['Nav', 'Hero', 'Section 3', 'News']]
+  ])('con le sezioni, i figli del frame di %s sono le sezioni con nome', (name, names) => {
+    expect(topNames(urlPlan(outlined(name), newId, undefined, {}, Sectioning.On)!)).toEqual(names);
+  });
+
+  it.each(FIXTURES)('il pannello livelli di %s mostra il nome della sezione, non "Group N"', (name) => {
+    const doc = urlPlan(outlined(name), newId, undefined, {}, Sectioning.On)!.plan.items[0].doc;
+    const sections = doc.tracks.flatMap((t) => t.clips.filter((c) => c.props.comp));
+
+    expect(sections.map((c) => doc.comps[String(c.props.comp)].name)).toEqual(sections.map((c) => c.name));
+  });
+
+  it.each(FIXTURES)('senza sezioni %s resta l\'albero di prima', (name) => {
+    const names = topNames(urlPlan(outlined(name), newId, undefined, {}, Sectioning.Off)!);
+
+    expect(names).not.toContain('Hero');
+  });
+
+  it.each(FIXTURES)('le sezioni non cambiano il testo che %s mostra', (name) => {
+    const texts = (sectioning: Sectioning) => clipsOf(urlPlan(outlined(name), newId, undefined, {}, sectioning)!).flatMap((c) => (typeof c.props.text === 'string' ? [c.props.text] : [])).sort();
+
+    expect(texts(Sectioning.On)).toEqual(texts(Sectioning.Off));
+  });
+
   it.each(FIXTURES)('una pagina reale %s diventa un solo frame col titolo della pagina', (name) => {
     const tree = treeOf(name);
     const made = urlPlan(tree, newId);

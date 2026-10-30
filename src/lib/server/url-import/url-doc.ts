@@ -7,6 +7,8 @@ import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import type { PageFont, PageTree } from './page-tree';
 import { repeatedOf } from './repeated';
 import { windowed } from './page-window';
+import { sectionsOf } from './page-sections';
+import { sectionFramed } from './section-frames';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -140,6 +142,7 @@ function countOf(doc: MotionDoc): ComponentCount {
 }
 
 const SLICE = DESIGN_MAX_SIDE;
+
 function lifted(n: RestNode, by: number): RestNode {
   const b = n.absoluteBoundingBox!;
   return { ...n, absoluteBoundingBox: { ...b, y: b.y - by }, ...(n.children ? { children: n.children.map((c) => lifted(c, by)) } : {}) };
@@ -166,15 +169,27 @@ function stacked(slices: { root: RestNode; top: number }[], newId: () => string,
 
 export type Marker = (root: RestNode) => RestNode;
 
+export enum Sectioning {
+  On = 'on',
+  Off = 'off'
+}
+
+export const sectioningOf = (sections: boolean) => (sections ? Sectioning.On : Sectioning.Off);
+
+const SECTIONED: Record<Sectioning, (tree: PageTree) => RestNode> = {
+  [Sectioning.On]: (tree) => (tree.outline ? sectionFramed(tree.root, sectionsOf({ ...tree.outline, height: tree.height })) : tree.root),
+  [Sectioning.Off]: (tree) => tree.root
+};
+
 const REPEATED: Marker = (root) => repeatedOf(root).root;
 
-export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}): UrlPlan | null {
+export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, sectioning = Sectioning.Off): UrlPlan | null {
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
   const images = refsOf(tree.root);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
-  const root = mapped({ ...mark(tree.root), name }, keyOf, family);
+  const root = mapped({ ...mark(SECTIONED[sectioning](tree)), name }, keyOf, family);
   const plan = stacked(slicesOf(root), newId, uploads);
   if (!plan) {
     return null;

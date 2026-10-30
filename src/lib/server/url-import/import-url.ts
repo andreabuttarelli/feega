@@ -6,7 +6,8 @@ import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
 import { dismissOverlays } from '$lib/server/web/overlays';
 import { TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
-import { fontsWanted, urlPlan, type FontAssets, type UrlPlan } from './url-doc';
+import type { PageOutline } from './page-outline';
+import { fontsWanted, Sectioning, urlPlan, type FontAssets, type UrlPlan } from './url-doc';
 
 export enum UrlImportOutcome {
   Ok = 'ok',
@@ -41,9 +42,9 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
 
 export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
 
-export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets) => UrlPlan | null };
+export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, sectioning: Sectioning) => UrlPlan | null };
 
-export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts) => urlPlan(tree, newId, undefined, fonts) };
+export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts, sectioning) => urlPlan(tree, newId, undefined, fonts, sectioning) };
 
 export type PageAsk = {
   url: string;
@@ -58,6 +59,7 @@ export type PageAsk = {
   settleMs?: number;
   planner?: Planner;
   maxHeight?: number;
+  sectioning?: Sectioning;
 };
 
 const SETTLE_MS = 1_200;
@@ -68,7 +70,7 @@ const HTTP_ERROR = 400;
 const WEB_SCHEMES = ['http:', 'https:'];
 const FILLED_SUMMARY = 'Filled page images';
 
-const TREE_SHAPE = z.object({ title: z.string(), url: z.string(), width: z.number().positive(), height: z.number().positive(), truncated: z.boolean(), root: z.object({ type: z.literal('FRAME') }).passthrough() });
+const TREE_SHAPE = z.object({ title: z.string(), url: z.string(), width: z.number().positive(), height: z.number().positive(), truncated: z.boolean(), root: z.object({ type: z.literal('FRAME') }).passthrough(), outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional() });
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -149,7 +151,7 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     return tree;
   }
 
-  const made = planner.plan(tree, ask.newId, await fontsFor(ask, tree));
+  const made = planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.sectioning ?? Sectioning.On);
   if (!made?.plan.items.length) {
     return refused(UrlImportOutcome.Unreadable);
   }

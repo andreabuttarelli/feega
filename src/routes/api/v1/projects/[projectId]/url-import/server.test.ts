@@ -40,6 +40,16 @@ describe('POST /api/v1/projects/:id/url-import', () => {
     expect(importPageAt.mock.calls[0][0]).toMatchObject({ url: 'https://acme.test', place: { projectId: 'p1', canvasId: 'c1' } });
   });
 
+  it('divide la pagina in sezioni di default, e non lo fa con sections false', async () => {
+    importPageAt.mockReset();
+    importPageAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Acme', undo: [], skipped: [], truncated: false });
+
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-sections-on');
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0, sections: false }, 'u-sections-off');
+
+    expect(importPageAt.mock.calls.map((c) => c[0].sectioning)).toEqual(['on', 'off']);
+  });
+
   it('un indirizzo privato torna 400 not_public', async () => {
     importPageAt.mockResolvedValue({ outcome: 'not_public' });
 

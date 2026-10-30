@@ -3,6 +3,7 @@ import type { AppTab } from '$lib/server/web/browser';
 import type { FrameStore } from '$lib/server/motion/move-element';
 import type { PageTree } from './page-tree';
 import { importPageAt, UrlImportOutcome } from './import-url';
+import { Sectioning } from './url-doc';
 
 const TREE: PageTree = {
   title: 'Acme — ship faster',
@@ -72,7 +73,34 @@ const askOf = (over: Partial<Parameters<typeof importPageAt>[0]> = {}) => {
   };
 };
 
+const NAV_TEXT = { id: '9', type: 'TEXT', characters: 'Acme', absoluteBoundingBox: { x: 20, y: 20, width: 80, height: 30 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 20, fontWeight: 600 } };
+
+const OUTLINED = { ...TREE, root: { ...TREE.root, children: [NAV_TEXT, ...TREE.root.children!] }, outline: { width: 1280, height: 900, root: { tag: 'body', box: { y: 0, height: 900, width: 1280 }, children: [{ tag: 'nav', box: { y: 0, height: 80, width: 1280 } }, { tag: 'section', h1: true, heading: 'Ship faster', box: { y: 80, height: 820, width: 1280 } }] } } };
+
+const sectionNames = (docs: Map<string, { doc: unknown }>) => {
+  const doc = docs.get('frame-1')!.doc as { tracks: { clips: { name?: string; props: { comp?: string } }[] }[] };
+  return doc.tracks.flatMap((t) => t.clips.filter((c) => c.props.comp).map((c) => c.name));
+};
+
 describe('importPageAt', () => {
+  it('una pagina importata arriva divisa in sezioni con nome', async () => {
+    const { ask, docs, tab } = askOf();
+    vi.mocked(tab.tree).mockResolvedValue(OUTLINED as never);
+
+    await importPageAt(ask);
+
+    expect(sectionNames(docs)).toEqual(['Nav', 'Hero']);
+  });
+
+  it('con le sezioni spente la pagina arriva come prima', async () => {
+    const { ask, docs, tab } = askOf({ sectioning: Sectioning.Off });
+    vi.mocked(tab.tree).mockResolvedValue(OUTLINED as never);
+
+    await importPageAt(ask);
+
+    expect(sectionNames(docs)).toEqual([]);
+  });
+
   it('the top of the page reads only the first screens, not the whole page', async () => {
     const { ask, tab } = askOf({ maxHeight: 1800 });
     vi.mocked(tab.reveal).mockResolvedValue({ height: 12_000, hidden: 0 } as never);

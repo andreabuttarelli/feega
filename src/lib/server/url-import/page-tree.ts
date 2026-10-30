@@ -1,6 +1,7 @@
 import { DESIGN_MAX_SIDE } from '@feega/motion-core/motion/doc';
 import type { RestNode, RestPaint } from '$lib/server/figma/rest-message';
 import { pageKit, type KitMatrix, type KitRect, type PageKit } from './page-kit';
+import { OUTLINE_LIMITS, pageOutlineOf, type PageOutline } from './page-outline';
 
 export enum SnapMode {
   Isolated = 'isolated',
@@ -20,9 +21,10 @@ export type PageBox = { x: number; y: number; width: number; height: number };
 export type PageFont = { family: string; weight: string; style: string; url: string };
 export type PageSnap = { ref: string; box: PageBox; mode: SnapMode };
 
-export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; snaps?: PageSnap[] };
+export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; snaps?: PageSnap[]; outline?: PageOutline };
 
-export const treeScript = (limits: TreeLimits) => `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})())`;
+export const treeScript = (limits: TreeLimits) =>
+  `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})()).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
 
 export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<PageTree> {
   const SKIPPED = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|HEAD|META|LINK|TITLE|BR|WBR|DIALOG)$/;

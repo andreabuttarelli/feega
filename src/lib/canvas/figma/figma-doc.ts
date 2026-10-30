@@ -355,14 +355,16 @@ function grouped(built: Built, layer: FrameLayer, p: Place): Built {
   if (built.ids.length < 2) {
     return { ...built, doc: faded(built.doc, built.ids, layer.opacity, p) };
   }
-  const groupId = p.newId();
+  const [groupId, compId] = [p.newId(), p.newId()];
   let n = 0;
-  const made = groupClips(built.doc, built.ids, () => (n++ === 0 ? p.newId() : groupId));
+  const made = groupClips(built.doc, built.ids, () => (n++ === 0 ? compId : groupId));
   if (!made.ok) {
     return built;
   }
-  const named = editClip(made.doc, groupId, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME), ...(layer.clip === Clip.Content ? { clipContent: true } : {}) }));
-  return { doc: faded(named.ok ? named.doc : made.doc, [groupId], layer.opacity, p), ids: [groupId], roots: [{ id: groupId, layer }] };
+  const name = layer.name.slice(0, MAX_NAME);
+  const titled = { ...made.doc, comps: { ...made.doc.comps, [compId]: { ...made.doc.comps[compId], name } } };
+  const named = editClip(titled, groupId, (clip) => ({ ...clip, name, ...(layer.clip === Clip.Content ? { clipContent: true } : {}) }));
+  return { doc: faded(named.ok ? named.doc : titled, [groupId], layer.opacity, p), ids: [groupId], roots: [{ id: groupId, layer }] };
 }
 
 function clipIdsIn(doc: MotionDoc, compId: string): string[] {
