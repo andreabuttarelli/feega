@@ -11,6 +11,16 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 Create a component from the selection with `⌥⌘K`. The **Components** panel lists them; drag one onto the canvas to add an instance.
 
+## The Components page
+
+Every project keeps its mains on a page named **Components**, made the first time you need it. Create a component with `⌥⌘K` and the main moves there, in a frame of its own sized to it; what stays where you made it is an instance linked to that main. A URL or code import puts its mains there too, one frame per component or variant set, laid out in a grid, instead of one large frame beside the page.
+
+On the Components page a variant set has a dashed purple outline and a **+** just below it: click it to add a variant, and the frame widens to show it. Edit a main there and every instance on every page follows, at the same size.
+
+Imports made before this change keep their Components frame and keep working.
+
+- **MCP / API:** `home_components` with a `frameId` moves the mains of that frame to the Components page, the same as the app does after `⌥⌘K`.
+
 ## Go to main component
 
 Select an instance and click the target icon in the Instance inspector header, or right-click it and pick **Go to main component**. Feega switches canvas if the main lives on another one, pans to it and selects it. Hover the icon to see where the main is (`canvas › frame`). In the Components panel, the same icon on a tile is **Show main**.
