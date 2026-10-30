@@ -8,6 +8,7 @@ import { depthOf, turnedInDepth } from './depth';
 import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
+import { placedBox } from '../effects/paint-area';
 import type { AudioAnalysis } from '../audio-analysis';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
 import { shapedText } from './text/measure';
@@ -418,6 +419,20 @@ function animatorsAt(clip: MotionClip, frame: number, colour: (v: string) => str
 
 const GROUP_COMPONENT = 'Precomp';
 
+function contentCut(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, size: Size): MaskLayer | null {
+  const chain = ancestorsOf(doc, clip.id).flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  const inside = chain.slice(chain.findLastIndex((c) => c.component === GROUP_COMPONENT) + 1);
+  const boxes = inside.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, size));
+  if (!boxes.length || boxes.some((b) => !b)) {
+    return null;
+  }
+  const left = Math.max(...boxes.map((b) => b!.left));
+  const top = Math.max(...boxes.map((b) => b!.top));
+  const right = Math.min(...boxes.map((b) => b!.left + b!.width));
+  const bottom = Math.min(...boxes.map((b) => b!.top + b!.height));
+  return { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[left, top, right, top, right, bottom, left, bottom]], matrix: IDENTITY } };
+}
+
 function enclosingGroups(doc: MotionDoc): Map<string, string[]> {
   const enclosing = new Map<string, string[]>();
   doc.tracks.forEach((track, at) => {
@@ -531,7 +546,9 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
       return Unsupported.Space3d;
     }
     const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));
-    const masks = maskLayers(clip, frame, size, world, asset);
+    const own = maskLayers(clip, frame, size, world, asset);
+    const cut = contentCut(doc, clip, byId, size);
+    const masks = own && cut ? [...own, cut] : own;
     const found = filtersOf(clip, frame, doc.fps, size, css);
     if (typeof found === 'string') {
       return found;

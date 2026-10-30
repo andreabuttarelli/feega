@@ -60,6 +60,13 @@ describe('faceRules', () => {
     expect(rules[1]).toEqual({ family: 'Inter', italic: false, weight: [100, 900], url: 'https://fonts.gstatic.com/inter.woff2', ranges: [[0, 0xff], [0x131, 0x131]] });
     expect(rules[2]).toMatchObject({ family: 'Brand', weight: [700, 700], url: 'https://x.test/brand-700.otf', ranges: [[0, 0x10ffff]] });
   });
+
+  it('reads a font file given inline as a data URL, whose semicolon is not the end of src', () => {
+    const inline = 'data:font/woff2;base64,d09GMgABAAAA';
+    const [rule] = faceRules(`@font-face{font-family:'Geist';src:url(${JSON.stringify(inline)});font-weight:450;font-style:normal;font-display:block}`);
+
+    expect(rule).toMatchObject({ family: 'Geist', url: inline, weight: [450, 450] });
+  });
 });
 
 describe('faceBook', () => {

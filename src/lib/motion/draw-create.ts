@@ -215,6 +215,8 @@ const FULL_BOX: DrawBox = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
 const evenSide = (n: number) => Math.max(MIN_DOC_SIDE, Math.round(n / 2) * 2);
 
+const evenFloor = (n: number) => Math.max(MIN_DOC_SIDE, Math.floor(n / 2) * 2);
+
 type Sides = { long: number; short: number };
 
 const VIDEO_SIDES: Sides = { long: MAX_SIDE, short: MAX_SHORT_SIDE };
@@ -224,7 +226,9 @@ function elementPixels(box: CanvasBox, sides: Sides = VIDEO_SIDES): { width: num
   const long = Math.max(box.width, box.height);
   const short = Math.min(box.width, box.height);
   const scale = Math.min(PIXELS_PER_CANVAS_PX, sides.long / long, sides.short / short);
-  return { width: evenSide(box.width * scale), height: evenSide(box.height * scale) };
+  const shortSide = evenFloor(short * scale);
+  const longSide = Math.min(evenSide((long * shortSide) / short), evenSide(long * scale));
+  return box.width >= box.height ? { width: longSide, height: shortSide } : { width: shortSide, height: longSide };
 }
 
 export function blankElement(box: CanvasBox): OpResult {

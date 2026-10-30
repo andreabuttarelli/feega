@@ -3506,3 +3506,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A URL-import reference screenshot does not match the tree it was taken with
 
 **Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame. **Move:** `captureBeyondViewport` and scroll-based snapshots fire resize, scroll and IntersectionObserver callbacks. Freeze the page first (`revealPage(RevealMode.Still)`: timers, rAF, `play()`, transitions), report every observed element as in view from the first script (`everythingInView`), and take the reference screenshot after the tree, with a second freeze, as `url-capture.browser.test.ts` does.
+
+## A URL import scores well and looks wrong on the canvas
+
+**Signal:** `url-fidelity.browser.test.ts` scores 0.95+, the canvas shows another font, content cut differently or a strip at the top. **Move:** the HTML still is not what the canvas draws. Score the GPU path too: `URL_IMPORT_GPU=<label> npx vite-node --config scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` after the HTML run with the same label, and compare both columns. Read a WebGPU canvas by screenshotting the element, never with `drawImage` after the frame presented (blank).

@@ -105,7 +105,9 @@ const COORD_DIGITS = 100;
 
 export function fontkitSource(bytes: Uint8Array): Source {
   const base = create(bytes) as KitFont;
-  base.getGlyph(0)._decode();
+  if (base.directory.tables.glyf) {
+    base.getGlyph(0)._decode();
+  }
   const axes = axesOf(base);
   const faces = new Map<string, Face>();
   return {
