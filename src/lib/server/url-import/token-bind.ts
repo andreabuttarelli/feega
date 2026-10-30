@@ -10,7 +10,9 @@ import { inEveryScope } from '$lib/motion/doc-scopes';
 import { defineStyle } from '$lib/motion/styles';
 import { resolveVariables } from '$lib/motion/variables';
 import type { RestNode } from '$lib/server/figma/rest-message';
-import { ColourPaint, sameColour, textKey, type CtaUse, type Samples, type TextCase, type TextStyle, type Tokens } from './page-tokens';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
+import { uniformRadius } from './corner-radius';
+import { ColourPaint, FULL_RADIUS, sameColour, textKey, type CtaUse, type Samples, type TextCase, type TextStyle, type Tokens } from './page-tokens';
 
 export type Units = { docPerPx: number; images: ReadonlySet<string> };
 
@@ -23,6 +25,8 @@ const TEXT_COMPONENTS = new Set(['Text', 'Title', 'Kicker', 'Caption']);
 const FILL_TARGET = 'fill';
 const TEXT_COLOUR_TARGET = 'color';
 const STROKE_TARGET = 'stroke';
+const RADIUS_TARGET = 'radius';
+const MAX_ROUNDNESS = 0.5;
 
 export function siteName(url: string): string {
   const host = URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, '') : 'Site';
@@ -222,7 +226,7 @@ export function samplesOf(docs: readonly MotionDoc[], root: RestNode, units: Uni
 
 export type Bound = { variables: number; styles: number; layers: number };
 
-type Plan = { collection: Collection; styles: Record<string, Style>; colourOf: Map<string, string>; textOf: Map<string, string>; effectOf: Map<string, string>; gradientOf: Map<string, string>; gapOf: Map<number, string> };
+type Plan = { collection: Collection; styles: Record<string, Style>; colourOf: Map<string, string>; textOf: Map<string, string>; effectOf: Map<string, string>; gradientOf: Map<string, string>; gapOf: Map<number, string>; radiusOf: Map<number, string>; fullRadius: string | undefined };
 
 const styleName = (site: string, name: string) => `${site} ${name}`;
 
@@ -254,11 +258,30 @@ function planOf(tokens: Tokens, site: string, root: MotionDoc, units: Units): Pl
     textOf: new Map(tokens.texts.flatMap((t) => kept(styleName(site, t.name)).map((n) => [t.key, n] as const))),
     effectOf: new Map(tokens.effects.flatMap((e) => kept(styleName(site, e.name)).map((n) => [e.key, n] as const))),
     gradientOf: new Map(tokens.gradients.flatMap((g) => kept(styleName(site, g.name)).map((n) => [g.key, n] as const))),
-    gapOf: new Map(tokens.spacing.map((s) => [s.value, keyOf(site, s.name)]))
+    gapOf: new Map(tokens.spacing.map((s) => [s.value, keyOf(site, s.name)])),
+    radiusOf: new Map(tokens.radii.map((r) => [r.value, keyOf(site, r.name)])),
+    fullRadius: tokens.radii.filter((r) => r.value >= FULL_RADIUS).map((r) => keyOf(site, r.name))[0]
   };
 }
 
-function boundClip(clip: MotionClip, look: Look, plan: Plan): MotionClip {
+function cornered(clip: MotionClip, view: MotionDoc, plan: Plan): MotionClip {
+  if (clip.component !== 'Shape' || clip.props.shape !== ShapeKind.Path || typeof clip.props.path !== 'string') {
+    return clip;
+  }
+  const box = { width: Number(clip.props.width) * view.width, height: Number(clip.props.height) * view.height };
+  const radius = uniformRadius(clip.props.path, box);
+  if (radius === null) {
+    return clip;
+  }
+  const short = Math.min(box.width, box.height);
+  const key = plan.radiusOf.get(Math.round(radius)) ?? (Math.abs(radius - short * MAX_ROUNDNESS) <= 1 ? plan.fullRadius : undefined);
+  if (!key) {
+    return clip;
+  }
+  return { ...clip, bind: { ...clip.bind, [RADIUS_TARGET]: key }, props: { ...clip.props, shape: ShapeKind.Rect, path: '', corners: [], roundness: Math.min(MAX_ROUNDNESS, radius / short) } };
+}
+
+function boundClip(clip: MotionClip, look: Look, plan: Plan, view: MotionDoc): MotionClip {
   const bind: Record<string, string> = { ...clip.bind };
   const colour = plan.colourOf.get(look.textColour ? paintKey(ColourPaint.Text, look.textColour) : paintKey(ColourPaint.Fill, look.fill ?? ''));
   if (colour) {
@@ -275,11 +298,11 @@ function boundClip(clip: MotionClip, look: Look, plan: Plan): MotionClip {
   const textRef = look.text ? plan.textOf.get(textKey(look.text)) : undefined;
   const lookRef = textRef ?? (look.gradient ? plan.gradientOf.get(look.gradient) : undefined);
   const effectRef = look.effects ? plan.effectOf.get(look.effects) : undefined;
-  return { ...clip, ...(Object.keys(bind).length ? { bind } : {}), ...(lookRef ? { styleRef: lookRef } : {}), ...(effectRef ? { effectStyleRef: effectRef } : {}) };
+  return cornered({ ...clip, ...(Object.keys(bind).length ? { bind } : {}), ...(lookRef ? { styleRef: lookRef } : {}), ...(effectRef ? { effectStyleRef: effectRef } : {}) }, view, plan);
 }
 
 function linked(doc: MotionDoc, plan: Plan, units: Units): OpResult {
-  return inEveryScope(doc, (view) => ({ ok: true, doc: { ...view, tracks: view.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (units.images.has(c.id) ? c : boundClip(c, lookOf(c, view, units), plan))) })) } }));
+  return inEveryScope(doc, (view) => ({ ok: true, doc: { ...view, tracks: view.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (units.images.has(c.id) ? c : boundClip(c, lookOf(c, view, units), plan, view))) })) } }));
 }
 
 type Overrides = Record<string, Record<string, unknown>>;

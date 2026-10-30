@@ -23,6 +23,12 @@ const GAP_TARGETS = ['autoLayout.gap', 'autoLayout.crossGap'];
 const PADDING_TARGET = 'autoLayout.padding';
 const PADDING_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 const LAYOUT_PREFIX = 'autoLayout.';
+export const RADIUS_TARGET = 'radius';
+const MAX_ROUNDNESS = 0.5;
+
+type Frame = { width: number; height: number };
+
+const roundable = (clip: MotionClip) => clip.component === 'Shape' && clip.props.shape === 'rect';
 
 const CONTROL_TYPE: Partial<Record<Control, VarType>> = {
   [Control.Color]: VarType.Colour,
@@ -38,6 +44,9 @@ function typeOfTarget(clip: MotionClip, target: string): VarType | undefined {
   if (target === PADDING_TARGET || GAP_TARGETS.includes(target)) {
     return clip.autoLayout ? VarType.Number : undefined;
   }
+  if (target === RADIUS_TARGET) {
+    return roundable(clip) ? VarType.Number : undefined;
+  }
   const field = fieldsOf(clip.component).find((f) => f.key === target);
   return field ? CONTROL_TYPE[field.control] : undefined;
 }
@@ -45,7 +54,8 @@ function typeOfTarget(clip: MotionClip, target: string): VarType | undefined {
 export function bindableTargets(clip: MotionClip, type: VarType): string[] {
   const own = fieldsOf(clip.component).filter((f) => CONTROL_TYPE[f.control] === type).map((f) => f.key);
   const layout = type === VarType.Number && clip.autoLayout ? [...GAP_TARGETS, PADDING_TARGET] : [];
-  return [...own, ...layout];
+  const radius = type === VarType.Number && roundable(clip) ? [RADIUS_TARGET] : [];
+  return [...own, ...layout, ...radius];
 }
 
 function activeMode(collection: Collection): string {
@@ -144,11 +154,23 @@ const stacked = (props: Props, target: string, value: VarLiteral): Props => PAIN
 
 export const fillTarget = (clip: MotionClip): string | undefined => bindableTargets(clip, VarType.Colour).find((t) => fillReplaces(clip.component, t));
 
-function resolvedClip(variables: Variables, clip: MotionClip): MotionClip {
+function withRadius(clip: MotionClip, frame: Frame, value: VarLiteral): MotionClip {
+  const short = Math.min(Number(clip.props.width) * frame.width, Number(clip.props.height) * frame.height);
+  if (typeof value !== 'number' || !(short > 0)) {
+    return clip;
+  }
+  return { ...clip, props: { ...clip.props, corners: [], roundness: Math.min(MAX_ROUNDNESS, Math.max(0, value / short)) } };
+}
+
+function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame): MotionClip {
   let next = clip;
   for (const [target, key] of Object.entries(clip.bind ?? {})) {
     const value = valueOf(variables, key);
     if (value === undefined) {
+      continue;
+    }
+    if (target === RADIUS_TARGET) {
+      next = withRadius(next, frame, value);
       continue;
     }
     next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: stacked({ ...ownedFill(next, target), [target]: clamped(next, target, value) }, target, value) };
@@ -161,7 +183,9 @@ export function resolveVariables(doc: MotionDoc): MotionDoc {
   if (!variables) {
     return doc;
   }
-  return mapEveryTrack(doc, (tracks) => tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.bind ? resolvedClip(variables, c as MotionClip) : c)) })));
+  const resolved = (tracks: MotionTrack[], frame: Frame) => tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.bind ? resolvedClip(variables, c as MotionClip, frame) : c)) })) as MotionTrack[];
+  const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: resolved(comp.tracks, comp.frame ?? doc) }]));
+  return { ...doc, tracks: resolved(doc.tracks, doc), comps };
 }
 
 export function defineVariable(doc: MotionDoc, collection: string, name: string, input: VarInput, modes?: readonly string[]): OpResult {
