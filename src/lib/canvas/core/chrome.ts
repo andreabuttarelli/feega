@@ -190,18 +190,35 @@ function tag(t: ChromeTile): PathItem[] {
   return [item(t, ChromePart.Tag, circle(t.x + t.width - TAG_RADIUS * k, centre, TAG_RADIUS * k), t.tag)];
 }
 
+function labelLayout(t: ChromeTile, glyphs: Glyphs) {
+  const k = labelK(t);
+  const line = LABEL_SIZE * LABEL_LEADING * k;
+  const top = t.y - (LABEL_GAP + LABEL_PAD) * k - line;
+  const left = t.icon ? t.x + (ICON_SIZE + ICON_GAP) * k : t.x;
+  const text = fitted(t.label ?? '', t.x + t.width - left, glyphs, LABEL_SIZE * k);
+  return { k, line, top, left, text };
+}
+
 function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.label || labelHidden(t)) {
     return [];
   }
-  const k = labelK(t);
-  const line = LABEL_SIZE * LABEL_LEADING * k;
-  const top = t.y - (LABEL_GAP + LABEL_PAD) * k - line;
+  const { k, line, top, left, text } = labelLayout(t, glyphs);
   const iconSize = ICON_SIZE * k;
   const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(scaled(t.icon, k), t.x, top + (line - iconSize) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
-  const left = t.icon ? t.x + (ICON_SIZE + ICON_GAP) * k : t.x;
-  const text = fitted(t.label, t.x + t.width - left, glyphs, LABEL_SIZE * k);
   return [...icon, item(t, ChromePart.Label, shift(text.contours, left, top), LABEL_COLOR)];
+}
+
+export type ChromeBox = { x: number; y: number; w: number; h: number };
+
+export function labelBoxes(t: ChromeTile, glyphs: Glyphs): ChromeBox[] {
+  if (labelHidden(t)) {
+    return [];
+  }
+  const { k, line, top, left, text } = labelLayout(t, glyphs);
+  const named = t.label ? [{ x: t.x, y: top, w: left + text.width - t.x, h: line }] : [];
+  const dot = t.tag ? [{ x: t.x + t.width - 2 * TAG_RADIUS * k, y: top, w: 2 * TAG_RADIUS * k, h: line }] : [];
+  return [...named, ...dot];
 }
 
 function name(t: ChromeTile, glyphs: Glyphs, m: PortMark, centre: number, side: ChromePart): PathItem {
