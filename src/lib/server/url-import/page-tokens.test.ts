@@ -30,6 +30,15 @@ describe('page tokens', () => {
     expect(names(PAGE)).toEqual({ Background: '#ffffff', Surface: '#f6f9fc', Text: '#061b31', 'Text muted': '#50617a', Primary: '#533afd', Border: '#e5edf5', Accent: '#ff6118' });
   });
 
+  it('a very dark tint is named Navy or Ink, a very light one Tint, never by its hue', () => {
+    const twice = (hex: string) => [colour(hex, ColourPaint.Fill, 20), colour(hex, ColourPaint.Fill, 20)];
+    const found = names({ ...PAGE, colours: [...PAGE.colours, ...twice('#0a2540'), ...twice('#1f0a40'), ...twice('#bcd2ff')] });
+
+    expect(found).toMatchObject({ Navy: '#0a2540', Ink: '#1f0a40', Tint: '#bcd2ff' });
+    expect(Object.keys(found)).not.toContain('Blue');
+    expect(Object.keys(found)).not.toContain('Purple');
+  });
+
   it('merges near-duplicate colours into one token that keeps every member', () => {
     const surface = tokensOf(PAGE).colours.find((c) => c.name === 'Surface')!;
 

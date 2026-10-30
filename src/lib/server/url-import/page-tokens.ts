@@ -136,7 +136,17 @@ function paintName(c: Cluster): string {
   return PAINT_NAME[paint];
 }
 
-const extraName = (c: Cluster) => (chromatic(c) ? hueName(c) : paintName(c));
+const DARK_TINT = 25;
+const LIGHT_TINT = 80;
+
+const TINT_NAMES: { when: (c: Cluster) => boolean; name: (hue: string) => string }[] = [
+  { when: (c) => c.lab[0] <= DARK_TINT, name: (hue) => (hue === 'Blue' ? 'Navy' : 'Ink') },
+  { when: (c) => c.lab[0] >= LIGHT_TINT, name: () => 'Tint' }
+];
+
+const tintName = (c: Cluster) => TINT_NAMES.find((t) => t.when(c))?.name(hueName(c));
+
+const extraName = (c: Cluster) => (chromatic(c) ? (tintName(c) ?? hueName(c)) : paintName(c));
 
 function unique(name: string, taken: readonly string[]): string {
   if (!taken.includes(name)) {
