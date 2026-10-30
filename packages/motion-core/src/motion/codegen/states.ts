@@ -1,5 +1,5 @@
 import type { MotionClip } from '../doc';
-import { EASE_BEZIER } from '../keyframes';
+import { bezierOf } from '../graph';
 import { ElementState, OVERRIDE_KEYS, type OverrideKey, type StateRow } from '../states/model';
 import { round } from './ease';
 import type { Rule } from './ir';
@@ -9,12 +9,12 @@ export enum StatePaint {
   Text = 'text'
 }
 
-export type StateStyle = { base: Rule[]; rows: { pseudo: string; rules: Rule[] }[] };
+export type StateStyle = { base: Rule[]; rows: { pseudo: string; variant: string; rules: Rule[] }[] };
 
-const PSEUDO: Record<StateRow['state'], string> = {
-  [ElementState.Hover]: ':hover',
-  [ElementState.Pressed]: ':active',
-  [ElementState.Focus]: ':focus-visible'
+const SELECTOR: Record<StateRow['state'], { pseudo: string; variant: string }> = {
+  [ElementState.Hover]: { pseudo: ':hover', variant: 'hover' },
+  [ElementState.Pressed]: { pseudo: ':active', variant: 'active' },
+  [ElementState.Focus]: { pseudo: ':focus-visible', variant: 'focus-visible' }
 };
 
 const ORDER: StateRow['state'][] = [ElementState.Hover, ElementState.Focus, ElementState.Pressed];
@@ -32,7 +32,7 @@ const CSS_OF: Record<OverrideKey, (value: number | string, paint: StatePaint, un
   cornerRadius: (v) => ['border-radius', px(Number(v))]
 };
 
-const curve = (row: StateRow) => `${row.transition.durationMs}ms cubic-bezier(${EASE_BEZIER[row.transition.easing].map(round).join(', ')})`;
+const curve = (row: StateRow) => `${row.transition.durationMs}ms cubic-bezier(${bezierOf(row.transition.easing).map(round).join(', ')})`;
 
 const transition = (rules: Rule[], row: StateRow): Rule => ['transition', rules.map(([p]) => `${p} ${curve(row)}`).join(', ')];
 
@@ -54,6 +54,6 @@ export function stateStyleOf(clip: MotionClip, unit: number): StateStyle | undef
   const touched = [...new Map(styled.flatMap((s) => s.rules).map((r) => [r[0], r] as const)).values()];
   return {
     base: [transition(touched, styled[0].row)],
-    rows: styled.map(({ row, rules }) => ({ pseudo: PSEUDO[row.state], rules: [...rules, transition(rules, row)] }))
+    rows: styled.map(({ row, rules }) => ({ ...SELECTOR[row.state], rules: [...rules, transition(rules, row)] }))
   };
 }

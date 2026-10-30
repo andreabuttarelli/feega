@@ -45,7 +45,7 @@ import { addAdjustment, createComp, mergeView, precompose, viewOf } from '@feega
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, defaultProps, type ComponentId } from '@feega/motion-core/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
-import { EASE_IDS, Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '@feega/motion-core/motion/design';
+import { EASE_IDS, KEY_EASE_IDS, Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '@feega/motion-core/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, MotionFormat, clipsOf, findClip, formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '@feega/motion-core/motion/junctions';
@@ -2544,7 +2544,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_element_state: tool({
-      description: `Give a layer an interaction state, like Figma's interactive components and Framer's hover/pressed variants: state ${OVERRIDABLE_STATES.join('|')}; overrides any of ${STATE_KEYS.join(', ')} (colours as hex, opacity 0..1, scale 1 = drawn size); transition easing ${EASE_IDS.join('|')} and durationMs 0..${MAX_STATE_MS} (default standard, ${DEFAULT_STATE_MS}). One row per state: setting it again replaces it. The prototype player and the web export play it while the pointer hovers, presses or focuses the layer.`,
+      description: `Give a layer an interaction state, like Figma's interactive components and Framer's hover/pressed variants: state ${OVERRIDABLE_STATES.join('|')}; overrides any of ${STATE_KEYS.join(', ')} (colours as hex, opacity 0..1, scale 1 = drawn size); transition easing ${KEY_EASE_IDS.join('|')} or a cubic bezier [x1, y1, x2, y2], and durationMs 0..${MAX_STATE_MS} (default standard, ${DEFAULT_STATE_MS}). One row per state: setting it again replaces it. The prototype player and the web export play it while the pointer hovers, presses or focuses the layer.`,
       inputSchema: z.object({ clip_id: z.string(), ...stateRowSchema.shape }),
       execute: async ({ clip_id, ...row }) => apply(putState(session.doc, clip_id, row), `${row.state} state on ${clip_id}`)
     }),

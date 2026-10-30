@@ -25,6 +25,23 @@ state and coming back.
 This works like Figma's interactive components ("While hovering", "While pressing" with Smart
 Animate) and Framer's Hover and Pressed variants, without making a component or a copy of it.
 
+## Edit a state
+
+1. Select a layer inside a frame.
+2. In Properties → **States**, pick **Hover** (or Pressed, Focus). The canvas shows the layer in
+   that state.
+3. Press **Add Hover state**, then change the values or pick **Add property…**.
+4. Click the curve to pick an easing or drag a custom one; type the duration in ms.
+5. Pick **Default** to see the layer as drawn again.
+
+Play the frame in the prototype player and move the pointer over the layer: the transition
+plays in, and back out when the pointer leaves. Pressing plays the Pressed state.
+
+## Add a variant
+
+Select a component instance: a **+** appears below it. Click it to add a variant to the set,
+named like Figma's (`Variant 2`, `Variant 3`…). Pick it in the instance's variant menu.
+
 ## Ask the agent
 
 > Give the button a hover state: fill #2255ff, scale 1.04, 250 ms enter.
@@ -36,4 +53,4 @@ The agent uses `set_element_state` and `remove_element_state`; MCP clients reach
 
 HTML and Svelte exports turn each state into a CSS rule — Hover is `:hover`, Pressed is
 `:active`, Focus is `:focus-visible` — with a `transition` using the state's easing and
-duration. React export does not include states yet.
+duration. React export adds the same values as `hover:`, `active:` and `focus-visible:` classes.

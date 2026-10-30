@@ -16,17 +16,17 @@ carry triggers and a transition with easing and duration
 | | Figma | Framer | Feega |
 |---|---|---|---|
 | Container of variants | Component set (dashed purple frame) | Component with variants | Component set (`component.set`) |
-| Add a variant | "+" button below/right of the set; "Add variant" in properties | "+" next to the variant in the component canvas | "+" on the main component on canvas → `addVariant` |
+| Add a variant | "+" just below the selected component set; a second "+" next to Add property creates a variant property | Add a variant from the component's variant bar | "+" below the selected instance → `appendVariant` (first property, default name `Variant`, values `Variant N` as Figma) |
 | State naming | Variant property, convention `State=Default/Hover/Pressed` | Built-in Hover and Pressed variants, plus custom ones | Built-in `default`, `hover`, `pressed`, `focus` rows on the element |
 | Where the state lives | A whole variant (copy of the component) | A variant of the component (override layer props) | A row of overrides on the element itself — no copy |
-| Triggering | Interaction "While hovering" / "While pressing" → Change to variant | Automatic for Hover/Pressed variants; Interactions on other triggers | Automatic in prototype and export: pointer enter/leave, down/up, focus/blur |
-| Transition | Smart Animate + easing preset or custom bezier/spring + duration | Transition per variant: Spring or Tween with curve and duration | `transition: { easing, durationMs }` per row, the house ease ids |
+| Triggering | Interactive components: "On click" / "On hover" + Change to (variant). Prototype "While hovering" / "While pressing" go back on leave/release. A prototype interaction with the same trigger overrides the variant one. Components remember their last variant unless reset | Hover and Press states branch from one variant and carry their interaction automatically | Automatic in the prototype player and export: pointer enter/leave, down/up, focus |
+| Transition | Smart Animate + easing preset or custom bezier/spring + duration | Spring or tween per transition (Motion: physical props default to spring) | `transition: { easing, durationMs }` per row; easing is a house ease id or a custom bezier, edited with the existing curve picker |
 | Overridable | Every visual property | Every visual property | `STATE_OVERRIDES`: opacity, scale, rotateZ, blur, fill, stroke, strokeWidth, cornerRadius |
 | Any element, not only components | No (needs a component) | No (needs a component) | Yes: text, shape, frame, image |
 
-Sources: help.figma.com "Create and use variants", "Create interactive components",
-"Prototype triggers" (While hovering / While pressing), "Smart animate" and "Easing and spring
-animations"; framer.com/learn "Variants", "Hover and pressed states", "Transitions".
+Sources read 2026-10-30: help.figma.com "Create and use variants" (360056440594), "Create
+interactive components" (360061175334), "Prototype triggers" (360040035834);
+framer.com/learn/component-variants; framer.com/motion/transition and /gestures.
 
 ## Decision
 
@@ -42,8 +42,13 @@ animations"; framer.com/learn "Variants", "Hover and pressed states", "Transitio
    variant-per-state, chosen because it works on every element and doubles nothing.
 4. **Agent parity**: `set_element_state` / `remove_element_state` motion tools, which the `edit`
    catalogue exposes to MCP.
-5. Edits to `states` ride the frame document save that every clip edit already uses; the
-   canvas `REGISTRY` is for canvas rows, not for fields inside a frame document.
+5. **Optimistic without a REGISTRY row.** `REGISTRY` runs canvas rows (nodes, edges). `states`
+   is a field inside a frame document, edited through `FrameEditSession.apply`, which already
+   changes local state in the same frame and saves in the background with undo. A second path
+   would mean two writers for one document.
+6. **Preview is view state, never saved.** The inspector switcher writes `statePreview`
+   (per frame, per clip); the canvas draws `previewDoc(doc, picks)`. The prototype player
+   tweens the same picks with `amountAt` and `mixState`.
 
 ## Discarded
 

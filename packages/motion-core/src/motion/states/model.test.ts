@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ElementState, resolveState, statesSchema } from './model';
+import { ElementState, mixState, resolveState, statesSchema } from './model';
 
 const clip = { transform: { opacity: 1 }, props: { fill: '#111111', stroke: '#000000' }, states: statesSchema.parse([{ state: ElementState.Hover, overrides: { opacity: 0.6, fill: '#ff0000' } }]) };
 
@@ -24,5 +24,38 @@ describe('element states', () => {
   it('refuses two rows for the same state and an unknown override', () => {
     expect(statesSchema.safeParse([{ state: 'hover', overrides: {} }, { state: 'hover', overrides: {} }]).success).toBe(false);
     expect(statesSchema.safeParse([{ state: 'hover', overrides: { width: 3 } }]).success).toBe(false);
+  });
+});
+
+describe('layers painted with fill and stroke lists', () => {
+  const layered = {
+    transform: {},
+    props: { fills: [{ type: 'solid', color: '#2b5cff', opacity: 1 }], strokes: [{ paint: { type: 'solid', color: '#000000' }, width: 2 }] },
+    states: statesSchema.parse([{ state: ElementState.Hover, overrides: { fill: '#ff0000', stroke: '#00ff00' } }])
+  };
+
+  it('a state recolours the first fill and stroke instead of adding a loose prop', () => {
+    const props = resolveState(layered, ElementState.Hover).props as typeof layered.props;
+    expect(props.fills[0].color).toBe('#ff0000');
+    expect(props.strokes[0].paint.color).toBe('#00ff00');
+    expect('fill' in props).toBe(false);
+  });
+
+  it('halfway mixes the fill list colour', () => {
+    const props = mixState(layered, ElementState.Hover, 0.5).props as typeof layered.props;
+    expect(props.fills[0].color).toBe('#952e80');
+  });
+});
+
+describe('mixing into a state', () => {
+  it('halfway mixes numbers and colours between default and the state', () => {
+    const half = mixState(clip, ElementState.Hover, 0.5);
+    expect(half.transform.opacity).toBeCloseTo(0.8);
+    expect(half.props.fill).toBe('#880909');
+  });
+
+  it('amount 1 is the resolved state and 0 is the element as drawn', () => {
+    expect(mixState(clip, ElementState.Hover, 1)).toEqual(resolveState(clip, ElementState.Hover));
+    expect(mixState(clip, ElementState.Hover, 0)).toEqual(resolveState(clip, ElementState.Default));
   });
 });

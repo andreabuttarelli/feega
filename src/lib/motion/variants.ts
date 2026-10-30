@@ -48,6 +48,13 @@ export function addVariant(doc: MotionDoc, compId: string, variant: Variant, new
   return { ok: true, doc: { ...doc, comps: { ...doc.comps, [compId]: marked, [id]: copy } } };
 }
 
+const FIRST_PROPERTY = 'Variant';
+
+export function appendVariant(doc: MotionDoc, compId: string, newId: NewId): OpResult {
+  const property = Object.keys(variantProps(doc, compId))[0] ?? FIRST_PROPERTY;
+  return addVariant(doc, compId, { [property]: `${FIRST_PROPERTY} ${setMembers(doc, compId).length + 1}` }, newId);
+}
+
 export function swapInstance(doc: MotionDoc, instanceId: string, compId: string): OpResult {
   const instance = instanceOf(doc, instanceId);
   const target = doc.comps[compId];
