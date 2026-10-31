@@ -15,6 +15,7 @@ Styles belong to the project: every canvas and page of the project sees the same
 - Deleting a style unlinks its layers; they keep their current look.
 - Styles already saved in older frames, and styles from a URL import, join the project library the first time their canvas opens. Nothing is overwritten: a project style with the same name wins.
 - Effect and gradient styles: save shadows, blurs, gradients and image fills as styles.
+- Overrides: change one property of a styled layer, such as its size, and it stays linked. The Style section lists the overridden properties with a reset; style edits keep reaching the others.
 
 ## Variables
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { findClip, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
-import { defineStyle } from '$lib/motion/styles';
+import { applyStyle, defineStyle } from '$lib/motion/styles';
 import { StyleKind } from '@feega/motion-core/motion/styles-model';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { canvasStyle, type StyleFrames } from './canvas-styles';
@@ -64,8 +64,7 @@ describe('the canvas styles library over MCP', () => {
   });
 
   it('defining restyles every frame that has the style', async () => {
-    const a = must(defineStyle(textDoc(), 'Brand', RED));
-    const store = frames({ a: must({ ok: true, doc: { ...a, tracks: a.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, styleRef: 'Brand' })) })) } }), b: textDoc() });
+    const store = frames({ a: must(applyStyle(must(defineStyle(textDoc(), 'Brand', RED)), ['t'], 'Brand')), b: textDoc() });
     const out = await canvasStyle(store, { name: 'Brand', style: BLUE });
     expect(out).toMatchObject({ ok: true, frames: ['a'] });
     expect(findClip(store.docs.a, 't')!.clip.props.color).toBe('#0000ff');
