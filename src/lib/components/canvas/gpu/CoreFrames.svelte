@@ -19,7 +19,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, toFetch, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -139,6 +139,7 @@
   }
 
   const STEP_WAIT_MS = 300;
+  const UNSAVED_SOURCE = { tries: 8, waitMs: 1000 };
   const STEP_POLL_MS = 50;
 
   async function awaitKnown(f: FrameAt): Promise<FrameDoc | null> {
@@ -154,7 +155,7 @@
 
   async function load(f: FrameAt) {
     const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
-    const built = given ? await buildSource(f, given) : await fetchAndBuild(f);
+    const built = given ? await buildSource(f, given) : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
     if (!built || (await media.ready(built.list)) === Readiness.Partial) {
       return;
     }

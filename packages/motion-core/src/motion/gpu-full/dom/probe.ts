@@ -47,6 +47,57 @@ export function domProbe(cfg: ProbeConfig) {
     "metadata",
   ]);
   const UNTRANSFORMED = "feega-dom-read-untransformed";
+
+  type Affine = [number, number, number, number, number, number];
+  const SVG_STEP = /(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/g;
+  const UNSET_TRANSFORM = new Set(["", "none"]);
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const times = (m: Affine, n: Affine): Affine => [
+    m[0] * n[0] + m[2] * n[1],
+    m[1] * n[0] + m[3] * n[1],
+    m[0] * n[2] + m[2] * n[3],
+    m[1] * n[2] + m[3] * n[3],
+    m[0] * n[4] + m[2] * n[5] + m[4],
+    m[1] * n[4] + m[3] * n[5] + m[5],
+  ];
+  const turned = ([degrees, cx = 0, cy = 0]: number[]): Affine => {
+    const c = Math.cos(radians(degrees));
+    const s = Math.sin(radians(degrees));
+    return [c, s, -s, c, cx - c * cx + s * cy, cy - s * cx - c * cy];
+  };
+  const SVG_STEPS: Record<string, (v: number[]) => Affine> = {
+    matrix: (v) => [v[0], v[1], v[2], v[3], v[4], v[5]],
+    translate: ([x, y = 0]) => [1, 0, 0, 1, x, y],
+    scale: ([x, y = x]) => [x, 0, 0, y, 0, 0],
+    rotate: turned,
+    skewX: ([a]) => [1, 0, Math.tan(radians(a)), 1, 0, 0],
+    skewY: ([a]) => [1, Math.tan(radians(a)), 0, 1, 0, 0],
+  };
+
+  const svgTransformOf = (el: Element, computed: CSSStyleDeclaration) => {
+    const listed = el.getAttribute("transform");
+    if (
+      el instanceof HTMLElement ||
+      !listed ||
+      !UNSET_TRANSFORM.has(computed.getPropertyValue("transform"))
+    ) {
+      return {};
+    }
+    const steps = [...listed.matchAll(SVG_STEP)].map(([, name, args]) =>
+      SVG_STEPS[name](
+        args
+          .trim()
+          .split(/[\s,]+/)
+          .map(Number),
+      ),
+    );
+    const matrix = steps.reduce(times, [1, 0, 0, 1, 0, 0]);
+    return {
+      transform: `matrix(${matrix.join(", ")})`,
+      "transform-origin": "0px 0px",
+    };
+  };
+
   const isSvgImage = (el: Element) =>
     !(el instanceof HTMLElement) && el.tagName.toLowerCase() === "image";
 
@@ -566,9 +617,12 @@ export function domProbe(cfg: ProbeConfig) {
       if (computed.display === "none") {
         return;
       }
-      const style = Object.fromEntries(
-        cfg.styles.map((k) => [k, computed.getPropertyValue(k)]),
-      );
+      const style = {
+        ...Object.fromEntries(
+          cfg.styles.map((k) => [k, computed.getPropertyValue(k)]),
+        ),
+        ...svgTransformOf(el, computed),
+      };
       const attrs = Object.fromEntries(
         cfg.attrs.flatMap((k) =>
           el.hasAttribute(k) ? [[k, el.getAttribute(k) ?? ""]] : [],
