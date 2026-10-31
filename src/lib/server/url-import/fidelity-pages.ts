@@ -12,7 +12,7 @@ export const FIDELITY_PAGES: Record<string, string> = {
   blog: 'https://overreacted.io/a-chain-reaction/'
 };
 
-export const FIDELITY_DIR = join(homedir(), 'Documents/feega-videos/url-import/fidelity2');
+export const FIDELITY_DIR = process.env.URL_IMPORT_FIDELITY_DIR ?? join(homedir(), 'Documents/feega-videos/url-import/fidelity2');
 
 export const capturedIn = (label: string) => join(FIDELITY_DIR, 'captures', label);
 

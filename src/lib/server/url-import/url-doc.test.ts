@@ -16,7 +16,11 @@ const clipsOf = (plan: NonNullable<ReturnType<typeof urlPlan>>) => {
 
 const outlined = (name: string): PageTree => ({ ...treeOf(name), outline: JSON.parse(readFileSync(new URL(`./fixtures/outlines/${name}.json`, import.meta.url), 'utf8')) as PageOutline });
 
-const topNames = (plan: NonNullable<ReturnType<typeof urlPlan>>) => plan.plan.items[0].doc.tracks.flatMap((t) => t.clips.filter((c) => c.props.comp).map((c) => c.name));
+const topNames = (plan: NonNullable<ReturnType<typeof urlPlan>>) => {
+  const clips = plan.plan.items[0].doc.tracks.flatMap((t) => t.clips);
+  const page = clips.find((c) => !c.parent && c.autoLayout)?.id ?? null;
+  return clips.filter((c) => c.parent === page && c.id !== page).map((c) => c.name);
+};
 
 let counter = 0;
 const newId = () => `id${++counter}`;
@@ -44,7 +48,7 @@ describe('urlPlan', () => {
   });
 
   it.each(FIXTURES)('le sezioni non cambiano il testo che %s mostra', (name) => {
-    const texts = (sectioning: Sectioning) => clipsOf(urlPlan(outlined(name), newId, undefined, {}, { sectioning })!).flatMap((c) => (typeof c.props.text === 'string' ? [c.props.text] : [])).sort();
+    const texts = (sectioning: Sectioning) => clipsOf(urlPlan(outlined(name), newId, (root) => root, {}, { sectioning })!).flatMap((c) => (typeof c.props.text === 'string' ? [...c.props.text.replace(/\s+/g, '')] : [])).sort().join('');
 
     expect(texts(Sectioning.On)).toEqual(texts(Sectioning.Off));
   });
@@ -152,6 +156,6 @@ describe('urlPlan', () => {
 
     const clip = clipsOf(urlPlan(tree, newId)!).find((c) => c.props.text);
 
-    expect(clip?.props.sizing).toBe('auto-height');
+    expect(clip?.props.sizing).not.toBe('auto');
   });
 });

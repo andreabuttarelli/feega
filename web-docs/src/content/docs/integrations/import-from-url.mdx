@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text in the page's own fonts, flex rows and columns become stacks where that keeps every layer in place, backgrounds, gradients, borders, corners, shadows and blurs become fills, strokes and effects, pictures are copied into your project, SVG icons and logos become vector paths. It is not a screenshot: only what a frame cannot hold as layers (a video, a canvas, an embedded page, a masked or blended block) comes in as a picture of itself.
+Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text in the page's own fonts, the page is rebuilt as stacks (see below), backgrounds, gradients, borders, corners, shadows and blurs become fills, strokes and effects, pictures are copied into your project, SVG icons and logos become vector paths. It is not a screenshot: only what a frame cannot hold as layers (a video, a canvas, an embedded page, a masked or blended block) comes in as a picture of itself.
 
 ## In the app
 
@@ -14,6 +14,14 @@ Open the insert menu (**+**), go to **Import**, choose **From URL…**, paste th
 ## What the import does before reading
 
 The page is scrolled to the bottom and back so lazy pictures load and scroll-revealed blocks show; running animations are finished, videos are stopped on their last frame, and cookie banners are hidden.
+
+## Stacks
+
+The imported frame is laid out like a well-built Figma file. The page is a vertical stack of sections; inside, blocks one under the other become vertical stacks, columns side by side become horizontal stacks, a grid becomes rows, and the lines of a paragraph become one text layer. Gaps and paddings come from the page and bind to its spacing variables.
+
+Only what really overlaps stays absolute: decorations behind or above the content, overlays like a cookie banner, glyph-by-glyph counters, and anything inside a block that clips an overflowing child. Every layer lands where the page drew it.
+
+Make the page stack narrower or wider (select the stack under the frame, change W) and sections fill the new width, full-width rows stretch, and wide rows spread their items. Text keeps the size and line breaks it had in the page.
 
 ## Fonts
 
