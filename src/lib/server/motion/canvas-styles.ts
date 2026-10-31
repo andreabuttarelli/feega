@@ -13,7 +13,7 @@ export const canvasStyleInput = z.object({
   name: z.string().min(1).max(40).optional(),
   to: z.string().min(1).max(40).optional().describe('rename: the new name, in the project and every frame that has the style'),
   style: styleSchema.optional().describe('define: saves the project style and restyles every frame with this name'),
-  ids: z.array(z.string()).optional().describe('apply name to frameId:elementId; none of style/ids/remove lists the project styles'),
+  ids: z.array(z.string()).optional().describe('apply name to nodeId:elementId, a frame or a free element alike; none of style/ids/remove lists the project styles'),
   remove: z.boolean().optional().describe('remove: deletes the project style; its elements keep their look, unlinked')
 });
 

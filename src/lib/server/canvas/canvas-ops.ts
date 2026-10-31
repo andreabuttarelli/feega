@@ -43,6 +43,7 @@ import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-grap
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
 import { listEntries } from '$lib/server/repos/project-library';
 import { runLibrary } from '$lib/server/canvas/project-library';
+import { docNodeIds } from '$lib/server/canvas/doc-nodes';
 import { LibraryKind } from '$lib/motion/project-library-ops';
 import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
 import { importLottieAt } from '$lib/server/motion/lottie-at';
@@ -935,7 +936,7 @@ export const CANVAS_OPS = {
       return canvasStyle(
         {
           project: { load: () => listEntries(ctx.db, scope), run: (ask) => runLibrary(ctx.db, scope, ask) },
-          ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
+          ids: async () => docNodeIds(await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })),
           read: frames.read,
           write: frames.write
         },
@@ -953,7 +954,7 @@ export const CANVAS_OPS = {
       return canvasVariable(
         {
           project: { load: () => listEntries(ctx.db, scope), run: (ask) => runLibrary(ctx.db, scope, ask) },
-          ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
+          ids: async () => docNodeIds(await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })),
           read: frames.read,
           write: frames.write
         },
