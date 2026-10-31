@@ -9,7 +9,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: vi.fn(async () => []
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: (...args: unknown[]) => findReachableProject(...args) }));
 vi.mock('$lib/server/url-import/import-url', async (actual) => ({ ...(await actual<object>()), importPageAt: (...args: unknown[]) => importPageAt(...args) }));
 vi.mock('$lib/server/repos/canvas', () => ({ findNode: (...args: unknown[]) => findNode(...args) }));
-vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({}) }));
+vi.mock('$lib/server/motion/move-element', () => ({ frameStore: () => ({ read: async () => null }) }));
 vi.mock('$lib/server/canvas/upload', () => ({ importCanvasLink: vi.fn() }));
 vi.mock('$lib/server/web/live', () => ({ liveBrowser: () => null }));
 vi.mock('$lib/server/start/site-brand', () => ({ findSiteBrand: (...args: unknown[]) => findSiteBrand(...(args as [])) }));
