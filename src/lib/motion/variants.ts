@@ -118,3 +118,16 @@ export function defineVariantProp(doc: MotionDoc, compId: string, key: string, v
   const copies = Object.fromEntries(missing.map((variant) => [newId(), { ...base, component: { ...base.component!, variant } }]));
   return { ok: true, doc: { ...withAxis, comps: { ...withAxis.comps, ...copies } } };
 }
+
+const MAX_CHIPS = 6;
+
+export type VariantChip = { compId: string; label: string; current: boolean };
+
+export function variantChips(doc: MotionDoc, compId: string): VariantChip[] | null {
+  const members = setMembers(doc, compId);
+  const several = Object.keys(variantProps(doc, compId)).length > 1;
+  if (members.length < 2 || (several && members.length > MAX_CHIPS)) {
+    return null;
+  }
+  return members.map(([id, comp]) => ({ compId: id, label: Object.values(comp.component!.variant ?? {}).join(', ') || comp.component!.name, current: id === compId }));
+}

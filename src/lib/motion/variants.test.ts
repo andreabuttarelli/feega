@@ -3,7 +3,7 @@ import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc }
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { createComponent, overrideInstance } from './main-component';
-import { addVariant, appendVariant, defineVariantProp, pickVariant, setVariant, swapInstance, variantMatrix, variantProps } from './variants';
+import { addVariant, appendVariant, defineVariantProp, pickVariant, setVariant, swapInstance, variantChips, variantMatrix, variantProps } from './variants';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -99,5 +99,30 @@ describe('variants and instance swap', () => {
     const { doc, mainId, instanceId } = made();
     const sized = must(defineVariantProp(doc, mainId, 'Size', ['S', 'M'], newId));
     expect(setVariant(sized, instanceId, { Size: 'XL' }).ok).toBe(false);
+  });
+});
+
+describe('quick variant chips in the right bar', () => {
+  it('a set with one property shows one chip per variant, the current one marked', () => {
+    const { doc, mainId } = made();
+    const set = must(addVariant(must(addVariant(doc, mainId, { State: 'Hover' }, newId)), mainId, { State: 'Pressed' }, newId));
+
+    const chips = variantChips(set, mainId)!;
+
+    expect(chips.map((c) => c.label)).toEqual(['Default', 'Hover', 'Pressed']);
+    expect(chips.filter((c) => c.current).map((c) => c.compId)).toEqual([mainId]);
+  });
+
+  it('a large matrix of several properties keeps to the dropdowns', () => {
+    const { doc, mainId } = made();
+    const sized = must(defineVariantProp(must(defineVariantProp(doc, mainId, 'Size', ['S', 'M', 'L'], newId)), mainId, 'State', ['Default', 'Hover', 'Pressed'], newId));
+
+    expect(variantChips(sized, mainId)).toBeNull();
+  });
+
+  it('a component with no variants has no chips', () => {
+    const { doc, mainId } = made();
+
+    expect(variantChips(doc, mainId)).toBeNull();
   });
 });
