@@ -217,7 +217,7 @@ describe('importPageAt', () => {
     const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
     const { ask, docs } = askOf({ open: async () => tabOf(tree), shape: FULL_SHAPE, components });
 
-    await importPageAt(ask);
+    const done = await importPageAt(ask);
 
     const page = docs.get('frame-1')!.doc as MotionDoc;
     const homes = Object.values(page.comps).flatMap((c) => (c.component ? [c.component.home] : []));
@@ -225,5 +225,6 @@ describe('importPageAt', () => {
     expect(components).toHaveBeenCalledOnce();
     expect(homes.length).toBeGreaterThan(0);
     expect(homes.every((home) => home && sets.includes(home))).toBe(true);
+    expect(done.undo.map((u) => (u as { nodeId: string }).nodeId).sort()).toEqual(['frame-1', ...sets].sort());
   });
 });

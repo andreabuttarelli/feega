@@ -168,13 +168,13 @@ async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
-async function placedSets(ask: PageAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[] }> {
+async function placedSets(ask: PageAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[]; undo: UndoItem[] }> {
   if (!sets.length || !ask.components) {
-    return { frameIds: [] };
+    return { frameIds: [], undo: [] };
   }
   const page = await ask.components();
   const placed = await placeFigmaPlan(ask.store, page.place, { items: sets, skipped: [], fileKey: null }, page.at);
-  return { frameIds: placed.frameIds };
+  return { frameIds: placed.frameIds, undo: placed.undo };
 }
 
 async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: UrlPlan['homes']): Promise<void> {
@@ -227,5 +227,5 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   await filled(ask, placed.frameIds, made.plan.items, assets);
   await filled(ask, sets.frameIds, made.sets, assets);
   const frameId = placed.frameIds[0];
-  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: placed.undo, skipped: placed.skipped, truncated: tree.truncated };
+  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: [...placed.undo, ...sets.undo], skipped: placed.skipped, truncated: tree.truncated };
 }
