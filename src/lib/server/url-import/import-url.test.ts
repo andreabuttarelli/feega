@@ -241,6 +241,6 @@ describe('importPageAt', () => {
     expect(components).toHaveBeenCalledOnce();
     expect(homes.length).toBeGreaterThan(0);
     expect(homes.every((home) => home && sets.includes(home))).toBe(true);
-    expect(done.undo.map((u) => (u as { nodeId: string }).nodeId).sort()).toEqual(['frame-1', ...sets].sort());
+    expect('undo' in done ? done.undo.map((u) => (u as { nodeId: string }).nodeId).sort() : []).toEqual(['frame-1', ...sets].sort());
   });
 });
