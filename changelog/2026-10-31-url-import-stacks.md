@@ -26,5 +26,8 @@ Result (same capture, fold/full SSIM, absolute share):
 linear .989/.971 → .989/.971, 58% → 10%;
 stripe .969/.888 → .981/.897, 66% → 14%;
 vercel .980/.972 → .980/.970, 62% → 17%.
+Blocks a code import already marks as components (`use`) keep their
+structure: stacking them lost nested instance text overrides
+(`code-doc.test.ts`), cause not isolated.
 Discarded: hugging all text (moves sections), fixed text everywhere
 (wraps), stacking clip frames with absolute children (render differs).

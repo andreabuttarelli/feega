@@ -68,7 +68,7 @@ const linesTouch = (kids: RestNode[]) => {
 
 const holdsItsKids = (n: RestNode) => !n.clipsContent || (n.children ?? []).every((k) => flowing(k) && inside(boxOf(k), boxOf(n)));
 
-const stackable = (n: RestNode) => STACKABLE.has(n.type) && (n.opacity ?? 1) >= 1 && holdsItsKids(n) && !n.layoutMode && !n.relativeTransform && Boolean(n.absoluteBoundingBox) && !drawing(n);
+const stackable = (n: RestNode) => STACKABLE.has(n.type) && n.use === undefined && (n.opacity ?? 1) >= 1 && holdsItsKids(n) && !n.layoutMode && !n.relativeTransform && Boolean(n.absoluteBoundingBox) && !drawing(n);
 
 const overlapOf = (k: RestNode, s: Side) => (k.type === 'TEXT' ? boxOf(k)[s.size] * TEXT_OVERLAP_SHARE : OVERLAP_PX);
 

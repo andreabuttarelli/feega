@@ -146,6 +146,12 @@ describe('stacksOf', () => {
     expect(made).toMatchObject({ layoutMode: 'VERTICAL', paddingBottom: 0 });
   });
 
+  it('un blocco già segnato come componente del codice resta com’è, così le istanze annidate tengono i loro override', () => {
+    const made = stacksOf(frame(0, 0, 150, 100, [rect(10, 10, 100, 20)], { use: 3 }));
+
+    expect(made.layoutMode).toBeUndefined();
+  });
+
   it('le icone vettoriali non diventano pile', () => {
     const made = stacksOf(node('GROUP', 0, 0, 24, 24, { children: [node('VECTOR', 0, 0, 10, 10), node('VECTOR', 14, 14, 10, 10)] }));
 
