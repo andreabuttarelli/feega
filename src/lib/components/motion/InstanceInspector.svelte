@@ -9,7 +9,7 @@
   import { Action, type ActionId } from '$lib/motion/actions';
   import { defineProperty, exposable, instanceProperties, removeProperty, resetProperty, setPreferred, setProperty, type Exposure } from '$lib/motion/component-properties';
   import { PropertyKind, type PropertyDef } from '@feega/motion-core/motion/property-resolve';
-  import { addVariant, pickVariant, swapInstance, variantProps } from '$lib/motion/variants';
+  import { addVariant, pickVariant, swapInstance, variantChips, variantProps } from '$lib/motion/variants';
   import VariantMatrix from './VariantMatrix.svelte';
 
   let { doc, clipId, onchange, onrun }: { doc: MotionDoc; clipId: string; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();
@@ -21,6 +21,7 @@
   const elements = $derived(instanceElements(doc, clipId));
   const images = $derived(doc.assets.filter((a) => a.kind === 'image'));
   const variantValues = $derived(instance ? variantProps(doc, instance.compId) : {});
+  const chips = $derived(instance ? variantChips(doc, instance.compId) : null);
   const mains = $derived(Object.entries(doc.comps).filter(([, c]) => c.component));
   const VARIANT_KEY = 'Variant';
 
@@ -168,6 +169,13 @@
         {/if}
       </div>
     {/each}
+    {#if chips}
+      <div class="chips" role="radiogroup" aria-label="Variant" data-testid="instance-variant-chips">
+        {#each chips as chip (chip.compId)}
+          <button type="button" class="chip" class:on={chip.current} role="radio" aria-checked={chip.current} data-testid="instance-variant-chip" onclick={() => applied(swapInstance(doc, clipId, chip.compId), 'Changed variant')}>{chip.label}</button>
+        {/each}
+      </div>
+    {/if}
     {#each Object.entries(variantValues) as [key, values] (key)}
       <label class="field">
         <span>{key}</span>
@@ -309,5 +317,25 @@
     color: var(--ui-text);
     font-size: var(--ui-type-caption);
     cursor: pointer;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .chip {
+    padding: 2px 8px;
+    border: 1px solid var(--ui-border, #e5e5e5);
+    border-radius: var(--ui-radius-sm, 4px);
+    background: var(--ui-surface, #fff);
+    color: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .chip.on {
+    border-color: var(--ui-component, #9747ff);
+    color: var(--ui-component, #9747ff);
   }
 </style>

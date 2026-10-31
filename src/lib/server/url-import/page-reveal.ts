@@ -1,6 +1,7 @@
 export type Revealed = { height: number; hidden: number };
 
 export enum RevealMode {
+  Loading = 'loading',
   Moving = 'moving',
   Still = 'still'
 }
@@ -18,16 +19,13 @@ export function revealPage(mode: RevealMode): Revealed {
       img.src = img.dataset.src!;
     }
   }
-  const shown = new CSSStyleSheet();
-  shown.replaceSync('*{content-visibility:visible!important}');
-  document.adoptedStyleSheets = [...document.adoptedStyleSheets, shown];
   for (const video of document.querySelectorAll('video')) {
     video.pause();
     if (!video.loop && Number.isFinite(video.duration) && video.duration > 0) {
       video.currentTime = video.duration;
     }
   }
-  for (const animation of document.getAnimations()) {
+  for (const animation of mode === 'loading' ? [] : document.getAnimations()) {
     try {
       if (animation.effect?.getComputedTiming().iterations === Infinity) {
         animation.pause();
@@ -40,6 +38,9 @@ export function revealPage(mode: RevealMode): Revealed {
   }
 
   if (mode === 'still') {
+    const shown = new CSSStyleSheet();
+    shown.replaceSync('*{content-visibility:visible!important}');
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, shown];
     const last = window.setTimeout(() => undefined, 0);
     for (let id = 0; id <= last; id++) {
       window.clearTimeout(id);
@@ -80,14 +81,30 @@ export function revealPage(mode: RevealMode): Revealed {
 }
 
 export function everythingInView(): void {
+  const MAX_TOLD = 2_000;
+  const Native = window.IntersectionObserver;
+  let told = 0;
+
   class SeesAll implements IntersectionObserver {
     readonly root = null;
     readonly rootMargin = '0px';
     readonly scrollMargin = '0px';
     readonly thresholds = [0];
+    readonly seen = new WeakSet<Element>();
+    native: IntersectionObserver | null = null;
     constructor(readonly callback: IntersectionObserverCallback) {}
 
     observe(target: Element) {
+      if (told >= MAX_TOLD) {
+        this.native ??= Native ? new Native(this.callback) : null;
+        this.native?.observe(target);
+        return;
+      }
+      if (this.seen.has(target)) {
+        return;
+      }
+      this.seen.add(target);
+      told++;
       queueMicrotask(() => {
         const box = target.getBoundingClientRect();
         const entry = { target, isIntersecting: true, intersectionRatio: 1, boundingClientRect: box, intersectionRect: box, rootBounds: null, time: performance.now() } as IntersectionObserverEntry;
@@ -95,9 +112,13 @@ export function everythingInView(): void {
       });
     }
 
-    unobserve() {}
+    unobserve(target: Element) {
+      this.native?.unobserve(target);
+    }
 
-    disconnect() {}
+    disconnect() {
+      this.native?.disconnect();
+    }
 
     takeRecords(): IntersectionObserverEntry[] {
       return [];

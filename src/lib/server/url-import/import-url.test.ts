@@ -213,13 +213,27 @@ describe('importPageAt', () => {
     expect((await importPageAt(ask)).outcome).toBe(UrlImportOutcome.Unreadable);
   });
 
+  it('stripe.com: a page that crashes the tab when every element thinks it is on screen is read again without that', async () => {
+    const crashing = tabOf(TREE);
+    vi.mocked(crashing.tree).mockRejectedValue(new Error("Attempted to use detached Frame 'F1'."));
+    const healthy = tabOf(TREE);
+    const open = vi.fn().mockResolvedValueOnce(crashing).mockResolvedValueOnce(healthy);
+    const { ask } = askOf({ open });
+
+    const done = await importPageAt(ask);
+
+    expect(done.outcome).toBe(UrlImportOutcome.Ok);
+    expect(crashing.seeAll).toHaveBeenCalled();
+    expect(healthy.seeAll).not.toHaveBeenCalled();
+  });
+
   it('every main of the page points at its own set frame on the Components page', async () => {
     const button = (id: string, x: number, label: string) => ({ id, type: 'FRAME', name: 'button', absoluteBoundingBox: { x, y: 600, width: 140, height: 44 }, fills: [{ type: 'SOLID', color: { r: 0.37, g: 0.42, b: 0.82, a: 1 } }], children: [{ id: `${id}t`, type: 'TEXT', characters: label, absoluteBoundingBox: { x: x + 20, y: 612, width: 90, height: 20 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 15, fontWeight: 500 } }] });
     const tree = { ...TREE, root: { ...TREE.root, children: [...TREE.root.children!, button('b1', 100, 'Start'), button('b2', 300, 'Sign up')] } };
     const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
     const { ask, docs } = askOf({ open: async () => tabOf(tree), shape: FULL_SHAPE, components });
 
-    await importPageAt(ask);
+    const done = await importPageAt(ask);
 
     const page = docs.get('frame-1')!.doc as MotionDoc;
     const homes = Object.values(page.comps).flatMap((c) => (c.component ? [c.component.home] : []));
@@ -227,5 +241,6 @@ describe('importPageAt', () => {
     expect(components).toHaveBeenCalledOnce();
     expect(homes.length).toBeGreaterThan(0);
     expect(homes.every((home) => home && sets.includes(home))).toBe(true);
+    expect('undo' in done ? done.undo.map((u) => (u as { nodeId: string }).nodeId).sort() : []).toEqual(['frame-1', ...sets].sort());
   });
 });

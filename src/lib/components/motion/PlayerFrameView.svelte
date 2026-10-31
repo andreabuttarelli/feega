@@ -7,6 +7,7 @@
   import { ElementState } from '@feega/motion-core/motion/states/model';
   import { clipsOf } from '@feega/motion-core/motion/doc';
   import { stateSpotsOf } from '$lib/motion/states/spots';
+  import { hasVariantStates } from '$lib/motion/states/variant-states';
   import { previewDoc, type StatePicks } from '$lib/motion/states/preview';
   import { amountAt, settled, type TweenRun } from '$lib/motion/states/tween';
 
@@ -31,6 +32,10 @@
 
   function tweenTo(clip: string, target: ElementState, to: number) {
     const row = clipRow(clip, target);
+    if (!row && hasVariantStates(live.doc, clip)) {
+      statePicks = { ...statePicks, [clip]: { state: target, amount: to } };
+      return;
+    }
     if (!row) {
       return;
     }

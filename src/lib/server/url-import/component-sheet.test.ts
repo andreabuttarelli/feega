@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
 import { compBox } from '$lib/motion/comp-frame';
+import { SET_GAP_PX, addSetVariant } from '$lib/motion/component-set';
 import type { PageOutline } from './page-outline';
 import type { PageTree } from './page-tree';
 import { FULL_SHAPE, urlPlan } from './url-doc';
@@ -55,5 +56,19 @@ describe('each main or set gets its own frame, sized to its content', () => {
     const overlaps = boxes.some((a, i) => boxes.some((b, j) => i < j && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b));
 
     expect(overlaps).toBe(false);
+  });
+});
+
+describe('a variant added to an imported set keeps its distance', () => {
+  it('linear: every set grown with + still has a gap between all its mains', () => {
+    let n = 0;
+    for (const set of planOf('linear').sets) {
+      const grown = addSetVariant(set.doc, () => `v${++n}`);
+      if (!grown.ok) {
+        continue;
+      }
+      const boxes = grown.doc.tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Precomp').map((c) => compBox(grown.doc.comps[String(c.props.comp)], grown.doc)!).sort((a, b) => a.left - b.left);
+      boxes.slice(1).forEach((box, i) => expect(Math.round(box.left - boxes[i].right)).toBeGreaterThanOrEqual(SET_GAP_PX));
+    }
   });
 });

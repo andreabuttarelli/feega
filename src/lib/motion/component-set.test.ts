@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@fe
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { createComponent } from './main-component';
 import { compBox } from './comp-frame';
-import { addSetVariant, setMainOf } from './component-set';
+import { SET_GAP_PX, addSetVariant, setMainOf } from './component-set';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -38,9 +38,9 @@ describe('a frame on the Components page that holds one set', () => {
     const [first, second] = precomps(grown).map((c) => compBox(grown.comps[String(c.props.comp)], grown)!);
 
     expect(precomps(grown)).toHaveLength(2);
-    expect(grown.width).toBe(280 + 200 + 48);
+    expect(grown.width).toBe(280 + 200 + SET_GAP_PX);
     expect(grown.height).toBe(124);
-    expect(Math.round(second.left - first.right)).toBe(48);
+    expect(Math.round(second.left - first.right)).toBe(SET_GAP_PX);
     expect(Math.round(second.right - second.left)).toBe(200);
   });
 });

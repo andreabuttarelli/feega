@@ -4,7 +4,8 @@ import { appendVariant } from './variants';
 import { compBox, reframed } from './comp-frame';
 import type { NewId } from './main-component';
 
-export const SET_GAP_PX = 48;
+export const SET_GAP_PX = 20;
+export const SET_PAD_PX = 20;
 export const SET_BACKDROP = 'Background';
 
 const fail = (error: string): OpResult => ({ ok: false, error });

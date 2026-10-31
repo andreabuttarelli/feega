@@ -4328,6 +4328,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onGroup={groupElements}
     onWrapStack={wrapWithStack}
     onComponentMade={homeComponents}
+    onNodeSize={(id, w, h) => void storeSize(id, w, h)}
     onUngroup={ungroupElements}
     onRestack={restack}
     onTileDragOver={tileDragOver}

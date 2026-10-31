@@ -1612,7 +1612,7 @@
     const grown = addSetVariant(before, () => crypto.randomUUID().slice(0, 8));
     commit(nodeId, grown, 'Added a variant');
     if (grown.ok && grown.doc.width !== before.width) {
-      props.onResize?.(nodeId, (tile.w * grown.doc.width) / before.width, tile.h);
+      props.onNodeSize?.(nodeId, (tile.w * grown.doc.width) / before.width, tile.h);
     }
   }
 

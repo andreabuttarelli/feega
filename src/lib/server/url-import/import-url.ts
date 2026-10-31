@@ -113,14 +113,24 @@ async function publicUrl(raw: string, guard: PageAsk['guard']): Promise<URL | nu
   );
 }
 
-export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, planner: Planner, maxHeight = TREE_LIMITS.height): Promise<UrlImported | null> {
-  await tab.seeAll().catch(() => undefined);
+export enum Sight {
+  Everything = 'everything',
+  Native = 'native'
+}
+
+const SIGHTED: Record<Sight, (tab: AppTab) => Promise<void>> = {
+  [Sight.Everything]: (tab) => tab.seeAll().catch(() => undefined),
+  [Sight.Native]: async () => undefined
+};
+
+export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, planner: Planner, maxHeight = TREE_LIMITS.height, sight = Sight.Everything): Promise<UrlImported | null> {
+  await SIGHTED[sight](tab);
   const status = await tab.goto(url.toString()).catch(() => null);
   if (status !== null && status >= HTTP_ERROR) {
     return refused(UrlImportOutcome.Failed, `the page answered ${status}`);
   }
   await tab.settle(NETWORK_IDLE_MS);
-  const { height } = await tab.reveal(RevealMode.Moving).catch(() => ({ height: TREE_LIMITS.height }));
+  const { height } = await tab.reveal(RevealMode.Loading).catch(() => ({ height: TREE_LIMITS.height }));
   const steps = Math.ceil(Math.min(height, maxHeight) / SCROLL_STEP_PX);
   for (let i = 0; i < steps; i++) {
     await tab.scroll({ px: SCROLL_STEP_PX }).catch(() => undefined);
@@ -138,8 +148,8 @@ export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, plan
   return null;
 }
 
-export async function pageTreeAt(tab: AppTab, url: URL, settleMs: number, planner: Planner, maxHeight?: number): Promise<PageTree | UrlImported> {
-  const refusal = await pagePrepared(tab, url, settleMs, planner, maxHeight);
+export async function pageTreeAt(tab: AppTab, url: URL, settleMs: number, planner: Planner, maxHeight?: number, sight = Sight.Everything): Promise<PageTree | UrlImported> {
+  const refusal = await pagePrepared(tab, url, settleMs, planner, maxHeight, sight);
   if (refusal) {
     return refusal;
   }
@@ -168,13 +178,13 @@ async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
-async function placedSets(ask: PageAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[] }> {
+async function placedSets(ask: PageAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[]; undo: UndoItem[] }> {
   if (!sets.length || !ask.components) {
-    return { frameIds: [] };
+    return { frameIds: [], undo: [] };
   }
   const page = await ask.components();
   const placed = await placeFigmaPlan(ask.store, page.place, { items: sets, skipped: [], fileKey: null }, page.at);
-  return { frameIds: placed.frameIds };
+  return { frameIds: placed.frameIds, undo: placed.undo };
 }
 
 async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: UrlPlan['homes']): Promise<void> {
@@ -207,9 +217,14 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     return refused(UrlImportOutcome.NoBrowser);
   }
 
-  const tab = await ask.open();
+  const open = ask.open;
   const planner = ask.planner ?? PLAIN_PLANNER;
-  const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+  const readWith = async (sight: Sight) => {
+    const tab = await open();
+    return pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+  };
+  const first = await readWith(Sight.Everything);
+  const read = 'outcome' in first && first.outcome === UrlImportOutcome.Unreadable ? await readWith(Sight.Native) : first;
   if ('outcome' in read) {
     return read;
   }
@@ -227,5 +242,5 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   await filled(ask, placed.frameIds, made.plan.items, assets);
   await filled(ask, sets.frameIds, made.sets, assets);
   const frameId = placed.frameIds[0];
-  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: placed.undo, skipped: placed.skipped, truncated: tree.truncated };
+  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: [...placed.undo, ...sets.undo], skipped: placed.skipped, truncated: tree.truncated };
 }

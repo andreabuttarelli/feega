@@ -1,11 +1,12 @@
 import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { FrameRect, FrameSize } from '$lib/motion/prototype/hotspots';
+import { hasVariantStates } from './variant-states';
 
 export type StateSpot = { clip: string; box: FrameRect };
 
 export function stateSpotsOf(doc: MotionDoc, size: FrameSize, rectOf: (clip: string) => FrameRect | null): StateSpot[] {
   return clipsOf(doc).flatMap((clip) => {
-    const rect = clip.states?.length ? rectOf(clip.id) : null;
+    const rect = clip.states?.length || hasVariantStates(doc, clip.id) ? rectOf(clip.id) : null;
     if (!rect) {
       return [];
     }
