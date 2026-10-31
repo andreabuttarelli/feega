@@ -949,8 +949,10 @@ export const CANVAS_OPS = {
     input: canvasVariableInput,
     run: async (ctx, input) => {
       const frames = framesOf(ctx);
+      const scope = { orgId: ctx.orgId, projectId: ctx.projectId, kind: LibraryKind.Variables };
       return canvasVariable(
         {
+          project: { load: () => listEntries(ctx.db, scope), run: (ask) => runLibrary(ctx.db, scope, ask) },
           ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
           read: frames.read,
           write: frames.write

@@ -1,3 +1,4 @@
+import { adoptDocLibrary } from '$lib/server/canvas/project-library';
 import type { Db } from '$lib/server/db/client';
 import { fetchCanvasLink, importCanvasBytes, importCanvasLink } from '$lib/server/canvas/upload';
 import { MAX_FONT_BYTES, storeFontBytes } from '$lib/server/motion/font-upload';
@@ -64,10 +65,11 @@ export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { ur
     return { outcome: UrlImportOutcome.RateLimited };
   }
 
-  return importPageAt({
+  const store = frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId });
+  const imported = await importPageAt({
     ...ask,
     shape: await shapeFor(scope, ask.url, ask.shape),
-    store: frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId }),
+    store,
     place: { projectId: scope.projectId, canvasId },
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),
     guard: (url) => assertPublicUrl(url),
@@ -75,4 +77,12 @@ export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { ur
     components: () => componentsPage(scope.db, scope),
     newId: () => crypto.randomUUID().slice(0, 8)
   });
+  if (imported.outcome !== UrlImportOutcome.Ok) {
+    return imported;
+  }
+  const head = await store.read(imported.frameId);
+  if (head) {
+    await adoptDocLibrary(scope.db, scope, head.doc);
+  }
+  return imported;
 }

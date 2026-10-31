@@ -4,7 +4,7 @@ import { removeStyle, renameStyle } from '$lib/motion/styles';
 import { adoptStyle, libraryOf, syncedDoc, type Library } from '$lib/motion/style-library';
 import { styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
-import { LibraryOp, type LibraryAsk, type LibraryEntries } from '$lib/motion/project-library-ops';
+import { LibraryOp, type LibraryPort } from '$lib/motion/project-library-ops';
 
 const ELEMENT_SEP = ':';
 
@@ -17,13 +17,8 @@ export const canvasStyleInput = z.object({
   remove: z.boolean().optional().describe('remove: deletes the project style; its elements keep their look, unlinked')
 });
 
-export type ProjectStyles = {
-  load: () => Promise<LibraryEntries>;
-  run: (ask: LibraryAsk) => Promise<{ ok: true; entries: LibraryEntries } | { ok: false; error: string }>;
-};
-
 export type StyleFrames = {
-  project: ProjectStyles;
+  project: LibraryPort;
   ids: () => Promise<string[]>;
   read: (id: string) => Promise<{ version: number; doc: MotionDoc } | null>;
   write: (id: string, version: number, doc: MotionDoc, summary: string) => Promise<RevisionWrite>;

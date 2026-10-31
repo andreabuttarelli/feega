@@ -1462,7 +1462,7 @@
   });
 
   $effect(() => {
-    variableLibrary.collections = variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+    variableLibrary.found(variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
   });
 
   const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
@@ -1489,7 +1489,12 @@
 
   onMount(() => {
     variableLibrary.connect({ push: syncCollection, remove: syncRemoval });
-    return () => variableLibrary.connect(null);
+    const projectId = page.params.projectId;
+    void variableLibrary.open(projectId ? projectLibraryStore(projectId, LibraryKind.Variables) : null);
+    return () => {
+      variableLibrary.connect(null);
+      void variableLibrary.open(null);
+    };
   });
 
   $effect(() => {

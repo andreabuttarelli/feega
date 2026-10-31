@@ -38,3 +38,8 @@ export type LibraryAsk =
   | { op: LibraryOp.Adopt; entries: LibraryEntries };
 
 export const isLibraryKind = (value: string): value is LibraryKind => (Object.values(LibraryKind) as string[]).includes(value);
+
+export type LibraryPort = {
+  load: () => Promise<LibraryEntries>;
+  run: (ask: LibraryAsk) => Promise<{ ok: true; entries: LibraryEntries } | { ok: false; error: string }>;
+};

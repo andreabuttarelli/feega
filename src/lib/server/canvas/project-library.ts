@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
-import { LibraryOp, type LibraryAsk, type LibraryEntries } from '$lib/motion/project-library-ops';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { LibraryKind, LibraryOp, type LibraryAsk, type LibraryEntries } from '$lib/motion/project-library-ops';
 import { adoptEntries, listEntries, removeEntry, renameEntry, saveEntry, type LibraryScope } from '$lib/server/repos/project-library';
 
 export type LibraryAnswer = { ok: true; entries: LibraryEntries } | { ok: false; error: string };
@@ -26,4 +27,22 @@ export async function runLibrary(db: Db, scope: LibraryScope, ask: LibraryAsk): 
   const held = await listEntries(db, scope);
   const refused = await (RUN[ask.op] as Run<LibraryOp>)(db, scope, held, ask as never);
   return refused ? { ok: false, error: refused } : { ok: true, entries: await listEntries(db, scope) };
+}
+
+const withoutMode = (collections: LibraryEntries): LibraryEntries => Object.fromEntries(Object.entries(collections).map(([name, c]) => [name, (({ active: _ownMode, ...shared }) => shared)(c as { active?: string })]));
+
+const HELD_BY_DOC: Record<LibraryKind, (doc: MotionDoc) => LibraryEntries> = {
+  [LibraryKind.Style]: (doc) => doc.styles ?? {},
+  [LibraryKind.Variables]: (doc) => withoutMode(doc.variables ?? {})
+};
+
+export async function adoptDocLibrary(db: Db, project: { orgId: string; projectId: string }, doc: MotionDoc): Promise<void> {
+  for (const kind of Object.values(LibraryKind)) {
+    const found = HELD_BY_DOC[kind](doc);
+    if (!Object.keys(found).length) {
+      continue;
+    }
+    const scope = { ...project, kind };
+    await adoptEntries(db, scope, await listEntries(db, scope), found);
+  }
 }
