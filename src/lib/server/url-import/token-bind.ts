@@ -165,7 +165,7 @@ function radiiIn(root: RestNode): number[] {
   return found;
 }
 
-const CTA_NAME = /^(a|button)( \d+)?(\s*\/.*)?$/i;
+const CTA_NAME = /^(a|button|link)( \d+)?(\s*\/.*)?$/i;
 const CTA_HEIGHT = 64;
 
 const textsIn = (n: RestNode): number => (n.type === 'TEXT' ? 1 : 0) + (n.children ?? []).reduce((sum, c) => sum + textsIn(c), 0);

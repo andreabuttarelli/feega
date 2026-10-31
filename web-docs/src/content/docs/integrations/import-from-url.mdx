@@ -21,6 +21,8 @@ The imported frame is laid out like a well-built Figma file. The page is a verti
 
 Only what really overlaps stays absolute: decorations behind or above the content, overlays like a cookie banner, glyph-by-glyph counters, and anything inside a block that clips an overflowing child. Every layer lands where the page drew it.
 
+Only layers that do something are kept. A wrapper that draws nothing and holds one layer is removed and its padding moves to the stack around it, so a button holds its label directly; empty layers go; nested stacks running the same way merge. Layers are named by role or content (Nav, Logo, Button, Icon, the label's text), never by HTML tag. Wrappers that clip, and anything inside a component, stay when removing them would change how the page looks or break the link to the main component.
+
 Make the page stack narrower or wider (select the stack under the frame, change W) and sections fill the new width, full-width rows stretch, and wide rows spread their items. Text keeps the size and line breaks it had in the page.
 
 ## Fonts
