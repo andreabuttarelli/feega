@@ -123,11 +123,13 @@ export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
 export type Move = (typeof MOVES)[number];
 
+export const MIN_BOX = { width: 0.0005, height: 0.0001 };
+
 const layout = (box: { x?: number; y?: number; width?: number; height?: number } = {}) => ({
   x: range(0, 1, 0.01, box.x ?? 0.5, 'X', Group.Layout),
   y: range(0, 1, 0.01, box.y ?? 0.5, 'Y', Group.Layout),
-  width: range(0.02, 1, 0.01, box.width ?? 0.8, 'Width', Group.Layout),
-  height: range(0.002, 1, 0.001, box.height ?? 0.5, 'Height', Group.Layout),
+  width: range(MIN_BOX.width, 1, 0.01, box.width ?? 0.8, 'Width', Group.Layout),
+  height: range(MIN_BOX.height, 1, 0.001, box.height ?? 0.5, 'Height', Group.Layout),
   align: choice(ALIGNS, 'center', 'Align', Group.Layout),
   opacity: range(0, 1, 0.01, 1, 'Opacity', Group.Layout),
   scale: range(0.1, 4, 0.01, 1, 'Scale', Group.Layout),
