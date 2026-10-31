@@ -7,6 +7,7 @@
   import { adoptStyle, offeredStyles } from '$lib/motion/style-library';
   import { FILLED } from '@feega/motion-core/motion/fill/elements';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { overridesOf, resetOverride } from '$lib/motion/style-overrides';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 
@@ -15,6 +16,7 @@
   const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles));
   const offeredIn = (slot: StyleSlot) => offered.filter((s) => slotOf(s.style.kind) === slot);
   const linkedStyles = $derived([clip.styleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
+  const overridden = $derived(overridesOf(doc, clip.id));
   let name = $state('');
 
   function pick(slot: StyleSlot, value: string) {
@@ -49,6 +51,13 @@
   {@render picker('Style', 'clip-style', StyleSlot.Look, clip.styleRef)}
   {#if clip.component in FILLED || clip.effects.length || offeredIn(StyleSlot.Effect).length || clip.effectStyleRef}
     {@render picker('Effect style', 'clip-effect-style', StyleSlot.Effect, clip.effectStyleRef)}
+  {/if}
+  {#if overridden.length}
+    <div class="flex flex-wrap gap-2" data-testid="style-overrides">
+      {#each overridden as key (key)}
+        <button type="button" class={cn(FIELD_INPUT, 'flex-1')} data-testid={`style-override-${key}`} title="Overridden: reset to the style" onclick={() => commit(resetOverride(doc, clip.id, key), `Reset ${key} to the style`)}>{key} · reset</button>
+      {/each}
+    </div>
   {/if}
   {#each linkedStyles as linked (linked.name)}
     <button type="button" class={cn(FIELD_INPUT, 'w-full')} data-testid="style-update" data-style={linked.name} onclick={() => save(linked.name, linked.kind)}>Update {linked.name} from this clip</button>

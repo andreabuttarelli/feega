@@ -134,4 +134,12 @@ describe('imported pages become tokens', () => {
 
     expect(doc.variables![site].vars.Primary.values.Default).toBe(primary);
   });
+
+  it.each(SITES)('%s: gaps and even paddings of the stacks are bound to spacing variables', (name) => {
+    const clips = [...placed(docOf(name, Tokening.On)).values()].map((p) => p.clip);
+    const target = (key: string) => clips.filter((c) => c.bind?.[key]).length;
+
+    expect(target('autoLayout.gap')).toBeGreaterThan(0);
+    expect(target('autoLayout.padding')).toBeGreaterThan(0);
+  });
 });

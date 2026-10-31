@@ -3539,3 +3539,10 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A URL import comes back "Nothing on that page could be read"
 
 **Signal:** one site (stripe.com) is always `unreadable` after ~70–130 s, the tree step throws `Attempted to use detached Frame`, other sites import. **Move:** the Browserless renderer crashed, and every later call waits for the session to end. Drive the steps one by one against Browserless with `vite-node` (a probe that calls `tab.*` and checks the tab after each), then bisect the page scripts with raw puppeteer (`evaluateOnNewDocument(everythingInView)`, `revealPage`, interception) until the crash goes away. Here it was `everythingInView` loading the whole page at once; the import now retries with the native observer.
+## A poster draws in Chrome and comes out scrambled in Safari
+
+**Signal:** an SVG-built poster (pills, strokes, shapes placed with `<g transform>`) is right in Chromium and wrong in WebKit: shapes piled at the top left, the rest of the frame bare. **Move:** WebKit's computed `transform` of an SVG element ignores its `transform` attribute and answers `none`; Chromium folds the attribute in. Never trust the computed style alone for SVG geometry: the probe reads the attribute when the computed value is unset (`svgTransformOf` in `probe.ts`). Diff the raw trees of both engines (capture `feega:dom-read-reply` with an init script) before suspecting the GPU.
+
+## A frame inserted a moment ago stays blank for good
+
+**Signal:** after inserting templates in quick succession, one frame stays empty (paper colour, or dark in dark mode) until reload; the console shows a 404 from `/motion/<id>/source`. **Move:** the node row and the frame source are not saved at the same instant, and the core asked once. A source that is not there yet is retried (`untilFound` in `frame-source.ts`), as the pick-doc fetch already did. Reproduce by inserting the whole poster gallery with a 400 ms gap, not one poster at a time.

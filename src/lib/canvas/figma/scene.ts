@@ -1,3 +1,4 @@
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import type { ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, NodePatch, Paint, Rgba, Vec } from './archive';
 import { geometryPath } from './commands';
 import { FillRule, networkPath } from './vector-network';
@@ -119,7 +120,7 @@ export type TextLayer = Common & {
   align: 'left' | 'center' | 'right' | 'justify';
   color: string;
   runs: TextRun[];
-  wraps: boolean;
+  sizing: TextSizing;
   fills: Fill[];
   strokes: Stroke[];
 };
@@ -374,6 +375,8 @@ function effectsOf(n: FigmaRawNode, report: Report): LayerEffect[] {
     });
 }
 
+const TEXT_SIZING: Record<string, TextSizing> = { HEIGHT: TextSizing.AutoHeight, NONE: TextSizing.Fixed, WIDTH_AND_HEIGHT: TextSizing.AutoWidth };
+
 const hugs = (sizing: string | undefined) => HUGGING.has(sizing ?? '');
 
 function autoLayoutOf(n: FigmaRawNode, report: Report): AutoLayout | null {
@@ -544,7 +547,7 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
     letterSpacing: unitOf(n.letterSpacing, '0%'),
     align: ALIGN[n.textAlignHorizontal ?? 'LEFT'] ?? 'left',
     runs: runsOf(n, base, ctx.report),
-    wraps: n.textAutoResize === 'HEIGHT',
+    sizing: TEXT_SIZING[n.textAutoResize ?? ''] ?? TextSizing.AutoWidth,
     decoration: DECORATION[n.textDecoration ?? ''] ?? Decoration.None,
     axes: n.fontAxes ?? '',
     features: n.fontFeatures ?? '',

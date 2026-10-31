@@ -47,7 +47,8 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
   textWrap: {
     wrap: { label: 'Wrap', icon: null },
     balance: { label: 'Balance', icon: null },
-    pretty: { label: 'Pretty', icon: null }
+    pretty: { label: 'Pretty', icon: null },
+    none: { label: 'No wrap', icon: null }
   },
   leadingTrim: {
     none: { label: 'Standard', icon: null },

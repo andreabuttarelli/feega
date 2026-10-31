@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stillFrame, toFetch } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stillFrame, toFetch, untilFound } from './frame-source';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -166,5 +166,24 @@ describe('the picture a frame shows while a new revision loads', () => {
 
   it('a frame never built has nothing to show', () => {
     expect(shownGroup('a:1', undefined, has())).toBeNull();
+  });
+});
+
+describe('a frame whose source is not saved yet', () => {
+  const noWait = async () => undefined;
+
+  it('a source that answers on the third try is built, not left blank for good', async () => {
+    const answers = [null, null, 'list'];
+    const built = await untilFound(async () => answers.shift() ?? null, { tries: 5, waitMs: 0 }, noWait);
+
+    expect(built).toBe('list');
+    expect(answers).toEqual([]);
+  });
+
+  it('a source that never appears stops after the tries it is given', async () => {
+    const attempt = vi.fn(async () => null);
+
+    expect(await untilFound(attempt, { tries: 3, waitMs: 0 }, noWait)).toBeNull();
+    expect(attempt).toHaveBeenCalledTimes(3);
   });
 });

@@ -69,6 +69,7 @@ export function sectionFramed(root: RestNode, sections: PageSection[]): RestNode
     absoluteBoundingBox: { x: page.x, y: band.top, width: page.width, height: band.bottom - band.top },
     fills: [],
     clipsContent: false,
+    layoutAlign: 'STRETCH',
     children: band.kids.map((k) => renamed(k, taken, i + 1))
   }));
   return { ...root, ...STACKED, children: frames };
