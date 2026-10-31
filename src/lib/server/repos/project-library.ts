@@ -8,7 +8,7 @@ const CONFLICT_KEY = 'project_id,kind,name';
 
 export type LibraryScope = { orgId: string; projectId: string; kind: LibraryKind };
 
-const rowOf = (scope: LibraryScope, name: string, value: unknown) => ({ org_id: scope.orgId, project_id: scope.projectId, kind: scope.kind, name, value: value as Json });
+const rowOf = (scope: LibraryScope, name: string, value: unknown) => ({ project_id: scope.projectId, kind: scope.kind, name, value: value as Json });
 
 function fail(error: { message: string } | null) {
   if (error) {
@@ -26,7 +26,7 @@ export async function listEntries(db: Db, scope: LibraryScope): Promise<LibraryE
 }
 
 export async function saveEntry(db: Db, scope: LibraryScope, name: string, value: unknown): Promise<void> {
-  const { error } = await db.from(TABLE).upsert({ ...rowOf(scope, name, value), updated_at: new Date().toISOString() }, { onConflict: CONFLICT_KEY });
+  const { error } = await db.from(TABLE).upsert({ ...rowOf(scope, name, value), org_id: scope.orgId, updated_at: new Date().toISOString() }, { onConflict: CONFLICT_KEY });
   fail(error);
 }
 
@@ -36,7 +36,7 @@ export async function adoptEntries(db: Db, scope: LibraryScope, held: LibraryEnt
     return [];
   }
   const { error } = await db.from(TABLE).upsert(
-    fresh.map(([name, value]) => rowOf(scope, name, value)),
+    fresh.map(([name, value]) => ({ ...rowOf(scope, name, value), org_id: scope.orgId })),
     { onConflict: CONFLICT_KEY, ignoreDuplicates: true }
   );
   fail(error);
@@ -44,7 +44,7 @@ export async function adoptEntries(db: Db, scope: LibraryScope, held: LibraryEnt
 }
 
 export async function renameEntry(db: Db, scope: LibraryScope, from: string, to: string): Promise<void> {
-  const { error } = await db.from(TABLE).update({ name: to, updated_at: new Date().toISOString() }).eq('org_id', scope.orgId).eq('project_id', scope.projectId).eq('kind', scope.kind).eq('name', from);
+  const { error } = await db.from(TABLE).update({ org_id: scope.orgId, name: to, updated_at: new Date().toISOString() }).eq('org_id', scope.orgId).eq('project_id', scope.projectId).eq('kind', scope.kind).eq('name', from);
   fail(error);
 }
 
