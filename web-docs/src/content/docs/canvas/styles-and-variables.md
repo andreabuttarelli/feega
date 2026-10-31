@@ -9,6 +9,7 @@ sidebar:
 
 Styles belong to the project: every canvas and page of the project sees the same list. Apply one anywhere; changing it updates every frame that uses it, on any page.
 
+- A text is a text: free elements on the canvas and layers inside frames apply and follow styles the same way, in the app and through agents.
 - Open the Styles panel from the left rail (Alt+7) to create, edit, rename and delete text and colour styles.
 - Text styles: edit font, size, weight, tracking and leading. Renaming a style renames it everywhere.
 - Deleting a style unlinks its layers; they keep their current look.
