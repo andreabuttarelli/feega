@@ -5,6 +5,9 @@ import { defineStyle } from '$lib/motion/styles';
 import { StyleKind } from '@feega/motion-core/motion/styles-model';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { canvasStyle, type StyleFrames } from './canvas-styles';
+import { LibraryOp } from '$lib/motion/project-library-ops';
+import type { Style } from '@feega/motion-core/motion/styles-model';
+import type { Library } from '$lib/motion/style-library';
 
 const RED = { kind: StyleKind.Colour, color: '#ff0000' } as const;
 const BLUE = { kind: StyleKind.Colour, color: '#0000ff' } as const;
@@ -18,10 +21,29 @@ function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): M
 
 const textDoc = () => must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'a' } }, 't'));
 
-function frames(docs: Record<string, MotionDoc>): StyleFrames & { docs: Record<string, MotionDoc> } {
+function frames(docs: Record<string, MotionDoc>, saved: Library = {}): StyleFrames & { docs: Record<string, MotionDoc>; saved: Library } {
   const versions: Record<string, number> = Object.fromEntries(Object.keys(docs).map((id) => [id, 1]));
   return {
     docs,
+    saved,
+    project: {
+      load: async () => ({ ...saved }),
+      run: async (ask) => {
+        const ran: Record<LibraryOp, () => void> = {
+          [LibraryOp.Save]: () => ask.op === LibraryOp.Save && (saved[ask.name] = ask.value as Style),
+          [LibraryOp.Adopt]: () => ask.op === LibraryOp.Adopt && Object.entries(ask.entries).forEach(([n, st]) => (saved[n] ??= st as Style)),
+          [LibraryOp.Rename]: () => {
+            if (ask.op === LibraryOp.Rename) {
+              saved[ask.to] = saved[ask.name];
+              delete saved[ask.name];
+            }
+          },
+          [LibraryOp.Remove]: () => ask.op === LibraryOp.Remove && delete saved[ask.name]
+        };
+        ran[ask.op]();
+        return { ok: true, entries: { ...saved } };
+      }
+    },
     ids: async () => Object.keys(docs),
     read: async (id) => (docs[id] ? { version: versions[id], doc: docs[id] } : null),
     write: async (id, version, doc) => {
@@ -92,5 +114,36 @@ describe('the canvas styles library over MCP', () => {
 
     expect(out).toMatchObject({ ok: true, frames: ['a', 'b'] });
     expect(findClip(store.docs.b, 't')!.clip.effectStyleRef).toBe('Raised');
+  });
+
+  it('listing adopts the styles found in frames into the project library', async () => {
+    const store = frames({ a: must(defineStyle(textDoc(), 'Brand', RED)) }, { Headline: { kind: StyleKind.Text, size: 0.2 } });
+
+    expect(await canvasStyle(store, {})).toEqual({ ok: true, styles: { Headline: { kind: StyleKind.Text, size: 0.2 }, Brand: RED } });
+    expect(store.saved.Brand).toEqual(RED);
+  });
+
+  it('defining saves the style to the project, so frames on other pages follow it', async () => {
+    const store = frames({ b: textDoc() });
+
+    await canvasStyle(store, { name: 'Brand', style: BLUE });
+
+    expect(store.saved.Brand).toEqual(BLUE);
+  });
+
+  it('a project style applies to an element even when no frame on the canvas has it yet', async () => {
+    const store = frames({ b: textDoc() }, { Brand: RED });
+
+    expect(await canvasStyle(store, { name: 'Brand', ids: ['b:t'] })).toMatchObject({ ok: true });
+    expect(findClip(store.docs.b, 't')!.clip.props.color).toBe('#ff0000');
+  });
+
+  it('removing a style takes it out of the project and detaches its elements', async () => {
+    const linked = (d: MotionDoc) => ({ ...d, tracks: d.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, styleRef: 'Brand' })) })) });
+    const store = frames({ a: linked(must(defineStyle(textDoc(), 'Brand', RED))) }, { Brand: RED });
+
+    expect(await canvasStyle(store, { name: 'Brand', remove: true })).toMatchObject({ ok: true, frames: ['a'] });
+    expect(store.saved).toEqual({});
+    expect(findClip(store.docs.a, 't')!.clip.styleRef).toBeUndefined();
   });
 });

@@ -43,8 +43,10 @@
   import GradientHandles from '../GradientHandles.svelte';
   import CropHandles from '../CropHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { projectLibraryStore } from '$lib/canvas/project-library-store';
+  import { LibraryKind } from '$lib/motion/project-library-ops';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
-  import { renameStyle } from '$lib/motion/styles';
+  import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
   import { removeVariable } from '$lib/motion/variables';
@@ -1415,7 +1417,7 @@
   onMount(lockOverscroll);
 
   $effect(() => {
-    styleLibrary.styles = libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
   });
 
   function syncStyle(name: string, style: Style) {
@@ -1439,9 +1441,24 @@
     }
   }
 
+  function syncRemove(name: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
+      const present = saverOf(frame.id)?.history.present;
+      const removed = present ? removeStyle(present, name) : null;
+      if (removed?.ok) {
+        commit(frame.id, removed, `Removed the ${name} style`);
+      }
+    }
+  }
+
   onMount(() => {
-    styleLibrary.connect({ push: syncStyle, rename: syncRename });
-    return () => styleLibrary.connect(null);
+    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove });
+    const projectId = page.params.projectId;
+    void styleLibrary.open(projectId ? projectLibraryStore(projectId, LibraryKind.Style) : null);
+    return () => {
+      styleLibrary.connect(null);
+      void styleLibrary.open(null);
+    };
   });
 
   $effect(() => {
