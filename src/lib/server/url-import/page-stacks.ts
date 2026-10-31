@@ -14,13 +14,21 @@ const SIDES: Record<Axis, { main: Side; cross: Side; other: Axis }> = {
   [Axis.Row]: { main: { start: 'x', size: 'width' }, cross: { start: 'y', size: 'height' }, other: Axis.Column }
 };
 
+const FIXED_TEXT = 'NONE';
+const ONE_LINE_TEXT = 'WIDTH_AND_HEIGHT';
+const WRAPPING_TEXT = 'HEIGHT';
+const linesOf = (k: RestNode) => Math.round(boxOf(k).height / (k.style?.lineHeightPx || boxOf(k).height));
 const AXES = [Axis.Column, Axis.Row];
 const EPS = 0.5;
 const OVERLAP_PX = 0.5;
 const SPREAD_SHARE = 0.8;
+const LINE_GAP_PX = 1;
+const TEXT_OVERLAP_SHARE = 0.25;
+const LINE_BREAK = '\n';
+const BACKDROPS = new Set(['RECTANGLE', 'FRAME']);
 const STACK_ID = 'stack:';
 const VECTORS = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'ELLIPSE', 'LINE', 'STAR', 'REGULAR_POLYGON']);
-const STACKABLE = new Set(['FRAME']);
+const STACKABLE = new Set(['FRAME', 'GROUP']);
 
 type Offsets = { lead: number[]; trail: number[] };
 
@@ -53,14 +61,23 @@ const flowing = (k: RestNode) => k.layoutPositioning !== 'ABSOLUTE';
 
 const drawing = (n: RestNode) => (n.children ?? []).some((c) => VECTORS.has(c.type));
 
-const stackable = (n: RestNode) => STACKABLE.has(n.type) && (n.opacity ?? 1) >= 1 && !n.effects?.length && !n.clipsContent && !n.layoutMode && !n.relativeTransform && Boolean(n.absoluteBoundingBox) && !drawing(n);
+const linesTouch = (kids: RestNode[]) => {
+  const sorted = [...kids].sort((a, b) => boxOf(a).y - boxOf(b).y);
+  return sorted.slice(1).every((k, i) => boxOf(k).y > boxOf(sorted[i]).y + boxOf(sorted[i]).height / 2 && boxOf(k).y - endOf(boxOf(sorted[i]), SIDES[Axis.Column].main) <= LINE_GAP_PX);
+};
+
+const holdsItsKids = (n: RestNode) => !n.clipsContent || (n.children ?? []).every((k) => flowing(k) && inside(boxOf(k), boxOf(n)));
+
+const stackable = (n: RestNode) => STACKABLE.has(n.type) && (n.opacity ?? 1) >= 1 && holdsItsKids(n) && !n.layoutMode && !n.relativeTransform && Boolean(n.absoluteBoundingBox) && !drawing(n);
+
+const overlapOf = (k: RestNode, s: Side) => (k.type === 'TEXT' ? boxOf(k)[s.size] * TEXT_OVERLAP_SHARE : OVERLAP_PX);
 
 function clusters(kids: RestNode[], s: Side): RestNode[][] {
   const sorted = [...kids].sort((a, b) => boxOf(a)[s.start] - boxOf(b)[s.start]);
   const out: RestNode[][] = [];
   let reach = -Infinity;
   for (const k of sorted) {
-    if (boxOf(k)[s.start] < reach - OVERLAP_PX) {
+    if (boxOf(k)[s.start] < reach - overlapOf(k, s)) {
       out[out.length - 1].push(k);
       reach = Math.max(reach, endOf(boxOf(k), s));
       continue;
@@ -82,9 +99,17 @@ function grouped(items: RestNode[], s: Side): { items: RestNode[]; gap: number }
   return { items: runs.map((run) => (run.length === 1 ? run[0] : wrapper(union(run), run, 'stack'))), gap };
 }
 
-function boxed(k: RestNode): RestNode {
-  return k.type === 'GROUP' ? { ...k, type: 'FRAME', fills: [], clipsContent: false } : k;
-}
+const TEXT_SIZING: Record<Axis, (k: RestNode) => string> = {
+  [Axis.Column]: (k) => (k.textAutoResize === WRAPPING_TEXT || linesOf(k) > 1 ? FIXED_TEXT : ONE_LINE_TEXT),
+  [Axis.Row]: () => FIXED_TEXT
+};
+
+const BOXED: Record<string, (k: RestNode, axis: Axis) => RestNode> = {
+  GROUP: (k) => ({ ...k, type: 'FRAME', fills: [], clipsContent: false }),
+  TEXT: (k, axis) => ({ ...k, textAutoResize: TEXT_SIZING[axis](k) })
+};
+
+const boxed = (k: RestNode, axis: Axis): RestNode => BOXED[k.type]?.(k, axis) ?? k;
 
 function aligned(items: RestNode[], box: Box, s: Side): { items: RestNode[]; align: string; pad: [number, number] } {
   const offsets = (list: RestNode[]): Offsets => ({ lead: list.map((k) => boxOf(k)[s.start] - box[s.start]), trail: list.map((k) => endOf(box, s) - endOf(boxOf(k), s)) });
@@ -120,6 +145,30 @@ function rowOf(kids: RestNode[], all: Box, cross: Side, axis: Axis): RestNode {
   return made;
 }
 
+const membersOf = (k: RestNode): string[] => (k.id.startsWith(STACK_ID) ? (k.children ?? []).flatMap(membersOf) : [k.id]);
+
+function painted(children: RestNode[], flow: RestNode[]): RestNode[] {
+  const slot = new Map(flow.flatMap((item, i) => membersOf(item).map((id) => [id, i] as const)));
+  const out: RestNode[] = [];
+  let next = 0;
+  for (const k of children) {
+    if (!flowing(k)) {
+      out.push(k);
+      continue;
+    }
+    const i = slot.get(k.id) ?? -1;
+    if (i < next) {
+      continue;
+    }
+    if (i > next) {
+      return [...children.filter((c) => !flowing(c)), ...flow];
+    }
+    out.push(flow[i]);
+    next++;
+  }
+  return next === flow.length ? out : [...children.filter((c) => !flowing(c)), ...flow];
+}
+
 function laidOut(n: RestNode, kids: RestNode[]): RestNode | null {
   const box = boxOf(n);
   const axis = AXES.find((a) => kids.length === 1 || clusters(kids, SIDES[a].main).length > 1);
@@ -132,18 +181,15 @@ function laidOut(n: RestNode, kids: RestNode[]): RestNode | null {
   const { items: runs, gap } = grouped(rows, main);
   const lead = boxOf(runs[0])[main.start] - box[main.start];
   const trail = endOf(box, main) - endOf(boxOf(runs.at(-1)!), main);
-  if (lead < -EPS || trail < -EPS) {
+  if (lead < -EPS) {
     return null;
   }
   const { items, align, pad } = aligned(runs.map((r) => (r.id.startsWith(STACK_ID) && !r.layoutMode ? layered(r) : r)), box, cross);
   if (pad[0] < -EPS) {
     return null;
   }
-  const flow = stretchedIn(items.map((k) => (k.layoutMode ? k : layered(boxed(k)))), box, cross, pad);
+  const flow = stretchedIn(items.map((k) => (k.layoutMode ? k : layered(boxed(k, axis)))), box, cross, pad);
   const children = n.children ?? [];
-  const firstFlowing = children.findIndex(flowing);
-  const before = children.slice(0, firstFlowing).filter((k) => !flowing(k));
-  const after = children.slice(firstFlowing).filter((k) => !flowing(k));
   const [start, end] = axis === Axis.Column ? [lead, trail] : pad;
   const [left, right] = axis === Axis.Column ? pad : [lead, trail];
   return {
@@ -155,18 +201,57 @@ function laidOut(n: RestNode, kids: RestNode[]): RestNode | null {
     paddingRight: round(Math.max(0, right)),
     paddingBottom: round(Math.max(0, end)),
     paddingLeft: round(Math.max(0, left)),
-    primaryAxisAlignItems: spread.has(n) && items.length > 1 ? 'SPACE_BETWEEN' : 'MIN',
+    primaryAxisAlignItems: spread.has(n) && items.length > 1 && gap >= 0 ? 'SPACE_BETWEEN' : 'MIN',
     counterAxisAlignItems: align,
     primaryAxisSizingMode: 'FIXED',
     counterAxisSizingMode: 'FIXED',
-    children: [...before, ...flow, ...after]
+    children: painted(children, flow)
   };
 }
 
-function layered(n: RestNode): RestNode {
+const sameLook = (kids: RestNode[]) => kids.every((k) => !k.characterStyleOverrides?.length && JSON.stringify([k.style, k.fills]) === JSON.stringify([kids[0].style, kids[0].fills]));
+
+function paragraphOf(kids: RestNode[]): RestNode | null {
+  if (kids.length < 2 || !kids.every((k) => k.type === 'TEXT') || !linesTouch(kids) || !sameLook(kids)) {
+    return null;
+  }
+  const lines = [...kids].sort((a, b) => boxOf(a).y - boxOf(b).y);
+  return { ...lines[0], characters: lines.map((k) => k.characters ?? '').join(LINE_BREAK), absoluteBoundingBox: union(lines) };
+}
+
+const inside = (b: Box, a: Box) => b.x >= a.x - EPS && b.y >= a.y - EPS && endOf(b, SIDES[Axis.Row].main) <= endOf(a, SIDES[Axis.Row].main) + EPS && endOf(b, SIDES[Axis.Column].main) <= endOf(a, SIDES[Axis.Column].main) + EPS;
+
+const leaf = (k: RestNode) => BACKDROPS.has(k.type) && !k.children?.length;
+
+const OVERLAYS: { lifts: (k: RestNode, kids: RestNode[]) => boolean }[] = [
+  { lifts: (k, kids) => kids.length > 2 && leaf(k) && inside(union(kids.filter((o) => o !== k)), boxOf(k)) },
+  { lifts: (k, kids) => kids.some((o) => o !== k && !leaf(o) && inside(boxOf(k), boxOf(o)) && !inside(boxOf(o), boxOf(k))) }
+];
+
+function withOverlays(n: RestNode): RestNode {
   const kids = (n.children ?? []).filter(flowing);
-  const enough = !kids.some((k) => k.type === 'TEXT') && (n.type === 'FRAME' ? kids.length >= 1 : kids.length >= 2);
-  return (stackable(n) && enough ? laidOut(n, kids) : null) ?? n;
+  const lifted = new Set(kids.filter((k) => OVERLAYS.some((rule) => rule.lifts(k, kids))));
+  if (!lifted.size || lifted.size === kids.length) {
+    return n;
+  }
+  return { ...n, children: n.children!.map((k) => (lifted.has(k) ? { ...k, layoutPositioning: 'ABSOLUTE' } : k)) };
+}
+
+function withParagraph(n: RestNode): RestNode {
+  const kids = (n.children ?? []).filter(flowing);
+  const merged = paragraphOf(kids);
+  if (!merged) {
+    return n;
+  }
+  const first = n.children!.findIndex((k) => kids.includes(k));
+  return { ...n, children: n.children!.flatMap((k, i) => (i === first ? [merged] : kids.includes(k) ? [] : [k])) };
+}
+
+function layered(raw: RestNode): RestNode {
+  const n = stackable(raw) ? withOverlays(withParagraph(raw)) : raw;
+  const kids = (n.children ?? []).filter(flowing);
+  const enough = kids.length >= 1;
+  return (stackable(n) && enough ? laidOut(n, kids) : null) ?? raw;
 }
 
 function filled(n: RestNode): RestNode {

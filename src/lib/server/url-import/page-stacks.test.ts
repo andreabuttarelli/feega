@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 import { absoluteShare, stacksOf } from './page-stacks';
+import type { PageOutline } from './page-outline';
+import { sectionsOf } from './page-sections';
+import { sectionFramed } from './section-frames';
+
+const MAX_ABSOLUTE_SHARE = 0.2;
 
 let n = 0;
 const node = (type: string, x: number, y: number, width: number, height: number, more: Partial<RestNode> = {}): RestNode => ({ id: `n${n++}`, type, absoluteBoundingBox: { x, y, width, height }, ...more });
@@ -12,7 +17,7 @@ const rect = (x: number, y: number, width: number, height: number) => node('RECT
 const placed = (root: RestNode): Map<string, RestNode['absoluteBoundingBox']> => {
   const out = new Map<string, RestNode['absoluteBoundingBox']>();
   const walk = (k: RestNode) => {
-    if (k.type !== 'FRAME' || !k.id.startsWith('stack:')) {
+    if (k.type !== 'TEXT' && (k.type !== 'FRAME' || !k.id.startsWith('stack:'))) {
       out.set(k.id, k.absoluteBoundingBox);
     }
     (k.children ?? []).forEach(walk);
@@ -20,6 +25,8 @@ const placed = (root: RestNode): Map<string, RestNode['absoluteBoundingBox']> =>
   walk(root);
   return out;
 };
+
+const textOf = (n: RestNode): string => [n.characters ?? '', ...(n.children ?? []).map(textOf)].join('').replace(/\s+/g, '').split('').sort().join('');
 
 describe('stacksOf', () => {
   it('blocchi uno sotto l’altro diventano una pila verticale con gap e padding', () => {
@@ -63,6 +70,13 @@ describe('stacksOf', () => {
     expect(made.children![0].layoutPositioning).toBe('ABSOLUTE');
   });
 
+  it('un figlio assoluto fra due in flusso resta dov’era nell’ordine di pittura', () => {
+    const glow = node('RECTANGLE', 0, 0, 300, 300, { layoutPositioning: 'ABSOLUTE' });
+    const made = stacksOf(frame(0, 0, 300, 300, [rect(0, 0, 300, 100), glow, rect(0, 120, 300, 100)]));
+
+    expect(made.children!.indexOf(made.children!.find((c) => c.id === glow.id)!)).toBe(1);
+  });
+
   it('un blocco largo quanto il contenitore lo riempie, così la tela si ridimensiona', () => {
     const made = stacksOf(frame(0, 0, 400, 300, [frame(0, 0, 400, 100, []), rect(100, 120, 200, 100)]));
 
@@ -89,10 +103,47 @@ describe('stacksOf', () => {
     expect(made.children![1].layoutAlign).toBeUndefined();
   });
 
-  it('una cornice con testi resta fissa: il motore ridimensionerebbe i testi', () => {
-    const made = stacksOf(frame(0, 0, 400, 100, [node('TEXT', 0, 0, 100, 20, { characters: 'a' }), node('TEXT', 0, 30, 100, 20, { characters: 'b' })]));
+  it('due testi uno sopra l’altro diventano una pila, ciascuno sulla sua riga', () => {
+    const made = stacksOf(frame(0, 0, 400, 100, [node('TEXT', 0, 0, 100, 20, { characters: 'a', style: { lineHeightPx: 20 } }), node('TEXT', 0, 30, 100, 20, { characters: 'b', style: { lineHeightPx: 20 } })]));
 
-    expect(made.layoutMode).toBeUndefined();
+    expect(made.layoutMode).toBe('VERTICAL');
+    expect(made.children!.map((c) => c.textAutoResize)).toEqual(['WIDTH_AND_HEIGHT', 'WIDTH_AND_HEIGHT']);
+  });
+
+  it('le righe di un paragrafo diventano un solo testo, e la cornice una pila', () => {
+    const style = { fontFamily: 'Inter', fontSize: 15, lineHeightPx: 24 };
+    const made = stacksOf(frame(0, 0, 360, 48, [node('TEXT', 0, 0, 320, 24, { characters: 'first line', style }), node('TEXT', 0, 24, 330, 24, { characters: 'second line', style })]));
+
+    expect(made.layoutMode).toBe('VERTICAL');
+    expect(made.children!.map((c) => [c.type, c.characters])).toEqual([['TEXT', 'first line\nsecond line']]);
+  });
+
+  it('un rettangolo di sfondo sotto tutto il resto esce dal flusso', () => {
+    const made = stacksOf(frame(0, 0, 300, 300, [rect(0, 0, 300, 300), rect(20, 20, 260, 100), rect(20, 140, 260, 100)]));
+
+    expect(made.layoutMode).toBe('VERTICAL');
+    expect(made.children![0].layoutPositioning).toBe('ABSOLUTE');
+  });
+
+  it('un riquadro posato dentro un altro fratello esce dal flusso, gli altri fanno pila', () => {
+    const banner = frame(200, 250, 80, 40, []);
+    const made = stacksOf(frame(0, 0, 300, 300, [frame(0, 0, 300, 300, [rect(0, 0, 10, 10)]), banner]));
+
+    expect(made.layoutMode).toBe('VERTICAL');
+    expect(made.children!.find((c) => c.id === banner.id)!.layoutPositioning).toBe('ABSOLUTE');
+  });
+
+  it('righe di testo che si sfiorano col riquadro dei glifi fanno comunque pila', () => {
+    const made = stacksOf(frame(0, 0, 400, 140, [node('TEXT', 0, 0, 400, 56, { characters: 'Title', style: { lineHeightPx: 50 } }), node('TEXT', 0, 51, 400, 80, { characters: 'Body', style: { fontSize: 20, lineHeightPx: 40 } })]));
+
+    expect(made.layoutMode).toBe('VERTICAL');
+    expect(made.itemSpacing).toBeCloseTo(-5, 5);
+  });
+
+  it('un contenuto che sborda in fondo resta una pila: la cornice lo taglia o lo lascia uscire come nella pagina', () => {
+    const made = stacksOf(frame(0, 0, 100, 20, [rect(0, 0, 100, 20), rect(0, 20, 100, 20), rect(0, 40, 100, 20)]));
+
+    expect(made).toMatchObject({ layoutMode: 'VERTICAL', paddingBottom: 0 });
   });
 
   it('le icone vettoriali non diventano pile', () => {
@@ -107,11 +158,14 @@ describe('stacksOf', () => {
     expect(placed(stacksOf(before))).toEqual(placed(before));
   });
 
-  it.each(['stripe', 'linear', 'vercel'])('%s: meno nodi assoluti, nessuno spostato', (name) => {
+  it.each(['stripe', 'linear', 'vercel'])('%s: al più un nodo su cinque resta assoluto, nessuno spostato', (name) => {
     const tree = JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8')) as PageTree;
+    const outline = JSON.parse(readFileSync(new URL(`./fixtures/outlines/${name}.json`, import.meta.url), 'utf8')) as PageOutline;
+    const sectioned = sectionFramed(tree.root, sectionsOf({ ...outline, height: tree.height }));
     const made = stacksOf(tree.root);
 
-    expect(absoluteShare(made)).toBeLessThan(absoluteShare(tree.root));
+    expect(absoluteShare(stacksOf(sectioned))).toBeLessThanOrEqual(MAX_ABSOLUTE_SHARE);
     expect(placed(made)).toEqual(placed(tree.root));
+    expect(textOf(made)).toBe(textOf(tree.root));
   });
 });

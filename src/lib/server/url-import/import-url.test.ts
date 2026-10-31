@@ -83,7 +83,7 @@ const sectionNames = (docs: Map<string, { doc: unknown }>) => {
   const doc = docs.get('frame-1')!.doc as { tracks: { clips: { id: string; name?: string; parent?: string | null; autoLayout?: unknown; props: { comp?: string } }[] }[] };
   const clips = doc.tracks.flatMap((t) => t.clips);
   const page = clips.find((c) => !c.parent && c.autoLayout)?.id ?? null;
-  return clips.filter((c) => c.parent === page && c.id !== page && (c.props.comp || c.autoLayout)).map((c) => c.name);
+  return clips.filter((c) => c.parent === page && c.id !== page).map((c) => c.name);
 };
 
 describe('importPageAt', () => {

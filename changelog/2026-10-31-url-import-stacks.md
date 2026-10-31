@@ -1,17 +1,30 @@
-# URL import: stacks inferred from geometry (draft)
+# URL import: pages come in as stacks
 
-Imported pages were absolute below the section level. `page-stacks.ts` now
-cuts every frame XY-style: children that do not overlap along an axis become
-a stack; uneven gaps nest (split at the largest gap); grids become rows;
-rows spanning the column spread (space-between) and fill; frames as wide as
-their parent fill. Overlaps, opacity, effects, clipping, vector drawings stay
-absolute. Gaps and even paddings bind to spacing variables.
+Imported pages were absolute below the section level (60–66% of layers
+on stripe, linear, vercel). `page-stacks.ts` now rebuilds each frame as
+stacks from geometry, with rule tables: blocks that don't overlap along
+an axis stack; uneven gaps nest at the largest gap; grids become rows;
+wide rows spread and fill; frames as wide as their parent fill. Overlays
+(a box inside a sibling, a leaf backdrop under everything), opacity,
+vector drawings and clipping frames with absolute children stay
+absolute. Lines of one paragraph merge into one text. Paint order is
+kept. Gaps and even paddings bind to spacing variables.
 
-Frames holding text are left fixed: an auto-layout text in the canvas hugs,
-and re-measured text moved whole sections (linear fold 0.989 -> 0.772).
-Fixed-size text (`textAutoResize: NONE` -> `TextSizing.Fixed`) is now mapped,
-but stacking text with it still lowered SSIM, so it is not used here.
+Engine fixes found by bisecting renders against the page:
+- `figma-doc`: a frame inside an auto layout is now a container with its
+  own box (`Background.InFlow`), not a group sized by what overflows it
+  (columns drifted 2 px each).
+- `text-extent`: hug height reads `lineHeight`/`letterSpacing` in px,
+  not only `leading` (one-line texts were 19.5 px instead of 24).
+- Figma `textAutoResize: NONE` maps to fixed text; a fixed text one line
+  tall gets `textWrap: none` (new value), so it never wraps when the
+  engine measures it wider than the browser did.
+- Stacked texts: one line in a column hugs; rows and multi-line keep
+  their box.
 
-Fidelity (PLAIN shape, same capture) still drops on full-page SSIM:
-linear 0.989/0.971 -> 0.985/0.969, stripe 0.969/0.888 -> 0.981/0.865,
-vercel 0.980/0.972 -> 0.980/0.950 (fold/full). Not merged for that reason.
+Result (same capture, fold/full SSIM, absolute share):
+linear .989/.971 → .989/.971, 58% → 10%;
+stripe .969/.888 → .981/.897, 66% → 14%;
+vercel .980/.972 → .980/.970, 62% → 17%.
+Discarded: hugging all text (moves sections), fixed text everywhere
+(wraps), stacking clip frames with absolute children (render differs).

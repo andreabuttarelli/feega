@@ -205,6 +205,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
     lineHeight: scaledPixels(layer.lineHeight, p),
     align: layer.align,
     verticalAlign: 'top',
+    ...(oneLineFixed(layer) ? { textWrap: 'none' } : {}),
     ...(layer.decoration === Decoration.None ? {} : { decoration: layer.decoration }),
     ...(layer.axes ? { axes: layer.axes } : {}),
     ...(layer.features ? { features: layer.features } : {}),
@@ -223,12 +224,14 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
 
 enum Background {
   IfPainted = 'if-painted',
-  Always = 'always'
+  Always = 'always',
+  InFlow = 'in-flow'
 }
 
 const NOTHING_TO_DRAW: Record<Background, (layer: FrameLayer) => boolean> = {
   [Background.IfPainted]: (layer) => !layer.fills.length && !layer.strokes.length,
-  [Background.Always]: () => false
+  [Background.Always]: () => false,
+  [Background.InFlow]: () => false
 };
 
 function frameBackground(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {
@@ -247,7 +250,7 @@ const BUILD: Record<LayerKind, (doc: MotionDoc, layer: Layer, p: Place) => Built
 
 const BUILD_IN_FLOW: Record<LayerKind, (doc: MotionDoc, layer: Layer, p: Place) => Built> = {
   ...BUILD,
-  [LayerKind.Frame]: (doc, layer, p) => nestedFrame(doc, layer as FrameLayer, p, Background.Always)
+  [LayerKind.Frame]: (doc, layer, p) => nestedFrame(doc, layer as FrameLayer, p, Background.InFlow)
 };
 
 const DIRECTION: Record<Flow, Direction> = { [Flow.Row]: Direction.Horizontal, [Flow.Column]: Direction.Vertical };
@@ -295,6 +298,15 @@ function flowOf(flow: AutoLayout, p: Place) {
   };
 }
 
+const ONE_LINE_SHARE = 1.5;
+const AUTO_LINE = 1.2;
+const PX_SUFFIX = /px$/;
+
+function oneLineFixed(layer: TextLayer): boolean {
+  const line = PX_SUFFIX.test(layer.lineHeight) ? parseFloat(layer.lineHeight) : layer.size * AUTO_LINE;
+  return layer.sizing === TextSizing.Fixed && layer.box.height < line * ONE_LINE_SHARE;
+}
+
 const TEXT_ITEM: Record<TextSizing, Partial<{ width: Sizing; height: Sizing }>> = {
   [TextSizing.Fixed]: {},
   [TextSizing.AutoHeight]: { height: Sizing.Hug },
@@ -322,6 +334,12 @@ function laidOut(built: Built, container: Root, layer: FrameLayer, flow: AutoLay
   return { ...built, doc: faded(doc, [container.id, ...kids.map((k) => k.id)], layer.opacity, p), roots: [container] };
 }
 
+function adopted(built: Built, container: Root, layer: FrameLayer, p: Place): Built {
+  const kids = built.roots.filter((r) => r.id !== container.id);
+  const doc = applied(built.doc, kids.map((kid): Step => (d) => setParent(d, kid.id, container.id, { at: p.frame })), p, `frame of ${layer.name}`);
+  return { ...built, doc: faded(doc, [container.id], layer.opacity, p), roots: [container] };
+}
+
 function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Built {
   const kids = built.roots.filter((r) => r.id !== container.id);
   const steps: Step[] = [...kids.map((kid): Step => (d) => setParent(d, kid.id, container.id, { at: p.frame })), (d) => editClip(d, container.id, (c) => ({ ...c, clipContent: true }))];
@@ -329,23 +347,27 @@ function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Bu
   return { ...built, doc, roots: [container] };
 }
 
-const holds = (layer: FrameLayer) => Boolean(layer.autoLayout) || layer.clip === Clip.Content;
+const holds = (layer: FrameLayer, need: Background = Background.IfPainted) => Boolean(layer.autoLayout) || layer.clip === Clip.Content || need === Background.InFlow;
 
 function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background.IfPainted): Built {
   const flow = layer.autoLayout;
-  const background = frameBackground(doc, layer, p, holds(layer) ? Background.Always : need);
+  const holding = holds(layer, need);
+  const background = frameBackground(doc, layer, p, holding ? Background.Always : need);
   const build = flow ? BUILD_IN_FLOW : BUILD;
-  let built: Built = { ...background, roots: holds(layer) ? [] : background.roots };
+  let built: Built = { ...background, roots: holding ? [] : background.roots };
   for (const child of layer.children) {
     const next = build[child.kind](built.doc, child, p);
     built = { doc: next.doc, ids: [...built.ids, ...next.ids], roots: [...built.roots, ...next.roots] };
   }
   const [container] = background.roots;
-  if (!container || !holds(layer)) {
+  if (!container || !holding) {
     return built;
   }
   const all = { ...built, roots: [container, ...built.roots] };
-  return flow ? laidOut(all, container, layer, flow, p) : clipped(all, container, layer, p);
+  if (flow) {
+    return laidOut(all, container, layer, flow, p);
+  }
+  return layer.clip === Clip.Content ? clipped(all, container, layer, p) : adopted(all, container, layer, p);
 }
 
 const OPAQUE = 1;
@@ -439,7 +461,7 @@ function instanceOfMain(doc: MotionDoc, layer: FrameLayer, main: Main, p: Place,
 
 function plainFrame(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {
   const built = layersOf(doc, layer, p, need);
-  return layer.autoLayout ? built : grouped(built, layer, p);
+  return layer.autoLayout || need === Background.InFlow ? built : grouped(built, layer, p);
 }
 
 function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {

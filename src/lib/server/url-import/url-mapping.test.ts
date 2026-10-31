@@ -216,6 +216,37 @@ describe('a fixed-size text keeps its box in a stack', () => {
   });
 });
 
+describe('one-line texts in a column keep their lines', () => {
+  it('two hugging lines 24px apart stay 24px apart', () => {
+    const style = { fontFamily: 'Inter Variable', fontSize: 15, fontWeight: 400, textAlignHorizontal: 'LEFT', letterSpacing: -0.165, fontAxes: "'opsz' 15", lineHeightUnit: 'PIXELS', lineHeightPx: 24 };
+    const line = (y: number, words: string) => text(words, { absoluteBoundingBox: { x: 0, y, width: 320, height: 24 }, textAutoResize: 'WIDTH_AND_HEIGHT', style });
+    const column: RestNode = { id: id(), type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 360, height: 48 }, fills: [], layoutMode: 'VERTICAL', itemSpacing: 0, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED', children: [line(0, 'Loops automate product work by responding to'), line(24, 'changes in Linear and connected tools. You can')] };
+
+    expect(textAt(pageOf([column]), 'changes in Linear and connected tools. You can').y).toBeCloseTo(24, 0);
+  });
+});
+
+describe('a fixed text one line tall never wraps', () => {
+  it('a one-line text sized NONE comes in without wrapping, a taller one keeps wrapping', () => {
+    const style = { fontFamily: 'Inter', fontSize: 15, fontWeight: 400, textAlignHorizontal: 'LEFT', lineHeightUnit: 'PIXELS', lineHeightPx: 24 };
+    const doc = docOf(pageOf([text('sync when minimum', { absoluteBoundingBox: { x: 0, y: 0, width: 120, height: 24 }, textAutoResize: 'NONE', style }), text('a paragraph over lines', { absoluteBoundingBox: { x: 140, y: 0, width: 120, height: 48 }, textAutoResize: 'NONE', style })]));
+    const wrapOf = (t: string) => clipsOf(doc).find((c) => c.props.text === t)?.props.textWrap;
+
+    expect(wrapOf('sync when minimum')).toBe('none');
+    expect(wrapOf('a paragraph over lines')).not.toBe('none');
+  });
+});
+
+describe('a frame in a stack keeps its own box', () => {
+  it('a column whose text runs past its box does not push the next column', () => {
+    const style = { fontFamily: 'Inter', fontSize: 16, fontWeight: 400, textAlignHorizontal: 'LEFT', lineHeightUnit: 'PIXELS', lineHeightPx: 24 };
+    const column = (x: number, words: string): RestNode => ({ id: id(), type: 'FRAME', absoluteBoundingBox: { x, y: 0, width: 100, height: 48 }, fills: [], children: [text(words, { absoluteBoundingBox: { x, y: 0, width: 160, height: 24 }, style }), text('second line', { absoluteBoundingBox: { x, y: 24, width: 80, height: 24 }, style: { ...style, fontWeight: 700 } })] });
+    const row: RestNode = { id: id(), type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 48 }, fills: [], layoutMode: 'HORIZONTAL', itemSpacing: 20, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED', children: [column(0, 'A rather long label'), column(120, 'Next')] };
+
+    expect(textAt(pageOf([row]), 'Next').x).toBeCloseTo(120, 0);
+  });
+});
+
 describe('what the page hides stays hidden', () => {
   it('a frame that clips its content without painting anything still clips it', async () => {
     const { composeHtml } = await import('@feega/motion-core/motion/hyperframes/compose');

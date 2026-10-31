@@ -26,3 +26,9 @@ describe('textExtent', () => {
     expect(Math.abs(width - INTER_MEDIUM_COPY) / INTER_MEDIUM_COPY).toBeLessThan(TOLERANCE);
   });
 });
+
+describe('textExtent line height', () => {
+  it('a line height in pixels sets the height of a hugging line', () => {
+    expect(textExtent('Text', { text: 'One line', size: 15, lineHeight: '24px' }, 1).height).toBeCloseTo(24, 5);
+  });
+});
