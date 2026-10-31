@@ -53,6 +53,21 @@ const LAYOUT_NAMES: Record<string, string> = { HORIZONTAL: 'Row', VERTICAL: 'Col
 
 const TYPE_NAMES: Record<string, string> = { VECTOR: 'Vector', BOOLEAN_OPERATION: 'Vector', ELLIPSE: 'Vector', LINE: 'Line', RECTANGLE: 'Rectangle', GROUP: 'Group', FRAME: 'Frame' };
 
+const DRAWN = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'ELLIPSE', 'LINE', 'STAR', 'REGULAR_POLYGON']);
+
+const anchorable = (n: RestNode) => n.type === 'VECTOR' && Boolean(n.fillGeometry?.length);
+
+const pathBound = (n: RestNode) => n.type === 'TEXT' || (DRAWN.has(n.type) && !anchorable(n));
+
+const anchorOf = (n: RestNode) => `M 0 0 Z M ${boxOf(n)!.width} ${boxOf(n)!.height} Z`;
+
+function anchored(n: RestNode): RestNode {
+  if (!anchorable(n) || n.fillGeometry!.some((g) => g.path === anchorOf(n))) {
+    return n;
+  }
+  return { ...n, fillGeometry: [...n.fillGeometry!, { path: anchorOf(n), windingRule: n.fillGeometry![0].windingRule }] };
+}
+
 const boxOf = (n: RestNode): Box | undefined => n.absoluteBoundingBox;
 
 const shows = (paints: RestPaint[] | undefined) => (paints ?? []).some((p) => p.visible !== false && (p.opacity ?? 1) > 0 && (p.type !== 'SOLID' || (p.color?.a ?? 1) > 0));
@@ -75,7 +90,11 @@ const boundary = (n: RestNode) => n.type === 'INSTANCE' || n.type === 'COMPONENT
 
 const looksLike = (n: RestNode) => shows(n.fills) || shows(n.strokes) || affects(n) || (n.opacity ?? 1) < 1 || Boolean(n.relativeTransform);
 
-const bare = (n: RestNode) => WRAPPERS.has(n.type) && !boundary(n) && !looksLike(n) && !n.clipsContent;
+const descendants = (n: RestNode): RestNode[] => (n.children ?? []).flatMap((k) => [k, ...descendants(k)]);
+
+const clipsSomething = (n: RestNode) => Boolean(n.clipsContent) && descendants(n).some((k) => !within(boxOf(k), boxOf(n)));
+
+const bare = (n: RestNode) => WRAPPERS.has(n.type) && !boundary(n) && !looksLike(n) && !clipsSomething(n);
 
 const zeroSized = (n: RestNode) => !boxOf(n) || boxOf(n)!.width < EPS || boxOf(n)!.height < EPS;
 
@@ -92,7 +111,7 @@ const raw = (name: string | undefined) => !name || RAW_NAMES.has(name.toLowerCas
 function adopted(child: RestNode, wrapper: RestNode): RestNode {
   const { layoutAlign, layoutGrow, layoutPositioning } = wrapper;
   const keepsName = child.type === 'TEXT' || !raw(child.name) || raw(wrapper.name);
-  return { ...child, layoutAlign, layoutGrow, layoutPositioning, name: keepsName ? child.name : wrapper.name };
+  return { ...anchored(child), layoutAlign, layoutGrow, layoutPositioning, name: keepsName ? child.name : wrapper.name };
 }
 
 const only = (n: RestNode) => (n.children?.length === 1 ? n.children[0] : null);
@@ -121,17 +140,54 @@ const growable = (k: RestNode) => {
   return Boolean(c) && bare(k) && c!.type === 'FRAME' && bare(c!) && within(boxOf(c!), boxOf(k));
 };
 
-type ChildRule = { name: string; applies: (k: RestNode, parent: RestNode) => boolean; becomes: (k: RestNode) => RestNode[] };
+const ONE_LINE_SHARE = 1.5;
+const FIXED_TEXT = 'NONE';
+
+const oneLine = (t: RestNode) => t.type === 'TEXT' && flowing(t) && !(t.characters ?? '').includes('\n') && boxOf(t)!.height < (t.style?.lineHeightPx || boxOf(t)!.height) * ONE_LINE_SHARE;
+
+const SLACK_PX = 1;
+
+const H_ALIGNS: { align: (t: RestNode) => string; fits: (lead: number, trail: number) => boolean }[] = [
+  { align: (t) => t.style?.textAlignHorizontal ?? 'LEFT', fits: (lead, trail) => lead <= SLACK_PX && trail <= SLACK_PX },
+  { align: () => 'LEFT', fits: (lead) => lead <= SLACK_PX },
+  { align: () => 'RIGHT', fits: (_, trail) => trail <= SLACK_PX },
+  { align: () => 'CENTER', fits: (lead, trail) => Math.abs(lead - trail) <= SLACK_PX }
+];
+
+const offsets = (inner: Box, outer: Box) => ({
+  left: inner.x - outer.x,
+  right: outer.x + outer.width - inner.x - inner.width,
+  top: inner.y - outer.y,
+  bottom: outer.y + outer.height - inner.y - inner.height
+});
+
+function alignIn(t: RestNode, wrapper: RestNode): string | null {
+  const o = offsets(boxOf(t)!, boxOf(wrapper)!);
+  if (Math.min(o.left, o.right, o.top, o.bottom) < -EPS) {
+    return null;
+  }
+  return H_ALIGNS.find((a) => a.fits(o.left, o.right))?.align(t) ?? null;
+}
+
+const pinned = (t: RestNode, wrapper: RestNode): RestNode => ({
+  ...adopted(t, wrapper),
+  absoluteBoundingBox: boxOf(wrapper),
+  textAutoResize: FIXED_TEXT,
+  style: { ...t.style, textAlignHorizontal: alignIn(t, wrapper)!, lineHeightUnit: 'PIXELS', lineHeightPx: round(boxOf(t)!.height + 2 * offsets(boxOf(t)!, boxOf(wrapper)!).top) }
+});
+
+type ChildRule = { name: string; applies: (k: RestNode, parent: RestNode, page: Box) => boolean; becomes: (k: RestNode) => RestNode[] };
 
 const CHILD_RULES: ChildRule[] = [
   { name: 'empty', applies: (k, parent) => invisible(k) && (!parent.layoutMode || !flowing(k)), becomes: () => [] },
-  { name: 'unwrap', applies: (k, parent) => Boolean(only(k)) && bare(k) && sameBox(boxOf(only(k)!), boxOf(k)) && (only(k)!.type !== 'TEXT' || !parent.layoutMode), becomes: (k) => [adopted(only(k)!, k)] },
+  { name: 'unwrap', applies: (k, parent) => Boolean(only(k)) && bare(k) && sameBox(boxOf(only(k)!), boxOf(k)) && (!pathBound(only(k)!) || !parent.layoutMode), becomes: (k) => [adopted(only(k)!, k)] },
+  { name: 'label', applies: (k, parent, page) => Boolean(parent.layoutMode) && Boolean(only(k)) && bare(k) && oneLine(only(k)!) && within(boxOf(k), page) && alignIn(only(k)!, k) !== null, becomes: (k) => [pinned(only(k)!, k)] },
   { name: 'lift', applies: (k, parent) => Boolean(only(k)) && bare(k) && !parent.layoutMode && (!k.layoutMode || flowing(only(k)!)), becomes: (k) => [adopted(only(k)!, k)] },
   { name: 'grow', applies: growable, becomes: (k) => [grown(only(k)!, k)] }
 ];
 
-function childFor(k: RestNode, parent: RestNode): RestNode[] {
-  return CHILD_RULES.find((rule) => rule.applies(k, parent))?.becomes(k) ?? [k];
+function childFor(k: RestNode, parent: RestNode, page: Box): RestNode[] {
+  return CHILD_RULES.find((rule) => rule.applies(k, parent, page))?.becomes(k) ?? [k];
 }
 
 const flowOf = (n: RestNode) => (n.children ?? []).filter(flowing);
@@ -139,7 +195,7 @@ const flowOf = (n: RestNode) => (n.children ?? []).filter(flowing);
 function foldable(n: RestNode): boolean {
   const [w] = flowOf(n);
   const c = w && only(w);
-  if (!n.layoutMode || flowOf(n).length !== 1 || !c || !bare(w) || !flowing(c)) {
+  if (!n.layoutMode || flowOf(n).length !== 1 || !c || !bare(w) || !flowing(c) || pathBound(c)) {
     return false;
   }
   return within(boxOf(c), boxOf(n));
@@ -190,20 +246,40 @@ const hoistable = (n: RestNode) => {
 
 const hoisted = (n: RestNode): RestNode => ({ ...n, ...layoutOf(only(n)!), children: only(n)!.children ?? [] });
 
+const mergeKey = (n: RestNode) => (n.type === 'VECTOR' && n.fillGeometry?.length && !n.strokeGeometry?.length ? JSON.stringify([n.absoluteBoundingBox, n.fills, n.strokes, n.opacity, n.effects, n.layoutPositioning, n.fillGeometry.map((g) => g.windingRule ?? '')[0], new Set(n.fillGeometry.map((g) => g.windingRule ?? '')).size]) : null);
+
+const twins = (a: RestNode | undefined, b: RestNode) => Boolean(a) && mergeKey(a!) !== null && mergeKey(a!) === mergeKey(b);
+
+function vectorsJoined(n: RestNode): RestNode {
+  const kids: RestNode[] = [];
+  for (const k of n.children!) {
+    const last = kids.at(-1);
+    if (twins(last, k)) {
+      kids[kids.length - 1] = { ...last!, fillGeometry: [...last!.fillGeometry!, ...k.fillGeometry!] };
+      continue;
+    }
+    kids.push(k);
+  }
+  return { ...n, children: kids };
+}
+
+const hasTwins = (n: RestNode) => (n.children ?? []).some((k, i, all) => i > 0 && twins(all[i - 1], k));
+
 type ParentRule = { name: string; applies: (n: RestNode) => boolean; becomes: (n: RestNode) => RestNode };
 
 const PARENT_RULES: ParentRule[] = [
+  { name: 'vectors', applies: hasTwins, becomes: vectorsJoined },
   { name: 'hoist', applies: hoistable, becomes: hoisted },
   { name: 'fold', applies: foldable, becomes: folded },
   { name: 'merge', applies: (n) => Boolean(n.layoutMode) && n.primaryAxisAlignItems !== SPACE_BETWEEN && (n.children ?? []).some(mergeable(n)), becomes: merged }
 ];
 
-function simplified(n: RestNode): RestNode {
+function simplified(n: RestNode, page: Box): RestNode {
   if (!n.children) {
     return n;
   }
-  const own = { ...n, children: n.children.map(simplified) };
-  const kids = { ...own, children: own.children.flatMap((k) => childFor(k, own)) };
+  const own = { ...n, children: n.children.map((k) => simplified(k, page)) };
+  const kids = { ...own, children: own.children.flatMap((k) => childFor(k, own, page)) };
   return PARENT_RULES.reduce<RestNode>((acc, rule) => (rule.applies(acc) ? rule.becomes(acc) : acc), kids);
 }
 
@@ -211,7 +287,6 @@ const textsIn = (n: RestNode): RestNode[] => (n.type === 'TEXT' ? [n] : (n.child
 
 const leavesIn = (n: RestNode): RestNode[] => (n.children?.length ? n.children.flatMap(leavesIn) : [n]);
 
-const DRAWN = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'ELLIPSE', 'LINE', 'STAR', 'REGULAR_POLYGON']);
 
 const ICON_MAX_PX = 64;
 
@@ -280,7 +355,7 @@ function alike(out: RestNode, root: RestNode): RestNode {
 export function flattened(root: RestNode): RestNode {
   let out = root;
   for (let pass = 0; pass < MAX_PASSES; pass++) {
-    const next = simplified(out);
+    const next = simplified(out, boxOf(root)!);
     const done = layersOf(next).count === layersOf(out).count;
     out = next;
     if (done) {

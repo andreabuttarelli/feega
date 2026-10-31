@@ -3546,3 +3546,11 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A frame inserted a moment ago stays blank for good
 
 **Signal:** after inserting templates in quick succession, one frame stays empty (paper colour, or dark in dark mode) until reload; the console shows a 404 from `/motion/<id>/source`. **Move:** the node row and the frame source are not saved at the same instant, and the core asked once. A source that is not there yet is retried (`untilFound` in `frame-source.ts`), as the pick-doc fetch already did. Reproduce by inserting the whole poster gallery with a 400 ms gap, not one poster at a time.
+
+## URL import fidelity from a worktree: every fixed text black and wrapped
+
+**Signal:** a local fidelity run paints imported texts black, centred and wrapping; `plan.skipped` lists `textWrap Invalid option`. **Move:** the worktree resolves `@feega/motion-core` from the main checkout, whose schema lacks newer values. Make `node_modules` a folder of symlinks to the main one with `@feega/*` pointing at the worktree's `packages/`, then score again; earlier numbers are not comparable.
+
+## A tiny text pushes its stack apart in a tall page
+
+**Signal:** after removing a text's wrapper, a column of 12 px labels in a long imported page spreads out. **Move:** the motion box minimum was a share of the doc (0.002 of the height ≈ 29 px on a 14 000 px slice). `MIN_BOX` in `components.ts` is now small enough; a fixed wrapper had been hiding it.
