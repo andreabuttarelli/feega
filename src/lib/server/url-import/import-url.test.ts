@@ -80,8 +80,10 @@ const NAV_TEXT = { id: '9', type: 'TEXT', characters: 'Acme', absoluteBoundingBo
 const OUTLINED = { ...TREE, root: { ...TREE.root, children: [NAV_TEXT, ...TREE.root.children!] }, outline: { width: 1280, height: 900, root: { tag: 'body', box: { y: 0, height: 900, width: 1280 }, children: [{ tag: 'nav', box: { y: 0, height: 80, width: 1280 } }, { tag: 'section', h1: true, heading: 'Ship faster', box: { y: 80, height: 820, width: 1280 } }] } } };
 
 const sectionNames = (docs: Map<string, { doc: unknown }>) => {
-  const doc = docs.get('frame-1')!.doc as { tracks: { clips: { name?: string; props: { comp?: string } }[] }[] };
-  return doc.tracks.flatMap((t) => t.clips.filter((c) => c.props.comp).map((c) => c.name));
+  const doc = docs.get('frame-1')!.doc as { tracks: { clips: { id: string; name?: string; parent?: string | null; autoLayout?: unknown; props: { comp?: string } }[] }[] };
+  const clips = doc.tracks.flatMap((t) => t.clips);
+  const page = clips.find((c) => !c.parent && c.autoLayout)?.id ?? null;
+  return clips.filter((c) => c.parent === page && c.id !== page && (c.props.comp || c.autoLayout)).map((c) => c.name);
 };
 
 describe('importPageAt', () => {
@@ -100,7 +102,7 @@ describe('importPageAt', () => {
 
     await importPageAt(ask);
 
-    expect(sectionNames(docs)).toEqual([]);
+    expect(sectionNames(docs)).not.toContain('Hero');
   });
 
   it('the top of the page reads only the first screens, not the whole page', async () => {

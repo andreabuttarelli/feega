@@ -203,6 +203,19 @@ describe('auto layout never moves what it holds', () => {
   });
 });
 
+describe('a fixed-size text keeps its box in a stack', () => {
+  it('a text sized NONE in a row keeps its width, and the next text stays where it was', () => {
+    const style = { fontFamily: 'Inter', fontSize: 16, fontWeight: 400, textAlignHorizontal: 'LEFT', lineHeightUnit: 'PIXELS', lineHeightPx: 24 };
+    const first = text('Docs', { absoluteBoundingBox: { x: 0, y: 0, width: 120, height: 24 }, textAutoResize: 'NONE', style });
+    const second = text('Pricing', { absoluteBoundingBox: { x: 140, y: 0, width: 120, height: 24 }, textAutoResize: 'NONE', style });
+    const row: RestNode = { id: id(), type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 24 }, fills: [], layoutMode: 'HORIZONTAL', itemSpacing: 20, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED', children: [first, second] };
+    const tree = pageOf([row]);
+
+    expect(textAt(tree, 'Docs').width).toBeCloseTo(120, 0);
+    expect(textAt(tree, 'Pricing').x).toBeCloseTo(140, 0);
+  });
+});
+
 describe('what the page hides stays hidden', () => {
   it('a frame that clips its content without painting anything still clips it', async () => {
     const { composeHtml } = await import('@feega/motion-core/motion/hyperframes/compose');

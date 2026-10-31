@@ -21,6 +21,7 @@ const HEADING = /^h([1-6])$/i;
 const BUTTON = /^button$/i;
 const SOLID_BLEND = 'normal';
 const GAP_TARGET = 'autoLayout.gap';
+const PADDING_TARGET = 'autoLayout.padding';
 const TEXT_COMPONENTS = new Set(['Text', 'Title', 'Kicker', 'Caption']);
 const FILL_TARGET = 'fill';
 const TEXT_COLOUR_TARGET = 'color';
@@ -92,7 +93,7 @@ const gradientOf = (fills: Fill[] | undefined): string | null => (fills?.some((f
 
 const effectKey = (effects: Effect[]) => JSON.stringify(effects.map(({ id: _id, ...rest }) => rest));
 
-type Look = { text: TextStyle | null; textColour: string | null; fill: string | null; border: string | null; gradient: string | null; effects: string | null; gap: number | null; area: number; chars: number };
+type Look = { text: TextStyle | null; textColour: string | null; fill: string | null; border: string | null; gradient: string | null; effects: string | null; gap: number | null; padding: number | null; area: number; chars: number };
 
 const isText = (clip: MotionClip) => TEXT_COMPONENTS.has(clip.component);
 
@@ -113,6 +114,11 @@ function textStyleOf(clip: MotionClip, view: MotionDoc, units: Units): TextStyle
   };
 }
 
+function evenPadding(clip: MotionClip): number | null {
+  const sides = clip.autoLayout ? Object.values(clip.autoLayout.padding) : [];
+  return sides.length && sides[0] > 0 && sides.every((side) => side === sides[0]) ? Math.round(sides[0]) : null;
+}
+
 function lookOf(clip: MotionClip, view: MotionDoc, units: Units): Look {
   const fills = (clip.props as Paints).fills;
   const strokes = clip.props.strokes as StrokePaint[] | undefined;
@@ -128,6 +134,7 @@ function lookOf(clip: MotionClip, view: MotionDoc, units: Units): Look {
     gradient: shape ? gradientOf(fills) : null,
     effects,
     gap: clip.autoLayout && clip.autoLayout.gap > 0 ? Math.round(clip.autoLayout.gap) : null,
+    padding: evenPadding(clip),
     area: (width * height) / units.docPerPx ** 2,
     chars: String(clip.props.text ?? '').length
   };
@@ -215,9 +222,7 @@ export function samplesOf(docs: readonly MotionDoc[], root: RestNode, units: Uni
         if (look.effects) {
           samples.effects.push({ key: look.effects, blur: Math.max(...clip.effects.map((e) => Number(e.params.blur ?? e.params.radius ?? 0))), shadow: clip.effects.every((e) => e.kind === EffectKind.DropShadow) });
         }
-        if (look.gap) {
-          samples.spacing.push(look.gap);
-        }
+        samples.spacing.push(...[look.gap, look.padding].filter((v): v is number => v !== null));
       }
     }
   }
@@ -294,6 +299,10 @@ function boundClip(clip: MotionClip, look: Look, plan: Plan, view: MotionDoc): M
   const gap = look.gap === null ? undefined : plan.gapOf.get(look.gap);
   if (gap) {
     bind[GAP_TARGET] = gap;
+  }
+  const padding = look.padding === null ? undefined : plan.gapOf.get(look.padding);
+  if (padding) {
+    bind[PADDING_TARGET] = padding;
   }
   const textRef = look.text ? plan.textOf.get(textKey(look.text)) : undefined;
   const lookRef = textRef ?? (look.gradient ? plan.gradientOf.get(look.gradient) : undefined);
