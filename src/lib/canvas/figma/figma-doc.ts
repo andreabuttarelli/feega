@@ -4,7 +4,7 @@ import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/m
 import { DrawTool } from '$lib/motion/draw-tool';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import type { Effect } from '@feega/motion-core/motion/effects/model';
-import { TYPE_SIZE } from '@feega/motion-core/motion/components';
+import { MIN_BOX, TYPE_SIZE } from '@feega/motion-core/motion/components';
 import { FillType, MAX_STOPS } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont, registerUpload } from '$lib/motion/fonts/ops';
@@ -42,7 +42,6 @@ const MAX_NAME = 60;
 const SHADOW_DISTANCE_LIMIT = 300;
 const MAX_STROKE_WIDTH = 0.2;
 const MIN_STOPS = 2;
-const MIN_TEXT_BOX: Unit = { x: 0.02, y: 0.002 };
 const CENTRE: Unit = { x: 0.5, y: 0.5 };
 
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
@@ -185,7 +184,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   }
   const [x0, y0] = toUnit(next, p)([layer.box.x, layer.box.y]);
   const [x1, y1] = toUnit(next, p)([layer.box.x + layer.box.width, layer.box.y + layer.box.height]);
-  const [width, height] = [Math.max(x1 - x0, MIN_TEXT_BOX.x), Math.max(y1 - y0, MIN_TEXT_BOX.y)];
+  const [width, height] = [Math.max(x1 - x0, MIN_BOX.width), Math.max(y1 - y0, MIN_BOX.height)];
   const id = p.newId();
   const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, layer.sizing, { text: layer.text });
   const size = (n: number) => clamp(round((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);

@@ -32,12 +32,12 @@ describe('flattened', () => {
     expect(made.children![0].type).toBe('FRAME');
   });
 
-  it('il bottone tiene il bordo e il testo ci sta dentro diretto, col padding nel bottone', () => {
+  it('il bottone tiene il bordo e il testo ci sta dentro diretto', () => {
     const label = text('Products', [20, 14, 60, 20]);
     const button = node('INSTANCE', 10, 10, 80, 48, { name: 'Button', componentId: 'm1', fills: red, ...stack('HORIZONTAL', { paddingTop: 2, paddingLeft: 2 }), children: [frame('span', [12, 12, 76, 44], [frame('stack', [20, 14, 60, 20], [label])], stack('HORIZONTAL', { paddingTop: 2, paddingLeft: 8 }))] });
     const made = flattened(page([button])).children![0];
 
-    expect(made).toMatchObject({ type: 'INSTANCE', componentId: 'm1', name: 'Button', paddingTop: 4, paddingLeft: 10 });
+    expect(made).toMatchObject({ type: 'INSTANCE', componentId: 'm1', name: 'Button' });
     expect(made.children).toHaveLength(1);
     expect(made.children![0]).toMatchObject({ type: 'TEXT', characters: 'Products' });
   });
@@ -91,6 +91,38 @@ describe('flattened', () => {
     expect(names.filter((x) => RAW.has(x))).toEqual([]);
     expect(made.children![0].name).toBe('Nav');
     expect(made.children![0].children![0].name).not.toBe('Nav');
+  });
+
+  it('un’etichetta di una riga in una pila prende il box del suo involucro, allineata come prima', () => {
+    const label = text('Enterprise', [276, 22, 65, 20]);
+    const row = frame('Row', [0, 0, 400, 64], [frame('a', [264, 16, 89, 32], [label]), text('Pricing', [360, 22, 40, 20])], stack('HORIZONTAL'));
+    const made = flattened(page([row])).children![0].children![0];
+
+    expect(made).toMatchObject({ type: 'TEXT', textAutoResize: 'NONE', absoluteBoundingBox: { x: 264, y: 16, width: 89, height: 32 } });
+    expect(made.style).toMatchObject({ textAlignHorizontal: 'CENTER', lineHeightPx: 32 });
+  });
+
+  it('vettori fratelli con la stessa pittura diventano un vettore solo', () => {
+    const path = (d: string) => node('VECTOR', 0, 0, 24, 24, { name: 'path', fills: red, fillGeometry: [{ path: d, windingRule: 'NONZERO' }] });
+    const made = flattened(page([node('GROUP', 0, 0, 24, 24, { name: 'svg', children: [path('M0 0L4 4Z'), path('M10 10L14 14Z')] })]));
+
+    expect(made.children).toHaveLength(1);
+    expect(made.children![0].fillGeometry!.map((g) => g.path).slice(0, 2)).toEqual(['M0 0L4 4Z', 'M10 10L14 14Z']);
+  });
+
+  it('un vettore che entra in una pila porta con sé il suo box, non quello del tracciato', () => {
+    const chevron = node('VECTOR', 137, 25, 14, 14, { name: 'path', fills: red, fillGeometry: [{ path: 'M4 5L7 8L10 5', windingRule: 'NONZERO' }] });
+    const row = frame('Row', [65, 16, 94, 32], [text('Products', [77, 22, 57, 20]), frame('icon', [137, 25, 14, 14], [chevron])], stack('HORIZONTAL'));
+    const icon = flattened(page([row])).children![0].children![1];
+
+    expect(icon.type).toBe('VECTOR');
+    expect(icon.fillGeometry!.map((g) => g.path)).toContain('M 0 0 Z M 14 14 Z');
+  });
+
+  it('un ritaglio che non taglia niente non tiene in vita l’involucro', () => {
+    const made = flattened(page([frame('div', [0, 0, 100, 40], [frame('span', [0, 0, 100, 40], [node('RECTANGLE', 10, 10, 20, 20, { fills: red })])], { clipsContent: true })]));
+
+    expect(made.children![0].type).toBe('RECTANGLE');
   });
 
   it('la home di vercel ha molti meno livelli e meno profondità', () => {
