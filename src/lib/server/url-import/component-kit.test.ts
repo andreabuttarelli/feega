@@ -1,3 +1,6 @@
+import { Destination } from '$lib/canvas/figma/scene';
+import { FrameKind } from '$lib/canvas/motion-node';
+import { Background } from '@feega/motion-core/motion/doc';
 import { describe, expect, it } from 'vitest';
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { flattenComps } from '@feega/motion-core/motion/precomp';
@@ -109,12 +112,13 @@ describe('repeated blocks of an imported page become a component kit', () => {
     expect(Object.keys(plan.homes[0]).sort()).toEqual(placed.sort());
   });
 
-  it('a set frame is painted with the page Background variable, so light text stays readable', () => {
+  it('a set stands free on the Components page: no frame, no backdrop, only its mains', () => {
     const [set] = planned().sets;
-    const [backdrop] = set.doc.tracks.flatMap((t) => t.clips);
 
-    expect(backdrop.component).toBe('Shape');
-    expect(backdrop.bind?.fill).toBe('Acme/Background');
+    expect(set.destination).toBe(Destination.Free);
+    expect(set.kind).toBe(FrameKind.Element);
+    expect(set.doc.background).toBe(Background.Transparent);
+    expect(set.doc.tracks.flatMap((t) => t.clips).every((c) => c.component === 'Precomp')).toBe(true);
   });
 });
 

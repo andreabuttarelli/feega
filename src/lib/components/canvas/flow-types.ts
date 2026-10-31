@@ -126,6 +126,7 @@ export type FlowProps = {
   onGroup?: (ids: string[]) => void;
   onWrapStack?: (ids: string[]) => void;
   onComponentMade?: (nodeId: string) => void;
+  onNodeSize?: (id: string, w: number, h: number) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;
   onUndo?: () => void;

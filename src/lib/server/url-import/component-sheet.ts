@@ -1,18 +1,15 @@
-import type { MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
+import { Background, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { Destination } from '$lib/canvas/figma/scene';
+import { FrameKind } from '$lib/canvas/motion-node';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
 import { componentSlice } from '$lib/motion/canvas-components';
 import { compBox, reframed, type Box } from '$lib/motion/comp-frame';
-import { addClip, editClip } from '@feega/motion-core/motion/timeline';
-import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
-import { DEFAULT_MODE, keyOf } from '@feega/motion-core/motion/variables-model';
 import type { NewId } from '$lib/motion/main-component';
-import { SET_BACKDROP, SET_GAP_PX } from '$lib/motion/component-set';
+import { SET_GAP_PX, SET_PAD_PX } from '$lib/motion/component-set';
 
-const PAD_PX = 40;
 const PAGE_GAP_PX = 120;
 const PAGE_ROW_PX = 2400;
-const BACKGROUND = 'Background';
-const FULL = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
 export type ComponentPages = { sets: PlanItem[]; homes: Record<number, Record<string, number>> };
 
@@ -41,32 +38,21 @@ function setsOf(items: readonly PlanItem[]): Map<string, SetOf> {
   return sets;
 }
 
-function backdropped(source: MotionDoc, size: { width: number; height: number }, newId: NewId): MotionDoc {
-  const empty: MotionDoc = { ...source, ...size, tracks: source.tracks.map((t) => ({ ...t, clips: [] })), comps: {} };
-  const [collection, vars] = Object.entries(source.variables ?? {}).find(([, c]) => c.vars[BACKGROUND]) ?? [];
-  const fill = vars?.vars[BACKGROUND].values[DEFAULT_MODE];
-  if (!collection || typeof fill !== 'string') {
-    return empty;
-  }
-  const id = newId();
-  const added = addClip(empty, { component: 'Shape', from: 0, durationInFrames: source.durationInFrames, props: { shape: ShapeKind.Rect, fill, ...FULL } }, id);
-  const bound = added.ok ? editClip(added.doc, id, (clip) => ({ ...clip, name: SET_BACKDROP, bind: { fill: keyOf(collection, BACKGROUND) } })) : added;
-  return bound.ok ? bound.doc : empty;
-}
+const bare = (source: MotionDoc, size: { width: number; height: number }): MotionDoc => ({ ...source, ...size, background: Background.Transparent, tracks: source.tracks.map((t) => ({ ...t, clips: [] })), comps: {} });
 
 const clipIdsIn = (doc: MotionDoc) => new Set(Object.values(doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((clip) => clip.id))));
 
 function setDoc(set: SetOf, newId: NewId): MotionDoc {
   const source = set.source.doc;
   const size = {
-    width: Math.ceil(PAD_PX * 2 + set.mains.reduce((sum, m) => sum + widthOf(m.box) + SET_GAP_PX, -SET_GAP_PX)),
-    height: Math.ceil(PAD_PX * 2 + Math.max(...set.mains.map((m) => heightOf(m.box))))
+    width: Math.ceil(SET_PAD_PX * 2 + set.mains.reduce((sum, m) => sum + widthOf(m.box) + SET_GAP_PX, -SET_GAP_PX)),
+    height: Math.ceil(SET_PAD_PX * 2 + Math.max(...set.mains.map((m) => heightOf(m.box))))
   };
-  let doc = backdropped(source, size, newId);
-  let left = PAD_PX;
+  let doc = bare(source, size);
+  let left = SET_PAD_PX;
   for (const main of set.mains) {
     const nested = Object.fromEntries(Object.entries(componentSlice(source, main.id).comps).filter(([id]) => id !== main.id && !doc.comps[id]).map(([id, comp]) => [id, reframed(comp, source, size)]));
-    const moved = reframed(main.comp, source, size, { x: left - main.box.left, y: PAD_PX - main.box.top });
+    const moved = reframed(main.comp, source, size, { x: left - main.box.left, y: SET_PAD_PX - main.box.top });
     const { home: _home, ...component } = main.comp.component!;
     doc = { ...doc, comps: { ...doc.comps, ...nested, [main.id]: { ...moved, component } } };
     const placed = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(main.comp.durationInFrames, doc.durationInFrames), props: { comp: main.id } }, newId());
@@ -94,7 +80,7 @@ export function componentPages(items: readonly PlanItem[], newId: NewId): Compon
   const made = sets.map((set) => {
     const doc = setDoc(set, newId);
     const inside = clipIdsIn(doc);
-    return { ...set.source, doc, name: set.name, size: { width: doc.width, height: doc.height }, centre: { x: 0, y: 0 }, images: items.flatMap((i) => i.images).filter((i) => inside.has(i.clipId)) };
+    return { ...set.source, destination: Destination.Free, kind: FrameKind.Element, doc, name: set.name, size: { width: doc.width, height: doc.height }, centre: { x: 0, y: 0 }, images: items.flatMap((i) => i.images).filter((i) => inside.has(i.clipId)) };
   });
   const homeOf = new Map(sets.flatMap((set, at) => set.mains.map((m) => [m.id, at] as const)));
   const homes = Object.fromEntries(
