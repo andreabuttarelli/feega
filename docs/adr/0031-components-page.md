@@ -20,11 +20,11 @@ copying the comp (`linked-mains.ts`): a smaller home would stretch every instanc
 ## Decision
 
 1. **The user chose Framer's behaviour** for every path that makes a main: `⌥⌘K` in the app
-   and URL/code import. After `createComponent` the app saves, then calls `home_components`,
+   an agent's `component create`, and URL/code import. After `createComponent` the app saves, then calls `home_components`,
    which places the main in its own set frame on the Components page and homes the page's copy
    there (`component.home`). The instance never leaves the screen: the move runs in the
    background.
-2. **One frame per set, sized to its content**, variants left to right, frames in a wrapped grid
+2. **One free element per set, sized to its content** (no design frame, transparent; amended 2026-10-31), 20 px padding and gap, variants left to right, frames in a wrapped grid
    below whatever the page already holds (`component-sheet.ts`, `components-page.ts`).
 3. **Comps keep pixels, not fractions, across frames.** `reframed(comp, from, to, shift)`
    (`comp-frame.ts`) rescales a comp between frame sizes. Following a main rescales it to the
@@ -42,4 +42,3 @@ copying the comp (`linked-mains.ts`): a smaller home would stretch every instanc
   fractions and ignores `comp.frame`, so it would have been an engine change across export,
   GPU and codegen.
 - Moving mains on save: it would also move the mains of old Components frames.
-- Agent `component create` homing on its own: the agent calls `home_components` like the app.

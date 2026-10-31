@@ -13,9 +13,9 @@ Create a component from the selection with `⌥⌘K`. The **Components** panel l
 
 ## The Components page
 
-Every project keeps its mains on a page named **Components**, made the first time you need it. Create a component with `⌥⌘K` and the main moves there, in a frame of its own sized to it; what stays where you made it is an instance linked to that main. A URL or code import puts its mains there too, one frame per component or variant set, laid out in a grid, instead of one large frame beside the page.
+Every project keeps its mains on a page named **Components**, made the first time you need it. Create a component with `⌥⌘K`, by hand or through an agent, and the main moves there, standing free on the canvas; what stays where you made it is an instance linked to that main. A URL or code import puts its mains there too, each component or variant set free on the page, laid out in a grid, instead of one large frame beside the page. Undoing the import removes them too.
 
-On the Components page a variant set has a dashed purple outline and a **+** just below it: click it to add a variant, and the frame widens to show it. Edit a main there and every instance on every page follows, at the same size.
+On the Components page a variant set has a dashed purple outline, 20 px around and between its variants, and a **+** just below it: click it to add a variant beside the last one. Edit a main there and every instance on every page follows, at the same size.
 
 Imports made before this change keep their Components frame and keep working.
 
@@ -39,6 +39,8 @@ The **Components** panel in the rail (`Alt+5`) shows the components of every can
 - **CLI:** `feega components <projectId>`. **MCP:** `list_project_components`. **API:** `GET /api/v1/projects/{projectId}/components`, and `GET /api/v1/projects/{projectId}/components/{frameId}/{compId}` for one main.
 
 ## Variants
+
+Select an instance or a main to switch its variant from the right bar: one dropdown per property, and, when the set has one property or a few variants, a row of chips, one per variant. Overrides stay. In the prototype player, an instance whose set has a `State=Hover` or `State=Pressed` variant shows it while hovered or pressed.
 
 A component can have several variant properties, like Size (S, M, L) and State (default, hover). Select an instance and the variant matrix appears in Properties: one cell per combination, the current one highlighted.
 
