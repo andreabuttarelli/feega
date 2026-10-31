@@ -1,3 +1,4 @@
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createCanvas, listCanvases, listNodes, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
@@ -34,6 +35,13 @@ export async function componentsPage(db: Db, scope: Scope): Promise<ComponentsPa
   return { place: { projectId: scope.projectId, canvasId }, at: belowAll(nodes) };
 }
 
+const homeless = (doc: MotionDoc) => new Set(Object.entries(doc.comps).flatMap(([id, c]) => (c.component && !c.component.home ? [id] : [])));
+
+export function mainsGained(before: MotionDoc, after: MotionDoc): boolean {
+  const had = homeless(before);
+  return [...homeless(after)].some((id) => !had.has(id));
+}
+
 export type HomedOutcome = { moved: string[]; setIds: string[] };
 
 const NOTHING: HomedOutcome = { moved: [], setIds: [] };
@@ -45,8 +53,7 @@ export async function homeComponents(store: FrameStore, page: () => Promise<Comp
   if (!frame) {
     return NOTHING;
   }
-  const homeless = Object.entries(frame.doc.comps).filter(([, c]) => c.component && !c.component.home);
-  if (!homeless.length) {
+  if (!homeless(frame.doc).size) {
     return NOTHING;
   }
 

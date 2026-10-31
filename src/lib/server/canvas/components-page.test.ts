@@ -4,7 +4,7 @@ import { addClip } from '@feega/motion-core/motion/timeline';
 import { createComponent } from '$lib/motion/main-component';
 import { setMainOf } from '$lib/motion/component-set';
 import type { FrameStore, StoredFrame } from '$lib/server/motion/move-element';
-import { belowAll, homeComponents } from './components-page';
+import { belowAll, homeComponents, mainsGained } from './components-page';
 
 function storeWith(doc: MotionDoc) {
   const frames = new Map<string, StoredFrame>([['page', { nodeId: 'page', projectId: 'p', canvasId: 'design', version: 1, doc }]]);
@@ -71,5 +71,15 @@ describe('new mains land below what the Components page already holds', () => {
       { position: { x: -50, y: 400, z: 0 }, size: { width: 200, height: 100 } }
     ];
     expect(belowAll(nodes)).toEqual({ x: -50, y: 740 });
+  });
+});
+
+describe('an agent that makes a component homes it like the app does', () => {
+  it('notices a new main without a home, and only that', () => {
+    const made = designWithButton();
+    const before = { ...made, comps: {} };
+
+    expect(mainsGained(before, made)).toBe(true);
+    expect(mainsGained(made, made)).toBe(false);
   });
 });

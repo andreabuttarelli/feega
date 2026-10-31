@@ -1,3 +1,4 @@
+import { componentsPage, homeComponents, mainsGained } from '$lib/server/canvas/components-page';
 import { orgFontFamilies } from './font-upload';
 import { asSchema, type Tool } from 'ai';
 import { nameVersion, namedRevisions } from './version-names';
@@ -17,7 +18,7 @@ import { exportStill } from './still-export';
 import { speakVoiceover } from './voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
-import { frameMover } from './move-element';
+import { frameMover, frameStore } from './move-element';
 import { drawFrames, firstFrames } from './server-frames';
 import { fontAdvance } from './font-advance';
 import { letteringOf } from '$lib/motion/text-outline-run';
@@ -215,7 +216,12 @@ async function commit(db: Db, ready: Prepared, summary: string): Promise<{ versi
   if (written.outcome !== OpsOutcome.Written) {
     return { outcome: ToolRun.Conflict };
   }
-  return { version: written.head.version, saved: true };
+  if (!mainsGained(saved.doc, session.doc)) {
+    return { version: written.head.version, saved: true };
+  }
+  const store = frameStore(db, { orgId: ready.nodeScope.orgId, actor: ready.actor, projectId: saved.project.id });
+  await homeComponents(store, () => componentsPage(db, { orgId: ready.nodeScope.orgId, projectId: saved.project.id }), ready.nodeScope.nodeId, () => crypto.randomUUID().slice(0, 8));
+  return { version: (await store.read(ready.nodeScope.nodeId))?.version ?? written.head.version, saved: true };
 }
 
 export function refusalOf(output: unknown): string | null {
