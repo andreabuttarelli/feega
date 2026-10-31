@@ -9,6 +9,7 @@ import { repeatedOf } from './repeated';
 import { windowed } from './page-window';
 import { sectionsOf } from './page-sections';
 import { sectionFramed } from './section-frames';
+import { stacksOf } from './page-stacks';
 import { tokensOf, type SiteBrand } from './page-tokens';
 import { samplesOf, siteName, tokenised } from './token-bind';
 import { componentKit } from './component-kit';
@@ -229,7 +230,7 @@ export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPE
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
-  const root = mapped({ ...mark(SECTIONED[shape.sectioning](tree)), name }, keyOf, family);
+  const root = mapped({ ...mark(stacksOf(SECTIONED[shape.sectioning](tree))), name }, keyOf, family);
   const stack = stacked(slicesOf(root), newId, uploads);
   if (!stack) {
     return null;

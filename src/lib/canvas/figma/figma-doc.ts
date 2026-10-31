@@ -187,7 +187,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   const [x1, y1] = toUnit(next, p)([layer.box.x + layer.box.width, layer.box.y + layer.box.height]);
   const [width, height] = [Math.max(x1 - x0, MIN_TEXT_BOX.x), Math.max(y1 - y0, MIN_TEXT_BOX.y)];
   const id = p.newId();
-  const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, layer.wraps ? TextSizing.AutoHeight : TextSizing.AutoWidth, { text: layer.text });
+  const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, layer.sizing, { text: layer.text });
   const size = (n: number) => clamp(round((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
   const font = known.get(layer.font);
   const runs = layer.runs.map(({ font: f, size: s, ...rest }) => ({ ...rest, ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
@@ -295,12 +295,18 @@ function flowOf(flow: AutoLayout, p: Place) {
   };
 }
 
+const TEXT_ITEM: Record<TextSizing, Partial<{ width: Sizing; height: Sizing }>> = {
+  [TextSizing.Fixed]: {},
+  [TextSizing.AutoHeight]: { height: Sizing.Hug },
+  [TextSizing.AutoWidth]: { width: Sizing.Hug, height: Sizing.Hug }
+};
+
 function itemFor(child: Layer, parent: AutoLayout): Partial<{ width: Sizing; height: Sizing; absolute: boolean }> {
   const row = parent.flow === Flow.Row;
   const fillsWidth = row ? child.item.grow : child.item.stretch;
   const fillsHeight = row ? child.item.stretch : child.item.grow;
   return {
-    ...(child.kind === LayerKind.Text ? (child.wraps ? { height: Sizing.Hug } : { width: Sizing.Hug, height: Sizing.Hug }) : {}),
+    ...(child.kind === LayerKind.Text ? TEXT_ITEM[child.sizing] : {}),
     ...(fillsWidth ? { width: Sizing.Fill } : {}),
     ...(fillsHeight ? { height: Sizing.Fill } : {}),
     ...(child.item.absolute ? { absolute: true } : {})
