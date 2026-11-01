@@ -1,4 +1,4 @@
-import { ActionKind, DEFAULT_DELAY_MS, TransitionKind, TriggerKind, transitionSchema, type Interaction } from '@feega/motion-core/motion/prototype/model';
+import { ActionKind, DEFAULT_DELAY_MS, TransitionKind, TriggerKind, transitionSchema, type Action, type Interaction } from '@feega/motion-core/motion/prototype/model';
 
 export const TRANSITION_FIELDS: Record<TransitionKind, { direction: boolean; timing: boolean }> = {
   [TransitionKind.Instant]: { direction: false, timing: false },
@@ -13,9 +13,18 @@ export function retriggered(interaction: Interaction, kind: TriggerKind): Intera
   return { ...interaction, trigger };
 }
 
-export function retargeted(interaction: Interaction, kind: ActionKind, target: string): Interaction {
-  const action = kind === ActionKind.Back ? { kind } : { kind, target };
-  return { ...interaction, action } as Interaction;
+type Picked = Record<string, string>;
+
+const ACTION_OF: Record<ActionKind, (target: string, variant: Picked) => Action> = {
+  [ActionKind.Navigate]: (target) => ({ kind: ActionKind.Navigate, target }),
+  [ActionKind.OpenOverlay]: (target) => ({ kind: ActionKind.OpenOverlay, target }),
+  [ActionKind.ScrollTo]: (target) => ({ kind: ActionKind.ScrollTo, target }),
+  [ActionKind.Back]: () => ({ kind: ActionKind.Back }),
+  [ActionKind.ChangeTo]: (_target, variant) => ({ kind: ActionKind.ChangeTo, variant })
+};
+
+export function retargeted(interaction: Interaction, kind: ActionKind, target: string, variant: Picked = {}): Interaction {
+  return { ...interaction, action: ACTION_OF[kind](target, variant) };
 }
 
 export function retimed(interaction: Interaction, patch: Record<string, unknown>): Interaction {

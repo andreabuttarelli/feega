@@ -1,5 +1,5 @@
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
-import { leafRectsAt, pickOwnersAt, pickStackAt, quadOf, rectOf, type FrameRect } from '$lib/motion/gpu/pick';
+import { leafRectsAt, pathRect, pickOwnersAt, pickStackAt, quadOf, rectOf, type FrameRect } from '$lib/motion/gpu/pick';
 import { isLayer } from '@feega/motion-core/motion/surface';
 import { compileScene, type Scene } from '$lib/motion/gpu/scene';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
@@ -105,6 +105,9 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
     },
     frameRect(clip: string) {
       return rectOf(scene(), clip, time());
+    },
+    pathRect(path: readonly string[]) {
+      return pathRect(scene(), path, time());
     },
     framePoint(world: World, space: FrameSpace): [number, number] {
       return space.toFrame(world);

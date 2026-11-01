@@ -24,6 +24,7 @@
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
   import { TRANSITION_FIELDS, retimed, retriggered, retargeted } from '$lib/motion/prototype/edit';
+  import { variantChoices } from '$lib/motion/prototype/variant-change';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 
@@ -31,6 +32,9 @@
   const aiming = $derived(prototypeLink.draft?.clipId === clip.id);
   const nameOf = (id: string) => prototypeLink.targets.find((t) => t.id === id)?.name ?? 'Missing frame';
   const targetOf = (i: Interaction) => ('target' in i.action ? i.action.target : '');
+  const choices = $derived(variantChoices(doc, clip.id));
+  const choiceLabel = (variant: Record<string, string>) => Object.entries(variant).map(([prop, value]) => `${prop}: ${value}`).join(', ');
+  const choiceOf = (i: Interaction) => ('variant' in i.action ? choiceLabel(i.action.variant) : '');
   const put = (next: Interaction, summary: string) => commit(putInteraction(doc, clip.id, next), summary);
   const ms = (text: string, fallback: number) => (Number.isFinite(Number(text)) && text.trim() !== '' ? Math.round(Number(text)) : fallback);
 </script>
@@ -57,9 +61,15 @@
         <button type="button" class="remove" aria-label="Remove interaction" onclick={() => commit(removeInteraction(doc, clip.id, interaction.id), 'Removed an interaction')}>Remove</button>
       </div>
       <div class="line">
-        <select aria-label="Action" value={interaction.action.kind} onchange={(e) => put(retargeted(interaction, e.currentTarget.value as ActionKind, targetOf(interaction) || prototypeLink.targets[0]?.id || ''), 'Changed the action')}>
-          {#each ACTION_KINDS as kind (kind)}<option value={kind}>{ACTION_LABEL[kind]}</option>{/each}
+        <select aria-label="Action" value={interaction.action.kind} onchange={(e) => put(retargeted(interaction, e.currentTarget.value as ActionKind, targetOf(interaction) || prototypeLink.targets[0]?.id || '', choices[0]), 'Changed the action')}>
+          {#each ACTION_KINDS as kind (kind)}<option value={kind} disabled={kind === ActionKind.ChangeTo && !choices.length}>{ACTION_LABEL[kind]}</option>{/each}
         </select>
+        {#if interaction.action.kind === ActionKind.ChangeTo}
+          <select aria-label="Variant" value={choiceOf(interaction)} onchange={(e) => put(retargeted(interaction, ActionKind.ChangeTo, '', choices.find((c) => choiceLabel(c) === e.currentTarget.value)), 'Changed the variant')}>
+            {#if !choices.some((c) => choiceLabel(c) === choiceOf(interaction))}<option value={choiceOf(interaction)}>{choiceOf(interaction)}</option>{/if}
+            {#each choices as choice (choiceLabel(choice))}<option value={choiceLabel(choice)}>{choiceLabel(choice)}</option>{/each}
+          </select>
+        {/if}
         {#if needsTarget(interaction.action.kind)}
           <select aria-label="Target frame" value={targetOf(interaction)} onchange={(e) => put(retargeted(interaction, interaction.action.kind, e.currentTarget.value), 'Changed the target frame')}>
             {#if !prototypeLink.targets.some((t) => t.id === targetOf(interaction))}<option value={targetOf(interaction)}>{nameOf(targetOf(interaction))}</option>{/if}
