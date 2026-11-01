@@ -7,7 +7,7 @@ import { addClip, moveClip, removeClips, setProps, type OpResult } from '@feega/
 import type { SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
 import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
-import { childrenInOrder, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { childrenInOrder, shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
 
@@ -261,12 +261,12 @@ function takePlace(doc: MotionDoc, parentId: string | null, taken: readonly stri
 
 function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string, container: Container): OpResult {
   const doc = ownTracks(source, clipIds, trackId);
-  const laid = withAutoLayout(doc);
   const size = { width: doc.width, height: doc.height };
-  const placed: Placed[] = clipIds
-    .map((c) => findClip(doc, c))
-    .filter((f) => f !== null && f.track.kind === TrackKind.Visual && hasBox(f.clip))
-    .map((f) => ({ clip: f!.clip, trackIndex: doc.tracks.indexOf(f!.track), box: pivotBox(findClip(laid, f!.clip.id)!.clip.props, size) }));
+  const placed: Placed[] = clipIds.flatMap((c) => {
+    const found = findClip(doc, c);
+    const box = found?.track.kind === TrackKind.Visual ? shownBox(doc, c) : null;
+    return found && box ? [{ clip: found.clip, trackIndex: doc.tracks.indexOf(found.track), box }] : [];
+  });
   if (!placed.length) {
     return fail('select the visual clips with a box that the stack should hold');
   }

@@ -84,6 +84,17 @@ describe('wrapInStack', () => {
     expect(clip(must(wrapInStack(doc, ['q', 'p'], 'box', 'lane')), 'box').autoLayout).toMatchObject({ direction: Direction.Vertical, order: ['p', 'q'] });
   });
 
+  it('wraps a component instance, boxed by its content like an imported one', () => {
+    const button = { id: 'pill', from: 0, durationInFrames: 60, component: 'Shape', props: { shape: 'rect', x: 0.7, y: 0.5, width: 0.1, height: 0.1 } };
+    const withMain: MotionDoc = { ...row, comps: { btn: { name: 'Nav Button', component: true, durationInFrames: 60, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [button] }] } as never } };
+    const doc = must(addClip(withMain, { component: 'Precomp', from: 0, durationInFrames: 60, props: { comp: 'btn' } }, 'inst'));
+    const wrapped = must(wrapInStack(doc, ['a', 'inst'], 'box', 'lane'));
+
+    expect(clip(wrapped, 'inst').parent).toBe('box');
+    expect(clip(wrapped, 'box').autoLayout?.order).toEqual(['a', 'inst']);
+    expect(clip(wrapped, 'box').props.width).toBeCloseTo(0.6, 5);
+  });
+
   it('refuses an audio clip or an empty selection', () => {
     expect(wrapInStack(row, [], 'box', 'lane').ok).toBe(false);
   });
