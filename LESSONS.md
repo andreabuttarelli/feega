@@ -3578,3 +3578,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A probe script outside the worktree runs old package code
 
 **Signal:** a fix to `packages/motion-core` passes its unit test, but a `vite-node` script you keep in the scratchpad still prints the old numbers, and a debug log you add never shows. **Move:** imports such as `@feega/motion-core/...` resolve from the nearest `node_modules` up the script's path, which may be a stray install, not your worktree. Keep probe scripts inside the worktree (an ignored folder) so they resolve the code you are editing.
+
+## A canvas freezes for minutes right after it opens
+
+**Signal:** after reload the frame stays blank, Ctrl+scroll does nothing, a `longtask` of tens of seconds or more; the CPU profile is all `found` (style or variable library) → `syncStyle` → `commit`, with Svelte's `infinite_loop_guard`. **Move:** a library sync effect compares a doc value with the project copy and re-commits on mismatch; anything that is not key-order free (`JSON.stringify` against jsonb, which reorders keys) never settles. Compare with `sameValue`. Probe with `tests/e2e/url-import-reopen.spec.ts` (`REOPEN_SEED=<file>` reuses one real import).
