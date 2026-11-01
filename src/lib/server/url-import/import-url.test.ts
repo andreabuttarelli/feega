@@ -258,4 +258,17 @@ describe('importPageAt', () => {
     expect(homes.every((home) => home && sets.includes(home))).toBe(true);
     expect('undo' in done ? done.undo.map((u) => (u as { nodeId: string }).nodeId).sort() : []).toEqual(['frame-1', ...sets].sort());
   });
+
+  it('feega.app FAQ: an accordion lands as a set whose open variant stays with the page, unplaced', async () => {
+    const summary = (id: string, y: number, go: string) => ({ id, type: 'FRAME', name: 'summary', go, absoluteBoundingBox: { x: 100, y, width: 400, height: 40 }, fills: [], children: [{ id: `${id}t`, type: 'TEXT', characters: 'Is it free?', absoluteBoundingBox: { x: 110, y: y + 10, width: 200, height: 20 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 16, fontWeight: 500 } }] });
+    const item = (id: string, open: boolean) => ({ id, type: 'FRAME', name: 'details', pattern: 0, absoluteBoundingBox: { x: 100, y: 600, width: 400, height: open ? 90 : 40 }, fills: [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95, a: 1 } }], children: [summary(`${id}s`, 600, open ? 'Closed' : 'Open'), ...(open ? [{ id: `${id}a`, type: 'TEXT', characters: 'Yes.', absoluteBoundingBox: { x: 110, y: 650, width: 200, height: 20 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 16, fontWeight: 400 } }] : [])] });
+    const tree = { ...TREE, root: { ...TREE.root, children: [...TREE.root.children!, item('d', false)] }, patterns: [{ ix: 0, kind: 'accordion', prop: 'State', initial: 'Closed', states: ['Closed', 'Open'], variants: [{ state: 'Open', root: item('o', true) }] }] };
+    const { ask, docs } = askOf({ open: async () => tabOf(tree) });
+
+    const done = await importPageAt(ask);
+
+    const page = docs.get('frame-1')!.doc as MotionDoc;
+    expect(done.outcome).toBe(UrlImportOutcome.Ok);
+    expect(Object.values(page.comps).flatMap((c) => (c.component?.set === 'Accordion 1' ? [c.component.variant] : []))).toEqual([{ State: 'Closed' }, { State: 'Open' }]);
+  });
 });
