@@ -19,8 +19,15 @@ const SHAPE_PROP = 'Variant';
 const ONE_SET_NAMES = new Set(['Logo']);
 const SIZE_STEP_PX = 4;
 const MAX_SIZES = 3;
-const SIZED = /^(Button|Nav link|Link)( \d+)?$/;
+const SIZED = /(^| )(Button|Nav link|Link)( \d+)?$/;
 const SIZE_VALUES: Record<number, string[]> = { 2: ['Small', 'Large'], 3: ['Small', 'Medium', 'Large'] };
+const TAG_LIKE = /^[a-z0-9-]*$/;
+const MAX_LABEL_WORDS = 3;
+const MAX_LABEL = 24;
+const NUMBERED = /\s\d+$/;
+const FILE_NAME = /\/([A-Za-z][A-Za-z-_ ]*[A-Za-z])(?:[-_][a-z0-9]{0,3})?\.(svg|png|webp|jpe?g|avif)(\?|$)/;
+const SPELLED = (raw: string) => raw.replace(/[-_]+/g, ' ');
+const NO_LABEL = new Set(['image']);
 
 type Seen = { node: RestNode; order: number; skeleton: string; parts: number; style: string; size: number; cta: boolean };
 type Facts = { tag: string; painted: boolean; texts: number; image: boolean; icon: boolean; height: number; y: number };
@@ -145,19 +152,57 @@ function chosenOf(seen: Seen[], parent: Map<string, string>): Chosen[] {
   });
 }
 
+const capitalised = (raw: string) => raw.charAt(0).toUpperCase() + raw.slice(1);
+
+const labelled = (raw: string | undefined): string | null => {
+  const words = (raw ?? '').replace(/[^A-Za-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  const label = words.join(' ');
+  const fits = words.length <= MAX_LABEL_WORDS && label.length <= MAX_LABEL && !NUMBERED.test(label);
+  return label && fits && !TAG_LIKE.test(raw ?? '') && !NO_LABEL.has(label.toLowerCase()) ? label : null;
+};
+
+const LABELS: ((n: RestNode) => string | null)[] = [
+  (n) => labelled(n.name),
+  (n) => {
+    const texts: RestNode[] = [];
+    walk(n, (d) => d.type === 'TEXT' && texts.push(d));
+    return texts.length === 1 ? labelled(texts[0].characters) : null;
+  },
+  (n) => {
+    const alts: string[] = [];
+    walk(n, (d) => d !== n && d.fills?.some((p) => p.type === 'IMAGE') && alts.push(d.name ?? ''));
+    return labelled(alts[0]);
+  },
+  (n) => {
+    const refs: string[] = [];
+    walk(n, (d) => d.fills?.forEach((p) => p.imageRef && refs.push(p.imageRef)));
+    const file = refs[0]?.match(FILE_NAME)?.[1];
+    return file ? labelled(capitalised(SPELLED(file))) : null;
+  }
+];
+
+const labelOf = (n: RestNode): string | null => LABELS.reduce<string | null>((found, rule) => found ?? rule(n), null);
+
 const styleValue = (index: number) => STYLE_VALUES[index] ?? `${STYLE_PROP} ${index + 1}`;
 
 const sizeValue = (index: number, count: number) => SIZE_VALUES[count]?.[index] ?? `${SIZE_PROP} ${index + 1}`;
 
+function shapeValues(variants: Group[]): string[] {
+  const labels = variants.map((g) => labelOf(g[0].node));
+  const once = (label: string | null) => label !== null && labels.filter((l) => l === label).length === 1;
+  return labels.map((label, i) => (once(label) ? label! : String(i + 1)));
+}
+
 function variantNames(name: string, variants: Group[]): Map<Group, string> {
   const styles = [...new Set(variants.map((g) => g[0].style))];
   const numbered = new Set(variants.map((g) => g[0].skeleton)).size > 1;
+  const shapes = shapeValues(variants);
   const uniform = SIZED.test(name) && variants.every((g) => g.every((s) => s.size === g[0].size));
   const sizes = uniform ? [...new Set(variants.map((g) => g[0].size))].sort((a, b) => a - b) : [];
   return new Map(
     variants.map((g) => {
       if (numbered) {
-        return [g, `${SHAPE_PROP}=${variants.indexOf(g) + 1}`];
+        return [g, `${SHAPE_PROP}=${shapes[variants.indexOf(g)]}`];
       }
       const pairs = [...(styles.length > 1 ? [`${STYLE_PROP}=${styleValue(styles.indexOf(g[0].style))}`] : []), ...(sizes.length > 1 ? [`${SIZE_PROP}=${sizeValue(sizes.indexOf(g[0].size), sizes.length)}`] : [])];
       return [g, pairs.join(', ')];
@@ -209,18 +254,37 @@ function oneSetPerName(chosen: Chosen[]): Chosen[] {
   });
 }
 
-function uniquelyNamed(chosen: Chosen[]): Chosen[] {
+type Tree = { root: RestNode; parent: Map<string, string>; byId: Map<string, RestNode> };
+
+function sectionOf(tree: Tree, id: string): string | null {
+  let at = id;
+  for (let up = tree.parent.get(at); up && up !== tree.root.id; up = tree.parent.get(at)) {
+    at = up;
+  }
+  return at === id ? null : labelled(tree.byId.get(at)?.name);
+}
+
+function uniquelyNamed(chosen: Chosen[], tree: Tree): Chosen[] {
+  const count = new Map<string, number>();
+  chosen.forEach((c) => count.set(c.name, (count.get(c.name) ?? 0) + 1));
+  const taken = new Set<string>();
   const uses = new Map<string, number>();
   return chosen.map((c) => {
     const n = (uses.get(c.name) ?? 0) + 1;
     uses.set(c.name, n);
-    return n === 1 ? c : { ...c, name: `${c.name} ${n}` };
+    const main = c.variants[0][0].node;
+    const qualifiers = count.get(c.name) === 1 ? [] : [sectionOf(tree, main.id), labelOf(main)].flatMap((q) => (q ? [`${q} ${c.name}`] : []));
+    const name = [...qualifiers, n === 1 ? c.name : `${c.name} ${n}`].find((candidate) => !taken.has(candidate))!;
+    taken.add(name);
+    return name === c.name ? c : { ...c, name };
   });
 }
 
 export function repeatedOf(root: RestNode): Repeated {
   const { seen, parent } = seenOf(root);
-  const chosen = uniquelyNamed(oneSetPerName(chosenOf(seen, parent)));
+  const byId = new Map<string, RestNode>();
+  walk(root, (n) => byId.set(n.id, n));
+  const chosen = uniquelyNamed(oneSetPerName(chosenOf(seen, parent)), { root, parent, byId });
   return {
     root: marked(root, markingsOf(chosen)),
     components: chosen.map(({ name, variants }) => ({ name, variants: variants.map((g) => ({ style: variantNames(name, variants).get(g) ?? '', occurrences: g.length })) }))
