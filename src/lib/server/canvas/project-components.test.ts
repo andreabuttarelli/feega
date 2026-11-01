@@ -19,17 +19,19 @@ function buttonDoc() {
 }
 
 const button = buttonDoc();
-const docs: Record<string, MotionDoc> = { f1: button.doc, f2: newMotionDoc(MotionFormat.Landscape) };
+const docs: Record<string, MotionDoc> = { f1: button.doc, f2: newMotionDoc(MotionFormat.Landscape), set: button.doc };
 
 vi.mock('$lib/server/repos/canvas', () => ({
   listCanvases: async () => [
     { id: 'c1', projectId: 'p', name: 'Home', viewport: null },
-    { id: 'c2', projectId: 'p', name: 'Empty', viewport: null }
+    { id: 'c2', projectId: 'p', name: 'Empty', viewport: null },
+    { id: 'c3', projectId: 'p', name: 'Components', viewport: null }
   ],
   listMotionNodes: async () => [
     { id: 'f1', canvasId: 'c1', data: { posterAssetId: 'a1' } },
     { id: 'f2', canvasId: 'c2', data: {} }
-  ]
+  ],
+  listNodes: async (_db: Db, scope: { canvasId: string }) => (scope.canvasId === 'c3' ? [{ id: 'set', canvasId: 'c3', type: 'element', data: {} }, { id: 'note', canvasId: 'c3', type: 'text', data: {} }] : [])
 }));
 
 vi.mock('$lib/server/repos/motion-revisions', () => ({
@@ -44,9 +46,15 @@ describe('components across the canvases of a project', () => {
   it('groups them by canvas, with the poster of the frame that holds them', async () => {
     const found = await listProjectComponents(db, scope);
 
-    expect(found).toHaveLength(1);
+    expect(found.map((c) => c.canvasName)).toEqual(['Home', 'Components']);
     expect(found[0]).toMatchObject({ canvasId: 'c1', canvasName: 'Home' });
     expect(found[0].components[0]).toMatchObject({ frameId: 'f1', name: 'Button', thumb: '/p/p/c/c1/assets/a1', revision: 1 });
+  });
+
+  it('lists the sets an import lays on the Components page, which are element frames, so Go to main finds them (vercel import: Go to main did nothing)', async () => {
+    const found = await listProjectComponents(db, scope);
+
+    expect(found.find((c) => c.canvasName === 'Components')?.components[0]).toMatchObject({ frameId: 'set', name: 'Button' });
   });
 
   it('hands over the main alone, ready to place on another canvas', async () => {
