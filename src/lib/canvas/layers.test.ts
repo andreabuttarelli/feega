@@ -203,6 +203,22 @@ describe('every frame lists its children, open or not', () => {
     expect(rows.some((r) => r.nodeId === 'm2' && r.depth > 0)).toBe(true);
   });
 
+  it('a group folded in a closed frame hides its insides, as after a reload', () => {
+    const doc = video();
+    const inner = { id: 'in', kind: TrackKind.Visual, name: 'Inner', clips: [{ ...doc.tracks[0].clips[0], id: 'deep' }] };
+    const grouped: MotionDoc = {
+      ...doc,
+      comps: { g1: { name: 'Nav', durationInFrames: 30, tracks: [inner] } as never },
+      tracks: doc.tracks.map((t, i) => (i === 0 ? { ...t, clips: [{ ...t.clips[0], id: 'g', component: 'Precomp', props: { comp: 'g1' } }] } : t))
+    };
+    const outline = { m2: frameRows(grouped, 'm2') };
+    const nav = layerRows(NODES, null, outline).find((r) => r.nodeId === 'm2' && r.id === 'g')!;
+    const rows = layerRows(NODES, null, outline, new Set([nav.key]));
+
+    expect(rows.some((r) => r.nodeId === 'm2' && r.id === 'g')).toBe(true);
+    expect(rows.some((r) => r.nodeId === 'm2' && r.id === 'deep')).toBe(false);
+  });
+
   it('the open frame reads its live doc, never the stored outline', () => {
     const doc = video();
     const rows = layerRows(NODES, { nodeId: 'm1', doc }, { m1: [] });

@@ -227,6 +227,20 @@ export function withAutoLayout(doc: MotionDoc, measure: TextMeasure = estimatedT
   return { ...doc, tracks: laidOut(doc.tracks, size, measure, instanceContent({ ...doc, comps }, size, measure)), comps };
 }
 
+export function shownBox(doc: MotionDoc, clipId: string, measure: TextMeasure = estimatedText): Box | null {
+  const laid = withAutoLayout(doc, measure);
+  const clip = visualClips(laid.tracks).find((c) => c.id === clipId);
+  if (!clip) {
+    return null;
+  }
+  const size = { width: doc.width, height: doc.height };
+  const content = instanceContent(laid, size, measure)(clip);
+  if (content) {
+    return shifted(content, clip, size);
+  }
+  return typeof clip.props.width === 'number' && typeof clip.props.height === 'number' ? pivotBox(clip.props, size) : null;
+}
+
 const RESIZE_TOLERANCE = 0.5;
 const WIDTH_VARIANT = '@w';
 

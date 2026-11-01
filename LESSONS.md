@@ -3636,3 +3636,12 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## Media emulation alone does not make a page light
 
 **Signal:** the same light site imports dark in some runs over Browserless, never locally; `emulateMediaFeatures` is set. **Move:** the stealth fingerprint answers scripts that call `matchMedia`; pin light from a script registered with `evaluateOnNewDocument` after the browser's own, plus `color-scheme` and the `Sec-CH-Prefers-Color-Scheme` hint. Check with five reads over Browserless (about $0.01): locally it never reproduces.
+
+## A dev server started inside an agent worktree never reloads
+
+**Signal:** `vite dev` runs from `.claude/worktrees/<agent>`, a source edit is on disk, yet the served module (`curl` its URL) still lacks it and debug logs never print. **Move:** `vite.config.ts` ignores `**/.claude/worktrees/**` in the watcher, which matches every file of that checkout. Restart the server after each edit, or start it with a scratch config that spreads the repo config and replaces `server.watch.ignored`.
+
+## "GPU renderer unavailable: unreachable" after a zoom
+
+**Signal:** the canvas goes blank with that banner; the console shows `[core] gpu lost` first. **Move:** the loss came first, the trap second: a reattach on the same `<canvas>` whose GL context is lost makes the core panic (`gl.create_texture().expect`). Headless Chromium has no WebGPU and renders GL in software; it reproduces only at `deviceScaleFactor: 2` on a tall imported page zoomed to 4×. `CoreFrames` now reattaches on a fresh canvas and reloads a trapped core (`afterAttachFailure` in `gpu-loss.ts`).
+

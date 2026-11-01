@@ -71,7 +71,7 @@
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import StackSection from './StackSection.svelte';
-  import { layoutParent, removeStack } from '$lib/motion/layout/ops';
+  import { laidClip, layoutParent, removeStack } from '$lib/motion/layout/ops';
   import { LAYOUT_KIND_LABEL, layoutKind, placementOf } from '@feega/motion-core/motion/layout/stack';
   import Minus from '@lucide/svelte/icons/minus';
   import StyleSection from './StyleSection.svelte';
@@ -474,7 +474,10 @@
   const fieldShown = (field: Field) => toShown(propsOwner(clip.component), field.key, Number(value(field)), doc);
   const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, v, doc);
   const fieldSlider = (field: Field) => steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), doc));
-  const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
+  const LAID_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
+  const laid = $derived(stackParent || clip.autoLayout ? (laidClip(doc, clip.id) ?? clip) : clip);
+  const resolved = (key: string) => ((LAID_KEYS.has(key) ? laid : clip).props as Record<string, unknown>)[key];
+  const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : resolved(field.key));
 
   const pulseShown = $derived(pulsable.length > 0 && shows(Part.Pulse, family) && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio')));
   const visual = $derived(spec.track === TrackKind.Visual);

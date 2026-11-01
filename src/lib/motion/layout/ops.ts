@@ -7,7 +7,7 @@ import { addClip, moveClip, removeClips, setProps, type OpResult } from '@feega/
 import type { SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
 import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
-import { childrenInOrder, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { childrenInOrder, shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
 
@@ -22,6 +22,8 @@ function withClip(doc: MotionDoc, clipId: string, edit: (clip: MotionClip) => Mo
 }
 
 export const hasBox = (clip: MotionClip) => typeof clip.props.width === 'number' && typeof clip.props.height === 'number';
+
+export const laidClip = (doc: MotionDoc, clipId: string): MotionClip | null => (findClip(withAutoLayout(doc), clipId)?.clip as MotionClip | undefined) ?? null;
 
 export function layoutParent(doc: MotionDoc, clip: MotionClip): (MotionClip & { autoLayout: AutoLayout }) | null {
   const parent = clip.parent ? findClip(doc, clip.parent)?.clip : undefined;
@@ -71,6 +73,7 @@ type Axis = 'width' | 'height';
 const GROW_KEY = { width: 'widthGrow', height: 'heightGrow' } as const;
 const PERCENT_KEY = { width: 'widthPercent', height: 'heightPercent' } as const;
 const DOC_SIDE = { width: 'width', height: 'height' } as const;
+const CENTRE_KEY = { width: 'x', height: 'y' } as const;
 
 const SIZE_PATCH: Record<Sizing, (axis: Axis, value: number | undefined) => Partial<LayoutItem>> = {
   [Sizing.Fixed]: (axis) => ({ [axis]: Sizing.Fixed }),
@@ -84,7 +87,12 @@ export function setChildSize(doc: MotionDoc, clipId: string, axis: Axis, entry: 
   if (!sized.ok || entry.sizing !== Sizing.Fixed || entry.value === undefined) {
     return sized;
   }
-  return setProps(sized.doc, clipId, { [axis]: entry.value / doc[DOC_SIDE[axis]] });
+  const clip = findClip(sized.doc, clipId)!.clip;
+  const side = doc[DOC_SIDE[axis]];
+  const centre = CENTRE_KEY[axis];
+  const start = Number(clip.props[centre]) * side - (Number(clip.props[axis] ?? 0) * side) / 2;
+  const anchored = typeof clip.props[centre] === 'number' ? { [centre]: (start + entry.value / 2) / side } : {};
+  return setProps(sized.doc, clipId, { [axis]: entry.value / side, ...anchored });
 }
 
 const ALONG: Record<Direction, (by: readonly [number, number]) => number> = {
@@ -261,12 +269,12 @@ function takePlace(doc: MotionDoc, parentId: string | null, taken: readonly stri
 
 function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string, container: Container): OpResult {
   const doc = ownTracks(source, clipIds, trackId);
-  const laid = withAutoLayout(doc);
   const size = { width: doc.width, height: doc.height };
-  const placed: Placed[] = clipIds
-    .map((c) => findClip(doc, c))
-    .filter((f) => f !== null && f.track.kind === TrackKind.Visual && hasBox(f.clip))
-    .map((f) => ({ clip: f!.clip, trackIndex: doc.tracks.indexOf(f!.track), box: pivotBox(findClip(laid, f!.clip.id)!.clip.props, size) }));
+  const placed: Placed[] = clipIds.flatMap((c) => {
+    const found = findClip(doc, c);
+    const box = found?.track.kind === TrackKind.Visual ? shownBox(doc, c) : null;
+    return found && box ? [{ clip: found.clip, trackIndex: doc.tracks.indexOf(found.track), box }] : [];
+  });
   if (!placed.length) {
     return fail('select the visual clips with a box that the stack should hold');
   }
