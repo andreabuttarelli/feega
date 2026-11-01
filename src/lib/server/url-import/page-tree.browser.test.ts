@@ -265,6 +265,25 @@ describe.runIf(process.env.CHROMIUM_PATH)('a paragraph whose line starts with an
   }, 30_000);
 });
 
+const TIGHT_HEADLINE = `<body style="margin:0"><h1 style="margin:0;width:330px;font:72px serif;line-height:0.8;text-indent:30px">The smart canvas</h1></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a headline set tighter than its glyphs', () => {
+  it('keeps each word on the line it sits on, though a glyph reaches into the line above (feega.app: "canvas" read onto the first phone line)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 300 });
+      await page.setContent(TIGHT_HEADLINE);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(['The smart', 'canvas']);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
 const CLIPPED = `<body style="margin:0"><svg width="40" height="40" viewBox="0 0 20 20"><defs><clipPath id="c"><rect x="0" y="0" width="10" height="20"/></clipPath></defs><g clip-path="url(#c)"><circle cx="10" cy="10" r="8" fill="#e00"/></g></svg></body>`;
 
 describe.runIf(process.env.CHROMIUM_PATH)('an svg clipped by a rectangle', () => {

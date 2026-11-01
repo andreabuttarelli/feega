@@ -451,9 +451,11 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   };
 
   const SPACE_EM = 0.2;
+  const overlapOf = (l: KitRect, r: KitRect) => Math.min(l.bottom, r.bottom) - Math.max(l.top, r.top);
+  const mostOn = (rect: KitRect, lines: KitRect[]) => lines.reduce((best, l, i) => (overlapOf(l, rect) > 0 && (best < 0 || overlapOf(l, rect) > overlapOf(lines[best], rect)) ? i : best), -1);
   const lineAt = (ch: Char, lines: KitRect[]) => {
     const rect = ch.node ? rectsOf(ch.node, ch.at, ch.at + 1)[0] : null;
-    return rect ? lines.findIndex((l) => Math.min(l.bottom, rect.bottom) - Math.max(l.top, rect.top) > 0) : -1;
+    return rect ? mostOn(rect, lines) : -1;
   };
   const firstOn = (chars: Char[], lines: KitRect[], line: number) => {
     let [lo, hi] = [0, chars.length];
@@ -603,7 +605,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     let last = 0;
     for (const ch of chars) {
       const rect = ch.node ? rectsOf(ch.node, ch.at, ch.at + 1)[0] : null;
-      const index = rect ? kept.findIndex((l) => Math.min(l.bottom, rect.bottom) - Math.max(l.top, rect.top) > 0) : -1;
+      const index = rect ? mostOn(rect, kept) : -1;
       if (index >= 0) {
         last = index;
       } else if (rect && ch.c.trim()) {
