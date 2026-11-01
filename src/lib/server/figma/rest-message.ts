@@ -44,6 +44,9 @@ export type RestNode = {
   strokes?: RestPaint[];
   strokeWeight?: number;
   strokeAlign?: string;
+  strokeDashes?: number[];
+  blendMode?: string;
+  maskGradient?: RestPaint;
   effects?: (Omit<Effect, 'color'> & { color?: RestColor })[];
   cornerRadius?: number;
   rectangleCornerRadii?: number[];
@@ -295,6 +298,9 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     strokePaints: paintsOf(n.strokes),
     strokeWeight: n.strokeWeight,
     strokeAlign: n.strokeAlign,
+    dashPattern: n.strokeDashes,
+    blendMode: n.blendMode,
+    maskGradient: n.maskGradient?.gradientHandlePositions && n.maskGradient.gradientStops ? { handles: n.maskGradient.gradientHandlePositions, stops: n.maskGradient.gradientStops.map((s) => ({ position: s.position, alpha: s.color.a ?? 1 })) } : undefined,
     effects: n.effects?.map((e) => ({ ...e, color: e.color ? rgba(e.color) : undefined })),
     frameMaskDisabled: n.clipsContent === undefined ? undefined : !n.clipsContent,
     fillGeometry: geometryOf(n.fillGeometry, build),

@@ -71,7 +71,10 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 | borders per side, outline, box-shadow (inset too), `filter: blur`, `backdrop-filter: blur`, radius per corner | strokes or side rectangles, effects | strokes, effects |
 | `::before` / `::after` | real elements before the walk | as any element |
 | content of a closed `<details>` | nodes marked `collapsed` | hidden clips (`hidden: true`) |
-| video, canvas, iframe, masked / blended / filtered / rotated blocks, native controls | snapshot RECTANGLE | image fill |
+| dashed / dotted border, SVG `stroke-dasharray` | `strokeDashes` (Chrome's pattern) | stroke `dash` / `gap` |
+| `mix-blend-mode` on a block without element children | `blendMode` (Figma names) | clip `blend` |
+| `mask-image: linear-gradient(...)` (one layer, default size and position) | `maskGradient`, frame clips its content | precomp with `rect` masks for opaque runs and `linear` masks for fades |
+| video, canvas, iframe, image / radial masks, blended blocks with children, filtered / rotated blocks, native controls | snapshot RECTANGLE | image fill |
 | an element partly off the page | box cut at the edge, picture focused on the part that was showing | — |
 
 ## Sections
@@ -123,7 +126,7 @@ palette. Borders, radii and the frame background are listed, not bound.
 ## Not yet
 
 - Tablet/phone captures as breakpoint overrides (ADR 0022).
-- Dashed strokes, `mask-image` and `mix-blend-mode` as layers (they come in as snapshots).
+- Image and radial `mask-image`, blend modes on blocks with children (they come in as snapshots).
 
 ## Fidelity
 

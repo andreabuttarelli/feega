@@ -124,6 +124,37 @@ describe('a page becomes a frame that looks like the page', () => {
     expect(clips.find((c) => c.props.text === 'Answer')?.hidden).toBe(true);
   });
 
+  it('a dashed border stays a dashed stroke with the page dash and gap (stripe: 89 dashed borders drawn solid)', () => {
+    const dashed = rect([], { x: 100, y: 100, width: 400, height: 100 }, { strokes: [{ type: 'SOLID', color: BLACK }], strokeWeight: 2, strokeAlign: 'INSIDE', strokeDashes: [6, 4] });
+    const clip = clipsOf(docOf(pageOf([dashed]))).find((c) => (c.props.strokes as unknown[] | undefined)?.length)!;
+    const [stroke] = clip.props.strokes as { width: number; dash: number; gap: number }[];
+
+    expect(stroke.dash / stroke.width).toBeCloseTo(3, 2);
+    expect(stroke.gap / stroke.width).toBeCloseTo(2, 2);
+  });
+
+  it('a blended picture stays a picture with its blend mode, not a snapshot of what is behind it (vercel: the hero image blends luminosity)', () => {
+    const blended = rect([{ type: 'IMAGE', imageRef: 'https://example.com/hero.png', scaleMode: 'FILL' }], { x: 100, y: 100, width: 400, height: 200 }, { blendMode: 'LUMINOSITY' });
+    const clip = clipsOf(docOf(pageOf([blended]))).find((c) => c.component === 'Shape' && c.name !== 'Page' && (c.props.fills as unknown[] | undefined)?.length)!;
+
+    expect(clip.blend).toBe('luminosity');
+  });
+
+  it('a block faded by a gradient mask keeps its layers under editable masks: solid where the mask is opaque, a linear fade where it fades (framer: 23 faded blocks came in as pictures)', () => {
+    const fade: RestPaint = { type: 'GRADIENT_LINEAR', gradientHandlePositions: [{ x: 0.5, y: 0 }, { x: 0.5, y: 1 }, { x: 0, y: 0 }], gradientStops: [{ position: 0.6, color: { ...BLACK, a: 1 } }, { position: 1, color: { ...BLACK, a: 0 } }] };
+    const kids = [rect([{ type: 'SOLID', color: BLACK }], { x: 120, y: 120, width: 50, height: 50 }), rect([{ type: 'SOLID', color: BLACK }], { x: 200, y: 120, width: 50, height: 50 })];
+    const block: RestNode = { id: id(), type: 'FRAME', name: 'faded', absoluteBoundingBox: { x: 100, y: 100, width: 200, height: 100 }, fills: [{ type: 'SOLID', color: WHITE }], maskGradient: fade, children: kids };
+    const doc = docOf(pageOf([block]));
+    const masked = clipsOf(doc).find((c) => c.mask)!;
+    const masks = [masked.mask!, ...(masked.maskStack ?? [])];
+
+    expect(masked.component).toBe('Precomp');
+    expect(masks.map((m) => m.kind)).toEqual(['rect', 'linear']);
+    expect(masks[1].rotation).toBeCloseTo(90, 3);
+    expect(masks[1].width * 1280).toBeCloseTo(40, 0);
+    expect(masks[1].y * 1280 * (doc.height / doc.width)).toBeCloseTo(180, 0);
+  });
+
   it('a one pixel rule on a long page stays one pixel thin', () => {
     const height = 14_535;
     const rule = rect([{ type: 'SOLID', color: BLACK }], { x: 0, y: 692, width: 1280, height: 1 });
