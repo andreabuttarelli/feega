@@ -5,6 +5,7 @@ import type { Outcome } from './core-outcome';
 import { OverlayPart } from './core-overlay';
 import type { Splice } from '../../canvas/core/group-diff';
 import { inlineCore, unzipBase64 } from './inline-core';
+import { releaseOnDispose, type GpuSurface } from './gpu-release';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
@@ -264,7 +265,8 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
     throw new Error('webgpu unavailable');
   }
   const core = await warmCore();
-  return fitting(await core.WebCore.attach(canvas, width, height), pictureSize(side));
+  const raster = fitting(await core.WebCore.attach(canvas, width, height), pictureSize(side));
+  return releaseOnDispose(raster, canvas.getContext('webgpu') as GpuSurface | null);
 }
 
 const GL_CONTEXT = { antialias: false, depth: true };
