@@ -69,3 +69,9 @@ describe('the canvas Stack tiles arranger keeps no ⇧A', () => {
     expect(labels).not.toContain('Wrap with stack');
   });
 });
+
+describe('the element context menu aligns inside a frame', () => {
+  it('offers every alignment on a picked element', () => {
+    expect(contextMenu(texted, ['t'])).toEqual(expect.arrayContaining(['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom']));
+  });
+});

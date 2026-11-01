@@ -6,6 +6,9 @@ import { pivotBox, transformAt } from '@feega/motion-core/motion/parent';
 import { Grip, aabb, dragPatch, quadOf, writePatch, type Bounds, type Boxes, type Pt } from './scene-select';
 import { setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { tidyMoves } from './tidy';
+import { layoutParent, setLayoutItem } from './layout/ops';
+import { Align, Direction } from '@feega/motion-core/motion/layout/auto-layout';
+import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
 
 export enum Edge {
   Left = 'left',
@@ -115,12 +118,49 @@ function union(all: Bounds[]): Bounds {
   return { left: Math.min(...all.map((b) => b.left)), top: Math.min(...all.map((b) => b.top)), right: Math.max(...all.map((b) => b.right)), bottom: Math.max(...all.map((b) => b.bottom)) };
 }
 
+const EDGE_ALIGN: Record<Edge, Align> = {
+  [Edge.Left]: Align.Start,
+  [Edge.Center]: Align.Center,
+  [Edge.Right]: Align.End,
+  [Edge.Top]: Align.Start,
+  [Edge.Middle]: Align.Center,
+  [Edge.Bottom]: Align.End
+};
+
+const CROSS_AXIS: Partial<Record<Direction, Axis>> = { [Direction.Horizontal]: Axis.Y, [Direction.Vertical]: Axis.X };
+
+function alignInStack(doc: MotionDoc, id: string, edge: Edge): OpResult | null {
+  const clip = findClip(doc, id)?.clip;
+  const stack = clip ? layoutParent(doc, clip) : null;
+  if (!clip || !stack || placementOf(clip, stack) !== Placement.Flow) {
+    return null;
+  }
+  if (CROSS_AXIS[stack.autoLayout.direction] !== ALIGN[edge].axis) {
+    return fail(`${id} follows its stack along that axis`);
+  }
+  return setLayoutItem(doc, id, { alignSelf: EDGE_ALIGN[edge] });
+}
+
+function parentBounds(doc: MotionDoc, id: string, frame: number, boxes: Boxes): Bounds {
+  const parent = findClip(doc, id)?.clip.parent;
+  if (!parent || !findClip(doc, parent) || !boxes[parent]) {
+    return { left: 0, top: 0, right: doc.width, bottom: doc.height };
+  }
+  return aabb(quadOf(doc, parent, frame, boxes[parent]));
+}
+
 export function alignSpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, edge: Edge, mode: EditMode): OpResult {
+  const stacked = ids.length === 1 ? alignInStack(doc, ids[0], edge) : null;
+  if (stacked) {
+    return stacked;
+  }
+
   const bounds = boundsOf(doc, ids, frame, boxes);
   if (typeof bounds === 'string') {
     return fail(bounds);
   }
-  const target = ids.length > 1 ? union([...bounds.values()]) : { left: 0, top: 0, right: doc.width, bottom: doc.height };
+
+  const target = ids.length > 1 ? union([...bounds.values()]) : parentBounds(doc, ids[0], frame, boxes);
   const { axis, at } = ALIGN[edge];
   return moveEach(
     doc,

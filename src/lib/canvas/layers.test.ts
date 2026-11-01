@@ -301,13 +301,20 @@ describe('layer keys and selection', () => {
     expect(layerKey({ key: 'a', mod: true })).toBeNull();
   });
 
-  it('click picks one, shift or ⌘ adds and removes, as on the canvas', () => {
+  it('click picks one, ⌘ adds and removes, shift picks the range, as in Figma', () => {
+    const rows = ['a', 'b', 'c', 'd', 'e'];
+
     expect(pickFor({ shift: false, mod: false })).toBe(Pick.One);
-    expect(pickFor({ shift: true, mod: false })).toBe(Pick.Toggle);
+    expect(pickFor({ shift: true, mod: false })).toBe(Pick.Range);
     expect(pickFor({ shift: false, mod: true })).toBe(Pick.Toggle);
-    expect(pickLayers(['a'], 'c', Pick.One)).toEqual(['c']);
-    expect(pickLayers(['a'], 'c', Pick.Toggle)).toEqual(['a', 'c']);
-    expect(pickLayers(['a', 'c'], 'a', Pick.Toggle)).toEqual(['c']);
+    expect(pickLayers(['a'], 'c', Pick.One, rows)).toEqual(['c']);
+    expect(pickLayers(['a'], 'c', Pick.Toggle, rows)).toEqual(['a', 'c']);
+    expect(pickLayers(['a', 'c'], 'a', Pick.Toggle, rows)).toEqual(['c']);
+    expect(pickLayers(['b'], 'd', Pick.Range, rows)).toEqual(['c', 'd', 'b']);
+    expect(pickLayers(['d'], 'b', Pick.Range, rows)).toEqual(['b', 'c', 'd']);
+    expect(pickLayers(['a', 'd'], 'b', Pick.Range, rows)).toEqual(['b', 'c', 'd']);
+    expect(pickLayers([], 'c', Pick.Range, rows)).toEqual(['c']);
+    expect(pickLayers(['x'], 'c', Pick.Range, rows)).toEqual(['c']);
   });
 
   it('a row picked in Layers is no longer selected once the canvas selects another node', () => {

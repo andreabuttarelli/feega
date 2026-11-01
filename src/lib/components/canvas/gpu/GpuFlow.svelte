@@ -27,7 +27,7 @@
   import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
-  import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
+  import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
   import { followDocks } from '$lib/canvas/dock-lift';
   import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
@@ -204,7 +204,7 @@
   import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
-  import type { Edge } from '$lib/motion/space';
+  import { alignSpace, propBoxes, type Edge } from '$lib/motion/space';
   import MeasureLayer from '../MeasureLayer.svelte';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   import type { GenMedium } from '$lib/canvas/gen-node';
@@ -1277,6 +1277,11 @@
   }
 
   function runElementMenu(id: SelectionActionId) {
+    const run = frameMenuRun(id);
+    if (run && 'edge' in run) {
+      alignPicks(run.edge);
+      return;
+    }
     const action = frameMenuAction(id);
     if (action) {
       void runFrameAction(action);
@@ -2820,7 +2825,7 @@
   }
 
   const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
-  const alignRun = (id: AlignActionId) => (ids: string[]) => alignSelection(ids, ALIGN_EDGE[id]);
+  const alignRun = (id: AlignActionId) => (ids: string[]) => alignHere(ids, ALIGN_EDGE[id]);
 
   function selectSibling(direction: Direction) {
     const next = siblingOf(placed.map((t) => t.id), selected, direction);
@@ -2909,6 +2914,26 @@
     return true;
   }
 
+  function alignPicks(edge: Edge): boolean {
+    const nodeId = inside?.nodeId;
+    const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
+    if (!nodeId || !tools) {
+      return false;
+    }
+    const at = scoped(tools.doc, picks, tools.frame);
+    const result = at ? alignSpace(at.view, at.ids, at.frame, propBoxes(at.view), edge, savers.get(nodeId)?.mode ?? EditMode.Design) : null;
+    if (at && result?.ok) {
+      commit(nodeId, { ok: true, doc: at.merge(result.doc) }, `Aligned ${edge}`);
+    }
+    return true;
+  }
+
+  function alignHere(ids: string[], edge: Edge) {
+    if (!alignPicks(edge)) {
+      alignSelection(ids, edge);
+    }
+  }
+
   function nudge(dx: number, dy: number) {
     if (nudgePicks(dx, dy)) {
       return;
@@ -2924,7 +2949,7 @@
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     add: (c) => c.id === 'add' && addAtCentre(c.what),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
-    align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
+    align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
     'wrap-stack': () => shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected),
     'edit-mode': () => editorMode.toggleMotion(),
