@@ -39,6 +39,7 @@ export type AppTab = Tab & {
   ui: () => Promise<UiDigest>;
   vector: () => Promise<unknown>;
   tree: (maxHeight?: number) => Promise<unknown>;
+  left: () => number;
   reveal: (mode: RevealMode) => Promise<Revealed>;
   seeAll: () => Promise<void>;
   sample: (walk?: Walk) => Promise<number>;
@@ -366,7 +367,7 @@ function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
   return { shoot, done };
 }
 
-function tabOf(page: Page, close: () => Promise<number>): AppTab {
+function tabOf(page: Page, close: () => Promise<number>, left: () => number): AppTab {
   const quiet = quietOf(page);
   return {
     goto: async (url) => {
@@ -415,8 +416,9 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     tree: async (maxHeight = TREE_LIMITS.height) => {
       const read = (await page.evaluate(treeScript({ ...TREE_LIMITS, height: maxHeight }))) as PageTree;
       const lens = camera(page);
-      return snapped(read, lens.shoot).finally(lens.done);
+      return snapped(read, lens.shoot, left).finally(lens.done);
     },
+    left,
     reveal: (mode) => page.evaluate(revealPage, mode),
     seeAll: async () => {
       await page.evaluateOnNewDocument(everythingInView);
@@ -442,10 +444,14 @@ export function localBrowser(newPage: () => Promise<Page>): OpenAppBrowser {
   return async () => {
     const page = await newPage();
     await fenced(page);
-    return tabOf(page, async () => {
-      await page.close().catch(() => undefined);
-      return 0;
-    });
+    return tabOf(
+      page,
+      async () => {
+        await page.close().catch(() => undefined);
+        return 0;
+      },
+      () => Infinity
+    );
   };
 }
 
@@ -484,7 +490,7 @@ export function browserless(config: BrowserlessConfig, ports: BrowserlessPorts):
     try {
       const page = await browser.newPage();
       await fenced(page);
-      return tabOf(page, close);
+      return tabOf(page, close, () => started + BROWSERLESS_SESSION_MS - now());
     } catch (e) {
       await close();
       throw hidden(e, config.key);

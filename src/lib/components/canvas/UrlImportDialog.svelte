@@ -18,6 +18,7 @@
     no_browser: 'Page import is not available right now.',
     failed: 'The page could not be opened.',
     unreadable: 'Nothing on that page could be read.',
+    too_slow: 'That page took too long to read.',
     rate_limited: 'Too many imports. Try again in a minute.'
   };
   const FALLBACK_REFUSAL = 'Could not import that page.';

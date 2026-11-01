@@ -18,6 +18,7 @@ export enum UrlImportOutcome {
   NoBrowser = 'no_browser',
   Failed = 'failed',
   Unreadable = 'unreadable',
+  TooSlow = 'too_slow',
   RateLimited = 'rate_limited'
 }
 
@@ -39,6 +40,7 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
   [UrlImportOutcome.NoBrowser]: 503,
   [UrlImportOutcome.Failed]: 502,
   [UrlImportOutcome.Unreadable]: 422,
+  [UrlImportOutcome.TooSlow]: 504,
   [UrlImportOutcome.RateLimited]: 429
 };
 
@@ -221,12 +223,14 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
 
   const open = ask.open;
   const planner = ask.planner ?? PLAIN_PLANNER;
+  const unreadable = (read: PageTree | UrlImported) => 'outcome' in read && read.outcome === UrlImportOutcome.Unreadable;
   const readWith = async (sight: Sight) => {
     const tab = await open();
-    return pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+    const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+    return unreadable(read) && tab.left() <= 0 ? refused(UrlImportOutcome.TooSlow) : read;
   };
   const first = await readWith(Sight.Everything);
-  const read = 'outcome' in first && first.outcome === UrlImportOutcome.Unreadable ? await readWith(Sight.Native) : first;
+  const read = unreadable(first) ? await readWith(Sight.Native) : first;
   if ('outcome' in read) {
     return read;
   }

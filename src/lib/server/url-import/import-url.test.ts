@@ -37,6 +37,7 @@ function tabOf(tree: unknown, status = 200) {
     click: vi.fn(async () => undefined),
     press: vi.fn(async () => undefined),
     tree: vi.fn(async () => tree),
+    left: vi.fn(() => Infinity),
     close: vi.fn(async () => 0.002)
   } as unknown as AppTab;
 }
@@ -236,6 +237,20 @@ describe('importPageAt', () => {
     expect(done.outcome).toBe(UrlImportOutcome.Ok);
     expect(crashing.seeAll).toHaveBeenCalled();
     expect(healthy.seeAll).not.toHaveBeenCalled();
+  });
+
+  it('a read that used up the whole browser session is not started again from scratch: it says the page was too slow (stripe on Browserless: 128 s, then a second session of 120 s)', async () => {
+    const late = tabOf(TREE);
+    vi.mocked(late.tree).mockRejectedValue(new Error('Target closed'));
+    vi.mocked(late.left).mockReturnValue(0);
+    const open = vi.fn().mockResolvedValue(late);
+    const { ask } = askOf({ open });
+
+    const done = await importPageAt(ask);
+
+    expect(done.outcome).toBe(UrlImportOutcome.TooSlow);
+    expect(open).toHaveBeenCalledOnce();
+    expect(late.close).toHaveBeenCalled();
   });
 
   it('every main of the page points at its own set frame on the Components page', async () => {
