@@ -5,28 +5,28 @@
   import { hotspotsOf, isDrag, type Hotspot } from '$lib/motion/prototype/hotspots';
   import { TriggerKind } from '@feega/motion-core/motion/prototype/model';
   import { ElementState } from '@feega/motion-core/motion/states/model';
-  import { clipsOf } from '@feega/motion-core/motion/doc';
-  import { stateSpotsOf } from '$lib/motion/states/spots';
-  import { hasVariantStates } from '$lib/motion/states/variant-states';
+  import { StateSpotKind, stateHold, stateSpotsOf, type StateSpot } from '$lib/motion/states/spots';
+  import { withStatedComps } from '$lib/motion/states/stated-comps';
   import { previewDoc, type StatePicks } from '$lib/motion/states/preview';
   import { amountAt, settled, type TweenRun } from '$lib/motion/states/tween';
-  import { changeTo, variantHotspotsOf, withSwaps, type Swaps, type VariantHotspot } from '$lib/motion/prototype/variant-change';
+  import { changeTo, clipById, variantHotspotsOf, withSwaps, type Swaps, type VariantHotspot } from '$lib/motion/prototype/variant-change';
 
   let { live, hint = false, interactive = true, onfire, onrelease }: { live: LiveDoc; hint?: boolean; interactive?: boolean; onfire: (spot: Hotspot) => void; onrelease: (spot: Hotspot) => void } = $props();
 
   let swaps = $state<Swaps>({});
+  let held = $state<Record<string, Swaps>>({});
   const current = $derived({ ...live, doc: withSwaps(live.doc, swaps) });
   const picker = $derived(framePicker(current, () => 0));
   const spots = $derived(hotspotsOf(current.doc, picker.frameSize(), (clip) => picker.frameRect(clip)));
   const variantSpots = $derived(interactive ? variantHotspotsOf(current.doc, picker.frameSize(), (path) => picker.pathRect(path)) : []);
   const percent = (fraction: number) => `${fraction * 100}%`;
 
-  const stateSpots = $derived(interactive ? stateSpotsOf(current.doc, picker.frameSize(), (clip) => picker.frameRect(clip)) : []);
+  const stateSpots = $derived(interactive ? stateSpotsOf(current.doc, picker.frameSize(), (path) => picker.pathRect(path)) : []);
   let runs: Record<string, { state: ElementState; run: TweenRun }> = {};
   let statePicks = $state<StatePicks>({});
   let ticking = 0;
-  const shown = $derived(previewDoc(current.doc, statePicks));
-  let hoverSwaps: Record<string, Swaps> = {};
+  const holding = $derived(Object.assign({}, ...Object.values(held)) as Swaps);
+  const shown = $derived(previewDoc(Object.keys(holding).length ? withSwaps(withStatedComps(current.doc), holding) : current.doc, statePicks));
 
   function tick() {
     const now = performance.now();
@@ -37,10 +37,6 @@
 
   function tweenTo(clip: string, target: ElementState, to: number) {
     const row = clipRow(clip, target);
-    if (!row && hasVariantStates(current.doc, clip)) {
-      statePicks = { ...statePicks, [clip]: { state: target, amount: to } };
-      return;
-    }
     if (!row) {
       return;
     }
@@ -51,43 +47,59 @@
     }
   }
 
-  const clipRow = (clip: string, target: ElementState) => clipsOf(current.doc).find((c) => c.id === clip)?.states?.find((r) => r.state === target);
+  const clipRow = (clip: string, target: ElementState) => clipById(current.doc, clip)?.states?.find((r) => r.state === target);
+
+  function hold(key: string, swapped: Swaps | null) {
+    if (swapped) {
+      held = { ...held, [key]: swapped };
+    }
+  }
+
+  function release(key: string) {
+    const { [key]: _released, ...rest } = held;
+    held = rest;
+  }
+
+  const stateKey = (spot: StateSpot) => `state:${spot.path.join('/')}`;
+
+  function stateEnter(spot: StateSpot, target: ElementState) {
+    if (spot.kind === StateSpotKind.Rows) {
+      tweenTo(spot.clip, target, 1);
+      return;
+    }
+    hold(stateKey(spot), stateHold(current.doc, spot, target));
+  }
+
+  function stateLeave(spot: StateSpot) {
+    if (spot.kind === StateSpotKind.Rows) {
+      tweenTo(spot.clip, statePicks[spot.clip]?.state ?? ElementState.Hover, 0);
+      return;
+    }
+    release(stateKey(spot));
+  }
 
   const spotKey = (spot: VariantHotspot) => `${spot.path.join('/')}:${spot.interaction.id}`;
 
-  function changeVariant(spot: VariantHotspot): Swaps | null {
+  function variantSwap(spot: VariantHotspot): Swaps | null {
     const picked = 'variant' in spot.interaction.action ? spot.interaction.action.variant : {};
     const swap = changeTo(current.doc, spot.path, picked);
-    if (!swap) {
-      return null;
-    }
-    const before = { [swap.instance]: swaps[swap.instance] ?? '' };
-    swaps = { ...swaps, [swap.instance]: swap.comp };
-    return before;
+    return swap ? { [swap.instance]: swap.comp } : null;
   }
 
   function variantClick(spot: VariantHotspot) {
-    if (spot.interaction.trigger.kind === TriggerKind.Click) {
-      changeVariant(spot);
+    const swapped = spot.interaction.trigger.kind === TriggerKind.Click ? variantSwap(spot) : null;
+    if (swapped) {
+      swaps = { ...swaps, ...swapped };
     }
   }
 
   function variantEnter(spot: VariantHotspot) {
-    const before = spot.interaction.trigger.kind === TriggerKind.Hover ? changeVariant(spot) : null;
-    if (before) {
-      hoverSwaps = { ...hoverSwaps, [spotKey(spot)]: before };
+    if (spot.interaction.trigger.kind === TriggerKind.Hover) {
+      hold(spotKey(spot), variantSwap(spot));
     }
   }
 
-  function variantLeave(spot: VariantHotspot) {
-    const before = hoverSwaps[spotKey(spot)];
-    if (!before) {
-      return;
-    }
-    const { [spotKey(spot)]: _left, ...rest } = hoverSwaps;
-    hoverSwaps = rest;
-    swaps = Object.fromEntries(Object.entries({ ...swaps, ...before }).filter(([, comp]) => comp));
-  }
+  const variantLeave = (spot: VariantHotspot) => release(spotKey(spot));
 
   let pressed: { id: string; x: number; y: number } | null = null;
 
@@ -127,17 +139,17 @@
 
 <div class="view">
   <CompositionPlayer doc={shown} assets={live.assets} tokens={live.tokens} />
-  {#each stateSpots as spot (spot.clip)}
+  {#each stateSpots as spot (spot.path.join('/'))}
     <div
       class="state-spot"
       data-testid="state-spot"
       data-clip={spot.clip}
       role="presentation"
       style={`left:${percent(spot.box.left)};top:${percent(spot.box.top)};width:${percent(spot.box.width)};height:${percent(spot.box.height)}`}
-      onpointerenter={() => tweenTo(spot.clip, ElementState.Hover, 1)}
-      onpointerleave={() => tweenTo(spot.clip, statePicks[spot.clip]?.state ?? ElementState.Hover, 0)}
-      onpointerdown={() => tweenTo(spot.clip, ElementState.Pressed, 1)}
-      onpointerup={() => tweenTo(spot.clip, ElementState.Hover, 1)}
+      onpointerenter={() => stateEnter(spot, ElementState.Hover)}
+      onpointerleave={() => stateLeave(spot)}
+      onpointerdown={() => stateEnter(spot, ElementState.Pressed)}
+      onpointerup={() => stateEnter(spot, ElementState.Hover)}
     ></div>
   {/each}
   {#each variantSpots as spot (spotKey(spot))}

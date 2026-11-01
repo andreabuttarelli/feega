@@ -14,7 +14,24 @@ const MAX_DEPTH = 32;
 
 const sameVariant = (a: Variant, b: Variant) => Object.keys({ ...a, ...b }).every((k) => a[k] === b[k]);
 
-export function placedClips(doc: MotionDoc): Placed[] {
+type Index = { placed: Placed[]; byId: Map<string, MotionClip> };
+
+const indexes = new WeakMap<MotionDoc, Index>();
+
+function indexOf(doc: MotionDoc): Index {
+  const held = indexes.get(doc);
+  if (held) {
+    return held;
+  }
+  const placed = placedIn(doc);
+  const index = { placed, byId: new Map(placed.map((p) => [p.clip.id, p.clip])) };
+  indexes.set(doc, index);
+  return index;
+}
+
+export const placedClips = (doc: MotionDoc): Placed[] => indexOf(doc).placed;
+
+function placedIn(doc: MotionDoc): Placed[] {
   const placed: Placed[] = [];
   const walk = (clips: MotionClip[], above: string[]) => {
     for (const clip of clips) {
@@ -43,8 +60,12 @@ export function variantHotspotsOf(doc: MotionDoc, size: FrameSize, rectOf: (path
   });
 }
 
-function clipById(doc: MotionDoc, id: string): MotionClip | null {
-  return placedClips(doc).find((p) => p.clip.id === id)?.clip ?? null;
+export const clipById = (doc: MotionDoc, id: string): MotionClip | null => indexOf(doc).byId.get(id) ?? null;
+
+export function isInstance(doc: MotionDoc, id: string): boolean {
+  const clip = clipById(doc, id);
+  const comp = clip ? compOf(clip) : null;
+  return Boolean(comp && doc.comps[comp]?.component);
 }
 
 export function changeTo(doc: MotionDoc, path: readonly string[], picked: Variant): Swap | null {
