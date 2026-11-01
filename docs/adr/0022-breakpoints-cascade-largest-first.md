@@ -76,6 +76,11 @@ frame's units per pixel, and merged into the base doc:
   **outline** (`props.path`): a rounded box's outline is stored relative to its box, so a box resized
   at a breakpoint needs its own outline to keep its corner radius in pixels.
 
+- Pairing is structural: a layer pairs only when its nearest named ancestor paired with the view
+  layer's, so a shared layer keeps the box the view nests it in. Section frames cut one element into
+  pieces and break that, so a page imported with breakpoints is not sectioned; components and
+  interactive parts stay on the desktop, their instances hidden in the views.
+
 Rejected: overriding text, fills and images per view (the whitelist would cover content, and the
 inspector could no longer tell a layout change from a content change); one doc per view (edits made
 N times); replanning the view and matching clips by order (532 mismatches on feega.app).
