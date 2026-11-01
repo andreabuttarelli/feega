@@ -6,6 +6,7 @@ import type { PageTree } from './page-tree';
 import { PatternKind, type PagePattern } from './page-patterns';
 import { PLAIN_SHAPE, urlPlan } from './url-doc';
 import { repeatedOf } from './repeated';
+import { PAGE_VIEWS } from './page-views';
 
 let counter = 0;
 const newId = () => `p${++counter}`;
@@ -98,5 +99,12 @@ describe('a dynamic part of the page becomes a component with a variant per stat
 
     expect(folds.length).toBeGreaterThan(0);
     expect(folds.every((clip) => clip.hidden)).toBe(true);
+  });
+
+  it('with tablet and phone views the page parts stay plain, as components do', () => {
+    const tree = faq();
+    const doc = urlPlan(tree, newId, REPEATED, {}, PLAIN_SHAPE, [{ view: PAGE_VIEWS[0], tree: { ...tree, patterns: [] } }])!.plan.items[0].doc;
+
+    expect(sets(doc)).toEqual([]);
   });
 });

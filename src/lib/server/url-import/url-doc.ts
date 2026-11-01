@@ -257,7 +257,7 @@ export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPE
   const [joined, views] = reads.length ? [joinedTree(read), reads.map((v) => ({ ...v, tree: joinedTree(v.tree) }))] : [read, reads];
   const tree = hovered(joined);
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
-  const patterns = tree.patterns ?? [];
+  const patterns = views.length ? [] : (tree.patterns ?? []);
   const shaped = withExtras(flattened(withPatterns(stacksOf(SECTIONED[shape.sectioning](tree)), patterns, views.length ? UNMARKED : mark, stacksOf)), views);
   const images = refsOf(shaped);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));

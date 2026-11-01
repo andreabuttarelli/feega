@@ -57,6 +57,8 @@ function setOf(node: RestNode, p: Named, stack: (n: RestNode) => RestNode): Rest
   return [mainOf(node, p, p.initial), ...others];
 }
 
+const unstamped = (root: RestNode): RestNode => mapped(root, ({ pattern: _pattern, go: _go, ...n }) => [n])[0];
+
 function firstRoots(root: RestNode): Map<number, RestNode> {
   const found = new Map<number, RestNode>();
   walk(root, (n) => {
@@ -96,7 +98,7 @@ export function withPatterns(root: RestNode, patterns: readonly PagePattern[], m
   const byIx = new Map(named(patterns).map((p) => [p.ix, p]));
   const roots = new Map([...firstRoots(root)].filter(([ix]) => byIx.has(ix)));
   if (!roots.size) {
-    return mark(root);
+    return mark(unstamped(root));
   }
   const held = new Map([...roots].map(([ix, n]) => [n.id, { node: n, pattern: byIx.get(ix)! }]));
   const bare = mapped(root, ({ pattern: _pattern, ...n }) => [held.has(n.id) ? { ...n, type: 'INSTANCE', children: [] } : n])[0];
