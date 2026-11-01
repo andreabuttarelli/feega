@@ -3,6 +3,7 @@ import type { RestColor, RestNode, RestPaint } from '$lib/server/figma/rest-mess
 import { pageKit, type KitMatrix, type KitRect, type PageKit } from './page-kit';
 import { OUTLINE_LIMITS, pageOutlineOf, type PageOutline } from './page-outline';
 import { PATTERN_LIMITS, pagePatterns, type PagePattern, type PatternKit } from './page-patterns';
+import { HOVER_LIMITS, pageHovers, type HoverKit } from './page-hovers';
 
 export enum SnapMode {
   Isolated = 'isolated',
@@ -25,9 +26,9 @@ export type PageSnap = { ref: string; box: PageBox; mode: SnapMode };
 export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; snaps?: PageSnap[]; outline?: PageOutline; patterns?: PagePattern[] };
 
 export const treeScript = (limits: TreeLimits) =>
-  `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})(), (${pagePatterns.toString()})(${JSON.stringify(PATTERN_LIMITS)})).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
+  `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})(), (${pagePatterns.toString()})(${JSON.stringify(PATTERN_LIMITS)}), (${pageHovers.toString()})(${JSON.stringify(HOVER_LIMITS)})).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
 
-export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: PatternKit): Promise<PageTree> {
+export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: PatternKit, hovers: HoverKit): Promise<PageTree> {
   const SKIPPED = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|HEAD|META|LINK|TITLE|BR|WBR|DIALOG)$/;
   const RASTER = /^(VIDEO|CANVAS|IFRAME|EMBED|OBJECT)$/;
   const REPLACED = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|EMBED|OBJECT|INPUT|SELECT|TEXTAREA|BUTTON|PICTURE)$/;
@@ -1158,6 +1159,10 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   };
 
   const stamped = (el: Element, made: RestNode[]): RestNode[] => {
+    const hover = hovered.get(el);
+    if (hover && made.length === 1) {
+      made[0].hover = hover;
+    }
     const pattern = el.getAttribute(limits.patternAttr);
     const go = el.getAttribute(limits.goAttr);
     if ((pattern === null && go === null) || !made.length) {
@@ -1292,6 +1297,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     ]);
   };
 
+  const hovered = hovers.read();
   const found = patterns.found();
   found.forEach((p, i) => p.root.setAttribute(limits.patternAttr, String(i)));
   found.forEach((p) => aimed(p, p.initial));
@@ -1308,6 +1314,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   const top: Ctx = { clip: PAGE, scale: 1, textFills: null, visible: true };
   const children = body ? sorted(childrenOf(body, pageCss!, top)).flatMap((n) => (n.type === 'GROUP' && n.name === 'body' ? (n.children ?? []) : [n])) : [];
   const captured = await variantsOf(found, top);
+  unstamped(children, new Set(captured.map((p) => p.ix)));
   hosts.forEach((h) => h.remove());
 
   return {
@@ -1326,6 +1333,17 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   function aimed(p: (typeof found)[number], state: string) {
     p.root.querySelectorAll(`[${limits.goAttr}]`).forEach((el) => el.removeAttribute(limits.goAttr));
     p.triggers(state).forEach(([el, target]) => el.setAttribute(limits.goAttr, target));
+  }
+
+  function unstamped(nodes: RestNode[], kept: ReadonlySet<number>, within = false) {
+    for (const n of nodes) {
+      const inside = n.pattern === undefined ? within : kept.has(n.pattern);
+      if (!inside) {
+        delete n.pattern;
+        delete n.go;
+      }
+      unstamped(n.children ?? [], kept, inside);
+    }
   }
 
   function freshPseudos(scope: Element) {
@@ -1359,6 +1377,9 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
       const variants: PagePattern['variants'] = [];
       for (const state of p.states.filter((s) => s !== p.initial)) {
         await shifted(p, state);
+        if (!p.shows(state)) {
+          continue;
+        }
         aimed(p, state);
         const made = visit(p.root, ctx).find((n) => n.pattern === ix);
         if (made) {

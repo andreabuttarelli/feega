@@ -14,9 +14,13 @@ const PAGE = `<body style="margin:0;font:16px sans-serif">
   <div role="tabpanel" id="p1" style="padding:8px;background:#eee">npm install feega</div>
   <div role="tabpanel" id="p2" hidden style="padding:8px;background:#eee">pnpm add feega</div>
 </div>
+<div id="dead" style="width:400px;margin-top:24px">
+  <div role="tablist"><button role="tab" aria-selected="true" aria-controls="d1">One</button><button role="tab" aria-selected="false" aria-controls="d2">Two</button></div>
+  <div role="tabpanel" id="d1">First</div><div role="tabpanel" id="d2" hidden>Second</div>
+</div>
 <button role="switch" aria-checked="false" id="dark" style="margin-top:24px;width:60px;height:30px;background:#999;border:0">Dark</button>
 <script>
-  const tabs = [...document.querySelectorAll('[role=tab]')];
+  const tabs = [...document.querySelectorAll('#tabs [role=tab]')];
   tabs.forEach((tab) => tab.addEventListener('click', () => {
     tabs.forEach((t) => {
       t.setAttribute('aria-selected', String(t === tab));
@@ -36,7 +40,7 @@ const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)]
 const textsOf = (n: RestNode) => all(n).filter((d) => d.type === 'TEXT' && !d.collapsed).map((d) => d.characters?.trim());
 
 describe.runIf(process.env.CHROMIUM_PATH)('dynamic parts of a page in a real browser', () => {
-  it('an accordion, tabs and a switch come back with every state they can show, and the page as it was', async () => {
+  it('an accordion, tabs and a switch come back with every state they can show, tabs that do not answer a click are left alone, and the page is as it was', async () => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
     try {
       const page = await browser.newPage();

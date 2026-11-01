@@ -79,6 +79,7 @@ export type RestNode = {
   use?: number;
   pattern?: number;
   go?: string;
+  hover?: { fill?: string; color?: string; stroke?: string; opacity?: number; scale?: number; durationMs: number; easing: string };
   codeComponent?: CodeComponent;
   behaviour?: ClipBehaviour;
   children?: RestNode[];

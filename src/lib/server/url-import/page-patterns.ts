@@ -31,6 +31,7 @@ export type FoundPattern = {
   initial: string;
   settleMs: number;
   enter: (state: string) => void;
+  shows: (state: string) => boolean;
   triggers: (state: string) => [Element, string][];
 };
 
@@ -88,6 +89,7 @@ export function pagePatterns(limits: PatternLimits): PatternKit {
           initial: details.open ? OPEN : CLOSED,
           settleMs: NOW,
           enter: (state: string) => (details.open = state === OPEN),
+          shows: (state: string) => details.open === (state === OPEN),
           triggers: (state: string) => [[summary, other(state, OPEN, CLOSED)]]
         }
       ];
@@ -117,6 +119,7 @@ export function pagePatterns(limits: PatternLimits): PatternKit {
           initial: expanded() ? OPEN : CLOSED,
           settleMs: limits.settleMs,
           enter: (state: string) => clickTo(button, () => expanded() === (state === OPEN)),
+          shows: (state: string) => expanded() === (state === OPEN),
           triggers: (state: string) => [[button, other(state, OPEN, CLOSED)]]
         }
       ];
@@ -141,6 +144,7 @@ export function pagePatterns(limits: PatternLimits): PatternKit {
           initial: names[selected],
           settleMs: limits.settleMs,
           enter: (state: string) => all[names.indexOf(state)]?.click(),
+          shows: (state: string) => all[names.indexOf(state)]?.getAttribute('aria-selected') === 'true',
           triggers: () => all.map((t, i): [Element, string] => [t, names[i]])
         }
       ];
@@ -164,6 +168,7 @@ export function pagePatterns(limits: PatternLimits): PatternKit {
           initial: on() ? ON : OFF,
           settleMs: limits.settleMs,
           enter: (state: string) => clickTo(input, () => on() === (state === ON)),
+          shows: (state: string) => on() === (state === ON),
           triggers: (state: string) => [[face, other(state, ON, OFF)]]
         }
       ];
@@ -192,6 +197,7 @@ export function pagePatterns(limits: PatternLimits): PatternKit {
           initial: names[Math.min(count - 1, swiper.activeIndex)] ?? names[0],
           settleMs: limits.settleMs,
           enter: (state: string) => swiper.slideTo(at(state), 0),
+          shows: (state: string) => swiper.activeIndex === at(state),
           triggers: (state: string) => [
             ...bullets.map((b, i): [Element, string] => [b, names[i]]),
             ...(next ? [[next, names[(at(state) + 1) % count]] as [Element, string]] : []),
