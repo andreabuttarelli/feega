@@ -27,6 +27,9 @@ const SELECT_DEADLINE_MS = 5000;
 const MODE_PAUSE_MS = 1500;
 const MODES = ['motion', 'play', 'design'];
 const MB = 1024 * 1024;
+const LAYERS = 'nav[data-dock="left-bar"] button[aria-label="Layers"]';
+const LANDING_LAYER = 'Ledgerline landing';
+const OWN_FETCH = /\/frame-outlines/;
 
 const BUDGET = { longestTaskMs: 2000, heapMb: 500, zoomStepMs: 1000 };
 
@@ -121,7 +124,7 @@ async function selectMs(page: Page): Promise<number | null> {
 }
 
 async function switchMode(page: Page, mode: string): Promise<number | null> {
-  const button = page.locator(`[data-testid="editor-mode-switch"] button[data-mode="${mode}"]`);
+  const button = page.locator(`[data-testid="editor-mode-switch"] :is(button[data-mode="${mode}"], [role="radio"][data-value="${mode}"])`).first();
   if (!(await button.count())) {
     return null;
   }
@@ -157,6 +160,8 @@ test.describe('a styled landing canvas stays responsive after it reopens @real',
     page.on('pageerror', (e) => errors.push(e.message.slice(0, 300)));
     page.on('console', (m) => m.type() === 'error' && !m.text().startsWith('Failed to load resource') && errors.push(m.text().slice(0, 300)));
     page.on('crash', () => (crashed = true));
+    const layersFetches: string[] = [];
+    page.on('request', (r) => OWN_FETCH.test(r.url()) && layersFetches.push(r.url()));
     await page.addInitScript(instrument);
     await page.addInitScript(watchLongTasks);
     if (NO_WEBGPU) {
@@ -180,6 +185,7 @@ test.describe('a styled landing canvas stays responsive after it reopens @real',
     await page.locator(SURFACE).first().waitFor({ timeout: OPEN_DEADLINE_MS });
     await page.locator(TILE).first().waitFor({ timeout: OPEN_DEADLINE_MS });
     const reopenMs = Date.now() - started;
+    await page.locator(LAYERS).click();
     await page.waitForTimeout(SETTLE_MS);
     const backend = await page.evaluate(() => ('gpu' in navigator && navigator.gpu ? 'webgpu' : 'webgl'));
     const heapAtOpen = await heapMb(cdp);
@@ -200,6 +206,7 @@ test.describe('a styled landing canvas stays responsive after it reopens @real',
     const inside = await zoomInOut(page);
     await page.waitForTimeout(SETTLE_MS / 2);
 
+    const layersShowLanding = await page.getByTestId('pages-layers').getByText(LANDING_LAYER, { exact: true }).first().isVisible();
     const long = await page.evaluate(() => (window as unknown as { __long: LongTask[] }).__long);
     const result = {
       label: LABEL,
@@ -215,7 +222,9 @@ test.describe('a styled landing canvas stays responsive after it reopens @real',
       inside,
       hud: await hud(page),
       errors,
-      crashed
+      crashed,
+      layersFetches: layersFetches.length,
+      layersShowLanding
     };
     mkdirSync(OUT, { recursive: true });
     writeFileSync(join(OUT, `landing-session-${LABEL}-${backend}.json`), JSON.stringify(result, null, 2));
@@ -228,5 +237,7 @@ test.describe('a styled landing canvas stays responsive after it reopens @real',
     expect(zoom.deepest, 'ctrl+wheel zooms in').toBeGreaterThan(zoom.before ?? Infinity);
     expect(zoom.stepMaxMs).toBeLessThan(BUDGET.zoomStepMs);
     expect(inside.stepMaxMs).toBeLessThan(BUDGET.zoomStepMs);
+    expect(layersFetches, 'Layers reads what the canvas loaded, never a fetch of its own').toEqual([]);
+    expect(layersShowLanding, 'Layers lists the elements of the loaded landing').toBe(true);
   });
 });
