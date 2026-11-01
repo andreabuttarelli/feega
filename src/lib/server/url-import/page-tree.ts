@@ -9,11 +9,13 @@ export enum SnapMode {
   Backdrop = 'backdrop'
 }
 
-export type TreeLimits = { nodes: number; height: number; text: number; snaps: number; useAttr: string; snapAttr: string; hostAttr: string; hideAttr: string };
+export type TreeLimits = { nodes: number; height: number; text: number; snaps: number; useAttr: string; snapAttr: string; hostAttr: string; hideAttr: string; hints: string[] };
 
 const PAGE_SLICES = 4;
 
-export const TREE_LIMITS: TreeLimits = { nodes: 10_000, height: DESIGN_MAX_SIDE * PAGE_SLICES, text: 4_000, snaps: 48, useAttr: 'data-feega-use', snapAttr: 'data-feega-snap', hostAttr: 'data-feega-host', hideAttr: 'data-feega-hide' };
+export const HINT_WORDS = ['avatar', 'badge', 'pill', 'chip', 'tag', 'pricing', 'tier', 'plan', 'testimonial', 'quote', 'review', 'accordion', 'faq', 'tab', 'tooltip', 'toast', 'alert', 'banner', 'input', 'field', 'search', 'button', 'btn', 'cta', 'logo', 'icon', 'card', 'tile', 'feature', 'nav', 'menu', 'link', 'item'];
+
+export const TREE_LIMITS: TreeLimits = { nodes: 10_000, height: DESIGN_MAX_SIDE * PAGE_SLICES, text: 4_000, snaps: 48, useAttr: 'data-feega-use', snapAttr: 'data-feega-snap', hostAttr: 'data-feega-host', hideAttr: 'data-feega-hide', hints: HINT_WORDS };
 
 export const SNAP_REF = 'snap:';
 
@@ -43,6 +45,12 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   const MOSTLY_SEEN = 0.5;
   const LIFTED = 1.5;
   const DRAWN_ALL = 0.99;
+  const HOLDERS = /^(grid|list|wrapper|wrap|container|group|row|rows|section|carousel|track|slider|marquee|items|cards|buttons|tabs|links)$/;
+  const LANDMARKS: [string, string][] = [
+    ['footer', 'footer, [role=contentinfo]'],
+    ['nav', 'nav, [role=navigation]'],
+    ['header', 'header, [role=banner]']
+  ];
 
   const width = document.documentElement.clientWidth;
   const full = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0, window.innerHeight);
@@ -967,7 +975,30 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     };
   };
 
+  const hintOf = (el: Element): string | undefined => {
+    const words = (el.getAttribute('class') ?? '').split(/\s+/).flatMap((token) => {
+      const parts = token.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/);
+      return parts.some((w) => HOLDERS.test(w)) ? [] : parts;
+    });
+    return limits.hints.find((hint) => words.includes(hint));
+  };
+  const domOf = (el: Element): NonNullable<RestNode['dom']> => {
+    const role = el.getAttribute('role') ?? undefined;
+    const hint = hintOf(el);
+    const landmark = LANDMARKS.find(([, selector]) => el.closest(selector))?.[0];
+    return { tag: el.tagName.toLowerCase(), ...(role ? { role } : {}), ...(hint ? { hint } : {}), ...(landmark ? { landmark } : {}) };
+  };
+  const described = (el: Element, made: RestNode[]): RestNode[] => {
+    const bare = made.filter((n) => !n.dom);
+    if (bare.length) {
+      const dom = domOf(el);
+      bare.forEach((n) => (n.dom = dom));
+    }
+    return made;
+  };
+
   const marked = (el: Element, made: RestNode[]): RestNode[] => {
+    described(el, made);
     const use = el.getAttribute(limits.useAttr);
     if (use === null || !made.length) {
       return made;
@@ -1080,7 +1111,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     };
     inline(el, css, ctx.textFills);
     flush();
-    return out;
+    return described(el, out);
   };
 
   const textPaintOf = (css: CSSStyleDeclaration, el: Element): RestPaint[] | null => {

@@ -416,3 +416,27 @@ describe.runIf(process.env.CHROMIUM_PATH)('a word split into one span per letter
     }
   }, 30_000);
 });
+
+const MARKUP = `<body style="margin:0;font:16px sans-serif"><header><nav style="display:flex;gap:8px"><a href="#" style="display:flex;padding:4px;background:#eee">Docs</a><a href="#" style="display:flex;padding:4px;background:#eee">Blog</a></nav></header><button class="HeroButton_root__x7" style="background:#00f;color:#fff;padding:8px">Start</button><div role="tab" aria-label="Pricing tab" style="display:flex;background:#eee;padding:4px">Monthly</div><footer><p>Made <span class="tag">by us</span></p></footer></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('the elements a node came from', () => {
+  it('are kept as tag, role, class hint and landmark, so the import can tell a button or a nav link from a box', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 600, height: 300 });
+      await page.setContent(MARKUP);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const framed = (text: string) => all(tree.root).filter((n) => n.type === 'FRAME' && n.dom && all(n).some((k) => k.characters === text)).at(-1);
+      const text = (characters: string) => all(tree.root).find((n) => n.characters === characters);
+
+      expect(framed('Docs')?.dom).toEqual({ tag: 'a', landmark: 'nav' });
+      expect(framed('Start')?.dom).toEqual({ tag: 'button', hint: 'button' });
+      expect(framed('Monthly')?.dom).toEqual({ tag: 'div', role: 'tab' });
+      expect(text('Made by us')?.dom).toEqual({ tag: 'p', landmark: 'footer' });
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
