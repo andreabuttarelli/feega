@@ -96,24 +96,25 @@ function settled(previous: (number | undefined)[]): Set<number> {
 
 const afterOf = (ids: readonly string[], i: number) => ({ after: i > 0 ? ids[i - 1] : null });
 
-function trackOps(before: MotionDoc, after: MotionDoc): DocOp[] {
-  const was = new Map(before.tracks.map((t, index) => [t.id, { t, index }]));
+function removedTracks(before: MotionDoc, after: MotionDoc): DocOp[] {
   const now = new Set(after.tracks.map((t) => t.id));
+  return before.tracks.filter((t) => !now.has(t.id)).map((t): DocOp => ({ kind: OpKind.TrackRemove, trackId: t.id }));
+}
+
+function placedTracks(before: MotionDoc, after: MotionDoc): DocOp[] {
+  const was = new Map(before.tracks.map((t, index) => [t.id, { t, index }]));
   const order = after.tracks.map((t) => t.id);
   const stays = settled(after.tracks.map((t) => was.get(t.id)?.index));
 
-  return [
-    ...before.tracks.filter((t) => !now.has(t.id)).map((t): DocOp => ({ kind: OpKind.TrackRemove, trackId: t.id })),
-    ...after.tracks.flatMap((t, i): DocOp[] => {
-      const old = was.get(t.id);
-      const { clips: _clips, ...track } = t;
-      if (!old) {
-        return [{ kind: OpKind.TrackAdd, track, ...afterOf(order, i) }];
-      }
-      const set = fieldOps(old.t as unknown as Bag, t as unknown as Bag, new Set([CLIPS, ID]), (field, value): DocOp => ({ kind: OpKind.TrackSet, trackId: t.id, field, ...valued(value) }));
-      return stays.has(i) ? set : [{ kind: OpKind.TrackMove, trackId: t.id, ...afterOf(order, i) }, ...set];
-    })
-  ];
+  return after.tracks.flatMap((t, i): DocOp[] => {
+    const old = was.get(t.id);
+    const { clips: _clips, ...track } = t;
+    if (!old) {
+      return [{ kind: OpKind.TrackAdd, track, ...afterOf(order, i) }];
+    }
+    const set = fieldOps(old.t as unknown as Bag, t as unknown as Bag, new Set([CLIPS, ID]), (field, value): DocOp => ({ kind: OpKind.TrackSet, trackId: t.id, field, ...valued(value) }));
+    return stays.has(i) ? set : [{ kind: OpKind.TrackMove, trackId: t.id, ...afterOf(order, i) }, ...set];
+  });
 }
 
 function clipOps(before: MotionDoc, after: MotionDoc): DocOp[] {
@@ -156,8 +157,9 @@ export function diffDoc(before: MotionDoc, after: MotionDoc): DocOp[] {
   const was = before as unknown as Bag;
   const now = after as unknown as Bag;
   return [
-    ...trackOps(before, after),
+    ...placedTracks(before, after),
     ...clipOps(before, after),
+    ...removedTracks(before, after),
     ...fieldOps(was, now, new Set([...KEYED_DOC_FIELDS, TRACKS]), (field, value): DocOp => ({ kind: OpKind.DocSet, field, ...valued(value) })),
     ...entryOps(was, now, KEYED_DOC_FIELDS, (field, key, value): DocOp => ({ kind: OpKind.DocEntry, field, key, ...valued(value) }))
   ];

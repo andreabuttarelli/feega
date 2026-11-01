@@ -1,11 +1,19 @@
 import type { ComponentId } from '../components';
 import type { Size } from './auto-layout';
+import { AUTO, leadingOf, trackingOf } from '../type-units';
 
 export const AVERAGE_ADVANCE = 0.5;
 export const CAPITAL_ADVANCE = 0.62;
 export const ASCENT = 0.8;
+export const AUTO_LEADING = 1.2;
 
-type TextProps = { text?: unknown; size?: unknown; leading?: unknown; tracking?: unknown; textCase?: unknown };
+type TextProps = { text?: unknown; size?: unknown; leading?: unknown; tracking?: unknown; lineHeight?: unknown; letterSpacing?: unknown; textCase?: unknown };
+
+const leadingIn = (props: TextProps, em: number): number => {
+  const leading = leadingOf(props, em);
+  return leading === AUTO ? AUTO_LEADING : leading;
+};
+
 type Inset = { across: number; down: number };
 
 const NO_INSET: Inset = { across: 0, down: 0 };
@@ -44,19 +52,19 @@ export function textExtent(component: ComponentId, props: TextProps, unit: numbe
   const inset = TEXT_INSET[component] ?? NO_INSET;
   const em = Number(props.size ?? 0) * unit;
   const capitals = CAPITALS[component] || props.textCase === 'upper';
-  const tracking = Number(props.tracking ?? 0);
+  const tracking = trackingOf(props, em);
   const advance = em * ((capitals ? CAPITAL_ADVANCE : AVERAGE_ADVANCE) + tracking);
   const text = String(props.text ?? '');
   const widths = (capitals ? text.toUpperCase() : text).split('\n').map((line) => em * runAdvance(line, tracking));
   const room = width === undefined ? Infinity : Math.max(advance, width - inset.across * em);
   const rows = widths.reduce((n, w) => n + Math.max(1, Math.ceil(w / room)), 0);
-  return { width: width ?? Math.max(...widths) + inset.across * em, height: rows * em * Number(props.leading ?? 1) + inset.down * em };
+  return { width: width ?? Math.max(...widths) + inset.across * em, height: rows * em * leadingIn(props, em) + inset.down * em };
 }
 
 export function textBaseline(component: ComponentId, props: TextProps, unit: number): number {
   const inset = TEXT_INSET[component] ?? NO_INSET;
   const em = Number(props.size ?? 0) * unit;
-  const leading = Number(props.leading ?? 1);
+  const leading = leadingIn(props, em);
   return (inset.down * em) / 2 + (em * (leading - 1)) / 2 + em * ASCENT;
 }
 

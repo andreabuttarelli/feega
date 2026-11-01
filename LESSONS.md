@@ -24,6 +24,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
 
+### A fresh core raster per still costs seconds, whatever its size
+**Signal:** a batch of small stills (component thumbnails, posters) takes 1–2 s each; timings show `raster.draw` in a few ms and the first `createImageBitmap(canvas)` eating the rest, the same at 1920×1080 and at 192×50. **Move:** the cost is the new GL context compiling its shaders on first readback, not pixels. Create one raster (`stillRaster` in `core-export.ts`) and reuse it for the whole batch; dispose it when idle.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
@@ -840,6 +843,20 @@ Su una pagina SvelteKit renderizzata server-side, il DOM del bottone esiste — 
 Login che funzionava dieci minuti prima risponde «Wrong email or password»; `auth.admin.getUserById` dà niente e anche l'org è sparita. Qualcosa ripulisce gli utenti `e2e-…@feega.app` sul progetto condiviso mentre la tua sessione manuale è ancora aperta. Mossa: per una sessione di lavoro lunga (screenshot, giri a mano) crea l'utente con un prefisso tuo, non `e2e-`, e smontalo tu alla fine; le spec Playwright restano su `fixtures/session.ts`, che dura quanto il test.
 
 ## Codice
+
+### Un campo nuovo di `PageTree` sparisce al `TREE_SHAPE.safeParse`
+`pageTreeAt` valida l'albero con uno `z.object` senza `.passthrough()` sulla radice: zod **toglie** le
+chiavi che lo schema non nomina. `outline` arrivava dal browser e non arrivava a `urlPlan`; anche
+`fonts` oggi si perde lì. Segnale: un campo presente in `tab.tree()` e `undefined` nel planner. Mossa:
+ogni campo nuovo di `PageTree` va nominato in `TREE_SHAPE`. Dal 30/10/2026 `TREE_SHAPE` è `.strict()`:
+un campo non nominato rende l'albero `unreadable` invece di sparire.
+
+### Uno stile o una variabile modificati non arrivano ai layer dentro le composizioni
+`defineStyle` e `resolveVariables` guardavano solo `doc.tracks`; sezioni, gruppi e componenti di un
+import vivono in `doc.comps`. I test con clip al primo livello erano verdi. Segnale: la modifica
+cambia il pannello ma non la pagina. Mossa: ogni operazione su clip collegati passa da
+`inEveryScope`/`mapEveryTrack` (`src/lib/motion/doc-scopes.ts`), e il test mette il clip in una
+composizione.
 
 ### Un valore nuovo per una colonna «libera» muore su un CHECK che le migration non hanno
 `platform = 'upload'` su `products`: i test con repo finti verdi, in produzione `23514 products_platform_check`. Lo stesso per `nodes.data.type` di un nodo `products` (`nodes_data_shape_check`). Quei CHECK vivono sul database e non in `supabase/migrations`: la lista vera è `src/lib/server/org-data/checks.ts` e le `canvas-migrations`. Segnale: `23514` al primo giro reale di un valore che nessun test ha mai scritto su Postgres. Mossa: prima di inventare un valore di enum, `grep` del nome della colonna in `org-data/checks.ts` e nelle `canvas-migrations`; se serve davvero, è una migration da applicare, non un cast.
@@ -3192,7 +3209,7 @@ Signal: `?renderer=dom` answers 500 on a canvas that has a group; the same page 
 Signal: Space or Play moves the playhead to a fixed frame, and the timecode flips between it and the next frame; the player is not paused. Cause: the doc has a `workArea` one frame long (an out point set at frame 0), and playback loops inside it. Move: read `workArea` in the doc before suspecting the player, the GPU engine or the interactive runtime.
 
 ### Every e2e spec fails at collection with "needs an import attribute of type: json"
-Signal: `npx playwright test` lists 0 tests; the error names a `.json` under `src/lib`. Cause: a spec imports an app module (`frame-custom-size.spec.ts` → `timeline`/`editor-mount` → `still.ts`), and a new import in that chain reaches a module that imports JSON without `with { type: 'json' }`, which Playwright's Node loader rejects. Move: keep modules that e2e specs import free of JSON-importing dependencies; check with `npx playwright test --list` before pushing.
+Signal: `npx playwright test` lists 0 tests; the error names a `.json` under `src/lib`. Cause: a spec imports an app module (`frame-custom-size.spec.ts` → `timeline`/`editor-mount` → `still.ts`), and a new import in that chain reaches a module that imports JSON without `with { type: 'json' }`, which Playwright's Node loader rejects. Move: give that JSON import `with { type: 'json' }` (or keep it out of the chain); `scripts/e2e/specs-load.test.ts` lists the suite in vitest and fails when this comes back.
 
 ### A GPU canvas that crashes Safari on iPhone: count texture bytes, not image downloads
 **Signal:** the tab reloads by itself on iPhone; images downloaded total ~10 MB. **Move:**
@@ -3505,8 +3522,55 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ## A URL-import reference screenshot does not match the tree it was taken with
 
-**Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame. **Move:** `captureBeyondViewport` and scroll-based snapshots fire resize, scroll and IntersectionObserver callbacks. Freeze the page first (`revealPage(RevealMode.Still)`: timers, rAF, `play()`, transitions), report every observed element as in view from the first script (`everythingInView`), and take the reference screenshot after the tree, with a second freeze, as `url-capture.browser.test.ts` does.
+**Signal:** the fidelity score of a page drops between runs with no code change; carousels shifted, scroll-revealed blocks faded, a video on another frame, a section that is fine in a viewport screenshot is half empty in the banded one. **Move:** `captureBeyondViewport` resizes the viewport for the shot: resize, scroll, `matchMedia` (`orientation`) and ResizeObserver callbacks fire, and libraries that captured `requestAnimationFrame` at load keep running. Gate them from the first script (`heldStill`), pin scroll-driven blocks to their sampled in-view state (`inViewSampled`, then `revealPage(RevealMode.Still)`), and replace canvases and videos with their own snapshot once read. Check a fix with the probe that matters: a viewport shot, a full-page shot and the banded shot of the same frozen page must agree.
+
+## A cookie banner is hidden by the import and still in the reference
+
+**Signal:** the import has no banner, the reference screenshot does; `querySelectorAll('body *')` finds no element with the banner text. **Move:** consent managers (Transcend on webflow.com) mount on `<html>`, inside a closed shadow root, and render into it after load; their `textContent` is mostly `<style>`. Open every shadow root from the first script, scan `html > :not(head, body)` too, read shadow text from non-style children, and watch shadow roots with the same MutationObserver as the document.
 
 ## A URL import scores well and looks wrong on the canvas
 
 **Signal:** `url-fidelity.browser.test.ts` scores 0.95+, the canvas shows another font, content cut differently or a strip at the top. **Move:** the HTML still is not what the canvas draws. Score the GPU path too: `URL_IMPORT_GPU=<label> npx vite-node --config scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` after the HTML run with the same label, and compare both columns. Read a WebGPU canvas by screenshotting the element, never with `drawImage` after the frame presented (blank).
+
+## A tall frame exports as "Export failed", or as an image that repeats
+
+**Signal:** image export of a frame several thousand px tall (an imported page) fails, or at 2× the bottom repeats the top, or WebP is 0 bytes. **Move:** never screenshot a viewport taller than a band: Chromium paints at most ~16384 device px and the serverless build less. Draw in `BAND_PX` bands with `pictureOf` and stitch; WebP itself stops at 16383 px per side (`rowSize` fits it).
+
+## An export fails on every frame locally, or only on imported ones
+
+**Signal:** "Export failed" with `Waiting failed: 20000ms exceeded` on any frame, a 1080×1080 one too; or `Invalid key: …/exports/…` only on frames whose name has a non-ASCII character (an import's page title); or PDF `Timed out after waiting 30000ms` on a long import. **Move:** reproduce through the real action, not a unit test: log in as the test account, `POST /api/v1/projects/<p>/canvases/<c>?action=exportSelection` and the frame dialog's `motion/<id>?action=still`, and read the JSON body — the dialog used to swallow it. The first is the render page waiting for `/motion-libs` from `PUBLIC_APP_URL` (a dead or older host); the second is Storage refusing the key (`storageName`); the third is a full-frame SVG `<mask>` the PDF printer rasterises (write hard masks as clips).
+
+## A URL import comes back "Nothing on that page could be read"
+
+**Signal:** one site (stripe.com) is always `unreadable` after ~70–130 s, the tree step throws `Attempted to use detached Frame`, other sites import. **Move:** the Browserless renderer crashed, and every later call waits for the session to end. Drive the steps one by one against Browserless with `vite-node` (a probe that calls `tab.*` and checks the tab after each), then bisect the page scripts with raw puppeteer (`evaluateOnNewDocument(everythingInView)`, `revealPage`, interception) until the crash goes away. Here it was `everythingInView` loading the whole page at once; the import now retries with the native observer.
+## A poster draws in Chrome and comes out scrambled in Safari
+
+**Signal:** an SVG-built poster (pills, strokes, shapes placed with `<g transform>`) is right in Chromium and wrong in WebKit: shapes piled at the top left, the rest of the frame bare. **Move:** WebKit's computed `transform` of an SVG element ignores its `transform` attribute and answers `none`; Chromium folds the attribute in. Never trust the computed style alone for SVG geometry: the probe reads the attribute when the computed value is unset (`svgTransformOf` in `probe.ts`). Diff the raw trees of both engines (capture `feega:dom-read-reply` with an init script) before suspecting the GPU.
+
+## A frame inserted a moment ago stays blank for good
+
+**Signal:** after inserting templates in quick succession, one frame stays empty (paper colour, or dark in dark mode) until reload; the console shows a 404 from `/motion/<id>/source`. **Move:** the node row and the frame source are not saved at the same instant, and the core asked once. A source that is not there yet is retried (`untilFound` in `frame-source.ts`), as the pick-doc fetch already did. Reproduce by inserting the whole poster gallery with a 400 ms gap, not one poster at a time.
+
+## URL import fidelity from a worktree: every fixed text black and wrapped
+
+**Signal:** a local fidelity run paints imported texts black, centred and wrapping; `plan.skipped` lists `textWrap Invalid option`. **Move:** the worktree resolves `@feega/motion-core` from the main checkout, whose schema lacks newer values. Make `node_modules` a folder of symlinks to the main one with `@feega/*` pointing at the worktree's `packages/`, then score again; earlier numbers are not comparable.
+
+## A tiny text pushes its stack apart in a tall page
+
+**Signal:** after removing a text's wrapper, a column of 12 px labels in a long imported page spreads out. **Move:** the motion box minimum was a share of the doc (0.002 of the height ≈ 29 px on a 14 000 px slice). `MIN_BOX` in `components.ts` is now small enough; a fixed wrapper had been hiding it.
+## A Next.js app imported from code has no components, a Vite one does
+
+**Signal:** code import of a Next.js 16 app answers `components: 0`; the page in the reference screenshot looks right, `__reactFiber$` keys are missing on every element, the console shows the `/_next/hmr` websocket failing with 500. **Move:** Next dev blocks `/_next/*` requests whose `Origin` is not localhost or in `allowedDevOrigins`, and without the HMR socket the client never hydrates, so there are no fibers to read. The sandbox puts `origin-proxy.ts` in front of the dev server: it rewrites `Host`, `Origin` and `Referer` to `localhost:<devPort>`, HTTP and websocket upgrade alike. Probe with `scripts/code-import/probe.mts <repo> <route>` (counts fibers, Svelte and Vue metas) before blaming the marker.
+
+
+## A see-through block in auto layout comes in twice as faded
+
+**Signal:** an imported card at opacity 0.64 is visibly darker than the page; the same card without auto layout is right. **Move:** `laidOut` (`figma-doc.ts`) parented the children to the container and then faded container and children; parent opacity is inherited, so children got it twice. Fade only the container. Measure with mean brightness of the same region in source and import before blaming text rendering.
+
+## An imported component in a row lands shifted by what it draws outside its box
+
+**Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
+
+## A URL import on Browserless takes four minutes and then succeeds
+
+**Signal:** `ai_calls` shows two `browserless` sessions per import, the first ~128 s, the second ~120 s. **Move:** the session cap is 120 s (`BROWSERLESS_SESSION_MS`): a slow capture is killed, `tab.tree` comes back empty, and `importPageAt` retries with `Sight.Native` in a new session. Profile with timers around each `AppTab` method over Browserless, not locally: stripe takes 15 s in local Chrome, but remotely `goto` hits its 20 s cap, `reveal` takes 55 s under `seeAll` and the 27 snapshots in `tree` take 70 s.

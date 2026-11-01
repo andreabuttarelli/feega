@@ -56,6 +56,17 @@ describe('components on a canvas', () => {
     expect(flattenComps(again).tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.component === 'Text')).toHaveLength(2);
   });
 
+  it('inserts an instance from a smaller frame at the same pixel size', () => {
+    const small = must(addClip({ ...newMotionDoc(MotionFormat.Landscape), width: 400, height: 200 }, { component: 'Shape', from: 0, durationInFrames: 30, props: { x: 0.5, y: 0.5, width: 0.5, height: 0.5 } }, 'pill'));
+    const source = must(createComponent(small, ['pill'], newId, 'Pill'));
+    const compId = String((source.tracks.flatMap((t) => t.clips)[0] as MotionClip).props.comp);
+
+    const placed = must(placeInstance({ ...newMotionDoc(MotionFormat.Landscape), width: 1000, height: 2000 }, source, compId, newId));
+    const pill = placed.comps[compId].tracks[0].clips[0] as MotionClip;
+
+    expect([Number(pill.props.width) * 1000, Number(pill.props.height) * 2000]).toEqual([200, 100]);
+  });
+
   it('inserts into the frame that owns the main without copying anything', () => {
     const { doc, compId } = frameWithButton();
 
@@ -112,6 +123,16 @@ describe('the home of a main component', () => {
 
     expect(mainClipOf(doc, compId)).toBe(instanceId);
     expect(mainClipOf(doc, 'nope')).toBeNull();
+  });
+
+  it('a main inside a group is found through the group clip that holds it', () => {
+    const { doc, compId } = frameWithButton();
+    const instance = doc.tracks.flatMap((t) => t.clips)[0] as MotionClip;
+    const groupComp = { name: 'Group', durationInFrames: doc.durationInFrames, tracks: doc.tracks };
+    const group = { ...instance, id: 'group', component: 'Precomp', props: { comp: 'g' } } as MotionClip;
+    const nested = { ...doc, tracks: [{ ...doc.tracks[0], clips: [group] }], comps: { ...doc.comps, g: groupComp } } as MotionDoc;
+
+    expect(mainClipOf(nested, compId)).toBe('group');
   });
 });
 

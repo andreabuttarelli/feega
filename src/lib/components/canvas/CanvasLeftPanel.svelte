@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers' | 'components' | 'history';
+  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers' | 'components' | 'history' | 'styles';
 </script>
 
 <script lang="ts">
@@ -12,6 +12,8 @@
   import type { ComponentProps } from 'svelte';
   import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
   import HistoryPanel from './HistoryPanel.svelte';
+  import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
+  import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import X from '@lucide/svelte/icons/x';
   import Search from '@lucide/svelte/icons/search';
   import { IconButton, IconSize, Side } from '$lib/components/ui/shell';
@@ -75,6 +77,8 @@
     <div class="left-panel-body is-flush">
       {#if kind === 'components'}
         <ProjectComponentsPanel {projectId} />
+      {:else if kind === 'styles'}
+        <StyleLibrarySection tokens={FEEGA_TOKENS} />
       {:else if kind === 'history'}
         {#if pages.currentId}
           <HistoryPanel {projectId} canvasId={pages.currentId} />

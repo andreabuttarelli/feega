@@ -1,3 +1,5 @@
+import { BLEND_MODES, BlendMode } from '@feega/motion-core/motion/blend';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import type { ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, NodePatch, Paint, Rgba, Vec } from './archive';
 import { geometryPath } from './commands';
 import { FillRule, networkPath } from './vector-network';
@@ -71,7 +73,7 @@ export type Fill =
   | { kind: FillKind.Diamond; stops: Stop[]; opacity: number }
   | { kind: FillKind.Image; hash: string; opacity: number; fit: PictureFit; focus: { x: number; y: number } };
 
-export type Stroke = { fill: Fill; weight: number; align: string };
+export type Stroke = { fill: Fill; weight: number; align: string; dash: [number, number] | null };
 
 export type Shadow = { kind: 'drop-shadow' | 'inner-shadow'; x: number; y: number; blur: number; spread: number; color: string; opacity: number };
 export type Blur = { kind: 'layer-blur' | 'background-blur'; radius: number };
@@ -81,9 +83,16 @@ export type Padding = { top: number; right: number; bottom: number; left: number
 export type AutoLayout = { flow: Flow; wrap: boolean; gap: number; crossGap: number; padding: Padding; justify: Justify; align: Cross; width: Fit; height: Fit };
 export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean };
 
-export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean };
+export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number };
 
-type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem };
+export enum MaskBand {
+  Solid = 'solid',
+  Fade = 'fade'
+}
+
+export type LayerMask = { band: MaskBand; x: number; y: number; length: number; span: number; rotation: number; opacity: number };
+
+type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[] };
 
 export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
 
@@ -119,7 +128,7 @@ export type TextLayer = Common & {
   align: 'left' | 'center' | 'right' | 'justify';
   color: string;
   runs: TextRun[];
-  wraps: boolean;
+  sizing: TextSizing;
   fills: Fill[];
   strokes: Stroke[];
 };
@@ -351,7 +360,8 @@ function strokesOf(n: FigmaRawNode, report: Report): Stroke[] {
       report(`${fill.kind} stroke`);
       return [];
     }
-    return [{ fill, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase() }];
+    const [dash, gap = dash] = n.dashPattern ?? [];
+    return [{ fill, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase(), dash: dash ? [round(dash), round(gap)] : null }];
   });
 }
 
@@ -373,6 +383,8 @@ function effectsOf(n: FigmaRawNode, report: Report): LayerEffect[] {
       return made ? [made(e)] : [];
     });
 }
+
+const TEXT_SIZING: Record<string, TextSizing> = { HEIGHT: TextSizing.AutoHeight, NONE: TextSizing.Fixed, WIDTH_AND_HEIGHT: TextSizing.AutoWidth };
 
 const hugs = (sizing: string | undefined) => HUGGING.has(sizing ?? '');
 
@@ -403,6 +415,12 @@ function autoLayoutOf(n: FigmaRawNode, report: Report): AutoLayout | null {
 
 const itemOf = (n: FigmaRawNode): ChildItem => ({ grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE' });
 
+const SPACING_PX: Record<string, (value: number, size: number) => number> = { PIXELS: (v) => v, PERCENT: (v, size) => (v / PERCENT) * size, RAW: (v, size) => v * size };
+
+const spacingPx = (u: { value: number; units: string } | undefined, size: number) => (u && SPACING_PX[u.units] ? SPACING_PX[u.units](u.value, size) : 0);
+
+const SPACING_STEP = 0.01;
+
 function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: number; color: string }, report: Report): TextRun[] {
   const ids = n.textData?.characterStyleIDs ?? [];
   const table = new Map((n.textData?.styleOverrideTable ?? []).map((s) => [s.styleID ?? 0, s]));
@@ -430,6 +448,11 @@ function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: num
       }
       if (fill && fill.color !== base.color) {
         run.color = fill.color;
+      }
+      const size = positive(style.fontSize) ? style.fontSize : base.size;
+      const spacing = spacingPx(style.letterSpacing, size);
+      if (style.letterSpacing && Math.abs(spacing - spacingPx(n.letterSpacing, base.size)) > SPACING_STEP) {
+        run.tracking = spacing / size;
       }
       if (Object.keys(run).length > 2) {
         runs.push(run);
@@ -516,8 +539,61 @@ function shapePath(n: FigmaRawNode, ctx: Ctx): { path: string; rule: FillRule } 
   return { path: geometry !== undefined && ctx.blobs[geometry] ? geometryPath(ctx.blobs[geometry]) : '', rule: FillRule.NonZero };
 }
 
+const BLENDS = new Set<string>(BLEND_MODES);
+
+const blendOf = (figma: string | undefined): BlendMode => {
+  const css = (figma ?? '').toLowerCase().replace(/_/g, '-');
+  return BLENDS.has(css) ? (css as BlendMode) : BlendMode.Normal;
+};
+
+const SEEN_ALPHA = 0.01;
+const MAX_MASKS = 8;
+const BEYOND = 4;
+const DEGREES = 180 / Math.PI;
+
+function masksOf(gradient: FigmaRawNode['maskGradient'], box: Box): LayerMask[] {
+  const [from, to] = gradient?.handles ?? [];
+  const stops = [...(gradient?.stops ?? [])].sort((a, b) => a.position - b.position);
+  if (!from || !to || stops.length < 2) {
+    return [];
+  }
+  const start = { x: box.x + from.x * box.width, y: box.y + from.y * box.height };
+  const [dx, dy] = [(to.x - from.x) * box.width, (to.y - from.y) * box.height];
+  const along = Math.hypot(dx, dy);
+  if (!along) {
+    return [];
+  }
+  const span = Math.hypot(box.width, box.height) * 2;
+  const rotation = Math.atan2(dy, dx) * DEGREES;
+  const ends = [{ position: -BEYOND, alpha: stops[0].alpha }, ...stops, { position: 1 + BEYOND, alpha: stops[stops.length - 1].alpha }];
+  const band = (t0: number, t1: number, kind: MaskBand, opacity: number, turn: number): LayerMask => {
+    const mid = (t0 + t1) / 2;
+    return { band: kind, x: round(start.x + dx * mid), y: round(start.y + dy * mid), length: round((t1 - t0) * along), span: round(span), rotation: round(rotation + turn), opacity: round(opacity) };
+  };
+  const segments = ends.slice(1).map((stop, i) => ({ t0: ends[i].position, t1: stop.position, a0: ends[i].alpha, a1: stop.alpha }));
+  const flat = (g: { a0: number; a1: number }) => g.a0 === g.a1;
+  const merged = segments.reduce<typeof segments>((out, g) => {
+    const last = out[out.length - 1];
+    if (last && flat(last) && flat(g) && last.a0 === g.a0) {
+      return [...out.slice(0, -1), { ...last, t1: g.t1 }];
+    }
+    return [...out, g];
+  }, []);
+  return merged
+    .flatMap(({ t0, t1, a0, a1 }) => {
+      const [low, high] = [Math.min(a0, a1), Math.max(a0, a1)];
+      if (t1 - t0 <= 0 || high < SEEN_ALPHA) {
+        return [];
+      }
+      const solid = low >= SEEN_ALPHA ? [band(t0, t1, MaskBand.Solid, low, 0)] : [];
+      const fade = high - low >= SEEN_ALPHA ? [band(t0, t1, MaskBand.Fade, high - low, a0 > a1 ? 0 : HALF_TURN)] : [];
+      return [...solid, ...fade];
+    })
+    .slice(0, MAX_MASKS);
+}
+
 function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
-  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n) };
+  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true, blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })) };
 }
 
 const DEFAULT_TEXT_SIZE = 12;
@@ -544,7 +620,7 @@ function textLayer(n: FigmaRawNode, m: Matrix, ctx: Ctx): TextLayer {
     letterSpacing: unitOf(n.letterSpacing, '0%'),
     align: ALIGN[n.textAlignHorizontal ?? 'LEFT'] ?? 'left',
     runs: runsOf(n, base, ctx.report),
-    wraps: n.textAutoResize === 'HEIGHT',
+    sizing: TEXT_SIZING[n.textAutoResize ?? ''] ?? TextSizing.AutoWidth,
     decoration: DECORATION[n.textDecoration ?? ''] ?? Decoration.None,
     axes: n.fontAxes ?? '',
     features: n.fontFeatures ?? '',
@@ -733,6 +809,9 @@ export function figmaScene(message: FigmaMessage): FigmaScene | null {
     opacity: 1,
     effects: [],
     item: { grow: false, stretch: false, absolute: false },
+    hidden: false,
+    blend: BlendMode.Normal,
+    masks: [],
     fills: [],
     strokes: [],
     radii: [0, 0, 0, 0],

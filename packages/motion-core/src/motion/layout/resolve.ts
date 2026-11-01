@@ -7,6 +7,7 @@ import { StrokeAlign, sidesShown, strokesOf } from '../stroke/model';
 import { Sizing, layoutTree, type Item, type Padding } from './auto-layout';
 import { DEFAULT_LAYOUT_ITEM, type AutoLayout } from './model';
 import { estimatedText, isText, textBaseline, type TextMeasure } from './text-extent';
+import { TextSizing } from '../text-sizing';
 
 type Clips = Map<string, MotionClip>;
 
@@ -89,7 +90,7 @@ function intrinsic(clip: MotionClip, size: Size, content: Content, measure: Text
 
 function reflowsText(clip: MotionClip): boolean {
   const item = clip.layoutItem ?? DEFAULT_LAYOUT_ITEM;
-  return isText(clip.component) && item.height === Sizing.Hug;
+  return isText(clip.component) && item.height === Sizing.Hug && clip.props.sizing !== TextSizing.AutoWidth;
 }
 
 const NO_INSET: Padding = { top: 0, right: 0, bottom: 0, left: 0 };

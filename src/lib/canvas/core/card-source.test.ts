@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { faceOf } from '$lib/canvas/gpu/card-face';
-import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
+import { SELECT_BLUE } from '$lib/canvas/highlight';
 import { CHROME_REACH, CardLayer, cardKey, cardOnCanvas, cardsOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
 import { PortState, type Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
@@ -48,6 +48,29 @@ describe('cardOnCanvas', () => {
   });
 });
 
+describe('card label at a distance', () => {
+  const far = { ...tile, zoom: 0.1 };
+
+  it('grows the top reach with the label so the bigger label is not scissored away', () => {
+    const f = cardOnCanvas(far, theme, glyphs);
+    const label = f.list.items.filter((i) => i.clip === 'n:label').flatMap((i) => ('contours' in i ? i.contours : []));
+
+    expect(f.box.y).toBeLessThan(200 - CHROME_REACH.top);
+    expect(Math.min(...ys(label))).toBeGreaterThanOrEqual(0);
+  });
+
+  it('redraws when the zoom step changes and not otherwise', () => {
+    expect(cardKey(far)).not.toBe(cardKey(tile));
+    expect(cardKey(far)).toBe(cardKey({ ...far }));
+  });
+
+  it('places the cached box by the same reach it was drawn with', () => {
+    const draw = cardsOnCanvas(theme, glyphs);
+
+    expect(draw(far).box.y).toBe(cardOnCanvas(far, theme, glyphs).box.y);
+  });
+});
+
 describe('card group', () => {
   it('holds no hover, ring or handles: they are overlay, drawn every frame', () => {
     const f = cardOnCanvas(tile, theme, glyphs);
@@ -58,9 +81,8 @@ describe('card group', () => {
 });
 
 describe('selection ring colour', () => {
-  it('rings in the output colour, the accent when there is none', () => {
-    expect(ringColour(tile, theme)).toBe(CONNECTOR_STYLE.text.color);
-    expect(ringColour({ ...tile, outputs: [] }, theme)).toBe(theme.accent);
+  it('rings in the selection blue whatever the output', () => {
+    expect(ringColour()).toBe(SELECT_BLUE);
   });
 });
 

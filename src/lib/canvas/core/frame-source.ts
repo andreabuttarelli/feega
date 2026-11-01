@@ -64,3 +64,17 @@ const STAGE: Record<FrameKind, Rgba | null> = {
 };
 
 export const onStage = (list: DisplayList, kind: FrameKind): DisplayList => ({ ...list, background: list.background ?? STAGE[kind] });
+
+export type Patience = { tries: number; waitMs: number };
+
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export async function untilFound<T>(attempt: () => Promise<T | null>, { tries, waitMs }: Patience, wait: (ms: number) => Promise<void> = pause): Promise<T | null> {
+  for (let tried = 1; ; tried++) {
+    const found = await attempt();
+    if (found !== null || tried >= tries) {
+      return found;
+    }
+    await wait(waitMs);
+  }
+}

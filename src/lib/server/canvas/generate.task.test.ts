@@ -186,12 +186,12 @@ const externalJobOf = (calls: ReturnType<typeof fakeDb>['calls']) =>
     | undefined)?.external_job_id;
 
 describe('an image node on a Wiro model', () => {
-  it('is refused in a standard project, by project mode, before any provider call', async () => {
+  it('is refused in a standard project when the model is uncensored, before any provider call', async () => {
     const { db } = canvas({ projects: [{ ...uncensoredProject, mode: 'standard' }] });
 
-    const out = await runGenNode(db, start(SAFE, 'a lighthouse'));
+    const out = await runGenNode(db, start(UNCENSORED, 'a lighthouse'));
 
-    expect(out).toEqual({ kind: 'refused', error: 'wiro_requires_uncensored_project' });
+    expect(out).toEqual({ kind: 'refused', error: 'uncensored_requires_uncensored_project' });
     expect(gateway.run).not.toHaveBeenCalled();
   });
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COLOR, IMAGE_ZOOM, TYPE, type ComponentId } from './components';
+import { COLOR, IMAGE_ZOOM, MIN_BOX, TYPE, type ComponentId } from './components';
 import { KEY_EASE_IDS, Ease } from './design';
 import { MASK_KEYS, MASK_PROPS, maskValue, type Mask, type MaskKey } from './mask';
 import { RING_NUMBERS, RING_NUMBER_KEYS } from '../canvas/composition/ring';
@@ -147,8 +147,8 @@ export const SOUND = {
 const soundProps: AnimProp[] = (Object.keys(SOUND) as (keyof typeof SOUND)[]).map((key) => ({ key, kind: ValueKind.Number, source: Source.Sound, ...SOUND[key] }));
 
 const BOX_SIZE = {
-  width: { label: 'Width', min: 0.02, max: 1, step: 0.01 },
-  height: { label: 'Height', min: 0.002, max: 1, step: 0.001 }
+  width: { label: 'Width', min: MIN_BOX.width, max: 1, step: 0.01 },
+  height: { label: 'Height', min: MIN_BOX.height, max: 1, step: 0.001 }
 } as const;
 
 const box = (width: number, height: number): AnimProp[] =>

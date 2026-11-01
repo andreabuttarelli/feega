@@ -64,6 +64,15 @@ describe('withAutoLayout', () => {
     expect(propsOf(withAutoLayout(doc), 't')).toMatchObject({ width: extent.width / W, height: extent.height / H });
   });
 
+  it('an auto width text stays one line in a column narrower than it, as it draws (stripe footer: gaps after the long links)', () => {
+    const props = { text: 'Capital for platforms', size: 0.02, leading: 1.2, tracking: 0, sizing: 'auto', x: 0, y: 0, width: 0.1, height: 0.024 };
+    const text = newClip({ id: 't', from: 0, durationInFrames: 30, component: 'Text', props, parent: 'c', layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Hug, height: Sizing.Hug } });
+    const doc = docOf([text, shape('c', { x: 0.5, y: 0.5, width: 0.05, height: 1 }, { autoLayout: flow({ direction: Direction.Vertical }) })]);
+    const line = textExtent('Text', props, 1000);
+
+    expect(propsOf(withAutoLayout(doc), 't').height).toBeCloseTo(line.height / H, 4);
+  });
+
   it('baseline alignment sits a text on the bottom of a box', () => {
     const text = newClip({ id: 't', from: 0, durationInFrames: 30, component: 'Kicker', props: { text: 'HI', size: 0.05, leading: 1, tracking: 0, x: 0, y: 0, width: 0.2, height: 0.1 }, parent: 'c' });
     const doc = docOf([text, shape('a', { x: 0, y: 0, width: 0.1, height: 0.2 }, { parent: 'c' }), shape('c', { x: 0.5, y: 0.5, width: 1, height: 1 }, { autoLayout: flow({ align: Align.Baseline }) })]);

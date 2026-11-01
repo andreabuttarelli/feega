@@ -56,6 +56,16 @@ describe('variables', () => {
     expect(findClip(ok(bindVariable(doc, 's1', 'roundness', 'Size/radius')), 's1')!.clip.props.roundness).toBe(0.25);
   });
 
+  it('a px variable binds the corner radius of a rect through its size', () => {
+    const sized = ok(setProps(docWith(), 's1', { width: 0.5, height: 0.25 }));
+    const doc = ok(defineVariable(sized, 'Size', 'Radius', { type: VarType.Number, values: { Default: 40 } }));
+    const bound = ok(bindVariable(doc, 's1', 'radius', 'Size/Radius'));
+    const short = Math.min(0.5 * bound.width, 0.25 * bound.height);
+
+    expect(findClip(bound, 's1')!.clip.props.roundness).toBeCloseTo(40 / short, 5);
+    expect(bindableTargets(findClip(bound, 's1')!.clip, VarType.Number)).toContain('radius');
+  });
+
   it('a number variable binds auto layout gap and padding', () => {
     const laid = ok(setAutoLayout(docWith(), 's1', {}));
     const doc = ok(defineVariable(laid, 'Space', 'm', { type: VarType.Number, values: { Default: 24 } }));

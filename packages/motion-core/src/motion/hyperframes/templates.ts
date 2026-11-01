@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { COMPONENTS, ComponentId, LeadingTrim, TextAlign, VerticalAlign } from '../components';
+import type { COMPONENTS, ComponentId, LeadingTrim, TextAlign, TextWrap, VerticalAlign } from '../components';
 import { decorationCss } from '../decoration';
 import { AUTO, CAP_TRIM_CSS, leadingOf, measured } from '../type-units';
 import { TextSizing } from '../text-sizing';
@@ -79,6 +79,9 @@ const REVEAL = 16;
 const LINE_STAGGER = 5;
 const FADE = 18;
 const WHITE_SPACE: Record<TextSizing, string> = { [TextSizing.Fixed]: 'pre-wrap', [TextSizing.AutoWidth]: 'pre', [TextSizing.AutoHeight]: 'pre-wrap' };
+
+const NO_WRAP = 'pre';
+const WRAP_STYLE: Record<TextWrap, string | undefined> = { wrap: undefined, balance: 'balance', pretty: 'pretty', none: undefined };
 
 const TEXT_BOX: Record<TextSizing, (truncate: boolean) => Record<string, string>> = {
   [TextSizing.Fixed]: (truncate): Record<string, string> => (truncate ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {}),
@@ -187,7 +190,7 @@ const Text: Template<'Text'> = {
     const size = typeSize(ctx);
     const paint = glyphPaint(ctx, 'Text');
     const lines = clampLines(ctx, size);
-    const style = css({ ...typeStyle(ctx, measured(ctx.p, size), size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], textWrapStyle: ctx.p.textWrap === 'wrap' ? undefined : ctx.p.textWrap, textBox: TEXT_BOX_TRIM[ctx.p.leadingTrim], ...decorationCss(ctx.p, ctx.color), ...clampCss(lines), ...ctx.text.vars });
+    const style = css({ ...typeStyle(ctx, measured(ctx.p, size), size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: ctx.p.textWrap === 'none' ? NO_WRAP : WHITE_SPACE[ctx.p.sizing], textWrapStyle: WRAP_STYLE[ctx.p.textWrap], textBox: TEXT_BOX_TRIM[ctx.p.leadingTrim], ...decorationCss(ctx.p, ctx.color), ...clampCss(lines), ...ctx.text.vars });
     return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-text style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, { justifyContent: VERTICAL[ctx.p.verticalAlign], ...TEXT_BOX[ctx.p.sizing](ctx.p.truncate) });
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]

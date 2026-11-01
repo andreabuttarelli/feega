@@ -94,7 +94,7 @@ describe('gateCreditsCore fails CLOSED when the org cannot be resolved from bran
     const { client } = createTestSupabase({
       orgs: [{ id: 'org-1' }],
       brands: [{ id: 'brand-1', org_id: 'org-1' }],
-      ai_calls: [{ id: '1', org_id: 'org-1', cost_usd: 5, created_at: new Date().toISOString() }] // 500 credits > 400 free quota
+      ai_calls: [{ id: '1', org_id: 'org-1', cost_usd: 5, created_at: new Date().toISOString() }] // 500 credits > free quota
     });
     vi.doMock('./supabase-admin', () => ({ createAdminClient: () => client }));
 

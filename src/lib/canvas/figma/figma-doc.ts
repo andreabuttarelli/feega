@@ -4,7 +4,7 @@ import { blankElement, canvasReady, drawClip, drawnFrame, penClip } from '$lib/m
 import { DrawTool } from '$lib/motion/draw-tool';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import type { Effect } from '@feega/motion-core/motion/effects/model';
-import { TYPE_SIZE } from '@feega/motion-core/motion/components';
+import { MIN_BOX, TYPE_SIZE } from '@feega/motion-core/motion/components';
 import { FillType, MAX_STOPS } from '@feega/motion-core/motion/fill/model';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { registerFont, registerUpload } from '$lib/motion/fonts/ops';
@@ -12,6 +12,8 @@ import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips } from '$lib/motion/main-component';
 import { precompose } from '@feega/motion-core/motion/precomp';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { MaskKind, maskSchema } from '@feega/motion-core/motion/mask';
 import { instanceOverrides } from './instance-diff';
 import { Align, Direction, Justify as MotionJustify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
@@ -20,7 +22,7 @@ import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { addClip, editClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { figmaMessage, type FigmaMessage } from './archive';
-import { Clip, Cross, Decoration, Destination, Fit, FillKind, Flow, Justify, LayerKind, PictureFit, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
+import { Clip, Cross, Decoration, Destination, Fit, FillKind, Flow, Justify, LayerKind, MaskBand, PictureFit, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
 
 type NewId = () => string;
 type Unit = { x: number; y: number };
@@ -42,7 +44,6 @@ const MAX_NAME = 60;
 const SHADOW_DISTANCE_LIMIT = 300;
 const MAX_STROKE_WIDTH = 0.2;
 const MIN_STOPS = 2;
-const MIN_TEXT_BOX: Unit = { x: 0.02, y: 0.002 };
 const CENTRE: Unit = { x: 0.5, y: 0.5 };
 
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
@@ -87,7 +88,8 @@ function imageSlots(fills: Fill[]): Omit<FigmaImage, 'clipId'>[] {
 function strokeStack(strokes: Stroke[], doc: MotionDoc, p: Place): Painted[] {
   return strokes.flatMap((s) => {
     const paint = MOTION_FILL[s.fill.kind](s.fill);
-    return paint ? [{ paint, width: clamp(round((s.weight * p.scale) / minSide(doc)), 0, MAX_STROKE_WIDTH), align: s.align }] : [];
+    const unit = (px: number) => clamp(round((px * p.scale) / minSide(doc)), 0, MAX_STROKE_WIDTH);
+    return paint ? [{ paint, width: unit(s.weight), align: s.align, ...(s.dash ? { dash: unit(s.dash[0]), gap: unit(s.dash[1]) } : {}) }] : [];
   });
 }
 
@@ -185,9 +187,9 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
   }
   const [x0, y0] = toUnit(next, p)([layer.box.x, layer.box.y]);
   const [x1, y1] = toUnit(next, p)([layer.box.x + layer.box.width, layer.box.y + layer.box.height]);
-  const [width, height] = [Math.max(x1 - x0, MIN_TEXT_BOX.x), Math.max(y1 - y0, MIN_TEXT_BOX.y)];
+  const [width, height] = [Math.max(x1 - x0, MIN_BOX.width), Math.max(y1 - y0, MIN_BOX.height)];
   const id = p.newId();
-  const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, layer.wraps ? TextSizing.AutoHeight : TextSizing.AutoWidth, { text: layer.text });
+  const drawn = drawClip(next, DrawTool.Text, { x: x0 + width / 2, y: y0 + height / 2, width, height }, p.frame, id, layer.sizing, { text: layer.text });
   const size = (n: number) => clamp(round((n * p.scale) / minSide(next)), TYPE_SIZE.min, TYPE_SIZE.max);
   const font = known.get(layer.font);
   const runs = layer.runs.map(({ font: f, size: s, ...rest }) => ({ ...rest, ...(f && known.get(f) ? { font: f } : {}), ...(s ? { size: size(s) } : {}) }));
@@ -205,6 +207,7 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
     lineHeight: scaledPixels(layer.lineHeight, p),
     align: layer.align,
     verticalAlign: 'top',
+    ...(oneLineFixed(layer) ? { textWrap: 'none' } : {}),
     ...(layer.decoration === Decoration.None ? {} : { decoration: layer.decoration }),
     ...(layer.axes ? { axes: layer.axes } : {}),
     ...(layer.features ? { features: layer.features } : {}),
@@ -223,12 +226,14 @@ function textClip(doc: MotionDoc, layer: TextLayer, p: Place): Built {
 
 enum Background {
   IfPainted = 'if-painted',
-  Always = 'always'
+  Always = 'always',
+  InFlow = 'in-flow'
 }
 
 const NOTHING_TO_DRAW: Record<Background, (layer: FrameLayer) => boolean> = {
   [Background.IfPainted]: (layer) => !layer.fills.length && !layer.strokes.length,
-  [Background.Always]: () => false
+  [Background.Always]: () => false,
+  [Background.InFlow]: () => false
 };
 
 function frameBackground(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {
@@ -247,7 +252,7 @@ const BUILD: Record<LayerKind, (doc: MotionDoc, layer: Layer, p: Place) => Built
 
 const BUILD_IN_FLOW: Record<LayerKind, (doc: MotionDoc, layer: Layer, p: Place) => Built> = {
   ...BUILD,
-  [LayerKind.Frame]: (doc, layer, p) => nestedFrame(doc, layer as FrameLayer, p, Background.Always)
+  [LayerKind.Frame]: (doc, layer, p) => nestedFrame(doc, layer as FrameLayer, p, Background.InFlow)
 };
 
 const DIRECTION: Record<Flow, Direction> = { [Flow.Row]: Direction.Horizontal, [Flow.Column]: Direction.Vertical };
@@ -295,12 +300,27 @@ function flowOf(flow: AutoLayout, p: Place) {
   };
 }
 
+const ONE_LINE_SHARE = 1.5;
+const AUTO_LINE = 1.2;
+const PX_SUFFIX = /px$/;
+
+function oneLineFixed(layer: TextLayer): boolean {
+  const line = PX_SUFFIX.test(layer.lineHeight) ? parseFloat(layer.lineHeight) : layer.size * AUTO_LINE;
+  return layer.sizing === TextSizing.Fixed && layer.box.height < line * ONE_LINE_SHARE;
+}
+
+const TEXT_ITEM: Record<TextSizing, Partial<{ width: Sizing; height: Sizing }>> = {
+  [TextSizing.Fixed]: {},
+  [TextSizing.AutoHeight]: { height: Sizing.Hug },
+  [TextSizing.AutoWidth]: { width: Sizing.Hug, height: Sizing.Hug }
+};
+
 function itemFor(child: Layer, parent: AutoLayout): Partial<{ width: Sizing; height: Sizing; absolute: boolean }> {
   const row = parent.flow === Flow.Row;
   const fillsWidth = row ? child.item.grow : child.item.stretch;
   const fillsHeight = row ? child.item.stretch : child.item.grow;
   return {
-    ...(child.kind === LayerKind.Text ? (child.wraps ? { height: Sizing.Hug } : { width: Sizing.Hug, height: Sizing.Hug }) : {}),
+    ...(child.kind === LayerKind.Text ? TEXT_ITEM[child.sizing] : {}),
     ...(fillsWidth ? { width: Sizing.Fill } : {}),
     ...(fillsHeight ? { height: Sizing.Fill } : {}),
     ...(child.item.absolute ? { absolute: true } : {})
@@ -313,7 +333,13 @@ function laidOut(built: Built, container: Root, layer: FrameLayer, flow: AutoLay
   const children = kids.flatMap((kid): Step[] => [(d) => setParent(d, kid.id, container.id, { at: p.frame }), (d) => setLayoutItem(d, kid.id, itemFor(kid.layer, flow))]);
   const clipped: Step[] = layer.clip === Clip.Content ? [(d) => editClip(d, container.id, (c) => ({ ...c, clipContent: true }))] : [];
   const doc = applied(built.doc, [...own, ...children, ...clipped], p, `auto layout of ${layer.name}`);
-  return { ...built, doc: faded(doc, [container.id, ...kids.map((k) => k.id)], layer.opacity, p), roots: [container] };
+  return { ...built, doc: faded(doc, [container.id], layer.opacity, p), roots: [container] };
+}
+
+function adopted(built: Built, container: Root, layer: FrameLayer, p: Place): Built {
+  const kids = built.roots.filter((r) => r.id !== container.id);
+  const doc = applied(built.doc, kids.map((kid): Step => (d) => setParent(d, kid.id, container.id, { at: p.frame })), p, `frame of ${layer.name}`);
+  return { ...built, doc: faded(doc, [container.id], layer.opacity, p), roots: [container] };
 }
 
 function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Built {
@@ -323,26 +349,77 @@ function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Bu
   return { ...built, doc, roots: [container] };
 }
 
-const holds = (layer: FrameLayer) => Boolean(layer.autoLayout) || layer.clip === Clip.Content;
+const holds = (layer: FrameLayer, need: Background = Background.IfPainted) => Boolean(layer.autoLayout) || layer.clip === Clip.Content || need !== Background.IfPainted;
 
 function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background.IfPainted): Built {
   const flow = layer.autoLayout;
-  const background = frameBackground(doc, layer, p, holds(layer) ? Background.Always : need);
+  const holding = holds(layer, need);
+  const background = frameBackground(doc, layer, p, holding ? Background.Always : need);
   const build = flow ? BUILD_IN_FLOW : BUILD;
-  let built: Built = { ...background, roots: holds(layer) ? [] : background.roots };
+  let built: Built = { ...background, roots: holding ? [] : background.roots };
   for (const child of layer.children) {
-    const next = build[child.kind](built.doc, child, p);
+    const made = build[child.kind](built.doc, child, p);
+    const shown = { ...made, doc: blended(child.hidden ? hiddenAll(made.doc, made.roots) : made.doc, made.roots, child.blend) };
+    const next = masked(shown, child, p);
     built = { doc: next.doc, ids: [...built.ids, ...next.ids], roots: [...built.roots, ...next.roots] };
   }
   const [container] = background.roots;
-  if (!container || !holds(layer)) {
+  if (!container || !holding) {
     return built;
   }
   const all = { ...built, roots: [container, ...built.roots] };
-  return flow ? laidOut(all, container, layer, flow, p) : clipped(all, container, layer, p);
+  if (flow) {
+    return laidOut(all, container, layer, flow, p);
+  }
+  return layer.clip === Clip.Content ? clipped(all, container, layer, p) : adopted(all, container, layer, p);
 }
 
 const OPAQUE = 1;
+
+const MASK_KIND: Record<MaskBand, MaskKind> = { [MaskBand.Solid]: MaskKind.Rect, [MaskBand.Fade]: MaskKind.Linear };
+
+function heldTogether(built: Built, layer: Layer, p: Place): Built {
+  const [groupId, compId] = [p.newId(), p.newId()];
+  let n = 0;
+  const made = groupClips(built.doc, built.ids, () => (n++ === 0 ? compId : groupId));
+  if (!made.ok) {
+    return built;
+  }
+  const named = editClip(made.doc, groupId, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME) }));
+  return { doc: named.ok ? named.doc : made.doc, ids: [groupId], roots: [{ id: groupId, layer }] };
+}
+
+function masked(built: Built, layer: Layer, p: Place): Built {
+  if (!layer.masks.length || !built.roots.length) {
+    return built;
+  }
+  const held = built.ids.length > 1 ? heldTogether(built, layer, p) : built;
+  const unit = toUnit(held.doc, p);
+  const masks = layer.masks.map((m) => {
+    const [x, y] = unit([m.x, m.y]);
+    return maskSchema.parse({ kind: MASK_KIND[m.band], x, y, width: (m.length * p.scale) / held.doc.width, height: (m.span * p.scale) / held.doc.height, rotation: m.rotation, opacity: m.opacity });
+  });
+  const [first, ...rest] = masks;
+  const set = editClip(held.doc, held.roots[0].id, (clip) => ({ ...clip, mask: first, maskStack: rest }));
+  return set.ok ? { ...held, doc: set.doc } : held;
+}
+
+function blended(doc: MotionDoc, roots: Root[], blend: BlendMode): MotionDoc {
+  if (blend === BlendMode.Normal) {
+    return doc;
+  }
+  return roots.reduce((d, root) => {
+    const set = editClip(d, root.id, (clip) => ({ ...clip, blend }));
+    return set.ok ? set.doc : d;
+  }, doc);
+}
+
+function hiddenAll(doc: MotionDoc, roots: Root[]): MotionDoc {
+  return roots.reduce((d, root) => {
+    const hid = editClip(d, root.id, (clip) => ({ ...clip, hidden: true }));
+    return hid.ok ? hid.doc : d;
+  }, doc);
+}
 
 function faded(doc: MotionDoc, ids: string[], opacity: number, p: Place): MotionDoc {
   if (opacity >= OPAQUE) {
@@ -355,14 +432,16 @@ function grouped(built: Built, layer: FrameLayer, p: Place): Built {
   if (built.ids.length < 2) {
     return { ...built, doc: faded(built.doc, built.ids, layer.opacity, p) };
   }
-  const groupId = p.newId();
+  const [groupId, compId] = [p.newId(), p.newId()];
   let n = 0;
-  const made = groupClips(built.doc, built.ids, () => (n++ === 0 ? p.newId() : groupId));
+  const made = groupClips(built.doc, built.ids, () => (n++ === 0 ? compId : groupId));
   if (!made.ok) {
     return built;
   }
-  const named = editClip(made.doc, groupId, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME), ...(layer.clip === Clip.Content ? { clipContent: true } : {}) }));
-  return { doc: faded(named.ok ? named.doc : made.doc, [groupId], layer.opacity, p), ids: [groupId], roots: [{ id: groupId, layer }] };
+  const name = layer.name.slice(0, MAX_NAME);
+  const titled = { ...made.doc, comps: { ...made.doc.comps, [compId]: { ...made.doc.comps[compId], name } } };
+  const named = editClip(titled, groupId, (clip) => ({ ...clip, name, ...(layer.clip === Clip.Content ? { clipContent: true } : {}) }));
+  return { doc: faded(named.ok ? named.doc : titled, [groupId], layer.opacity, p), ids: [groupId], roots: [{ id: groupId, layer }] };
 }
 
 function clipIdsIn(doc: MotionDoc, compId: string): string[] {
@@ -403,7 +482,7 @@ function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: P
 
 function ownOverrides(doc: MotionDoc, layer: FrameLayer, main: Main, shift: Unit, p: Place) {
   const images: FigmaImage[] = [];
-  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(p.mains), report: () => undefined }, Background.Always);
+  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(), report: () => undefined }, Background.Always);
   const ids = { comp: p.newId(), clip: p.newId() };
   const made = own.ids.length ? precompose(own.doc, own.ids, ids, layer.name) : null;
   return made?.ok ? instanceOverrides(made.doc, ids.comp, main.compId, { own: images, main: main.images }) : null;
@@ -431,7 +510,7 @@ function instanceOfMain(doc: MotionDoc, layer: FrameLayer, main: Main, p: Place,
 
 function plainFrame(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {
   const built = layersOf(doc, layer, p, need);
-  return layer.autoLayout ? built : grouped(built, layer, p);
+  return layer.autoLayout || need === Background.InFlow ? built : grouped(built, layer, p);
 }
 
 function nestedFrame(doc: MotionDoc, layer: FrameLayer, p: Place, need: Background): Built {

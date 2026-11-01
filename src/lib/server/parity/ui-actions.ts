@@ -90,6 +90,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   layersToFrame: canvas('layers_to_frame'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
+  homeComponents: canvas('home_components'),
   drawFrame: canvas('draw_frame'),
   pasteFigma: uiOnly('decodes the Figma clipboard of the browser; agents draw the same layers with draw_frame and edit'),
   importLottie: canvas('import_lottie'),

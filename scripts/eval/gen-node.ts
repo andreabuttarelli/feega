@@ -5,7 +5,6 @@ import { env } from '../_shims/env-private';
 import { refuseAdminWrites, targetOf } from '../e2e/target';
 import { runGenNode, reconcileVideoNodeRuns } from '$lib/server/canvas/generate';
 import { writeNodeData } from '$lib/server/repos/canvas';
-import { grantWelcomeCredits } from '$lib/server/tenancy/free-org-limit';
 import { GPT_IMAGE_25_FLARE_MODEL } from '$lib/image-models';
 import { GROK_IMAGINE_VIDEO_MODEL } from '$lib/video-models';
 
@@ -145,7 +144,6 @@ try {
   await checked(admin.from('orgs').insert({ id: orgId, name: 'Gen node eval', slug: `gen-node-eval-${orgId}` }));
   orgCreated = true;
   await checked(admin.from('orgs_members').insert({ org_id: orgId, user_id: userId, role: 'owner' }));
-  await grantWelcomeCredits(admin as never, orgId);
   await checked(admin.from('projects').insert({ id: projectId, org_id: orgId, name: 'Gen node eval', slug: 'gen-node-eval' }));
   await checked(admin.from('canvases').insert({ id: canvasId, org_id: orgId, project_id: projectId, name: 'Gen node eval' }));
   await checked(userClient.rpc('auth_org_ids'));

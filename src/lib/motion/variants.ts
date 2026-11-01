@@ -48,6 +48,13 @@ export function addVariant(doc: MotionDoc, compId: string, variant: Variant, new
   return { ok: true, doc: { ...doc, comps: { ...doc.comps, [compId]: marked, [id]: copy } } };
 }
 
+const FIRST_PROPERTY = 'Variant';
+
+export function appendVariant(doc: MotionDoc, compId: string, newId: NewId): OpResult {
+  const property = Object.keys(variantProps(doc, compId))[0] ?? FIRST_PROPERTY;
+  return addVariant(doc, compId, { [property]: `${FIRST_PROPERTY} ${setMembers(doc, compId).length + 1}` }, newId);
+}
+
 export function swapInstance(doc: MotionDoc, instanceId: string, compId: string): OpResult {
   const instance = instanceOf(doc, instanceId);
   const target = doc.comps[compId];
@@ -110,4 +117,17 @@ export function defineVariantProp(doc: MotionDoc, compId: string, key: string, v
   const base = withAxis.comps[compId];
   const copies = Object.fromEntries(missing.map((variant) => [newId(), { ...base, component: { ...base.component!, variant } }]));
   return { ok: true, doc: { ...withAxis, comps: { ...withAxis.comps, ...copies } } };
+}
+
+const MAX_CHIPS = 6;
+
+export type VariantChip = { compId: string; label: string; current: boolean };
+
+export function variantChips(doc: MotionDoc, compId: string): VariantChip[] | null {
+  const members = setMembers(doc, compId);
+  const several = Object.keys(variantProps(doc, compId)).length > 1;
+  if (members.length < 2 || (several && members.length > MAX_CHIPS)) {
+    return null;
+  }
+  return members.map(([id, comp]) => ({ compId: id, label: Object.values(comp.component!.variant ?? {}).join(', ') || comp.component!.name, current: id === compId }));
 }

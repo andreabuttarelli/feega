@@ -30,20 +30,28 @@ export class FrameExtras implements FontLibrary {
   private readonly at: FrameAt;
   private readonly supabase: SupabaseClient;
   private readonly docOf: () => MotionDoc;
+  private readonly landed: Promise<boolean>;
 
-  constructor(at: FrameAt, supabase: SupabaseClient, docOf: () => MotionDoc) {
+  constructor(at: FrameAt, supabase: SupabaseClient, docOf: () => MotionDoc, landed: Promise<boolean>) {
     this.at = at;
     this.docOf = docOf;
+    this.landed = landed;
     this.supabase = supabase;
     this.editorUrl = `/p/${at.projectId}/c/${at.canvasId}/motion/${at.nodeId}`;
   }
 
   load(): Promise<void> {
-    this.loading ??= loadPageData<Loaded>(new URL(this.editorUrl, location.origin)).then((data) => {
-      this.data = data;
-      this.families = data.fonts;
-    });
+    this.loading ??= this.fetched();
     return this.loading;
+  }
+
+  private async fetched(): Promise<void> {
+    if (!(await this.landed)) {
+      return;
+    }
+    const data = await loadPageData<Loaded>(new URL(this.editorUrl, location.origin));
+    this.data = data;
+    this.families = data.fonts;
   }
 
   get assets(): FrameAsset[] {

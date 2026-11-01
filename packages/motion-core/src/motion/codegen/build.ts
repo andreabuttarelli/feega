@@ -18,7 +18,8 @@ import { absoluteRules, containerRules, flowItemRules, isFlowChild, px, Shape } 
 import { backgroundRules, borderRules, effectRules, radiusRules, typeRules, type Painter } from './paint';
 import { ColourRole, TokenBook } from './tokens';
 import { animationOf, timelineOf, type Timeline } from './animate';
-import { planComponents, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
+import { stateStyleOf } from './states';
+import { planComponents, PlanExport, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
 
 export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; brand: BrandTokens | null };
 
@@ -166,7 +167,8 @@ function element(tag: string, clip: MotionClip, rules: Rule[], scope: Scope, ext
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
   const animation = animated(clip, scope);
-  return { kind: NodeKind.Element, tag, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...(animation ? { animation } : {}), ...extra };
+  const states = stateStyleOf(clip, scope.painter.unit);
+  return { kind: NodeKind.Element, tag, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...rules, ...effects.rules], attrs: [], children: [], styleBinds: [], ...(shownBy ? { shownBy } : {}), ...(animation ? { animation } : {}), ...(states ? { states } : {}), ...extra };
 }
 
 const animated = (clip: MotionClip, scope: Scope) => animationOf(clip, { timeline: scope.timeline, space: scope.space, notes: scope.shared.notes, label: layerName(clip) });
@@ -306,13 +308,17 @@ function svgNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   noteDropped(clip, effects.dropped, scope);
   const shownBy = bound(clip, PropKey.Hidden, scope);
   const animation = animated(clip, scope);
-  return { ...(animation ? { animation } : {}), kind: NodeKind.Svg, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
+  const states = stateStyleOf(clip, scope.painter.unit);
+  return { ...(animation ? { animation } : {}), ...(states ? { states } : {}), kind: NodeKind.Svg, clipId: clip.id, className: scope.names.unique(kebab(layerName(clip))), rules: [...placement(clip, parent, scope), ...effects.rules], width: Math.round(box.width), height: Math.round(box.height), markup, ...(shownBy ? { shownBy } : {}) };
 }
 
 function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): CodeNode | null {
   const plan = scope.shared.plans.get(compOf(clip)!);
   if (!plan) {
     return null;
+  }
+  if (plan.exportAs === PlanExport.Inline) {
+    return inlinedNode(plan, clip, parent, scope);
   }
   ensureComponent(plan, scope.shared);
   scope.uses.add(plan.set?.name ?? plan.name);
@@ -334,6 +340,17 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
     forwards,
     ...(shownBy ? { shownBy } : {})
   };
+}
+
+const overriding = (base: Rule[], over: Rule[]): Rule[] => [...base.filter(([p]) => !over.some(([q]) => q === p)), ...over];
+
+function inlinedNode(plan: ComponentPlan, clip: MotionClip, parent: MotionClip | null, scope: Scope): ElementNode {
+  const { shared } = scope;
+  const space = plan.comp.frame ?? { width: shared.doc.width, height: shared.doc.height };
+  const content = shared.content.get(plan.compId);
+  const inner: Scope = { ...scopeOf(shared, plan.comp.tracks, space, scope.plan, 0, { ...shared.timeline, start: 0, length: plan.comp.durationInFrames }), names: scope.names, uses: scope.uses, open: scope.open };
+  const root = rootOf(inner, 'div', [], [['width', px(content?.width ?? space.width)]]);
+  return { ...root, clipId: clip.id, className: root.className || scope.names.unique(kebab(layerName(clip))), rules: overriding(root.rules, placement(clip, parent, scope)) };
 }
 
 function nodeOf(clip: MotionClip, parent: MotionClip | null, scope: Scope, parentTag: string): CodeNode | null {

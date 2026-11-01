@@ -4,6 +4,7 @@ import { adoptCollection, syncedCollection, variableLibraryOf } from '$lib/motio
 import { bindVariable, defineVariable, setActiveMode } from '$lib/motion/variables';
 import { VARIABLE_NAME, VarType, keyOf, type Collection, type VarInput, type Variables } from '@feega/motion-core/motion/variables-model';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
+import { LibraryOp, type LibraryPort } from '$lib/motion/project-library-ops';
 
 const ELEMENT_SEP = ':';
 
@@ -20,6 +21,7 @@ export const canvasVariableInput = z.object({
 });
 
 export type VariableFrames = {
+  project: LibraryPort;
   ids: () => Promise<string[]>;
   read: (id: string) => Promise<{ version: number; doc: MotionDoc } | null>;
   write: (id: string, version: number, doc: MotionDoc, summary: string) => Promise<RevisionWrite>;
@@ -77,6 +79,18 @@ const ASKS: [(ask: VariableAsk) => boolean, CanvasVariableAction][] = [
 
 export const actionOf = (ask: VariableAsk): CanvasVariableAction => ASKS.find(([matches]) => matches(ask))?.[1] ?? CanvasVariableAction.List;
 
+const shared = ({ active: _ownMode, ...collection }: Collection): Collection => collection;
+
+async function projectLibrary(store: VariableFrames, frames: readonly Frame[]): Promise<Variables> {
+  const held = (await store.project.load()) as Variables;
+  const found = variableLibraryOf(frames.map((f) => f.doc));
+  const fresh = Object.fromEntries(Object.entries(found).filter(([name]) => !held[name]).map(([name, c]) => [name, shared(c)]));
+  if (Object.keys(fresh).length) {
+    await store.project.run({ op: LibraryOp.Adopt, entries: fresh });
+  }
+  return { ...held, ...fresh };
+}
+
 const owns = (frame: Frame, collection: string) => !!frame.doc.variables?.[collection];
 
 function withCollection(frame: Frame, name: string, collection: Collection): MotionDoc | null {
@@ -90,7 +104,7 @@ function withCollection(frame: Frame, name: string, collection: Collection): Mot
 const named = (frames: Frame[], ask: VariableAsk) => frames.filter((f) => (ask.frames ?? []).includes(f.id));
 
 const ACTIONS: Record<CanvasVariableAction, (store: VariableFrames, ask: VariableAsk) => Promise<VariableAnswer>> = {
-  [CanvasVariableAction.List]: async (store) => ({ ok: true, variables: variableLibraryOf((await framesOf(store)).map((f) => f.doc)) }),
+  [CanvasVariableAction.List]: async (store) => ({ ok: true, variables: await projectLibrary(store, await framesOf(store)) }),
   [CanvasVariableAction.Define]: async (store, ask) => {
     if (!ask.collection || !ask.name || !ask.type || !ask.values) {
       return { ok: false, error: 'define takes collection, name, type and values' };
@@ -106,6 +120,10 @@ const ACTIONS: Record<CanvasVariableAction, (store: VariableFrames, ask: Variabl
       return defined;
     }
     const canonical = defined.doc.variables![ask.collection];
+    const stored = await store.project.run({ op: LibraryOp.Save, name: ask.collection, value: shared(canonical) });
+    if (!stored.ok) {
+      return stored;
+    }
     const summary = `Updated the ${keyOf(ask.collection, ask.name)} variable`;
     const changed = await Promise.all(
       targets.map((f) => {
@@ -135,7 +153,7 @@ const ACTIONS: Record<CanvasVariableAction, (store: VariableFrames, ask: Variabl
   },
   [CanvasVariableAction.Bind]: async (store, ask) => {
     const frames = await framesOf(store);
-    const collection = ask.collection ? variableLibraryOf(frames.map((f) => f.doc))[ask.collection] : undefined;
+    const collection = ask.collection ? (await projectLibrary(store, frames))[ask.collection] : undefined;
     if (!ask.collection || !ask.name || !ask.target || !collection) {
       return { ok: false, error: `bind takes collection, name, target and ids; no canvas collection ${ask.collection ?? ''}` };
     }

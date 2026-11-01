@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TYPE, TYPE_SIZE } from './components';
+import { TEXT_CASES, TYPE, TYPE_SIZE } from './components';
 import { fillsSchema } from './fill/model';
 import { effectSchema, MAX_EFFECTS } from './effects/model';
 
@@ -23,6 +23,7 @@ export const textStyleSchema = z
     weight: z.number().int().min(TYPE.weight.min).max(TYPE.weight.max).optional(),
     tracking: z.number().min(TYPE.tracking.min).max(TYPE.tracking.max).optional(),
     leading: z.number().min(TYPE.leading.min).max(TYPE.leading.max).optional(),
+    textCase: z.enum(TEXT_CASES).optional(),
     color: colour.optional()
   })
   .strict();

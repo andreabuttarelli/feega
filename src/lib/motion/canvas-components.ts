@@ -1,5 +1,6 @@
 import { compsOf, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { NewId } from './main-component';
+import { reframed } from './comp-frame';
 import { setMembers, type Variant } from './variants';
 import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
@@ -12,9 +13,12 @@ const fail = (error: string): OpResult => ({ ok: false, error });
 
 export function componentGroups(frames: readonly FrameDoc[]): ComponentGroup[] {
   const seen = new Set<string>();
+  const present = new Set(frames.map((f) => f.id));
   return frames.flatMap(({ id, doc }) =>
     Object.entries(doc.comps).flatMap(([compId, comp]) => {
-      if (!comp.component || seen.has(compId)) {
+      const home = comp.component?.home;
+      const followed = Boolean(home && home !== id && present.has(home));
+      if (!comp.component || followed || seen.has(compId)) {
         return [];
       }
       const members = setMembers(doc, compId);
@@ -38,7 +42,7 @@ function copied(target: MotionDoc, source: MotionDoc, compId: string): MotionDoc
   if (target.comps[compId]) {
     return target;
   }
-  const comps = Object.fromEntries([...withNested(source, compId)].filter(([id]) => !target.comps[id]));
+  const comps = Object.fromEntries([...withNested(source, compId)].filter(([id]) => !target.comps[id]).map(([id, comp]) => [id, reframed(comp, source, target)]));
   const known = new Set(target.assets.map((a) => a.id));
   const assets = [...target.assets, ...source.assets.filter((a) => !known.has(a.id))];
   return { ...target, assets, comps: { ...target.comps, ...comps } };
@@ -54,9 +58,30 @@ export function homed(source: MotionDoc, frameId: string): MotionDoc {
   return { ...source, comps };
 }
 
+export function homedAt(source: MotionDoc, homes: Readonly<Record<string, string>>): MotionDoc {
+  const comps = Object.fromEntries(Object.entries(source.comps).map(([id, comp]) => [id, comp.component && homes[id] ? { ...comp, component: { ...comp.component, home: homes[id] } } : comp]));
+  return { ...source, comps };
+}
+
 export const mainHome = (doc: MotionDoc, compId: string, frameId: string): string => doc.comps[compId]?.component?.home ?? frameId;
 
-export const mainClipOf = (doc: MotionDoc, compId: string): string | null => doc.tracks.flatMap((t) => t.clips).find((c) => c.props.comp === compId)?.id ?? null;
+const holdsMain = (doc: MotionDoc, clip: MotionClip, compId: string, seen: Set<string>): boolean => {
+  const comp = clip.props.comp;
+  if (comp === compId) {
+    return true;
+  }
+  if (typeof comp !== 'string' || seen.has(comp)) {
+    return false;
+  }
+  seen.add(comp);
+  return (doc.comps[comp]?.tracks ?? []).flatMap((t) => t.clips as MotionClip[]).some((inner) => holdsMain(doc, inner, compId, seen));
+};
+
+export const mainClipOf = (doc: MotionDoc, compId: string): string | null => {
+  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
+  const shown = clips.find((c) => c.props.comp === compId) ?? clips.find((c) => holdsMain(doc, c, compId, new Set()));
+  return shown?.id ?? null;
+};
 
 export function placeInstance(target: MotionDoc, source: MotionDoc, compId: string, newId: NewId, at?: Offset): OpResult {
   const main = source.comps[compId];

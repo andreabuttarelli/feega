@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { compOf, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { overridden } from '@feega/motion-core/motion/precomp';
+import { flattenComps, overridden } from '@feega/motion-core/motion/precomp';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { withStacking } from '@feega/motion-core/motion/layout/stacking';
+import { withoutHidden } from '@feega/motion-core/motion/organize';
+import { apply2d, pivotBox, worldAt } from '@feega/motion-core/motion/parent';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import type { ComponentUse } from './component-marks';
@@ -63,6 +67,15 @@ function shownTexts(doc: MotionDoc, comp: MotionComp, host: MotionClip, depth = 
   return clips.flatMap((c) => (typeof c.props.text === 'string' ? [c.props.text] : compOf(c) && depth < 8 ? shownTexts(doc, doc.comps[compOf(c)!], c, depth + 1) : []));
 }
 
+function textAt(doc: MotionDoc, tree: PageTree, characters: string) {
+  const flat = flattenComps(withStacking(withAutoLayout(withoutHidden(doc))));
+  const size = { width: flat.width, height: flat.height };
+  const clip = flat.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.props.text === characters)!;
+  const [x, y] = apply2d(worldAt(flat, clip.id, 0, size), [pivotBox(clip.props, size).left, pivotBox(clip.props, size).top]);
+  const k = flat.width / tree.width;
+  return { x: Math.round(x / k), y: Math.round(y / k) };
+}
+
 describe('codePlan', () => {
   it('ogni combinazione di props di un componente è una variante dello stesso insieme', () => {
     const doc = docOf();
@@ -116,6 +129,45 @@ describe('codePlan', () => {
     expect(hostsOf(doc, mainId).map((h) => shownTexts(doc, main, h)[0]).sort()).toEqual(['Download', 'Save']);
   });
 
+  it('un componente annidato visto per la prima volta dentro un\'istanza ha il suo main', () => {
+    const icon = (use: number, path: string, x: number): RestNode => ({ id: nid(), type: 'VECTOR', name: 'svg', use, absoluteBoundingBox: box(x, 17, 16, 16), fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], fillGeometry: [{ path }] });
+    const row = (use: number, x: number, child: RestNode) => framed(use, [x, 10, 120, 30], BLUE, [child, text('Go', x + 24, 17)]);
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, children: [row(0, 10, icon(1, 'M 0 0 L 16 0 L 16 16 Z', 14)), row(2, 140, icon(3, 'M 0 0 L 16 16 L 0 16 Z', 144))] } };
+    const uses: ComponentUse[] = [
+      { component: 'NavLink', props: {} },
+      { component: 'Icon', props: { icon: 'home' } },
+      { component: 'NavLink', props: {} },
+      { component: 'Icon', props: { icon: 'tasks' } }
+    ];
+    const doc = codePlan(tree, uses, nid)!.plan.items[0].doc;
+
+    expect(mainsNamed(doc, 'Icon').map(([, c]) => c.component!.variant)).toEqual(expect.arrayContaining([{ icon: 'home' }, { icon: 'tasks' }]));
+  });
+
+  it('due componenti con la stessa radice: l\'esterno è un main che contiene un\'istanza dell\'interno', () => {
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, children: [framed(0, [10, 10, 80, 30], BLUE, [text('Save', 20, 17)]), framed(2, [100, 10, 80, 30], BLUE, [text('Undo', 110, 17)])] } };
+    const uses: ComponentUse[] = [
+      { component: 'Tooltip', props: {} },
+      { component: 'Button', props: { children: 'Save' }, shares: 0 },
+      { component: 'Tooltip', props: {} },
+      { component: 'Button', props: { children: 'Undo' }, shares: 2 }
+    ];
+    const doc = codePlan(tree, uses, nid)!.plan.items[0].doc;
+    const [tooltipId, tooltip] = mainsNamed(doc, 'Tooltip')[0];
+    const [buttonId] = mainsNamed(doc, 'Button')[0];
+
+    expect(tooltip.tracks.flatMap((t) => t.clips as MotionClip[]).some((c) => compOf(c) === buttonId)).toBe(true);
+    expect(hostsOf(doc, tooltipId)).toHaveLength(2);
+    expect(hostsOf(doc, tooltipId).map((h) => shownTexts(doc, tooltip, h)[0]).sort()).toEqual(['Save', 'Undo']);
+  });
+
+  it('ogni insieme di varianti va sulla pagina Components, e le istanze della pagina vi rimandano', () => {
+    const made = codePlan(TREE, USES, nid)!;
+
+    expect(made.sets.map((s) => s.name).sort()).toEqual(['Button', 'Card', 'CardTitle']);
+    expect(Object.keys(made.homes[0] ?? {})).toHaveLength(4);
+  });
+
   it('la prop di testo del codice diventa la proprietà del main, col suo nome', () => {
     const doc = docOf();
     const [, title] = mainsNamed(doc, 'CardTitle')[0];
@@ -123,5 +175,30 @@ describe('codePlan', () => {
 
     expect(title.component!.properties!.children).toMatchObject({ kind: 'text', default: 'Revenue' });
     expect(title.tracks.flatMap((t) => t.clips).find((c) => c.id === target)?.props.text).toBe('Revenue');
+  });
+
+  it('un main in auto layout resta dove stava, anche se un suo figlio esce dal riquadro', () => {
+    const header: RestNode = { id: nid(), type: 'FRAME', name: 'header', absoluteBoundingBox: box(0, 0, 400, 40), fills: [{ type: 'SOLID', color: GREY }] };
+    const badge: RestNode = { id: nid(), type: 'FRAME', name: 'badge', absoluteBoundingBox: box(380, 30, 20, 20), fills: [{ type: 'SOLID', color: BLUE }] };
+    const card = framed(0, [0, 40, 400, 100], GREY, [text('Title', 20, 60), badge]);
+    const column = { layoutMode: 'VERTICAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN' };
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, ...column, children: [header, card] } };
+    const doc = codePlan(tree, [{ component: 'Card', props: {} }], nid)!.plan.items[0].doc;
+
+    expect(mainsNamed(doc, 'Card')).toHaveLength(1);
+    expect(textAt(doc, tree, 'Title')).toEqual({ x: 20, y: 60 });
+  });
+
+  it('componenti annidati in profondità costano lavoro lineare, non esponenziale', () => {
+    const DEPTH = 14;
+    const nesting = (x: number, base: number, level = 0): RestNode =>
+      framed(base + level, [x + level * 2, 10 + level * 10, 150 - level * 4, 280 - level * 12], level % 2 ? GREY : WHITE, [text(`L${level}`, x + level * 2 + 4, 12 + level * 10), ...(level + 1 < DEPTH ? [nesting(x, base, level + 1)] : [])]);
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, children: [nesting(10, 0), nesting(200, DEPTH)] } };
+    const uses = [...Array(2 * DEPTH).keys()].map((i) => ({ component: `Level${i % DEPTH}`, props: {} }));
+    let made = 0;
+    const plan = codePlan(tree, uses, () => `n${++made}`)!;
+
+    expect(mainsNamed(plan.plan.items[0].doc, 'Level0')).toHaveLength(1);
+    expect(made).toBeLessThan(DEPTH * 20);
   });
 });

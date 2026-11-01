@@ -282,4 +282,16 @@ describe("domProbe", () => {
     expect(text?.lines).toEqual([{ chars: ["a", "b"], xs: [5, 11], top: 8, height: 14 }]);
     expect(text?.raster).toBeNull();
   });
+
+  it("reads an svg transform attribute that the computed style leaves out, as WebKit does", async () => {
+    const { reply } = await asked('<svg width="400" height="400"><g transform="translate(100 50) rotate(90)"><rect width="10" height="4"></rect></g><path transform="matrix(1,0,0,1,7,8) scale(2)" d="M0 0L1 1"></path></svg>');
+    const nodes = (reply.trees[CLIP] as { nodes: { tag: string; style: Record<string, string> }[] }).nodes;
+    const style = (tag: string) => nodes.find((n) => n.tag === tag)!.style;
+    const numbers = (value: string) => value.match(/-?[\d.]+(e-?\d+)?/g)!.map((n) => Math.round(Number(n) * 1000) / 1000 || 0);
+
+    expect(numbers(style("g").transform)).toEqual([0, 1, -1, 0, 100, 50]);
+    expect(style("g")["transform-origin"]).toBe("0px 0px");
+    expect(numbers(style("path").transform)).toEqual([2, 0, 0, 2, 7, 8]);
+    expect(style("rect").transform ?? "").not.toMatch(/matrix/);
+  });
 });

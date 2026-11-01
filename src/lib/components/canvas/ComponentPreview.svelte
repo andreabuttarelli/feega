@@ -31,8 +31,8 @@
       return;
     }
     let live = true;
-    void componentPreview(wanted).then((preview) => {
-      if (!live || !preview) {
+    void componentPreview(wanted, (preview) => {
+      if (!live) {
         return;
       }
       target.width = preview.width;

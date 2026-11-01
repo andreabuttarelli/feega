@@ -1,4 +1,4 @@
-import TABLE from './template/part-usage.json';
+import TABLE from './template/part-usage.json' with { type: 'json' };
 
 export enum ShapePaint {
   Fill = 'fill',

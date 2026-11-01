@@ -30,7 +30,7 @@ export function videosFromCredits(credits: number): number {
 }
 
 /** Free-tier monthly credit grant (no Stripe plan). */
-export const FREE_CREDITS = 400;
+export const FREE_CREDITS = 25;
 
 /*
  * NON reintrodurre `apiValueEur/Usd` (il "valore API" accanto ai crediti sul pricing): quei numeri

@@ -1,10 +1,13 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Browser, Page } from 'puppeteer-core';
 import shaderRuntime from 'virtual:motion-shader-fx';
 import type { ExportPage, ExportPort, PageBox, StillPage, StillPort, Viewport } from './server-frames';
 import { Pose, kindsOf, measureClips } from '@feega/motion-core/motion/hyperframes/measure';
 import type { GlPage } from '$lib/server/effects/check';
 import { extraChromiumArgs } from './chromium-args';
+import { LOCAL_LIBS_DIR, localLib } from './local-libs';
+import { libsOrigin } from './libs-origin';
 
 const CHROMIUM_VERSION = '153.0.0';
 const CHROMIUM_PACK = `https://github.com/Sparticuz/chromium/releases/download/v${CHROMIUM_VERSION}/chromium-v${CHROMIUM_VERSION}-pack.x64.tar`;
@@ -105,25 +108,40 @@ async function shiftedTo(page: Page, top: number) {
   );
 }
 
-async function pictureOf(page: Page, full: Viewport, mime: string, quality?: number): Promise<Buffer> {
+const wholeOf = (full: Viewport): PageBox => ({ left: 0, top: 0, width: full.width, height: full.height });
+
+async function pictureOf(page: Page, full: Viewport, mime: string, quality?: number, region: PageBox = wholeOf(full)): Promise<Buffer> {
   const type = SCREENSHOT_TYPE[mime];
-  if (full.height <= BAND_PX) {
-    return Buffer.from(await page.screenshot({ type, quality, omitBackground: true }));
-  }
   const bands: { input: Buffer; top: number; left: number }[] = [];
-  for (let top = 0; top < full.height; top += BAND_PX) {
-    await shiftedTo(page, top);
-    const clip = { x: 0, y: 0, width: full.width, height: Math.min(BAND_PX, full.height - top) };
+  for (let top = 0; top < region.height; top += BAND_PX) {
+    await shiftedTo(page, region.top + top);
+    const clip = { x: region.left, y: 0, width: region.width, height: Math.min(BAND_PX, region.height - top) };
     bands.push({ input: Buffer.from(await page.screenshot({ type: 'png', omitBackground: true, clip })), top: Math.round(top * full.scale), left: 0 });
   }
   await shiftedTo(page, 0);
   const { default: sharp } = await import('sharp');
-  const sheet = sharp({ create: { width: Math.round(full.width * full.scale), height: Math.round(full.height * full.scale), channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(bands);
+  const size = { width: Math.round(region.width * full.scale), height: Math.round(region.height * full.scale) };
+  if (bands.length === 1 && type === 'png') {
+    return bands[0].input;
+  }
+  const sheet = sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }, limitInputPixels: false }).composite(bands);
   return sheet.toFormat(type, quality === undefined ? {} : { quality }).toBuffer();
+}
+
+async function libsFromCheckout(page: Page) {
+  const root = resolve(LOCAL_LIBS_DIR);
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    const lib = localLib(request.url(), libsOrigin(), root);
+    void (lib ? request.respond({ status: 200, contentType: lib.type, headers: { 'access-control-allow-origin': '*' }, body: readFileSync(lib.path) }) : request.continue());
+  });
 }
 
 async function openPage(viewport: Viewport): Promise<Page> {
   const page = await (await browser()).newPage();
+  if (localChromium()) {
+    await libsFromCheckout(page);
+  }
   page.setDefaultTimeout(SEEK_TIMEOUT_MS);
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: viewport.scale });
   return page;
@@ -149,11 +167,11 @@ async function boxOf(page: Page, clipId: string): Promise<PageBox | null> {
 }
 
 async function exportPageOf(viewport: Viewport): Promise<ExportPage> {
-  const page = await openPage(viewport);
+  const page = await openPage(banded(viewport));
   return {
     ...stillOf(page, viewport),
     boxOf: (clipId) => boxOf(page, clipId),
-    shot: async (mime, quality, clip) => Buffer.from(await page.screenshot({ type: SCREENSHOT_TYPE[mime], quality, omitBackground: true, ...(clip ? { clip: { x: clip.left, y: clip.top, width: clip.width, height: clip.height } } : {}) }))
+    shot: (mime, quality, clip) => pictureOf(page, viewport, mime, quality, clip ?? wholeOf(viewport))
   };
 }
 

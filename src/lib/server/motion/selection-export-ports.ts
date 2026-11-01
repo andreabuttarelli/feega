@@ -3,6 +3,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { findNode } from '$lib/server/repos/canvas';
 import { insertAsset } from '$lib/server/repos/assets';
+import { storageName } from '$lib/server/repos/storage-key';
 import { SIGNED_URL_TTL_S, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { withScenes } from '$lib/canvas/scene-sources';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -50,7 +51,7 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
     },
     draw: (targets, row) => drawTargets({ port: chromiumExport, compose, vector }, targets, row),
     store: async (packed) => {
-      const path = `${canvasUploadPrefix(orgId, projectId)}exports/${crypto.randomUUID()}/${packed.name}`;
+      const path = `${canvasUploadPrefix(orgId, projectId)}exports/${crypto.randomUUID()}/${storageName(packed.name)}`;
       await storeAssetFile(db, path, new File([new Uint8Array(packed.bytes)], packed.name, { type: packed.mime }));
       const row = await insertAsset(db, { orgId, projectId, type: packed.mime.startsWith('image/') ? 'image' : 'document', source: 'upload', url: path, mimeType: packed.mime, bytes: packed.bytes.length });
       return { asset_id: row.id, url: await signAssetFile(db, path) };

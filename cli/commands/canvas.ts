@@ -56,15 +56,33 @@ export async function cmdCanvasImport(project: string, file: string, opts: { org
   console.log(JSON.stringify(result, null, 2));
 }
 
-export async function cmdCanvasImportUrl(project: string, url: string, opts: { canvas: string; x: number; y: number; org?: string }) {
-  const input = { canvasId: opts.canvas, url, x: opts.x, y: opts.y };
+export async function cmdCanvasImportUrl(project: string, url: string, opts: { canvas: string; x: number; y: number; sections: boolean; tokens: boolean; org?: string }) {
+  const input = { canvasId: opts.canvas, url, x: opts.x, y: opts.y, sections: opts.sections, tokens: opts.tokens };
   const result = await canvasApi.run(await token(), { project, op: 'import_url', input }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }
 
-export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string; x: number; y: number; org?: string }) {
-  const input = { canvasId: opts.canvas, repo, route: opts.route, x: opts.x, y: opts.y };
+export async function cmdCanvasImportCode(project: string, repo: string, opts: { canvas: string; route: string[]; x: number; y: number; org?: string }) {
+  const input = { canvasId: opts.canvas, repo, routes: opts.route, x: opts.x, y: opts.y };
   const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function cmdCanvasImportStorybook(project: string, storybook: string, opts: { canvas: string; story?: string[]; x: number; y: number; org?: string }) {
+  const input = { canvasId: opts.canvas, storybook, stories: opts.story, x: opts.x, y: opts.y };
+  const result = await canvasApi.run(await token(), { project, op: 'import_code', input }, opts.org);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+const GITHUB_OPS: Record<string, string> = { status: 'github_status', connect: 'github_connect', repos: 'github_repos', branches: 'github_branches', disconnect: 'github_disconnect' };
+
+export async function cmdCanvasGithub(project: string, action: string, repo: string | undefined, opts: { org?: string }) {
+  const op = GITHUB_OPS[action];
+  if (!op) {
+    console.error(`Unknown action ${action}: ${Object.keys(GITHUB_OPS).join(', ')}`);
+    process.exit(1);
+  }
+  const result = await canvasApi.run(await token(), { project, op, input: repo ? { repo } : {} }, opts.org);
   console.log(JSON.stringify(result, null, 2));
 }
 

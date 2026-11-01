@@ -38,8 +38,14 @@ export type Forward = { name: string; prop: string };
 
 export type SetMark = { name: string; variant: Record<string, string> };
 
+export enum PlanExport {
+  Component = 'component',
+  Inline = 'inline'
+}
+
 export type ComponentPlan = {
   compId: string;
+  exportAs: PlanExport;
   name: string;
   set: SetMark | null;
   block: string;
@@ -71,9 +77,8 @@ const setOf = (comp: MotionComp): SetMark | null => (comp.component?.set && Obje
 
 const memberName = (comp: MotionComp, set: SetMark | null) => pascal(set ? `${set.name} ${Object.values(set.variant).join(' ')}` : (comp.component?.name ?? comp.name));
 
-function planOne(compId: string, comp: MotionComp, hosts: MotionClip[], names: NameBook, resolve: (key: PropKey, value: string | boolean) => string | boolean): ComponentPlan {
+function planOne(compId: string, comp: MotionComp, hosts: MotionClip[], resolve: (key: PropKey, value: string | boolean) => string | boolean): ComponentPlan {
   const set = setOf(comp);
-  const name = names.unique(memberName(comp, set));
   const masters = comp.tracks.flatMap((t) => t.clips as MotionClip[]);
   const effective = hosts.map((h) => [h.id, effectiveClips(comp, h)] as const);
   const declared = declaredNames(comp);
@@ -102,7 +107,7 @@ function planOne(compId: string, comp: MotionComp, hosts: MotionClip[], names: N
       }
     }
   }
-  return { compId, name, set, block: kebab(name), comp, bindings, values, exposed: [], forwards: new Map(), propNames };
+  return { compId, exportAs: PlanExport.Component, name: '', set, block: '', comp, bindings, values, exposed: [], forwards: new Map(), propNames };
 }
 
 export const specsOf = (plan: ComponentPlan): PropSpec[] => [...[...plan.bindings.values()].flat().map((b) => b.spec), ...plan.exposed];
@@ -158,8 +163,16 @@ export function planComponents(doc: MotionDoc, resolve: (key: PropKey, value: st
   const names = new NameBook('');
   const ids = [...new Set(hosts.map((h) => compOf(h)!))].sort((a, b) => doc.comps[a].name.localeCompare(doc.comps[b].name) || a.localeCompare(b));
   new Set(ids.flatMap((id) => setOf(doc.comps[id])?.name ?? [])).forEach((set) => names.unique(set));
-  const plans = new Map(ids.map((id) => [id, planOne(id, doc.comps[id], hosts.filter((h) => compOf(h) === id), names, resolve)]));
+  const plans = new Map(ids.map((id) => [id, planOne(id, doc.comps[id], hosts.filter((h) => compOf(h) === id), resolve)]));
   const done = new Set<string>();
   plans.forEach((plan) => expose(plan, plans, done));
+  plans.forEach((plan) => {
+    if (!plan.comp.component && !specsOf(plan).length) {
+      plan.exportAs = PlanExport.Inline;
+      return;
+    }
+    plan.name = names.unique(memberName(plan.comp, plan.set));
+    plan.block = kebab(plan.name);
+  });
   return plans;
 }

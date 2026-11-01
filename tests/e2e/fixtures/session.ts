@@ -142,14 +142,18 @@ async function createInTestAccount(opts: SessionOptions): Promise<E2eSession> {
 const PROJECT_ROWS = ['assets', 'chat_threads', 'nodes', 'canvases'] as const;
 const CANVAS_BUCKET = 'canvas-assets';
 
+export async function dropProject(db: SupabaseClient, orgId: string, projectId: string): Promise<void> {
+  await purgeStorage(fixedBuckets(db, [CANVAS_BUCKET]), [`${orgId}/${projectId}`]);
+  for (const table of PROJECT_ROWS) {
+    await checked(db.from(table).delete().eq('project_id', projectId));
+  }
+  await checked(db.from('projects').delete().eq('id', projectId));
+}
+
 async function teardownInTestAccount(session: E2eSession): Promise<void> {
   const { db, userId } = await userClient(session.email, session.password);
 
-  await purgeStorage(fixedBuckets(db, [CANVAS_BUCKET]), [`${session.orgId}/${session.projectId}`]);
-  for (const table of PROJECT_ROWS) {
-    await checked(db.from(table).delete().eq('project_id', session.projectId));
-  }
-  await checked(db.from('projects').delete().eq('id', session.projectId));
+  await dropProject(db, session.orgId, session.projectId);
   await checked(db.from('profiles').update({ onboarding_seen_at: new Date().toISOString() }).eq('id', userId));
 }
 

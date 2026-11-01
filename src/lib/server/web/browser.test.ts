@@ -34,6 +34,12 @@ describe('browserless: a hosted browser behind the same tab', () => {
     expect(endpoint.searchParams.has('proxy')).toBe(false);
   });
 
+  it('keeps the session alive through a slow page import: stripe.com took ~80 s and lost its frame at 70 s', () => {
+    const STRIPE_IMPORT_MS = 80_000;
+
+    expect(Number(new URL(browserlessEndpoint({ key: KEY })).searchParams.get('timeout'))).toBeGreaterThan(STRIPE_IMPORT_MS * 1.4);
+  });
+
   it('follows the region of a configured base url', () => {
     expect(new URL(browserlessEndpoint({ key: KEY, base: 'https://production-lon.browserless.io/' })).host).toBe('production-lon.browserless.io');
   });

@@ -1,3 +1,4 @@
+import { componentsPage, homeComponents } from '$lib/server/canvas/components-page';
 import { exportCodeNode } from '$lib/server/canvas/code-export-node';
 import { listProjectComponents } from './project-components';
 import { ExportMode } from '$lib/canvas/code-frame';
@@ -40,6 +41,10 @@ import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { canvasStyle, canvasStyleInput } from '$lib/server/motion/canvas-styles';
+import { listEntries } from '$lib/server/repos/project-library';
+import { runLibrary } from '$lib/server/canvas/project-library';
+import { docNodeIds } from '$lib/server/canvas/doc-nodes';
+import { LibraryKind } from '$lib/motion/project-library-ops';
 import { canvasVariable, canvasVariableInput } from '$lib/server/motion/canvas-variables';
 import { importLottieAt } from '$lib/server/motion/lottie-at';
 import { lottieSource } from '$lib/motion/import-lottie';
@@ -77,7 +82,13 @@ import { pasteNodes } from '$lib/server/canvas/paste';
 import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
+import { sectioningOf, tokeningOf } from '$lib/server/url-import/url-doc';
 import { importCodeInto } from '$lib/server/code-import/canvas-import';
+import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
+import { githubFor } from '$lib/server/code-import/github-runtime';
+import { libsOrigin } from '$lib/server/motion/libs-origin';
+import { GithubRefusal } from '$lib/server/code-import/github-http';
+import { MAX_STORIES } from '$lib/server/code-import/storybook';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { readSelection, SELECTION_WAIT_MS } from '$lib/server/canvas/selection-read';
@@ -238,6 +249,8 @@ const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame
 const placeComponentInput = z.object({ canvasId: z.string(), frameId: z.string().describe('the Frame node holding the main component'), compId: z.string().describe('the main component id'), x: z.number().finite(), y: z.number().finite() }).strict();
 const placeInFrameInput =z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
+const homeComponentsInput = z.object({ frameId: z.string().describe('the Frame node where a main component was just made') }).strict();
+
 const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse|polygon|star, box:{left,top,width,height}}, {tool:line|arrow, from:{x,y}, to:{x,y}, stroke?:#hex}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
@@ -253,9 +266,11 @@ const importFigmaInput = z
   })
   .strict();
 
-const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).describe('a public https://github.com/<owner>/<repo> link, optionally /tree/<ref>'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), x: z.number().finite(), y: z.number().finite() }).strict();
 
-const importUrlInput = z.object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importUrlInput = z
+  .object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite(), sections: z.boolean().default(true).describe('split the page into named section frames (Nav, Hero, Features, Footer…); false keeps one layer tree'), tokens: z.boolean().default(true).describe('turn the page colours, type, effects, radii and spacing into shared variables and styles bound to its layers; false keeps raw values') })
+  .strict();
 
 const drawFrameInput = z
   .object({
@@ -922,9 +937,11 @@ export const CANVAS_OPS = {
     input: canvasStyleInput,
     run: async (ctx, input) => {
       const frames = framesOf(ctx);
+      const scope = { orgId: ctx.orgId, projectId: ctx.projectId, kind: LibraryKind.Style };
       return canvasStyle(
         {
-          ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
+          project: { load: () => listEntries(ctx.db, scope), run: (ask) => runLibrary(ctx.db, scope, ask) },
+          ids: async () => docNodeIds(await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })),
           read: frames.read,
           write: frames.write
         },
@@ -938,9 +955,11 @@ export const CANVAS_OPS = {
     input: canvasVariableInput,
     run: async (ctx, input) => {
       const frames = framesOf(ctx);
+      const scope = { orgId: ctx.orgId, projectId: ctx.projectId, kind: LibraryKind.Variables };
       return canvasVariable(
         {
-          ids: async () => (await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })).filter((n) => n.type === MOTION_TYPE).map((n) => n.id),
+          project: { load: () => listEntries(ctx.db, scope), run: (ask) => runLibrary(ctx.db, scope, ask) },
+          ids: async () => docNodeIds(await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId })),
           read: frames.read,
           write: frames.write
         },
@@ -985,16 +1004,62 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => importFigmaInto(figmaScope(ctx), input.canvasId, { url: input.url, nodeIds: input.frameIds ?? null, at: { x: input.x, y: input.y } })
   }),
 
+  home_components: op({
+    access: Access.Write,
+    input: homeComponentsInput,
+    run: async (ctx, input) => homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8))
+  }),
+
   import_url: op({
     access: Access.Write,
     input: importUrlInput,
-    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y }, shape: { sectioning: sectioningOf(input.sections), tokening: tokeningOf(input.tokens) } })
   }),
 
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, route: input.route, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, routes: askedRoutes(input.route, input.routes), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
+  }),
+
+  github_status: op({
+    access: Access.Read,
+    input: z.object({}).strict(),
+    run: async (ctx) => githubFor(ctx.db, ctx).status()
+  }),
+
+  github_connect: op({
+    access: Access.Write,
+    input: z.object({}).strict(),
+    run: async (ctx) => (await githubFor(ctx.db, ctx).connect(libsOrigin(), '/')) ?? { error: GithubRefusal.NotConfigured }
+  }),
+
+  github_disconnect: op({
+    access: Access.Write,
+    input: z.object({}).strict(),
+    run: async (ctx) => {
+      await githubFor(ctx.db, ctx).disconnect();
+      return { connected: false };
+    }
+  }),
+
+  github_repos: op({
+    access: Access.Read,
+    input: z.object({}).strict(),
+    run: async (ctx) => {
+      const repos = await githubFor(ctx.db, ctx).repos();
+      return repos ? { repos } : { error: GithubRefusal.NotConnected };
+    }
+  }),
+
+  github_branches: op({
+    access: Access.Read,
+    input: z.object({ repo: z.string().max(200).describe('owner/name') }).strict(),
+    run: async (ctx, input) => {
+      const repo = repoOf(`https://github.com/${input.repo}`);
+      const branches = repo ? await githubFor(ctx.db, ctx).branches(repo) : null;
+      return branches ? { branches } : { error: repo ? GithubRefusal.NotConnected : GithubRefusal.Invalid };
+    }
   }),
 
   draw_frame: op({

@@ -24,10 +24,11 @@
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
+  import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
   import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
-  import { frameLayers, frameSummaries } from '$lib/motion/frame-menu';
+  import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
   import { followDocks } from '$lib/canvas/dock-lift';
   import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
@@ -43,8 +44,10 @@
   import GradientHandles from '../GradientHandles.svelte';
   import CropHandles from '../CropHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { projectLibraryStore } from '$lib/canvas/project-library-store';
+  import { LibraryKind } from '$lib/motion/project-library-ops';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
-  import { renameStyle } from '$lib/motion/styles';
+  import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
   import { removeVariable } from '$lib/motion/variables';
@@ -78,7 +81,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Reach, childBelow, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Press, Reach, childBelow, pressOn, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
@@ -100,6 +103,7 @@
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { EditMode, startMode } from '$lib/motion/edit-mode';
   import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
+  import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import { elementKey } from '$lib/canvas/prototype-arrows';
   import type { PrototypeLink } from '$lib/motion/prototype/links';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
@@ -129,6 +133,14 @@
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { statePreview } from '$lib/canvas/state-preview.svelte';
+  import { previewDoc } from '$lib/motion/states/preview';
+  import { instanceOf } from '$lib/motion/main-component';
+  import { appendVariant } from '$lib/motion/variants';
+  import VariantPlus from '../VariantPlus.svelte';
+  import ComponentSetOutline from '../ComponentSetOutline.svelte';
+  import { addSetVariant, setMainOf } from '$lib/motion/component-set';
+  import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
@@ -144,6 +156,9 @@
   import { frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
+  import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
+  import { nodeHitRects } from '$lib/canvas/core/node-hit';
+  import type { ChromeTile, Glyphs } from '$lib/canvas/core/chrome';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
   import Repeat from '@lucide/svelte/icons/repeat';
@@ -158,6 +173,8 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
+  import { restoreViewport } from '$lib/canvas/restore-viewport';
+  import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
@@ -191,7 +208,7 @@
   import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { enterSelected } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
-  import type { Edge } from '$lib/motion/space';
+  import { alignSpace, propBoxes, type Edge } from '$lib/motion/space';
   import MeasureLayer from '../MeasureLayer.svelte';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   import type { GenMedium } from '$lib/canvas/gen-node';
@@ -224,7 +241,7 @@
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -291,7 +308,7 @@
     addLingerTimer = setTimeout(() => (addLinger = null), ADD_LINGER_MS);
     return () => clearTimeout(addLingerTimer);
   });
-  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[]; at: string } | null>(null);
+  let pickHover = $state<{ nodeId: string; clip: string; quad: Point[]; at: string; highlight: HighlightKind } | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
@@ -305,6 +322,7 @@
   let gesturing = $state(false);
   let resizing = $state<ReadonlySet<string>>(new Set());
   let fitted = false;
+  let fittedCanvas = '';
   let known = new Set<string>();
 
   const assetUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, AssetSize.Full);
@@ -384,6 +402,8 @@
   };
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
+  const labelZoom = $derived(labelZoomStep(view.zoom));
+  const strokeZoom = $derived(strokeZoomStep(view.zoom));
   const coreCards = $derived.by(() => {
     const text = coreType;
     const draw = drawCard;
@@ -398,7 +418,8 @@
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null,
-        tag: tagHexOf(t.id)
+        tag: tagHexOf(t.id),
+        zoom: labelZoom
       };
       const poster = holdsDoc(t.kind ?? '');
       return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
@@ -420,7 +441,7 @@
       const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const { x, y, w, h } = v.frame.box;
-      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, ring: on ? chrome.ring : NodeChrome.None, handles: false, hovered: false, ringColor: ringColour({ outputs: [] }, look), names: false, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
+      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, hovered: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
     });
     const tiles = placed.flatMap((t) => {
       const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
@@ -435,8 +456,8 @@
         return [];
       }
       const marks = portMarks(t);
-      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id) } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(marks, look), names: on, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
+      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id), zoom: labelZoom } : { label: null, icon: null };
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(), names: on, strokeZoom, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
     return [...tiles, ...views];
   });
@@ -574,6 +595,16 @@
   }
 
   const showsPrototype = $derived(editorMode.spec.lines === CanvasLines.Prototype);
+
+  let modeShown = editorMode.current;
+  $effect(() => {
+    const mode = editorMode.current;
+    if (mode === modeShown) {
+      return;
+    }
+    modeShown = mode;
+    untrack(() => rightBar.select(BarTab.Properties));
+  });
   const curves = $derived(
     (showsPrototype ? [] : edges).flatMap((e) => {
       const from = portFor(e.source, PortSide.Out, e.sourceHandle);
@@ -602,14 +633,28 @@
     if (gone.length) {
       select(selected.filter((id) => known.has(id)));
     }
-    if (fitted) {
+    const canvasId = page.params.canvasId ?? '';
+    if (fitted && fittedCanvas === canvasId) {
       return;
     }
     fitted = true;
-    if (incoming.length) {
-      fitTo(incoming);
-    }
+    fittedCanvas = canvasId;
+    cancelAnimationFrame(tween);
+    const saved = props.viewerId ? loadViewport(props.viewerId, canvasId) : null;
+    const s = screenSize();
+    view = restoreViewport(saved, boundsOf(incoming), { width: s.width, height: s.height });
   }
+
+  const REMEMBER_VIEW_MS = 400;
+  $effect(() => {
+    const at = view;
+    const who = props.viewerId;
+    if (!who || !fitted) {
+      return;
+    }
+    const timer = setTimeout(() => rememberViewport(who, untrack(() => page.params.canvasId ?? ''), at), REMEMBER_VIEW_MS);
+    return () => clearTimeout(timer);
+  });
 
   let reported = '';
   function select(ids: string[]) {
@@ -762,7 +807,17 @@
     return { x: e.clientX - s.left, y: e.clientY - s.top };
   }
 
-  const hitIndex = $derived(new SpatialIndex(placed.map((t) => (t.tag === NameTag.Hidden ? t : { id: t.id, x: t.x, y: t.y - LABEL_CLEARANCE, w: t.w, h: t.h + LABEL_CLEARANCE }))));
+  const NO_GLYPHS: Glyphs = () => ({ contours: [], width: 0, height: 0 });
+  const hitRects = $derived(
+    placed.map((t) => {
+      const glyphs = coreType?.glyphs;
+      const tile: ChromeTile = { id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, inputs: [], outputs: [], label: glyphs ? labelOf(t) : null, icon: coreType?.icons.get(t.kind as NodeType) ?? null, tag: glyphs ? tagHexOf(t.id) : null, zoom: labelZoom };
+      const [body, ...labels] = nodeHitRects(tile, glyphs ?? NO_GLYPHS);
+      return { body, labels };
+    })
+  );
+  const hitIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => [r.body, ...r.labels])));
+  const labelIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => r.labels)));
 
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
@@ -819,8 +874,8 @@
   });
 
   function titledAt(world: Point): Tile | null {
-    const hit = placed.findLast((t) => t.tag !== NameTag.Hidden && world.x >= t.x && world.x <= t.x + t.w && world.y >= t.y - LABEL_CLEARANCE && world.y < t.y);
-    return hit ?? null;
+    const id = labelIndex.topAt(world);
+    return id ? (byId.get(id) ?? null) : null;
   }
 
   function startNaming(tile: Tile) {
@@ -1030,7 +1085,7 @@
   function hoverElement(w: Point, reach: Reach) {
     const hit = elementAt(w, reach);
     const quad = hit ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
-    pickHover = hit && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id } : null;
+    pickHover = hit && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id, highlight: highlightOf(liveOf(hit.nodeId)!.doc, hit.clip) } : null;
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
   }
 
@@ -1224,6 +1279,10 @@
     }
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
+    if (id === Action.CreateComponent && !onComponentsPage) {
+      await saverOf(nodeId)?.flushScheduled();
+      props.onComponentMade?.(nodeId);
+    }
   }
 
   let elementMenu = $state<Point | null>(null);
@@ -1247,6 +1306,11 @@
   }
 
   function runElementMenu(id: SelectionActionId) {
+    const run = frameMenuRun(id);
+    if (run && 'edge' in run) {
+      alignPicks(run.edge);
+      return;
+    }
     const action = frameMenuAction(id);
     if (action) {
       void runFrameAction(action);
@@ -1297,13 +1361,13 @@
       {
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
-        show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc }),
+        show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(doc, statePreview.picksOf(nodeId)) }),
         recorded: () => {
           settle.edited(nodeId);
           autosize(nodeId);
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
-        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: session.history.present }),
+        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) }),
         landed: (from, to) => {
           const step = stepOf(nodeId, from, to);
           if (step) {
@@ -1338,7 +1402,7 @@
     if (held || !session) {
       return held ?? null;
     }
-    const made = new FrameExtras({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId }, createSupabaseBrowserClient(), () => session.history.present);
+    const made = new FrameExtras({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId }, createSupabaseBrowserClient(), () => session.history.present, drawSaves.get(nodeId) ?? Promise.resolve(true));
     extras.set(nodeId, made);
     return made;
   }
@@ -1387,7 +1451,7 @@
   onMount(lockOverscroll);
 
   $effect(() => {
-    styleLibrary.styles = libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
   });
 
   function syncStyle(name: string, style: Style) {
@@ -1411,13 +1475,28 @@
     }
   }
 
+  function syncRemove(name: string) {
+    for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
+      const present = saverOf(frame.id)?.history.present;
+      const removed = present ? removeStyle(present, name) : null;
+      if (removed?.ok) {
+        commit(frame.id, removed, `Removed the ${name} style`);
+      }
+    }
+  }
+
   onMount(() => {
-    styleLibrary.connect({ push: syncStyle, rename: syncRename });
-    return () => styleLibrary.connect(null);
+    styleLibrary.connect({ push: syncStyle, rename: syncRename, remove: syncRemove });
+    const projectId = page.params.projectId;
+    void styleLibrary.open(projectId ? projectLibraryStore(projectId, LibraryKind.Style) : null);
+    return () => {
+      styleLibrary.connect(null);
+      void styleLibrary.open(null);
+    };
   });
 
   $effect(() => {
-    variableLibrary.collections = variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? []));
+    variableLibrary.found(variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
   });
 
   const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
@@ -1444,7 +1523,12 @@
 
   onMount(() => {
     variableLibrary.connect({ push: syncCollection, remove: syncRemoval });
-    return () => variableLibrary.connect(null);
+    const projectId = page.params.projectId;
+    void variableLibrary.open(projectId ? projectLibraryStore(projectId, LibraryKind.Variables) : null);
+    return () => {
+      variableLibrary.connect(null);
+      void variableLibrary.open(null);
+    };
   });
 
   $effect(() => {
@@ -1458,6 +1542,7 @@
 
   $effect(() => {
     layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
+    layersSource.setDocs(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   });
 
   $effect(() => {
@@ -1517,7 +1602,52 @@
     const session = saverOf(nodeId);
     session?.apply(result, summary);
     if (session && result.ok) {
-      liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
+      liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) });
+    }
+  }
+
+  $effect(() => {
+    for (const [nodeId, picks] of statePreview.byNode) {
+      const session = untrack(() => savers.get(nodeId));
+      const live = untrack(() => liveOf(nodeId));
+      if (session && live) {
+        untrack(() => liveDocs.set(nodeId, { ...live, doc: previewDoc(session.history.present, picks) }));
+      }
+    }
+  });
+
+  function variantMark(nodeId: string) {
+    const mark = picks.length === 1 && !typing ? selectionMarks(nodeId)[0] : null;
+    const saver = mark ? saverOf(nodeId) : null;
+    const instance = mark && saver ? instanceOf(saver.history.present, mark.clip) : null;
+    return mark && instance ? { rect: quadBox(mark.quad), compId: instance.compId } : null;
+  }
+
+  function addVariantAt(nodeId: string, compId: string) {
+    const saver = saverOf(nodeId);
+    if (saver) {
+      commit(nodeId, appendVariant(saver.history.present, compId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+    }
+  }
+
+  const onComponentsPage = $derived((page.data as { canvas?: { name?: string } }).canvas?.name === COMPONENTS_PAGE);
+
+  const isComponentSet = (nodeId: string) => {
+    const doc = onComponentsPage ? liveOf(nodeId)?.doc : null;
+    return Boolean(doc && setMainOf(doc));
+  };
+
+  function addSetVariantAt(nodeId: string) {
+    const saver = saverOf(nodeId);
+    const tile = byId.get(nodeId);
+    if (!saver || !tile) {
+      return;
+    }
+    const before = saver.history.present;
+    const grown = addSetVariant(before, () => crypto.randomUUID().slice(0, 8));
+    commit(nodeId, grown, 'Added a variant');
+    if (grown.ok && grown.doc.width !== before.width) {
+      props.onNodeSize?.(nodeId, (tile.w * grown.doc.width) / before.width, tile.h);
     }
   }
 
@@ -1652,7 +1782,7 @@
       const quad = at.picker.outlineQuad(clip, at.space);
       const own = findClip(at.live.doc, clip)?.clip;
       const pivot: [number, number] = [own?.transform.anchorX ?? TRANSFORM.anchorX.fallback, own?.transform.anchorY ?? TRANSFORM.anchorY.fallback];
-      return quad ? [{ clip, kind, pivot, quad: quad.map(onScreen) }] : [];
+      return quad ? [{ clip, kind, pivot, highlight: highlightOf(at.live.doc, clip), quad: quad.map(onScreen) }] : [];
     });
   }
 
@@ -1796,8 +1926,9 @@
     frameBar.tool = DrawTool.Select;
   }
 
-  function drawnInside(id: string) {
+  function drawnInside(nodeId: string, id: string) {
     picks = [id];
+    typeOnArrival = frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null;
     frameBar.tool = DrawTool.Select;
   }
 
@@ -2220,6 +2351,8 @@
     window.addEventListener('pointerup', up);
   }
 
+  let hostPress: PointerEvent | null = null;
+
   function onDown(e: PointerEvent) {
     glide = null;
     dropHover();
@@ -2250,7 +2383,9 @@
       e.preventDefault();
       return;
     }
-    if (hit.kind === HitKind.Node && (extendPick(e, w) || pickElement(e, w))) {
+    const press = hit.kind === HitKind.Node ? pressOn({ selected, inside: inside?.nodeId ?? null, picks }, hit.nodeId, reachOf(e)) : Press.Child;
+    hostPress = press === Press.Host ? e : null;
+    if (hit.kind === HitKind.Node && (extendPick(e, w) || (press === Press.Child && pickElement(e, w)))) {
       e.preventDefault();
       return;
     }
@@ -2485,6 +2620,11 @@
         if (a.kind !== GestureKind.Drag) {
           return;
         }
+        const press = hostPress;
+        hostPress = null;
+        if (!a.moved && press && pickElement(press, toWorld(view, local(press)))) {
+          return;
+        }
         if (!a.moved) {
           clickNode(a.id, a.toggle);
           return;
@@ -2716,7 +2856,7 @@
   }
 
   const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
-  const alignRun = (id: AlignActionId) => (ids: string[]) => alignSelection(ids, ALIGN_EDGE[id]);
+  const alignRun = (id: AlignActionId) => (ids: string[]) => alignHere(ids, ALIGN_EDGE[id]);
 
   function selectSibling(direction: Direction) {
     const next = siblingOf(placed.map((t) => t.id), selected, direction);
@@ -2805,6 +2945,26 @@
     return true;
   }
 
+  function alignPicks(edge: Edge): boolean {
+    const nodeId = inside?.nodeId;
+    const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
+    if (!nodeId || !tools) {
+      return false;
+    }
+    const at = scoped(tools.doc, picks, tools.frame);
+    const result = at ? alignSpace(at.view, at.ids, at.frame, propBoxes(at.view), edge, savers.get(nodeId)?.mode ?? EditMode.Design) : null;
+    if (at && result?.ok) {
+      commit(nodeId, { ok: true, doc: at.merge(result.doc) }, `Aligned ${edge}`);
+    }
+    return true;
+  }
+
+  function alignHere(ids: string[], edge: Edge) {
+    if (!alignPicks(edge)) {
+      alignSelection(ids, edge);
+    }
+  }
+
   function nudge(dx: number, dy: number) {
     if (nudgePicks(dx, dy)) {
       return;
@@ -2820,7 +2980,7 @@
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     add: (c) => c.id === 'add' && addAtCentre(c.what),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
-    align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
+    align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
     'wrap-stack': () => shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected),
     'edit-mode': () => editorMode.toggleMotion(),
@@ -3406,11 +3566,18 @@
           <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
         {/each}
         {@const gradient = gradientMark(frame.id)}
         {#if gradient}
           <GradientHandles rect={gradient.rect} fill={gradient.fill} onchange={(f) => dragGradient(frame.id, gradient.clip, gradient.index, f)} ondone={(f) => dropGradient(frame.id, gradient.clip, gradient.index, f)} />
+        {/if}
+        {#if isComponentSet(frame.id)}
+          <ComponentSetOutline onadd={() => addSetVariantAt(frame.id)} />
+        {/if}
+        {@const plus = variantMark(frame.id)}
+        {#if plus}
+          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.compId)} />
         {/if}
         {@const crop = cropMark(frame.id)}
         {#if crop}
@@ -3426,7 +3593,7 @@
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} drop={frameGuides?.nodeId === frame.id ? (frameGuides.drop ?? null) : null} measured={measuredGapsIn} />
         {/if}
         {#if pickHover?.at === frame.id}
-          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+          <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
         {@const live = peering ? liveOf(frame.id) : null}
         {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
@@ -3435,7 +3602,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={drawnInside} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
@@ -3447,10 +3614,10 @@
       {#snippet children(frame)}
         {@const nodeId = baseNodeId(frame.id)}
         {#each typing || cropping?.nodeId === nodeId ? [] : marksIn(frame.id) as mark (mark.clip)}
-          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} pivot={null} turn={0} ongrab={(grip, handle, e) => grab(nodeId, mark.clip, grip, handle, e)} />
+          <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={null} turn={0} ongrab={(grip, handle, e) => grab(nodeId, mark.clip, grip, handle, e)} />
         {/each}
         {#if pickHover?.at === frame.id}
-          <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+          <div class="pick-outline" data-testid="view-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
         {@const viewLive = inside?.nodeId === nodeId ? viewLives.get(frame.id) : null}
         {#if viewLive}
@@ -3777,7 +3944,7 @@
   .pick-outline {
     position: absolute;
     box-sizing: border-box;
-    border: 1px solid var(--ui-hover-outline, var(--ui-accent));
+    border: 1px solid var(--highlight, var(--ui-highlight));
     pointer-events: none;
     transform-origin: 0 0;
   }

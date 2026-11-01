@@ -1,5 +1,5 @@
 import type { Db } from '$lib/server/db/client';
-import { FREE_ORGS_PER_USER, WELCOME_CREDITS, WELCOME_CREDITS_EXPIRY_DAYS } from '$lib/credit-ladder';
+import { FREE_ORGS_PER_USER } from '$lib/credit-ladder';
 
 /**
  * `credit_ledger` (20260922_org_billing.sql) non è nei tipi generati — `database.types.ts` non è
@@ -18,7 +18,6 @@ type LedgerDb = {
         error: { message: string } | null;
       }>;
     };
-    insert(row: Record<string, unknown>): PromiseLike<{ error: { code?: string; message: string } | null }>;
   };
   from(table: 'orgs_members'): {
     select(cols: string): {
@@ -83,39 +82,5 @@ export async function assertFreeOrgLimit(db: Db, input: { userId: string; joinin
   if (!(await isOrgFree(db, input.joiningOrgId))) return;
   if ((await freeOrgCount(db, input.userId)) >= FREE_ORGS_PER_USER) {
     throw new FreeOrgLimitReachedError();
-  }
-}
-
-/**
- * Lo stesso codice che Postgres risponde su un `unique` violato (`credit_ledger.stripe_event_id`):
- * un secondo grant per la stessa org trova la riga già lì e non ne scrive una seconda — la
- * conferma che una race fra due richieste concorrenti non regala due volte.
- */
-export const WELCOME_ALREADY_GRANTED_CODE = '23505';
-
-/**
- * Il benvenuto: un grant `promo` unico per org, che scade — mai una seconda scrittura per la
- * stessa org (stripe_event_id = 'welcome:' || orgId, sotto lo stesso unique che protegge un
- * doppio-apply di un evento Stripe). Chiamato SOLO quando l'org è dentro il limite gratuito:
- * un'org creata mentre l'utente ha già un'org pagante parte con 0 crediti, non con il benvenuto —
- * una sola regola, dichiarata qui.
- */
-export async function grantWelcomeCredits(db: Db, orgId: string, now: Date = new Date()): Promise<void> {
-  const expiresAt = new Date(now.getTime() + WELCOME_CREDITS_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-
-  const { error } = await ledgerDb(db)
-    .from('credit_ledger')
-    .insert({
-      org_id: orgId,
-      kind: 'grant',
-      source: 'promo',
-      amount: WELCOME_CREDITS,
-      stripe_event_id: `welcome:${orgId}`,
-      expires_at: expiresAt.toISOString(),
-      note: 'Welcome credits'
-    });
-
-  if (error && error.code !== WELCOME_ALREADY_GRANTED_CODE) {
-    throw error;
   }
 }

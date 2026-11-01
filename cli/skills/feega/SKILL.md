@@ -303,7 +303,7 @@ batch status) run through `motion_editor_op` `{ node_id, op, input }` with the s
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.
 
 Graphic elements (Text, Box, Ellipse, Path, Image) live in frames or free on the canvas; Generate
-text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element, `import_url` turns a public web page into an editable frame (`feega canvas import-url`), `import_code` turns a page of a public GitHub React app into a frame whose code components are main components with variants (`feega canvas import-code`), `import_lottie` turns a Lottie (JSON or https URL) into an editable frame,
+text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element, `import_url` turns a public web page into an editable frame split into named sections, Nav, Hero, Features, Footer… (`feega canvas import-url`, `--no-sections` for one layer tree; colours become variables and type, effects, gradients styles, named Primary, Text, Body, H1…, `--no-tokens` for raw values), `import_code` turns pages of a GitHub React, Vue or Svelte app (private once `github_connect` is done: `feega canvas github <project> connect`), or the stories of a public Storybook (`feega canvas import-storybook`), into one frame, a board per page or story, whose code components are main components with variants shared across boards (`feega canvas import-code --route / /settings`), `import_lottie` turns a Lottie (JSON or https URL) into an editable frame,
 `group_elements` / `ungroup_element` group free elements; `move_frame_element` moves an element
 into another frame (or onto the canvas as a free element) keeping props and keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
 motion `motion_tool` `move_to_frame` does the same from inside a video. A frame takes no inputs: a line into it is refused. CLI:
@@ -330,7 +330,7 @@ imported from a website) and content the moderation refuses. Free. CLI: `feega g
 The user may belong to several organisations; one is active, and every tool, the CLI and the web
 app work there when `org` is omitted. `list_orgs` lists them with the role and `active`.
 `team_op` changes one thing, only when the user asks: `switch_org` makes another one active, `create_org` creates one the user owns (a free
-organisation starts with the welcome credits; past the free limit the answer says how to upgrade).
+organisation gets the free monthly credits; past the free limit the answer says how to upgrade).
 `list_team` shows members, pending invites and the invite link; `team_op` also `invite` (email,
 role admin/member/viewer), `resend_invite`, `revoke_invite`, `invite_link` (anyone with it joins
 as viewer), `disable_invite_link`, `set_role`, `remove_member`, `leave`, `transfer_ownership`.

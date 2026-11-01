@@ -5,6 +5,7 @@ import { VarType } from '@feega/motion-core/motion/variables-model';
 import { bindVariable, defineVariable } from '$lib/motion/variables';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { canvasVariable, type VariableFrames } from './canvas-variables';
+import { LibraryOp, type LibraryAsk, type LibraryEntries } from '$lib/motion/project-library-ops';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!r.ok) {
@@ -17,10 +18,28 @@ const shape = () => must(addClip(newMotionDoc(MotionFormat.Landscape), { compone
 const SURFACE = { type: VarType.Colour, values: { Light: '#ffffff', Dark: '#101010' } } as const;
 const themed = () => must(defineVariable(shape(), 'Theme', 'surface', SURFACE, ['Light', 'Dark']));
 
-function frames(docs: Record<string, MotionDoc>): VariableFrames & { docs: Record<string, MotionDoc> } {
+function projectOf(saved: LibraryEntries) {
+  const ran: Record<LibraryOp, (ask: LibraryAsk) => void> = {
+    [LibraryOp.Save]: (ask) => ask.op === LibraryOp.Save && (saved[ask.name] = ask.value),
+    [LibraryOp.Adopt]: (ask) => ask.op === LibraryOp.Adopt && Object.entries(ask.entries).forEach(([n, v]) => (saved[n] ??= v)),
+    [LibraryOp.Rename]: () => {},
+    [LibraryOp.Remove]: () => {}
+  };
+  return {
+    load: async () => ({ ...saved }),
+    run: async (ask: LibraryAsk) => {
+      ran[ask.op](ask);
+      return { ok: true as const, entries: { ...saved } };
+    }
+  };
+}
+
+function frames(docs: Record<string, MotionDoc>, saved: LibraryEntries = {}): VariableFrames & { docs: Record<string, MotionDoc>; saved: LibraryEntries } {
   const versions: Record<string, number> = Object.fromEntries(Object.keys(docs).map((id) => [id, 1]));
   return {
     docs,
+    saved,
+    project: projectOf(saved),
     ids: async () => Object.keys(docs),
     read: async (id) => (docs[id] ? { version: versions[id], doc: docs[id] } : null),
     write: async (id, version, doc) => {
@@ -85,5 +104,26 @@ describe('the canvas variables library over MCP', () => {
     expect(out).toMatchObject({ ok: true });
     expect(findClip(store.docs.b, 's')!.clip.bind).toEqual({ fill: 'Theme/surface' });
     expect(fillOf(store.docs.b)).toBe('#ffffff');
+  });
+
+  it('listing adopts frame collections into the project, without the frame mode', async () => {
+    const store = frames({ a: themed() });
+    await canvasVariable(store, {});
+    expect(store.saved.Theme).toMatchObject({ modes: ['Light', 'Dark'] });
+    expect(store.saved.Theme).not.toHaveProperty('active');
+  });
+
+  it('defining a variable saves its collection to the project', async () => {
+    const store = frames({ a: themed() });
+    await canvasVariable(store, { collection: 'Theme', name: 'ink', type: VarType.Colour, values: { Light: '#000000', Dark: '#ffffff' } });
+    expect((store.saved.Theme as { vars: Record<string, unknown> }).vars.ink).toBeDefined();
+  });
+
+  it('binds a project collection in a frame that never had it', async () => {
+    const theme = themed().variables!.Theme;
+    const store = frames({ b: shape() }, { Theme: theme });
+    const out = await canvasVariable(store, { collection: 'Theme', name: 'surface', target: 'fill', ids: ['b:s'] });
+    expect(out).toMatchObject({ ok: true, frames: ['b'] });
+    expect(store.docs.b.variables?.Theme).toBeDefined();
   });
 });

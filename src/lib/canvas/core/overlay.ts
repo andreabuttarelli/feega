@@ -1,3 +1,4 @@
+import { HOVER_SCREEN_PX, strokeWorld } from './label-size';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
@@ -88,7 +89,7 @@ export function ghostItems(c: Curve, ok: boolean, zoom: number, theme: CoreTheme
 }
 
 export function hoverItems(b: Box, zoom: number, theme: CoreTheme): PathItem[] {
-  return [solid(`hover:${OverlayPart.Hover}`, line(rect(b.x, b.y, b.w, b.h), OVERLAY_LINE / zoom, true), theme.accent, HOVER_ALPHA)];
+  return [solid(`hover:${OverlayPart.Hover}`, line(rect(b.x, b.y, b.w, b.h), strokeWorld(HOVER_SCREEN_PX, zoom), true), theme.accent, HOVER_ALPHA)];
 }
 
 function roundRing(b: Box, width: number, radius: number): number[][] {

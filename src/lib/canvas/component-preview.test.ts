@@ -5,7 +5,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { createComponent } from '$lib/motion/main-component';
 import { precompose } from '@feega/motion-core/motion/precomp';
-import { Tone, fitInTile, inkBounds, padded, toneOf, previewCache, previewDoc, previewKey, previewSide, shownBox } from './component-preview';
+import { Freshness, Tone, fitInTile, framedDoc, freshness, inkBounds, padded, toneOf, previewCache, previewDoc, previewKey, previewSide, shownBox } from './component-preview';
 import { Device } from './gpu/memory-budget';
 
 const must = (r: OpResult): MotionDoc => {
@@ -63,6 +63,21 @@ describe('the preview of a component', () => {
 
     expect(box.width).toBeLessThan(alone.width / 2);
     expect(box.height).toBeLessThan(alone.height / 2);
+  });
+
+  it('is drawn at tile size, the crop filling the tile, never at frame size', () => {
+    const { doc, compId } = frameWithCard();
+    const alone = previewDoc(doc, compId);
+    const crop = shownBox(drawFrame(prepare(alone, tokens), 0), {})!;
+
+    const framed = framedDoc(alone, crop, 96);
+    const box = shownBox(drawFrame(prepare(framed.doc, tokens), 0), {})!;
+
+    expect(Math.max(framed.width, framed.height)).toBe(96);
+    expect(box.left).toBeCloseTo(0, 0);
+    expect(box.top).toBeCloseTo(0, 0);
+    expect(box.width).toBeCloseTo(framed.width, 0);
+    expect(box.height).toBeCloseTo(framed.height, 0);
   });
 
   it('fits the crop inside a square tile, keeping its proportions', () => {
@@ -142,5 +157,21 @@ describe('the ink of a preview', () => {
   it('sits on a dark tile when it is light, and on a light tile when it is dark', () => {
     expect(toneOf(pixels(2, 1, [{ x: 0, y: 0, rgba: WHITE }]))).toBe(Tone.Dark);
     expect(toneOf(pixels(2, 1, [{ x: 0, y: 0, rgba: BLACK }]))).toBe(Tone.Light);
+  });
+});
+
+describe('a stored preview', () => {
+  const stored = { revision: 4, hash: 'abc' };
+
+  it('is shown without asking the server when the frame has not changed', () => {
+    expect(freshness(stored, 4)).toBe(Freshness.Current);
+  });
+
+  it('is shown at once and checked when the frame changed', () => {
+    expect(freshness(stored, 5)).toBe(Freshness.Stale);
+  });
+
+  it('is drawn anew when nothing was stored', () => {
+    expect(freshness(undefined, 5)).toBe(Freshness.Missing);
   });
 });

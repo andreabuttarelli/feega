@@ -81,6 +81,7 @@ const CLIP: Record<string, Access> = {
   constraints: { write: ['set_layout_item', 'set_constraints'], read: 'constraints' },
   overrides: { write: ['set_breakpoint_override'], read: 'overrides' },
   interactions: { write: ['add_interaction', 'remove_interaction'], read: 'interactions' },
+  states: { write: ['set_element_state', 'remove_element_state'], read: 'states' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
   styleRef: { write: ['named_style'], read: 'styleRef' },
   bind: { write: ['variable', 'bind_variable', 'unbind_variable'], read: 'bind' },

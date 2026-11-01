@@ -1,3 +1,4 @@
+import { componentsPage, homeComponents } from '$lib/server/canvas/components-page';
 import { exportCodeNode, isExportMode } from '$lib/server/canvas/code-export-node';
 import { musicEnabled } from '$lib/server/elevenlabs-music';
 import { ExportMode } from '$lib/canvas/code-frame';
@@ -1506,6 +1507,15 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid group' });
     }
     return movedAnswer(await ungroupElement(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, id));
+  },
+
+  homeComponents: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const nodeId = String((await request.formData()).get('node_id') ?? '');
+    if (!UUID.test(nodeId)) {
+      return fail(400, { error: 'invalid frame' });
+    }
+    return homeComponents(canvasFrames(scope), () => componentsPage(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId }), nodeId, () => crypto.randomUUID().slice(0, 8));
   },
 
   drawElement: async ({ request, params, locals }) => {

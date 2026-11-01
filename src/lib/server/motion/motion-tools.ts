@@ -45,7 +45,7 @@ import { addAdjustment, createComp, mergeView, precompose, viewOf } from '@feega
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, defaultProps, type ComponentId } from '@feega/motion-core/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
-import { EASE_IDS, Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '@feega/motion-core/motion/design';
+import { EASE_IDS, KEY_EASE_IDS, Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '@feega/motion-core/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MOTION_FORMATS, MotionFormat, clipsOf, findClip, formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '@feega/motion-core/motion/junctions';
@@ -129,6 +129,8 @@ import { setMotionPath, setPathTangent } from '$lib/motion/path-ops';
 import { COUNTER_FORMATS } from '@feega/motion-core/motion/text-counter';
 import { setTextCounter } from '$lib/motion/text-counter-ops';
 import { actionSchema, transitionSchema, triggerSchema, ACTION_KINDS, TRANSITION_KINDS as LINK_TRANSITIONS, TRIGGER_KINDS } from '@feega/motion-core/motion/prototype/model';
+import { putState, removeState } from '$lib/motion/states/ops';
+import { DEFAULT_STATE_MS, MAX_STATE_MS, OVERRIDABLE_STATES, OVERRIDE_KEYS as STATE_KEYS, stateRowSchema } from '@feega/motion-core/motion/states/model';
 import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
 import { setFlow } from '$lib/motion/prototype/flows';
 import { MAX_FLOW_NAME } from '@feega/motion-core/motion/prototype/flow';
@@ -459,6 +461,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         constraints: c.constraints ?? null,
         overrides: c.overrides ?? null,
         interactions: c.interactions ?? [],
+        states: c.states ?? [],
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
@@ -2538,6 +2541,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'List every prototype link of this frame: the layer (clip_id), its trigger, action (with target frame) and transition. Links between frames are drawn as arrows on the canvas.',
       inputSchema: z.object({}),
       execute: async () => ({ interactions: clipsOf(session.doc).flatMap((c) => (c.interactions ?? []).map((i) => ({ clip_id: c.id, interaction_id: i.id, trigger: i.trigger, action: i.action, transition: i.transition }))) })
+    }),
+
+    set_element_state: tool({
+      description: `Give a layer an interaction state, like Figma's interactive components and Framer's hover/pressed variants: state ${OVERRIDABLE_STATES.join('|')}; overrides any of ${STATE_KEYS.join(', ')} (colours as hex, opacity 0..1, scale 1 = drawn size); transition easing ${KEY_EASE_IDS.join('|')} or a cubic bezier [x1, y1, x2, y2], and durationMs 0..${MAX_STATE_MS} (default standard, ${DEFAULT_STATE_MS}). One row per state: setting it again replaces it. The prototype player and the web export play it while the pointer hovers, presses or focuses the layer.`,
+      inputSchema: z.object({ clip_id: z.string(), ...stateRowSchema.shape }),
+      execute: async ({ clip_id, ...row }) => apply(putState(session.doc, clip_id, row), `${row.state} state on ${clip_id}`)
+    }),
+
+    remove_element_state: tool({
+      description: 'Remove one interaction state (hover|pressed|focus) from a layer.',
+      inputSchema: z.object({ clip_id: z.string(), state: z.enum(OVERRIDABLE_STATES) }),
+      execute: async ({ clip_id, state }) => apply(removeState(session.doc, clip_id, state), `removed ${state} state from ${clip_id}`)
     }),
 
     set_text_counter: tool({

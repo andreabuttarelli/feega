@@ -92,10 +92,6 @@ export const ZERNIO_COST_PER_ACCOUNT_USD_PLACEHOLDER = 7;
 export const ACCOUNT_SEAT_USD = 11;
 export const ACCOUNT_SEAT_CREDITS = ACCOUNT_SEAT_USD * CREDITS_PER_USD_SUBSCRIPTION_LIST; // 1320
 
-// ── Crediti di benvenuto ────────────────────────────────────────────────────────────
-export const WELCOME_CREDITS = 100;
-export const WELCOME_CREDITS_EXPIRY_DAYS = 14;
-
 // ── Org gratuite per utente ──────────────────────────────────────────────────────────
 // "Gratuita" = mai un acquisto vero (nessuna riga credit_ledger source subscription_renewal o
 // one_time_purchase): il benvenuto stesso (source 'promo') non conta come acquisto, altrimenti

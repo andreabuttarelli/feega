@@ -38,7 +38,8 @@ export enum LayerAction {
 
 export enum Pick {
   One = 'one',
-  Toggle = 'toggle'
+  Toggle = 'toggle',
+  Range = 'range'
 }
 
 export enum NodeIcon {
@@ -379,14 +380,32 @@ const LAYER_KEYS: readonly (KeyPress & { action: LayerAction })[] = [
 
 export const layerKey = (press: KeyPress): LayerAction | null => LAYER_KEYS.find((k) => k.key === press.key && k.mod === press.mod)?.action ?? null;
 
-const PICK: Record<Pick, (current: readonly string[], id: string) => string[]> = {
+function rangeOf(current: readonly string[], id: string, rows: readonly string[]): string[] {
+  const anchor = current.at(-1);
+  const from = anchor === undefined ? -1 : rows.indexOf(anchor);
+  const to = rows.indexOf(id);
+  if (from < 0 || to < 0) {
+    return [id];
+  }
+
+  const span = rows.slice(Math.min(from, to), Math.max(from, to) + 1);
+  return [...span.filter((r) => r !== anchor), anchor!];
+}
+
+const PICK: Record<Pick, (current: readonly string[], id: string, rows: readonly string[]) => string[]> = {
   [Pick.One]: (_current, id) => [id],
-  [Pick.Toggle]: (current, id) => (current.includes(id) ? current.filter((c) => c !== id) : [...current, id])
+  [Pick.Toggle]: (current, id) => (current.includes(id) ? current.filter((c) => c !== id) : [...current, id]),
+  [Pick.Range]: rangeOf
 };
 
-export const pickLayers = (current: readonly string[], id: string, pick: Pick) => PICK[pick](current, id);
+export const pickLayers = (current: readonly string[], id: string, pick: Pick, rows: readonly string[]) => PICK[pick](current, id, rows);
 
-export const pickFor = (press: { shift: boolean; mod: boolean }): Pick => (press.shift || press.mod ? Pick.Toggle : Pick.One);
+export function pickFor(press: { shift: boolean; mod: boolean }): Pick {
+  if (press.mod) {
+    return Pick.Toggle;
+  }
+  return press.shift ? Pick.Range : Pick.One;
+}
 
 export type LayerSelection = {
   canvas: readonly string[];

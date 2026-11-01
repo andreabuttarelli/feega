@@ -71,9 +71,19 @@ describe('svgOf', () => {
     expect(skipped).toEqual([]);
   });
 
-  it('keeps a rectangle mask as a mask', () => {
-    const masked = patch(withCard, 'card', { mask: { kind: 'rect', x: 0.5, y: 0.5, width: 0.05, height: 0.05, rotation: 0, expansion: 0, feather: 0, opacity: 1, invert: false, mode: 'add', assetId: null, points: [], text: '' } } as never);
-    const { svg, skipped } = svgFor(masked);
+  const rectMask = (over: Record<string, unknown>) => patch(withCard, 'card', { mask: { kind: 'rect', x: 0.5, y: 0.5, width: 0.05, height: 0.05, rotation: 0, expansion: 0, feather: 0, opacity: 1, invert: false, mode: 'add', assetId: null, points: [], text: '', ...over } } as never);
+
+  it('writes a hard mask as a clip, which a PDF printer draws in a blink instead of rasterising the whole frame', () => {
+    const { svg, skipped } = svgFor(rectMask({}));
+
+    expect(svg).not.toContain('<mask');
+    expect(svg).toMatch(/<clipPath id="c\d+"><path/);
+    expect(svg).toMatch(/clip-path="url\(#c\d+\)"/);
+    expect(skipped).toEqual([]);
+  });
+
+  it('keeps an inverted mask as a mask', () => {
+    const { svg, skipped } = svgFor(rectMask({ invert: true }));
 
     expect(svg).toMatch(/<mask id="m\d+"/);
     expect(svg).toMatch(/mask="url\(#m\d+\)"/);

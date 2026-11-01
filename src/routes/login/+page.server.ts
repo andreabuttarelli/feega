@@ -8,6 +8,8 @@ import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
 import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import { signInErrorIn } from './sign-in-error';
+import { peekStartUrl } from '$lib/server/onboarding/start-url-cookie';
+import { START_URL_PARAM, startUrlOf } from '$lib/start-url';
 import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
 import { appleSignInFlag, appleSignInShown } from '$lib/apple-sign-in/visibility';
 import { env } from '$env/dynamic/private';
@@ -22,6 +24,7 @@ function preferSignup(url: URL): boolean {
   if (url.searchParams.get('next') === 'onboarding') return true;
   if (url.searchParams.get('mode') === 'signup') return true;
   if (sanitizeWebsiteParam(url.searchParams.get('website'))) return true;
+  if (startUrlOf(url.searchParams.get(START_URL_PARAM))) return true;
   return false;
 }
 
@@ -156,7 +159,7 @@ export const actions: Actions = {
   // Resend — we never use Supabase's built-in mailer. We verify the token at /auth/confirm, so the
   // link points straight there (no redirect-allow-list config needed). Always returns the same
   // "sent" state, even for unknown emails, to avoid account enumeration.
-  reset: async ({ request, url }) => {
+  reset: async ({ request, url, cookies }) => {
     const data = await request.formData();
     const email = String(data.get('email') ?? '').trim().toLowerCase();
     if (!EMAIL_RE.test(email)) return fail(400, { errorCode: 'invalidEmail', email });
@@ -168,7 +171,7 @@ export const actions: Actions = {
       const hashed = link?.properties?.hashed_token;
       if (!error && hashed) {
         const base = appBase(url);
-        const confirmUrl = `${base}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=recovery&next=${encodeURIComponent(resetPasswordPath(inviteTokenIn(data)))}`;
+        const confirmUrl = `${base}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=recovery&next=${encodeURIComponent(resetPasswordPath(inviteTokenIn(data), peekStartUrl(cookies)))}`;
         await sendEmail({
           to: email,
           subject: passwordResetEmailSubject(locale),
@@ -209,12 +212,22 @@ export const actions: Actions = {
   }
 };
 
-function resetPasswordPath(inviteToken: string | null): string {
-  return inviteToken ? `/auth/reset-password?${INVITE_PARAM}=${encodeURIComponent(inviteToken)}` : '/auth/reset-password';
+function resetPasswordPath(inviteToken: string | null, startUrl: string | null): string {
+  const query = new URLSearchParams();
+  if (inviteToken) {
+    query.set(INVITE_PARAM, inviteToken);
+  }
+  if (startUrl) {
+    query.set(START_URL_PARAM, startUrl);
+  }
+  return query.size ? `/auth/reset-password?${query}` : '/auth/reset-password';
 }
 
-function buildRedirectTo(authBase: string, cliPort: string, cliState: string, inviteToken: string | null): string {
+function buildRedirectTo(authBase: string, cliPort: string, cliState: string, inviteToken: string | null, startUrl: string | null): string {
   const cb = new URLSearchParams();
+  if (startUrl) {
+    cb.set(START_URL_PARAM, startUrl);
+  }
   if (cliPort) {
     cb.set('cli_port', cliPort);
     cb.set('cli_state', cliState);
@@ -226,12 +239,12 @@ function buildRedirectTo(authBase: string, cliPort: string, cliState: string, in
 }
 
 // Shared OAuth kickoff: ask Supabase for the provider URL and bounce the browser there.
-async function oauthSignIn({ request, locals: { supabase }, url }: RequestEvent, provider: 'github' | 'google' | 'apple') {
+async function oauthSignIn({ request, cookies, locals: { supabase }, url }: RequestEvent, provider: 'github' | 'google' | 'apple') {
   const data = await request.formData();
   const cliPort = String(data.get('cli_port') ?? '');
   const cliState = String(data.get('cli_state') ?? '');
   const authBase = isNativeShell(request.headers.get('user-agent')) ? NATIVE_AUTH_BASE : `${appBase(url)}/auth`;
-  const redirectTo = buildRedirectTo(authBase, cliPort, cliState, inviteTokenIn(data));
+  const redirectTo = buildRedirectTo(authBase, cliPort, cliState, inviteTokenIn(data), peekStartUrl(cookies));
   const { data: oauth, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
 
   if (error || !oauth?.url) return fail(400, { error: error?.message ?? `Could not start ${provider} sign-in` });

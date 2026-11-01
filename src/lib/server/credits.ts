@@ -29,7 +29,7 @@ export type CreditsUsage = {
 };
 
 // ── Plan quotas ──────────────────────────────────────────────────────────────────
-// Free (no plan): 400 credits ≈ €10 of API value. Paid tiers share credits with
+// Free (no plan): the monthly FREE_CREDITS grant. Paid tiers share credits with
 // src/lib/plans.ts (PlanCards / pricing) so UI and entitlement cannot drift.
 // `scale` (legacy grandfathered tier, not in PLANS) is mapped to the Pro quota
 // explicitly so it never falls back to the free grant.

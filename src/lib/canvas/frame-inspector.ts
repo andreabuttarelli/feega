@@ -22,7 +22,7 @@ import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion
 import { Command, OPACITY_KEYS, commandFor, isTyping } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
-import type { SelectionActionId } from './selection-actions';
+import { ALIGN_ACTIONS, type SelectionActionId } from './selection-actions';
 import { siblingsOf } from './frame-select';
 import { EditMode } from '$lib/motion/edit-mode';
 import { propBoxes, tidySpace } from '$lib/motion/space';
@@ -256,7 +256,7 @@ const LATER_OPS: Partial<Record<ActionId, LaterOp>> = {
   [Action.TextToPath]: { shown: allText, run: async (ctx) => kept(ctx, await outlineTexts(ctx.doc, ctx.selection, ctx.load), 'Outlined text') }
 };
 
-const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.WrapStack, Action.RemoveStack, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
+const STRUCTURE_ORDER: readonly ActionId[] = [Action.CreateComponent, Action.GoToMain,Action.DetachInstance, Action.PushInstance, Action.ResetInstance, Action.Group, Action.Ungroup, Action.FrameSelection, Action.ResizeToFit, Action.WrapStack, Action.RemoveStack, Action.Union, Action.Subtract, Action.Intersect, Action.Exclude, Action.Flatten, Action.OutlineStroke, Action.TextToPath, Command.UseAsMask, Command.RemoveMask, Action.FlipHorizontal, Action.FlipVertical];
 
 export const FRAME_STRUCTURE_ACTIONS: ReadonlySet<ActionId> = new Set(STRUCTURE_ORDER);
 
@@ -320,15 +320,15 @@ export function frameKeyAction(e: KeyboardEvent): ActionId | null {
 const shownIn = (id: ActionId, doc: MotionDoc, selection: readonly string[]) => (BAR_OPS[id] ?? LATER_OPS[id])?.shown(doc, selection) ?? runs(id);
 
 export const elementMenuIds = (doc: MotionDoc, picks: readonly string[]): ReadonlySet<SelectionActionId> =>
-  new Set([...FRAME_ELEMENT_MENU].filter((id) => shownIn(frameMenuAction(id)!, doc, picks)));
+  new Set([...[...FRAME_ELEMENT_MENU].filter((id) => shownIn(frameMenuAction(id)!, doc, picks)), ...(picks.length ? ALIGN_ACTIONS : [])]);
 
-const TOOLBAR_ELEMENT_ACTIONS: readonly SelectionActionId[] = ['wrap-stack', 'remove-stack'];
+const TOOLBAR_ELEMENT_ACTIONS: readonly SelectionActionId[] = ['wrap-stack', 'remove-stack', 'go-to-main'];
 
 export const elementToolbarActions = (doc: MotionDoc, picks: readonly string[]): SelectionActionId[] => {
   const shown = elementMenuIds(doc, picks);
   return picks.length ? TOOLBAR_ELEMENT_ACTIONS.filter((id) => shown.has(id)) : [];
 };
 
-const LAYER_ACTIONS: readonly ActionId[] = [Action.WrapStack, Action.RemoveStack, Action.CreateComponent, Command.UseAsMask, Command.RemoveMask, Action.ToggleHidden, Action.ToggleLocked, Action.Delete];
+const LAYER_ACTIONS: readonly ActionId[] = [Action.WrapStack, Action.RemoveStack, Action.CreateComponent, Action.GoToMain, Command.UseAsMask, Command.RemoveMask, Action.ToggleHidden, Action.ToggleLocked, Action.Delete];
 
 export const layerMenuActions = (doc: MotionDoc, selection: readonly string[]): ActionId[] => (selection.length ? LAYER_ACTIONS.filter((id) => shownIn(id, doc, selection)) : []);

@@ -1,7 +1,9 @@
 import { Control } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
 import { fillReplaces } from '@feega/motion-core/motion/fill/elements';
-import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { FillType } from '@feega/motion-core/motion/fill/model';
+import { findClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { mapEveryTrack } from './doc-scopes';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { DEFAULT_MODE, VarType, keyOf, splitKey, variableSchema, variablesSchema, type Collection, type VarAlias, type VarInput, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 
@@ -21,6 +23,12 @@ const GAP_TARGETS = ['autoLayout.gap', 'autoLayout.crossGap'];
 const PADDING_TARGET = 'autoLayout.padding';
 const PADDING_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 const LAYOUT_PREFIX = 'autoLayout.';
+export const RADIUS_TARGET = 'radius';
+const MAX_ROUNDNESS = 0.5;
+
+type Frame = { width: number; height: number };
+
+const roundable = (clip: MotionClip) => clip.component === 'Shape' && clip.props.shape === 'rect';
 
 const CONTROL_TYPE: Partial<Record<Control, VarType>> = {
   [Control.Color]: VarType.Colour,
@@ -36,6 +44,9 @@ function typeOfTarget(clip: MotionClip, target: string): VarType | undefined {
   if (target === PADDING_TARGET || GAP_TARGETS.includes(target)) {
     return clip.autoLayout ? VarType.Number : undefined;
   }
+  if (target === RADIUS_TARGET) {
+    return roundable(clip) ? VarType.Number : undefined;
+  }
   const field = fieldsOf(clip.component).find((f) => f.key === target);
   return field ? CONTROL_TYPE[field.control] : undefined;
 }
@@ -43,7 +54,8 @@ function typeOfTarget(clip: MotionClip, target: string): VarType | undefined {
 export function bindableTargets(clip: MotionClip, type: VarType): string[] {
   const own = fieldsOf(clip.component).filter((f) => CONTROL_TYPE[f.control] === type).map((f) => f.key);
   const layout = type === VarType.Number && clip.autoLayout ? [...GAP_TARGETS, PADDING_TARGET] : [];
-  return [...own, ...layout];
+  const radius = type === VarType.Number && roundable(clip) ? [RADIUS_TARGET] : [];
+  return [...own, ...layout, ...radius];
 }
 
 function activeMode(collection: Collection): string {
@@ -130,16 +142,38 @@ function ownedFill(clip: MotionClip, target: string): MotionClip['props'] {
   return rest;
 }
 
+type Props = MotionClip['props'];
+
+type StackPaint = { paint?: { type?: string; color?: string } };
+
+const PAINT_STACKS: Record<string, (props: Props, value: VarLiteral) => Props> = {
+  stroke: (props, value) => (Array.isArray(props.strokes) ? { ...props, strokes: (props.strokes as StackPaint[]).map((s) => (s.paint?.type === FillType.Solid ? { ...s, paint: { ...s.paint, color: value } } : s)) } : props)
+};
+
+const stacked = (props: Props, target: string, value: VarLiteral): Props => PAINT_STACKS[target]?.(props, value) ?? props;
+
 export const fillTarget = (clip: MotionClip): string | undefined => bindableTargets(clip, VarType.Colour).find((t) => fillReplaces(clip.component, t));
 
-function resolvedClip(variables: Variables, clip: MotionClip): MotionClip {
+function withRadius(clip: MotionClip, frame: Frame, value: VarLiteral): MotionClip {
+  const short = Math.min(Number(clip.props.width) * frame.width, Number(clip.props.height) * frame.height);
+  if (typeof value !== 'number' || !(short > 0)) {
+    return clip;
+  }
+  return { ...clip, props: { ...clip.props, corners: [], roundness: Math.min(MAX_ROUNDNESS, Math.max(0, value / short)) } };
+}
+
+function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame): MotionClip {
   let next = clip;
   for (const [target, key] of Object.entries(clip.bind ?? {})) {
     const value = valueOf(variables, key);
     if (value === undefined) {
       continue;
     }
-    next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: { ...ownedFill(next, target), [target]: clamped(next, target, value) } };
+    if (target === RADIUS_TARGET) {
+      next = withRadius(next, frame, value);
+      continue;
+    }
+    next = target.startsWith(LAYOUT_PREFIX) ? withLayout(next, target, value) : { ...next, props: stacked({ ...ownedFill(next, target), [target]: clamped(next, target, value) }, target, value) };
   }
   return next;
 }
@@ -149,7 +183,9 @@ export function resolveVariables(doc: MotionDoc): MotionDoc {
   if (!variables) {
     return doc;
   }
-  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.bind ? resolvedClip(variables, c as MotionClip) : c)) })) };
+  const resolved = (tracks: MotionTrack[], frame: Frame) => tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.bind ? resolvedClip(variables, c as MotionClip, frame) : c)) })) as MotionTrack[];
+  const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: resolved(comp.tracks, comp.frame ?? doc) }]));
+  return { ...doc, tracks: resolved(doc.tracks, doc), comps };
 }
 
 export function defineVariable(doc: MotionDoc, collection: string, name: string, input: VarInput, modes?: readonly string[]): OpResult {
@@ -176,15 +212,18 @@ export function setActiveMode(doc: MotionDoc, collection: string, mode: string):
 type Bind = Record<string, string>;
 
 function rebound(doc: MotionDoc, change: (clip: MotionClip) => Bind): MotionDoc {
-  const tracks = doc.tracks.map((t) => ({
+  return mapEveryTrack(doc, (tracks) => reboundTracks(tracks, change));
+}
+
+function reboundTracks(tracks: MotionTrack[], change: (clip: MotionClip) => Bind): MotionTrack[] {
+  return tracks.map((t) => ({
     ...t,
     clips: t.clips.map((c) => {
       const bind = change(c as MotionClip);
       const { bind: _old, ...rest } = c;
       return Object.keys(bind).length ? { ...rest, bind } : rest;
     })
-  }));
-  return { ...doc, tracks } as MotionDoc;
+  })) as MotionTrack[];
 }
 
 const withTarget = (doc: MotionDoc, clipId: string, edit: (bind: Bind) => Bind) => rebound(doc, (c) => (c.id === clipId ? edit(c.bind ?? {}) : (c.bind ?? {})));

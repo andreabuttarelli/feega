@@ -81,9 +81,27 @@ export const exportElementsSchema = z.array(z.object({ frameId: z.string(), elem
 
 type Size = { width: number; height: number };
 
+const FORMAT_MAX_SIDE: Partial<Record<FileFormat, number>> = { [FileFormat.Webp]: 16383, [FileFormat.Jpg]: 65535 };
+
+const askedScale = (row: ExportRow, frame: Size) => (row.by === SizeBy.Scale ? row.value : row.value / (row.by === SizeBy.Width ? frame.width : frame.height));
+
+function fittedScale(row: ExportRow, frame: Size): number {
+  const asked = askedScale(row, frame);
+  const max = FORMAT_MAX_SIDE[row.format];
+  return max ? Math.min(asked, Math.floor(max) / Math.max(frame.width, frame.height)) : asked;
+}
+
 export function rowSize(row: ExportRow, frame: Size): Size & { scale: number } {
-  const scale = row.by === SizeBy.Scale ? row.value : row.value / (row.by === SizeBy.Width ? frame.width : frame.height);
+  const scale = fittedScale(row, frame);
   return { width: Math.round(frame.width * scale), height: Math.round(frame.height * scale), scale };
+}
+
+export function sizeNote(row: ExportRow, frame: Size): string | null {
+  if (fittedScale(row, frame) >= askedScale(row, frame)) {
+    return null;
+  }
+  const { width, height } = rowSize(row, frame);
+  return `${FILE[row.format].label} is at most ${FORMAT_MAX_SIDE[row.format]} px per side: scaled to ${width}×${height}. Pick PNG for the full size`;
 }
 
 export type ExportFrame = { id: string; name: string; elementId?: string; elementName?: string };

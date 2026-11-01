@@ -10,6 +10,7 @@ import { chooseOrg } from '$lib/server/tenancy/context';
 import { seedWelcome } from '$lib/server/onboarding/welcome';
 import { WELCOME_PARAM, type Campaign } from '$lib/onboarding/campaigns';
 import { toolForCampaign, toolHref } from '$lib/tools';
+import { START_URL_PARAM, startHost } from '$lib/start-url';
 
 /**
  * ENTRARE NELL'APP È UN BOOTSTRAP SILENZIOSO, NON UN MODULO DA COMPILARE.
@@ -28,6 +29,7 @@ export const DEFAULT_PROJECT_NAME = 'Untitled';
 export const DEFAULT_CANVAS_NAME = 'Untitled';
 const DEFAULT_WORKSPACE_NAME = 'My workspace';
 const DEFAULT_PROJECT_SLUG = 'untitled';
+const SITE_SLUG_BYTES = 4;
 
 export type Entry = { orgId: string; projectId: string; canvasId: string; firstRun: boolean };
 
@@ -239,4 +241,27 @@ export async function homePathFor(
     return toolHref(tool, entry.projectId) ?? path;
   }
   return seeded ? `${path}?${WELCOME_PARAM}=${campaign}` : path;
+}
+
+function siteSlug(host: string): string {
+  const suffix = [...crypto.getRandomValues(new Uint8Array(SITE_SLUG_BYTES))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${host.replace(/[^a-z0-9]+/g, '-')}-${suffix}`;
+}
+
+export const START_PATH = '/start';
+
+export async function startPathFor(db: Db, deps: EntryDeps, user: User, chosenOrgId: string | null, startUrl: string): Promise<string> {
+  await deps.ensureProfile(db, user);
+  await orgIdFor(db, deps, user, chosenOrgId);
+  return `${START_PATH}?${START_URL_PARAM}=${encodeURIComponent(startUrl)}`;
+}
+
+export async function startProject(db: Db, deps: EntryDeps, user: User, chosenOrgId: string | null, startUrl: string): Promise<{ projectId: string; canvasId: string }> {
+  await deps.ensureProfile(db, user);
+  const orgId = await orgIdFor(db, deps, user, chosenOrgId);
+
+  const host = startHost(startUrl);
+  const project = await deps.createProject(db, { orgId, name: host, slug: siteSlug(host), brandId: null });
+  const canvas = await deps.createCanvas(db, { orgId, projectId: project.id, name: DEFAULT_CANVAS_NAME });
+  return { projectId: project.id, canvasId: canvas.id };
 }

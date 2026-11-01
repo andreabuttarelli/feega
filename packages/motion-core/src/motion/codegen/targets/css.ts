@@ -1,3 +1,4 @@
+import type { StateStyle } from '../states';
 import { isRef, TokenKind, type CssValue, type MediaRules, type Rule, type Token } from '../ir';
 import { tokenIndex, tokenKey } from '../tokens';
 
@@ -30,6 +31,13 @@ export function ruleBlock(selector: string, rules: readonly Rule[], tokens: Toke
     return [];
   }
   return [`${indent}${selector} {`, ...rules.map(([p, v]) => `${indent}${INDENT}${p}: ${cssValue(v, tokens)};`), `${indent}}`];
+}
+
+export function stateBlocks(selector: string, style: StateStyle | undefined, tokens: TokenLookup, indent = ''): string[] {
+  if (!style) {
+    return [];
+  }
+  return [...ruleBlock(selector, style.base, tokens, indent), '', ...style.rows.flatMap((row) => [...ruleBlock(`${selector}${row.pseudo}`, row.rules, tokens, indent), ''])];
 }
 
 export function mediaBlocks(selector: string, media: readonly MediaRules[] | undefined, tokens: TokenLookup, indent = ''): string[] {

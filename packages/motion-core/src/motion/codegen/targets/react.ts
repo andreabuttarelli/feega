@@ -62,14 +62,14 @@ function useLines(node: UseNode, depth: number, ctx: Ctx): string[] {
 }
 
 function svgOf(node: SvgNode, ctx: Ctx): string {
-  const classes = tailwindOf(node.rules, ctx.tokens, node.media);
+  const classes = tailwindOf(node.rules, ctx.tokens, node.media, node.states);
   const tag = motionTag({ tag: 'svg', animation: node.animation });
   return `<${tag}${spread(node, ctx)}${classes ? ` className="${classes}"` : ''} width={${node.width}} height={${node.height}} viewBox="0 0 ${node.width} ${node.height}" fill="none" aria-hidden="true">${jsxSvg(node.markup)}</${tag}>`;
 }
 
 const dialect: Dialect<Ctx> = {
   tagOf: motionTag,
-  openTag: (node, ctx) => `<${motionTag(node)}${spread(node, ctx)}${classAttr(tailwindOf(node.rules, ctx.tokens, node.media), node === ctx.root)}${attrsOf(node)}${styleAttr(node)}>`,
+  openTag: (node, ctx) => `<${motionTag(node)}${spread(node, ctx)}${classAttr(tailwindOf(node.rules, ctx.tokens, node.media, node.states), node === ctx.root)}${attrsOf(node)}${styleAttr(node)}>`,
   text: (value) => (isProp(value) ? `{${value.prop}}` : JSX_SPECIAL.test(value.literal) ? `{${jsString(value.literal)}}` : value.literal),
   lineBreak: '<br />',
   use: useLines,

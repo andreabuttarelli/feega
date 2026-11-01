@@ -7,12 +7,13 @@ export type NavFamily = 'panel' | 'sheet' | 'route';
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'palette' | 'users-round' | 'settings' | 'camera' | 'layers' | 'components' | 'history';
+  icon: 'images' | 'palette' | 'users-round' | 'settings' | 'camera' | 'layers' | 'components' | 'history' | 'styles';
   family: NavFamily;
   path: string;
   mobilePath?: string;
   group: 'canvas' | 'panel' | 'workbench' | 'menu';
   local?: true;
+  offRail?: true;
   shortcut?: string;
 };
 
@@ -26,17 +27,19 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'assets', labelKey: 'app.nav2.materials', icon: 'images', family: 'panel', path: '/assets', group: 'panel', local: true, shortcut: 'Alt+2' },
   { id: 'brands', labelKey: 'app.nav2.brands', icon: 'palette', family: 'panel', path: '/brands', group: 'panel', shortcut: 'Alt+3' },
   { id: 'influencers', labelKey: 'app.nav2.influencers', icon: 'users-round', family: 'panel', path: '/influencers', group: 'panel', shortcut: 'Alt+4' },
-  { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench' },
+  { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench', offRail: true },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },
   { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas', local: true, shortcut: 'Alt+1' },
   { id: 'components', labelKey: 'app.nav2.components', icon: 'components', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+5' },
-  { id: 'history', labelKey: 'app.nav2.history', icon: 'history', family: 'panel', path: '', group: 'panel', shortcut: 'Alt+6' }
+  { id: 'history', labelKey: 'app.nav2.history', icon: 'history', family: 'panel', path: '', group: 'panel', shortcut: 'Alt+6' },
+  { id: 'styles', labelKey: 'app.nav2.styles', icon: 'styles', family: 'panel', path: '', group: 'panel', local: true, shortcut: 'Alt+7' }
 ];
 
 export const PANEL_WIDTHS: Record<string, number> = {
   layers: 280,
   components: 300,
   history: 300,
+  styles: 300,
   assets: 320,
   brands: 320,
   influencers: 320
@@ -45,6 +48,8 @@ export const PANEL_WIDTHS: Record<string, number> = {
 export function navEntriesByGroup(group: NavEntry['group']): NavEntry[] {
   return NAV_ENTRIES.filter((entry) => entry.group === group && (entry.local || !isLocalMode(publicEnv)));
 }
+
+export const railEntries = (group: NavEntry['group']): NavEntry[] => navEntriesByGroup(group).filter((entry) => !entry.offRail);
 
 const projectPath = (projectId: string, path: string) => `/p/${projectId}${path}`;
 

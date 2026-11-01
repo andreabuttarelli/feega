@@ -4,6 +4,7 @@ import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/
 import { createComponent, instanceOf, overrideInstance } from './main-component';
 import { homed, placeInstance } from './canvas-components';
 import { linkedMains, mainHomesOf, mainsSignature } from './linked-mains';
+import { compBox, reframed } from './comp-frame';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -113,6 +114,22 @@ describe('instances follow their main across frames', () => {
     const resolved = linkedMains(doc, 'B', new Map([['A', looped]]));
 
     expect(resolved.comps[compId]).toEqual(doc.comps[compId]);
+  });
+
+  it('follows a main homed in a smaller frame without stretching it or moving the instance', () => {
+    const page = { width: 1000, height: 2000 };
+    const set = { width: 400, height: 200 };
+    const shape = must(addClip({ ...newMotionDoc(MotionFormat.Landscape), ...page }, { component: 'Shape', from: 0, durationInFrames: 30, props: { x: 0.5, y: 0.75, width: 0.2, height: 0.05 } }, 'pill'));
+    const local = must(createComponent(shape, ['pill'], newId, 'Pill'));
+    const compId = String(clipsOf(local)[0].props.comp);
+    const doc = homed(local, 'S');
+    const homeComp = reframed(local.comps[compId], page, set, { x: -352, y: -1402 });
+    const home = { ...local, ...set, tracks: [], comps: { [compId]: { ...homeComp, component: { ...homeComp.component!, home: undefined } } } };
+
+    const resolved = linkedMains(doc, 'B', new Map([['S', home]]));
+    const box = compBox(resolved.comps[compId], page)!;
+
+    expect([box.left, box.top, box.right, box.bottom].map((v) => Math.round(v))).toEqual([400, 1450, 600, 1550]);
   });
 
   it('signs the mains of a frame, so a change to one is told apart from any other save', () => {

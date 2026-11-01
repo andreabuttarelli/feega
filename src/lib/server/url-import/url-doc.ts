@@ -1,4 +1,4 @@
-import { planOf, type FigmaPlan, type FontUpload } from '$lib/canvas/figma/figma-doc';
+import { planOf, type FigmaPlan, type FontUpload, type PlanItem } from '$lib/canvas/figma/figma-doc';
 import { catalogueFamily, familyFor } from '$lib/motion/vector-ui/piece';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { restMessage, type RestNode, type RestPaint, type RestStyle } from '$lib/server/figma/rest-message';
@@ -6,6 +6,15 @@ import { DESIGN_MAX_SIDE, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import type { PageFont, PageTree } from './page-tree';
 import { repeatedOf } from './repeated';
+import { windowed } from './page-window';
+import { sectionsOf } from './page-sections';
+import { sectionFramed } from './section-frames';
+import { stacksOf } from './page-stacks';
+import { flattened } from './page-flatten';
+import { tokensOf, type SiteBrand } from './page-tokens';
+import { samplesOf, siteName, tokenised } from './token-bind';
+import { componentKit } from './component-kit';
+import { componentPages, type ComponentPages } from './component-sheet';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -20,7 +29,7 @@ const UNSAFE_FAMILY = /[^A-Za-z0-9 \-.']+/g;
 export type ImageRefs = Record<string, string>;
 export type FontAssets = Record<string, string>;
 export type ComponentCount = { components: number; instances: number };
-export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string; components: ComponentCount };
+export type UrlPlan = { plan: FigmaPlan; images: ImageRefs; name: string; components: ComponentCount; sets: PlanItem[]; homes: ComponentPages['homes'] };
 
 const FAMILIES = GOOGLE_FONTS.map((f) => f.f);
 
@@ -134,38 +143,11 @@ function mapped(n: RestNode, keyOf: Map<string, string>, family: (raw: string) =
 function countOf(doc: MotionDoc): ComponentCount {
   const mains = new Set(Object.entries(doc.comps).flatMap(([id, c]) => (c.component ? [id] : [])));
   const clips = [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips);
-  const uses = clips.filter((c) => mains.has(String(c.props.comp))).length;
-  return { components: mains.size, instances: uses - mains.size };
+  const used = clips.filter((c) => mains.has(String(c.props.comp)));
+  return { components: mains.size, instances: used.length - new Set(used.map((c) => c.props.comp)).size };
 }
 
 const SLICE = DESIGN_MAX_SIDE;
-const WHOLE = new Set(['TEXT', 'VECTOR']);
-const CENTRED_EDGE = 0.5;
-
-type Window = { left: number; top: number; right: number; bottom: number };
-
-const edgeOf = (cutStart: boolean, cutEnd: boolean) => (cutStart ? 1 : cutEnd ? 0 : CENTRED_EDGE);
-
-function cutPaints(fills: RestPaint[] | undefined, focus: RestPaint['imageFocus']): RestPaint[] | undefined {
-  return fills?.map((p) => (p.imageRef ? { ...p, scaleMode: 'FILL', imageFocus: focus } : p));
-}
-
-function windowed(n: RestNode, w: Window): RestNode | null {
-  const b = n.absoluteBoundingBox!;
-  if (WHOLE.has(n.type)) {
-    return b.y >= w.top && b.y < w.bottom && b.x < w.right && b.x + b.width > w.left ? n : null;
-  }
-  const kids = n.children?.flatMap((c) => windowed(c, w) ?? []);
-  const overlaps = b.y < w.bottom && b.y + b.height > w.top && b.x < w.right && b.x + b.width > w.left;
-  if (!overlaps && !kids?.length) {
-    return null;
-  }
-  const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
-  const [x0, x1, y0, y1] = [clamp(b.x, w.left, w.right), clamp(b.x + b.width, w.left, w.right), clamp(b.y, w.top, w.bottom), clamp(b.y + b.height, w.top, w.bottom)];
-  const [cutLeft, cutRight, cutTop, cutBottom] = [x0 > b.x, x1 < b.x + b.width, y0 > b.y, y1 < b.y + b.height];
-  const cut = cutLeft || cutRight || cutTop || cutBottom ? { layoutMode: undefined, fills: cutPaints(n.fills, { x: edgeOf(cutLeft, cutRight), y: edgeOf(cutTop, cutBottom) }) } : {};
-  return { ...n, absoluteBoundingBox: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, ...cut, ...(n.children ? { children: kids } : {}) };
-}
 
 function lifted(n: RestNode, by: number): RestNode {
   const b = n.absoluteBoundingBox!;
@@ -193,19 +175,70 @@ function stacked(slices: { root: RestNode; top: number }[], newId: () => string,
 
 export type Marker = (root: RestNode) => RestNode;
 
+export enum Sectioning {
+  On = 'on',
+  Off = 'off'
+}
+
+export const sectioningOf = (sections: boolean) => (sections ? Sectioning.On : Sectioning.Off);
+
+export enum Tokening {
+  On = 'on',
+  Off = 'off'
+}
+
+export const tokeningOf = (tokens: boolean) => (tokens ? Tokening.On : Tokening.Off);
+
+export type PageShape = { sectioning: Sectioning; tokening?: Tokening; brand?: SiteBrand };
+
+export const PLAIN_SHAPE: PageShape = { sectioning: Sectioning.Off, tokening: Tokening.Off };
+
+export const FULL_SHAPE: PageShape = { sectioning: Sectioning.On, tokening: Tokening.On };
+
+type Tokenise = (plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined, newId: () => string) => FigmaPlan;
+
+function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined, newId: () => string): FigmaPlan {
+  const docs = plan.items.map((item) => item.doc);
+  const images = new Set(plan.items.flatMap((item) => item.images.flatMap((image) => [image.clipId, ...(image.innerId ? [image.innerId] : [])])));
+  const units = { docPerPx: (docs[0]?.width ?? tree.width) / tree.width, images };
+  const tokens = tokensOf(samplesOf(docs, root, units), brand);
+  const site = siteName(tree.url);
+  return { ...plan, items: plan.items.map((item) => ({ ...item, doc: componentKit(tokenised(item.doc, tokens, site, units), site, newId) })) };
+}
+
+const NO_PAGES: ComponentPages = { sets: [], homes: {} };
+
+const PAGED: Record<Tokening, (plan: FigmaPlan, newId: () => string) => ComponentPages> = {
+  [Tokening.On]: (plan, newId) => componentPages(plan.items, newId),
+  [Tokening.Off]: () => NO_PAGES
+};
+
+const TOKENISED: Record<Tokening, Tokenise> = {
+  [Tokening.On]: withTokens,
+  [Tokening.Off]: (plan) => plan
+};
+
+const SECTIONED: Record<Sectioning, (tree: PageTree) => RestNode> = {
+  [Sectioning.On]: (tree) => (tree.outline ? sectionFramed(tree.root, sectionsOf({ ...tree.outline, height: tree.height })) : tree.root),
+  [Sectioning.Off]: (tree) => tree.root
+};
+
 const REPEATED: Marker = (root) => repeatedOf(root).root;
 
-export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}): UrlPlan | null {
+export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, shape: PageShape = PLAIN_SHAPE): UrlPlan | null {
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
   const images = refsOf(tree.root);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
-  const root = mapped({ ...mark(tree.root), name }, keyOf, family);
-  const plan = stacked(slicesOf(root), newId, uploads);
-  if (!plan) {
+  const root = mapped({ ...flattened(mark(stacksOf(SECTIONED[shape.sectioning](tree)))), name }, keyOf, family);
+  const stack = stacked(slicesOf(root), newId, uploads);
+  if (!stack) {
     return null;
   }
-  const counts = plan.items.map((item) => countOf(item.doc));
-  return { plan, images, name, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
+  const tokening = shape.tokening ?? Tokening.Off;
+  const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
+  const counts = tokened.items.map((item) => countOf(item.doc));
+  const { sets, homes } = PAGED[tokening](tokened, newId);
+  return { plan: tokened, images, name, sets, homes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
 }

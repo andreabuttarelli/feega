@@ -4,6 +4,7 @@ import type { Cookies } from '@sveltejs/kit';
 import { landingPath, type LandingDeps } from '$lib/server/tenancy/landing';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { EntryVia } from '$lib/server/tenancy/entry';
+import { START_URL_COOKIE } from '$lib/server/onboarding/start-url-cookie';
 
 const USER = { id: 'u1', email: 'b@esempio.it' } as User;
 const DB = {} as never;
@@ -32,7 +33,8 @@ function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>, termsAc
       order.push('accept');
       return outcome;
     }),
-    homePathFor: vi.fn(async (..._args: Parameters<LandingDeps['homePathFor']>) => '/p/proj/c/canvas')
+    homePathFor: vi.fn(async (..._args: Parameters<LandingDeps['homePathFor']>) => '/p/proj/c/canvas'),
+    startPathFor: vi.fn(async (..._args: Parameters<LandingDeps['startPathFor']>) => '/p/site/c/canvas?start_url=x')
   };
 }
 
@@ -103,5 +105,29 @@ describe('a signup that came from a landing page', () => {
 
     expect(d.homePathFor.mock.calls[0][5]).toBe('anime-video-generator');
     expect(jar.feega_campaign).toBeUndefined();
+  });
+});
+
+describe('a start url carried through sign-in', () => {
+  it('lands in a new project for that site, and is used once', async () => {
+    const d = deps({ outcome: 'invalid' });
+    const jar = { [ORG_COOKIE]: 'o1', [START_URL_COOKIE]: 'https://stripe.com/' };
+
+    const path = await landingPath(DB, USER, cookies(jar), null, d);
+
+    expect(path).toBe('/p/site/c/canvas?start_url=x');
+    expect(d.startPathFor.mock.calls[0].slice(3)).toEqual(['o1', 'https://stripe.com/']);
+    expect(d.homePathFor).not.toHaveBeenCalled();
+    expect(jar).not.toHaveProperty(START_URL_COOKIE);
+  });
+
+  it('an invite wins, and the start url is dropped', async () => {
+    const d = deps({ outcome: 'accepted', orgId: 'o2' } as never);
+    const jar = { [START_URL_COOKIE]: 'https://stripe.com/' };
+
+    await landingPath(DB, USER, cookies(jar), 'tok', d);
+
+    expect(d.startPathFor).not.toHaveBeenCalled();
+    expect(jar).not.toHaveProperty(START_URL_COOKIE);
   });
 });

@@ -47,6 +47,17 @@ describe('diffing two docs into ops', () => {
     expect(applyOps(before, diffDoc(before, after))).toEqual(after);
   });
 
+  it('replays a clip moving out of a track that goes away, the undo of a wrap in a stack', () => {
+    const wrapped = base();
+    const [main] = wrapped.tracks;
+    const moved = { ...wrapped, tracks: [{ ...main, clips: main.clips.filter((c) => c.id !== 'a') }, { ...main, id: 'stack-track', clips: main.clips.filter((c) => c.id === 'a') }] };
+
+    const undone = applyOps(JSON.parse(JSON.stringify(moved)), diffDoc(moved, wrapped));
+
+    expect(undone.tracks.flatMap((t) => t.clips.map((c) => c.id)).sort()).toEqual(['a', 'b']);
+    expect(undone.tracks.map((t) => t.id)).toEqual(wrapped.tracks.map((t) => t.id));
+  });
+
   it('replays a reorder inside a track', () => {
     const before = base();
     const track = before.tracks[0];

@@ -139,7 +139,8 @@ export type Typography = { vertical: number; paragraph: Paragraph; clips: boolea
 export const coreTypography = ({ leading, typography: { vertical, paragraph, clips, rule, features } }: Pick<TextPlan, 'leading' | 'typography'>) =>
   leading !== AUTO && !clips && rule.line === NO_RULE.line && !Object.keys(features).length && vertical === VERTICAL_SHARE.center && (Object.keys(PLAIN_PARAGRAPH) as (keyof Paragraph)[]).every((key) => paragraph[key] === PLAIN_PARAGRAPH[key]);
 
-const WRAP_OF: Record<TextWrap, Wrap> = { wrap: Wrap.Greedy, balance: Wrap.Balance, pretty: Wrap.Pretty };
+const WRAP_OF: Record<TextWrap, Wrap> = { wrap: Wrap.Greedy, balance: Wrap.Balance, pretty: Wrap.Pretty, none: Wrap.Greedy };
+const UNWRAPPED: Record<TextWrap, (flow: Flow) => Flow> = { wrap: (f) => f, balance: (f) => f, pretty: (f) => f, none: (f) => ({ ...f, wraps: false }) };
 const TRIM_OF: Record<LeadingTrim, Trim> = { none: Trim.None, cap: Trim.Cap };
 
 const truncates = (p: Props) => p.truncate === true;
@@ -463,7 +464,7 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
     leading: leadingOf(p, size),
     inset: kind.inset,
     shaping: run?.finest === AnimatorUnit.Char ? Shaping.Chars : Shaping.Runs,
-    flow: kind.flow(p),
+    flow: UNWRAPPED[p.textWrap ?? 'wrap'](kind.flow(p)),
     frame: { left: frame.box.left - env.box.left, top: frame.box.top - env.box.top, width: frame.box.width, height: frame.box.height, anchor: frame.anchor, hugs: frame.hugs },
     align: ALIGN_SHARE[p.align] ?? 0,
     typography: { vertical: VERTICAL_SHARE[p.verticalAlign ?? 'center'], paragraph: paragraphOf(p), clips: truncates(p) && sizingOf(p) === TextSizing.Fixed, rule: ruleOf(p), ruleColour: p.decorationColor ? colour(String(p.decorationColor)) : null, features: featuresFor(p) },

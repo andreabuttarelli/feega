@@ -9,6 +9,7 @@
  * leggerebbero due lingue diverse.
  */
 import type { Db } from '$lib/server/db/client';
+import type { Json } from '$lib/database.types';
 import { runBrandAnalysis, type BrandProfile } from '$lib/server/brand-analysis';
 import { withOrgContext } from '$lib/server/ai-log';
 import { gateOrgCredits, CreditsExhaustedError } from '$lib/server/credits';
@@ -140,6 +141,7 @@ export async function createBrandFromWizard(
     logoUrl: string | null;
     products: WizardProduct[];
     productsPlatform: StorePlatform | null;
+    kit?: { palette: Json; logos: Json; voice: Json };
   }
 ): Promise<{ id: string; slug: string }> {
   const base = slugify(input.name);
@@ -157,7 +159,8 @@ export async function createBrandFromWizard(
         website: input.website,
         short_description: input.shortDescription,
         content: input.content,
-        logo_url: input.logoUrl
+        logo_url: input.logoUrl,
+        ...input.kit
       })
       .select('id, slug')
       .single();

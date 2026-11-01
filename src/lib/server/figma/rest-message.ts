@@ -35,6 +35,7 @@ export type RestNode = {
   name?: string;
   type: string;
   visible?: boolean;
+  collapsed?: boolean;
   opacity?: number;
   size?: Vec;
   absoluteBoundingBox?: { x: number; y: number; width: number; height: number };
@@ -43,6 +44,9 @@ export type RestNode = {
   strokes?: RestPaint[];
   strokeWeight?: number;
   strokeAlign?: string;
+  strokeDashes?: number[];
+  blendMode?: string;
+  maskGradient?: RestPaint;
   effects?: (Omit<Effect, 'color'> & { color?: RestColor })[];
   cornerRadius?: number;
   rectangleCornerRadii?: number[];
@@ -207,7 +211,8 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     styleID: Number(id),
     fontName: fontOf(style),
     fontSize: style.fontSize,
-    fillPaints: paintsOf(style.fills)
+    fillPaints: paintsOf(style.fills),
+    ...(style.letterSpacing !== undefined ? { letterSpacing: { value: style.letterSpacing, units: 'PIXELS' } } : {})
   }));
   const style = n.style;
   return {
@@ -284,6 +289,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     type: n.type,
     name: n.name,
     visible: n.visible,
+    collapsed: n.collapsed,
     opacity: n.opacity,
     size: sizeOf(n),
     transform: transformOf(n, parent.rest),
@@ -292,6 +298,9 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     strokePaints: paintsOf(n.strokes),
     strokeWeight: n.strokeWeight,
     strokeAlign: n.strokeAlign,
+    dashPattern: n.strokeDashes,
+    blendMode: n.blendMode,
+    maskGradient: n.maskGradient?.gradientHandlePositions && n.maskGradient.gradientStops ? { handles: n.maskGradient.gradientHandlePositions, stops: n.maskGradient.gradientStops.map((s) => ({ position: s.position, alpha: s.color.a ?? 1 })) } : undefined,
     effects: n.effects?.map((e) => ({ ...e, color: e.color ? rgba(e.color) : undefined })),
     frameMaskDisabled: n.clipsContent === undefined ? undefined : !n.clipsContent,
     fillGeometry: geometryOf(n.fillGeometry, build),

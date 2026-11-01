@@ -9,10 +9,11 @@ export const FIDELITY_PAGES: Record<string, string> = {
   framer: 'https://www.framer.com/',
   webflow: 'https://webflow.com/',
   tailwind: 'https://tailwindcss.com/docs/installation/using-vite',
-  blog: 'https://overreacted.io/a-chain-reaction/'
+  blog: 'https://overreacted.io/a-chain-reaction/',
+  feega: 'https://feega.app/'
 };
 
-export const FIDELITY_DIR = join(homedir(), 'Documents/feega-videos/url-import/fidelity2');
+export const FIDELITY_DIR = process.env.URL_IMPORT_FIDELITY_DIR ?? join(homedir(), 'Documents/feega-videos/url-import/fidelity2');
 
 export const capturedIn = (label: string) => join(FIDELITY_DIR, 'captures', label);
 
