@@ -60,4 +60,13 @@ describe('a page node carries its behaviour into the clip it becomes', () => {
     expect(mains.map((c) => c.component?.variant?.State)).not.toContain('Hover');
     expect(mains.flatMap((c) => c.tracks.flatMap((t) => t.clips.flatMap((clip) => clip.states ?? []))).map((r) => r.overrides.fill)).toContain('#003399');
   });
+
+  it('astro.build file tree: what a closed details folds is hidden down to its last layer, not just its list', () => {
+    const row: RestNode = { id: 'row', type: 'FRAME', name: 'li', absoluteBoundingBox: box(20, 80, 200, 24), fills: [{ type: 'SOLID', color: ink }], children: [text('file', 'robots.txt', 82)] };
+    const list: RestNode = { id: 'list', type: 'FRAME', name: 'ul', collapsed: true, absoluteBoundingBox: box(20, 80, 200, 48), fills: [], strokes: [{ type: 'SOLID', color: ink }], strokeWeight: 1, layoutMode: 'VERTICAL', children: [row] };
+    const clips = clipsOfPlan(page([list]));
+    const shown = clips.filter((c) => !c.hidden && (c.props.text === 'robots.txt' || c.name === 'li'));
+
+    expect(shown.map((c) => c.name)).toEqual([]);
+  });
 });

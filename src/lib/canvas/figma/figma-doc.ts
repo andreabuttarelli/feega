@@ -436,11 +436,25 @@ function behaved(doc: MotionDoc, roots: Root[], layer: Layer): MotionDoc {
   return set.ok ? set.doc : doc;
 }
 
+function withDescendants(doc: MotionDoc, ids: readonly string[]): Set<string> {
+  const all = new Set(ids);
+  const clips = doc.tracks.flatMap((t) => t.clips);
+  let grew = true;
+  while (grew) {
+    const before = all.size;
+    for (const c of clips) {
+      if (c.parent && all.has(c.parent)) {
+        all.add(c.id);
+      }
+    }
+    grew = all.size > before;
+  }
+  return all;
+}
+
 function hiddenAll(doc: MotionDoc, roots: Root[]): MotionDoc {
-  return roots.reduce((d, root) => {
-    const hid = editClip(d, root.id, (clip) => ({ ...clip, hidden: true }));
-    return hid.ok ? hid.doc : d;
-  }, doc);
+  const folded = withDescendants(doc, roots.map((r) => r.id));
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (folded.has(c.id) ? { ...c, hidden: true } : c)) })) };
 }
 
 function faded(doc: MotionDoc, ids: string[], opacity: number, p: Place): MotionDoc {
