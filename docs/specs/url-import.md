@@ -217,4 +217,5 @@ writes `<page>-gpu-*.png`, `<page>-gpu-score.json` and a `gpu-<backend>.md` tabl
 HTML scores of the same label. Both harnesses stretch each frame into its node box, like the
 canvas. GPU text is drawn with `Smoothing.Plain` (`URL_IMPORT_GPU_SMOOTHING`), as the headless shell
 renders the source and the HTML still; the canvas on a Mac dilates text like CoreText, which the
-shell does not.
+shell does not. Captured views (`<page>@768`, `<page>@390`) are planned with the page and scored too,
+each frame resolved to the view (`resolveView`) and drawn at the view width.
