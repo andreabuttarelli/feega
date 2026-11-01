@@ -511,12 +511,12 @@ function stageAt({ doc, tokens, moves }: Prepared, frame: number) {
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
   const drawable = bottomFirst.flatMap((t) => t.clips as MotionClip[]).filter((clip) => shown(clip) && !sources.has(clip.id) && !onScreen(clip));
   const alphaOf = (clip: MotionClip, opacity: number, edge: Pose) => inheritedOpacity(doc, clip, byId, frame) * opacity * edge.opacity;
-  return { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf };
+  return { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf, enclosing };
 }
 
 export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
   const { doc, tokens, assets, typeset } = prepared;
-  const { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf } = stageAt(prepared, frame);
+  const { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf, enclosing } = stageAt(prepared, frame);
   const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
   const colour = (v: string) => rgbaOf(css(v)) ?? [0, 0, 0, 1];
   const items: Item[] = [];
@@ -586,8 +586,25 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     return projected([{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }]);
   }
 
+  function groupMasked(clip: MotionClip, drawn: Item[]): Item[] | Unsupported {
+    let held = drawn;
+    for (const id of [...(enclosing.get(clip.id) ?? [])].reverse()) {
+      const group = byId.get(id);
+      if (!group?.mask) {
+        continue;
+      }
+      const masks = maskLayers(group, frame, size, worldAt(doc, id, frame, size), asset);
+      if (!masks) {
+        return Unsupported.Mask;
+      }
+      held = [{ kind: ItemKind.Group, clip: clip.id, items: held, opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal, masks }];
+    }
+    return held;
+  }
+
   for (const clip of drawable) {
-    const drawn = clipItems(clip);
+    const own = clipItems(clip);
+    const drawn = Array.isArray(own) ? groupMasked(clip, own) : own;
     if (Array.isArray(drawn)) {
       items.push(...drawn);
       continue;

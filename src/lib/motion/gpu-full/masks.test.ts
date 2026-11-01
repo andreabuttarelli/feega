@@ -4,7 +4,9 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { MaskKind, MaskMode, Matte, maskSchema } from '@feega/motion-core/motion/mask';
-import { CoverKind, displayListAt, ItemKind, Unsupported, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { CoverKind, displayListAt, ItemKind, Unsupported, type Item, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { MaskLayer } from '@feega/motion-core/motion/gpu-full/mask-layers';
+import { groupClips } from '../group';
 import { apply2d } from '@feega/motion-core/motion/affine';
 
 function must(r: OpResult): MotionDoc {
@@ -71,6 +73,24 @@ describe('track mattes', () => {
     expect(drawn.items.map((i) => i.clip)).not.toContain('hole');
     expect(card(doc)?.matte).toMatchObject({ luma: true, invert: true });
     expect(card(doc)?.matte?.items.map((i) => i.clip)).toEqual(['hole']);
+  });
+});
+
+describe('masks on a group', () => {
+  it('cuts what the group holds with the group mask, as the HTML render does', () => {
+    let n = 0;
+    const grouped = must(groupClips(withCard, ['card'], () => (n++ === 0 ? 'inner' : 'group')));
+    const doc = patch(grouped, 'group', { mask: mask({ kind: MaskKind.Rect, x: 0.25, y: 0.5, width: 0.5, height: 1 }) });
+    const drawn = displayListAt(doc, 0, FEEGA_TOKENS);
+    const masksOn = (items: Item[]): MaskLayer[] => items.flatMap((i) => [...(i.masks ?? []), ...(i.kind === ItemKind.Group ? masksOn(i.items) : [])]);
+
+    expect(drawn.unsupported).toEqual([]);
+    const [layer] = masksOn(drawn.items);
+    const cover = layer.cover as Extract<CoverOf, { kind: CoverKind.Path }>;
+    const xs = cover.contours.flatMap((c) => c.filter((_, i) => i % 2 === 0).map((x, i) => apply2d(cover.matrix, [x, c[i * 2 + 1]])[0]));
+
+    expect(masksOn(drawn.items).map((m) => m.mode)).toEqual([MaskMode.Add]);
+    expect([Math.min(...xs), Math.max(...xs)]).toEqual([0, 960]);
   });
 });
 
