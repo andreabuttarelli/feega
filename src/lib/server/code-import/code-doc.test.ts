@@ -163,4 +163,17 @@ describe('codePlan', () => {
     expect(title.component!.properties!.children).toMatchObject({ kind: 'text', default: 'Revenue' });
     expect(title.tracks.flatMap((t) => t.clips).find((c) => c.id === target)?.props.text).toBe('Revenue');
   });
+
+  it('componenti annidati in profondità costano lavoro lineare, non esponenziale', () => {
+    const DEPTH = 14;
+    const nesting = (x: number, base: number, level = 0): RestNode =>
+      framed(base + level, [x + level * 2, 10 + level * 10, 150 - level * 4, 280 - level * 12], level % 2 ? GREY : WHITE, [text(`L${level}`, x + level * 2 + 4, 12 + level * 10), ...(level + 1 < DEPTH ? [nesting(x, base, level + 1)] : [])]);
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, children: [nesting(10, 0), nesting(200, DEPTH)] } };
+    const uses = [...Array(2 * DEPTH).keys()].map((i) => ({ component: `Level${i % DEPTH}`, props: {} }));
+    let made = 0;
+    const plan = codePlan(tree, uses, () => `n${++made}`)!;
+
+    expect(mainsNamed(plan.plan.items[0].doc, 'Level0')).toHaveLength(1);
+    expect(made).toBeLessThan(DEPTH * 20);
+  });
 });

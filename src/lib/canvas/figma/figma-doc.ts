@@ -440,7 +440,7 @@ function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: P
 
 function ownOverrides(doc: MotionDoc, layer: FrameLayer, main: Main, shift: Unit, p: Place) {
   const images: FigmaImage[] = [];
-  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(p.mains), report: () => undefined }, Background.Always);
+  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(), report: () => undefined }, Background.Always);
   const ids = { comp: p.newId(), clip: p.newId() };
   const made = own.ids.length ? precompose(own.doc, own.ids, ids, layer.name) : null;
   return made?.ok ? instanceOverrides(made.doc, ids.comp, main.compId, { own: images, main: main.images }) : null;
