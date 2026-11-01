@@ -3408,6 +3408,7 @@
     untrack(() => {
       select([pick.nodeId]);
       goInside(pick.nodeId, Gesture.Click, clip);
+      requestAnimationFrame(zoomToSelection);
     });
   });
 
