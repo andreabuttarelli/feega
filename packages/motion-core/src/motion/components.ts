@@ -23,7 +23,7 @@ import { fillsSchema } from './fill/model';
 import { strokesSchema } from './stroke/model';
 import { runsSchema } from './text-runs';
 import { listsSchema } from './text-lists';
-import { LETTER_SPACING, LINE_HEIGHT } from './type-units';
+import { AXES, LETTER_SPACING, LINE_HEIGHT } from './type-units';
 import { DECORATION_STYLES, DECORATIONS, FEATURES, RULE } from './decoration';
 import { counterSchema } from './text-counter';
 import { BooleanOp } from './shape/boolean-op';
@@ -148,7 +148,6 @@ export const TYPE = {
   slant: { min: -20, max: 20, step: 0.5, fallback: 0 }
 } as const;
 
-export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(\.\d+)?)*$|^$/;
 
 type Look = { weight?: number; tracking: number; leading: number };
 
