@@ -1101,12 +1101,15 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
         if (SKIPPED.test(element.tagName.toUpperCase()) && element.tagName !== 'BR') {
           continue;
         }
+        const ccss = getComputedStyle(element);
+        if (ccss.display === 'none') {
+          continue;
+        }
         if (element.tagName === 'BR') {
           run.push({ node: null, css: own, fills, br: true });
           continue;
         }
-        const ccss = getComputedStyle(element);
-        if (ccss.display === 'none' || Number(ccss.opacity) === 0) {
+        if (Number(ccss.opacity) === 0) {
           continue;
         }
         if (plainInline(element, ccss)) {

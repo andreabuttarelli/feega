@@ -284,6 +284,25 @@ describe.runIf(process.env.CHROMIUM_PATH)('a headline set tighter than its glyph
   }, 30_000);
 });
 
+const HIDDEN_BREAK = `<body style="margin:0"><p style="margin:0;width:380px;font:14px sans-serif"><strong>Add user sign ups and logins</strong>,<br style="display:none"> securing your data</p></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a line break the page hides at this width', () => {
+  it('does not break the text (supabase.com: a desktop-only break split every phone card text)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(HIDDEN_BREAK);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(['Add user sign ups and logins, securing your data']);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
 const CLIPPED = `<body style="margin:0"><svg width="40" height="40" viewBox="0 0 20 20"><defs><clipPath id="c"><rect x="0" y="0" width="10" height="20"/></clipPath></defs><g clip-path="url(#c)"><circle cx="10" cy="10" r="8" fill="#e00"/></g></svg></body>`;
 
 describe.runIf(process.env.CHROMIUM_PATH)('an svg clipped by a rectangle', () => {
