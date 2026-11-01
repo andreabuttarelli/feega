@@ -1,6 +1,5 @@
 import puppeteer, { type ConnectionTransport, type Page } from 'puppeteer-core';
 import sharp from 'sharp';
-import { WebSocket } from 'ws';
 import { describe, expect, it } from 'vitest';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import { localBrowser } from '$lib/server/web/browser';
@@ -289,8 +288,8 @@ const ROUND_TRIPS_PER_PICTURE = 3;
 const ROUND_TRIPS_AROUND = 6;
 
 async function counted(endpoint: string): Promise<{ transport: ConnectionTransport; sent: () => number }> {
-  const socket = new WebSocket(endpoint, { perMessageDeflate: false, maxPayload: 256 * 1024 * 1024 });
-  await new Promise((open) => socket.once('open', open));
+  const socket = new WebSocket(endpoint);
+  await new Promise((open) => socket.addEventListener('open', open, { once: true }));
   let sent = 0;
   const transport: ConnectionTransport = {
     send: (message) => {
@@ -299,8 +298,8 @@ async function counted(endpoint: string): Promise<{ transport: ConnectionTranspo
     },
     close: () => socket.close()
   };
-  socket.on('message', (data) => transport.onmessage?.(data.toString()));
-  socket.on('close', () => transport.onclose?.());
+  socket.addEventListener('message', (event) => transport.onmessage?.(String(event.data)));
+  socket.addEventListener('close', () => transport.onclose?.());
   return { transport, sent: () => sent };
 }
 
