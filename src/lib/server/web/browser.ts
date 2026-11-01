@@ -252,12 +252,11 @@ const SNAP_CSS: Record<SnapMode, (target: string) => string> = {
 type SnapBox = PageSnap['box'];
 type Held = { target: string; picture: string; box: SnapBox };
 type SnapStage = { held: Held | null; style?: string | null; y: number; shot: { target: string; box: SnapBox } | null };
-type SnapView = { view: SnapBox; live: boolean };
 type Piece = { data: string; top: number };
 
 const SEE_THROUGH = { color: { r: 0, g: 0, b: 0, a: 0 } };
 
-function snapStaged(stage: SnapStage): SnapView {
+function snapStaged(stage: SnapStage): boolean {
   const LIVE = /^(CANVAS|VIDEO|IFRAME|EMBED|OBJECT)$/;
   const SAME_PX = 1;
   const STYLE_ID = 'feega-snap-style';
@@ -290,20 +289,7 @@ function snapStaged(stage: SnapStage): SnapView {
   }
 
   window.scrollTo(0, stage.y);
-  const { pageLeft, pageTop, width, height } = window.visualViewport ?? { pageLeft: window.scrollX, pageTop: window.scrollY, width: innerWidth, height: innerHeight };
-  return { view: { x: pageLeft, y: pageTop, width, height }, live: stage.shot ? liveAt(stage.shot.target, stage.shot.box) !== null : false };
-}
-
-function rounded(box: SnapBox): SnapBox {
-  const x = Math.round(box.x);
-  const y = Math.round(box.y);
-  return { x, y, width: Math.round(box.width + box.x - x), height: Math.round(box.height + box.y - y) };
-}
-
-function seenIn(clip: SnapBox, view: SnapBox): SnapBox {
-  const x = Math.max(clip.x, view.x);
-  const y = Math.max(clip.y, view.y);
-  return { x, y, width: Math.max(Math.min(clip.x + clip.width, view.x + view.width) - x, 0), height: Math.max(Math.min(clip.y + clip.height, view.y + view.height) - y, 0) };
+  return stage.shot ? liveAt(stage.shot.target, stage.shot.box) !== null : false;
 }
 
 async function stitched(pieces: Piece[], box: SnapBox): Promise<string> {
@@ -337,12 +323,9 @@ function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
       const piece = { x: snap.box.x, y: top, width: snap.box.width, height: Math.min(height, snap.box.y + snap.box.height - top) };
       const first = pieces.length === 0;
       const stage: SnapStage = first ? { held, style: SNAP_CSS[snap.mode](target), y: top + piece.height <= height ? 0 : top, shot: { target, box: snap.box } } : { held: null, y: top, shot: null };
-      const staged = await page.evaluate(snapStaged, stage);
-      if (first) {
-        held = null;
-        live = staged.live;
-      }
-      const { data } = await (await cdp()).send('Page.captureScreenshot', { format: 'png', clip: { ...seenIn(rounded(piece), staged.view), scale: 1 }, captureBeyondViewport: false });
+      live ||= await page.evaluate(snapStaged, stage);
+      held = null;
+      const data = Buffer.from(await page.screenshot({ type: 'png', clip: piece, captureBeyondViewport: false })).toString('base64');
       pieces.push({ data, top: Math.round(top - snap.box.y) });
     }
 
