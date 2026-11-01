@@ -8,7 +8,7 @@ import { openCanvas, SETTLE_MS } from './seed';
 const SITE = process.env.DEMO_SITE ?? 'https://vercel.com';
 const TEST_MS = 1_800_000;
 const IMPORT_MS = 400_000;
-const HOLD_MS = 2400;
+const HOLD_MS = 2500;
 const SECTION_DEPTH_PX = '44px';
 const SECTIONS = [1, 3];
 const FOLD_LIMIT = 40;
@@ -17,7 +17,8 @@ const SCREEN = { x: 0, y: 0, width: 1600, height: 900 };
 const CANVAS_AREA = { x: 440, y: 60, width: 1010, height: 780 };
 const CODE_MODE = 3;
 const COMPONENTS = 'Components';
-const INSTANCE = process.env.DEMO_INSTANCE ?? 'Get a Demo';
+const USAGE = '<[A-Z]\\w+[ />]';
+const HTML = 'html';
 
 type Rect = { x: number; y: number; width: number; height: number };
 
@@ -52,6 +53,23 @@ async function foldSections(layers: Locator) {
     await layers.evaluate((el) => el.scrollBy(0, -1));
     await layers.page().waitForTimeout(200);
   }
+}
+
+async function usedComponent(page: Page, names: string[]): Promise<string> {
+  const layers = page.getByTestId('layers');
+  const search = page.getByTestId('layers-search');
+  await page.getByTestId('layers-search-toggle').click();
+  for (const name of names) {
+    await search.fill(name);
+    await page.waitForTimeout(800);
+    if (await layers.locator('[data-layer][data-highlight="component"]', { hasText: name }).count()) {
+      await search.fill('');
+      await page.getByTestId('layers-search-toggle').click();
+      await page.waitForTimeout(SETTLE_MS);
+      return name;
+    }
+  }
+  throw new Error(`no component of ${names.join(', ')} has an instance on the page`);
 }
 
 async function reopen(page: Page, href: string, ready: Locator) {
@@ -138,9 +156,17 @@ test('import from url, the result', async ({ page, session }) => {
       await d.click(layersButton);
     }
     await d.click(components);
-    await d.cut(() => reopen(page, componentsLink, sets.first()));
+    await d.cut(async () => {
+      await reopen(page, componentsLink, sets.first());
+      if (!(await layers.isVisible())) {
+        await layersButton.click();
+      }
+    });
     await hold(CANVAS_AREA);
     await hold(around(await box(sets.nth(0)), await box(sets.nth(1))));
+    const main = layers.locator('[data-layer]').first();
+    await expect(main).toBeVisible({ timeout: 30_000 });
+    const names = (await layers.locator('[data-layer]').allInnerTexts()).map((n) => n.trim()).filter(Boolean);
 
     if (!(await home.isVisible())) {
       await d.click(layersButton);
@@ -154,9 +180,10 @@ test('import from url, the result', async ({ page, session }) => {
       await expect(layers.locator('[data-layer]').first()).toBeVisible({ timeout: 60_000 });
       await page.waitForTimeout(SETTLE_MS);
     });
-    const instance = layers.locator('[data-layer][data-highlight="component"]', { hasText: INSTANCE }).first();
+    const name = process.env.DEMO_INSTANCE ?? (await d.cut(() => usedComponent(page, names)));
+    const instance = layers.locator('[data-layer][data-highlight="component"]', { hasText: name }).first();
     await d.click(page.getByTestId('layers-search-toggle'));
-    await d.type(page.getByTestId('layers-search'), INSTANCE);
+    await d.type(page.getByTestId('layers-search'), name);
     await expect(instance).toBeVisible({ timeout: 15_000 });
     await d.click(instance);
     await d.key('Shift+Digit2', '⇧2');
@@ -166,12 +193,36 @@ test('import from url, the result', async ({ page, session }) => {
     await d.move(goMain);
     await hold(top(await box(page.getByTestId('motion-inspector')), 0.3));
 
-    await d.click(page.getByTestId('editor-mode-switch').locator('[role="radio"]').nth(CODE_MODE));
     const code = page.getByTestId('dev-code');
+    const source = page.getByTestId('dev-code-source');
+    await d.click(page.getByTestId('editor-mode-switch').locator('[role="radio"]').nth(CODE_MODE));
     await expect(code).toBeVisible({ timeout: 30_000 });
+    await code.scrollIntoViewIfNeeded();
     await d.wait(1500);
+    const panel = await box(code);
+    await hold(panel);
+
+    await d.cut(() => source.evaluate((pre) => pre.scrollTo({ top: 0 })));
+    await source.evaluate((pre, usage) => {
+      const offset = (l: Element) => l.getBoundingClientRect().top - pre.getBoundingClientRect().top + pre.scrollTop;
+      const lines = [...pre.querySelectorAll('.line')];
+      const hidden = lines.find((l) => offset(l) > pre.clientHeight && new RegExp(usage).test(l.textContent ?? ''));
+      const top = hidden ? offset(hidden) - pre.clientHeight / 3 : pre.clientHeight / 2;
+      pre.scrollTo({ top, behavior: 'smooth' });
+    }, USAGE);
+    await d.wait(800);
+    await hold(await box(source));
+
+    await d.click(page.getByTestId('dev-code-copy'), { fit: await box(source) });
+    await expect(page.getByTestId('dev-code-copy')).toHaveAttribute('aria-label', 'Copied');
+    await hold(await box(source));
+
+    await d.select(page.getByTestId('dev-code-target'), HTML, panel);
+    await d.wait(800);
     await hold(await box(code));
+
+    await hold(SCREEN);
   };
 
-  await recordDemo(page, { slug: 'import-layers-v2', title: 'import from url' }, flow);
+  await recordDemo(page, { slug: 'import-layers-v3', title: 'import from url' }, flow);
 });

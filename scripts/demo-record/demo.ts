@@ -101,10 +101,10 @@ export async function demo(page: Page, dir: string) {
 
     move: async (target: Locator | Point) => moveTo(await centreOf(target)),
 
-    async click(target: Locator | Point, options: { button?: 'left' | 'right'; double?: boolean } = {}) {
+    async click(target: Locator | Point, options: { button?: 'left' | 'right'; double?: boolean; fit?: Rect } = {}) {
       const at = await centreOf(target);
       await moveTo(at);
-      events.push({ kind: 'click', t: now(), x: at.x, y: at.y });
+      events.push({ kind: 'click', t: now(), x: at.x, y: at.y, ...(options.fit ? { fit: options.fit } : {}) });
       await page.waitForTimeout(DWELL_MS);
       await press(at, { button: options.button, clickCount: options.double ? 2 : 1 });
       await page.waitForTimeout(BEAT_MS);
