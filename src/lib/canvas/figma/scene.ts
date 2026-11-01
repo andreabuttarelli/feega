@@ -82,9 +82,9 @@ export type Padding = { top: number; right: number; bottom: number; left: number
 export type AutoLayout = { flow: Flow; wrap: boolean; gap: number; crossGap: number; padding: Padding; justify: Justify; align: Cross; width: Fit; height: Fit };
 export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean };
 
-export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean };
+export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number };
 
-type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem };
+type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean };
 
 export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
 
@@ -406,6 +406,12 @@ function autoLayoutOf(n: FigmaRawNode, report: Report): AutoLayout | null {
 
 const itemOf = (n: FigmaRawNode): ChildItem => ({ grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE' });
 
+const SPACING_PX: Record<string, (value: number, size: number) => number> = { PIXELS: (v) => v, PERCENT: (v, size) => (v / PERCENT) * size, RAW: (v, size) => v * size };
+
+const spacingPx = (u: { value: number; units: string } | undefined, size: number) => (u && SPACING_PX[u.units] ? SPACING_PX[u.units](u.value, size) : 0);
+
+const SPACING_STEP = 0.01;
+
 function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: number; color: string }, report: Report): TextRun[] {
   const ids = n.textData?.characterStyleIDs ?? [];
   const table = new Map((n.textData?.styleOverrideTable ?? []).map((s) => [s.styleID ?? 0, s]));
@@ -433,6 +439,11 @@ function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: num
       }
       if (fill && fill.color !== base.color) {
         run.color = fill.color;
+      }
+      const size = positive(style.fontSize) ? style.fontSize : base.size;
+      const spacing = spacingPx(style.letterSpacing, size);
+      if (style.letterSpacing && Math.abs(spacing - spacingPx(n.letterSpacing, base.size)) > SPACING_STEP) {
+        run.tracking = spacing / size;
       }
       if (Object.keys(run).length > 2) {
         runs.push(run);
@@ -520,7 +531,7 @@ function shapePath(n: FigmaRawNode, ctx: Ctx): { path: string; rule: FillRule } 
 }
 
 function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
-  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n) };
+  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true };
 }
 
 const DEFAULT_TEXT_SIZE = 12;
@@ -736,6 +747,7 @@ export function figmaScene(message: FigmaMessage): FigmaScene | null {
     opacity: 1,
     effects: [],
     item: { grow: false, stretch: false, absolute: false },
+    hidden: false,
     fills: [],
     strokes: [],
     radii: [0, 0, 0, 0],

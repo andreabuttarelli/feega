@@ -35,6 +35,7 @@ export type RestNode = {
   name?: string;
   type: string;
   visible?: boolean;
+  collapsed?: boolean;
   opacity?: number;
   size?: Vec;
   absoluteBoundingBox?: { x: number; y: number; width: number; height: number };
@@ -207,7 +208,8 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     styleID: Number(id),
     fontName: fontOf(style),
     fontSize: style.fontSize,
-    fillPaints: paintsOf(style.fills)
+    fillPaints: paintsOf(style.fills),
+    ...(style.letterSpacing !== undefined ? { letterSpacing: { value: style.letterSpacing, units: 'PIXELS' } } : {})
   }));
   const style = n.style;
   return {
@@ -284,6 +286,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     type: n.type,
     name: n.name,
     visible: n.visible,
+    collapsed: n.collapsed,
     opacity: n.opacity,
     size: sizeOf(n),
     transform: transformOf(n, parent.rest),

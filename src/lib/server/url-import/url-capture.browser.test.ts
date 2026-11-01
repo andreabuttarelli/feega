@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { localBrowser } from '$lib/server/web/browser';
 import { capturedIn, FIDELITY_PAGES } from './fidelity-pages';
+import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
 import { pagePrepared, PLAIN_PLANNER } from './import-url';
@@ -24,6 +25,8 @@ async function fullShot(page: Page): Promise<Buffer> {
   return sharp({ create: { width, height, channels: 3, background: { r: 255, g: 255, b: 255 } } }).composite(bands).png().toBuffer();
 }
 
+const paintedTexts = (n: RestNode): string[] => (n.collapsed ? [] : [...(n.type === 'TEXT' ? [n.characters ?? ''] : []), ...(n.children ?? []).flatMap(paintedTexts)]);
+
 const PAGES = Object.entries(FIDELITY_PAGES).filter(([name]) => !ONLY || ONLY.includes(name));
 
 describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import reads it, and its screenshot', () => {
@@ -36,6 +39,7 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import
       const refusal = await pagePrepared(tab, new URL(url), SETTLE_MS, PLAIN_PLANNER);
       const dir = capturedIn(LABEL);
       mkdirSync(dir, { recursive: true });
+      const folded = await page!.evaluate(() => [...document.querySelectorAll('details:not([open]) > :not(summary)')].map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter((text) => text && !document.body.innerText.replace(/\s+/g, ' ').includes(text)));
       const tree = (await tab.tree()) as PageTree;
       writeFileSync(join(dir, `${name}.json`), JSON.stringify(tree));
       await tab.reveal(RevealMode.Still);
@@ -43,6 +47,7 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import
 
       expect(refusal).toBeNull();
       expect(tree.root).toBeDefined();
+      expect(paintedTexts(tree.root).filter((t) => folded.some((f) => t.startsWith(f)))).toEqual([]);
     } finally {
       await browser.close();
     }

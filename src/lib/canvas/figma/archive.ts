@@ -45,6 +45,7 @@ export type FigmaRawNode = {
   rectangleBottomLeftCornerRadius?: number;
   rectangleCornerRadiiIndependent?: boolean;
   frameMaskDisabled?: boolean;
+  collapsed?: boolean;
   resizeToFit?: boolean;
   stackMode?: string;
   stackSpacing?: number;
