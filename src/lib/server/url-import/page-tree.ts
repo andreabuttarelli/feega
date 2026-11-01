@@ -51,6 +51,13 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     ['nav', 'nav, [role=navigation]'],
     ['header', 'header, [role=banner]']
   ];
+  const PRESSES: [string, string][] = [
+    ['tab', '[role=tab]'],
+    ['menuitem', '[role=menuitem]'],
+    ['button', 'button, [role=button], input[type=submit], input[type=button]'],
+    ['link', 'a[href], [role=link]']
+  ];
+  const PRESSABLE = PRESSES.map(([, selector]) => selector).join(', ');
 
   const width = document.documentElement.clientWidth;
   const full = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0, window.innerHeight);
@@ -982,11 +989,17 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     });
     return limits.hints.find((hint) => words.includes(hint));
   };
+  const pressOf = (el: Element): string | undefined => {
+    const control = el.closest(PRESSABLE);
+    const labelled = control && (control.textContent ?? '').trim() === (el.textContent ?? '').trim();
+    return labelled ? PRESSES.find(([, selector]) => control.matches(selector))?.[0] : undefined;
+  };
   const domOf = (el: Element): NonNullable<RestNode['dom']> => {
     const role = el.getAttribute('role') ?? undefined;
     const hint = hintOf(el);
     const landmark = LANDMARKS.find(([, selector]) => el.closest(selector))?.[0];
-    return { tag: el.tagName.toLowerCase(), ...(role ? { role } : {}), ...(hint ? { hint } : {}), ...(landmark ? { landmark } : {}) };
+    const press = pressOf(el);
+    return { tag: el.tagName.toLowerCase(), ...(role ? { role } : {}), ...(hint ? { hint } : {}), ...(landmark ? { landmark } : {}), ...(press ? { press } : {}) };
   };
   const described = (el: Element, made: RestNode[]): RestNode[] => {
     const bare = made.filter((n) => !n.dom);
