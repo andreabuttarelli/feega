@@ -242,6 +242,22 @@ and astro from `v6`; before = the first cut on the same capture):
 | supabase | 0.94/0.94 → 0.94/0.94 | 0.90/0.84 | 0.92/0.93 | 0.70/0.78 | 0.79/0.86 |
 | astro | 0.90/0.93 → 0.90/0.93 | 0.77/0.82 | 0.81/0.83 | 0.57/0.64 | 0.66/0.68 |
 
+The same frames drawn by the GPU core (`gpu-fidelity.ts`, WebGPU):
+
+| page | desktop | tablet before | tablet after | phone before | phone after |
+|---|---|---|---|---|---|
+| vercel | 0.99/0.97 → 0.99/0.97 | 0.69/0.89 | 0.93/0.97 | 0.70/0.85 | 0.99/0.98 |
+| linear | 0.97/0.97 → 0.99/0.97 | 0.84/0.87 | 0.99/0.97 | 0.63/0.81 | 0.95/0.97 |
+| stripe | 0.98/0.97 → 0.98/0.97 | 0.47/0.82 | 0.92/0.96 | 0.53/0.57 | 0.99/0.95 |
+| apple | 0.99/0.98 → 0.99/0.98 | 0.95/0.71 | 0.99/0.97 | 0.64/0.58 | 0.99/0.94 |
+| framer | 0.99/0.96 → 0.99/0.96 | 0.94/0.74 | 0.99/0.98 | 0.82/0.75 | 0.91/0.95 |
+| webflow | 0.99/0.96 → 0.99/0.96 | 0.95/0.92 | 0.98/0.95 | 0.80/0.76 | 0.90/0.94 |
+| tailwind | 0.96/0.96 → 0.96/0.96 | 0.95/0.96 | 0.98/0.98 | 0.90/0.91 | 0.97/0.96 |
+| blog | 0.97/0.97 → 0.97/0.97 | 0.93/0.84 | 0.95/0.93 | 0.90/0.42 | 0.92/0.87 |
+| feega | 0.95/0.96 → 0.95/0.95 | 0.83/0.86 | 0.96/0.98 | 0.69/0.59 | 0.82/0.92 |
+| supabase | 0.98/0.95 → 0.98/0.95 | 0.94/0.85 | 0.97/0.94 | 0.79/0.80 | 0.88/0.89 |
+| astro | 0.90/0.93 → 0.90/0.93 | 0.77/0.82 | 0.81/0.84 | 0.57/0.64 | 0.65/0.68 |
+
 Below 0.95 the causes are the narrow page as the planner draws it at any width, not the merge: the
 same reads planned alone as pages score alike (feega phone fold 0.84, framer phone 0.91, webflow
 phone 0.90, blog phone 0.91/0.87). Fonts render a hair heavier and wider than the page (feega's
