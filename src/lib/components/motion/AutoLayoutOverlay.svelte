@@ -67,21 +67,20 @@
 
 <div class="overlay" bind:this={host} data-testid="auto-layout-overlay" role="presentation">
   {#each strips as strip, i (i)}
-    <button
-      type="button"
-      class="strip"
-      class:across={strip.kind === StripKind.Gap ? layout.direction === Direction.Horizontal : strip.side === 'left' || strip.side === 'right'}
-      class:active={grab && keyOf(grab.strip) === keyOf(strip)}
-      data-strip={keyOf(strip)}
-      aria-label={`Drag to change the ${nameOf(strip)} (${valueOf(strip)} px)`}
-      style={place(strip.box)}
-      onpointerdown={(e) => begin(e, strip)}
-      onpointermove={move}
-      onpointerup={end}
-      onpointercancel={end}
-    >
+    <div class="band" class:active={grab && keyOf(grab.strip) === keyOf(strip)} data-band={keyOf(strip)} style={place(strip.box)}>
+      <button
+        type="button"
+        class="handle"
+        class:across={strip.kind === StripKind.Gap ? layout.direction === Direction.Horizontal : strip.side === 'left' || strip.side === 'right'}
+        data-strip={keyOf(strip)}
+        aria-label={`Drag to change the ${nameOf(strip)} (${valueOf(strip)} px)`}
+        onpointerdown={(e) => begin(e, strip)}
+        onpointermove={move}
+        onpointerup={end}
+        onpointercancel={end}
+      ></button>
       <span class="value">{valueOf(strip)}</span>
-    </button>
+    </div>
   {/each}
 </div>
 
@@ -92,25 +91,36 @@
     pointer-events: none;
   }
 
-  .strip {
+  .band {
     position: absolute;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 4px;
+  }
+
+  .band:has(.handle:hover),
+  .band.active {
+    background: color-mix(in oklab, var(--ui-accent) 22%, transparent);
+  }
+
+  .handle {
+    flex: none;
+    width: 12px;
+    height: 4px;
     padding: 0;
     border: 0;
-    background: transparent;
+    border-radius: 9999px;
+    background: var(--ui-accent);
     pointer-events: all;
     cursor: ns-resize;
+    touch-action: none;
   }
 
-  .strip.across {
+  .handle.across {
+    width: 4px;
+    height: 12px;
     cursor: ew-resize;
-  }
-
-  .strip:hover,
-  .strip.active {
-    background: color-mix(in oklab, var(--ui-accent) 22%, transparent);
   }
 
   .value {
@@ -124,8 +134,8 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .strip:hover .value,
-  .strip.active .value {
+  .band:has(.handle:hover) .value,
+  .band.active .value {
     display: block;
   }
 </style>
