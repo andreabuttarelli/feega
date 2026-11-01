@@ -4,6 +4,9 @@ import { addClip, setKeyframe, type OpResult } from '@feega/motion-core/motion/t
 import { setClipFlags } from '@feega/motion-core/motion/organize';
 import { EditMode } from './edit-mode';
 import { aabb, quadOf } from './scene-select';
+import { wrapInFrame, wrapInStack } from './layout/ops';
+import { Align } from '@feega/motion-core/motion/layout/auto-layout';
+import { findClip } from '@feega/motion-core/motion/doc';
 import { Axis, Edge, alignSpace, distributeSpace, gapOf, moveBy, propBoxes, tidySpace } from './space';
 
 function must(r: OpResult): MotionDoc {
@@ -80,6 +83,35 @@ describe('align', () => {
     const aligned = must(alignSpace(base, ['c'], 0, propBoxes(base), Edge.Right, EditMode.Design));
 
     expect(bounds(aligned, 'c').right).toBeCloseTo(W, 5);
+  });
+
+  it('a small clip centres on a big one, which defines the bounds and stays put', () => {
+    const pair = must(addClip(shape(newMotionDoc(MotionFormat.Landscape), 'small', 0.45, 0.05, 0.45), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.6, y: 0.6, width: 0.4, height: 0.4 } }, 'big'));
+    const centred = must(alignSpace(pair, ['small', 'big'], 0, propBoxes(pair), Edge.Center, EditMode.Design));
+    const both = must(alignSpace(centred, ['small', 'big'], 0, propBoxes(centred), Edge.Middle, EditMode.Design));
+    const mid = (doc: MotionDoc, id: string) => [(bounds(doc, id).left + bounds(doc, id).right) / 2, (bounds(doc, id).top + bounds(doc, id).bottom) / 2];
+
+    expect(mid(both, 'small')[0]).toBeCloseTo(mid(pair, 'big')[0], 5);
+    expect(mid(both, 'small')[1]).toBeCloseTo(mid(pair, 'big')[1], 5);
+    expect(bounds(both, 'big')).toEqual(bounds(pair, 'big'));
+  });
+
+  it('one clip inside a frame aligns to the frame it sits in, not the canvas', () => {
+    const framed = must(wrapInFrame(base, ['a', 'b'], 'box', 'lane'));
+    const centred = must(alignSpace(framed, ['a'], 0, propBoxes(framed), Edge.Center, EditMode.Design));
+    const both = must(alignSpace(centred, ['a'], 0, propBoxes(centred), Edge.Middle, EditMode.Design));
+    const box = bounds(framed, 'box');
+    const a = bounds(both, 'a');
+
+    expect((a.left + a.right) / 2).toBeCloseTo((box.left + box.right) / 2, 5);
+    expect((a.top + a.bottom) / 2).toBeCloseTo((box.top + box.bottom) / 2, 5);
+  });
+
+  it('a clip in a stack aligns across the stack with align-self', () => {
+    const stacked = must(wrapInStack(base, ['a', 'b'], 'box', 'lane'));
+    const aligned = must(alignSpace(stacked, ['a'], 0, propBoxes(stacked), Edge.Middle, EditMode.Design));
+
+    expect(findClip(aligned, 'a')!.clip.layoutItem?.alignSelf).toBe(Align.Center);
   });
 });
 

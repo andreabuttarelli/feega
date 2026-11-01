@@ -24,6 +24,14 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 - Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it.
 - Esc goes up one level.
 
+In the Layers panel, Shift-click selects every row between the last picked one and the clicked one; Cmd-click (Ctrl-click on Windows) adds or removes one row. It works on canvas nodes and on the elements inside a frame, and the canvas and the right bar follow.
+
+## Align
+
+- With two or more elements selected, align moves them to the edges or centre of the selection's bounds: a small element over a big one centres on it, and the big one stays put. Distribute spreads three or more evenly.
+- With one element selected, align places it inside its parent: the frame, or the container it sits in. In a stack, the alignment across the stack sets the element's align-self.
+- Align from the right bar, the right-click menu or the Alt shortcuts (Alt+A, Alt+H, Alt+D, Alt+W, Alt+V, Alt+S).
+
 With several nodes selected, dragging one moves all, and the selection bar shows the shared properties, editable once for all.
 
 ## Properties of a frame or a multi-selection

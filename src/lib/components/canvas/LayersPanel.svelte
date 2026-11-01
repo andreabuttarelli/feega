@@ -196,6 +196,8 @@
   }
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => pickFor({ shift: e.shiftKey, mod: e.metaKey || e.ctrlKey });
+  const sameScope = (a: LayerRow, b: LayerRow) => (a.kind === LayerKind.Node) === (b.kind === LayerKind.Node) && (a.kind === LayerKind.Node || a.nodeId === b.nodeId) && b.kind !== LayerKind.Part;
+  const rangeRows = (row: LayerRow) => shown.filter((r) => sameScope(row, r)).map((r) => r.id);
 
   function choose(row: LayerRow, e: MouseEvent) {
     if (row.kind !== LayerKind.Node && video?.nodeId !== row.nodeId) {
@@ -209,10 +211,10 @@
       return;
     }
     if (row.kind === LayerKind.Node) {
-      canvas?.select(pickLayers(canvas.selected, row.id, pickOf(e)));
+      canvas?.select(pickLayers(canvas.selected, row.id, pickOf(e), rangeRows(row)));
       return;
     }
-    video?.select(pickLayers(video.selection, row.id, pickOf(e)));
+    video?.select(pickLayers(video.selection, row.id, pickOf(e), rangeRows(row)));
   }
 
   function run(ids: readonly string[], action: LayerAction, summary: string, name?: string) {

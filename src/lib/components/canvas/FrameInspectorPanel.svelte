@@ -165,7 +165,7 @@
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} />
+      <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} onalign={alignPicks} />
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}
         <StatesSection doc={shownDoc!} clip={shown.clip} current={statePreview.stateOf(nodeId, shown.clip.id)} commit={commitShown} onpreview={(next) => statePreview.pick(nodeId, shown.clip.id, next)} />
