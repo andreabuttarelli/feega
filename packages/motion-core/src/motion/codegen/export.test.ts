@@ -219,3 +219,23 @@ describe('a variant set exported back to code', () => {
     expect(file(svelte, 'src/lib/components/Button.svelte')).toContain("{#if variant === 'outline'}");
   });
 });
+
+describe('a plain group, not a component', () => {
+  const grouped = () => {
+    const doc = variantsDoc();
+    const outline = doc.comps['cmp-outline'];
+    const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'cancel' ? { ...c, props: { comp: 'cmp-outline' } } : c)) }));
+    return { ...doc, tracks, comps: { ...doc.comps, 'cmp-outline': { name: 'Group', durationInFrames: outline.durationInFrames, tracks: outline.tracks } } };
+  };
+
+  it.each([
+    [CodeTarget.React, 'src/pages/Toolbar.tsx'],
+    [CodeTarget.Svelte, 'src/routes/+page.svelte']
+  ])('%s inlines its layers instead of exporting a Group component', (target, page) => {
+    const out = exportCode(grouped(), { name: 'Toolbar', target });
+    const all = out.files.map((f) => `${f.path}\n${f.content}`).join('\n');
+    expect(all).not.toMatch(/Group\d*\.(tsx|svelte)/);
+    expect(all).not.toContain('<Group');
+    expect(file(out, page)).toContain('Save');
+  });
+});

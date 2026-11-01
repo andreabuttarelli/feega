@@ -19,7 +19,7 @@ import { backgroundRules, borderRules, effectRules, radiusRules, typeRules, type
 import { ColourRole, TokenBook } from './tokens';
 import { animationOf, timelineOf, type Timeline } from './animate';
 import { stateStyleOf } from './states';
-import { planComponents, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
+import { planComponents, PlanExport, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
 
 export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; brand: BrandTokens | null };
 
@@ -317,6 +317,9 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
   if (!plan) {
     return null;
   }
+  if (plan.exportAs === PlanExport.Inline) {
+    return inlinedNode(plan, clip, parent, scope);
+  }
   ensureComponent(plan, scope.shared);
   scope.uses.add(plan.set?.name ?? plan.name);
   if (Object.keys(clip.keyframes).length) {
@@ -337,6 +340,17 @@ function useNode(clip: MotionClip, parent: MotionClip | null, scope: Scope): Cod
     forwards,
     ...(shownBy ? { shownBy } : {})
   };
+}
+
+const overriding = (base: Rule[], over: Rule[]): Rule[] => [...base.filter(([p]) => !over.some(([q]) => q === p)), ...over];
+
+function inlinedNode(plan: ComponentPlan, clip: MotionClip, parent: MotionClip | null, scope: Scope): ElementNode {
+  const { shared } = scope;
+  const space = plan.comp.frame ?? { width: shared.doc.width, height: shared.doc.height };
+  const content = shared.content.get(plan.compId);
+  const inner: Scope = { ...scopeOf(shared, plan.comp.tracks, space, scope.plan, 0, { ...shared.timeline, start: 0, length: plan.comp.durationInFrames }), names: scope.names, uses: scope.uses, open: scope.open };
+  const root = rootOf(inner, 'div', [], [['width', px(content?.width ?? space.width)]]);
+  return { ...root, clipId: clip.id, className: root.className || scope.names.unique(kebab(layerName(clip))), rules: overriding(root.rules, placement(clip, parent, scope)) };
 }
 
 function nodeOf(clip: MotionClip, parent: MotionClip | null, scope: Scope, parentTag: string): CodeNode | null {

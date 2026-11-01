@@ -1,6 +1,7 @@
 import { Sandbox } from '@vercel/sandbox';
 import type { FarmAccess } from '$lib/server/motion/vercel-farm';
 import { cloneUrl, DEV_ARGS, devServerOf, managerOf, namesIn, PackageManager, type RepoRef } from './repo';
+import { ORIGIN_PROXY } from './origin-proxy';
 
 export type RunningApp = { url: string; names: string[]; stop: () => Promise<void> };
 
@@ -13,11 +14,11 @@ export enum RunFailure {
 
 export type RunOutcome = { ok: true; app: RunningApp } | { ok: false; failure: RunFailure; detail: string };
 
-export type RepoRunner = (repo: RepoRef) => Promise<RunOutcome>;
+export type RepoRunner = (repo: RepoRef, archive: Uint8Array | null) => Promise<RunOutcome>;
 
-export type RunLimits = { wallMs: number; installMs: number; readyMs: number; vcpus: number; port: number; files: number };
+export type RunLimits = { wallMs: number; installMs: number; readyMs: number; vcpus: number; port: number; devPort: number; files: number };
 
-export const RUN_LIMITS: RunLimits = { wallMs: 6 * 60_000, installMs: 4 * 60_000, readyMs: 90_000, vcpus: 4, port: 4173, files: 4_000 };
+export const RUN_LIMITS: RunLimits = { wallMs: 6 * 60_000, installMs: 4 * 60_000, readyMs: 90_000, vcpus: 4, port: 4173, devPort: 4174, files: 4_000 };
 
 const POLL_MS = 2_000;
 const MS_PER_HOUR = 3_600_000;
@@ -27,8 +28,7 @@ const GB_PER_VCPU = 2;
 
 export const sandboxUsd = (ms: number, vcpus: number = RUN_LIMITS.vcpus) => (ms / MS_PER_HOUR) * vcpus * (VCPU_HOUR_USD + GB_PER_VCPU * GB_HOUR_USD);
 const TAIL = 400;
-const ALLOWED_HOSTS_ENV = '__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS';
-const SANDBOX_HOSTS = '.vercel.run';
+const PROXY_FILE = '/tmp/feega-origin-proxy.cjs';
 
 const INSTALL: Record<PackageManager, string> = {
   [PackageManager.Npm]: 'npm install --no-audit --no-fund --loglevel=error',
@@ -57,10 +57,10 @@ async function shell({ sandbox, dir }: Box, script: string, env: Record<string, 
   return { ok: done.exitCode === 0, out: await done.stdout(), err: await done.stderr() };
 }
 
-async function ready(box: Box, limits: RunLimits): Promise<boolean> {
+async function ready(box: Box, port: number, limits: RunLimits): Promise<boolean> {
   const until = Date.now() + limits.readyMs;
   while (Date.now() < until) {
-    const probe = await shell(box, `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${limits.port}/`);
+    const probe = await shell(box, `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${port}/`);
     if (probe.ok && /^[23]/.test(probe.out.trim())) {
       return true;
     }
@@ -83,21 +83,37 @@ async function started(box: Box, limits: RunLimits): Promise<RunOutcome> {
   }
 
   const pkg = JSON.parse((await shell(box, 'cat package.json')).out) as Parameters<typeof devServerOf>[0];
-  const args = DEV_ARGS[devServerOf(pkg)](limits.port).join(' ');
-  await box.sandbox.runCommand({ cmd: 'bash', args: ['-lc', `${RUN[manager]} ${args} > /tmp/dev.log 2>&1`], cwd: box.dir, detached: true, env: { PORT: String(limits.port), HOST: '0.0.0.0', BROWSER: 'none', [ALLOWED_HOSTS_ENV]: SANDBOX_HOSTS } });
-  if (!(await ready(box, limits))) {
+  const args = DEV_ARGS[devServerOf(pkg)](limits.devPort).join(' ');
+  await box.sandbox.runCommand({ cmd: 'bash', args: ['-lc', `${RUN[manager]} ${args} > /tmp/dev.log 2>&1`], cwd: box.dir, detached: true, env: { PORT: String(limits.devPort), HOST: '0.0.0.0', BROWSER: 'none' } });
+  if (!(await ready(box, limits.devPort, limits))) {
     return failed(RunFailure.NoDevServer, (await shell(box, 'tail -c 400 /tmp/dev.log')).out);
+  }
+
+  await box.sandbox.writeFiles([{ path: PROXY_FILE, content: ORIGIN_PROXY }]);
+  await box.sandbox.runCommand({ cmd: 'node', args: [PROXY_FILE, String(limits.port), String(limits.devPort)], detached: true });
+  if (!(await ready(box, limits.port, limits))) {
+    return failed(RunFailure.NoDevServer, 'the origin proxy did not start');
   }
 
   const names = namesIn((await shell(box, NAMES)).out);
   return { ok: true, app: { url: box.sandbox.domain(limits.port), names, stop: () => box.sandbox.stop().then(() => undefined) } };
 }
 
+const ARCHIVE_FILE = '/tmp/feega-repo.tgz';
+
+const cloned = (repo: RepoRef) => ({ source: { type: 'git' as const, url: cloneUrl(repo), depth: 1, ...(repo.ref ? { revision: repo.ref } : {}) } });
+
+async function unpacked(box: Box, archive: Uint8Array): Promise<RunOutcome | null> {
+  await box.sandbox.writeFiles([{ path: ARCHIVE_FILE, content: archive }]);
+  const done = await shell({ ...box, dir: '/' }, `mkdir -p ${box.dir} && tar xzf ${ARCHIVE_FILE} -C ${box.dir} --strip-components=1 && rm ${ARCHIVE_FILE}`);
+  return done.ok ? null : failed(RunFailure.Clone, done.err);
+}
+
 export function sandboxRunner(access: FarmAccess, limits: RunLimits = RUN_LIMITS): RepoRunner {
-  return async (repo) => {
+  return async (repo, archive) => {
     const sandbox = await Sandbox.create({
       ...access,
-      source: { type: 'git', url: cloneUrl(repo), depth: 1, ...(repo.ref ? { revision: repo.ref } : {}) },
+      ...(archive ? {} : cloned(repo)),
       ports: [limits.port],
       timeout: limits.wallMs,
       resources: { vcpus: limits.vcpus },
@@ -107,7 +123,9 @@ export function sandboxRunner(access: FarmAccess, limits: RunLimits = RUN_LIMITS
       return failed(RunFailure.Clone, sandbox.message);
     }
 
-    const outcome = await started({ sandbox, dir: `${sandbox.cwd}/${repo.repo}` }, limits).catch((e: unknown) => failed(RunFailure.NoDevServer, e instanceof Error ? e.message : String(e)));
+    const box = { sandbox, dir: `${sandbox.cwd}/${repo.repo}` };
+    const unpack = archive ? await unpacked(box, archive).catch((e: unknown) => failed(RunFailure.Clone, e instanceof Error ? e.message : String(e))) : null;
+    const outcome = unpack ?? (await started(box, limits).catch((e: unknown) => failed(RunFailure.NoDevServer, e instanceof Error ? e.message : String(e))));
     if (!outcome.ok) {
       await sandbox.stop().catch(() => undefined);
     }

@@ -102,7 +102,7 @@ const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const refused = (outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>, error?: string): UrlImported => ({ outcome, ...(error ? { error } : {}) });
 
-async function publicUrl(raw: string, guard: PageAsk['guard']): Promise<URL | null> {
+export async function publicUrl(raw: string, guard: PageAsk['guard']): Promise<URL | null> {
   const url = URL.canParse(raw) ? new URL(raw) : null;
   if (!url || !WEB_SCHEMES.includes(url.protocol)) {
     return null;
@@ -157,19 +157,21 @@ export async function pageTreeAt(tab: AppTab, url: URL, settleMs: number, planne
   return parsed.success ? (parsed.data as unknown as PageTree) : refused(UrlImportOutcome.Unreadable);
 }
 
-async function imported(ask: PageAsk, images: Record<string, string>): Promise<ImageAssets> {
+export type LandAsk = Pick<PageAsk, 'store' | 'place' | 'at' | 'importImage' | 'importFont' | 'fetchText' | 'components'>;
+
+async function imported(ask: LandAsk, images: Record<string, string>): Promise<ImageAssets> {
   const entries = await Promise.all(Object.entries(images).map(async ([hash, url]) => [hash, await ask.importImage(url).catch(() => null)] as const));
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
-async function withSheetFonts(ask: PageAsk, tree: PageTree): Promise<PageTree> {
+export async function withSheetFonts(ask: LandAsk, tree: PageTree): Promise<PageTree> {
   if (!ask.fetchText || !tree.sheets?.length) {
     return tree;
   }
   return { ...tree, fonts: [...(tree.fonts ?? []), ...(await sheetFonts(tree.sheets, ask.fetchText))] };
 }
 
-async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
+export async function fontsFor(ask: LandAsk, tree: PageTree): Promise<FontAssets> {
   const importFont = ask.importFont;
   if (!importFont) {
     return {};
@@ -178,7 +180,7 @@ async function fontsFor(ask: PageAsk, tree: PageTree): Promise<FontAssets> {
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
-async function placedSets(ask: PageAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[]; undo: UndoItem[] }> {
+async function placedSets(ask: LandAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[]; undo: UndoItem[] }> {
   if (!sets.length || !ask.components) {
     return { frameIds: [], undo: [] };
   }
@@ -198,7 +200,7 @@ async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string
   }
 }
 
-async function filled(ask: PageAsk, frameIds: string[], items: UrlPlan['sets'], assets: ImageAssets): Promise<void> {
+async function filled(ask: LandAsk, frameIds: string[], items: UrlPlan['sets'], assets: ImageAssets): Promise<void> {
   for (const [i, frameId] of frameIds.entries()) {
     const frame = await ask.store.read(frameId);
     const images = items[i]?.images ?? [];
@@ -230,7 +232,10 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   }
   const tree = await withSheetFonts(ask, read);
 
-  const made = planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE);
+  return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE), tree.truncated);
+}
+
+export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: boolean): Promise<UrlImported> {
   if (!made?.plan.items.length) {
     return refused(UrlImportOutcome.Unreadable);
   }
@@ -242,5 +247,5 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   await filled(ask, placed.frameIds, made.plan.items, assets);
   await filled(ask, sets.frameIds, made.sets, assets);
   const frameId = placed.frameIds[0];
-  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: [...placed.undo, ...sets.undo], skipped: placed.skipped, truncated: tree.truncated };
+  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: [...placed.undo, ...sets.undo], skipped: placed.skipped, truncated };
 }

@@ -37,7 +37,16 @@ describe('POST /api/v1/projects/:id/code-import', () => {
 
     expect(res.status).toBe(200);
     expect(body).toMatchObject({ nodes: [{ id: 'f1' }], components: 3, variants: 5, instances: 9 });
-    expect(importCodeAt.mock.calls[0][0]).toMatchObject({ repo: 'https://github.com/a/b', route: '/x', place: { projectId: 'p1', canvasId: 'c1' } });
+    expect(importCodeAt.mock.calls[0][0]).toMatchObject({ repo: 'https://github.com/a/b', routes: ['/x'], place: { projectId: 'p1', canvasId: 'c1' } });
+  });
+
+  it('più rotte arrivano tutte all\'import', async () => {
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/', '/x'], components: 1, variants: 1, instances: 0 });
+
+    const { body } = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', routes: ['/', '/x'], x: 0, y: 0 }, 'u-many');
+
+    expect(body).toMatchObject({ pages: ['/', '/x'] });
+    expect(importCodeAt.mock.calls.at(-1)![0]).toMatchObject({ routes: ['/', '/x'] });
   });
 
   it('un repo che non parte torna 422 col motivo', async () => {
