@@ -44,6 +44,7 @@
   import GradientHandles from '../GradientHandles.svelte';
   import CropHandles from '../CropHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { sameValue } from '$lib/canvas/node-patch';
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
@@ -713,6 +714,12 @@
   }
 
   let tween = 0;
+
+  function takeCamera() {
+    glide = null;
+    cancelAnimationFrame(tween);
+  }
+
   function animateTo(target: Viewport) {
     cancelAnimationFrame(tween);
     const from = view;
@@ -1454,7 +1461,7 @@
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && JSON.stringify(present.styles?.[name]) !== JSON.stringify(style) ? syncedDoc(present, name, style) : null;
+      const synced = present && !sameValue(present.styles?.[name], style) ? syncedDoc(present, name, style) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -1495,12 +1502,12 @@
     variableLibrary.found(variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
   });
 
-  const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
+  const sharedShape = (c: Collection | undefined) => c && { modes: c.modes, vars: c.vars };
 
   function syncCollection(name: string, collection: Collection) {
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[name])) {
       const present = saverOf(frame.id)?.history.present;
-      const synced = present && sharedShape(present.variables?.[name]) !== sharedShape(collection) ? syncedCollection(present, name, collection) : null;
+      const synced = present && !sameValue(sharedShape(present.variables?.[name]), sharedShape(collection)) ? syncedCollection(present, name, collection) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} variables`);
       }
@@ -2350,7 +2357,7 @@
   let hostPress: PointerEvent | null = null;
 
   function onDown(e: PointerEvent) {
-    glide = null;
+    takeCamera();
     dropHover();
     markBusy();
     measureSurface();
@@ -2754,14 +2761,14 @@
       return;
     }
     return watchPinch(el, (factor, x, y) => {
-      glide = null;
+      takeCamera();
       markBusy();
       view = zoomAt(view, local({ clientX: x, clientY: y }), factor);
     });
   });
 
   function onWheel(e: WheelEvent) {
-    glide = null;
+    takeCamera();
     markBusy();
     props.onUserPan?.();
     const target = e.target as HTMLElement;
