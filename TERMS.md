@@ -45,7 +45,7 @@ You must be at least **18 years old** and able to enter a binding contract. If y
 - **Monthly plans**: €8, €16, €32, €64, €128 or €256 per month (prices in EUR, [VAT INCLUDED / EXCLUDED — to confirm]), each granting the same number of credits as its price. Subscriptions renew automatically each month until cancelled; cancellation takes effect at the end of the current period.
 - **Subscription credits expire** at the end of the billing period they were granted for and do not roll over.
 - **Top-ups** are one-time purchases at the same rate. Top-up credits **do not expire**.
-- **Welcome credits** granted to a new workspace expire after **14 days**.
+- The free plan includes **25 credits per month**. They renew each month, do not roll over and are not granted on sign-up.
 - Each connected social account may carry a **monthly credit fee**, shown before you connect it. If the balance cannot cover it, the account is paused.
 - Payments are processed by **Stripe**. We do not see or store full card numbers.
 - Credits have no cash value, cannot be transferred between workspaces or resold, and are not refunded when spent on a generation you did not like.
