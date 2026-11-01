@@ -141,4 +141,6 @@ scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` (optional `URL_I
 frames in a GPU core world as `CoreFrames.svelte` does, screenshots the canvas band by band and
 writes `<page>-gpu-*.png`, `<page>-gpu-score.json` and a `gpu-<backend>.md` table next to the
 HTML scores of the same label. Both harnesses stretch each frame into its node box, like the
-canvas.
+canvas. GPU text is drawn with `Smoothing.Plain` (`URL_IMPORT_GPU_SMOOTHING`), as the headless shell
+renders the source and the HTML still; the canvas on a Mac dilates text like CoreText, which the
+shell does not.
