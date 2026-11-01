@@ -158,13 +158,13 @@ const picturedBy = (images: FigmaImage[]): Pictured => {
   return (id) => (grouped.get(id) ?? []).map(({ clipId: _id, ...rest }) => rest);
 };
 
-type Scope = { byId: Map<string, MotionClip>; kids: Map<string | null, MotionClip[]>; keys: Map<string, string>; pictured: Pictured; page: string | null; surface: string | null };
+type Scope = { byId: Map<string, MotionClip>; order: Map<string, number>; kids: Map<string | null, MotionClip[]>; keys: Map<string, string>; pictured: Pictured; page: string | null; surface: string | null };
 
 function scopeOf(doc: MotionDoc, keys: Map<string, string>, images: FigmaImage[], page: string | null): Scope {
   const clips = doc.tracks.flatMap((t) => t.clips) as MotionClip[];
   const byId = new Map(clips.map((c) => [c.id, c]));
   const kids = Map.groupBy(clips, (c) => (c.parent && byId.has(c.parent) ? c.parent : null));
-  return { byId, kids, keys, pictured: picturedBy(images), page, surface: doc.surface ?? null };
+  return { byId, order: new Map(clips.map((c, i) => [c.id, i])), kids, keys, pictured: picturedBy(images), page, surface: doc.surface ?? null };
 }
 
 const kidsOf = (scope: Scope, id: string | null) => scope.kids.get(id) ?? [];
@@ -235,7 +235,14 @@ const copyId = (view: string, id: string) => `${view}:${id}`;
 
 const LAST = '';
 
-type Copies = { clips: MotionClip[]; before: Map<string, MotionClip[]>; images: FigmaImage[]; comps: MotionDoc['comps']; keys: [string, string][] };
+enum Side {
+  Before = 'before',
+  After = 'after'
+}
+
+const slotAt = (side: Side, id: string) => `${side}:${id}`;
+
+type Copies = { clips: MotionClip[]; slots: Map<string, MotionClip[]>; images: FigmaImage[]; comps: MotionDoc['comps']; keys: [string, string][] };
 
 function ownedIn(read: Scope, paired: Set<string>): Set<string> {
   const own = new Set<string>();
@@ -274,13 +281,23 @@ function compsCopied(doc: MotionDoc, ids: string[], view: string, into: MotionDo
 function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: FigmaImage[], pairs: Map<string, string>, base: Scope): Copies {
   const partnerOf = new Map([...pairs].map(([b, r]) => [r, b]));
   const own = ownedIn(read, new Set([...partnerOf.keys(), ...(read.surface ? [read.surface] : [])]));
-  const before = new Map<string, MotionClip[]>();
+  const slots = new Map<string, MotionClip[]>();
+  const slotOf = new Map<string, string>();
   const clips: MotionClip[] = [];
   let waiting: MotionClip[] = [];
+  const settle = (next: string | null) => {
+    for (const copy of waiting) {
+      const parent = copy.parent ?? null;
+      const above = parent !== null && (next === null || (base.order.get(parent) ?? -1) >= (base.order.get(next) ?? -1));
+      const slot = parent && slotOf.has(parent) ? slotOf.get(parent)! : above ? slotAt(Side.After, parent!) : next ? slotAt(Side.Before, next) : LAST;
+      slotOf.set(copy.id, slot);
+      slots.set(slot, [...(slots.get(slot) ?? []), copy]);
+    }
+    waiting = [];
+  };
   for (const clip of readDoc.tracks.flatMap((t) => t.clips) as MotionClip[]) {
     if (partnerOf.has(clip.id)) {
-      before.set(partnerOf.get(clip.id)!, waiting);
-      waiting = [];
+      settle(partnerOf.get(clip.id)!);
       continue;
     }
     if (!own.has(clip.id)) {
@@ -293,7 +310,7 @@ function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: Fig
     clips.push(copy);
     waiting.push(copy);
   }
-  before.set(LAST, waiting);
+  settle(null);
   const comps = compsCopied(
     readDoc,
     [...own].flatMap((id) => (read.byId.get(id)?.props.comp ? [String(read.byId.get(id)!.props.comp)] : [])),
@@ -302,12 +319,13 @@ function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: Fig
   const inner = new Set(Object.values(comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((k) => k.id))));
   const images = readImages.flatMap((i) => (own.has(i.clipId) ? [{ ...i, clipId: copyId(view, i.clipId) }] : inner.has(i.clipId) ? [i] : []));
   const keys = [...own].flatMap((id) => (read.keys.has(id) ? [[copyId(view, id), read.keys.get(id)!] as [string, string]] : []));
-  return { clips, before, images, comps, keys };
+  return { clips, slots, images, comps, keys };
 }
 
-function placedTracks(doc: MotionDoc, settledClips: Map<string, MotionClip>, before: Map<string, MotionClip[]>): MotionDoc['tracks'] {
-  const tail = before.get(LAST) ?? [];
-  return doc.tracks.map((t, i) => ({ ...t, clips: [...(t.clips as MotionClip[]).flatMap((c) => [...(before.get(c.id) ?? []), settledClips.get(c.id) ?? c]), ...(i ? [] : tail)] })) as MotionDoc['tracks'];
+function placedTracks(doc: MotionDoc, settledClips: Map<string, MotionClip>, slots: Map<string, MotionClip[]>): MotionDoc['tracks'] {
+  const at = (side: Side, id: string) => slots.get(slotAt(side, id)) ?? [];
+  const tail = slots.get(LAST) ?? [];
+  return doc.tracks.map((t, i) => ({ ...t, clips: [...(t.clips as MotionClip[]).flatMap((c) => [...at(Side.Before, c.id), settledClips.get(c.id) ?? c, ...at(Side.After, c.id)]), ...(i ? [] : tail)] })) as MotionDoc['tracks'];
 }
 
 const shownOnlyAt = (clip: MotionClip, view: string): MotionClip => ({ ...clip, hidden: true, ...(clip.hidden ? {} : { overrides: { [view]: { hidden: false } } }) });
@@ -325,7 +343,7 @@ function viewed(state: State, plan: ViewPlan): State {
   const read = scopeOf(item.doc, clipKeys(item, plan.root), item.images, item.keys?.[plan.root.id] ?? null);
   const pairs = pairsOf(base, read);
   const copies = copiesOf(view.id, read, item.doc, item.images, pairs, base);
-  const wanted = { ...resolved, tracks: placedTracks(resolved, settled(base, read, pairs), copies.before), comps: { ...resolved.comps, ...copies.comps } } as MotionDoc;
+  const wanted = { ...resolved, tracks: placedTracks(resolved, settled(base, read, pairs), copies.slots), comps: { ...resolved.comps, ...copies.comps } } as MotionDoc;
   const lifted = liftEdit(added.doc, view.id, wanted);
   const copied = new Set(copies.clips.map((c) => c.id));
   const doc = { ...lifted, tracks: lifted.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (copied.has(c.id) ? shownOnlyAt(c, view.id) : c)) })) } as MotionDoc;

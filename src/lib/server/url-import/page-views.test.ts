@@ -271,4 +271,15 @@ describe('a page read at desktop and phone width', () => {
 
     expect(at('#e60000')).toBeLessThan(at('#330000'));
   });
+
+  it('a layer only the phone page has stays above the matched box it sits in, even when the desktop paints that box later (tailwindcss.com: the phone heading drawn under its section)', () => {
+    const tinted = (key: string, box: Box, r: number, children: RestNode[] = []): RestNode => ({ ...card(key, box), fills: [{ type: 'SOLID', color: { r, g: 0, b: 0, a: 1 } }], children });
+    const wide = pageOf(1280, 800, [tinted('b', { x: 40, y: 20, width: 500, height: 60 }, 0.2), tinted('a', { x: 40, y: 100, width: 500, height: 300 }, 0.4)]);
+    const narrow = pageOf(390, 1200, [tinted('a', { x: 20, y: 100, width: 350, height: 300 }, 0.4, [tinted('a/x', { x: 40, y: 120, width: 100, height: 40 }, 0.9)]), tinted('b', { x: 20, y: 500, width: 350, height: 100 }, 0.2)]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+    const order = (resolveView(doc, PAGE_VIEWS[1].id).tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => !c.hidden).map((c) => JSON.stringify(c.props.fills));
+    const at = (r: string) => order.findIndex((f) => f?.includes(r));
+
+    expect(at('#e60000')).toBeGreaterThan(at('#660000'));
+  });
 });
