@@ -3611,3 +3611,10 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** play mode on a long imported page is black; the console says `Texture size ... exceeded maximum texture size ... 8192`. **Move:** a WebGPU surface holds 8192 px per side by default; `drawableOn` sends taller or wider frames to the HTML engine. For screenshots in Playwright, open the player with Fill width and scroll the stage, and take the shot from headless Chromium with GPU flags (`--enable-unsafe-webgpu --use-angle=metal`).
 
+## "A valid external Instance reference no longer exists" on a canvas page
+
+**Signal:** PostHog shows an unhandled `DOMException: OperationError` with that text; the canvas goes blank or stops reacting to zoom, mostly on Windows. **Move:** it is Chrome's WebGPU connection to the GPU process dropping (crash, reset, out of GPU memory), not a bug in one call. Reproduce on any Mac with CDP `Browser.crashGpuProcess` (`browser.newBrowserCDPSession()`), and count `requestDevice` / `GPUDevice.destroy` with an init script: wgpu's web backend never destroys a device on drop, so every raster you `free()` keeps its GPU memory until GC unless `releaseOnDispose` (`gpu-release.ts`) destroys it.
+
+## A dev server keeps serving a package file you edited
+
+**Signal:** a change under `packages/motion-core` is in the file, `curl /node_modules/@feega/motion-core/...` shows it, but the browser still runs the old code and a debug log never prints. **Move:** the app imports it as `/packages/motion-core/...`, a second URL whose transform Vite cached before the edit. `curl` that exact URL (take it from the importing module's served source); if it is stale, restart with `vite dev --force`.
