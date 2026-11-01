@@ -103,8 +103,11 @@ async function gate(request: HTTPRequest): Promise<void> {
   await request.continue(headers ? { headers } : undefined).catch(() => undefined);
 }
 
+const LIGHT_SCHEME = [{ name: 'prefers-color-scheme', value: 'light' }];
+
 async function fenced(page: Page): Promise<void> {
   await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 });
+  await page.emulateMediaFeatures(LIGHT_SCHEME);
   await page.setBypassCSP(true);
   await page.setRequestInterception(true);
   page.on('request', (request) => void gate(request));
