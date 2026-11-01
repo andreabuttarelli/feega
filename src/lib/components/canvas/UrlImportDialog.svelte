@@ -31,7 +31,7 @@
   let site = $state<string | null>(null);
   let sections = $state(true);
   let tokens = $state(true);
-  let breakpoints = $state(false);
+  let breakpoints = $state(true);
 
   const title = $derived(site ? (busy ? `Importing ${site}…` : `Couldn't import ${site}`) : 'Import from URL');
 
@@ -74,7 +74,7 @@
       <input class="rounded-sm" type="text" inputmode="url" placeholder="https://example.com" aria-label="Page address" bind:value={url} data-testid="url-import-url" />
       <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !url.trim()} data-testid="url-import-run">{busy ? 'Importing…' : site ? 'Try another URL' : 'Import'}</button>
     </form>
-    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={sections} data-testid="url-import-sections" /> Split into sections (Nav, Hero, Footer…)</label>
+    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={sections} disabled={breakpoints} data-testid="url-import-sections" /> Split into sections (Nav, Hero, Footer…)</label>
     <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={tokens} data-testid="url-import-tokens" /> Extract styles and variables (colours, type, effects)</label>
     <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={breakpoints} data-testid="url-import-breakpoints" /> Add tablet and phone layouts as breakpoints</label>
     {/if}
