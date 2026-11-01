@@ -233,7 +233,9 @@ function settled(base: Scope, read: Scope, pairs: Map<string, string>): Map<stri
 
 const copyId = (view: string, id: string) => `${view}:${id}`;
 
-type Copies = { clips: MotionClip[]; after: Map<string, MotionClip[]>; images: FigmaImage[]; comps: MotionDoc['comps']; keys: [string, string][] };
+const LAST = '';
+
+type Copies = { clips: MotionClip[]; before: Map<string, MotionClip[]>; images: FigmaImage[]; comps: MotionDoc['comps']; keys: [string, string][] };
 
 function ownedIn(read: Scope, paired: Set<string>): Set<string> {
   const own = new Set<string>();
@@ -272,12 +274,13 @@ function compsCopied(doc: MotionDoc, ids: string[], view: string, into: MotionDo
 function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: FigmaImage[], pairs: Map<string, string>, base: Scope): Copies {
   const partnerOf = new Map([...pairs].map(([b, r]) => [r, b]));
   const own = ownedIn(read, new Set([...partnerOf.keys(), ...(read.surface ? [read.surface] : [])]));
-  const after = new Map<string, MotionClip[]>();
+  const before = new Map<string, MotionClip[]>();
   const clips: MotionClip[] = [];
-  let anchor = '';
+  let waiting: MotionClip[] = [];
   for (const clip of readDoc.tracks.flatMap((t) => t.clips) as MotionClip[]) {
     if (partnerOf.has(clip.id)) {
-      anchor = partnerOf.get(clip.id)!;
+      before.set(partnerOf.get(clip.id)!, waiting);
+      waiting = [];
       continue;
     }
     if (!own.has(clip.id)) {
@@ -288,8 +291,9 @@ function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: Fig
     const { autoLayout: _flow, layoutItem: _item, ...rest } = withComp(clip, view);
     const copy = { ...rest, id: copyId(view, clip.id), parent, ...(flowing ? { layoutItem: { ...DEFAULT_LAYOUT_ITEM, absolute: true } } : {}) } as MotionClip;
     clips.push(copy);
-    after.set(anchor, [...(after.get(anchor) ?? []), copy]);
+    waiting.push(copy);
   }
+  before.set(LAST, waiting);
   const comps = compsCopied(
     readDoc,
     [...own].flatMap((id) => (read.byId.get(id)?.props.comp ? [String(read.byId.get(id)!.props.comp)] : [])),
@@ -298,12 +302,12 @@ function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: Fig
   const inner = new Set(Object.values(comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((k) => k.id))));
   const images = readImages.flatMap((i) => (own.has(i.clipId) ? [{ ...i, clipId: copyId(view, i.clipId) }] : inner.has(i.clipId) ? [i] : []));
   const keys = [...own].flatMap((id) => (read.keys.has(id) ? [[copyId(view, id), read.keys.get(id)!] as [string, string]] : []));
-  return { clips, after, images, comps, keys };
+  return { clips, before, images, comps, keys };
 }
 
-function placedTracks(doc: MotionDoc, settledClips: Map<string, MotionClip>, after: Map<string, MotionClip[]>): MotionDoc['tracks'] {
-  const lead = after.get('') ?? [];
-  return doc.tracks.map((t, i) => ({ ...t, clips: [...(i ? [] : lead), ...(t.clips as MotionClip[]).flatMap((c) => [settledClips.get(c.id) ?? c, ...(after.get(c.id) ?? [])])] })) as MotionDoc['tracks'];
+function placedTracks(doc: MotionDoc, settledClips: Map<string, MotionClip>, before: Map<string, MotionClip[]>): MotionDoc['tracks'] {
+  const tail = before.get(LAST) ?? [];
+  return doc.tracks.map((t, i) => ({ ...t, clips: [...(t.clips as MotionClip[]).flatMap((c) => [...(before.get(c.id) ?? []), settledClips.get(c.id) ?? c]), ...(i ? [] : tail)] })) as MotionDoc['tracks'];
 }
 
 const shownOnlyAt = (clip: MotionClip, view: string): MotionClip => ({ ...clip, hidden: true, ...(clip.hidden ? {} : { overrides: { [view]: { hidden: false } } }) });
@@ -321,7 +325,7 @@ function viewed(state: State, plan: ViewPlan): State {
   const read = scopeOf(item.doc, clipKeys(item, plan.root), item.images, item.keys?.[plan.root.id] ?? null);
   const pairs = pairsOf(base, read);
   const copies = copiesOf(view.id, read, item.doc, item.images, pairs, base);
-  const wanted = { ...resolved, tracks: placedTracks(resolved, settled(base, read, pairs), copies.after), comps: { ...resolved.comps, ...copies.comps } } as MotionDoc;
+  const wanted = { ...resolved, tracks: placedTracks(resolved, settled(base, read, pairs), copies.before), comps: { ...resolved.comps, ...copies.comps } } as MotionDoc;
   const lifted = liftEdit(added.doc, view.id, wanted);
   const copied = new Set(copies.clips.map((c) => c.id));
   const doc = { ...lifted, tracks: lifted.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (copied.has(c.id) ? shownOnlyAt(c, view.id) : c)) })) } as MotionDoc;

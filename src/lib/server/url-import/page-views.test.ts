@@ -260,4 +260,15 @@ describe('a page read at desktop and phone width', () => {
 
     expect(Object.values(planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).images)).toContain(PHONE_ONLY);
   });
+
+  it('a glow only the phone page paints below a card stays below it on the phone view (vercel.com: the glow lit up around every card)', () => {
+    const tinted = (key: string, box: Box, r: number): RestNode => ({ ...card(key, box), fills: [{ type: 'SOLID', color: { r, g: 0, b: 0, a: 1 } }] });
+    const wide = pageOf(1280, 800, [tinted('card', { x: 40, y: 100, width: 500, height: 300 }, 0.2), tinted('column', { x: 700, y: 100, width: 500, height: 300 }, 0.4)]);
+    const narrow = pageOf(390, 1200, [tinted('column', { x: 30, y: 150, width: 330, height: 200 }, 0.4), tinted('glow', { x: 10, y: 90, width: 370, height: 320 }, 0.9), tinted('card', { x: 20, y: 100, width: 350, height: 300 }, 0.2)]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+    const order = (resolveView(doc, PAGE_VIEWS[1].id).tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => !c.hidden).map((c) => JSON.stringify(c.props.fills));
+    const at = (r: string) => order.findIndex((f) => f?.includes(r));
+
+    expect(at('#e60000')).toBeLessThan(at('#330000'));
+  });
 });
