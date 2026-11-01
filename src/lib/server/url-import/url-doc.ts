@@ -43,15 +43,15 @@ const familyKey = (family: string) => family.replace(/["']/g, '').trim().toLower
 
 function refsOf(roots: RestNode[]): ImageRefs {
   const keyOf = new Map<string, string>();
-  const visit = (n: RestNode) => {
+  const visit = (n: RestNode, cap: number) => {
     for (const paint of n.fills ?? []) {
-      if (paint.imageRef && !keyOf.has(paint.imageRef) && keyOf.size < MAX_IMAGES) {
+      if (paint.imageRef && !keyOf.has(paint.imageRef) && keyOf.size < cap) {
         keyOf.set(paint.imageRef, hexOf(keyOf.size + 1));
       }
     }
-    (n.children ?? []).forEach(visit);
+    (n.children ?? []).forEach((c) => visit(c, cap));
   };
-  roots.forEach(visit);
+  roots.forEach((root) => visit(root, keyOf.size + MAX_IMAGES));
   return Object.fromEntries([...keyOf].map(([url, key]) => [key, url]));
 }
 

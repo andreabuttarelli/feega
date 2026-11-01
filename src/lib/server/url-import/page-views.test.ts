@@ -250,4 +250,14 @@ describe('a page read at desktop and phone width', () => {
 
     expect(item.images.filter((i) => made.images[i.hash] === SHOT).some((i) => inComps.has(i.clipId))).toBe(true);
   });
+
+  it('a page whose desktop read already holds every picture an import takes still brings the pictures only its phone read has (apple.com: the phone photos came in blank)', () => {
+    const DESKTOP_PICTURES = 200;
+    const picture = (i: number, y: number): RestNode => ({ ...card(`p${i}`, { x: 0, y, width: 100, height: 4 }), fills: [{ type: 'IMAGE', imageRef: `https://example.com/${i}.jpg`, scaleMode: 'FILL' }] });
+    const wide = pageOf(1280, 1000, Array.from({ length: DESKTOP_PICTURES }, (_, i) => picture(i, i * 5)));
+    const PHONE_ONLY = 'https://example.com/phone.jpg';
+    const narrow = pageOf(390, 800, [{ ...card('only', { x: 0, y: 0, width: 390, height: 300 }), fills: [{ type: 'IMAGE', imageRef: PHONE_ONLY, scaleMode: 'FILL' }] }]);
+
+    expect(Object.values(planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).images)).toContain(PHONE_ONLY);
+  });
 });
