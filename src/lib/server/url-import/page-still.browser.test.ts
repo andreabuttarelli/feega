@@ -137,7 +137,7 @@ draw();
 </script></body>`;
 
 describe.runIf(process.env.CHROMIUM_PATH)('a WebGL canvas scrolled out of view', () => {
-  it('keeps its last frame instead of drawing, and draws again in view (stripe on Browserless: software WebGL in every canvas held the page 30-40 s)', async () => {
+  it('draws a frame a second instead of every frame, and every frame again in view (stripe on Browserless: software WebGL in every canvas held the page 30-40 s; webflow: a scene kept the frame from before its pictures loaded)', async () => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
     try {
       let page: Page | null = null;
@@ -157,11 +157,16 @@ describe.runIf(process.env.CHROMIUM_PATH)('a WebGL canvas scrolled out of view',
       await page!.evaluate(() => ((window as unknown as { colour: number[] }).colour = [1, 0, 0, 1]));
       await frames();
       const away = await pixel();
+      await page!.evaluate(() => ((window as unknown as { colour: number[] }).colour = [0, 0, 1, 1]));
+      await page!.evaluate(() => new Promise((done) => setTimeout(done, 1_300)));
+      const later = await pixel();
+      await page!.evaluate(() => ((window as unknown as { colour: number[] }).colour = [1, 0, 0, 1]));
       await page!.evaluate(() => window.scrollTo(0, 0));
       await frames();
       const back = await pixel();
 
       expect(away).toEqual([0, 255, 0, 255]);
+      expect(later).toEqual([0, 0, 255, 255]);
       expect(back).toEqual([255, 0, 0, 255]);
     } finally {
       await browser.close();

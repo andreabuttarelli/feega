@@ -353,6 +353,8 @@ export function everythingInView(): void {
 }
 
 export function drawnInView(): void {
+  const REFRESH_MS = 1_000;
+  const FRAME_MS = 50;
   const DRAWS = ['clear', 'clearBufferfv', 'clearBufferiv', 'clearBufferuiv', 'clearBufferfi', 'drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'drawRangeElements', 'blitFramebuffer'];
   const Native = window.IntersectionObserver;
   if (!Native) {
@@ -360,6 +362,7 @@ export function drawnInView(): void {
   }
   const hidden = new WeakSet<Element>();
   const watched = new WeakSet<Element>();
+  const refreshed = new WeakMap<Element, number>();
   const sight = new Native((entries) => {
     for (const entry of entries) {
       if (entry.isIntersecting) {
@@ -369,7 +372,7 @@ export function drawnInView(): void {
       hidden.add(entry.target);
     }
   });
-  const away = (canvas: unknown) => {
+  const away = (canvas: unknown, call: string) => {
     if (!(canvas instanceof HTMLCanvasElement)) {
       return false;
     }
@@ -377,7 +380,19 @@ export function drawnInView(): void {
       watched.add(canvas);
       sight.observe(canvas);
     }
-    return canvas.isConnected && hidden.has(canvas);
+    if (!canvas.isConnected || !hidden.has(canvas)) {
+      return false;
+    }
+    const now = performance.now();
+    const since = now - (refreshed.get(canvas) ?? -Infinity);
+    if (since < FRAME_MS) {
+      return false;
+    }
+    if (call === 'clear' && since >= REFRESH_MS) {
+      refreshed.set(canvas, now);
+      return false;
+    }
+    return true;
   };
 
   for (const Context of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) {
@@ -388,7 +403,7 @@ export function drawnInView(): void {
         continue;
       }
       proto![name] = function (this: WebGLRenderingContext, ...args: unknown[]) {
-        return away(this.canvas) ? undefined : draw.apply(this, args);
+        return away(this.canvas, name) ? undefined : draw.apply(this, args);
       };
     }
   }
