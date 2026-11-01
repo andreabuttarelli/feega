@@ -74,7 +74,10 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 | dashed / dotted border, SVG `stroke-dasharray` | `strokeDashes` (Chrome's pattern) | stroke `dash` / `gap` |
 | `mix-blend-mode` on a block without element children | `blendMode` (Figma names) | clip `blend` |
 | `mask-image: linear-gradient(...)` (one layer, default size and position) | `maskGradient`, frame clips its content | precomp with `rect` masks for opaque runs and `linear` masks for fades |
-| video, canvas, iframe, image / radial masks, blended blocks with children, filtered / rotated blocks, native controls | snapshot RECTANGLE | image fill |
+| video, canvas, iframe, native controls; image / radial masks, filters, clip paths, blends and rotations on blocks without text, links or controls | snapshot RECTANGLE | image fill |
+| the same effects on a block holding text, links or controls (`holdsContent`) | the block as layers: `drop-shadow()` → DROP_SHADOW, blend → `blendMode` on its leaves, several linear mask layers → one backdrop-coloured gradient veil each on top (`veilsOf`, product of the masks), other masks, filters and clip paths → a snapshot of the block's own paint as its background (`own` mode) | layers |
+| `matrix3d` with no rotation and no perspective (`translateZ`) | the 2D part of the matrix, not a rotation | — |
+| a word split into one inline-block span per letter | one TEXT (`lettersJoined`), a space where the gap is over 0.2 em | text |
 | an element partly off the page | box cut at the edge, picture focused on the part that was showing | — |
 
 ## Sections
@@ -200,7 +203,10 @@ hero, apple's tiles, webflow's grids) run past the frame's edge.
 - Breakpoint views where the narrower page uses other elements (linear's headline spans, stripe's
   logo marquee), pictures whose crop changes with the width, components together with
   breakpoints, phone pages taller than the frame maximum (16,384 px).
-- Image and radial `mask-image`, blend modes on blocks with children (they come in as snapshots).
+- Image and radial `mask-image`, filters and clip paths on blocks without text (they come in as
+  snapshots); on blocks holding text only their own paint keeps the effect, the text does not.
+- A blend mode passed to text leaves inside an isolated parent blends with less than the page did
+  (stripe's hero: fold 0.989 → 0.974).
 
 ## Fidelity
 

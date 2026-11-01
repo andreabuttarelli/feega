@@ -43,6 +43,16 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import
       const dir = capturedIn(LABEL);
       mkdirSync(dir, { recursive: true });
       const folded = await page!.evaluate(() => [...document.querySelectorAll('details:not([open]) > :not(summary)')].map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter((text) => text && !document.body.innerText.replace(/\s+/g, ' ').includes(text)));
+      const navWords = await page!.evaluate(() =>
+        [...document.querySelectorAll('header a, header button, nav a, nav button')]
+          .filter((el) => {
+            const r = el.getBoundingClientRect();
+            const seen = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return r.width > 0 && r.height > 0 && r.top + window.scrollY < 120 && el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) && Boolean(seen && (el === seen || el.contains(seen)));
+          })
+          .flatMap((el) => ((el as HTMLElement).innerText ?? '').split(/\s+/))
+          .filter(Boolean)
+      );
       const tree = (await tab.tree()) as PageTree;
       writeFileSync(join(dir, `${name}.json`), JSON.stringify(tree));
       await tab.reveal(RevealMode.Still);
@@ -60,6 +70,7 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import
       expect(refusal).toBeNull();
       expect(tree.root).toBeDefined();
       expect(paintedTexts(tree.root).filter((t) => folded.some((f) => t.startsWith(f)))).toEqual([]);
+      expect([...new Set(navWords)].filter((word) => !paintedTexts(tree.root).join(' ').includes(word))).toEqual([]);
     } finally {
       await browser.close();
     }

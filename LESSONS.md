@@ -3595,6 +3595,10 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** after reload the frame stays blank, Ctrl+scroll does nothing, a `longtask` of tens of seconds or more; the CPU profile is all `found` (style or variable library) → `syncStyle` → `commit`, with Svelte's `infinite_loop_guard`. **Move:** a library sync effect compares a doc value with the project copy and re-commits on mismatch; anything that is not key-order free (`JSON.stringify` against jsonb, which reorders keys) never settles. Compare with `sameValue`. Probe with `tests/e2e/url-import-reopen.spec.ts` (`REOPEN_SEED=<file>` reuses one real import).
 
+## A whole nav comes in as one picture
+
+**Signal:** an imported block with links and buttons is a single image layer. **Move:** ask why the walker took the snapshot (`shape` in `page-tree.ts`: filter, mask, clip path, blend with children, `turned`). On supabase.com it was Tailwind's `transform` utility: it computes to `matrix3d(... 0, 0, 999, 1)` (a `translateZ`), which `matrixOf` did not parse, so `turned` read it as a rotation. Blocks holding text never snapshot now (`holdsContent`); a new snapshot reason must still keep them as layers.
+
 ## Imported text cannot be typed, double-click climbs to a "Precomp"
 
 **Signal:** on an imported page Cmd-click selects a label, Enter does nothing, double-click selects a wrapper (often 0×0, named Precomp or Group). **Move:** the label sits inside a Precomp (a group or an instance), so its id is scoped (`host__0__label`) and every top-level lookup (`findClip`, `isLayer`, `textCaretAt`) misses it. Resolve scene ids through `textScope`/`scoped` before editing; for URL imports, plain groups come in as frames (`Grouping.Frame`), never as Precomps.
@@ -3602,3 +3606,11 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A release regression that the fixture does not reproduce
 
 **Signal:** two release builds measure the same on the seeded fixture, while production freezes; the crash telemetry (`[canvas] webcontent-crash-suspected` in Vercel runtime logs, one day of retention) shows the real device and texture bytes. **Move:** seed what the real canvas carries that the fixture lacks (styles, variables, components, images) and measure the reopen, not only the first open; `tests/e2e/canvas-landing-session.spec.ts` against two `build:node` builds served with `node --env-file=.env build` is the comparison.
+
+## "A valid external Instance reference no longer exists" on a canvas page
+
+**Signal:** PostHog shows an unhandled `DOMException: OperationError` with that text; the canvas goes blank or stops reacting to zoom, mostly on Windows. **Move:** it is Chrome's WebGPU connection to the GPU process dropping (crash, reset, out of GPU memory), not a bug in one call. Reproduce on any Mac with CDP `Browser.crashGpuProcess` (`browser.newBrowserCDPSession()`), and count `requestDevice` / `GPUDevice.destroy` with an init script: wgpu's web backend never destroys a device on drop, so every raster you `free()` keeps its GPU memory until GC unless `releaseOnDispose` (`gpu-release.ts`) destroys it.
+
+## A dev server keeps serving a package file you edited
+
+**Signal:** a change under `packages/motion-core` is in the file, `curl /node_modules/@feega/motion-core/...` shows it, but the browser still runs the old code and a debug log never prints. **Move:** the app imports it as `/packages/motion-core/...`, a second URL whose transform Vite cached before the edit. `curl` that exact URL (take it from the importing module's served source); if it is stale, restart with `vite dev --force`.

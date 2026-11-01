@@ -5,6 +5,7 @@ import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
 import { readClips, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+import { loseOnDispose } from '@feega/motion-core/motion/gpu-full/gpu-release';
 
 export type FrameSink = (bitmap: ImageBitmap, index: number) => Promise<void>;
 
@@ -20,16 +21,22 @@ const onWholeFrame = (prepared: Prepared, time: number): boolean => Math.abs(tim
 
 export const coreExportable = (prepared: Prepared, times: number[], read = NO_READS): boolean => times.every((t) => onWholeFrame(prepared, t) && drawFrame(prepared, frameAt(prepared, t)).unsupported.every((gap) => read.has(gap.clip)));
 
+async function ownRaster(backend: FullBackend, width: number, height: number): Promise<{ canvas: HTMLCanvasElement; raster: CoreRaster } | null> {
+  const canvas = document.createElement('canvas');
+  const raster = (await BACKENDS[backend](canvas, width, height).catch(() => null)) as CoreRaster | null;
+  return raster ? { canvas, raster: loseOnDispose(raster, canvas.getContext('webgl2')) } : null;
+}
+
 export async function renderOnCore(prepared: Prepared, backend: FullBackend, times: number[], onFrame: FrameSink, signal: AbortSignal, custom: CustomReads): Promise<boolean> {
   if (!coreExportable(prepared, times, new Set(readClips(prepared.doc, prepared.tokens.logoUrl).read))) {
     return false;
   }
   const { width, height } = prepared.doc;
-  const canvas = document.createElement('canvas');
-  const raster = (await BACKENDS[backend](canvas, width, height).catch(() => null)) as CoreRaster | null;
-  if (!raster) {
+  const owned = await ownRaster(backend, width, height);
+  if (!owned) {
     return false;
   }
+  const { canvas, raster } = owned;
   const media = createMedia({ frames: originalFrames() });
   try {
     for (const [index, time] of times.entries()) {
@@ -59,11 +66,11 @@ export type Size = { width: number; height: number };
 export type StillRaster = { shoot: (prepared: Prepared, time: number, size: Size) => Promise<ImageBitmap | null>; dispose: () => void };
 
 export async function stillRaster(backend: FullBackend, side: number): Promise<StillRaster | null> {
-  const canvas = document.createElement('canvas');
-  const raster = (await BACKENDS[backend](canvas, side, side).catch(() => null)) as CoreRaster | null;
-  if (!raster) {
+  const owned = await ownRaster(backend, side, side);
+  if (!owned) {
     return null;
   }
+  const { canvas, raster } = owned;
   const media = createMedia({ frames: originalFrames() });
 
   async function shoot(prepared: Prepared, time: number, size: Size): Promise<ImageBitmap | null> {
@@ -72,7 +79,7 @@ export async function stillRaster(backend: FullBackend, side: number): Promise<S
     }
     const list = drawFrame(prepared, frameAt(prepared, time));
     await media.ready(list);
-    if (raster!.draw(list, media.pictures).length) {
+    if (raster.draw(list, media.pictures).length) {
       return null;
     }
     return createImageBitmap(canvas, 0, 0, Math.min(side, size.width), Math.min(side, size.height));
