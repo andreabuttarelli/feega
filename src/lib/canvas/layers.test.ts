@@ -655,3 +655,27 @@ describe('dropTool: a tile dragged from the add menu into the layers', () => {
     expect(dropTool(video(), DrawTool.Pen, 't1', Place.Above, 'new1', DROP_BOX).ok).toBe(false);
   });
 });
+
+describe('dropping a layer onto a stack child', () => {
+  const stacked = (() => {
+    let doc = newMotionDoc(MotionFormat.Square);
+    for (const [id, x] of [['a', 0.2], ['b', 0.5], ['c', 0.8]] as const) {
+      doc = ok(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } }, id));
+    }
+    doc = ok(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.9, width: 0.1, height: 0.1 } }, 'loose'));
+    return ok(wrapInStack(doc, ['a', 'b', 'c'], 'box', 'lane'));
+  })();
+  const orderOf = (doc: MotionDoc) => findClip(doc, 'box')!.clip.autoLayout!.order;
+
+  it('reorders it in the stack', () => {
+    expect(orderOf(ok(dropLayers(stacked, ['c'], 'a', Place.Above, ['a', 'b', 'c'])))).toEqual(['c', 'a', 'b']);
+    expect(orderOf(ok(dropLayers(stacked, ['a'], 'b', Place.Below, ['a', 'b', 'c'])))).toEqual(['b', 'a', 'c']);
+  });
+
+  it('moves a layer from outside into the stack', () => {
+    const doc = ok(dropLayers(stacked, ['loose'], 'b', Place.Below, ['a', 'b', 'c', 'loose']));
+
+    expect(findClip(doc, 'loose')!.clip.parent).toBe('box');
+    expect(orderOf(doc)).toEqual(['a', 'b', 'loose', 'c']);
+  });
+});

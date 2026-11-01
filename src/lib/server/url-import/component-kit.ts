@@ -7,8 +7,8 @@ import { resolveVariables } from '$lib/motion/variables';
 import { colourDistance } from './page-tokens';
 
 const TEXT_COMPONENTS = new Set(['Text', 'Title', 'Kicker', 'Caption']);
-const LABELLED = /^(Button|Nav link|Link|List item|Item)\b/;
-const STATEFUL = /^(Button|Nav link|Link)\b/;
+const LABELLED = /(^| )(Button|Nav link|Link|List item|Item)( \d+)?$/;
+const STATEFUL = /(^| )(Button|Nav link|Link)( \d+)?$/;
 const FILL_TARGET = 'fill';
 const STATE_PROP = 'State';
 const MAX_PROPERTY = 40;

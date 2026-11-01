@@ -62,9 +62,17 @@ function slotOf(doc: MotionDoc, stack: Stack, clipId: string, boxes: Record<stri
 }
 
 function join(doc: MotionDoc, clipId: string, stack: Stack, index: number): OpResult {
-  const left = leaveStack(doc, clipId);
+  const left = layoutParent(doc, findClip(doc, clipId)!.clip as MotionClip) ? leaveStack(doc, clipId) : { ok: true as const, doc };
   const placed = left.ok ? setParent(left.doc, clipId, stack.id, { keep: KeepWorld.No }) : left;
   return placed.ok ? reorderChild(placed.doc, stack.id, clipId, index) : placed;
+}
+
+export function placeInStack(doc: MotionDoc, clipId: string, stack: Stack, index: number): OpResult {
+  const child = findClip(doc, clipId)?.clip;
+  if (!child) {
+    return { ok: false, error: `no clip ${clipId}` };
+  }
+  return child.parent === stack.id ? reorderChild(doc, stack.id, clipId, index) : join(doc, clipId, stack, index);
 }
 
 function leave(doc: MotionDoc, clipId: string, to: Pt): OpResult {

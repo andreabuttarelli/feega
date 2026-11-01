@@ -189,8 +189,8 @@ const linkName = (url: string) => decodeURIComponent(new URL(url).pathname.split
 
 export type FetchedLink = { fileName: string; mime: string; bytes: Uint8Array };
 
-export async function fetchCanvasLink(input: { url: string; maxBytes?: number }): Promise<FetchedLink> {
-  const fetched = await safeFetchBytes(input.url, { maxBytes: input.maxBytes ?? UPLOAD_MAX_BYTES.video, timeoutMs: LINK_TIMEOUT_MS, maxRedirects: LINK_REDIRECTS, scheme: 'https-only' }).catch((cause: unknown) => {
+export async function fetchCanvasLink(input: { url: string; maxBytes?: number; referer?: string }): Promise<FetchedLink> {
+  const fetched = await safeFetchBytes(input.url, { maxBytes: input.maxBytes ?? UPLOAD_MAX_BYTES.video, timeoutMs: LINK_TIMEOUT_MS, maxRedirects: LINK_REDIRECTS, scheme: 'https-only', ...(input.referer ? { headers: { Referer: input.referer } } : {}) }).catch((cause: unknown) => {
     throw new UploadError(400, cause instanceof SafeFetchError ? cause.message : 'That link could not be fetched');
   });
   if (!fetched.ok) {
