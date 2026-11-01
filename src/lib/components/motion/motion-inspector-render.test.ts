@@ -7,7 +7,8 @@ import { addClip, setTransform } from '@feega/motion-core/motion/timeline';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { ComponentId } from '@feega/motion-core/motion/components';
-import { wrapInStack } from '$lib/motion/layout/ops';
+import { setChildSize, wrapInStack } from '$lib/motion/layout/ops';
+import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 
 function withClip(component: ComponentId, id: string, doc: MotionDoc = newMotionDoc(MotionFormat.Landscape)): MotionDoc {
   const added = addClip(doc, { component, from: 0 }, id);
@@ -51,6 +52,22 @@ describe('a Stack in Properties', () => {
 
     expect(sections(html)).toContain('stack');
     expect(html).not.toContain('data-testid="auto-layout-remove"');
+  });
+
+  it('shows the height the stack hugs at, not the one stored before Hug', () => {
+    const texted = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } }, 's');
+    const stacked = texted.ok ? wrapInStack(texted.doc, ['s'], 'stack', 'lane') : texted;
+    const tall = stacked.ok ? setChildSize(stacked.doc, 'stack', 'height', { sizing: Sizing.Fixed, value: 640 }) : stacked;
+    const hugged = tall.ok ? setChildSize(tall.doc, 'stack', 'height', { sizing: Sizing.Hug }) : tall;
+    if (!hugged.ok) {
+      throw new Error(hugged.error);
+    }
+    const clip = findClip(hugged.doc, 'stack')!.clip;
+    const html = render(MotionInspector, { props: { doc: hugged.doc, clip, tokens: FEEGA_TOKENS, assets: [], frame: 0, mode: EditMode.Design, onchange: () => {} } }).body;
+    const layout = html.slice(html.indexOf('data-section="layout"'));
+
+    expect(layout).toMatch(/value="108"/);
+    expect(layout.slice(0, layout.indexOf('data-section=', 30))).not.toMatch(/value="640"/);
   });
 
   it('shows no Stack section on a clip outside any stack', () => {

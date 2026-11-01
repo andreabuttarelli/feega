@@ -23,6 +23,8 @@ function withClip(doc: MotionDoc, clipId: string, edit: (clip: MotionClip) => Mo
 
 export const hasBox = (clip: MotionClip) => typeof clip.props.width === 'number' && typeof clip.props.height === 'number';
 
+export const laidClip = (doc: MotionDoc, clipId: string): MotionClip | null => (findClip(withAutoLayout(doc), clipId)?.clip as MotionClip | undefined) ?? null;
+
 export function layoutParent(doc: MotionDoc, clip: MotionClip): (MotionClip & { autoLayout: AutoLayout }) | null {
   const parent = clip.parent ? findClip(doc, clip.parent)?.clip : undefined;
   return parent?.autoLayout ? (parent as MotionClip & { autoLayout: AutoLayout }) : null;

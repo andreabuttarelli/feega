@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
-import { setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
+import { laidClip, setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 
@@ -343,6 +343,17 @@ describe('a stack child as a flex item', () => {
     expect(left(wider)).toBeCloseTo(left(before), 5);
     expect(Number(wider.width) * stacked.width).toBeCloseTo(900, 5);
     expect(top(taller)).toBeCloseTo(top(before), 5);
+  });
+
+  it('the inspector reads the size the stack resolves, not the stored one', () => {
+    const filled = must(setChildSize(stacked, 'a', 'width', { sizing: Sizing.Fill, value: 1 }));
+    const fixedBox = must(setChildSize(filled, 'box', 'width', { sizing: Sizing.Fixed, value: 800 }));
+    const huggedTall = must(setChildSize(stacked, 'box', 'height', { sizing: Sizing.Fixed, value: 600 }));
+    const hugAgain = must(setChildSize(huggedTall, 'box', 'height', { sizing: Sizing.Hug }));
+
+    expect(Number(laidClip(fixedBox, 'a')!.props.width) * stacked.width).toBeGreaterThan(Number(clip(fixedBox, 'a').props.width) * stacked.width + 1);
+    expect(Number(laidClip(hugAgain, 'box')!.props.height) * stacked.height).toBeCloseTo(0.1 * stacked.height, 5);
+    expect(Number(clip(hugAgain, 'box').props.height) * stacked.height).toBeCloseTo(600, 5);
   });
 
   it('steps earlier and later among its siblings, never past the ends', () => {
