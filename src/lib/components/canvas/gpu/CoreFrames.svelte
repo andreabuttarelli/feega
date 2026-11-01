@@ -3,7 +3,7 @@
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
-  import { CoreMotion, createCore, createCoreGl, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
   import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
@@ -34,7 +34,7 @@
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
-  import { backendAfterLoss } from '$lib/canvas/gpu/gpu-loss';
+  import { AttachStep, afterAttachFailure, backendAfterLoss, isTrap } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -48,6 +48,7 @@
   let canvas = $state<HTMLCanvasElement | null>(null);
   let backend = $state(0);
   let attempt = $state(0);
+  let freshCores = 0;
   let raster = $state<CoreRaster | null>(null);
   let lists = $state(new Map<string, DisplayList>());
   const asked = new Set<string>();
@@ -332,12 +333,11 @@
     let gone = false;
     let made: CoreRaster | null = null;
     const tried = backend;
-    void attempt;
     void BACKENDS[tried](target, width, height, budget.pictureSide).then(
       (r) => {
         made = r;
         if (gone) {
-          r.dispose();
+          release(r);
           return;
         }
         put.clear();
@@ -352,17 +352,26 @@
         if (gone) {
           return;
         }
-        if (tried + 1 < BACKENDS.length) {
-          backend = tried + 1;
+        const next = afterAttachFailure(e, tried, freshCores, BACKENDS.length);
+        if (next.step === AttachStep.GiveUp) {
+          onfallback(e instanceof Error ? e.message : String(e));
           return;
         }
-        onfallback(e instanceof Error ? e.message : String(e));
+        if (next.step === AttachStep.FreshCore) {
+          freshCores++;
+          dropCore();
+          attempt++;
+          return;
+        }
+        backend = next.backend;
       }
     );
     return () => {
       gone = true;
       raster = null;
-      made?.dispose();
+      if (made) {
+        release(made);
+      }
     };
   });
 
@@ -504,8 +513,19 @@
 
   let losses = 0;
 
+  function release(gone: CoreRaster) {
+    try {
+      gone.dispose();
+    } catch (e) {
+      console.warn('[core] raster of a lost core not released', e);
+    }
+  }
+
   function attachAgain(why: unknown) {
     console.warn('[core] gpu lost, attaching again', why);
+    if (isTrap(why)) {
+      dropCore();
+    }
     losses++;
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
@@ -652,7 +672,7 @@
 {#if !raster?.behindPage}
   <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {/if}
-{#key backend}
+{#key `${backend}:${attempt}`}
   <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}
 

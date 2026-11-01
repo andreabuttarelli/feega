@@ -30,7 +30,12 @@ const FIT_CAP: Record<FitPurpose, number> = {
   [FitPurpose.Command]: FIT_MAX_ZOOM
 };
 
-export function fitView(content: Bounds, screen: Screen, purpose: FitPurpose): Viewport {
+const measurable = (b: Bounds) => [b.x, b.y, b.width, b.height].every(Number.isFinite);
+
+export function fitView(content: Bounds, screen: Screen, purpose: FitPurpose): Viewport | null {
+  if (!measurable(content)) {
+    return null;
+  }
   const room = 1 + FIT_PADDING;
   const wanted = Math.min(screen.width / (content.width * room), screen.height / (content.height * room));
   const zoom = Math.max(MIN_ZOOM, Math.min(FIT_CAP[purpose], wanted));
@@ -42,14 +47,16 @@ export function fitView(content: Bounds, screen: Screen, purpose: FitPurpose): V
   };
 }
 
+const centred = (screen: Screen): Viewport => ({ x: screen.width / HALF, y: screen.height / HALF, zoom: READABLE_ZOOM });
+
 export function restoreViewport(saved: Viewport | null, content: Bounds | null, screen: Screen): Viewport {
   if (!content) {
-    return { x: screen.width / HALF, y: screen.height / HALF, zoom: READABLE_ZOOM };
+    return centred(screen);
   }
 
   if (saved && isUsable(saved) && showsContent(saved, content, screen)) {
     return saved;
   }
 
-  return fitView({ ...content, width: Math.max(content.width, 1), height: Math.max(content.height, 1) }, screen, FitPurpose.Open);
+  return fitView({ ...content, width: Math.max(content.width, 1), height: Math.max(content.height, 1) }, screen, FitPurpose.Open) ?? centred(screen);
 }

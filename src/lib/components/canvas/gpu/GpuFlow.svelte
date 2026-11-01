@@ -699,7 +699,10 @@
       return;
     }
     const s = screenSize();
-    animateTo(fitView(b, { width: s.width, height: s.height }, purpose));
+    const target = fitView(b, { width: s.width, height: s.height }, purpose);
+    if (target) {
+      animateTo(target);
+    }
   }
 
   function pickedRects(): WorldRect[] {
