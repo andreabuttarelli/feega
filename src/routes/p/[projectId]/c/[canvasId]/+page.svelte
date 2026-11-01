@@ -841,6 +841,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let nodes = $state<Tile[]>((data.nodes as CanvasNodeRecord[]).map((n) => toTile(n)));
+  let heldCanvas = $state(untrack(() => data.canvas.id));
   const nodeById = $derived(byId(nodes));
 
   /**
@@ -1933,6 +1934,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     snapshotVersion += 1;
     runsOverride = null;
     nodes = keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty);
+    heldCanvas = data.canvas.id;
     edges = (data.connections as Connection[]).map(toEdge);
     seenRevision = data.revision;
     const carried = takeNotice();
@@ -4283,6 +4285,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   <Flow
     mode={canvasMode}
     viewerId={me}
+    canvasId={heldCanvas}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
     {edges}

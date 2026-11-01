@@ -243,7 +243,7 @@
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -617,12 +617,15 @@
   const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && editable ? selectedBoxes[0] : null);
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && editable);
 
+  const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
+
   $effect(() => {
     const incoming = tiles;
-    untrack(() => adoptNew(incoming));
+    const canvasId = heldCanvas;
+    untrack(() => adoptNew(incoming, canvasId));
   });
 
-  function adoptNew(incoming: Tile[]) {
+  function adoptNew(incoming: Tile[], canvasId: string) {
     const added = incoming.filter((t) => !known.has(t.id));
     known = new Set(incoming.map((t) => t.id));
     const chosen = added.filter((t) => t.select).map((t) => t.id);
@@ -633,7 +636,6 @@
     if (gone.length) {
       select(selected.filter((id) => known.has(id)));
     }
-    const canvasId = page.params.canvasId ?? '';
     if (fitted && fittedCanvas === canvasId) {
       return;
     }
@@ -649,10 +651,11 @@
   $effect(() => {
     const at = view;
     const who = props.viewerId;
+    const canvasId = fittedCanvas;
     if (!who || !fitted) {
       return;
     }
-    const timer = setTimeout(() => rememberViewport(who, untrack(() => page.params.canvasId ?? ''), at), REMEMBER_VIEW_MS);
+    const timer = setTimeout(() => rememberViewport(who, canvasId, at), REMEMBER_VIEW_MS);
     return () => clearTimeout(timer);
   });
 
