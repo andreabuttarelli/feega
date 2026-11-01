@@ -89,4 +89,14 @@ describe('a dynamic part of the page becomes a component with a variant per stat
 
     expect(Object.values(before.comps).some((c) => c.component)).toBe(false);
   });
+
+  it('what a variant keeps folded stays hidden in that variant', () => {
+    const folded = (n: number, y: number): RestNode => ({ ...item(n, y, true), children: [summary(`f-s${n}`, `Question ${n}`, y, 'Open'), { ...text(`f-a${n}`, `Folded ${n}`, y + 40), collapsed: true }] });
+    const tree = page([item(0, 20, false)], [{ ...accordion(0, 20), variants: [{ state: 'Open', root: folded(0, 20) }] }]);
+    const doc = docOf(tree);
+    const folds = Object.values(doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.filter((clip) => clip.props.text === 'Folded 0')));
+
+    expect(folds.length).toBeGreaterThan(0);
+    expect(folds.every((clip) => clip.hidden)).toBe(true);
+  });
 });

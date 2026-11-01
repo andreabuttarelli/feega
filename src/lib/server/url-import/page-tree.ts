@@ -1335,6 +1335,19 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     p.triggers(state).forEach(([el, target]) => el.setAttribute(limits.goAttr, target));
   }
 
+  function stayed(event: Event) {
+    if (event.target instanceof Element && event.target.closest('a[href], [type=submit]')) {
+      event.preventDefault();
+    }
+  }
+
+  function unfocused() {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement || active instanceof SVGElement) {
+      active.blur();
+    }
+  }
+
   function unstamped(nodes: RestNode[], kept: ReadonlySet<number>, within = false) {
     for (const n of nodes) {
       const inside = n.pattern === undefined ? within : kept.has(n.pattern);
@@ -1361,8 +1374,11 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     const FRAME_MS = 16;
     held.__feegaStill = false;
     held.requestAnimationFrame = (callback) => window.setTimeout(() => callback(performance.now()), FRAME_MS);
+    window.addEventListener('click', stayed, true);
     p.enter(state);
+    window.removeEventListener('click', stayed, true);
     await new Promise((done) => setTimeout(done, p.settleMs));
+    unfocused();
     held.requestAnimationFrame = frozen;
     held.__feegaStill = true;
     freshPseudos(p.root);

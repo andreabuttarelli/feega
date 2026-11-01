@@ -8,7 +8,7 @@ export enum PatternKind {
   Carousel = 'carousel'
 }
 
-export type PatternLimits = { patterns: number; states: number; label: number; slides: number; settleMs: number; kinds: Record<PatternKind, PatternKind> };
+export type PatternLimits = { patterns: number; states: number; label: number; slides: number; settleMs: number; pageShare: number; kinds: Record<PatternKind, PatternKind> };
 
 export const PATTERN_LIMITS: PatternLimits = {
   patterns: 32,
@@ -16,6 +16,7 @@ export const PATTERN_LIMITS: PatternLimits = {
   label: 24,
   slides: 6,
   settleMs: 450,
+  pageShare: 0.5,
   kinds: { [PatternKind.Accordion]: PatternKind.Accordion, [PatternKind.Disclosure]: PatternKind.Disclosure, [PatternKind.Tabs]: PatternKind.Tabs, [PatternKind.Toggle]: PatternKind.Toggle, [PatternKind.Carousel]: PatternKind.Carousel }
 };
 
@@ -209,12 +210,18 @@ export function pagePatterns(limits: PatternLimits): PatternKit {
 
   const ROWS: (() => FoundPattern[])[] = [accordions, tabs, carousels, disclosures, toggles];
 
+  const local = (root: Element) => {
+    const r = root.getBoundingClientRect();
+    const page = document.documentElement.scrollWidth * document.documentElement.scrollHeight;
+    return root !== document.body && root !== document.documentElement && r.width * r.height <= page * limits.pageShare;
+  };
+
   const found = () => {
     const taken: FoundPattern[] = [];
     for (const row of ROWS) {
       for (const p of row()) {
         const clashes = taken.some((t) => t.root === p.root || t.root.contains(p.root) || p.root.contains(t.root));
-        if (!clashes && shown(p.root) && taken.length < limits.patterns) {
+        if (!clashes && shown(p.root) && local(p.root) && taken.length < limits.patterns) {
           taken.push(p);
         }
       }
