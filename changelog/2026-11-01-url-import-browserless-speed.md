@@ -22,7 +22,8 @@ scratch with the native IntersectionObserver in a second session.
   makes puppeteer read the viewport first: one more round trip); the transparent background
   switches per mode, not per shot; a picture goes back into the page only for a live element.
   Tried and dropped: `Page.captureScreenshot` on a second CDP session left apple.com missing
-  images in every later full-page screenshot.
+  images in every later full-page screenshot. Staging scrolls with `behavior: 'instant'`:
+  supabase.com scrolls smoothly and the crops landed above the page.
 - `goto` waits for `load`, then a quiet network (nothing started or ended for 500 ms, nothing in
   flight younger than 4 s); `settle` uses the same rule.
 - `drawnInView`: a connected WebGL canvas that a native observer reports out of view draws one
