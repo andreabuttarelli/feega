@@ -11,7 +11,7 @@ const SPEC_BLOCK = /```yaml\n([\s\S]*?)\n```/;
 
 const LIST_REFS = new Set(['image_urls', 'input_urls', 'image_input', 'reference_image_urls']);
 
-const NEEDS_INPUT_MEDIA = /video-to|reference-to|keyframe-to|videoedit|video-edit|extend|upscale|transition|motion-control|lip-sync|segment/;
+const NEEDS_INPUT_MEDIA = /video-to|videoedit|video-edit|extend|upscale|transition|motion-control|lip-sync|segment/;
 
 const FILLED_BY_WIRE = new Set(['prompt', 'aspect_ratio', 'resolution', 'duration', 'image_url', 'first_frame_url', ...LIST_REFS]);
 
