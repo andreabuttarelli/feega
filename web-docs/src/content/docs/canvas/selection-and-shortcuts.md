@@ -61,6 +61,7 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Arrows | Move the selection |
 | Arrows + Shift | Move by a longer step |
 | 0 | Fit the whole canvas |
+| Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
 | + / = | Zoom in |
 | - | Zoom out |
 | 1, 2, 3... | Add the node type at that position of the bar |
