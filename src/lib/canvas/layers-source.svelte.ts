@@ -2,14 +2,12 @@ import type { MotionDoc } from "@feega/motion-core/motion/doc";
 import type { EditMode } from "$lib/motion/edit-mode";
 import type { OpResult } from "@feega/motion-core/motion/timeline";
 import type { CanvasLayer, LayerHover } from "./layers";
-import type { HeldDocs, OutlineCache } from "./frame-outlines";
+import type { HeldDocs } from "./frame-outlines";
 import type { ActionId } from "$lib/motion/actions";
 
 export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
   readonly selected: readonly string[];
-  readonly outlinesUrl: string;
-  previewUrl(nodeId: string): string;
   select(ids: string[]): void;
   open(nodeId: string): void;
   rename(nodeId: string, name: string): void;
@@ -33,7 +31,6 @@ let canvas = $state.raw<CanvasSide | null>(null);
 let video = $state.raw<VideoSide | null>(null);
 let hovered = $state.raw<LayerHover>(null);
 let docs = $state.raw<HeldDocs>(new Map());
-let outlines = $state.raw<OutlineCache>({});
 let glyphs = $state.raw<ReadonlyMap<string, string | undefined>>(new Map());
 
 function publisher<T>(set: (side: T | null) => void, current: () => T | null) {
@@ -62,12 +59,6 @@ export const layersSource = {
   },
   get docs() {
     return docs;
-  },
-  get outlines() {
-    return outlines;
-  },
-  setOutlines(next: OutlineCache) {
-    outlines = next;
   },
   setDocs(next: HeldDocs) {
     if (
