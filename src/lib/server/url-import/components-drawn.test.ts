@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planOf } from '$lib/canvas/figma/figma-doc';
+import { imagesFilled } from '$lib/canvas/figma/images';
 import { restMessage, type RestNode } from '$lib/server/figma/rest-message';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { withStacking } from '@feega/motion-core/motion/layout/stacking';
@@ -37,14 +38,14 @@ const row = (label: string, x: number, y: number, width = 208, dot = 6): RestNod
   children: [icon(x + 7, y + 7, dot), text(label, x + 29, y + 6)]
 });
 
-const card = (title: string, x: number, width: number, image: string): RestNode => ({
+const card = (title: string, x: number, width: number, image: string, focus = { x: 0.5, y: 0.5 }): RestNode => ({
   id: id(),
   type: 'FRAME',
   name: 'article',
   absoluteBoundingBox: box(x, 300, width, 240),
   fills: [{ type: 'SOLID', color: GREY }],
   cornerRadius: 8,
-  children: [{ id: id(), type: 'RECTANGLE', name: 'image', absoluteBoundingBox: box(x, 300, width, 120), fills: [{ type: 'IMAGE', imageRef: image }] }, text(title, x + 10, 430), text('Read more', x + 10, 460)]
+  children: [{ id: id(), type: 'RECTANGLE', name: 'image', absoluteBoundingBox: box(x, 300, width, 120), fills: [{ type: 'IMAGE', imageRef: image, scaleMode: 'FILL', imageFocus: focus }] }, text(title, x + 10, 430), text('Read more', x + 10, 460)]
 });
 
 const page = (children: RestNode[], extra: Partial<RestNode> = {}): RestNode => ({ id: id(), type: 'FRAME', name: 'Page', absoluteBoundingBox: box(0, 0, 1280, 800), fills: [{ type: 'SOLID', color: WHITE }], children, ...extra });
@@ -113,5 +114,17 @@ describe('a page made of components is drawn where the plain page is', () => {
 
     expect(made.components).toEqual({ components: 1, instances: 1 });
     expect(made.plan.items[0].images.filter((i) => i.innerId).map((i) => made.images[i.hash])).toEqual(['https://a/2.png']);
+  });
+
+  it('cards with the same picture cropped differently link, and each instance keeps its own crop', () => {
+    const tree = page([card('One', 0, 200, 'https://a/1.png', { x: 0, y: 0.5 }), card('Two', 220, 200, 'https://a/1.png', { x: 1, y: 0.5 })]);
+    const made = urlPlan({ url: 'https://example.com', title: 'Example', root: tree } as never, () => `id${++ids}`)!;
+    const item = made.plan.items[0];
+    const doc = imagesFilled(item.doc, item.images, Object.fromEntries(Object.keys(made.images).map((k) => [k, 'asset-1'])));
+    const flat = flattenComps(withoutHidden(doc));
+    const focuses = flat.tracks.flatMap((t) => t.clips as MotionClip[]).flatMap((c) => ((c.props.fills ?? []) as { type: string; focus?: { x: number } }[]).filter((f) => f.type === 'image').map((f) => f.focus?.x));
+
+    expect(made.components).toEqual({ components: 1, instances: 1 });
+    expect(focuses.sort()).toEqual([0, 1]);
   });
 });

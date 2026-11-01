@@ -53,6 +53,12 @@ describe('the shell primitives', () => {
     expect(html).toContain('aria-label="Grid"');
   });
 
+  it('the active segment is a thumb that slides to the checked index', () => {
+    const html = render(SegmentedControl, { props: { label: 'Mode', value: 'c', onchange: noop, options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }] } }).body;
+    expect(html).toContain('data-slot="segmented-thumb"');
+    expect(html).toContain('translateX(200%)');
+  });
+
   it('a row indents by depth and states its selection', () => {
     const html = render(Row, { props: { label: 'Title', depth: 2, selected: true, meta: '00:02' } }).body;
     expect(html).toContain('aria-selected="true"');

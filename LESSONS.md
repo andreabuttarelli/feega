@@ -3578,3 +3578,11 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A size page-stacks measured is not the size the layer gets
 
 **Signal:** a value computed in `page-stacks.ts` from a node box (a max width, a span) shifts a layer by a few px on desktop; dumping clip boxes with and without the change shows the layer narrower than its doc width. **Move:** `page-flatten` runs after stacks and can hand a node a wrapper box; take sizes the layout depends on from the built clip in `figma-doc.ts` (or guard with it), not from the box stacks saw. Diff clip boxes (`withAutoLayout`, every clip including comps) before scoring SSIM.
+
+## An imported component in a row lands shifted by what it draws outside its box
+
+**Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
+
+## A URL import on Browserless takes four minutes and then succeeds
+
+**Signal:** `ai_calls` shows two `browserless` sessions per import, the first ~128 s, the second ~120 s. **Move:** the session cap is 120 s (`BROWSERLESS_SESSION_MS`): a slow capture is killed, `tab.tree` comes back empty, and `importPageAt` retries with `Sight.Native` in a new session. Profile with timers around each `AppTab` method over Browserless, not locally: stripe takes 15 s in local Chrome, but remotely `goto` hits its 20 s cap, `reveal` takes 55 s under `seeAll` and the 27 snapshots in `tree` take 70 s.

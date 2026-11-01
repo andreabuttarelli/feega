@@ -73,8 +73,12 @@ describe('il menu +', () => {
     expect(bar.match(/@render insertMenu\(\)/g)?.length).toBe(2);
   });
 
-  it('la percentuale di zoom resta nella barra', () => {
-    expect(bar).toMatch(/data-testid="canvas-zoom"/);
+  it('la barra non mostra più la percentuale di zoom', () => {
+    expect(bar).not.toMatch(/canvas-zoom/);
+  });
+
+  it('il selettore di modalità sta a destra, dopo gli strumenti', () => {
+    expect(bar.indexOf('@render modeSlot()')).toBeGreaterThan(bar.indexOf('SLOT[s]()'));
   });
 });
 
