@@ -500,6 +500,10 @@
   }
 
   .add-bar {
+    --bar-pad: 5px;
+    --bar-item: 36px;
+    --mode-pill: 32px;
+    --mode-inset: calc((var(--bar-item) + 2 * var(--bar-pad) - var(--mode-pill)) / 2);
     position: absolute;
     z-index: 61;
     bottom: calc(var(--lift, 0px) + 12px);
@@ -509,7 +513,8 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 5px;
+    padding: var(--bar-pad);
+    padding-right: var(--mode-inset);
     border-radius: var(--ui-radius-full);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
@@ -525,6 +530,10 @@
 
   .pick {
     cursor: pointer;
+  }
+
+  .modes :global([data-slot='segmented-control']) {
+    height: var(--mode-pill);
   }
 
   .mode-divider {
@@ -563,8 +572,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 36px;
-    height: 36px;
+    min-width: var(--bar-item);
+    height: var(--bar-item);
     padding: 0 9px;
     font: inherit;
     color: var(--ui-icon-ink);
