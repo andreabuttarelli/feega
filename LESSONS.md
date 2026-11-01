@@ -3575,6 +3575,14 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** `ai_calls` shows two `browserless` sessions per import, the first ~128 s, the second ~120 s. **Move:** the session cap is 120 s (`BROWSERLESS_SESSION_MS`): a slow capture is killed, `tab.tree` comes back empty, and `importPageAt` retries with `Sight.Native` in a new session. Profile with timers around each `AppTab` method over Browserless, not locally: stripe takes 15 s in local Chrome, but remotely `goto` hits its 20 s cap, `reveal` takes 55 s under `seeAll` and the 27 snapshots in `tree` take 70 s.
 
+## "A valid external Instance reference no longer exists" on a canvas page
+
+**Signal:** PostHog shows an unhandled `DOMException: OperationError` with that text; the canvas goes blank or stops reacting to zoom, mostly on Windows. **Move:** it is Chrome's WebGPU connection to the GPU process dropping (crash, reset, out of GPU memory), not a bug in one call. Reproduce on any Mac with CDP `Browser.crashGpuProcess` (`browser.newBrowserCDPSession()`), and count `requestDevice` / `GPUDevice.destroy` with an init script: wgpu's web backend never destroys a device on drop, so every raster you `free()` keeps its GPU memory until GC unless `releaseOnDispose` (`gpu-release.ts`) destroys it.
+
+## A dev server keeps serving a package file you edited
+
+**Signal:** a change under `packages/motion-core` is in the file, `curl /node_modules/@feega/motion-core/...` shows it, but the browser still runs the old code and a debug log never prints. **Move:** the app imports it as `/packages/motion-core/...`, a second URL whose transform Vite cached before the edit. `curl` that exact URL (take it from the importing module's served source); if it is stale, restart with `vite dev --force`.
+
 ## A canvas freezes for minutes right after it opens
 
 **Signal:** after reload the frame stays blank, Ctrl+scroll does nothing, a `longtask` of tens of seconds or more; the CPU profile is all `found` (style or variable library) → `syncStyle` → `commit`, with Svelte's `infinite_loop_guard`. **Move:** a library sync effect compares a doc value with the project copy and re-commits on mismatch; anything that is not key-order free (`JSON.stringify` against jsonb, which reorders keys) never settles. Compare with `sameValue`. Probe with `tests/e2e/url-import-reopen.spec.ts` (`REOPEN_SEED=<file>` reuses one real import).
