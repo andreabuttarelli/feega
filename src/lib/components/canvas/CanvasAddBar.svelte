@@ -30,6 +30,7 @@
   import { PhoneSheetKind, phoneSheets } from '$lib/canvas/phone-sheets.svelte';
   import PhoneSheet from './PhoneSheet.svelte';
   import SegmentedControl, { type SegmentOption } from '$lib/components/ui/shell/SegmentedControl.svelte';
+  import { SegmentedShape } from '$lib/components/ui/shell/segmented-shape';
   import { EditorMode, MODES, editorMode } from '$lib/canvas/editor-mode.svelte';
   import ProviderIcon from './ProviderIcon.svelte';
   import { hotDrag, type HotModel } from '$lib/canvas/hot-models';
@@ -354,7 +355,7 @@
 {#snippet modeSlot()}
   <span class="mode-divider" aria-hidden="true"></span>
   <div class="modes" data-testid="editor-mode-switch" data-mode={editorMode.current}>
-  <SegmentedControl label="Editor mode" options={MODE_OPTIONS} value={editorMode.current} onchange={(mode) => editorMode.set(mode as EditorMode)} />
+  <SegmentedControl label="Editor mode" shape={SegmentedShape.Pill} options={MODE_OPTIONS} value={editorMode.current} onchange={(mode) => editorMode.set(mode as EditorMode)} />
   </div>
 {/snippet}
 
