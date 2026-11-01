@@ -3582,3 +3582,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A canvas freezes for minutes right after it opens
 
 **Signal:** after reload the frame stays blank, Ctrl+scroll does nothing, a `longtask` of tens of seconds or more; the CPU profile is all `found` (style or variable library) → `syncStyle` → `commit`, with Svelte's `infinite_loop_guard`. **Move:** a library sync effect compares a doc value with the project copy and re-commits on mismatch; anything that is not key-order free (`JSON.stringify` against jsonb, which reorders keys) never settles. Compare with `sameValue`. Probe with `tests/e2e/url-import-reopen.spec.ts` (`REOPEN_SEED=<file>` reuses one real import).
+
+## A whole nav comes in as one picture
+
+**Signal:** an imported block with links and buttons is a single image layer. **Move:** ask why the walker took the snapshot (`shape` in `page-tree.ts`: filter, mask, clip path, blend with children, `turned`). On supabase.com it was Tailwind's `transform` utility: it computes to `matrix3d(... 0, 0, 999, 1)` (a `translateZ`), which `matrixOf` did not parse, so `turned` read it as a rotation. Blocks holding text never snapshot now (`holdsContent`); a new snapshot reason must still keep them as layers.
