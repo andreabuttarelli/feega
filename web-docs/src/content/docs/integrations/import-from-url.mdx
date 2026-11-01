@@ -79,7 +79,7 @@ Components nest like in Figma: a button inside a card is a Button instance insid
 
 Each main has properties: its texts, nested ones included (`Label` on a button, `Title` and `Text` on a card) and toggles to show or hide its icon or picture. Buttons and links whose background is a colour variable get `State=Default`, `Hover` and `Pressed` variants, bound to `Primary hover` and `Primary pressed` (a shade of the same colour, always far enough from it to see), so changing Primary restyles every state.
 
-All mains land on the project's **Components** page, one frame per set; that frame is their home, so editing a main there updates the page, and a main nested in another one (the button in a card) still has a single home on its own set. They are listed once in the **Components** panel.
+All mains land on the project's **Components** page, one frame per set; that frame is their home, so editing a main there updates the page, and a main nested in another one (the button in a card) still has a single home on its own set. Each set sits on the background it was designed on (a dark hero's buttons on that dark, a card from a white section on white), so light text stays readable on the light Components page; a variant from another section gets its own patch of that section's background. They are listed once in the **Components** panel.
 
 A block is at least 16 px on each side. Copies with a different icon or spacing stay linked: the difference is an override on that instance, as in Figma. A part the page draws as a picture (a header or a scrolling wall drawn with a blur or a mask) stays a picture, so its buttons and links are not components.
 
