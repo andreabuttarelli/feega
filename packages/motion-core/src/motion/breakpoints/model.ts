@@ -250,14 +250,16 @@ function rescaleClip(clip: MotionClip, unit: number, across: number, anchor: Anc
   return { ...clip, props };
 }
 
-function rescale(doc: MotionDoc, width: number): MotionDoc {
-  const unit = unitOf(doc) / unitOf({ width, height: doc.height });
-  const across = doc.width / width;
+export function heldPixels(doc: MotionDoc, from: { width: number; height: number }): MotionDoc {
+  const unit = unitOf(from) / unitOf(doc);
+  const across = from.width / doc.width;
   const comps = Object.fromEntries(
     Object.entries(doc.comps ?? {}).map(([id, comp]) => [id, comp.frame ? comp : { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => rescaleClip(c as MotionClip, unit, across, Anchor.Pixels)) })) }])
   ) as MotionDoc['comps'];
-  return { ...mapTop(doc, (c) => rescaleClip(c, unit, across)), comps, width };
+  return { ...mapTop(doc, (c) => rescaleClip(c, unit, across)), comps };
 }
+
+const rescale = (doc: MotionDoc, width: number): MotionDoc => heldPixels({ ...doc, width }, doc);
 
 function cascaded(doc: MotionDoc, breakpointId: string): { doc: MotionDoc; width: number; height: number } {
   const views = viewsOf(doc);
