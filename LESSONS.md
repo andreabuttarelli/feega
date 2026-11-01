@@ -3657,3 +3657,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## One capture scores old and new code badly on the same page
 
 **Signal:** a fresh capture drops a page for both the old and the new code (stripe desktop full 0.98 → 0.69, apple phone fold 0.98 → 0.59); the source screenshot shows another accordion item open, or a search panel. **Move:** the capture reads the tree and screenshots a moment later; a page that moves on its own in between (rotating accordion, a narrow-width panel) makes the two disagree. Compare code on one capture, and keep the capture whose screenshot matches its tree as the reference.
+
+## `replaceState` in an `$effect` at mount: `Cannot read properties of undefined (reading '$set')`
+
+**Signal:** a page that cleans its URL on mount shows nothing it should, and a production build logs that `$set` error (in dev: `Cannot call replaceState(...) before router is initialized`). **Move:** SvelteKit's `replaceState`/`pushState` write to the root component, which does not exist while the first page is still mounting. Call them from `afterNavigate`, never from an `$effect` or `onMount` of the first page.
