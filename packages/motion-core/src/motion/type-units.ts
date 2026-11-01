@@ -4,6 +4,7 @@ export type Leading = number | typeof AUTO;
 
 export const LINE_HEIGHT = /^(auto|\d+(\.\d+)?(px|%))?$/;
 export const LETTER_SPACING = /^(-?\d+(\.\d+)?(px|%))?$/;
+export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(\.\d+)?)*$|^$/;
 
 const MEASURE = /^(-?\d+(?:\.\d+)?)(px|%)$/;
 const PERCENT = 100;

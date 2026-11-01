@@ -3649,3 +3649,11 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** the canvas goes blank with that banner; the console shows `[core] gpu lost` first. **Move:** the loss came first, the trap second: a reattach on the same `<canvas>` whose GL context is lost makes the core panic (`gl.create_texture().expect`). Headless Chromium has no WebGPU and renders GL in software; it reproduces only at `deviceScaleFactor: 2` on a tall imported page zoomed to 4×. `CoreFrames` now reattaches on a fresh canvas and reloads a trapped core (`afterAttachFailure` in `gpu-loss.ts`).
 
+
+## A breakpoint view scores low and looks fine, its bottom half drifting
+
+**Signal:** `url-fidelity` view bands fall steadily down the page (stripe phone: 25 px off at 20 000 px); the side by side looks right at the top. **Move:** a view keeps the frame's units per pixel, and a frame's units rarely divide 390 or 768 evenly. Size a drawn view by the base frame's pixels per unit (`item.size.width / item.doc.width`), as `breakpoint-views.ts` does on the canvas, never by stretching it to the view width. Lowering the units so widths divide evenly blurred the desktop instead (stripe full 0.981 → 0.962).
+
+## One capture scores old and new code badly on the same page
+
+**Signal:** a fresh capture drops a page for both the old and the new code (stripe desktop full 0.98 → 0.69, apple phone fold 0.98 → 0.59); the source screenshot shows another accordion item open, or a search panel. **Move:** the capture reads the tree and screenshots a moment later; a page that moves on its own in between (rotating accordion, a narrow-width panel) makes the two disagree. Compare code on one capture, and keep the capture whose screenshot matches its tree as the reference.

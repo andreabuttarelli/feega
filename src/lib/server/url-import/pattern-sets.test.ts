@@ -7,6 +7,7 @@ import { PatternKind, type PagePattern } from './page-patterns';
 import { PLAIN_SHAPE, urlPlan } from './url-doc';
 import { repeatedOf } from './repeated';
 import { PAGE_VIEWS } from './page-views';
+import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
 
 let counter = 0;
 const newId = () => `p${++counter}`;
@@ -101,10 +102,14 @@ describe('a dynamic part of the page becomes a component with a variant per stat
     expect(folds.every((clip) => clip.hidden)).toBe(true);
   });
 
-  it('with tablet and phone views the page parts stay plain, as components do', () => {
+  it('with tablet and phone views the desktop keeps its parts and the phone view draws the phone read as plain layers', () => {
     const tree = faq();
-    const doc = urlPlan(tree, newId, REPEATED, {}, PLAIN_SHAPE, [{ view: PAGE_VIEWS[0], tree: { ...tree, patterns: [] } }])!.plan.items[0].doc;
+    const narrow = { ...tree, width: 390, patterns: [], root: { ...tree.root, absoluteBoundingBox: box(0, 0, 390, 400) } };
+    const doc = urlPlan(tree, newId, REPEATED, {}, PLAIN_SHAPE, [{ view: PAGE_VIEWS[1], tree: narrow }])!.plan.items[0].doc;
+    const phone = resolveView(doc, PAGE_VIEWS[1].id).tracks.flatMap((t) => t.clips).filter((c) => !c.hidden);
 
-    expect(sets(doc)).toEqual([]);
+    expect(sets(doc).length).toBeGreaterThan(0);
+    expect(phone.filter((c) => c.component === 'Precomp')).toEqual([]);
+    expect(phone.map((c) => c.props.text).filter(Boolean)).toEqual(['Question 0', 'Question 1']);
   });
 });

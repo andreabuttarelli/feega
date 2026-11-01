@@ -451,9 +451,11 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   };
 
   const SPACE_EM = 0.2;
+  const overlapOf = (l: KitRect, r: KitRect) => Math.min(l.bottom, r.bottom) - Math.max(l.top, r.top);
+  const mostOn = (rect: KitRect, lines: KitRect[]) => lines.reduce((best, l, i) => (overlapOf(l, rect) > 0 && (best < 0 || overlapOf(l, rect) > overlapOf(lines[best], rect)) ? i : best), -1);
   const lineAt = (ch: Char, lines: KitRect[]) => {
     const rect = ch.node ? rectsOf(ch.node, ch.at, ch.at + 1)[0] : null;
-    return rect ? lines.findIndex((l) => Math.min(l.bottom, rect.bottom) - Math.max(l.top, rect.top) > 0) : -1;
+    return rect ? mostOn(rect, lines) : -1;
   };
   const firstOn = (chars: Char[], lines: KitRect[], line: number) => {
     let [lo, hi] = [0, chars.length];
@@ -586,7 +588,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     const seen = (l: KitRect) => {
       const r = { x: l.left, y: l.top, width: l.right - l.left, height: l.bottom - l.top };
       const v = meet(r, ctx.clip);
-      return (v.width * v.height) / Math.max(1, r.width * r.height);
+      return v.width > 0 ? v.height / Math.max(1, r.height) : 0;
     };
     const kept = lines.filter((l) => seen(l) >= MOSTLY_SEEN && l.top < height);
     if (!kept.length) {
@@ -603,7 +605,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     let last = 0;
     for (const ch of chars) {
       const rect = ch.node ? rectsOf(ch.node, ch.at, ch.at + 1)[0] : null;
-      const index = rect ? kept.findIndex((l) => Math.min(l.bottom, rect.bottom) - Math.max(l.top, rect.top) > 0) : -1;
+      const index = rect ? mostOn(rect, kept) : -1;
       if (index >= 0) {
         last = index;
       } else if (rect && ch.c.trim()) {
@@ -1099,12 +1101,15 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
         if (SKIPPED.test(element.tagName.toUpperCase()) && element.tagName !== 'BR') {
           continue;
         }
+        const ccss = getComputedStyle(element);
+        if (ccss.display === 'none') {
+          continue;
+        }
         if (element.tagName === 'BR') {
           run.push({ node: null, css: own, fills, br: true });
           continue;
         }
-        const ccss = getComputedStyle(element);
-        if (ccss.display === 'none' || Number(ccss.opacity) === 0) {
+        if (Number(ccss.opacity) === 0) {
           continue;
         }
         if (plainInline(element, ccss)) {

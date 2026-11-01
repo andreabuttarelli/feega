@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { similarity } from '$lib/server/web/ui-fidelity';
 import type { PageTree } from './page-tree';
-import { fontsWanted, urlPlan, type UrlPlan } from './url-doc';
+import { FULL_SHAPE, fontsWanted, PLAIN_SHAPE, urlPlan, type PageShape, type UrlPlan } from './url-doc';
 import type { ViewRead } from './page-views';
 import { sheetFonts } from './sheet-fonts';
 
@@ -29,12 +29,14 @@ async function inlined(url: string): Promise<string> {
 
 const sheetText = (referer: string) => (url: string) => fetch(url, { headers: { referer } }).then((r) => (r.ok ? r.text() : ''));
 
-export async function plannedPage(read: PageTree, views: ViewRead[] = []): Promise<PlannedPage> {
+export const harnessShape = (): PageShape => (process.env.URL_IMPORT_SHAPE === 'full' ? FULL_SHAPE : PLAIN_SHAPE);
+
+export async function plannedPage(read: PageTree, views: ViewRead[] = [], shape: PageShape = PLAIN_SHAPE): Promise<PlannedPage> {
   const tree = { ...read, fonts: [...(read.fonts ?? []), ...(await sheetFonts(read.sheets ?? [], sheetText(read.url)))] };
   let n = 0;
   const faces = fontsWanted(tree);
   const fonts = Object.fromEntries(faces.map((f, i) => [f.url, `font-${i}`]));
-  const made = urlPlan(tree, () => `c${++n}`, undefined, fonts, undefined, views)!;
+  const made = urlPlan(tree, () => `c${++n}`, undefined, fonts, shape, views)!;
   const assetOf = Object.fromEntries(Object.keys(made.images).map((hash) => [hash, `img-${hash}`]));
   const images = Object.entries(made.images).map(([hash, url]) => [`img-${hash}`, url]);
   const faceUrls = await Promise.all(faces.map(async (f, i) => [`font-${i}`, await inlined(f.url)]));

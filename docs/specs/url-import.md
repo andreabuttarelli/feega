@@ -18,7 +18,7 @@ CLI `feega import-url`) → `importUrlInto` (`src/lib/server/url-import/canvas-i
   goes through the same check (`fenced` request interception). Downloads denied. No cookies or
   saved sessions are loaded.
 - Caps: 10 000 nodes, page height 65 536 px (frames of 16 384 px stacked), text 4 000 chars per
-  node, 200 images, 48 raster snapshots, 20 s navigation, 4 imports per user per minute.
+  node, 200 images per read, 48 raster snapshots, 20 s navigation, 4 imports per user per minute.
 - Desktop width 1 280 px. Hidden, transparent and off-page elements are skipped.
 - Frame named after the page title (host when there is none).
 
@@ -113,8 +113,9 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 
 ## Sections
 
-On by default (`sections: false` / `--no-sections` / the dialog checkbox turn it off). The page frame's
-direct children become section frames in a vertical auto layout, top to bottom.
+On by default (`sections: false` / `--no-sections` / the dialog checkbox turn it off), and off with
+breakpoints (see Breakpoints). The page frame's direct children become section frames in a vertical
+auto layout, top to bottom.
 
 - `page-outline.ts` reads, after the tree, the full-width blocks (≥50% wide): tag, role, aria-label,
   id/class words, first h1–h3, background, picture/blockquote/details counts, fixed/sticky.
@@ -187,35 +188,66 @@ palette. Borders, radii and the frame background are listed, not bound.
 With `breakpoints: true` (API, MCP `import_url`, CLI `--breakpoints`, dialog checkbox) the page is
 read again at 768 and 390 px (`PAGE_VIEWS`, `tab.viewport`), each with the same freeze, in its
 own tab at the same time as the desktop read; a width whose tab cannot open is left out. The
-frame gets Tablet and Phone breakpoints (ADR 0022) whose overrides make each view look like the
-page at that width:
+frame gets Tablet and Phone breakpoints (ADR 0022, amendment 2) that draw the page as it is at each
+width:
 
 - The walker names every layer by where it sits in the DOM (`RestNode.key`: element path, `~n`
   for the n-th text run of an element, `.i` for a line). Keys match across widths.
 - `joinedTree`: a paragraph the walker split into lines comes in as one wrapping text (alignment
-  read from the line edges), on every read, so it can rewrap at another width.
-- `withExtras`: layers only a narrower page shows (a phone menu) are added to the frame hidden,
-  with ids of their own (`<view>:<id>`) and their images.
-- `viewedRoot`: the desktop layer tree, after sections and stacks, takes each keyed layer's box
-  and text style from the narrower read; layers whose element is not on that page are collapsed;
-  unnamed layers move with their parent; wrappers take the union of their children; the root
-  takes the page's width and runs as long as its content.
-- `planOf` records which clip each layer became (`PlanItem.keys`, layer id → clip id); `withView`
-  compares each layer's two boxes and writes: hidden, x/y/width/height, font size, line height,
-  text resizing and wrap; a child of an auto layout leaves the flow (`layoutItem.absolute`). The
-  breakpoint carries the view's own height (capped at the frame maximum).
-- With breakpoints the page is not marked into components: an instance's layout can differ per
-  copy on a phone, which per-composition overrides cannot say.
+  read from the line edges), on every read, so it can be the same layer at every width. Only a run
+  that is its element's only run is joined; lines of a run that starts after an inline chip stay
+  where the page put them.
+- Each narrower read is shaped like the desktop one (stacks, flatten; no sections, components or
+  interactive parts) and planned on its own at the base frame's units per pixel (`planOf(…, unitsPerPx)`, `sliceItems`). A page taller
+  than one frame cuts each narrow read where the desktop cut falls (`narrowCuts`).
+- `withViews` (`page-views.ts`) merges each view plan into the base doc, widest first, against the
+  doc as resolved at that view:
+  - a base clip and a view clip with the same key are one layer when they differ only in layout
+    keys (`LAYOUT_PROPS`: box, font size, line height, letter spacing, font axes, alignment, text
+    resizing and wrap, outline) and pictures; matching runs top down, so a layer pairs only under a
+    paired parent. Its view values are lifted into overrides (`liftEdit`); in an auto layout it
+    leaves the flow at its captured box with fixed sizing; it takes the view read's visibility.
+  - a layer pairs only when its nearest named ancestor paired with the view layer's nearest named
+    ancestor, so a shared layer is drawn inside the box the view puts it in.
+  - unnamed wrappers (stacks) span their paired children; the page root spans the view.
+  - every other view clip comes in as a view-only layer (`<view>:<id>`), its subtree,
+    compositions and pictures with it, hidden at base, shown in its view, placed below the next
+    paired clip of the view's paint order. Base clips with no partner are hidden there.
+  - the breakpoint is as wide and as tall as the view plan; its height may exceed the frame
+    maximum.
+- Each read brings up to 200 pictures of its own.
+- With breakpoints the page is not split into section frames: a section cuts a block spanning two
+  of them into pieces named after one element, which no view can match. Components and interactive
+  parts stay on the desktop; an instance has no plain partner in a narrow read, so the views draw
+  the narrow read's own layers there.
 
-Values are stored in the base frame's units (x in view fractions, widths of children in base
-units, ADR 0022), so `resolveView` draws the view at its own width and height.
+Values are stored in the base frame's units (ADR 0022), so `resolveView` draws the view at its
+own width and height; the canvas sizes a view by the frame's pixels per unit, and so do both
+fidelity harnesses.
 
-Measured on the nine fidelity pages (SSIM fold/full, HTML, capture `v4`), tablet: vercel
-0.69/0.89, linear 0.55/0.79, stripe 0.49/0.80, apple 0.93/0.71, framer 0.94/0.74, webflow
-0.96/0.87, tailwind 0.94/0.94, blog 0.92/0.83, feega 0.84/0.87; phone: vercel 0.69/0.84, linear
-0.28/0.68, stripe 0.53/0.55, apple 0.60/0.59, framer 0.82/0.75, webflow 0.80/0.74, tailwind
-0.90/0.90, blog 0.87/0.41, feega 0.70/0.58. The base view keeps its fidelity (every page ≥ 0.95).
-Breakpoints are opt-in for that reason.
+Measured with the HTML still (SSIM fold/full against the page at that width; capture `v4`, supabase
+and astro from `v6`; before = the first cut on the same capture):
+
+| page | desktop | tablet before | tablet after | phone before | phone after |
+|---|---|---|---|---|---|
+| vercel | 0.99/0.96 → 0.99/0.96 | 0.67/0.89 | 0.92/0.93 | 0.69/0.85 | 0.98/0.94 |
+| linear | 0.97/0.96 → 0.98/0.97 | 0.84/0.87 | 0.98/0.97 | 0.62/0.81 | 0.97/0.97 |
+| stripe | 0.99/0.98 → 0.99/0.98 | 0.49/0.83 | 0.98/0.97 | 0.53/0.57 | 0.98/0.95 |
+| apple | 0.99/0.97 → 0.99/0.97 | 0.94/0.71 | 0.99/0.97 | 0.62/0.58 | 0.98/0.96 |
+| framer | 0.99/0.96 → 0.99/0.96 | 0.93/0.74 | 0.98/0.98 | 0.82/0.75 | 0.91/0.95 |
+| webflow | 0.99/0.96 → 0.99/0.96 | 0.95/0.92 | 0.99/0.94 | 0.80/0.76 | 0.90/0.94 |
+| tailwind | 0.95/0.95 → 0.95/0.95 | 0.94/0.95 | 0.97/0.97 | 0.90/0.91 | 0.97/0.95 |
+| blog | 0.98/0.97 → 0.98/0.97 | 0.92/0.83 | 0.94/0.92 | 0.88/0.41 | 0.92/0.86 |
+| feega | 0.96/0.95 → 0.96/0.95 | 0.84/0.86 | 0.96/0.98 | 0.70/0.58 | 0.82/0.91 |
+| supabase | 0.94/0.94 → 0.94/0.94 | 0.90/0.84 | 0.92/0.93 | 0.70/0.78 | 0.79/0.86 |
+| astro | 0.90/0.93 → 0.90/0.93 | 0.77/0.82 | 0.81/0.83 | 0.57/0.64 | 0.66/0.68 |
+
+Below 0.95 the causes are the narrow page as the planner draws it at any width, not the merge: the
+same reads planned alone as pages score alike (feega phone fold 0.84, framer phone 0.91, webflow
+phone 0.90, blog phone 0.91/0.87). Fonts render a hair heavier and wider than the page (feega's
+serif headline, supabase's Inter at weight 450), so lines wrap one word early (blog, framer);
+blurs wider than the effect's cap come in brighter (vercel's card glow); scroll-revealed blocks
+caught mid-fade in the screenshot (webflow); astro's desktop is below 0.95 too.
 
 ## Resizing
 
@@ -267,14 +299,13 @@ The player swaps the instance around a clicked layer (`variant-change.ts`): spot
 
 ## Not yet
 
-- Breakpoint views where the narrower page uses other elements (linear's headline spans, stripe's
-  logo marquee), pictures whose crop changes with the width, components together with
-  breakpoints, phone pages taller than the frame maximum (16,384 px).
+- Breakpoint views keep the desktop paint order for the layers they share with it; a view only
+  changes the order of its own layers. Section frames together with breakpoints.
 - Image and radial `mask-image`, filters and clip paths on blocks without text (they come in as
   snapshots); on blocks holding text only their own paint keeps the effect, the text does not.
 - A blend mode passed to text leaves inside an isolated parent blends with less than the page did
   (stripe's hero: fold 0.989 → 0.974).
-- Interactive parts driven by pointer events or by scripts the freeze stops (feega.app's tabs are a Framer component that ignores a synthetic click once frozen), JavaScript hover effects, hover on a descendant (`.card:hover .title`), carousels other than Swiper, interactive parts together with breakpoints.
+- Interactive parts driven by pointer events or by scripts the freeze stops (feega.app's tabs are a Framer component that ignores a synthetic click once frozen), JavaScript hover effects, hover on a descendant (`.card:hover .title`), carousels other than Swiper, interactive parts on the tablet and phone views (they come in as plain layers there).
 
 ## Fidelity
 
@@ -295,4 +326,8 @@ HTML scores of the same label. Both harnesses stretch each frame into its node b
 canvas. GPU text is drawn with `Smoothing.Plain` (`URL_IMPORT_GPU_SMOOTHING`), as the headless shell
 renders the source and the HTML still; the canvas on a Mac dilates text like CoreText, which the
 shell does not. Captured views (`<page>@768`, `<page>@390`) are planned with the page and scored too,
-each frame resolved to the view (`resolveView`) and drawn at the view width.
+each frame resolved to the view (`resolveView`) and sized by the frame's pixels per unit, as the
+canvas sizes a view. `URL_IMPORT_SHAPE=full` plans with sections and tokens as the product does;
+the default is the plain shape. A capture reads the tree and screenshots the page a moment apart,
+so a page that moves on its own between the two (stripe.com's rotating accordion, apple.com's
+search panel on narrow widths) scores low for both old and new code: compare code on one capture.

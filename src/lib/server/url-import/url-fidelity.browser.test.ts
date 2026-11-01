@@ -11,11 +11,11 @@ import type { PlanItem } from '$lib/canvas/figma/figma-doc';
 import type { PageTree } from './page-tree';
 import { PAGE_VIEWS, type PageView, type ViewRead } from './page-views';
 import { capturedIn, scoredIn } from './fidelity-pages';
-import { band, FOLD, plannedPage, scores, sideBySide, stacked } from './fidelity-score';
+import { band, FOLD, harnessShape, plannedPage, scores, sideBySide, stacked } from './fidelity-score';
 
 const LABEL = process.env.URL_IMPORT_FIDELITY ?? '';
 const ONLY = process.env.URL_IMPORT_ONLY?.split(',');
-const SPEC = { mime: 'image/png', ext: 'png', scale: 1, quality: undefined, size: () => FOLD } as never;
+const atWidth = (width: number, doc: { width: number }) => ({ mime: 'image/png', ext: 'png', scale: Math.max(1, width / doc.width), quality: undefined, size: () => FOLD }) as never;
 
 const captured = LABEL ? capturedIn(process.env.URL_IMPORT_CAPTURED ?? LABEL) : '';
 const names = captured && existsSync(captured) ? readdirSync(captured).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, '')).filter((n) => !n.includes('@') && (!ONLY || ONLY.includes(n))) : [];
@@ -27,8 +27,9 @@ async function viewDrawn(items: PlanItem[], view: PageView, assetOf: Record<stri
   let top = 0;
   for (const item of items) {
     const doc = resolveView(imagesFilled(item.doc, item.images, assetOf), view.id);
-    const png = await drawStill(chromiumFrames, { doc, tokens: FEEGA_TOKENS, assets }, SPEC);
-    const fitted = await sharp(png).resize({ width: view.width }).png().toBuffer();
+    const pxPerUnit = item.size.width / item.doc.width;
+    const png = await drawStill(chromiumFrames, { doc, tokens: FEEGA_TOKENS, assets }, atWidth(view.width, doc));
+    const fitted = await sharp(png).resize({ width: Math.min(view.width, Math.round(doc.width * pxPerUnit)), height: Math.round(doc.height * pxPerUnit), fit: 'fill' }).png().toBuffer();
     parts.push({ input: fitted, top, left: 0 });
     top += (await sharp(fitted).metadata()).height!;
   }
@@ -39,10 +40,10 @@ describe.runIf(LABEL && names.length)('an imported page painted again looks like
   it.each(names)('%s', async (name) => {
     const tree = JSON.parse(readFileSync(join(captured, `${name}.json`), 'utf8')) as PageTree;
     const views = viewsOf(name);
-    const { made, assetOf, assets } = await plannedPage(tree, views);
+    const { made, assetOf, assets } = await plannedPage(tree, views, harnessShape());
     const parts: { png: Buffer; height: number }[] = [];
     for (const item of made.plan.items) {
-      parts.push({ png: await drawStill(chromiumFrames, { doc: imagesFilled(item.doc, item.images, assetOf), tokens: FEEGA_TOKENS, assets }, SPEC), height: item.size.height });
+      parts.push({ png: await drawStill(chromiumFrames, { doc: imagesFilled(item.doc, item.images, assetOf), tokens: FEEGA_TOKENS, assets }, atWidth(FOLD.width, item.doc)), height: item.size.height });
     }
     const drawn = await stacked(parts);
     const out = scoredIn(LABEL);

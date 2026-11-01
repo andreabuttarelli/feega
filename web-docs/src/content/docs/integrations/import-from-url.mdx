@@ -59,7 +59,7 @@ Web fonts the page loads are copied into your workspace's uploaded fonts and use
 - The page is read in light mode: a site with a dark theme comes in light, a dark-only site comes in dark.
 - The page is read at desktop width (1280 px), down to 65 536 px from the top, up to 10 000 layers. A page taller than 16 384 px comes in as frames stacked one under the other.
 - Four imports a minute per person.
-- Tablet and phone layouts as breakpoints are experimental: tick **Add tablet and phone layouts as breakpoints** (or pass `--breakpoints`) and the frame gets Tablet (768) and Phone (390) views read from the page at those widths. Pages that build their phone layout from different elements come out rough; components are not marked when breakpoints are on.
+- Tick **Add tablet and phone layouts as breakpoints** (or pass `--breakpoints`) and the frame gets Tablet (768) and Phone (390) views, each drawn from the page read at that width. A layer that is the same element and content at both widths is one layer with its own position and type size per view; what the narrower page shows differently (another headline, another picture, a phone menu) comes in as layers that show only in that view. With breakpoints the page is not split into section frames; components and interactive parts stay on the desktop layout. Reading three widths takes longer.
 
 ## Design tokens
 
