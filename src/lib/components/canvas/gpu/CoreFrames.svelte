@@ -34,6 +34,7 @@
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { backendAfterLoss } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -501,17 +502,38 @@
     };
   });
 
+  let losses = 0;
+
+  function attachAgain(why: unknown) {
+    console.warn('[core] gpu lost, attaching again', why);
+    losses++;
+    const next = backendAfterLoss(backend, losses, BACKENDS.length);
+    if (next !== backend) {
+      losses = 0;
+      backend = next;
+    }
+    raster = null;
+    attempt++;
+  }
+
   function paint(): boolean {
     const into = raster;
     if (!into) {
       return false;
     }
-    if (into.lost()) {
-      console.warn('[core] gpu lost, attaching again');
-      raster = null;
-      attempt++;
+    try {
+      if (into.lost()) {
+        attachAgain('device lost');
+        return false;
+      }
+      return paintOn(into);
+    } catch (e) {
+      attachAgain(e);
       return false;
     }
+  }
+
+  function paintOn(into: CoreRaster): boolean {
     const tails = nearTails();
     const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
