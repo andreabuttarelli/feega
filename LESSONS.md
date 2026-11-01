@@ -3567,6 +3567,14 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** an imported card at opacity 0.64 is visibly darker than the page; the same card without auto layout is right. **Move:** `laidOut` (`figma-doc.ts`) parented the children to the container and then faded container and children; parent opacity is inherited, so children got it twice. Fade only the container. Measure with mean brightness of the same region in source and import before blaming text rendering.
 
+## An imported component in a row lands shifted by what it draws outside its box
+
+**Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
+
+## A URL import on Browserless takes four minutes and then succeeds
+
+**Signal:** `ai_calls` shows two `browserless` sessions per import, the first ~128 s, the second ~120 s. **Move:** the session cap is 120 s (`BROWSERLESS_SESSION_MS`): a slow capture is killed, `tab.tree` comes back empty, and `importPageAt` retries with `Sight.Native` in a new session. Profile with timers around each `AppTab` method over Browserless, not locally: stripe takes 15 s in local Chrome, but remotely `goto` hits its 20 s cap, `reveal` takes 55 s under `seeAll` and the 27 snapshots in `tree` take 70 s.
+
 ## A probe script outside the worktree runs old package code
 
 **Signal:** a fix to `packages/motion-core` passes its unit test, but a `vite-node` script you keep in the scratchpad still prints the old numbers, and a debug log you add never shows. **Move:** imports such as `@feega/motion-core/...` resolve from the nearest `node_modules` up the script's path, which may be a stray install, not your worktree. Keep probe scripts inside the worktree (an ignored folder) so they resolve the code you are editing.
