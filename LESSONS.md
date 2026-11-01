@@ -3624,3 +3624,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A dev server keeps serving a package file you edited
 
 **Signal:** a change under `packages/motion-core` is in the file, `curl /node_modules/@feega/motion-core/...` shows it, but the browser still runs the old code and a debug log never prints. **Move:** the app imports it as `/packages/motion-core/...`, a second URL whose transform Vite cached before the edit. `curl` that exact URL (take it from the importing module's served source); if it is stale, restart with `vite dev --force`.
+
+## Go to main does nothing, and nothing errors
+
+**Signal:** an instance's `component.home` is set and the node exists, but clicking Go to main changes neither URL nor view. **Move:** check that `/api/v1/projects/<id>/components` lists a component whose `frameId` is that home: `mainLocation` only knows frames the list holds. Import sets are `element` nodes on the Components page; a list built from `motion` nodes alone misses them.
