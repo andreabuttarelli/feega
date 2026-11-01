@@ -1,4 +1,4 @@
-import { planOf, type FigmaPlan, type FontUpload, type PlanItem } from '$lib/canvas/figma/figma-doc';
+import { Grouping, planOf, type FigmaPlan, type FontUpload, type PlanItem } from '$lib/canvas/figma/figma-doc';
 import { catalogueFamily, familyFor } from '$lib/motion/vector-ui/piece';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { restMessage, type RestNode, type RestPaint, type RestStyle } from '$lib/server/figma/rest-message';
@@ -176,7 +176,7 @@ function viewed(plan: FigmaPlan | null, root: RestNode, slice: Slice, views: Vie
 function stacked(slices: { root: RestNode; top: number }[], newId: () => string, uploads: FontUpload[], views: ViewRead[] = [], pagePx = 1): FigmaPlan | null {
   const total = slices.reduce((s, x) => s + x.root.absoluteBoundingBox!.height, 0);
   const plans = slices.flatMap(({ root, top }, i) => {
-    const plan = viewed(planOf(restMessage([root], FILE_KEY), newId, uploads), root, i ? Slice.Later : Slice.First, views, pagePx);
+    const plan = viewed(planOf(restMessage([root], FILE_KEY), newId, uploads, Grouping.Frame), root, i ? Slice.Later : Slice.First, views, pagePx);
     const middle = top + root.absoluteBoundingBox!.height / 2 - total / 2;
     return plan ? [{ ...plan, items: plan.items.map((item) => ({ ...item, centre: { x: 0, y: middle } })) }] : [];
   });
