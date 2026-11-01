@@ -115,4 +115,13 @@ describe('content clipped by a parent', () => {
   it('leaves a child alone when its parent does not clip', () => {
     expect(card(patch(wide, 'frame', { clipContent: false }))?.masks).toBeUndefined();
   });
+
+  it('moves the cut with the group it is in, as an instance placed elsewhere on the page', () => {
+    let n = 0;
+    const grouped = must(groupClips(wide, ['frame', 'card'], () => (n++ === 0 ? 'inner' : 'group')));
+    const moved = patch(grouped, 'group', { transform: { x: 0.25 } });
+    const drawn = displayListAt(moved, 0, FEEGA_TOKENS).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip.endsWith('card'));
+
+    expect(extentOf(drawn!.masks![0].cover)).toEqual([960, 270, 1920, 810]);
+  });
 });
