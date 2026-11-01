@@ -30,10 +30,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
   import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
-  import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesNow, partIds, partsParam, posterHeads, type FrameHead } from '$lib/canvas/frame-outlines';
-  import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
-  import { whenIdle } from '$lib/canvas/when-idle';
-  import PartsProbe from './PartsProbe.svelte';
+  import { canvasHeads, heldOutlines } from '$lib/canvas/frame-outlines';
   import { rowWindow } from '$lib/canvas/row-window';
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
@@ -51,7 +48,6 @@
   const INDENT_PX = 12;
   const FOLD_GUTTER = 20;
   const FOLD_ICON = 12;
-  const PROBE_LANES = 6;
   let { density = Density.Pointer, searching = true }: { density?: Density; searching?: boolean } = $props();
   const rowStep = $derived(ROW_STEP_PX[density]);
   const OVERSCAN = 8;
@@ -60,46 +56,14 @@
   const canvas = $derived(layersSource.canvas);
   const video = $derived(layersSource.video);
   const heads = $derived(canvasHeads(canvas?.nodes ?? []));
-  const known = $derived(layersSource.outlines);
   const held = $derived(layersSource.docs);
   let opening = $state<{ nodeId: string; id: string } | null>(null);
   let folds = $state.raw<Set<string>>(localStore() ? readFolds(localStore()!) : new Set());
 
-  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesNow(heads, known, held), folds));
+  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, heldOutlines(heads, held), folds));
   const elements = $derived(new Set((canvas?.nodes ?? []).filter((n) => n.element).map((n) => n.id)));
   const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])].filter((id) => !elements.has(id))));
   const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
-
-  let probed = $state.raw<ReadonlySet<string>>(new Set());
-  const probing = $derived(canvas ? posterHeads(heads, known, probed, video?.nodeId ?? null).slice(0, PROBE_LANES) : []);
-
-  function measured(head: FrameHead, boxes: Record<string, MeasuredBox>) {
-    probed = new Set([...probed, headKey(head)]);
-    const parts = partIds(boxes);
-    const url = canvas?.outlinesUrl;
-    if (!url || !Object.keys(parts).length) {
-      return;
-    }
-    const query = `${HEADS_PARAM}=${encodeURIComponent(headsParam([head]))}&${PARTS_PARAM}=${encodeURIComponent(partsParam(head.nodeId, parts))}`;
-    void fetch(`${url}?${query}`)
-      .then((res) => (res.ok ? res.json() : {}))
-      .then((answer) => layersSource.setOutlines(cacheOutlines(layersSource.outlines, [head], answer)))
-      .catch(() => {});
-  }
-
-  $effect(() => {
-    const url = canvas?.outlinesUrl;
-    const missing = missingHeads(heads, untrack(() => known));
-    if (!url || !missing.length) {
-      return;
-    }
-    return whenIdle(() =>
-      void fetch(`${url}?${HEADS_PARAM}=${encodeURIComponent(headsParam(missing))}`)
-        .then((res) => (res.ok ? res.json() : {}))
-        .then((answer) => layersSource.setOutlines(cacheOutlines(layersSource.outlines, missing, answer)))
-        .catch(() => {})
-    );
-  });
 
   $effect(() => {
     if (!opening || video?.nodeId !== opening.nodeId) {
@@ -316,12 +280,6 @@
     renaming = id ?? null;
   }
 </script>
-
-{#if canvas}
-  {#each probing as head (headKey(head))}
-    <PartsProbe url={`${canvas.previewUrl(head.nodeId)}?revision=${head.version}`} onmeasured={(boxes) => measured(head, boxes)} />
-  {/each}
-{/if}
 
 {#if searching}
   <!-- svelte-ignore a11y_autofocus -->
