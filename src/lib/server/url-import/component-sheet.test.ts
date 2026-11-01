@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
+import type { RestNode } from '$lib/server/figma/rest-message';
 import { compBox } from '$lib/motion/comp-frame';
 import { SET_GAP_PX, addSetVariant } from '$lib/motion/component-set';
 import type { PageOutline } from './page-outline';
@@ -17,14 +18,17 @@ function planOf(name: string) {
 
 const mainsIn = (set: PlanItem) => Object.entries(set.doc.comps).filter(([, c]) => c.component);
 
+const ownMainsIn = (made: ReturnType<typeof planOf>, at: number) => mainsIn(made.sets[at]).filter(([id]) => made.setHomes[at]?.[id] === undefined);
+
 describe('each main or set gets its own frame, sized to its content', () => {
   it.each(['linear', 'vercel'])('%s: no Components frame sits beside the page any more', (name) => {
     expect(planOf(name).plan.items.some((item) => item.name === 'Components')).toBe(false);
   });
 
   it.each(['linear', 'vercel'])('%s: every main lands inside its own set frame', (name) => {
-    for (const set of planOf(name).sets) {
-      for (const [, comp] of mainsIn(set)) {
+    const made = planOf(name);
+    for (const [at, set] of made.sets.entries()) {
+      for (const [, comp] of ownMainsIn(made, at)) {
         const box = compBox(comp, set.doc)!;
         expect(box.left).toBeGreaterThanOrEqual(0);
         expect(box.top).toBeGreaterThanOrEqual(0);
@@ -43,8 +47,9 @@ describe('each main or set gets its own frame, sized to its content', () => {
   });
 
   it('linear: variants of one set share one frame and every page main has a home', () => {
-    const { plan, sets, homes } = planOf('linear');
-    const setNames = sets.map((s) => new Set(mainsIn(s).map(([, c]) => c.component!.set ?? c.component!.name)));
+    const made = planOf('linear');
+    const { plan, sets, homes } = made;
+    const setNames = sets.map((_, at) => new Set(ownMainsIn(made, at).map(([, c]) => c.component!.set ?? c.component!.name)));
     const pageMains = plan.items.flatMap((item) => Object.entries(item.doc.comps).filter(([, c]) => c.component).map(([id]) => id));
 
     expect(setNames.every((names) => names.size === 1)).toBe(true);
@@ -70,5 +75,35 @@ describe('a variant added to an imported set keeps its distance', () => {
       const boxes = grown.doc.tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Precomp').map((c) => compBox(grown.doc.comps[String(c.props.comp)], grown.doc)!).sort((a, b) => a.left - b.left);
       boxes.slice(1).forEach((box, i) => expect(Math.round(box.left - boxes[i].right)).toBeGreaterThanOrEqual(SET_GAP_PX));
     }
+  });
+});
+
+const solid = (r: number, g: number, b: number) => [{ type: 'SOLID', color: { r, g, b, a: 1 } }];
+const label = (id: string, characters: string, x: number, y: number): RestNode => ({ id, type: 'TEXT', characters, absoluteBoundingBox: { x, y, width: 60, height: 20 }, fills: solid(0, 0, 0), style: { fontFamily: 'Inter', fontSize: 14, fontWeight: 500 } });
+const button = (id: string, main: string, x: number): RestNode => ({ id, type: 'INSTANCE', name: 'Button', componentId: main, absoluteBoundingBox: { x, y: 140, width: 100, height: 40 }, fills: solid(0.1, 0.3, 0.9), cornerRadius: 6, children: [label(`${id}t`, 'Go', x + 20, 150)] });
+const card = (id: string, x: number): RestNode => ({ id, type: 'INSTANCE', name: 'Card', componentId: 'k1', absoluteBoundingBox: { x, y: 40, width: 200, height: 160 }, fills: solid(0.9, 0.9, 0.9), cornerRadius: 8, children: [label(`${id}t`, 'Title', x + 10, 50), button(`${id}b`, 'k1b', x + 10)] });
+const nested = (): PageTree => ({ title: 'Nested', url: 'https://example.com', width: 600, height: 240, truncated: false, root: { id: 'root', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 600, height: 240 }, fills: solid(1, 1, 1), children: [card('k1', 40), card('k2', 300)] } });
+
+const nestedPlan = () => {
+  let n = 0;
+  return urlPlan(nested(), () => `id${++n}`, (root) => root, {}, FULL_SHAPE)!;
+};
+
+describe('a button main given hover and pressed states', () => {
+  it('names its set Button, not after the id of its main', () => {
+    const made = nestedPlan();
+
+    expect(made.sets.map((s) => s.name).sort()).toEqual(['Button', 'Card']);
+    expect(Object.values(made.plan.items[0].doc.comps).flatMap((c) => c.component?.set ?? [])).toEqual(['Button', 'Button', 'Button']);
+  });
+});
+
+describe('a main nested in another main', () => {
+  it('stays homed on its own set, so the Card set does not hold a second Button main', () => {
+    const made = nestedPlan();
+    const at = (name: string) => made.sets.findIndex((s) => s.name === name);
+
+    expect([...new Set(Object.values(made.setHomes[at('Card')]))]).toEqual([at('Button')]);
+    expect(made.setHomes[at('Button')]).toBeUndefined();
   });
 });

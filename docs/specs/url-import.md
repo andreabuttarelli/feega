@@ -98,17 +98,38 @@ direct children become section frames in a vertical auto layout, top to bottom.
 
 ## Components
 
-`repeatedOf` (`src/lib/server/url-import/repeated.ts`) runs on the tree before `restMessage`.
+`repeatedOf` (`src/lib/server/url-import/repeated.ts`) runs on the tree before `restMessage`; what a
+block is comes from one table, `KINDS` in `component-kinds.ts` (first matching row wins).
 
-- Skeleton signature: type, auto layout direction, text size/weight, image fill presence, recursively; text,
-  image src and colours ignored.
-- Candidate: FRAME/GROUP, ≥2 nodes, ≥16 px per side, painted or with image/icon; inside auto layout too.
-- Same skeleton → one set; root style (fills, strokes, radius, effects, opacity) → variant
-  (`Style=Primary|Secondary|…`). Size is not part of the key: a copy of another size is an instance with a
-  size override. Kept when ≥2 copies.
-- Outermost wins: nothing nested inside an occurrence becomes a component.
+- The walker keeps per node `dom`: `tag`, `role`, a component word from the class (`hint`, from
+  `HINT_WORDS`: `Button_root` → `button`), the `landmark` it sits in (footer, nav, header) and `press`:
+  the control (link, button, tab, menuitem) whose text is exactly this node's text.
+- Skeleton signature: kind, type, auto layout direction, text size/weight, image fill presence,
+  recursively; text, image src and colours ignored.
+- Candidate: inside the page horizontally (an off-page carousel slide made a main whose copies drew
+  shifted), FRAME/GROUP, ≥2 nodes, ≥16 px per side, painted or with image/icon, or an atom kind, or a
+  kind that stands alone; a text or picture leaf when its kind allows it (nav, footer and plain links,
+  avatars, named logos), wrapped in an instance frame of its own box.
+- Kept when ≥2 copies of one look, or when the kind stands alone: buttons, badges, inputs, avatars, tabs,
+  nav and footer links, named logos, accordion items, pricing tiers (a price per period), testimonials,
+  footer columns, and cards or feature tiles that are boxed (painted with a radius, bordered or with a
+  shadow).
+- Same skeleton → one group; look → variant: atoms by filled/outlined/plain, fill and stroke colour,
+  pill; molecules by their exact fills, strokes, radius, effects and opacity;
+  sized kinds also split by height (within 15 %). Size is otherwise not part of the key: a copy of
+  another size is an instance with a size override.
+- Sets: atoms merge by name (one Button set); molecules merge when their leaves are alike (Jaccard ≥ 0.5,
+  size within 1.6×/2×) or when they are siblings in one grid with the same look. Variant properties come
+  from the kind's `props`: `Style` (Primary/Secondary/Tertiary by saturation then use, Outline, Plain),
+  `Size` (Small…Large, XS…XL), `Icon` (Leading, Trailing, Only, None), `Image` (On/Off), `Items` (text
+  count); `Variant=<label>` (node name, single text, image alt or file name) or `Variant=N` only when
+  those collide. Two sets of one name are qualified by their section, then their label
+  (`Hero Card`), before `Card 2`; `kindNamed` reads the kind from the last words of a name.
+- Nesting: outer first. Atoms nest in molecules (a Button instance inside the Card main), not in atoms;
+  molecules nest when painted (or paintless kinds: list items, accordion items, footer columns); icons
+  and generic items never nest; a block with its parent's box is not a second component.
 - Occurrences become `INSTANCE` nodes whose `componentId` is the first copy; that copy is the main, placed
-  where it was. Names from a rule table (logo, button, nav link, link, list item, card, feature card).
+  where it was. A main nested in another set's main is homed on its own set frame (`setHomes`).
 - Figma scene: an instance builds its own layers at the main's position and diffs them with the main
   (`instance-diff.ts`). Differences on any clip become overrides (text, fills, geometry, auto layout,
   layout item); inside nested groups they are path overrides. Images that differ on top-level clips

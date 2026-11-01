@@ -68,14 +68,18 @@ describe('repeatedOf', () => {
     expect(repeatedOf(page([row(0), row(200)])).components).toHaveLength(1);
   });
 
-  it('un componente dentro un altro non diventa un secondo componente', () => {
+  it('a button inside repeated cards is a Button instance inside the Card main, not lost in it', () => {
     const withButton = (x: number): RestNode => {
       const base = card('Card', x, 'https://a/1.png');
       return { ...base, children: [...base.children!, button('Go', x + 10, BLUE)] };
     };
     const found = repeatedOf(page([withButton(0), withButton(220)]));
+    const [main, other] = found.root.children!;
+    const buttonOf = (n: RestNode) => n.children!.find((c) => c.name?.startsWith('Button'))!;
 
-    expect(found.components.map((c) => c.name)).toEqual(['Card']);
+    expect(found.components.map((c) => c.name)).toEqual(['Card', 'Button']);
+    expect(buttonOf(main).type).toBe('INSTANCE');
+    expect(buttonOf(other).componentId).toBe(buttonOf(main).id);
   });
 
   it('buttons of the same style and different heights are Size variants of one set', () => {
@@ -102,22 +106,126 @@ describe('repeatedOf', () => {
     expect(components[0].variants).toHaveLength(3);
     expect(root.children!.map((c) => c.name)).toEqual(['Logo / Variant=1', 'Logo', 'Logo / Variant=2', 'Logo', 'Logo / Variant=3', 'Logo']);
   });
-  it('two Button components are named after their sections, not Button and Button 2', () => {
-    const iconButton = (label: string, x: number): RestNode => {
-      const base = button(label, x, BLUE);
-      return { ...base, children: [{ id: id(), type: 'VECTOR', name: 'path', absoluteBoundingBox: { x: x + 4, y: 30, width: 12, height: 12 }, fills: [{ type: 'SOLID', color: WHITE }] }, ...base.children!] };
-    };
-    const section = (name: string, y: number, children: RestNode[]): RestNode => ({ id: id(), type: 'FRAME', name, absoluteBoundingBox: { x: 0, y, width: 1280, height: 200 }, children });
-    const { components } = repeatedOf(page([section('Hero', 0, [button('Start', 0, BLUE), button('Docs', 140, BLUE)]), section('Pricing', 300, [iconButton('Buy', 0), iconButton('Try', 140)])]));
 
-    expect(components.map((c) => c.name).sort()).toEqual(['Hero Button', 'Pricing Button']);
+  it('a button, a badge, an input, an avatar and a nav link seen once are components named for what they are', () => {
+    const badge: RestNode = { id: id(), type: 'FRAME', name: 'span', absoluteBoundingBox: { x: 600, y: 300, width: 48, height: 22 }, fills: [{ type: 'SOLID', color: BLUE }], cornerRadius: 11, children: [{ ...text('New', 606, 303), style: { fontFamily: 'Inter', fontSize: 12, fontWeight: 500 }, absoluteBoundingBox: { x: 606, y: 303, width: 36, height: 16 } }] };
+    const input: RestNode = { id: id(), type: 'FRAME', name: 'email', dom: { tag: 'input' }, absoluteBoundingBox: { x: 0, y: 400, width: 240, height: 40 }, strokes: [{ type: 'SOLID', color: BLACK }], children: [text('you@company.com', 10, 410)] };
+    const avatar: RestNode = { id: id(), type: 'RECTANGLE', name: 'Ada', absoluteBoundingBox: { x: 300, y: 400, width: 40, height: 40 }, cornerRadius: 20, fills: [{ type: 'IMAGE', imageRef: 'https://a/ada.png' }] };
+    const nav: RestNode = { ...text('Pricing', 400, 30), dom: { tag: 'a', landmark: 'nav', press: 'link' } };
+    const { components, root } = repeatedOf(page([button('Start', 800, BLUE), badge, input, avatar, nav]));
+
+    expect(components.map((c) => c.name).sort()).toEqual(['Avatar', 'Badge', 'Button', 'Input', 'Nav link']);
+    expect(root.children!.find((c) => c.name === 'Nav link')?.children?.[0].characters).toBe('Pricing');
+  });
+
+  it('a nav link that is only a text is wrapped in an instance of its own size, so it lands where the text was', () => {
+    const link = (label: string, x: number): RestNode => ({ ...text(label, x, 30), dom: { tag: 'a', landmark: 'nav', press: 'link' } });
+    const { root } = repeatedOf(page([link('Docs', 400), link('Blog', 500)]));
+    const [main, other] = root.children!;
+
+    expect(main).toMatchObject({ type: 'INSTANCE', absoluteBoundingBox: { x: 400, y: 30, width: 80, height: 20 }, fills: [] });
+    expect(main.componentId).toBe(main.id);
+    expect(other.componentId).toBe(main.id);
+  });
+
+  it('buttons with and without an icon are Icon variants of one Button set, not Button and Button 2', () => {
+    const arrow = (x: number): RestNode => ({ id: id(), type: 'VECTOR', name: 'path', absoluteBoundingBox: { x, y: 30, width: 12, height: 12 }, fills: [{ type: 'SOLID', color: WHITE }] });
+    const withIcon = (label: string, x: number): RestNode => {
+      const base = button(label, x, BLUE);
+      return { ...base, children: [...base.children!, arrow(x + 100)] };
+    };
+    const { components, root } = repeatedOf(page([button('Start', 0, BLUE), withIcon('Next', 140), button('Go', 280, BLUE)]));
+
+    expect(components.map((c) => c.name)).toEqual(['Button']);
+    expect(new Set(root.children!.map((c) => c.name))).toEqual(new Set(['Button / Icon=None', 'Button / Icon=Trailing', 'Button']));
+  });
+
+  it('filled and bordered buttons are Primary and Outline, not Style 1 and Style 2', () => {
+    const outline = (label: string, x: number): RestNode => ({ ...button(label, x, BLUE), fills: [], strokes: [{ type: 'SOLID', color: BLACK }] });
+    const { root } = repeatedOf(page([button('Start', 0, BLUE), outline('Docs', 140)]));
+
+    expect(root.children!.map((c) => c.name)).toEqual(['Button / Style=Primary', 'Button / Style=Outline']);
+  });
+
+  it('two cards that differ by one line are variants of one Card set', () => {
+    const longer = (x: number): RestNode => {
+      const base = card('More', x, 'https://a/4.png');
+      return { ...base, children: [...base.children!, text('By Ada', x + 10, 290)] };
+    };
+    const { components } = repeatedOf(page([card('One', 0, 'https://a/1.png'), card('Two', 220, 'https://a/2.png'), longer(440), longer(660)]));
+
+    expect(components.map((c) => c.name)).toEqual(['Card']);
+    expect(components[0].variants).toHaveLength(2);
+  });
+
+  it('icons repeated on their own are Icon, and an icon inside a component stays part of it', () => {
+    const glyph = (x: number, y: number): RestNode => ({ id: id(), type: 'GROUP', name: 'icon', absoluteBoundingBox: { x, y, width: 20, height: 20 }, children: [{ id: id(), type: 'VECTOR', absoluteBoundingBox: { x, y, width: 20, height: 20 }, fills: [{ type: 'SOLID', color: BLACK }] }] });
+    const framed = (x: number): RestNode => ({ ...button('Go', x, BLUE), children: [glyph(x + 4, 24), text('Go', x + 30, 30)] });
+    const { components } = repeatedOf(page([glyph(0, 600), glyph(40, 600), framed(400), framed(600)]));
+
+    expect(components.map((c) => c.name).sort()).toEqual(['Button', 'Icon']);
+    expect(components.find((c) => c.name === 'Icon')!.variants[0].occurrences).toBe(2);
+  });
+
+  it('tiles of one grid with the same look are one set, though one shows a picture and another an icon', () => {
+    const GREY = { r: 0.95, g: 0.95, b: 0.95, a: 1 };
+    const tile = (x: number, art: RestNode, lines: number): RestNode => ({ id: id(), type: 'FRAME', name: 'div', absoluteBoundingBox: { x, y: 300, width: 300, height: 260 }, fills: [{ type: 'SOLID', color: GREY }], cornerRadius: 12, children: [art, ...Array.from({ length: lines }, (_, i) => text(`Line ${i}`, x + 16, 420 + i * 24))] });
+    const picture = (x: number): RestNode => ({ id: id(), type: 'RECTANGLE', name: 'img', absoluteBoundingBox: { x, y: 300, width: 300, height: 100 }, fills: [{ type: 'IMAGE', imageRef: `https://a/${x}.png` }] });
+    const glyph = (x: number): RestNode => ({ id: id(), type: 'VECTOR', name: 'path', absoluteBoundingBox: { x: x + 16, y: 316, width: 24, height: 24 }, fills: [{ type: 'SOLID', color: BLACK }] });
+    const grid: RestNode = { id: id(), type: 'FRAME', name: 'div', absoluteBoundingBox: { x: 0, y: 300, width: 940, height: 260 }, children: [tile(0, picture(0), 2), tile(320, glyph(320), 3), tile(640, glyph(640), 2)] };
+    const { components } = repeatedOf(page([grid]));
+
+    expect(components).toHaveLength(1);
+    expect(components[0].variants).toHaveLength(3);
+  });
+
+  it('a block with a price is a Pricing tier only when the price is per month, seat or year', () => {
+    const tier = (x: number, period: string): RestNode => ({ id: id(), type: 'FRAME', name: 'div', absoluteBoundingBox: { x, y: 300, width: 300, height: 300 }, strokes: [{ type: 'SOLID', color: BLACK }], children: [text('Pro', x + 16, 316), text(`$20${period}`, x + 16, 360), text('For growing teams', x + 16, 400)] });
+
+    expect(repeatedOf(page([tier(0, '/month')])).components.map((c) => c.name)).toEqual(['Pricing tier']);
+    expect(repeatedOf(page([tier(0, ' billion')])).components.map((c) => c.name)).toEqual(['Card']);
+  });
+
+  it('a footer text inside a link is a Footer link though the link wraps it in other elements', () => {
+    const link = (label: string, y: number): RestNode => ({ ...text(label, 400, y), dom: { tag: 'div', landmark: 'footer', press: 'link' } });
+    const { components } = repeatedOf(page([link('Pricing', 700), link('Docs', 730)]));
+
+    expect(components.map((c) => c.name)).toEqual(['Footer link']);
+    expect(components[0].variants[0].occurrences).toBe(2);
+  });
+
+  it('a carousel slide scrolled off the page is left as it is, so the main is a card you can see (framer: an off-page main drew its copies shifted)', () => {
+    const { root } = repeatedOf(page([card('Hidden', -260, 'https://a/0.png'), card('One', 0, 'https://a/1.png'), card('Two', 220, 'https://a/2.png')]));
+    const [hidden, main] = root.children!;
+
+    expect(hidden.type).toBe('FRAME');
+    expect(main.componentId).toBe(main.id);
+  });
+
+  it('two Card sets are named after their sections, not Card and Card 2', () => {
+    const GREY = { r: 0.9, g: 0.9, b: 0.9, a: 1 };
+    const priced = (x: number): RestNode => ({ id: id(), type: 'FRAME', name: 'div', absoluteBoundingBox: { x, y: 400, width: 200, height: 160 }, fills: [{ type: 'SOLID', color: GREY }], children: [{ ...text('Pro', x + 10, 410), style: { fontFamily: 'Inter', fontSize: 24, fontWeight: 700 } }, text('For teams', x + 10, 450)] });
+    const section = (name: string, y: number, children: RestNode[]): RestNode => ({ id: id(), type: 'FRAME', name, absoluteBoundingBox: { x: 0, y, width: 1280, height: 300 }, children });
+    const { components } = repeatedOf(page([section('Hero', 100, [card('One', 0, 'https://a/1.png'), card('Two', 220, 'https://a/2.png')]), section('Pricing', 400, [priced(0), priced(220)])]));
+
+    expect(components.map((c) => c.name).sort()).toEqual(['Hero Card', 'Pricing Card']);
   });
 
   it('logo variants are named by their label, so the code says LogoNotion, not Logo4', () => {
     const vector = (x: number): RestNode => ({ id: id(), type: 'VECTOR', name: 'path', absoluteBoundingBox: { x, y: 500, width: 30, height: 30 }, fills: [{ type: 'SOLID', color: BLACK }] });
     const mark = (x: number, marks: number, label: string): RestNode => ({ id: id(), type: 'FRAME', name: label, absoluteBoundingBox: { x, y: 500, width: 100, height: 40 }, children: Array.from({ length: marks }, (_, i) => vector(x + i * 40)) });
-    const { root } = repeatedOf(page([mark(0, 1, 'Notion'), mark(120, 1, 'Notion logo'), mark(240, 2, 'Zapier'), mark(360, 2, 'Zapier')]));
+    const { root } = repeatedOf(page([mark(0, 1, 'Notion'), mark(120, 1, 'Notion'), mark(240, 2, 'Zapier'), mark(360, 2, 'Zapier')]));
 
     expect(root.children!.map((c) => c.name)).toEqual(['Logo / Variant=Notion', 'Logo', 'Logo / Variant=Zapier', 'Logo']);
   });
+
+  it('a wrapper of the same box around an icon is not the component, the icon is (linear: an Icon instance held a frame named Icon)', () => {
+    const glyph = (x: number): RestNode => ({ id: id(), type: 'GROUP', name: 'icon', absoluteBoundingBox: { x, y: 600, width: 20, height: 20 }, children: [{ id: id(), type: 'VECTOR', absoluteBoundingBox: { x, y: 600, width: 20, height: 20 }, fills: [{ type: 'SOLID', color: BLACK }] }] });
+    const wrapped = (x: number): RestNode => ({ id: id(), type: 'FRAME', name: 'span', absoluteBoundingBox: { x, y: 600, width: 20, height: 20 }, fills: [], children: [glyph(x)] });
+    const { root } = repeatedOf(page([wrapped(0), wrapped(40)]));
+
+    expect(root.children!.map((c) => c.type)).toEqual(['FRAME', 'FRAME']);
+    expect(root.children!.map((c) => c.children![0].type)).toEqual(['INSTANCE', 'INSTANCE']);
+  });
 });
+
