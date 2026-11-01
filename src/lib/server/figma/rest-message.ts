@@ -77,6 +77,8 @@ export type RestNode = {
   styleOverrideTable?: Record<string, RestStyle>;
   componentId?: string;
   use?: number;
+  pattern?: number;
+  go?: string;
   codeComponent?: CodeComponent;
   behaviour?: ClipBehaviour;
   children?: RestNode[];
