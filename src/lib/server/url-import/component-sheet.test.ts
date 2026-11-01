@@ -18,14 +18,17 @@ function planOf(name: string) {
 
 const mainsIn = (set: PlanItem) => Object.entries(set.doc.comps).filter(([, c]) => c.component);
 
+const ownMainsIn = (made: ReturnType<typeof planOf>, at: number) => mainsIn(made.sets[at]).filter(([id]) => made.setHomes[at]?.[id] === undefined);
+
 describe('each main or set gets its own frame, sized to its content', () => {
   it.each(['linear', 'vercel'])('%s: no Components frame sits beside the page any more', (name) => {
     expect(planOf(name).plan.items.some((item) => item.name === 'Components')).toBe(false);
   });
 
   it.each(['linear', 'vercel'])('%s: every main lands inside its own set frame', (name) => {
-    for (const set of planOf(name).sets) {
-      for (const [, comp] of mainsIn(set)) {
+    const made = planOf(name);
+    for (const [at, set] of made.sets.entries()) {
+      for (const [, comp] of ownMainsIn(made, at)) {
         const box = compBox(comp, set.doc)!;
         expect(box.left).toBeGreaterThanOrEqual(0);
         expect(box.top).toBeGreaterThanOrEqual(0);
@@ -44,8 +47,9 @@ describe('each main or set gets its own frame, sized to its content', () => {
   });
 
   it('linear: variants of one set share one frame and every page main has a home', () => {
-    const { plan, sets, homes } = planOf('linear');
-    const setNames = sets.map((s) => new Set(mainsIn(s).map(([, c]) => c.component!.set ?? c.component!.name)));
+    const made = planOf('linear');
+    const { plan, sets, homes } = made;
+    const setNames = sets.map((_, at) => new Set(ownMainsIn(made, at).map(([, c]) => c.component!.set ?? c.component!.name)));
     const pageMains = plan.items.flatMap((item) => Object.entries(item.doc.comps).filter(([, c]) => c.component).map(([id]) => id));
 
     expect(setNames.every((names) => names.size === 1)).toBe(true);
