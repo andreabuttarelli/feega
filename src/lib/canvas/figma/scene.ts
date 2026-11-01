@@ -747,6 +747,7 @@ export function figmaScene(message: FigmaMessage): FigmaScene | null {
     opacity: 1,
     effects: [],
     item: { grow: false, stretch: false, absolute: false },
+    hidden: false,
     fills: [],
     strokes: [],
     radii: [0, 0, 0, 0],
