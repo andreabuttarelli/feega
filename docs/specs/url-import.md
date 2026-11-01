@@ -235,6 +235,9 @@ hero, apple's tiles, webflow's grids) run past the frame's edge.
 `fidelity-pages.ts` as the import reads them, plus a reference screenshot;
 `URL_IMPORT_FIDELITY=<label>` (`url-fidelity.browser.test.ts`) draws the plan and scores SSIM above
 the fold and over the whole page. Output in `~/Documents/feega-videos/url-import/fidelity2/`.
+`URL_IMPORT_SHEET=<label>` (`components-page.browser.test.ts`, with `URL_IMPORT_CAPTURED`) draws
+every set frame of the plan where the Components page puts it, on the light canvas grey, as
+`runs/<label>/<page>-components.png`.
 
 The HTML still is not what the canvas draws. `URL_IMPORT_GPU=<label> npx vite-node --config
 scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` (optional `URL_IMPORT_CAPTURED`,
