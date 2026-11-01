@@ -32,6 +32,7 @@
   import SegmentedControl, { type SegmentOption } from '$lib/components/ui/shell/SegmentedControl.svelte';
   import { SegmentedShape } from '$lib/components/ui/shell/segmented-shape';
   import { EditorMode, MODES, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { SlotPhase, slotTransition } from '$lib/canvas/slot-motion';
   import ProviderIcon from './ProviderIcon.svelte';
   import { hotDrag, type HotModel } from '$lib/canvas/hot-models';
   import { CANVAS_DRAG_FILLED_NODE } from '$lib/canvas/drag-payload';
@@ -404,7 +405,9 @@
 
 <div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
   <div class="group" data-testid={`bar-${context}`}>
-    {#each slots as s (s)}{@render SLOT[s]()}{/each}
+    {#each slots as s, i (s)}
+      <div class="slot" in:slotTransition={{ phase: SlotPhase.Enter, index: i }} out:slotTransition={{ phase: SlotPhase.Leave, index: i }}>{@render SLOT[s]()}</div>
+    {/each}
   </div>
   {#if !phone}{@render modeSlot()}{/if}
   <input bind:this={imageInput} type="file" class="sr-only" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-testid="frame-image-input" onchange={imageChosen} />
@@ -518,6 +521,12 @@
     border-radius: var(--ui-radius-full);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
+  }
+
+  .slot {
+    display: flex;
+    align-items: center;
+    gap: 2px;
   }
 
   .group {
