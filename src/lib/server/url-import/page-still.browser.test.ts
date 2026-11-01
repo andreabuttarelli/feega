@@ -128,3 +128,43 @@ describe.runIf(process.env.CHROMIUM_PATH)('the state a block is frozen in', () =
     }
   }, 30_000);
 });
+
+const GL_PAGE = `<body style="margin:0"><canvas id="gl" width="40" height="40" style="display:block"></canvas><div style="height:4000px"></div><script>
+const gl = document.getElementById('gl').getContext('webgl', { preserveDrawingBuffer: true });
+window.colour = [0, 1, 0, 1];
+const draw = () => { gl.clearColor(...window.colour); gl.clear(gl.COLOR_BUFFER_BIT); requestAnimationFrame(draw); };
+draw();
+</script></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a WebGL canvas scrolled out of view', () => {
+  it('keeps its last frame instead of drawing, and draws again in view (stripe on Browserless: software WebGL in every canvas held the page 30-40 s)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      let page: Page | null = null;
+      const tab = await localBrowser(async () => (page = await browser.newPage()))();
+      await tab.seeAll();
+      await tab.goto(`data:text/html,${encodeURIComponent(GL_PAGE)}`);
+      const pixel = () =>
+        page!.evaluate(() => {
+          const gl = (document.getElementById('gl') as HTMLCanvasElement).getContext('webgl')!;
+          const out = new Uint8Array(4);
+          gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, out);
+          return [...out];
+        });
+      const frames = () => page!.evaluate(() => new Promise((done) => setTimeout(done, 300)));
+      await page!.evaluate(() => window.scrollTo(0, 2_000));
+      await frames();
+      await page!.evaluate(() => ((window as unknown as { colour: number[] }).colour = [1, 0, 0, 1]));
+      await frames();
+      const away = await pixel();
+      await page!.evaluate(() => window.scrollTo(0, 0));
+      await frames();
+      const back = await pixel();
+
+      expect(away).toEqual([0, 255, 0, 255]);
+      expect(back).toEqual([255, 0, 0, 255]);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});

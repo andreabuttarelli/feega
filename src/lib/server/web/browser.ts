@@ -4,7 +4,7 @@ import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
 import { OVERLAY_SELECTOR, type Overlay } from './overlays';
 import { SnapMode, TREE_LIMITS, treeScript, type PageSnap, type PageTree } from '$lib/server/url-import/page-tree';
-import { everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed, type Walk } from '$lib/server/url-import/page-reveal';
+import { drawnInView, everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed, type Walk } from '$lib/server/url-import/page-reveal';
 import { snapped, type Shoot } from '$lib/server/url-import/page-snaps';
 import { componentMarksOf, MARK_LIMITS, type ComponentUse } from '$lib/server/code-import/component-marks';
 
@@ -404,6 +404,7 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     left,
     reveal: (mode) => page.evaluate(revealPage, mode),
     seeAll: async () => {
+      await page.evaluateOnNewDocument(drawnInView);
       await page.evaluateOnNewDocument(everythingInView);
       await page.evaluateOnNewDocument(heldStill);
     },

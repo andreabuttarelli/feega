@@ -351,3 +351,45 @@ export function everythingInView(): void {
   }
   window.IntersectionObserver = SeesAll as unknown as typeof IntersectionObserver;
 }
+
+export function drawnInView(): void {
+  const DRAWS = ['clear', 'clearBufferfv', 'clearBufferiv', 'clearBufferuiv', 'clearBufferfi', 'drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'drawRangeElements', 'blitFramebuffer'];
+  const Native = window.IntersectionObserver;
+  if (!Native) {
+    return;
+  }
+  const hidden = new WeakSet<Element>();
+  const watched = new WeakSet<Element>();
+  const sight = new Native((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        hidden.delete(entry.target);
+        continue;
+      }
+      hidden.add(entry.target);
+    }
+  });
+  const away = (canvas: unknown) => {
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      return false;
+    }
+    if (!watched.has(canvas)) {
+      watched.add(canvas);
+      sight.observe(canvas);
+    }
+    return canvas.isConnected && hidden.has(canvas);
+  };
+
+  for (const Context of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) {
+    const proto = Context?.prototype as unknown as Record<string, unknown> | undefined;
+    for (const name of proto ? DRAWS : []) {
+      const draw = proto![name];
+      if (typeof draw !== 'function') {
+        continue;
+      }
+      proto![name] = function (this: WebGLRenderingContext, ...args: unknown[]) {
+        return away(this.canvas) ? undefined : draw.apply(this, args);
+      };
+    }
+  }
+}
