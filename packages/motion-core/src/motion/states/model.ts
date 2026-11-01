@@ -31,10 +31,12 @@ const propSlot = (key: string): Slot => ({ read: (p) => p.props[key], write: (p,
 type Painted = { color?: unknown };
 const firstOf = (p: Parts, list: string) => (Array.isArray(p.props[list]) && p.props[list].length ? (p.props[list] as unknown[]) : null);
 
-const paintSlot = (list: string, flat: string, paintOf: (item: Record<string, unknown>) => Painted, repaint: (item: Record<string, unknown>, color: unknown) => Record<string, unknown>): Slot => ({
+type Flat = (p: Parts) => string;
+
+const paintSlot = (list: string, flat: Flat, paintOf: (item: Record<string, unknown>) => Painted, repaint: (item: Record<string, unknown>, color: unknown) => Record<string, unknown>): Slot => ({
   read: (p) => {
     const items = firstOf(p, list);
-    return items ? paintOf(items[0] as Record<string, unknown>).color : p.props[flat];
+    return items ? paintOf(items[0] as Record<string, unknown>).color : p.props[flat(p)];
   },
   write: (p, value) => {
     const items = firstOf(p, list);
@@ -42,12 +44,16 @@ const paintSlot = (list: string, flat: string, paintOf: (item: Record<string, un
       p.props[list] = [repaint(items[0] as Record<string, unknown>, value), ...items.slice(1)];
       return;
     }
-    p.props[flat] = value;
+    p.props[flat(p)] = value;
   }
 });
 
-const fillSlot = paintSlot('fills', 'fill', (f) => f, (f, color) => ({ ...f, color }));
-const strokeSlot = paintSlot('strokes', 'stroke', (s) => (s.paint ?? {}) as Painted, (s, color) => ({ ...s, paint: { ...(s.paint as object), color } }));
+const TEXT_COLOUR = 'color';
+
+const isText = (p: Parts) => p.props.text !== undefined;
+
+const fillSlot = paintSlot('fills', (p) => (isText(p) ? TEXT_COLOUR : 'fill'), (f) => f, (f, color) => ({ ...f, color }));
+const strokeSlot = paintSlot('strokes', () => 'stroke', (s) => (s.paint ?? {}) as Painted, (s, color) => ({ ...s, paint: { ...(s.paint as object), color } }));
 
 const colour = z.string().min(1).max(64);
 const unit = (key: 'opacity' | 'scale' | 'rotateZ' | 'blur') => z.number().min(TRANSFORM[key].min).max(TRANSFORM[key].max);

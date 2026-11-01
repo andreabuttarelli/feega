@@ -47,6 +47,16 @@ describe('layers painted with fill and stroke lists', () => {
   });
 });
 
+describe('a text layer', () => {
+  it('a fill state recolours the text, which draws its colour, not a fill', () => {
+    const text = { transform: {}, props: { text: 'Overview', color: '#555962' }, states: statesSchema.parse([{ state: ElementState.Hover, overrides: { fill: '#17181c' } }]) };
+    const props = resolveState(text, ElementState.Hover).props as Record<string, unknown>;
+
+    expect(props.color).toBe('#17181c');
+    expect('fill' in props).toBe(false);
+  });
+});
+
 describe('mixing into a state', () => {
   it('halfway mixes numbers and colours between default and the state', () => {
     const half = mixState(clip, ElementState.Hover, 0.5);
