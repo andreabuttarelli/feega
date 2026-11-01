@@ -103,6 +103,7 @@
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { EditMode, startMode } from '$lib/motion/edit-mode';
   import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
+  import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import { elementKey } from '$lib/canvas/prototype-arrows';
   import type { PrototypeLink } from '$lib/motion/prototype/links';
   import { withPlayhead } from '$lib/canvas/frame-playhead';
@@ -591,6 +592,16 @@
   }
 
   const showsPrototype = $derived(editorMode.spec.lines === CanvasLines.Prototype);
+
+  let modeShown = editorMode.current;
+  $effect(() => {
+    const mode = editorMode.current;
+    if (mode === modeShown) {
+      return;
+    }
+    modeShown = mode;
+    untrack(() => rightBar.select(BarTab.Properties));
+  });
   const curves = $derived(
     (showsPrototype ? [] : edges).flatMap((e) => {
       const from = portFor(e.source, PortSide.Out, e.sourceHandle);
