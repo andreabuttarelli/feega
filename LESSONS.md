@@ -197,6 +197,12 @@ worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallis
 un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
 Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright. Vale anche per una misura di
 performance: numeri identici prima e dopo un fix vogliono dire codice vecchio servito, non un fix inutile.
+Vale anche al contrario: un bug già corretto su `dev` torna vivo. Un dev server acceso alle 8:34 ha
+servito fino alle 14 il `GpuFlow.svelte` delle 10:29, prima del fix del loop di sync degli stili:
+~9000 `updated at` (`set docs`, `commit`, `liveDocs.set`) e tab in crash dopo un import da URL,
+sul codice di `dev` zero. Segnale: le righe dello stack non tornano col sorgente. Mossa:
+`curl localhost:<porta>/src/<file>.svelte | grep <riga del fix>`; se manca, riavvia prima di
+diagnosticare.
 
 ### Il canvas core diventa vuoto o nero dopo un clic, senza errori
 Segnale: nessun `pageerror`, nessun `liveDocs.set`, `data-painted` aumenta di un `full` e poi il
