@@ -164,6 +164,7 @@
           </form>
         {:else}
           <a class="page-link" href={canvas.href} title={canvas.name} aria-current={isCurrent ? 'page' : undefined} onclick={onpick} ondblclick={isCurrent ? startRename : undefined}>
+            {#if isCurrent}<span class="current-dot" data-testid="current-dot" aria-hidden="true"></span>{/if}
             <span class="page-name">{canvas.name}</span>
             {#if isCurrent && commentsUnseen}<span class="unseen-dot" data-testid="comments-unseen" role="img" aria-label="Unread mention"></span>{/if}
           </a>
@@ -300,7 +301,7 @@
     background: color-mix(in srgb, var(--ui-text) 5%, transparent);
   }
   .page-row.is-current {
-    background: color-mix(in srgb, var(--ui-text) 9%, transparent);
+    background: var(--ui-selected);
     font-weight: var(--ui-weight-medium);
   }
 
@@ -386,6 +387,18 @@
   }
   .touch .rename-input {
     font-size: 16px;
+  }
+
+  .page-link {
+    position: relative;
+  }
+  .current-dot {
+    position: absolute;
+    left: 8px;
+    width: 6px;
+    height: 6px;
+    background: var(--ui-accent);
+    border-radius: var(--ui-radius-full);
   }
 
   .unseen-dot {
