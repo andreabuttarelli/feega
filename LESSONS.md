@@ -3607,6 +3607,10 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** on an imported page Cmd-click selects a label, Enter does nothing, double-click selects a wrapper (often 0×0, named Precomp or Group). **Move:** the label sits inside a Precomp (a group or an instance), so its id is scoped (`host__0__label`) and every top-level lookup (`findClip`, `isLayer`, `textCaretAt`) misses it. Resolve scene ids through `textScope`/`scoped` before editing; for URL imports, plain groups come in as frames (`Grouping.Frame`), never as Precomps.
 
+## A release regression that the fixture does not reproduce
+
+**Signal:** two release builds measure the same on the seeded fixture, while production freezes; the crash telemetry (`[canvas] webcontent-crash-suspected` in Vercel runtime logs, one day of retention) shows the real device and texture bytes. **Move:** seed what the real canvas carries that the fixture lacks (styles, variables, components, images) and measure the reopen, not only the first open; `tests/e2e/canvas-landing-session.spec.ts` against two `build:node` builds served with `node --env-file=.env build` is the comparison.
+
 ## "A valid external Instance reference no longer exists" on a canvas page
 
 **Signal:** PostHog shows an unhandled `DOMException: OperationError` with that text; the canvas goes blank or stops reacting to zoom, mostly on Windows. **Move:** it is Chrome's WebGPU connection to the GPU process dropping (crash, reset, out of GPU memory), not a bug in one call. Reproduce on any Mac with CDP `Browser.crashGpuProcess` (`browser.newBrowserCDPSession()`), and count `requestDevice` / `GPUDevice.destroy` with an init script: wgpu's web backend never destroys a device on drop, so every raster you `free()` keeps its GPU memory until GC unless `releaseOnDispose` (`gpu-release.ts`) destroys it.
