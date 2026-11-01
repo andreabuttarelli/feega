@@ -222,4 +222,12 @@ describe('a page read at desktop and phone width', () => {
     expect(blue(phoneView).map((c) => c.id)).toEqual(blue(doc).map((c) => c.id));
     expect(corner).toBeCloseTo(16 * scale, 0);
   });
+
+  it('a run that starts after an inline chip keeps its lines where the page put them, not joined into a block of its own (overreacted.io: "for a paragraph," right-aligned over the next line)', () => {
+    const line = (key: string, x: number, y: number, width: number, characters: string): RestNode => ({ ...textOf(key, { x, y, width, height: 28 }, characters), textAutoResize: undefined });
+    const narrow = pageOf(390, 800, [line('p~0', 20, 300, 340, 'However, because these concepts have been given agreed-upon names ('), card('p/code1', { x: 230, y: 330, width: 34, height: 24 }), line('p~1.0', 270, 328, 60, 'for a'), line('p~1.1', 20, 356, 90, 'paragraph,')]);
+    const doc = planned(pageOf(1280, 800, [line('p~0', 40, 300, 700, 'Wide paragraph')]), [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+
+    expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['However, because these concepts have been given agreed-upon names (', 'for a', 'paragraph,']);
+  });
 });

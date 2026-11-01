@@ -61,15 +61,30 @@ function joined(lines: RestNode[], key: string): RestNode {
   };
 }
 
+const RUN = /^([^~]*)(?:~(\d+))?/;
+
+const runOf = (key: string) => key.match(RUN)!;
+
+function runsOf(children: RestNode[]): Map<string, Set<string>> {
+  const runs = new Map<string, Set<string>>();
+  for (const key of children.flatMap((c) => (c.key ? [c.key] : []))) {
+    const [, element, run = ''] = runOf(key);
+    runs.set(element, (runs.get(element) ?? new Set()).add(run));
+  }
+  return runs;
+}
+
 function joinedLines(n: RestNode): RestNode {
   if (!n.children?.length) {
     return n;
   }
   const runs: RestNode[][] = [];
+  const elements = runsOf(n.children);
+  const alone = (para: string) => (elements.get(runOf(para)[1])?.size ?? 0) <= 1;
   for (const c of n.children.map(joinedLines)) {
     const last = runs[runs.length - 1];
     const para = paragraphOf(c);
-    if (para && last && paragraphOf(last[0]) === para) {
+    if (para && last && paragraphOf(last[0]) === para && alone(para)) {
       last.push(c);
       continue;
     }
