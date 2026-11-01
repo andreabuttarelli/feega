@@ -8,7 +8,7 @@ import { projectScopeOf } from '$lib/server/projects/project-scope';
 import { findNode } from '$lib/server/repos/canvas';
 import type { RequestHandler } from './$types';
 
-const askSchema = z.object({ canvasId: z.string().min(1), url: z.string().min(1).max(2000), x: z.number().finite(), y: z.number().finite(), extent: z.nativeEnum(PageExtent).default(PageExtent.Full), sections: z.boolean().default(true), tokens: z.boolean().default(true), breakpoints: z.boolean().default(false) });
+const askSchema = z.object({ canvasId: z.string().min(1), url: z.string().min(1).max(2000), x: z.number().finite(), y: z.number().finite(), extent: z.nativeEnum(PageExtent).default(PageExtent.Full), sections: z.boolean().default(true), tokens: z.boolean().default(true), breakpoints: z.boolean().default(true) });
 
 export const POST: RequestHandler = async (event) => {
   const scope = await projectScopeOf(event);

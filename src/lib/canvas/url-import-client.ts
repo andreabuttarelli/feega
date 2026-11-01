@@ -8,7 +8,7 @@ export async function importPage(ask: { projectId: string; canvasId: string; url
   const res = await fetchFn(`/api/v1/projects/${ask.projectId}/url-import`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ canvasId: ask.canvasId, url: ask.url, x: ask.at.x, y: ask.at.y, ...(ask.extent ? { extent: ask.extent } : {}), ...(ask.sections === false ? { sections: false } : {}), ...(ask.tokens === false ? { tokens: false } : {}), ...(ask.breakpoints ? { breakpoints: true } : {}) })
+    body: JSON.stringify({ canvasId: ask.canvasId, url: ask.url, x: ask.at.x, y: ask.at.y, ...(ask.extent ? { extent: ask.extent } : {}), ...(ask.sections === false ? { sections: false } : {}), ...(ask.tokens === false ? { tokens: false } : {}), ...(ask.breakpoints === false ? { breakpoints: false } : {}) })
   }).catch(() => null);
   if (!res?.ok) {
     const body = (await res?.json().catch(() => ({}))) as { error?: string } | undefined;

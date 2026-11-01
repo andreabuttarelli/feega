@@ -104,4 +104,14 @@ describe('POST /api/v1/projects/:id/url-import', () => {
 
     expect(importPageAt.mock.lastCall?.[0].maxHeight).toBeUndefined();
   });
+
+  it('reads the tablet and phone widths by default, and only the desktop with breakpoints false', async () => {
+    importPageAt.mockReset();
+    importPageAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Acme', undo: [], skipped: [], truncated: false });
+
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-views-on');
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0, breakpoints: false }, 'u-views-off');
+
+    expect(importPageAt.mock.calls.map((c) => c[0].views.map((v: { width: number }) => v.width))).toEqual([[768, 390], []]);
+  });
 });
