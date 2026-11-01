@@ -588,7 +588,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     const seen = (l: KitRect) => {
       const r = { x: l.left, y: l.top, width: l.right - l.left, height: l.bottom - l.top };
       const v = meet(r, ctx.clip);
-      return (v.width * v.height) / Math.max(1, r.width * r.height);
+      return v.width > 0 ? v.height / Math.max(1, r.height) : 0;
     };
     const kept = lines.filter((l) => seen(l) >= MOSTLY_SEEN && l.top < height);
     if (!kept.length) {

@@ -303,6 +303,26 @@ describe.runIf(process.env.CHROMIUM_PATH)('a line break the page hides at this w
   }, 30_000);
 });
 
+const SCROLLED_CODE = `<body style="margin:0"><pre style="margin:0;width:200px;overflow-x:auto;font:16px monospace">const browserJSX = translateForBrowser(originalJSX);
+console.log(browserJSX.type);</pre></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a code line that runs past its scrolling box', () => {
+  it('stays, cut by the box, not dropped (overreacted.io: the phone code blocks lost their long lines)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(SCROLLED_CODE);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).flatMap((n) => (n.type === 'TEXT' ? (n.characters ?? '').split('\n') : []))).toContain('const browserJSX = translateForBrowser(originalJSX);');
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
 const CLIPPED = `<body style="margin:0"><svg width="40" height="40" viewBox="0 0 20 20"><defs><clipPath id="c"><rect x="0" y="0" width="10" height="20"/></clipPath></defs><g clip-path="url(#c)"><circle cx="10" cy="10" r="8" fill="#e00"/></g></svg></body>`;
 
 describe.runIf(process.env.CHROMIUM_PATH)('an svg clipped by a rectangle', () => {
