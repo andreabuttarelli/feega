@@ -1,11 +1,11 @@
-import type { Browser, HTTPRequest, Page } from 'puppeteer-core';
+import type { Browser, CDPSession, HTTPRequest, Page } from 'puppeteer-core';
 import { RequestVerdict, requestVerdict } from './screenshot';
 import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
 import { OVERLAY_SELECTOR, type Overlay } from './overlays';
 import { SnapMode, TREE_LIMITS, treeScript, type PageSnap, type PageTree } from '$lib/server/url-import/page-tree';
 import { everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed, type Walk } from '$lib/server/url-import/page-reveal';
-import { snapped } from '$lib/server/url-import/page-snaps';
+import { snapped, type Shoot } from '$lib/server/url-import/page-snaps';
 import { componentMarksOf, MARK_LIMITS, type ComponentUse } from '$lib/server/code-import/component-marks';
 
 export type Target = { selector?: string; text?: string };
@@ -219,54 +219,122 @@ const SNAP_CSS: Record<SnapMode, (target: string) => string> = {
   [SnapMode.Backdrop]: (target) => `${hiddenWithin('')}${shown(target)}${hiddenWithin(`${target} `)}`
 };
 
-async function shotInView(page: Page, snap: PageSnap): Promise<Buffer> {
-  const { height } = page.viewport() ?? VIEWPORT;
-  const pieces: { input: Buffer; top: number; left: number }[] = [];
-  for (let top = snap.box.y; top < snap.box.y + snap.box.height; top += height) {
-    const piece = { x: snap.box.x, y: top, width: snap.box.width, height: Math.min(height, snap.box.y + snap.box.height - top) };
-    await page.evaluate((y) => window.scrollTo(0, y), top + piece.height <= height ? 0 : top);
-    pieces.push({ input: Buffer.from(await page.screenshot({ type: 'png', clip: piece, captureBeyondViewport: false, omitBackground: snap.mode !== SnapMode.Backdrop })), top: Math.round(top - snap.box.y), left: 0 });
-  }
-  await page.evaluate(() => window.scrollTo(0, 0));
-  if (pieces.length === 1) {
-    return pieces[0].input;
-  }
-  const { default: sharp } = await import('sharp');
-  const size = { width: Math.round(snap.box.width), height: Math.round(snap.box.height) };
-  return sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(pieces).png().toBuffer();
-}
+type SnapBox = PageSnap['box'];
+type Held = { target: string; picture: string; box: SnapBox };
+type SnapStage = { held: Held | null; style?: string | null; y: number; shot: { target: string; box: SnapBox } | null };
+type SnapView = { view: SnapBox; live: boolean };
+type Piece = { data: string; top: number };
 
-function heldOn(target: string, picture: string, box: PageSnap['box']): void {
+const SEE_THROUGH = { color: { r: 0, g: 0, b: 0, a: 0 } };
+
+function snapStaged(stage: SnapStage): SnapView {
   const LIVE = /^(CANVAS|VIDEO|IFRAME|EMBED|OBJECT)$/;
   const SAME_PX = 1;
-  const el = document.querySelector<HTMLElement>(target);
-  if (!el || !LIVE.test(el.tagName)) {
-    return;
+  const STYLE_ID = 'feega-snap-style';
+  const liveAt = (target: string, box: SnapBox) => {
+    const el = document.querySelector<HTMLElement>(target);
+    if (!el || !LIVE.test(el.tagName)) {
+      return null;
+    }
+    const r = el.getBoundingClientRect();
+    return Math.abs(r.width - box.width) <= SAME_PX && Math.abs(r.height - box.height) <= SAME_PX ? { el, r } : null;
+  };
+
+  const held = stage.held ? liveAt(stage.held.target, stage.held.box) : null;
+  if (held && stage.held) {
+    const still = document.createElement('img');
+    still.src = stage.held.picture;
+    still.className = held.el.className;
+    still.style.cssText = `${held.el.style.cssText};width:${held.r.width}px;height:${held.r.height}px;object-fit:fill`;
+    held.el.replaceWith(still);
   }
-  const r = el.getBoundingClientRect();
-  const whole = Math.abs(r.width - box.width) <= SAME_PX && Math.abs(r.height - box.height) <= SAME_PX;
-  if (!whole) {
-    return;
+
+  if (stage.style !== undefined) {
+    document.getElementById(STYLE_ID)?.remove();
   }
-  const still = document.createElement('img');
-  still.src = picture;
-  still.className = el.className;
-  still.style.cssText = `${el.style.cssText};width:${r.width}px;height:${r.height}px;object-fit:fill`;
-  el.replaceWith(still);
+  if (stage.style) {
+    const sheet = document.createElement('style');
+    sheet.id = STYLE_ID;
+    sheet.textContent = stage.style;
+    (document.head ?? document.documentElement).append(sheet);
+  }
+
+  window.scrollTo(0, stage.y);
+  const { pageLeft, pageTop, width, height } = window.visualViewport ?? { pageLeft: window.scrollX, pageTop: window.scrollY, width: innerWidth, height: innerHeight };
+  return { view: { x: pageLeft, y: pageTop, width, height }, live: stage.shot ? liveAt(stage.shot.target, stage.shot.box) !== null : false };
 }
 
-async function shoot(page: Page, snap: PageSnap): Promise<string | null> {
-  const target = `[${TREE_LIMITS.snapAttr}="${snap.ref}"]`;
-  const css = SNAP_CSS[snap.mode](target);
-  const style = css ? await page.addStyleTag({ content: css }) : null;
-  try {
-    const picture = `data:image/png;base64,${(await shotInView(page, snap)).toString('base64')}`;
-    await page.evaluate(heldOn, target, picture, snap.box).catch(() => undefined);
-    return picture;
-  } finally {
-    await style?.evaluate((el) => el.remove()).catch(() => undefined);
-    await style?.dispose();
+function rounded(box: SnapBox): SnapBox {
+  const x = Math.round(box.x);
+  const y = Math.round(box.y);
+  return { x, y, width: Math.round(box.width + box.x - x), height: Math.round(box.height + box.y - y) };
+}
+
+function seenIn(clip: SnapBox, view: SnapBox): SnapBox {
+  const x = Math.max(clip.x, view.x);
+  const y = Math.max(clip.y, view.y);
+  return { x, y, width: Math.max(Math.min(clip.x + clip.width, view.x + view.width) - x, 0), height: Math.max(Math.min(clip.y + clip.height, view.y + view.height) - y, 0) };
+}
+
+async function stitched(pieces: Piece[], box: SnapBox): Promise<string> {
+  if (pieces.length === 1) {
+    return pieces[0].data;
   }
+  const { default: sharp } = await import('sharp');
+  const size = { width: Math.round(box.width), height: Math.round(box.height) };
+  const layers = pieces.map((piece) => ({ input: Buffer.from(piece.data, 'base64'), top: piece.top, left: 0 }));
+  return (await sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(layers).png().toBuffer()).toString('base64');
+}
+
+function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
+  let session: Promise<CDPSession> | null = null;
+  let held: Held | null = null;
+  let seeThrough = false;
+  const cdp = () => (session ??= page.createCDPSession());
+
+  const shoot: Shoot = async (snap) => {
+    const target = `[${TREE_LIMITS.snapAttr}="${snap.ref}"]`;
+    const transparent = snap.mode !== SnapMode.Backdrop;
+    if (transparent !== seeThrough) {
+      await (await cdp()).send('Emulation.setDefaultBackgroundColorOverride', transparent ? SEE_THROUGH : {});
+      seeThrough = transparent;
+    }
+
+    const { height } = page.viewport() ?? VIEWPORT;
+    const pieces: Piece[] = [];
+    let live = false;
+    for (let top = snap.box.y; top < snap.box.y + snap.box.height; top += height) {
+      const piece = { x: snap.box.x, y: top, width: snap.box.width, height: Math.min(height, snap.box.y + snap.box.height - top) };
+      const first = pieces.length === 0;
+      const stage: SnapStage = first ? { held, style: SNAP_CSS[snap.mode](target), y: top + piece.height <= height ? 0 : top, shot: { target, box: snap.box } } : { held: null, y: top, shot: null };
+      const staged = await page.evaluate(snapStaged, stage);
+      if (first) {
+        held = null;
+        live = staged.live;
+      }
+      const { data } = await (await cdp()).send('Page.captureScreenshot', { format: 'png', clip: { ...seenIn(rounded(piece), staged.view), scale: 1 }, captureBeyondViewport: false });
+      pieces.push({ data, top: Math.round(top - snap.box.y) });
+    }
+
+    const picture = `data:image/png;base64,${await stitched(pieces, snap.box)}`;
+    held = live ? { target, picture, box: snap.box } : null;
+    return picture;
+  };
+
+  const done = async () => {
+    await page.evaluate(snapStaged, { held, style: null, y: 0, shot: null }).catch(() => undefined);
+    held = null;
+    if (!session) {
+      return;
+    }
+    const opened = await session;
+    if (seeThrough) {
+      await opened.send('Emulation.setDefaultBackgroundColorOverride', {}).catch(() => undefined);
+    }
+    await opened.detach().catch(() => undefined);
+  };
+
+  return { shoot, done };
 }
 
 function tabOf(page: Page, close: () => Promise<number>): AppTab {
@@ -309,7 +377,11 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     },
     ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
     vector: () => vectorOfPage(page),
-    tree: async (maxHeight = TREE_LIMITS.height) => snapped((await page.evaluate(treeScript({ ...TREE_LIMITS, height: maxHeight }))) as PageTree, (snap) => shoot(page, snap)),
+    tree: async (maxHeight = TREE_LIMITS.height) => {
+      const read = (await page.evaluate(treeScript({ ...TREE_LIMITS, height: maxHeight }))) as PageTree;
+      const lens = camera(page);
+      return snapped(read, lens.shoot).finally(lens.done);
+    },
     reveal: (mode) => page.evaluate(revealPage, mode),
     seeAll: async () => {
       await page.evaluateOnNewDocument(everythingInView);
