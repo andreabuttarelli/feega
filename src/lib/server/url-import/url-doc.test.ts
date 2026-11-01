@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { MotionClip } from '@feega/motion-core/motion/doc';
 import type { PageTree } from './page-tree';
 import type { PageOutline } from './page-outline';
+import { frameRows } from '$lib/canvas/layers';
 import { FULL_SHAPE, PLAIN_SHAPE, Sectioning, urlPlan } from './url-doc';
 
 const FIXTURES = ['linear', 'stripe', 'vercel'];
@@ -137,6 +138,37 @@ describe('urlPlan', () => {
 
     expect(made.components.components).toBeGreaterThan(0);
     expect(made.components.instances).toBeGreaterThan(0);
+  });
+
+  it.each(FIXTURES)('in %s ogni Precomp è un componente: un gruppo è un frame con misura e nome, che si apre col doppio clic', (name) => {
+    const doc = urlPlan(outlined(name), newId, undefined, {}, FULL_SHAPE)!.plan.items[0].doc;
+    const all = [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips) as MotionClip[];
+    const groups = all.filter((c) => c.component === 'Precomp' && !doc.comps[String(c.props.comp)]?.component);
+
+    expect(groups.map((c) => c.name)).toEqual([]);
+  });
+
+  it.each(FIXTURES)('nel pannello livelli di %s un bottone compare una volta, non istanza e poi il suo frame con lo stesso nome', (name) => {
+    const doc = urlPlan(outlined(name), newId, undefined, {}, FULL_SHAPE)!.plan.items[0].doc;
+    const rows = frameRows(doc, 'n1');
+    const doubled = rows.filter((row, i) => row.instance && rows[i + 1]?.depth === row.depth + 1 && rows[i + 1].label === row.label);
+
+    expect(doubled.map((row) => row.label)).toEqual([]);
+  });
+
+  it('un blocco senza aspetto e senza auto layout tiene i figli in un frame, non in un Precomp', () => {
+    const black = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }];
+    const label = (id: string, chars: string, y: number) => ({ id, type: 'TEXT', characters: chars, absoluteBoundingBox: { x: 20, y, width: 120, height: 24 }, fills: black, style: { fontFamily: 'Inter', fontSize: 20, fontWeight: 400 } });
+    const tree: PageTree = { title: 'Page', url: 'https://example.com', width: 400, height: 200, truncated: false, root: { id: '1', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 200 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], children: [{ id: '2', type: 'FRAME', name: 'Header', absoluteBoundingBox: { x: 20, y: 20, width: 200, height: 80 }, fills: [], children: [label('3', 'Agents', 20), label('4', 'Build agents', 30)] }, { id: '5', type: 'RECTANGLE', name: 'Glow', absoluteBoundingBox: { x: 0, y: 0, width: 300, height: 150 }, fills: black }] } };
+
+    const doc = urlPlan(tree, newId)!.plan.items[0].doc;
+    const clips = doc.tracks.flatMap((t) => t.clips) as MotionClip[];
+    const header = clips.find((c) => c.name === 'Header');
+
+    expect(clips.some((c) => c.component === 'Precomp')).toBe(false);
+    expect(header?.component).toBe('Shape');
+    expect(Number(header?.props.width)).toBeGreaterThan(0);
+    expect(clips.filter((c) => c.parent === header?.id).map((c) => c.props.text)).toEqual(['Agents', 'Build agents']);
   });
 
   it('un paragrafo che nella pagina va a capo resta largo come nella pagina', () => {

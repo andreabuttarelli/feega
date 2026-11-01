@@ -60,7 +60,7 @@
   import { ImageTool } from '$lib/image-tools';
   import type { FillOf, FillType } from '@feega/motion-core/motion/fill/model';
   import type { Fill } from '@feega/motion-core/motion/fill/model';
-  import { baseStyle, commitText, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
@@ -102,6 +102,8 @@
   import { stackPlaced } from '$lib/motion/layout/ops';
   import { dragInStack, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
+  import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
+  import { mul2d } from '@feega/motion-core/motion/parent';
   import { EditMode, startMode } from '$lib/motion/edit-mode';
   import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
   import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
@@ -920,17 +922,20 @@
     const deeper = framePickAt(world, picks);
     const id = hit.kind === HitKind.Node ? hit.nodeId : (deeper?.nodeId ?? null);
     const doc = id ? liveOf(id)?.doc : null;
-    const entered = id && deeper && doc && inside?.nodeId === id ? (enteredFrom(deeper.picker.chain(world, deeper.space), picks) ?? (deeper.clip ? childBelow(doc, deeper.clip, picks) : null)) : null;
+    const held = id && deeper && inside?.nodeId === id ? picks : [];
+    const chain = deeper && held.length ? deeper.picker.chain(world, deeper.space) : [];
+    const entered = doc && held.length ? (enteredFrom(chain, held) ?? (deeper?.clip ? childBelow(doc, deeper.clip, held) : null)) : null;
     if (id && entered) {
       pickMany(id, [entered]);
       return;
     }
     if (id && deeper?.clip) {
+      const target = doubledOn(chain, held, deeper.clip);
       select([id]);
-      goInside(id, Gesture.Double, deeper.clip);
+      goInside(id, Gesture.Double, target);
       if (editable) {
-        void startTyping(id, deeper.clip);
-        startCrop(id, deeper.clip);
+        void startTyping(id, target);
+        startCrop(id, target);
       }
       return;
     }
@@ -1952,18 +1957,20 @@
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
-    const found = doc ? findClip(doc, clip)?.clip : null;
+    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live)) : null;
+    const found = scope ? findClip(scope.view, scope.id)?.clip : null;
     const size = at?.picker.frameSize();
-    if (editedView(nodeId) || !saver || !at || !doc || !found || !size || !editsText(doc, clip)) {
+    if (editedView(nodeId) || !saver || !at || !doc || !scope || !found || !size || !editsText(scope.view, scope.id)) {
       return;
     }
-    const caret = await caretSource(() => at.live.tokens, () => at.live.assets)(doc, clip);
-    if (!caret || saver.history.present !== doc) {
+    const laid = await caretSource(() => at.live.tokens, () => at.live.assets)(scope.view, scope.id);
+    if (!laid || saver.history.present !== doc) {
       return;
     }
-    const look = textEditStyle({ clip: found as MotionClip, doc, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, doc, at.live.tokens) };
-    liveDocs.set(nodeId, { ...at.live, doc: hideText(doc, clip) });
+    const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
+    const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens) };
+    liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
   let typeOnArrival = $state<{ nodeId: string; clip: string | null } | null>(null);
@@ -2069,7 +2076,7 @@
     if (!open || !saver) {
       return;
     }
-    const result = commitText(saver.history.present, open.clip, text, runs, lists);
+    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }));
     liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
     if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs) || JSON.stringify(lists) !== JSON.stringify(open.lists))) {
       commit(open.nodeId, result, 'Edited text');
