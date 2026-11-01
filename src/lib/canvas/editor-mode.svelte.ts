@@ -40,8 +40,11 @@ export enum SoundEntries {
   Shown = 'shown'
 }
 
+type ModeAccent = { solid: string; light: string; dark: string };
+
 type ModeSpec = {
   label: string;
+  accent: ModeAccent;
   icon: Component;
   edit: EditMode;
   inspector: ModeInspector;
@@ -55,10 +58,10 @@ type ModeSpec = {
 };
 
 export const MODES: Record<EditorMode, ModeSpec> = {
-  [EditorMode.Design]: { label: 'Design', icon: PenTool, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Scrub, sounds: SoundEntries.Hidden },
-  [EditorMode.Motion]: { label: 'Motion', icon: Diamond, edit: EditMode.Motion, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Recording, timeline: TimelineAccess.Edit, sounds: SoundEntries.Shown },
-  [EditorMode.Play]: { label: 'Play', icon: Play, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden },
-  [EditorMode.Code]: { label: 'Code', icon: CodeXml, edit: EditMode.Design, access: DocAccess.Read, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden }
+  [EditorMode.Design]: { label: 'Design', accent: { solid: '#0b6bcb', light: '#0b6bcb', dark: '#3ab0ff' }, icon: PenTool, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Motion, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Scrub, sounds: SoundEntries.Hidden },
+  [EditorMode.Motion]: { label: 'Motion', accent: { solid: '#c42b1c', light: '#c42b1c', dark: '#ff7366' }, icon: Diamond, edit: EditMode.Motion, access: DocAccess.Write, inspector: ModeInspector.Properties, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Recording, timeline: TimelineAccess.Edit, sounds: SoundEntries.Shown },
+  [EditorMode.Play]: { label: 'Play', accent: { solid: '#1a7f37', light: '#1a7f37', dark: '#3fb950' }, icon: Play, edit: EditMode.Design, access: DocAccess.Write, inspector: ModeInspector.Play, lines: CanvasLines.Prototype, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Code, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden },
+  [EditorMode.Code]: { label: 'Code', accent: { solid: '#9a6700', light: '#9a6700', dark: '#e3b341' }, icon: CodeXml, edit: EditMode.Design, access: DocAccess.Read, inspector: ModeInspector.Code, lines: CanvasLines.Nodes, onMotionKey: EditorMode.Design, onCodeKey: EditorMode.Design, chrome: ModeChrome.Plain, timeline: TimelineAccess.Hidden, sounds: SoundEntries.Hidden }
 };
 
 const FRAME_TIMELINE: Record<TimelineAccess, (kindHasTimeline: boolean, mode: EditMode) => boolean> = {
@@ -68,6 +71,22 @@ const FRAME_TIMELINE: Record<TimelineAccess, (kindHasTimeline: boolean, mode: Ed
 };
 
 export const frameTimeline = (access: TimelineAccess, kindHasTimeline: boolean, mode: EditMode): TimelineAccess => (FRAME_TIMELINE[access](kindHasTimeline, mode) ? access : TimelineAccess.Hidden);
+
+export const accentTokens = (mode: EditorMode): Record<string, string> => ({
+  '--ui-mode-solid': MODES[mode].accent.solid,
+  '--ui-mode-text-light': MODES[mode].accent.light,
+  '--ui-mode-text-dark': MODES[mode].accent.dark
+});
+
+function paint(mode: EditorMode): void {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  for (const [name, value] of Object.entries(accentTokens(mode))) {
+    document.documentElement.style.setProperty(name, value);
+  }
+}
 
 export const EDITOR_MODE_KEY = 'feega.editor-mode';
 
@@ -97,6 +116,7 @@ export class EditorModeState {
 
   constructor(private readonly store: ModeStore | null) {
     this.current = readEditorMode(recalled(store));
+    paint(this.current);
   }
 
   get spec(): ModeSpec {
@@ -105,6 +125,7 @@ export class EditorModeState {
 
   set(mode: EditorMode) {
     this.current = mode;
+    paint(mode);
     remember(this.store, mode);
   }
 

@@ -1,5 +1,23 @@
 @import './lib/styles/safe-area.css';
 @import './lib/styles/desktop-window.css';
+@property --ui-mode-solid {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0b6bcb;
+}
+
+@property --ui-mode-text-light {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0b6bcb;
+}
+
+@property --ui-mode-text-dark {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #3ab0ff;
+}
+
 /* ============================================================
    feega — shared app shell + components.
    This is the design system for the product surface. When this
@@ -95,6 +113,7 @@
 }
 
 :root {
+  transition: --ui-mode-solid 150ms var(--ease-expo-out), --ui-mode-text-light 150ms var(--ease-expo-out), --ui-mode-text-dark 150ms var(--ease-expo-out);
   --ink:        #1d1d1f;
   --ink-soft:   #6e6e73;
   --ink-faint:  #86868b;
@@ -208,7 +227,7 @@
   --link-pending: var(--ui-warn);
   --ui-wire-iterate: var(--ui-warn);
   --link-down: var(--ui-danger);
-  --playhead: #ff3b30;
+  --playhead: var(--ui-mode-solid);
   --ui-bar-h: 48px;
   --ui-bar-h-dense: 44px;
   --ui-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -229,7 +248,7 @@
   --ui-space-8: 32px;
   --ui-icon: 16px;
   --ui-icon-sm: 14px;
-  --ui-focus: 0 0 0 2px var(--ui-bg), 0 0 0 3px var(--ui-accent);
+  --ui-focus: 0 0 0 2px var(--ui-bg), 0 0 0 3px var(--ui-mode-solid);
   --grey-0: #ffffff;
   --grey-1: #f9f9f9;
   --grey-2: #f2f2f2;
@@ -260,13 +279,13 @@
   --ui-text-tertiary: var(--grey-9);
   --ui-text-disabled: var(--grey-7);
   --ui-icon-ink: var(--grey-10);
-  --ui-accent-solid: #0b6bcb;
-  --ui-accent-text: #0b6bcb;
+  --ui-accent-solid: var(--ui-mode-solid);
+  --ui-accent-text: var(--ui-mode-text-light);
   --ui-on-accent: #ffffff;
-  --ui-selected: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  --ui-selected: color-mix(in srgb, var(--ui-mode-solid) 12%, transparent);
   --ui-shadow-raised: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px -6px rgb(0 0 0 / 0.14);
   --ui-shadow-float: 0 0 0 1px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.06), 0 12px 32px -8px rgb(0 0 0 / 0.18);
-  --ui-ring: 0 0 0 2px var(--ui-accent);
+  --ui-ring: 0 0 0 2px var(--ui-mode-solid);
   --ui-radius-none: 0px;
   --ui-radius-xs: 2px;
   --ui-radius-sm: 4px;
@@ -378,8 +397,8 @@
   --ui-text-tertiary: var(--grey-9);
   --ui-text-disabled: var(--grey-7);
   --ui-icon-ink: var(--grey-10);
-  --ui-accent-text: #3ab0ff;
-  --ui-selected: color-mix(in srgb, var(--ui-accent) 22%, transparent);
+  --ui-accent-text: var(--ui-mode-text-dark);
+  --ui-selected: color-mix(in srgb, var(--ui-mode-solid) 22%, transparent);
   --ui-shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.06), 0 8px 24px -6px rgb(0 0 0 / 0.6);
   --ui-shadow-float: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
   --ui-tooltip: var(--grey-6);

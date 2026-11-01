@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditMode } from '$lib/motion/edit-mode';
 import { DocAccess } from '$lib/motion/frame-edit-session.svelte';
-import { CanvasLines, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeChrome, ModeInspector, MODES, SoundEntries, frameTimeline, readEditorMode, TimelineAccess } from './editor-mode.svelte';
+import { CanvasLines, accentTokens, EDITOR_MODE_KEY, EditorMode, EditorModeState, ModeChrome, ModeInspector, MODES, SoundEntries, frameTimeline, readEditorMode, TimelineAccess } from './editor-mode.svelte';
 
 class MemoryStore {
   kept = new Map<string, string>();
@@ -116,5 +116,22 @@ describe('editor mode', () => {
     expect(frameTimeline(TimelineAccess.Edit, true, EditMode.Motion)).toBe(TimelineAccess.Edit);
     expect(frameTimeline(TimelineAccess.Scrub, true, EditMode.Design)).toBe(TimelineAccess.Scrub);
     expect(frameTimeline(TimelineAccess.Scrub, false, EditMode.Design)).toBe(TimelineAccess.Hidden);
+  });
+});
+
+describe('the mode accent', () => {
+  it('every mode paints its own chrome tokens from the table', () => {
+    for (const mode of Object.values(EditorMode)) {
+      expect(accentTokens(mode)).toEqual({
+        '--ui-mode-solid': MODES[mode].accent.solid,
+        '--ui-mode-text-light': MODES[mode].accent.light,
+        '--ui-mode-text-dark': MODES[mode].accent.dark
+      });
+    }
+  });
+
+  it('no two modes share an accent', () => {
+    const solids = Object.values(EditorMode).map((m) => MODES[m].accent.solid);
+    expect(new Set(solids).size).toBe(solids.length);
   });
 });
