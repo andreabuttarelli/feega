@@ -185,6 +185,7 @@ export async function inViewSampled(walk: Walk = { steps: 0, stepPx: 0, pauseMs:
   const STYLED = PROPS.map((p) => `[style*="${p}"]`).join(', ');
   const GAIN = 0.01;
   const IN_VIEW = 0.5;
+  const FRAME_WAIT_MS = 100;
   const state = window as StillWindow;
   const seen = (state.__feegaInView ??= new Map());
 
@@ -238,6 +239,10 @@ export async function inViewSampled(walk: Walk = { steps: 0, stepPx: 0, pauseMs:
   for (let step = 0; step < walk.steps; step++) {
     window.scrollBy(0, walk.stepPx);
     await new Promise((done) => setTimeout(done, walk.pauseMs));
+    await new Promise((done) => {
+      requestAnimationFrame(done);
+      setTimeout(done, FRAME_WAIT_MS);
+    });
     sampled();
   }
   return seen.size;
