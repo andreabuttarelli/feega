@@ -419,11 +419,8 @@ function animatorsAt(clip: MotionClip, frame: number, colour: (v: string) => str
 
 const GROUP_COMPONENT = 'Precomp';
 
-function contentCut(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, size: Size, frame: number): MaskLayer | null {
-  const chain = ancestorsOf(doc, clip.id).flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
-  const host = chain.findLastIndex((c) => c.component === GROUP_COMPONENT);
-  const inside = chain.slice(host + 1);
-  const boxes = inside.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, size));
+function cutOf(level: MotionClip[], size: Size, matrix: Affine): MaskLayer | null {
+  const boxes = level.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, size));
   if (!boxes.length || boxes.some((b) => !b)) {
     return null;
   }
@@ -431,7 +428,18 @@ function contentCut(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionCl
   const top = Math.max(...boxes.map((b) => b!.top));
   const right = Math.min(...boxes.map((b) => b!.left + b!.width));
   const bottom = Math.min(...boxes.map((b) => b!.top + b!.height));
-  return { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[left, top, right, top, right, bottom, left, bottom]], matrix: host < 0 ? IDENTITY : worldAt(doc, chain[host].id, frame, size) } };
+  return { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[left, top, right, top, right, bottom, left, bottom]], matrix } };
+}
+
+function contentCuts(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, size: Size, frame: number): MaskLayer[] {
+  const chain = ancestorsOf(doc, clip.id).flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  const hosts = chain.flatMap((c, at) => (c.component === GROUP_COMPONENT ? [at] : []));
+  const starts = [-1, ...hosts];
+  return starts.flatMap((host, i) => {
+    const level = chain.slice(host + 1, starts[i + 1] ?? chain.length);
+    const cut = cutOf(level, size, host < 0 ? IDENTITY : worldAt(doc, chain[host].id, frame, size));
+    return cut ? [cut] : [];
+  });
 }
 
 function enclosingGroups(doc: MotionDoc): Map<string, string[]> {
@@ -548,8 +556,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     }
     const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));
     const own = maskLayers(clip, frame, size, world, asset);
-    const cut = contentCut(doc, clip, byId, size, frame);
-    const masks = own && cut ? [...own, cut] : own;
+    const cuts = contentCuts(doc, clip, byId, size, frame);
+    const masks = own && cuts.length ? [...own, ...cuts] : own;
     const found = filtersOf(clip, frame, doc.fps, size, css);
     if (typeof found === 'string') {
       return found;

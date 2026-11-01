@@ -127,6 +127,14 @@ describe('content clipped by a parent', () => {
     expect(card(patch(wide, 'frame', { clipContent: false }))?.masks).toBeUndefined();
   });
 
+  it('cuts a group by the parent that clips it, as the HTML render cuts the group layer', () => {
+    let n = 0;
+    const grouped = patch(must(groupClips(wide, ['card'], () => (n++ === 0 ? 'inner' : 'group'))), 'group', { parent: 'frame' });
+    const drawn = displayListAt(grouped, 0, FEEGA_TOKENS).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip.endsWith('card'));
+
+    expect(drawn?.masks?.map((m) => extentOf(m.cover))).toEqual([[480, 270, 1440, 810]]);
+  });
+
   it('moves the cut with the group it is in, as an instance placed elsewhere on the page', () => {
     let n = 0;
     const grouped = must(groupClips(wide, ['frame', 'card'], () => (n++ === 0 ? 'inner' : 'group')));
