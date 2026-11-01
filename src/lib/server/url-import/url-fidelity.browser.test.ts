@@ -11,7 +11,7 @@ import type { PlanItem } from '$lib/canvas/figma/figma-doc';
 import type { PageTree } from './page-tree';
 import { PAGE_VIEWS, type PageView, type ViewRead } from './page-views';
 import { capturedIn, scoredIn } from './fidelity-pages';
-import { band, FOLD, plannedPage, scores, sideBySide, stacked } from './fidelity-score';
+import { band, FOLD, harnessShape, plannedPage, scores, sideBySide, stacked } from './fidelity-score';
 
 const LABEL = process.env.URL_IMPORT_FIDELITY ?? '';
 const ONLY = process.env.URL_IMPORT_ONLY?.split(',');
@@ -40,7 +40,7 @@ describe.runIf(LABEL && names.length)('an imported page painted again looks like
   it.each(names)('%s', async (name) => {
     const tree = JSON.parse(readFileSync(join(captured, `${name}.json`), 'utf8')) as PageTree;
     const views = viewsOf(name);
-    const { made, assetOf, assets } = await plannedPage(tree, views);
+    const { made, assetOf, assets } = await plannedPage(tree, views, harnessShape());
     const parts: { png: Buffer; height: number }[] = [];
     for (const item of made.plan.items) {
       parts.push({ png: await drawStill(chromiumFrames, { doc: imagesFilled(item.doc, item.images, assetOf), tokens: FEEGA_TOKENS, assets }, atWidth(FOLD.width, item.doc)), height: item.size.height });

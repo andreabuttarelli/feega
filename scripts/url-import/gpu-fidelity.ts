@@ -12,7 +12,7 @@ import { imagesFilled } from '$lib/canvas/figma/images';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import { PAGE_VIEWS, type PageView, type ViewRead } from '$lib/server/url-import/page-views';
 import { capturedIn, scoredIn } from '$lib/server/url-import/fidelity-pages';
-import { band, FOLD, plannedPage, scores, sideBySide } from '$lib/server/url-import/fidelity-score';
+import { band, FOLD, harnessShape, plannedPage, scores, sideBySide } from '$lib/server/url-import/fidelity-score';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { GpuBackend, type WorldInput, type WorldResult } from './gpu-world';
 
@@ -168,7 +168,7 @@ const viewDocs = (docs: { doc: MotionDoc; width: number }[], view: PageView) =>
 for (const name of names) {
   const tree = JSON.parse(readFileSync(join(captured, `${name}.json`), 'utf8')) as PageTree;
   const views = viewsOf(name);
-  const { made, assetOf, assets } = await plannedPage(tree, views);
+  const { made, assetOf, assets } = await plannedPage(tree, views, harnessShape());
   const local = Object.fromEntries(await Promise.all(Object.entries(assets).map(async ([id, url]) => [id, await served(url, tree.url)] as const)).then((all) => all.map(([id, url]) => [id, url.startsWith('/') ? `${server.origin}${url}` : url])));
   const docs = made.plan.items.map((item) => ({ doc: imagesFilled(item.doc, item.images, assetOf), ...item.size }));
   await gpuScored(name, docs, local, FOLD.width);
