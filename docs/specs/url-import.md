@@ -130,6 +130,10 @@ block is comes from one table, `KINDS` in `component-kinds.ts` (first matching r
   and generic items never nest; a block with its parent's box is not a second component.
 - Occurrences become `INSTANCE` nodes whose `componentId` is the first copy; that copy is the main, placed
   where it was. A main nested in another set's main is homed on its own set frame (`setHomes`).
+- Set frames get a `Background` rect (`SET_BACKDROP`, which `setMainOf` accepts): the most used
+  backdrop of their mains, found by `main-backdrop.ts` walking up from the clip that places the main
+  (through the comps that hold it) to the first opaque solid fill, with its variable binding; a main
+  on another backdrop gets its own rect behind it, its box plus half the set gap.
 - Figma scene: an instance builds its own layers at the main's position and diffs them with the main
   (`instance-diff.ts`). Differences on any clip become overrides (text, fills, geometry, auto layout,
   layout item); inside nested groups they are path overrides. Images that differ on top-level clips
