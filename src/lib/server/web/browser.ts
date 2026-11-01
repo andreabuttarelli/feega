@@ -252,11 +252,12 @@ const SNAP_CSS: Record<SnapMode, (target: string) => string> = {
 type SnapBox = PageSnap['box'];
 type Held = { target: string; picture: string; box: SnapBox };
 type SnapStage = { held: Held | null; style?: string | null; y: number; shot: { target: string; box: SnapBox } | null };
-type Piece = { data: string; top: number };
+type SnapView = { live: boolean; scrolled: number };
+type Piece = { data: Buffer; top: number };
 
 const SEE_THROUGH = { color: { r: 0, g: 0, b: 0, a: 0 } };
 
-function snapStaged(stage: SnapStage): boolean {
+function snapStaged(stage: SnapStage): SnapView {
   const LIVE = /^(CANVAS|VIDEO|IFRAME|EMBED|OBJECT)$/;
   const SAME_PX = 1;
   const STYLE_ID = 'feega-snap-style';
@@ -289,16 +290,27 @@ function snapStaged(stage: SnapStage): boolean {
   }
 
   window.scrollTo(0, stage.y);
-  return stage.shot ? liveAt(stage.shot.target, stage.shot.box) !== null : false;
+  return { live: stage.shot ? liveAt(stage.shot.target, stage.shot.box) !== null : false, scrolled: window.scrollY };
+}
+
+async function cropped(viewport: Uint8Array, piece: SnapBox, scrolled: number): Promise<Buffer> {
+  const { default: sharp } = await import('sharp');
+  const shot = sharp(viewport);
+  const { width = 0, height = 0 } = await shot.metadata();
+  const left = Math.max(0, Math.round(piece.x));
+  const top = Math.max(0, Math.round(piece.y - scrolled));
+  const right = Math.min(width, Math.round(piece.x + piece.width));
+  const bottom = Math.min(height, Math.round(piece.y - scrolled + piece.height));
+  return shot.extract({ left, top, width: right - left, height: bottom - top }).png().toBuffer();
 }
 
 async function stitched(pieces: Piece[], box: SnapBox): Promise<string> {
   if (pieces.length === 1) {
-    return pieces[0].data;
+    return pieces[0].data.toString('base64');
   }
   const { default: sharp } = await import('sharp');
   const size = { width: Math.round(box.width), height: Math.round(box.height) };
-  const layers = pieces.map((piece) => ({ input: Buffer.from(piece.data, 'base64'), top: piece.top, left: 0 }));
+  const layers = pieces.map((piece) => ({ input: piece.data, top: piece.top, left: 0 }));
   return (await sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(layers).png().toBuffer()).toString('base64');
 }
 
@@ -323,9 +335,10 @@ function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
       const piece = { x: snap.box.x, y: top, width: snap.box.width, height: Math.min(height, snap.box.y + snap.box.height - top) };
       const first = pieces.length === 0;
       const stage: SnapStage = first ? { held, style: SNAP_CSS[snap.mode](target), y: top + piece.height <= height ? 0 : top, shot: { target, box: snap.box } } : { held: null, y: top, shot: null };
-      live ||= await page.evaluate(snapStaged, stage);
+      const view = await page.evaluate(snapStaged, stage);
+      live ||= view.live;
       held = null;
-      const data = Buffer.from(await page.screenshot({ type: 'png', clip: piece, captureBeyondViewport: false })).toString('base64');
+      const data = await cropped(await page.screenshot({ type: 'png', optimizeForSpeed: true }), piece, view.scrolled);
       pieces.push({ data, top: Math.round(top - snap.box.y) });
     }
 

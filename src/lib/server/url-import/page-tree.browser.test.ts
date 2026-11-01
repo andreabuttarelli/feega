@@ -284,7 +284,7 @@ describe.runIf(process.env.CHROMIUM_PATH)('a canvas that keeps drawing after it 
 
 const CANVASES = 8;
 const MANY_PICTURES = `<body style="margin:0;background:#fff">${Array.from({ length: CANVASES }, (_, i) => `<canvas width="100" height="100" style="display:block;width:100px;height:100px;margin-bottom:${i * 150}px"></canvas>`).join('')}<script>for (const canvas of document.querySelectorAll('canvas')) { const c = canvas.getContext('2d'); c.fillStyle = '#0a0'; c.fillRect(0, 0, 100, 100); }</script></body>`;
-const ROUND_TRIPS_PER_PICTURE = 3;
+const ROUND_TRIPS_PER_PICTURE = 2;
 const ROUND_TRIPS_AROUND = 6;
 
 async function counted(endpoint: string): Promise<{ transport: ConnectionTransport; sent: () => number }> {
