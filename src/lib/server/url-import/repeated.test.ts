@@ -218,5 +218,14 @@ describe('repeatedOf', () => {
 
     expect(root.children!.map((c) => c.name)).toEqual(['Logo / Variant=Notion', 'Logo', 'Logo / Variant=Zapier', 'Logo']);
   });
+
+  it('a wrapper of the same box around an icon is not the component, the icon is (linear: an Icon instance held a frame named Icon)', () => {
+    const glyph = (x: number): RestNode => ({ id: id(), type: 'GROUP', name: 'icon', absoluteBoundingBox: { x, y: 600, width: 20, height: 20 }, children: [{ id: id(), type: 'VECTOR', absoluteBoundingBox: { x, y: 600, width: 20, height: 20 }, fills: [{ type: 'SOLID', color: BLACK }] }] });
+    const wrapped = (x: number): RestNode => ({ id: id(), type: 'FRAME', name: 'span', absoluteBoundingBox: { x, y: 600, width: 20, height: 20 }, fills: [], children: [glyph(x)] });
+    const { root } = repeatedOf(page([wrapped(0), wrapped(40)]));
+
+    expect(root.children!.map((c) => c.type)).toEqual(['FRAME', 'FRAME']);
+    expect(root.children!.map((c) => c.children![0].type)).toEqual(['INSTANCE', 'INSTANCE']);
+  });
 });
 

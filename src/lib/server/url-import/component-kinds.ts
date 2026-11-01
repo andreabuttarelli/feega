@@ -35,6 +35,7 @@ export type Facts = {
   links: number;
   images: number;
   vectors: number;
+  drawing: boolean;
   priced: boolean;
   periodic: boolean;
   quoted: boolean;
@@ -164,7 +165,7 @@ export const KINDS: Kind[] = [
   molecule({ name: 'Testimonial', when: (f) => (QUOTE_HINTS.has(f.hint) || f.quoted) && f.texts >= 2 && bounded(f), alone: always }),
   molecule({ name: 'Footer column', when: (f) => f.landmark === 'footer' && f.links >= MIN_LINKS && f.width <= COLUMN_MAX_WIDTH, alone: always, paintless: true, props: [Prop.Items] }),
   kind({ name: 'Logo', when: (f) => logoLike(f) && logoNamed(f), alone: always, leaf: true, props: [] }),
-  kind({ name: 'Icon', when: (f) => iconOnly(f) && f.width <= ICON_SIDE && f.height <= ICON_SIDE, nests: false, props: [] }),
+  kind({ name: 'Icon', when: (f) => iconOnly(f) && f.drawing && f.width <= ICON_SIDE && f.height <= ICON_SIDE, nests: false, props: [] }),
   kind({ name: 'Logo', when: logoLike, props: [] }),
   molecule({ name: 'Feature tile', when: (f) => (FEATURE_HINTS.has(f.hint) || (f.vectors > 0 && !f.images)) && f.texts >= 2, alone: boxed }),
   molecule({ name: 'Card', when: (f) => f.hint === 'card' || (f.images > 0 && f.texts > 0) || f.texts >= 2, alone: (f) => boxed(f) && f.texts >= 2 }),
@@ -208,6 +209,7 @@ export function factsOf(n: RestNode, kids: Facts[], pageWidth: number): Facts {
     links: dom?.press === LINK ? 1 : sum('links'),
     images: sum('images') + (n.fills?.some((p) => p.type === 'IMAGE') ? 1 : 0),
     vectors: sum('vectors') + (VECTOR_TYPES.has(n.type) ? 1 : 0),
+    drawing: Boolean(n.children?.length) && n.children!.every((c) => VECTOR_TYPES.has(c.type)),
     priced: kids.some((k) => k.priced) || PRICE.test(text),
     periodic: kids.some((k) => k.periodic) || PERIOD.test(text),
     quoted: kids.some((k) => k.quoted) || QUOTE_TAGS.has(n.dom?.tag ?? '') || (QUOTE_MARK.test(text) && text.length >= QUOTE_CHARS),

@@ -77,6 +77,7 @@ function treeOf(root: RestNode): Tree {
   const seen: Seen[] = [];
   const parent = new Map<string, string>();
   const byId = new Map<string, RestNode>();
+  const picked = new Set<string>();
   const pageWidth = root.absoluteBoundingBox?.width ?? 0;
   let order = 0;
   const visit = (n: RestNode): { skeleton: string; parts: number; facts: Facts } => {
@@ -90,7 +91,10 @@ function treeOf(root: RestNode): Tree {
     const parts = 1 + kids.reduce((sum, k) => sum + k.parts, 0);
     const facts = factsOf(n, kids.map((k) => k.facts), pageWidth);
     const kind = kindOf(facts);
-    if (n !== root && candidate(n, parts, facts, kind)) {
+    const only = n.children?.length === 1 ? n.children[0] : undefined;
+    const wraps = only !== undefined && picked.has(only.id) && sameBox(n, only);
+    if (n !== root && !wraps && candidate(n, parts, facts, kind)) {
+      picked.add(n.id);
       seen.push({ node: n, order: at, skeleton: `${kind.name}|${skeleton}`, parts, style: STYLES[kind.level](n, facts), size: facts.height, facts, kind });
     }
     return { skeleton, parts, facts };
