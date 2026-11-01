@@ -11,7 +11,6 @@ const ZOOMS = [1, 2] as const;
 const SECOND_LINE = 'Two';
 const TINY_DRAG_PX = 5;
 const SETTLE_MS = 2500;
-const GLYPH_INSET_PX = { x: 15, y: 11 };
 const ONE_LINE_RATIO = 3;
 const SLACK_PX = 4;
 
@@ -153,11 +152,6 @@ test.describe('every new text is auto width @real', () => {
       await pickBarTool(page, 'text');
       const at = { x: stage.x + stage.width * 0.05, y: stage.y + stage.height * 0.4 };
       await page.mouse.click(at.x, at.y);
-      await page.waitForTimeout(SETTLE_MS);
-      const field = page.getByTestId('core-text-edit');
-      if (!(await field.count())) {
-        await page.mouse.dblclick(at.x + GLYPH_INSET_PX.x, at.y + GLYPH_INSET_PX.y);
-      }
       await expectAutoWidth(page, admin, session, `frame-z${zoom}`);
     });
   }
