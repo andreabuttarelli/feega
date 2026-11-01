@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { everyClip } from '@feega/motion-core/motion/doc';
 import { Ease } from '@feega/motion-core/motion/design';
-import { ElementState } from '@feega/motion-core/motion/states/model';
+import { ElementState, type StateRow } from '@feega/motion-core/motion/states/model';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 import { FULL_SHAPE, PLAIN_SHAPE, urlPlan } from './url-doc';
@@ -31,7 +31,7 @@ const clipsOfPlan = (tree: PageTree) => everyClip(urlPlan(tree, newId, (root) =>
 
 describe('a page node carries its behaviour into the clip it becomes', () => {
   it('a hover read from the page lands on the layer as an element state', () => {
-    const hover = { state: ElementState.Hover, overrides: { fill: '#003399' }, transition: { easing: Ease.Standard, durationMs: 150 } };
+    const hover: StateRow = { state: ElementState.Hover, overrides: { fill: '#003399' }, transition: { easing: Ease.Standard, durationMs: 150 } };
     const clips = clipsOfPlan(page([button({ states: [hover] })]));
 
     expect(clips.filter((c) => c.states?.length).map((c) => c.states)).toEqual([[hover]]);
