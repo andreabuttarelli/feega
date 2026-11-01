@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
+import type { RestNode } from '$lib/server/figma/rest-message';
 import { compBox } from '$lib/motion/comp-frame';
 import { SET_GAP_PX, addSetVariant } from '$lib/motion/component-set';
 import type { PageOutline } from './page-outline';
@@ -72,3 +73,24 @@ describe('a variant added to an imported set keeps its distance', () => {
     }
   });
 });
+
+const solid = (r: number, g: number, b: number) => [{ type: 'SOLID', color: { r, g, b, a: 1 } }];
+const label = (id: string, characters: string, x: number, y: number): RestNode => ({ id, type: 'TEXT', characters, absoluteBoundingBox: { x, y, width: 60, height: 20 }, fills: solid(0, 0, 0), style: { fontFamily: 'Inter', fontSize: 14, fontWeight: 500 } });
+const button = (id: string, main: string, x: number): RestNode => ({ id, type: 'INSTANCE', name: 'Button', componentId: main, absoluteBoundingBox: { x, y: 140, width: 100, height: 40 }, fills: solid(0.1, 0.3, 0.9), cornerRadius: 6, children: [label(`${id}t`, 'Go', x + 20, 150)] });
+const card = (id: string, x: number): RestNode => ({ id, type: 'INSTANCE', name: 'Card', componentId: 'k1', absoluteBoundingBox: { x, y: 40, width: 200, height: 160 }, fills: solid(0.9, 0.9, 0.9), cornerRadius: 8, children: [label(`${id}t`, 'Title', x + 10, 50), button(`${id}b`, 'k1b', x + 10)] });
+const nested = (): PageTree => ({ title: 'Nested', url: 'https://example.com', width: 600, height: 240, truncated: false, root: { id: 'root', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 600, height: 240 }, fills: solid(1, 1, 1), children: [card('k1', 40), card('k2', 300)] } });
+
+const nestedPlan = () => {
+  let n = 0;
+  return urlPlan(nested(), () => `id${++n}`, (root) => root, {}, FULL_SHAPE)!;
+};
+
+describe('a button main given hover and pressed states', () => {
+  it('names its set Button, not after the id of its main', () => {
+    const made = nestedPlan();
+
+    expect(made.sets.map((s) => s.name).sort()).toEqual(['Button', 'Card']);
+    expect(Object.values(made.plan.items[0].doc.comps).flatMap((c) => c.component?.set ?? [])).toEqual(['Button', 'Button', 'Button']);
+  });
+});
+

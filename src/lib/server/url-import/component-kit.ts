@@ -114,7 +114,7 @@ function withStates(doc: MotionDoc, compId: string, site: string, newId: NewId):
   for (const state of STATES) {
     vars[stateName(painted.name, state)] ??= { type: collection.vars[painted.name].type, values: { [DEFAULT_MODE]: stateShade(painted.hex, state) } };
   }
-  const set = comp.component!.set ?? compId;
+  const set = comp.component!.set ?? comp.component!.name;
   const base = { ...comp.component!.variant, [STATE_PROP]: DEFAULT_VARIANT };
   const comps: MotionDoc['comps'] = { ...doc.comps, [compId]: { ...comp, component: { ...comp.component!, set, variant: base } } };
   for (const state of STATES) {
