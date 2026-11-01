@@ -158,10 +158,11 @@ async function gpuScored(name: string, docs: { doc: MotionDoc; width: number; he
   console.log(row);
 }
 
-const viewDocs = (docs: { doc: MotionDoc }[], view: PageView) =>
-  docs.map(({ doc }) => {
+const viewDocs = (docs: { doc: MotionDoc; width: number }[], view: PageView) =>
+  docs.map(({ doc, width }) => {
     const seen = resolveView(doc, view.id);
-    return { doc: seen, width: view.width, height: Math.round((seen.height * view.width) / seen.width) };
+    const pxPerUnit = width / doc.width;
+    return { doc: seen, width: Math.min(view.width, Math.round(seen.width * pxPerUnit)), height: Math.round(seen.height * pxPerUnit) };
   });
 
 for (const name of names) {
