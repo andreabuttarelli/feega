@@ -173,6 +173,8 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
+  import { restoreViewport } from '$lib/canvas/restore-viewport';
+  import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
@@ -239,7 +241,7 @@
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { dragAngle, followGroup } from '$lib/canvas/node-layout';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -320,6 +322,7 @@
   let gesturing = $state(false);
   let resizing = $state<ReadonlySet<string>>(new Set());
   let fitted = false;
+  let fittedCanvas = '';
   let known = new Set<string>();
 
   const assetUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, AssetSize.Full);
@@ -630,14 +633,28 @@
     if (gone.length) {
       select(selected.filter((id) => known.has(id)));
     }
-    if (fitted) {
+    const canvasId = page.params.canvasId ?? '';
+    if (fitted && fittedCanvas === canvasId) {
       return;
     }
     fitted = true;
-    if (incoming.length) {
-      fitTo(incoming);
-    }
+    fittedCanvas = canvasId;
+    cancelAnimationFrame(tween);
+    const saved = props.viewerId ? loadViewport(props.viewerId, canvasId) : null;
+    const s = screenSize();
+    view = restoreViewport(saved, boundsOf(incoming), { width: s.width, height: s.height });
   }
+
+  const REMEMBER_VIEW_MS = 400;
+  $effect(() => {
+    const at = view;
+    const who = props.viewerId;
+    if (!who || !fitted) {
+      return;
+    }
+    const timer = setTimeout(() => rememberViewport(who, untrack(() => page.params.canvasId ?? ''), at), REMEMBER_VIEW_MS);
+    return () => clearTimeout(timer);
+  });
 
   let reported = '';
   function select(ids: string[]) {
