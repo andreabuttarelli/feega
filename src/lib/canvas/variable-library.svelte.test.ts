@@ -96,4 +96,14 @@ describe('the project variables library', () => {
 
     expect(sent).toEqual([{ op: LibraryOp.Save, name: 'Theme', value: { modes: ['Light'], vars: {} } }]);
   });
+  it('a collection the project stored with its keys in another order is the same collection: no push', async () => {
+    const push = vi.fn();
+    const library = new VariableLibrary();
+    library.connect({ push, remove: vi.fn() });
+    await library.open(store({ Theme: { vars: { surface: { values: { Light: '#ffffff' }, type: VarType.Colour } }, modes: ['Light'] } }).backend);
+
+    library.found({ Theme: THEME });
+
+    expect(push).not.toHaveBeenCalled();
+  });
 });
