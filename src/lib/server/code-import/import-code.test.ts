@@ -134,6 +134,16 @@ describe('importCodeAt', () => {
     expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/', '/settings'], components: 1, variants: 2, instances: 4 });
   });
 
+  it('ogni rotta si apre in una scheda nuova, chiusa subito dopo', async () => {
+    const { ask, tab } = askOf({ routes: ['/', '/settings'] });
+    const open = vi.fn(async () => tab);
+
+    await importCodeAt({ ...ask, open });
+
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(tab.close).toHaveBeenCalledTimes(2);
+  });
+
   it('una rotta che non si apre resta fuori e lo dice, le altre arrivano', async () => {
     const { ask, tab } = askOf({ routes: ['/', '/missing'] });
     tab.goto.mockImplementation(async (url: string) => (url.endsWith('/missing') ? 404 : 200));

@@ -1,7 +1,7 @@
 import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { fontsFor, landPlan, pageTreeAt, publicUrl, UrlImportOutcome, withSheetFonts, type PageAsk, type Planner } from '$lib/server/url-import/import-url';
 import { urlPlan } from '$lib/server/url-import/url-doc';
-import type { AppTab } from '$lib/server/web/browser';
+import type { OpenAppBrowser } from '$lib/server/web/browser';
 import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
 import { boardsOf, cropped, type Capture } from './boards';
@@ -92,7 +92,7 @@ enum Missed {
 
 type Window = { settleMs: number; budgetMs: number; now: () => number };
 
-async function captured(tab: AppTab, pages: CodePage[], names: string[], window: Window): Promise<{ captures: Capture[]; missed: string[]; last: Refusal | null }> {
+async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[], window: Window): Promise<{ captures: Capture[]; missed: string[]; last: Refusal | null }> {
   const captures: Capture[] = [];
   const missed: string[] = [];
   const until = window.now() + window.budgetMs;
@@ -103,7 +103,8 @@ async function captured(tab: AppTab, pages: CodePage[], names: string[], window:
       continue;
     }
     const found = { uses: [] as ComponentUse[] };
-    const tree = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found));
+    const tab = await open();
+    const tree = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found)).finally(() => tab.close());
     if ('outcome' in tree) {
       missed.push(`${page.label}: ${Missed.Unopened}`);
       last = tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[tree.outcome], tree.error);
@@ -125,9 +126,8 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
     return refused(CodeImportOutcome.NoBrowser);
   }
 
-  const tab = await ask.open();
   const window = { settleMs: ask.settleMs ?? SETTLE_MS, budgetMs: ask.budgetMs ?? CAPTURE_BUDGET_MS, now: ask.now ?? Date.now };
-  const { captures, missed, last } = await captured(tab, ask.pages, ask.names, window).finally(() => tab.close());
+  const { captures, missed, last } = await captured(ask.open, ask.pages, ask.names, window);
   if (!captures.length) {
     return last ?? refused(CodeImportOutcome.Unreadable);
   }
