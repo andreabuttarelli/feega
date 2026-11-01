@@ -39,6 +39,7 @@ function tabOf(tree: unknown, status = 200) {
     click: vi.fn(async () => undefined),
     press: vi.fn(async () => undefined),
     tree: vi.fn(async () => tree),
+    left: vi.fn(() => Infinity),
     close: vi.fn(async () => 0.002)
   } as unknown as AppTab;
 }
@@ -115,7 +116,17 @@ describe('importPageAt', () => {
     await importPageAt(ask);
 
     expect(tab.tree).toHaveBeenCalledWith(1800);
-    expect(vi.mocked(tab.scroll).mock.calls.filter(([step]) => 'px' in step).length).toBe(3);
+    expect(tab.sample).toHaveBeenCalledWith(expect.objectContaining({ steps: 3 }));
+  });
+
+  it('walks the page in one call to the browser, not two per screen (stripe on Browserless: 44 round trips to scroll it)', async () => {
+    const { ask, tab } = askOf();
+    vi.mocked(tab.reveal).mockResolvedValue({ height: 14_000, hidden: 0 } as never);
+
+    await importPageAt(ask);
+
+    expect(vi.mocked(tab.scroll).mock.calls.filter(([step]) => 'px' in step)).toEqual([]);
+    expect(tab.sample).toHaveBeenCalledWith({ steps: 20, stepPx: 700, pauseMs: 0 });
   });
 
   it('asked for tablet and phone, the page is read again at each width and the frame gets those breakpoints', async () => {
@@ -128,6 +139,31 @@ describe('importPageAt', () => {
 
     expect(vi.mocked(tab.viewport).mock.calls.map(([w]) => w)).toEqual([768, 390]);
     expect(doc.breakpoints?.map((b) => b.name)).toEqual(['Tablet', 'Phone']);
+  });
+
+  it('reads the tablet and phone widths alongside the desktop one, each in its own tab, not one after the other (Browserless: three sessions in a row)', async () => {
+    const tabs = [tabOf(TREE), tabOf(TREE), tabOf(TREE)];
+    let release = () => undefined as void;
+    const held = new Promise<void>((done) => (release = done));
+    for (const tab of tabs) {
+      vi.mocked(tab.goto).mockImplementation(async () => held.then(() => 200));
+    }
+    const open = vi.fn();
+    tabs.forEach((tab) => open.mockResolvedValueOnce(tab));
+    const { ask } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
+
+    const done = importPageAt(ask);
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(3));
+    release();
+
+    expect((await done).outcome).toBe(UrlImportOutcome.Ok);
+  });
+
+  it('a breakpoint whose browser cannot be opened is left out, the page still comes in', async () => {
+    const open = vi.fn().mockResolvedValueOnce(tabOf(TREE)).mockRejectedValue(new Error('Unexpected server response: 429'));
+    const { ask } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
+
+    expect((await importPageAt(ask)).outcome).toBe(UrlImportOutcome.Ok);
   });
 
   it('una pagina pubblica diventa un frame col nome della pagina', async () => {
@@ -240,6 +276,20 @@ describe('importPageAt', () => {
     expect(done.outcome).toBe(UrlImportOutcome.Ok);
     expect(crashing.seeAll).toHaveBeenCalled();
     expect(healthy.seeAll).not.toHaveBeenCalled();
+  });
+
+  it('a read that used up the whole browser session is not started again from scratch: it says the page was too slow (stripe on Browserless: 128 s, then a second session of 120 s)', async () => {
+    const late = tabOf(TREE);
+    vi.mocked(late.tree).mockRejectedValue(new Error('Target closed'));
+    vi.mocked(late.left).mockReturnValue(0);
+    const open = vi.fn().mockResolvedValue(late);
+    const { ask } = askOf({ open });
+
+    const done = await importPageAt(ask);
+
+    expect(done.outcome).toBe(UrlImportOutcome.TooSlow);
+    expect(open).toHaveBeenCalledOnce();
+    expect(late.close).toHaveBeenCalled();
   });
 
   it('every main of the page points at its own set frame on the Components page', async () => {
