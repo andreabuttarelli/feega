@@ -39,7 +39,7 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import
       const refusal = await pagePrepared(tab, new URL(url), SETTLE_MS, PLAIN_PLANNER);
       const dir = capturedIn(LABEL);
       mkdirSync(dir, { recursive: true });
-      const folded = await page!.evaluate(() => [...document.querySelectorAll('details:not([open]) > :not(summary)')].map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean));
+      const folded = await page!.evaluate(() => [...document.querySelectorAll('details:not([open]) > :not(summary)')].map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter((text) => text && !document.body.innerText.replace(/\s+/g, ' ').includes(text)));
       const tree = (await tab.tree()) as PageTree;
       writeFileSync(join(dir, `${name}.json`), JSON.stringify(tree));
       await tab.reveal(RevealMode.Still);
