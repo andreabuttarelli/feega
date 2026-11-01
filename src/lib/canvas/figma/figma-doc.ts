@@ -346,7 +346,7 @@ function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Bu
   return { ...built, doc, roots: [container] };
 }
 
-const holds = (layer: FrameLayer, need: Background = Background.IfPainted) => Boolean(layer.autoLayout) || layer.clip === Clip.Content || need === Background.InFlow;
+const holds = (layer: FrameLayer, need: Background = Background.IfPainted) => Boolean(layer.autoLayout) || layer.clip === Clip.Content || need !== Background.IfPainted;
 
 function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background.IfPainted): Built {
   const flow = layer.autoLayout;

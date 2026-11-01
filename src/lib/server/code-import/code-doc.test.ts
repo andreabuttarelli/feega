@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { compOf, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { overridden } from '@feega/motion-core/motion/precomp';
+import { flattenComps, overridden } from '@feega/motion-core/motion/precomp';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { withStacking } from '@feega/motion-core/motion/layout/stacking';
+import { withoutHidden } from '@feega/motion-core/motion/organize';
+import { apply2d, pivotBox, worldAt } from '@feega/motion-core/motion/parent';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import type { ComponentUse } from './component-marks';
@@ -61,6 +65,15 @@ const hostsOf = (doc: MotionDoc, compId: string) => allClips(doc).filter((c) => 
 function shownTexts(doc: MotionDoc, comp: MotionComp, host: MotionClip, depth = 0): string[] {
   const clips = overridden(comp.tracks, host, comp.component).flatMap((t) => t.clips as MotionClip[]);
   return clips.flatMap((c) => (typeof c.props.text === 'string' ? [c.props.text] : compOf(c) && depth < 8 ? shownTexts(doc, doc.comps[compOf(c)!], c, depth + 1) : []));
+}
+
+function textAt(doc: MotionDoc, tree: PageTree, characters: string) {
+  const flat = flattenComps(withStacking(withAutoLayout(withoutHidden(doc))));
+  const size = { width: flat.width, height: flat.height };
+  const clip = flat.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.props.text === characters)!;
+  const [x, y] = apply2d(worldAt(flat, clip.id, 0, size), [pivotBox(clip.props, size).left, pivotBox(clip.props, size).top]);
+  const k = flat.width / tree.width;
+  return { x: Math.round(x / k), y: Math.round(y / k) };
 }
 
 describe('codePlan', () => {
@@ -162,6 +175,18 @@ describe('codePlan', () => {
 
     expect(title.component!.properties!.children).toMatchObject({ kind: 'text', default: 'Revenue' });
     expect(title.tracks.flatMap((t) => t.clips).find((c) => c.id === target)?.props.text).toBe('Revenue');
+  });
+
+  it('un main in auto layout resta dove stava, anche se un suo figlio esce dal riquadro', () => {
+    const header: RestNode = { id: nid(), type: 'FRAME', name: 'header', absoluteBoundingBox: box(0, 0, 400, 40), fills: [{ type: 'SOLID', color: GREY }] };
+    const badge: RestNode = { id: nid(), type: 'FRAME', name: 'badge', absoluteBoundingBox: box(380, 30, 20, 20), fills: [{ type: 'SOLID', color: BLUE }] };
+    const card = framed(0, [0, 40, 400, 100], GREY, [text('Title', 20, 60), badge]);
+    const column = { layoutMode: 'VERTICAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN' };
+    const tree: PageTree = { ...TREE, root: { ...TREE.root, ...column, children: [header, card] } };
+    const doc = codePlan(tree, [{ component: 'Card', props: {} }], nid)!.plan.items[0].doc;
+
+    expect(mainsNamed(doc, 'Card')).toHaveLength(1);
+    expect(textAt(doc, tree, 'Title')).toEqual({ x: 20, y: 60 });
   });
 
   it('componenti annidati in profondità costano lavoro lineare, non esponenziale', () => {
