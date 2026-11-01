@@ -459,3 +459,26 @@ describe.runIf(process.env.CHROMIUM_PATH)('a page with many pictures to take', (
     }
   }, 30_000);
 });
+
+const SMOOTH = `<html style="scroll-behavior:smooth"><body style="margin:0;background:#fff"><div style="height:3000px"></div><canvas id="far" width="100" height="100" style="display:block;width:100px;height:100px"></canvas><div style="height:3000px"></div><script>const c = document.getElementById('far').getContext('2d'); c.fillStyle = '#0a0'; c.fillRect(0, 0, 100, 100);</script></body></html>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a page that scrolls smoothly', () => {
+  it('gets its pictures from where they are and is back at the top when read (supabase.com: seven snapshots cut from a viewport still scrolling, the nav off the reference)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      let page: Page | null = null;
+      const tab = await localBrowser(async () => (page = await browser.newPage()))();
+      await tab.goto(`data:text/html,${encodeURIComponent(SMOOTH)}`);
+      const tree = (await tab.tree()) as PageTree;
+      const top = await page!.evaluate(() => window.scrollY);
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const picture = all(tree.root).flatMap((n) => n.fills ?? []).find((f) => f.imageRef?.startsWith('data:image/png'));
+      const { data } = await sharp(Buffer.from(picture!.imageRef!.split(',')[1], 'base64')).raw().toBuffer({ resolveWithObject: true });
+
+      expect([data[0], data[1], data[2]]).toEqual([0, 170, 0]);
+      expect(top).toBe(0);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});

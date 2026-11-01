@@ -293,7 +293,7 @@ function snapStaged(stage: SnapStage): SnapView {
     (document.head ?? document.documentElement).append(sheet);
   }
 
-  window.scrollTo(0, stage.y);
+  window.scrollTo({ top: stage.y, behavior: 'instant' });
   return { live: stage.shot ? liveAt(stage.shot.target, stage.shot.box) !== null : false, scrolled: window.scrollY };
 }
 
