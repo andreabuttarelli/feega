@@ -20,7 +20,7 @@ const DWELL_MS = 900;
 const BADGE_LEAD_MS = 250;
 const DRAG_STEPS = 72;
 const SKIP_PLAY_S = 1.2;
-const DRAG_PLAY_S = 0.8;
+const DRAG_FRAME_MS = 16;
 const LOCATE_MS = 15_000;
 
 type ScreencastFrame = { data: string; sessionId: number; metadata: { timestamp?: number } };
@@ -143,14 +143,13 @@ export async function demo(page: Page, dir: string) {
       await page.waitForTimeout(DWELL_MS / 2);
       presses.push(now());
       await page.mouse.down();
-      const moving = now();
       const steps = DRAG_STEPS;
       for (let i = 1; i <= steps; i++) {
         const p = easeInOutExpo(i / steps);
         const at = path ? path(p) : { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p };
         await point(at);
+        await page.waitForTimeout(DRAG_FRAME_MS);
       }
-      warps.push({ t: moving, end: now(), play: DRAG_PLAY_S });
       await page.mouse.up();
       events.push({ kind: 'drag', t, end: now(), from: a, to: mouse, fit });
       await page.waitForTimeout(BEAT_MS);
@@ -160,6 +159,13 @@ export async function demo(page: Page, dir: string) {
       const t = now();
       await work();
       warps.push({ t, end: now(), play: SKIP_PLAY_S });
+    },
+
+    async cut<T>(work: () => Promise<T>): Promise<T> {
+      const t = now();
+      const out = await work();
+      warps.push({ t, end: now(), play: 0 });
+      return out;
     },
 
     async look(fit: Rect, ms: number) {

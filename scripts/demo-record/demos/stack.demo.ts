@@ -5,37 +5,59 @@ import type { Demo } from '../demo';
 import { frameDoc, frameHost, openCanvas, seedFrame, solid, words, SETTLE_MS } from './seed';
 
 const TEST_MS = 900_000;
-const READ_MS = 900;
+const HOLD_MS = 2200;
 const W = 1920;
+const H = 1080;
 const SPAN = 150;
 const INK = '#111111';
 const SOFT = '#5f5f5f';
 const PAGE = '#f4f4f2';
-const NODE = { width: 900, height: 506 };
+const PAN_PX = 120;
+const NODE = { width: 1280, height: 720 };
 
 type Box = { x: number; y: number; w: number; h: number };
 
-const BODY: Box = { x: 700, y: 330, w: 640, h: 90 };
-const TITLE: Box = { x: 600, y: 470, w: 520, h: 110 };
-const CTA: Box = { x: 660, y: 640, w: 320, h: 50 };
+const LEFT = 580;
+const STACK_W = 1760;
+const TITLE: Box = { x: LEFT, y: 200, w: 560, h: 120 };
+const BODY: Box = { x: LEFT, y: 470, w: 760, h: 56 };
+const CTA: Box = { x: LEFT, y: 720, w: 300, h: 88 };
+const PILL_EDGE: Box = { x: CTA.x + 4, y: CTA.y + 30, w: 16, h: 32 };
 
-const TITLE_IN_STACK: Box = { x: 640, y: 460, w: 200, h: 30 };
-const TOP_OF_STACK: Box = { x: 640, y: 330, w: 200, h: 6 };
+const frac = (b: Box) => ({ x: (b.x + b.w / 2) / W, y: (b.y + b.h / 2) / H, width: b.w / W, height: b.h / H });
+const HUG = { width: 'hug', height: 'hug', rowSpan: 1, absolute: false, columnSpan: 1 };
+const PILL = { gap: 0, wrap: false, align: 'center', order: ['cta-label'], columns: 2, justify: 'center', padding: { top: 22, left: 40, right: 40, bottom: 22 }, autoFlow: 'row', crossGap: 0, direction: 'horizontal', rowTracks: [], firstOnTop: false, alignContent: 'auto', columnTracks: [], strokesIncluded: true };
 
-const title = words('title', 'Ship faster.', TITLE, 72, INK);
+const clip = (c: Record<string, unknown>) => ({ from: 0, durationInFrames: SPAN, ...c });
+const title = words('title', 'Ship faster.', TITLE, 96, INK);
 
-const cardDoc = () =>
-  frameDoc([
-    { id: 'page', from: 0, durationInFrames: SPAN, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1, fills: solid(PAGE) } },
-    { ...words('body', 'Preview every push on a real URL before it merges.', BODY, 32, SOFT), name: 'Body' },
-    { ...title, name: 'Title', props: { ...title.props, weight: 600, tracking: -0.04 } },
-    { ...words('cta', 'Start deploying →', CTA, 32, INK), name: 'Button' }
-  ]);
+const LAYERS = [
+  clip({ id: 'cta-label', name: 'Label', parent: 'cta', component: 'Text', layoutItem: HUG, props: { text: 'Start deploying', size: 30 / H, weight: 600, color: '#ffffff', font: 'sans', align: 'center', ...frac(CTA) } }),
+  clip({ id: 'cta', name: 'Button', component: 'Shape', autoLayout: PILL, layoutItem: HUG, props: { shape: 'rect', roundness: 0.5, ...frac(CTA), fills: solid(INK) } }),
+  { ...words('body', 'Preview every push on a real URL.', BODY, 36, SOFT), name: 'Body' },
+  { ...title, name: 'Title', props: { ...title.props, weight: 600, tracking: -0.04 } },
+  clip({ id: 'page', name: 'Background', component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1, fills: solid(PAGE) } })
+];
+
+const cardDoc = () => ({ ...frameDoc([]), tracks: LAYERS.map((c, i) => ({ id: `v${i + 1}`, kind: 'visual', name: `Video ${i + 1}`, clips: [c] })) });
 
 async function onFrame(page: Page, id: string, b: Box) {
   const r = (await frameHost(page, id).boundingBox())!;
   const k = r.width / W;
   return { x: r.x + (b.x + b.w / 2) * k, y: r.y + (b.y + b.h / 2) * k };
+}
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+const centre = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+
+async function selected(page: Page): Promise<Rect> {
+  await page.waitForTimeout(500);
+  return (await page.getByTestId('frame-selection').boundingBox())!;
+}
+
+async function blur(page: Page) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
 async function retype(d: Demo, page: Page, field: Locator, value: string) {
@@ -51,44 +73,60 @@ test('wrap with stack', async ({ page, session, admin, seedNode }) => {
   await installCursor(page);
   await openCanvas(page, session);
   await expect(frameHost(page, id)).toBeVisible();
-  await page.getByRole('button', { name: 'Layers', exact: true }).click();
-  await page.keyboard.press('Shift+Digit1');
+  await page.keyboard.press('-');
+  await page.waitForTimeout(SETTLE_MS);
+  await page.mouse.move(800, 600);
+  await page.mouse.wheel(PAN_PX, 0);
   await page.waitForTimeout(SETTLE_MS);
 
-  await recordDemo(page, { slug: 'stack', title: 'wrap with stack' }, async (d) => {
-    const layers = page.getByTestId('layers');
-    const row = (clip: string) => layers.locator(`[data-layer="${clip}"]`);
+  const flow = async (d: Demo) => {
     const inspector = page.getByTestId('motion-inspector');
     const section = inspector.getByTestId('stack-section');
-    const set = async (field: Locator, value: string) => {
-      await field.fill(value);
-      await field.press('Enter');
-    };
+    const frame = async () => (await frameHost(page, id).boundingBox())!;
+    const hold = async () => d.look(await frame(), HOLD_MS);
 
-    await row('body').click();
-    await row('title').click({ modifiers: ['Shift'] });
-    await row('cta').click({ modifiers: ['Shift'] });
+    await d.look(await frame(), 1200);
+    await d.click(await onFrame(page, id, TITLE));
+    await page.keyboard.down('Shift');
+    await d.click(await onFrame(page, id, BODY));
+    await d.click(await onFrame(page, id, PILL_EDGE));
+    await page.keyboard.up('Shift');
+
     await d.key('Shift+A', '⇧A');
     await expect(section).toBeVisible({ timeout: 15_000 });
-    await d.wait(READ_MS);
+    await hold();
 
-    await row('title').click();
-    await d.drag(await onFrame(page, id, TITLE_IN_STACK), await onFrame(page, id, TOP_OF_STACK));
-    await d.wait(READ_MS / 2);
-
-    await layers.locator('[data-layer]', { hasText: 'Stack' }).first().click();
     await d.click(section.getByRole('radio', { name: 'Horizontal' }));
-    await d.skip(async () => {
-      await set(section.getByTestId('stack-size-width'), '1760');
-      await set(section.getByTestId('auto-layout-gap'), '48');
-      await section.getByRole('button', { name: 'Align center center' }).click();
-      await row('title').click();
-      await set(inspector.getByTestId('stack-size-width'), '1fr');
-      await row('body').click();
-    });
+    await hold();
+
+    await retype(d, page, section.getByTestId('auto-layout-gap'), '48');
+    await hold();
+
+    await retype(d, page, section.getByTestId('stack-size-width'), String(STACK_W));
+    await hold();
+
+    await d.click(section.getByRole('button', { name: 'Align center center' }));
+    await hold();
+
+    const stack = await d.cut(() => selected(page));
+    await d.click(centre(stack), { double: true });
     await retype(d, page, inspector.getByTestId('stack-size-width'), '2fr');
-    await page.mouse.click(800, 800);
-    await page.waitForTimeout(600);
-    await d.look((await frameHost(page, id).boundingBox())!, READ_MS);
-  });
+    await hold();
+
+    await d.click({ x: stack.x + stack.width - 8, y: stack.y + stack.height / 2 });
+    await retype(d, page, inspector.getByTestId('stack-size-width'), '1fr');
+    await hold();
+
+    const pill = await d.cut(async () => {
+      await blur(page);
+      return selected(page);
+    });
+    await d.drag({ x: pill.x + pill.width * 0.3, y: pill.y + pill.height / 2 }, { x: stack.x + 16, y: stack.y + stack.height / 2 });
+    await d.cut(async () => {
+      await page.mouse.click(5, 450);
+      await page.waitForTimeout(400);
+    });
+    await hold();
+  };
+  await recordDemo(page, { slug: 'stack-v2', title: 'wrap with stack' }, flow);
 });
