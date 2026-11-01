@@ -30,4 +30,5 @@ export const QUERY_TABLES =
   'project_library project_members prompt_skills publish_logs push_subscriptions reference_images rubrics ' +
   'scheduler_runs scrapecreators_cache shared_views social_accounts social_post_history social_thumb_cache ' +
   'store_events talent_views talents techniques thread_events tool_usage user_age_verifications user_cloud_tokens ' +
-  'user_figma_tokens video_renders video_requests video_reviews webhook_deliveries zernio_ad_accounts';
+  'user_connected_accounts user_figma_tokens video_renders video_requests video_reviews webhook_deliveries ' +
+  'zernio_ad_accounts';
