@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { parseMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
@@ -308,5 +308,15 @@ describe('a page read at desktop and phone width', () => {
 
     expect(names(plannedAs(Sectioning.On, []))).not.toEqual(names(plannedAs(Sectioning.Off, [])));
     expect(names(plannedAs(Sectioning.On, reads))).toEqual(names(plannedAs(Sectioning.Off, reads)));
+  });
+
+  it('a font only the phone page sets is registered in the frame, so the frame saves (vercel.com, top of the page: Geist Mono only on the phone, an empty frame landed)', () => {
+    const label: RestNode = { id: 'tag', key: 'tag', type: 'TEXT', characters: 'NEW', absoluteBoundingBox: { x: 20, y: 20, width: 80, height: 20 }, fills: [{ type: 'SOLID', color: BLUE }], style: { fontFamily: 'Space Mono', fontSize: 14, fontWeight: 400 } };
+    let n = 0;
+    const made = urlPlan(desktop, () => `c${++n}`, (r) => r, {}, undefined, [{ view: PAGE_VIEWS[1], tree: { ...phone, root: { ...phone.root, children: [...phone.root.children!, label] } } }])!;
+    const doc = made.plan.items[0].doc;
+
+    expect(doc.fonts.map((f) => f.family)).toContain('Space Mono');
+    expect(parseMotionDoc(doc).ok).toBe(true);
   });
 });

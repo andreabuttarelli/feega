@@ -3661,3 +3661,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## `replaceState` in an `$effect` at mount: `Cannot read properties of undefined (reading '$set')`
 
 **Signal:** a page that cleans its URL on mount shows nothing it should, and a production build logs that `$set` error (in dev: `Cannot call replaceState(...) before router is initialized`). **Move:** SvelteKit's `replaceState`/`pushState` write to the root component, which does not exist while the first page is still mounting. Call them from `afterNavigate`, never from an `$effect` or `onMount` of the first page.
+
+## An imported frame lands empty, the import answers 200
+
+**Signal:** a URL import returns 200 and a frame named after the page, but the frame is 16:9 with no layers and its head revision is the default doc. **Move:** the plan doc failed `parseMotionDoc` and `frameStore.create` ignores the `Invalid` write. Run the plan on a capture (`urlPlan` + `parseMotionDoc` over `fidelity2/captures/<label>`) and read the refusal: a font only one breakpoint read uses was the cause once.
