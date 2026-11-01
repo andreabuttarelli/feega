@@ -33,10 +33,10 @@ Each link has three rows in Prototype.
 | Part | Options |
 |---|---|
 | Trigger | On click, While hovering, On drag, After delay (milliseconds) |
-| Action | Navigate to, Open overlay, Back, Scroll to |
+| Action | Navigate to, Open overlay, Back, Scroll to, Change to |
 | Transition | Instant, Dissolve, Slide in, Push, [Smart animate](/canvas/smart-animate/); slide and push take a direction; every transition but Instant takes an easing and a duration in milliseconds |
 
-Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back needs none. A layer holds up to 16 links. Remove deletes one.
+Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back needs none. **Change to** works on a layer inside a component (or on an instance) and picks one of the set's variants, such as `State: Open`: in the player the instance around the layer switches to it, as Figma interactive components do. A layer holds up to 16 links. Remove deletes one.
 
 A new link is On click, Navigate to, Instant.
 
@@ -65,6 +65,12 @@ Run it on a saved frame with the MCP `motion_tool` (`node_id`, `tool`, `input`),
 ```bash
 feega motion tool <nodeId> add_interaction --input '{"clip_id":"cta","trigger":{"kind":"click"},"action":{"kind":"navigate","target":"<frame node id>"}}'
 feega motion tool <nodeId> list_interactions
+```
+
+`change_to` takes the variant instead of a target:
+
+```json
+{ "clip_id": "question", "trigger": { "kind": "click" }, "action": { "kind": "change_to", "variant": { "State": "Open" } } }
 ```
 
 Clips also show their `interactions` in `get_motion_doc`.
