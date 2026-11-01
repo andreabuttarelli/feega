@@ -282,4 +282,16 @@ describe('a page read at desktop and phone width', () => {
 
     expect(at('#e60000')).toBeGreaterThan(at('#660000'));
   });
+
+  it('a layer the phone read nests in another box than the desktop plan does is drawn in that box, above its fill (tailwindcss.com with sections: the phone hero under the next section background)', () => {
+    const tinted = (key: string, box: Box, r: number, children: RestNode[] = []): RestNode => ({ ...card(key, box), fills: [{ type: 'SOLID', color: { r, g: 0, b: 0, a: 1 } }], children });
+    const title = textOf('a/t', { x: 60, y: 140, width: 300, height: 40 }, 'Get started');
+    const wide = pageOf(1280, 800, [tinted('a', { x: 40, y: 100, width: 600, height: 200 }, 0.4, [title]), tinted('b', { x: 40, y: 400, width: 600, height: 200 }, 0.2)]);
+    const narrow = pageOf(390, 1200, [tinted('a', { x: 20, y: 20, width: 350, height: 40 }, 0.4), tinted('b', { x: 20, y: 100, width: 350, height: 400 }, 0.2, [{ ...title, absoluteBoundingBox: { x: 40, y: 140, width: 300, height: 40 } }])]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+    const shown = (resolveView(doc, PAGE_VIEWS[1].id).tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => !c.hidden);
+    const at = (match: (c: MotionClip) => boolean) => shown.findIndex(match);
+
+    expect(at((c) => c.props.text === 'Get started')).toBeGreaterThan(at((c) => JSON.stringify(c.props.fills ?? '').includes('#330000')));
+  });
 });

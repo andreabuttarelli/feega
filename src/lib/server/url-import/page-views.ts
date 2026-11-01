@@ -171,6 +171,18 @@ const kidsOf = (scope: Scope, id: string | null) => scope.kids.get(id) ?? [];
 
 const sameLayer = (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => a.component !== PRECOMP && b.component !== PRECOMP && alike(painted(a), painted(b)) && alike(base.pictured(a.id), read.pictured(b.id));
 
+const UNPAIRED = '';
+
+const anchors = (scope: Scope, id: string) => scope.keys.has(id) || id === scope.page;
+
+function anchorOf(scope: Scope, id: string): string | null {
+  const parent = scope.byId.get(id)?.parent;
+  if (!parent || !scope.byId.has(parent)) {
+    return null;
+  }
+  return anchors(scope, parent) ? parent : anchorOf(scope, parent);
+}
+
 function pairsOf(base: Scope, read: Scope): Map<string, string> {
   const byKey = Map.groupBy([...read.keys].map(([id, key]) => ({ id, key })), (e) => e.key);
   const used = new Set<string>();
@@ -179,16 +191,17 @@ function pairsOf(base: Scope, read: Scope): Map<string, string> {
     pairs.set(base.page, read.page);
     used.add(read.page);
   }
-  const walk = (clip: MotionClip, ok: boolean) => {
+  const walk = (clip: MotionClip, anchor: string | null) => {
     const key = base.keys.get(clip.id);
-    const partner = ok && key && !pairs.has(clip.id) ? (byKey.get(key) ?? []).find((e) => !used.has(e.id) && sameLayer(base, clip, read, read.byId.get(e.id)!)) : undefined;
+    const within = anchor === null ? null : (pairs.get(anchor) ?? UNPAIRED);
+    const partner = key && !pairs.has(clip.id) ? (byKey.get(key) ?? []).find((e) => !used.has(e.id) && anchorOf(read, e.id) === within && sameLayer(base, clip, read, read.byId.get(e.id)!)) : undefined;
     if (partner) {
       pairs.set(clip.id, partner.id);
       used.add(partner.id);
     }
-    kidsOf(base, clip.id).forEach((k) => walk(k, pairs.has(clip.id) || (ok && !key)));
+    kidsOf(base, clip.id).forEach((k) => walk(k, anchors(base, clip.id) ? clip.id : anchor));
   };
-  kidsOf(base, null).forEach((c) => walk(c, true));
+  kidsOf(base, null).forEach((c) => walk(c, null));
   return pairs;
 }
 
