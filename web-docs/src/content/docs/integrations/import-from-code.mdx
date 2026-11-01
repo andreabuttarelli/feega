@@ -11,7 +11,7 @@ Paste a public GitHub repository and one or more page paths, or a Storybook link
 - Every other use of it is an **instance** linked to that main. Different labels become text overrides.
 - Props with a few short lowercase values (`variant="outline"`, `size="sm"`) and boolean props become **variants** of one component set. A prop the code leaves out is the variant `Default`.
 
-Several pages land in **one frame**, a board per page named after its path, side by side. The components are shared: a `Button` rendered on `/` and on `/settings` is one main, and the second page holds instances of it. The Components panel lists each component once.
+Several pages land in **one frame**, a board per page named after its path, side by side. The components are shared: a `Button` rendered on `/` and on `/settings` is one main, and the second page holds instances of it. The Components panel lists each component once, and every component set is laid out on the project's Components page.
 
 Export the frame back to code (React or Svelte) and you get the same names and props: `<Button variant="outline" children="Cancel" />`, with a `Button` component that picks the right variant. Layers grouped only for layout are plain markup, not `Group1…N` components.
 

@@ -72,7 +72,9 @@ its main instead of being linked to an older one. At most 64 variants per set.
 `routes` (up to 8, default `/`): one sandbox, one tab, the routes captured in turn, then one
 frame. Each route is a board named after its path (`boardsOf`: shelf rows under the 16 384 px
 side, 160 px gaps, ids prefixed, use indices shifted), and one code-sets pass covers every use,
-so a component rendered on two routes has one main and the Components panel lists it once. A
+so a component rendered on two routes has one main and the Components panel lists it once. As
+for URL import, every variant set is also laid out on the project's Components page
+(`componentPages`) and the page's mains are homed there. A
 route that does not open is skipped and reported; the import fails only if none opens. A frame per
 route was discarded: an instance cannot point at another frame's main.
 

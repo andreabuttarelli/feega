@@ -6,7 +6,9 @@ Spec `docs/specs/code-import.md`.
   route is a board (`boardsOf`, shelf-packed under `DESIGN_MAX_SIDE`), and one code-sets pass runs
   over the uses of every route, so a component rendered on two routes is one main. Discarded: a
   frame per route — mains live in a frame's doc and an instance cannot point at another frame's
-  main, so the library would have been one copy per route.
+  main, so the library would have been one copy per route. Rebased on the Components page work:
+  `codePlan` also returns `componentPages` sets, so code mains land on the project's Components
+  page and are homed there, like URL import's.
 - Storybook as a source (`storybook`, `stories`): `index.json` (v7+) or `stories.json` (v6), up to
   12 stories interleaved across components, each `iframe.html?id=…` captured and cropped to what
   it draws, then the same boards. Names: the last segment of every title; a library display name
