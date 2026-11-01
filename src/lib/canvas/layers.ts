@@ -5,6 +5,7 @@ import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/componen
 import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feega/motion-core/motion/timeline';
 import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
+import { soleFrame } from '$lib/motion/main-component';
 import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -180,7 +181,15 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const inside = nests && open ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
   const held = open ? kids.flatMap((kid) => clipRows(walk, kid, depth + 1)) : [];
-  return [row, ...own, ...held, ...trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1), ...maskedRows(walk, clip.id, depth + 1)];
+  const compRows = trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1);
+  return [row, ...own, ...held, ...withoutFrame(compRows, doc.comps[comp] ? soleFrame(doc.comps[comp]) : null), ...maskedRows(walk, clip.id, depth + 1)];
+}
+
+function withoutFrame(rows: LayerRow[], frame: string | null): LayerRow[] {
+  if (!frame) {
+    return rows;
+  }
+  return rows.filter((r) => r.id !== frame).map((r) => ({ ...r, depth: r.depth - 1 }));
 }
 
 function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number, clipKey: string): LayerRow {

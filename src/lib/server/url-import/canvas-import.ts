@@ -9,6 +9,7 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { importPageAt, UrlImportOutcome, type UrlImported } from './import-url';
+import type { PageView } from './page-views';
 import { Tokening, type PageShape } from './url-doc';
 import type { SiteBrand } from './page-tokens';
 import { findSiteBrand } from '$lib/server/start/site-brand';
@@ -60,7 +61,7 @@ async function shapeFor(scope: UrlScope, url: string, shape: PageShape | undefin
   return brand ? { ...shape, brand } : shape;
 }
 
-export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape }): Promise<UrlImported> {
+export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape; views?: PageView[] }): Promise<UrlImported> {
   if (!limiter.allow(scope.userId)) {
     return { outcome: UrlImportOutcome.RateLimited };
   }

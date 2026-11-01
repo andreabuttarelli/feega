@@ -371,7 +371,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     return text;
   };
 
-  type Seg = { node: Text | null; css: CSSStyleDeclaration; fills: RestPaint[] | null; br: boolean; lead?: number; trail?: number };
+  type Seg = { node: Text | null; css: CSSStyleDeclaration; fills: RestPaint[] | null; br: boolean; lead?: number; trail?: number; host?: Element };
   type Char = { c: string; seg: number; node: Text | null; at: number; extra?: number };
 
   const styleOf = (seg: Seg, scale: number) => ({
@@ -542,13 +542,29 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     return node;
   };
 
-  const runNodes = (segs: Seg[], ctx: Ctx, block: CSSStyleDeclaration): RestNode[] => {
+  const paths = new Map<Element, string>();
+  const pathOf = (el: Element): string => {
+    const known = paths.get(el);
+    if (known) {
+      return known;
+    }
+    const parent = el.parentElement ?? (el.parentNode instanceof ShadowRoot ? el.parentNode.host : null);
+    const siblings = el.parentNode ? [...el.parentNode.children] : [];
+    const step = `${el.tagName.toLowerCase()}${siblings.indexOf(el)}`;
+    const path = parent ? `${pathOf(parent)}/${el.parentNode instanceof ShadowRoot ? '#' : ''}${step}` : step;
+    paths.set(el, path);
+    return path;
+  };
+
+  const runNodes = (segs: Seg[], ctx: Ctx, block: CSSStyleDeclaration, key: string): RestNode[] => {
     const chars = charsOf(segs);
     if (!chars.some((c) => c.c.trim())) {
       return [];
     }
     const texts = segs.filter((s) => s.node);
-    const all = texts.flatMap((s) => rectsOf(s.node!));
+    const hosts = [...new Set(segs.flatMap((s) => (s.host ? [s.host] : [])))];
+    const boxes = hosts.flatMap((h) => [...h.getClientRects()].map((r) => ({ left: r.left + window.scrollX, top: r.top + window.scrollY, right: r.right + window.scrollX, bottom: r.bottom + window.scrollY })));
+    const all = [...texts.flatMap((s) => rectsOf(s.node!)), ...boxes];
     const lines = kit.linesOf(all);
     const seen = (l: KitRect) => {
       const r = { x: l.left, y: l.top, width: l.right - l.left, height: l.bottom - l.top };
@@ -564,7 +580,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= LINE_SLACK || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
     if (clean) {
       const made = textNode(chars, segs, lines, ctx, align);
-      return made ? [made] : [];
+      return made ? [{ ...made, key }] : [];
     }
     const perLine = kept.map(() => [] as Char[]);
     let last = 0;
@@ -587,7 +603,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         trimmed.pop();
       }
       const made = trimmed.length ? textNode(trimmed, segs, [kept[i]], ctx, 'LEFT') : null;
-      return made ? [made] : [];
+      return made ? [{ ...made, key: `${key}.${i}` }] : [];
     });
   };
 
@@ -1007,9 +1023,10 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   const childrenOf = (el: Element, css: CSSStyleDeclaration, ctx: Ctx): RestNode[] => {
     const out: RestNode[] = [];
     let run: Seg[] = [];
+    let runs = 0;
     const flush = () => {
       if (run.length) {
-        out.push(...runNodes(run, ctx, css));
+        out.push(...runNodes(run, ctx, css, `${pathOf(el)}~${runs++}`));
       }
       run = [];
     };
@@ -1052,6 +1069,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
           const inside = run === was ? run.slice(from).filter((seg) => seg.node) : [];
           if (inside.length) {
             inside[0].lead = (inside[0].lead ?? 0) + lead;
+            inside[0].host = lead || trail ? element : inside[0].host;
             inside[inside.length - 1].trail = (inside[inside.length - 1].trail ?? 0) + trail;
           }
           continue;
@@ -1117,6 +1135,9 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     }
     const ctx = fixed ? { ...within, clip: PAGE } : within;
     const made = shape(el, css, ctx);
+    if (made[0] && !made[0].key) {
+      made[0].key = pathOf(el);
+    }
     const fade = maskOf(css) ? gradientMaskOf(el, css) : null;
     if (fade && made[0]?.type === 'FRAME') {
       made[0].maskGradient = fade;

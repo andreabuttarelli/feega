@@ -126,11 +126,87 @@ writes them as the frame's variable collection (named after the site) and styles
 and binds the layers whose value matches. A brand of the same host pulls close colours to its
 palette. Borders, radii and the frame background are listed, not bound.
 
+## Breakpoints
+
+With `breakpoints: true` (API, MCP `import_url`, CLI `--breakpoints`, dialog checkbox) the page is
+read again at 768 and 390 px (`PAGE_VIEWS`, `tab.viewport`), each with the same freeze. The
+frame gets Tablet and Phone breakpoints (ADR 0022) whose overrides make each view look like the
+page at that width:
+
+- The walker names every layer by where it sits in the DOM (`RestNode.key`: element path, `~n`
+  for the n-th text run of an element, `.i` for a line). Keys match across widths.
+- `joinedTree`: a paragraph the walker split into lines comes in as one wrapping text (alignment
+  read from the line edges), on every read, so it can rewrap at another width.
+- `withExtras`: layers only a narrower page shows (a phone menu) are added to the frame hidden,
+  with ids of their own (`<view>:<id>`) and their images.
+- `viewedRoot`: the desktop layer tree, after sections and stacks, takes each keyed layer's box
+  and text style from the narrower read; layers whose element is not on that page are collapsed;
+  unnamed layers move with their parent; wrappers take the union of their children; the root
+  takes the page's width and runs as long as its content.
+- `planOf` records which clip each layer became (`PlanItem.keys`, layer id → clip id); `withView`
+  compares each layer's two boxes and writes: hidden, x/y/width/height, font size, line height,
+  text resizing and wrap; a child of an auto layout leaves the flow (`layoutItem.absolute`). The
+  breakpoint carries the view's own height (capped at the frame maximum).
+- With breakpoints the page is not marked into components: an instance's layout can differ per
+  copy on a phone, which per-composition overrides cannot say.
+
+Values are stored in the base frame's units (x in view fractions, widths of children in base
+units, ADR 0022), so `resolveView` draws the view at its own width and height.
+
+Measured on the nine fidelity pages (SSIM fold/full, HTML, capture `v4`), tablet: vercel
+0.69/0.89, linear 0.55/0.79, stripe 0.49/0.80, apple 0.93/0.71, framer 0.94/0.74, webflow
+0.96/0.87, tailwind 0.94/0.94, blog 0.92/0.83, feega 0.84/0.87; phone: vercel 0.69/0.84, linear
+0.28/0.68, stripe 0.53/0.55, apple 0.60/0.59, framer 0.82/0.75, webflow 0.80/0.74, tailwind
+0.90/0.90, blog 0.87/0.41, feega 0.70/0.58. The base view keeps its fidelity (every page ≥ 0.95).
+Breakpoints are opt-in for that reason.
+
+## Resizing
+
+Resizing an imported frame on the canvas (`fitToNode`, constrained) reflows it like the page in a
+narrower window:
+
+- A still frame keeps pixels on resize (`heldPixels`, the rule a breakpoint view uses): text size,
+  stroke widths and the width of laid-out children stay, positions follow constraints and auto
+  layout. Videos still scale with the frame.
+- The page layer spanning the frame is pinned left and right (`pinnedWide`), so it fills the new
+  width.
+- A column whose content sits centred between equal side paddings (`centredColumn`,
+  `page-stacks.ts`) loses those paddings; its full-width children fill it with `maxWidth` at their
+  width (`RestNode.maxWidth` → `layoutItem.maxWidth`, never below the clip's own width), so the
+  content stays centred on desktop and shrinks with a narrower frame.
+- Paragraphs as wide as their column fill it and grow down (`STRETCHED`, `page-stacks.ts`).
+
+`URL_IMPORT_RESIZE=<label> URL_IMPORT_CAPTURED=<capture> URL_IMPORT_ONLY=<pages>`
+(`url-resize-fidelity.browser.test.ts`) resizes the plan to the widths the capture has
+(`<page>@<width>-source.png`) and scores it against the page at that width.
+
+Measured on capture `v4` (SSIM fold/full against the page at that width, before → after):
+
+| page | 768 | 390 |
+|---|---|---|
+| vercel | 0.21/0.37 → 0.27/0.52 | 0.16/0.29 → 0.36/0.39 |
+| linear | 0.45/0.50 → 0.53/0.62 | 0.45/0.35 → 0.83/0.36 |
+| stripe | 0.43/0.37 → 0.38/0.36 | 0.57/0.49 → 0.62/0.56 |
+| apple | 0.44/0.48 → 0.34/0.46 | 0.66/0.50 → 0.60/0.59 |
+| framer | 0.68/0.40 → 0.52/0.39 | 0.70/0.40 → 0.58/0.30 |
+| webflow | 0.68/0.46 → 0.60/0.43 | 0.55/0.46 → 0.49/0.42 |
+| tailwind | 0.42/0.33 → 0.53/0.45 | 0.46/0.38 → 0.60/0.47 |
+| blog | 0.62/0.55 → 0.77/0.59 | 0.56/0.41 → 0.70/0.56 |
+| feega | 0.33/0.29 → 0.61/0.37 | 0.43/0.26 → 0.61/0.34 |
+
+Before, a narrower frame was the desktop page shrunk (small text, same layout), which SSIM
+sometimes scores well; after, text keeps its size and rows built with fixed widths (framer's
+hero, apple's tiles, webflow's grids) run past the frame's edge.
+
 ## Not yet
 
-- Tablet/phone captures as breakpoint overrides (ADR 0022).
-- Image and radial `mask-image`, filters and clip paths on blocks without text (they come in as snapshots); on blocks holding text only their own paint keeps the effect, the text does not.
-- A blend mode passed to text leaves inside an isolated parent blends with less than the page did (stripe's hero: fold 0.989 → 0.974).
+- Breakpoint views where the narrower page uses other elements (linear's headline spans, stripe's
+  logo marquee), pictures whose crop changes with the width, components together with
+  breakpoints, phone pages taller than the frame maximum (16,384 px).
+- Image and radial `mask-image`, filters and clip paths on blocks without text (they come in as
+  snapshots); on blocks holding text only their own paint keeps the effect, the text does not.
+- A blend mode passed to text leaves inside an isolated parent blends with less than the page did
+  (stripe's hero: fold 0.989 → 0.974).
 
 ## Fidelity
 

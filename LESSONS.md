@@ -3567,6 +3567,18 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** an imported card at opacity 0.64 is visibly darker than the page; the same card without auto layout is right. **Move:** `laidOut` (`figma-doc.ts`) parented the children to the container and then faded container and children; parent opacity is inherited, so children got it twice. Fade only the container. Measure with mean brightness of the same region in source and import before blaming text rendering.
 
+## A breakpoint round trip writes overrides nobody made
+
+**Signal:** after making breakpoint code walk compositions, `liftViewEdit` of an untouched view adds overrides to a top-level clip (the landing fixture's `cta`). **Move:** clip ids are unique per composition, not per doc; a `Map` by id over top-level and composition clips mixes two clips with the same id. Keep id lookups scoped (top-level, or one composition), and only walk every composition for per-clip work that needs no lookup.
+
+## Layers copied from another read collide by node id
+
+**Signal:** an imported phone view places a desktop hero at an FAQ answer's box; node count and distinct ids of the planned tree differ. **Move:** each page read numbers its nodes from 1, so a layer copied from the phone read into the desktop tree reuses a desktop id, and any map by id picks the wrong one. Give copied layers a namespaced id (`<view>:<id>`) and count `new Set(ids).size` against the node count before trusting an id map.
+
+## A size page-stacks measured is not the size the layer gets
+
+**Signal:** a value computed in `page-stacks.ts` from a node box (a max width, a span) shifts a layer by a few px on desktop; dumping clip boxes with and without the change shows the layer narrower than its doc width. **Move:** `page-flatten` runs after stacks and can hand a node a wrapper box; take sizes the layout depends on from the built clip in `figma-doc.ts` (or guard with it), not from the box stacks saw. Diff clip boxes (`withAutoLayout`, every clip including comps) before scoring SSIM.
+
 ## An imported component in a row lands shifted by what it draws outside its box
 
 **Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
@@ -3586,3 +3598,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A whole nav comes in as one picture
 
 **Signal:** an imported block with links and buttons is a single image layer. **Move:** ask why the walker took the snapshot (`shape` in `page-tree.ts`: filter, mask, clip path, blend with children, `turned`). On supabase.com it was Tailwind's `transform` utility: it computes to `matrix3d(... 0, 0, 999, 1)` (a `translateZ`), which `matrixOf` did not parse, so `turned` read it as a rotation. Blocks holding text never snapshot now (`holdsContent`); a new snapshot reason must still keep them as layers.
+
+## Imported text cannot be typed, double-click climbs to a "Precomp"
+
+**Signal:** on an imported page Cmd-click selects a label, Enter does nothing, double-click selects a wrapper (often 0×0, named Precomp or Group). **Move:** the label sits inside a Precomp (a group or an instance), so its id is scoped (`host__0__label`) and every top-level lookup (`findClip`, `isLayer`, `textCaretAt`) misses it. Resolve scene ids through `textScope`/`scoped` before editing; for URL imports, plain groups come in as frames (`Grouping.Frame`), never as Precomps.

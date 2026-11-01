@@ -3,6 +3,7 @@ import type { AppTab } from '$lib/server/web/browser';
 import type { FrameStore } from '$lib/server/motion/move-element';
 import type { PageTree } from './page-tree';
 import { importPageAt, UrlImportOutcome } from './import-url';
+import { PAGE_VIEWS } from './page-views';
 import { FULL_SHAPE, PLAIN_SHAPE } from './url-doc';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
@@ -33,6 +34,7 @@ function tabOf(tree: unknown, status = 200) {
     settle: vi.fn(async () => undefined),
     seeAll: vi.fn(async () => undefined),
     sample: vi.fn(async () => 0),
+    viewport: vi.fn(async () => undefined),
     overlay: vi.fn(async () => null),
     click: vi.fn(async () => undefined),
     press: vi.fn(async () => undefined),
@@ -114,6 +116,18 @@ describe('importPageAt', () => {
 
     expect(tab.tree).toHaveBeenCalledWith(1800);
     expect(vi.mocked(tab.scroll).mock.calls.filter(([step]) => 'px' in step).length).toBe(3);
+  });
+
+  it('asked for tablet and phone, the page is read again at each width and the frame gets those breakpoints', async () => {
+    const { ask, docs, tab } = askOf({ views: PAGE_VIEWS, shape: PLAIN_SHAPE });
+    const keyedTree = { ...TREE, root: { ...TREE.root, children: TREE.root.children!.map((c) => ({ ...c, key: c.id })) } };
+    vi.mocked(tab.tree).mockResolvedValue(keyedTree as never);
+
+    await importPageAt(ask);
+    const doc = docs.get('frame-1')!.doc as { breakpoints?: { name: string }[] };
+
+    expect(vi.mocked(tab.viewport).mock.calls.map(([w]) => w)).toEqual([768, 390]);
+    expect(doc.breakpoints?.map((b) => b.name)).toEqual(['Tablet', 'Phone']);
   });
 
   it('una pagina pubblica diventa un frame col nome della pagina', async () => {

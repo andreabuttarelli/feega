@@ -43,6 +43,13 @@ export function instanceOf(doc: MotionDoc, clipId: string): Instance | null {
 
 export const innerClips = (comp: MotionComp): MotionClip[] => comp.tracks.flatMap((t) => t.clips as MotionClip[]);
 
+export function soleFrame(comp: MotionComp): string | null {
+  const clips = innerClips(comp);
+  const roots = clips.filter((c) => !c.parent);
+  const [root] = roots;
+  return comp.component && roots.length === 1 && clips.some((c) => c.parent === root.id) ? root.id : null;
+}
+
 export function createComponent(doc: MotionDoc, clipIds: readonly string[], newId: NewId, name: string): OpResult {
   const ids = { comp: newId(), clip: newId() };
   const made = precompose(doc, clipIds, ids, name);

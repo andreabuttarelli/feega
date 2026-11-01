@@ -129,9 +129,14 @@ function aligned(items: RestNode[], box: Box, s: Side): { items: RestNode[]; ali
   return { items: shifted, align: 'MIN', pad: [lead, Math.max(0, Math.min(...offsets(shifted).trail))] };
 }
 
+const STRETCHED: Record<string, (k: RestNode, s: Side) => RestNode> = {
+  FRAME: (k) => ({ ...k, layoutAlign: 'STRETCH' }),
+  TEXT: (k, s) => (s.size === 'width' && k.textAutoResize !== ONE_LINE_TEXT ? { ...k, layoutAlign: 'STRETCH', textAutoResize: WRAPPING_TEXT } : k)
+};
+
 function stretchedIn(items: RestNode[], box: Box, s: Side, pad: [number, number]): RestNode[] {
   const span = box[s.size] - pad[0] - pad[1];
-  return items.map((k) => (k.type === 'FRAME' && Math.abs(boxOf(k)[s.size] - span) <= EPS ? { ...k, layoutAlign: 'STRETCH' } : k));
+  return items.map((k) => (STRETCHED[k.type] && Math.abs(boxOf(k)[s.size] - span) <= EPS ? STRETCHED[k.type](k, s) : k));
 }
 
 function rowOf(kids: RestNode[], all: Box, cross: Side, axis: Axis): RestNode {
@@ -169,6 +174,13 @@ function painted(children: RestNode[], flow: RestNode[]): RestNode[] {
   return next === flow.length ? out : [...children.filter((c) => !flowing(c)), ...flow];
 }
 
+const spansColumn = (k: RestNode, box: Box, pad: [number, number]) => Math.abs(boxOf(k).width - (box.width - pad[0] - pad[1])) <= EPS;
+
+function centredColumn(items: RestNode[], box: Box, align: string, pad: [number, number]): boolean {
+  const stretching = items.filter((k) => k.layoutAlign === 'STRETCH');
+  return pad[0] > EPS && Math.abs(pad[0] - pad[1]) <= EPS && stretching.length > 0 && stretching.every((k) => spansColumn(k, box, pad)) && (align === 'CENTER' || items.every((k) => spansColumn(k, box, pad)));
+}
+
 function laidOut(n: RestNode, kids: RestNode[]): RestNode | null {
   const box = boxOf(n);
   const axis = AXES.find((a) => kids.length === 1 || clusters(kids, SIDES[a].main).length > 1);
@@ -188,10 +200,12 @@ function laidOut(n: RestNode, kids: RestNode[]): RestNode | null {
   if (pad[0] < -EPS) {
     return null;
   }
-  const flow = stretchedIn(items.map((k) => (k.layoutMode ? k : layered(boxed(k, axis)))), box, cross, pad);
+  const stretched = stretchedIn(items.map((k) => (k.layoutMode ? k : layered(boxed(k, axis)))), box, cross, pad);
+  const centred = axis === Axis.Column && centredColumn(stretched, box, align, pad);
+  const flow = centred ? stretched.map((k) => (k.layoutAlign === 'STRETCH' && spansColumn(k, box, pad) ? { ...k, maxWidth: boxOf(k).width } : k)) : stretched;
   const children = n.children ?? [];
   const [start, end] = axis === Axis.Column ? [lead, trail] : pad;
-  const [left, right] = axis === Axis.Column ? pad : [lead, trail];
+  const [left, right] = axis === Axis.Column ? (centred ? [0, 0] : pad) : [lead, trail];
   return {
     ...n,
     ...(n.type === 'GROUP' ? { type: 'FRAME', fills: [], clipsContent: false } : {}),
@@ -202,7 +216,7 @@ function laidOut(n: RestNode, kids: RestNode[]): RestNode | null {
     paddingBottom: round(Math.max(0, end)),
     paddingLeft: round(Math.max(0, left)),
     primaryAxisAlignItems: spread.has(n) && items.length > 1 && gap >= 0 ? 'SPACE_BETWEEN' : 'MIN',
-    counterAxisAlignItems: align,
+    counterAxisAlignItems: centred ? 'CENTER' : align,
     primaryAxisSizingMode: 'FIXED',
     counterAxisSizingMode: 'FIXED',
     children: painted(children, flow)
