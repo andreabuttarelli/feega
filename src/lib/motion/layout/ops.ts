@@ -71,6 +71,7 @@ type Axis = 'width' | 'height';
 const GROW_KEY = { width: 'widthGrow', height: 'heightGrow' } as const;
 const PERCENT_KEY = { width: 'widthPercent', height: 'heightPercent' } as const;
 const DOC_SIDE = { width: 'width', height: 'height' } as const;
+const CENTRE_KEY = { width: 'x', height: 'y' } as const;
 
 const SIZE_PATCH: Record<Sizing, (axis: Axis, value: number | undefined) => Partial<LayoutItem>> = {
   [Sizing.Fixed]: (axis) => ({ [axis]: Sizing.Fixed }),
@@ -84,7 +85,12 @@ export function setChildSize(doc: MotionDoc, clipId: string, axis: Axis, entry: 
   if (!sized.ok || entry.sizing !== Sizing.Fixed || entry.value === undefined) {
     return sized;
   }
-  return setProps(sized.doc, clipId, { [axis]: entry.value / doc[DOC_SIDE[axis]] });
+  const clip = findClip(sized.doc, clipId)!.clip;
+  const side = doc[DOC_SIDE[axis]];
+  const centre = CENTRE_KEY[axis];
+  const start = Number(clip.props[centre]) * side - (Number(clip.props[axis] ?? 0) * side) / 2;
+  const anchored = typeof clip.props[centre] === 'number' ? { [centre]: (start + entry.value / 2) / side } : {};
+  return setProps(sized.doc, clipId, { [axis]: entry.value / side, ...anchored });
 }
 
 const ALONG: Record<Direction, (by: readonly [number, number]) => number> = {

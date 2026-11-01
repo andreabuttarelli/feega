@@ -332,6 +332,19 @@ describe('a stack child as a flex item', () => {
     expect(done.props.width).toBeCloseTo(270 / stacked.width);
   });
 
+  it('a typed width keeps the stack where it is, its left and top edges anchored', () => {
+    const shown = (doc: MotionDoc) => findClip(withAutoLayout(doc), 'box')!.clip.props;
+    const before = shown(stacked);
+    const wider = shown(must(setChildSize(stacked, 'box', 'width', { sizing: Sizing.Fixed, value: 900 })));
+    const taller = shown(must(setChildSize(stacked, 'box', 'height', { sizing: Sizing.Fixed, value: 600 })));
+    const left = (p: typeof before) => (Number(p.x) - Number(p.width) / 2) * stacked.width;
+    const top = (p: typeof before) => (Number(p.y) - Number(p.height) / 2) * stacked.height;
+
+    expect(left(wider)).toBeCloseTo(left(before), 5);
+    expect(Number(wider.width) * stacked.width).toBeCloseTo(900, 5);
+    expect(top(taller)).toBeCloseTo(top(before), 5);
+  });
+
   it('steps earlier and later among its siblings, never past the ends', () => {
     const later = must(stepInStack(stacked, 'a', 1));
     expect(clip(later, 'box').autoLayout?.order).toEqual(['b', 'a']);
