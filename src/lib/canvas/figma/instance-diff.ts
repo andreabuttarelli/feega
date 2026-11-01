@@ -39,6 +39,8 @@ function paired(doc: MotionDoc, ownId: string, mainId: string, top: boolean): Pa
   return pairs;
 }
 
+const shownOf = (image: FigmaImage | undefined) => ({ hash: image?.hash, fit: image?.fit, focus: image?.focus });
+
 const restOf = (clip: MotionClip) => Object.fromEntries(Object.entries(clip).filter(([k]) => !IGNORED.has(k)));
 
 function changed(pair: Pair): Record<string, unknown> {
@@ -78,20 +80,20 @@ export function instanceOverrides(doc: MotionDoc, ownId: string, mainId: string,
     overrides[id] = { ...overrides[id], ...props };
   }
 
-  const slot = (list: FigmaImage[], clipId: string, at: number) => list.find((i) => i.clipId === clipId && i.at === at)?.hash;
+  const slot = (list: FigmaImage[], clipId: string, at: number) => list.find((i) => i.clipId === clipId && i.at === at);
   const slots: Slot[] = [];
   for (const image of images.own) {
     const pair = mainOf.get(image.clipId);
     if (!pair) {
       return null;
     }
-    if (slot(images.main, pair.main.id, image.at) === image.hash) {
+    if (same(shownOf(image), shownOf(slot(images.main, pair.main.id, image.at)))) {
       continue;
     }
     if (!pair.top) {
       return null;
     }
-    slots.push({ innerId: pair.main.id, hash: image.hash, at: image.at });
+    slots.push({ hash: image.hash, at: image.at, fit: image.fit, focus: image.focus, innerId: pair.main.id });
   }
   const covered = images.main.every((m) => pairs.some((p) => p.main.id === m.clipId && slot(images.own, p.own.id, m.at)));
   return covered ? { overrides, images: slots } : null;

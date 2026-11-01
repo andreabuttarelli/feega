@@ -14,6 +14,23 @@ export const VIEW_ITEMS = [
   item(FrameView.Pivot, Command.TogglePivot, 'Rotation pivot')
 ] as const;
 
+export const ZOOM_ITEMS = [
+  item(FrameView.Outlines, Command.PreviewFit, 'Zoom to fit'),
+  item(FrameView.Outlines, Command.PreviewActual, 'Zoom to 100%'),
+  item(FrameView.Outlines, Command.PreviewSelection, 'Zoom to selection')
+].map(({ command, label, keys }) => ({ command, label, keys }));
+
+class ZoomRequest {
+  current = $state<{ command: Command; seq: number } | null>(null);
+  private seq = 0;
+
+  ask(command: Command) {
+    this.current = { command, seq: ++this.seq };
+  }
+}
+
+export const zoomRequest = new ZoomRequest();
+
 class FrameViewState {
   local = $state<FrameViews>(FRAME_VIEW_DEFAULT);
 

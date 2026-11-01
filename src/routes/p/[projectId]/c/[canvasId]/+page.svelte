@@ -4284,6 +4284,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if Flow}
   <Flow
     mode={canvasMode}
+    viewerId={me}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
     {edges}

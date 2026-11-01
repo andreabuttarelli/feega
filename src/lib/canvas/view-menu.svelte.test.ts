@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FrameView } from './frame-view';
 import { Command } from '$lib/motion/shortcuts';
-import { VIEW_ITEMS, frameViews } from './view-menu.svelte';
+import { VIEW_ITEMS, ZOOM_ITEMS, frameViews } from './view-menu.svelte';
 import { rulersPref } from './rulers-pref.svelte';
 
 describe('the header View menu', () => {
@@ -22,5 +22,11 @@ describe('the header View menu', () => {
     frameViews.flip(FrameView.Rulers);
     expect(rulersPref.on).toBe(!before);
     expect(frameViews.isOn(FrameView.Rulers)).toBe(!before);
+  });
+});
+
+describe('zoom lives in the View menu', () => {
+  it('offers fit, 100% and selection', () => {
+    expect(ZOOM_ITEMS.map((i) => i.command)).toEqual([Command.PreviewFit, Command.PreviewActual, Command.PreviewSelection]);
   });
 });

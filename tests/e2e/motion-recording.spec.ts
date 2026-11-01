@@ -31,13 +31,13 @@ test.describe('Motion records, Design scrubs @real', () => {
     const canvas = page.locator('[data-canvas-surface]');
     const timeline = page.getByTestId('frame-timeline');
 
-    await modeSwitch.locator('[data-mode="motion"]').click();
+    await modeSwitch.locator('[data-value="motion"]').click();
     await expect(canvas).toHaveAttribute('data-mode-chrome', 'recording');
     await expect(timeline).toBeVisible();
     await page.waitForTimeout(SETTLE_MS);
     await shoot(page, 'motion-recording');
 
-    await modeSwitch.locator('[data-mode="design"]').click();
+    await modeSwitch.locator('[data-value="design"]').click();
     await expect(canvas).toHaveAttribute('data-mode-chrome', 'plain');
     await expect(timeline).toBeHidden();
     await page.keyboard.press('Meta+j');
