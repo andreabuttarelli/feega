@@ -3,7 +3,7 @@ import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
-import { urlPlan } from './url-doc';
+import { Sectioning, urlPlan } from './url-doc';
 import { PAGE_VIEWS } from './page-views';
 
 const WHITE = { r: 1, g: 1, b: 1, a: 1 };
@@ -293,5 +293,20 @@ describe('a page read at desktop and phone width', () => {
     const at = (match: (c: MotionClip) => boolean) => shown.findIndex(match);
 
     expect(at((c) => c.props.text === 'Get started')).toBeGreaterThan(at((c) => JSON.stringify(c.props.fills ?? '').includes('#330000')));
+  });
+
+  it('with breakpoints the page is not cut into section frames, so each element stays one layer the views can match (stripe.com: the hero gradient over its headline on the phone)', () => {
+    const outlined = (page: PageTree): PageTree => ({ ...page, outline: { width: page.width, height: page.height, root: { tag: 'body', box: { x: 0, y: 0, width: page.width, height: page.height }, children: [{ tag: 'header', box: { x: 0, y: 0, width: page.width, height: 100 } }, { tag: 'main', box: { x: 0, y: 100, width: page.width, height: page.height - 100 } }] } } });
+    const wide = outlined(pageOf(1280, 800, [card('a', { x: 40, y: 20, width: 1200, height: 60 }), card('b', { x: 40, y: 50, width: 1200, height: 650 })]));
+    const narrow = outlined(pageOf(390, 1200, [card('a', { x: 20, y: 20, width: 350, height: 60 }), card('b', { x: 20, y: 50, width: 350, height: 1050 })]));
+    const plannedAs = (sectioning: Sectioning, reads: { view: (typeof PAGE_VIEWS)[number]; tree: PageTree }[]) => {
+      let n = 0;
+      return urlPlan(wide, () => `c${++n}`, (r) => r, {}, { sectioning }, reads)!.plan.items[0].doc;
+    };
+    const names = (doc: MotionDoc) => (doc.tracks.flatMap((t) => t.clips) as MotionClip[]).map((c) => c.name).sort();
+    const reads = [{ view: PAGE_VIEWS[1], tree: narrow }];
+
+    expect(names(plannedAs(Sectioning.On, []))).not.toEqual(names(plannedAs(Sectioning.Off, [])));
+    expect(names(plannedAs(Sectioning.On, reads))).toEqual(names(plannedAs(Sectioning.Off, reads)));
   });
 });
