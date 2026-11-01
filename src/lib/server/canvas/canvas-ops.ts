@@ -82,6 +82,7 @@ import { pasteNodes } from '$lib/server/canvas/paste';
 import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import';
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
+import { viewsOf } from '$lib/server/url-import/page-views';
 import { sectioningOf, tokeningOf } from '$lib/server/url-import/url-doc';
 import { importCodeInto } from '$lib/server/code-import/canvas-import';
 import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
@@ -269,7 +270,7 @@ const importFigmaInput = z
 const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), x: z.number().finite(), y: z.number().finite() }).strict();
 
 const importUrlInput = z
-  .object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite(), sections: z.boolean().default(true).describe('split the page into named section frames (Nav, Hero, Features, Footer…); false keeps one layer tree'), tokens: z.boolean().default(true).describe('turn the page colours, type, effects, radii and spacing into shared variables and styles bound to its layers; false keeps raw values') })
+  .object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite(), sections: z.boolean().default(true).describe('split the page into named section frames (Nav, Hero, Features, Footer…); false keeps one layer tree'), tokens: z.boolean().default(true).describe('turn the page colours, type, effects, radii and spacing into shared variables and styles bound to its layers; false keeps raw values'), breakpoints: z.boolean().default(false).describe('also read the page at tablet (768) and phone (390) width and add them to the frame as breakpoints; triples the reading time') })
   .strict();
 
 const drawFrameInput = z
@@ -1013,7 +1014,7 @@ export const CANVAS_OPS = {
   import_url: op({
     access: Access.Write,
     input: importUrlInput,
-    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y }, shape: { sectioning: sectioningOf(input.sections), tokening: tokeningOf(input.tokens) } })
+    run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y }, shape: { sectioning: sectioningOf(input.sections), tokening: tokeningOf(input.tokens) }, views: viewsOf(input.breakpoints) })
   }),
 
   import_code: op({

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TEXT_SIZINGS, TextSizing } from './text-sizing';
+import { TEXT_SIZINGS, TEXT_WRAPS, TextSizing } from './text-sizing';
 import { networkSchema } from './vector/model';
 import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
@@ -113,7 +113,7 @@ export const TEXT_CASES = ['as-typed', 'upper', 'lower', 'title', 'small-caps'] 
 export const TEXT_ALIGNS = [...ALIGNS, 'justify'] as const;
 export type TextAlign = (typeof TEXT_ALIGNS)[number];
 export const VERTICAL_ALIGNS = ['top', 'center', 'bottom'] as const;
-export const TEXT_WRAPS = ['wrap', 'balance', 'pretty', 'none'] as const;
+export { TEXT_WRAPS };
 export type TextWrap = (typeof TEXT_WRAPS)[number];
 export const LEADING_TRIMS = ['none', 'cap'] as const;
 export type LeadingTrim = (typeof LEADING_TRIMS)[number];

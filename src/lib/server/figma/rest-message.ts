@@ -36,6 +36,7 @@ export type RestNode = {
   type: string;
   visible?: boolean;
   collapsed?: boolean;
+  key?: string;
   opacity?: number;
   size?: Vec;
   absoluteBoundingBox?: { x: number; y: number; width: number; height: number };
@@ -290,6 +291,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     name: n.name,
     visible: n.visible,
     collapsed: n.collapsed,
+    ref: n.id,
     opacity: n.opacity,
     size: sizeOf(n),
     transform: transformOf(n, parent.rest),

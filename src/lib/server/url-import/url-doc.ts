@@ -10,6 +10,7 @@ import { windowed } from './page-window';
 import { sectionsOf } from './page-sections';
 import { sectionFramed } from './section-frames';
 import { stacksOf } from './page-stacks';
+import { joinedTree, Slice, viewedRoot, withExtras, withView, type ViewRead } from './page-views';
 import { flattened } from './page-flatten';
 import { tokensOf, type SiteBrand } from './page-tokens';
 import { samplesOf, siteName, tokenised } from './token-bind';
@@ -163,10 +164,19 @@ function slicesOf(root: RestNode): { root: RestNode; top: number }[] {
   });
 }
 
-function stacked(slices: { root: RestNode; top: number }[], newId: () => string, uploads: FontUpload[]): FigmaPlan | null {
+function viewed(plan: FigmaPlan | null, root: RestNode, slice: Slice, views: ViewRead[], pagePx: number): FigmaPlan | null {
+  if (!plan || plan.items.length !== 1 || !views.length) {
+    return plan;
+  }
+  const [item] = plan.items;
+  const doc = views.reduce((base, { view, tree }) => withView(base, item.keys ?? {}, root, viewedRoot(root, tree, slice), view, pagePx), item.doc);
+  return { ...plan, items: [{ ...item, doc }] };
+}
+
+function stacked(slices: { root: RestNode; top: number }[], newId: () => string, uploads: FontUpload[], views: ViewRead[] = [], pagePx = 1): FigmaPlan | null {
   const total = slices.reduce((s, x) => s + x.root.absoluteBoundingBox!.height, 0);
-  const plans = slices.flatMap(({ root, top }) => {
-    const plan = planOf(restMessage([root], FILE_KEY), newId, uploads);
+  const plans = slices.flatMap(({ root, top }, i) => {
+    const plan = viewed(planOf(restMessage([root], FILE_KEY), newId, uploads), root, i ? Slice.Later : Slice.First, views, pagePx);
     const middle = top + root.absoluteBoundingBox!.height / 2 - total / 2;
     return plan ? [{ ...plan, items: plan.items.map((item) => ({ ...item, centre: { x: 0, y: middle } })) }] : [];
   });
@@ -225,14 +235,18 @@ const SECTIONED: Record<Sectioning, (tree: PageTree) => RestNode> = {
 
 const REPEATED: Marker = (root) => repeatedOf(root).root;
 
-export function urlPlan(tree: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, shape: PageShape = PLAIN_SHAPE): UrlPlan | null {
+const UNMARKED: Marker = (root) => root;
+
+export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, shape: PageShape = PLAIN_SHAPE, reads: ViewRead[] = []): UrlPlan | null {
+  const [tree, views] = reads.length ? [joinedTree(read), reads.map((v) => ({ ...v, tree: joinedTree(v.tree) }))] : [read, reads];
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
-  const images = refsOf(tree.root);
+  const shaped = withExtras(flattened((views.length ? UNMARKED : mark)(stacksOf(SECTIONED[shape.sectioning](tree)))), views);
+  const images = refsOf(shaped);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
-  const root = mapped({ ...flattened(mark(stacksOf(SECTIONED[shape.sectioning](tree)))), name }, keyOf, family);
-  const stack = stacked(slicesOf(root), newId, uploads);
+  const root = mapped({ ...shaped, name }, keyOf, family);
+  const stack = stacked(slicesOf(root), newId, uploads, views, tree.width);
   if (!stack) {
     return null;
   }

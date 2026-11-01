@@ -3567,6 +3567,14 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** an imported card at opacity 0.64 is visibly darker than the page; the same card without auto layout is right. **Move:** `laidOut` (`figma-doc.ts`) parented the children to the container and then faded container and children; parent opacity is inherited, so children got it twice. Fade only the container. Measure with mean brightness of the same region in source and import before blaming text rendering.
 
+## A breakpoint round trip writes overrides nobody made
+
+**Signal:** after making breakpoint code walk compositions, `liftViewEdit` of an untouched view adds overrides to a top-level clip (the landing fixture's `cta`). **Move:** clip ids are unique per composition, not per doc; a `Map` by id over top-level and composition clips mixes two clips with the same id. Keep id lookups scoped (top-level, or one composition), and only walk every composition for per-clip work that needs no lookup.
+
+## Layers copied from another read collide by node id
+
+**Signal:** an imported phone view places a desktop hero at an FAQ answer's box; node count and distinct ids of the planned tree differ. **Move:** each page read numbers its nodes from 1, so a layer copied from the phone read into the desktop tree reuses a desktop id, and any map by id picks the wrong one. Give copied layers a namespaced id (`<view>:<id>`) and count `new Set(ids).size` against the node count before trusting an id map.
+
 ## An imported component in a row lands shifted by what it draws outside its box
 
 **Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
