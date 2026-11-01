@@ -56,7 +56,7 @@ export type PageAsk = {
   open: OpenAppBrowser | null;
   guard: (url: URL) => Promise<void>;
   importImage: (url: string) => Promise<string | null>;
-  importFont?: (url: string) => Promise<string | null>;
+  importFont?: (url: string, page: string) => Promise<string | null>;
   fetchText?: FetchText;
   newId: () => string;
   settleMs?: number;
@@ -181,7 +181,7 @@ export async function fontsFor(ask: LandAsk, tree: PageTree): Promise<FontAssets
   if (!importFont) {
     return {};
   }
-  const entries = await Promise.all(fontsWanted(tree).map(async (face) => [face.url, await importFont(face.url).catch(() => null)] as const));
+  const entries = await Promise.all(fontsWanted(tree).map(async (face) => [face.url, await importFont(face.url, tree.url).catch(() => null)] as const));
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 

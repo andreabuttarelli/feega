@@ -67,6 +67,25 @@ describe('createMedia', () => {
     expect(await media.ready(list('/ok.png', '/gone.png'))).toBe(Readiness.Partial);
   });
 
+  it('loads the pictures inside a group, such as a masked group of an imported page', async () => {
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = '';
+        naturalWidth = 4;
+        naturalHeight = 4;
+        decode = () => Promise.resolve();
+      }
+    );
+    const media = createMedia();
+    const inner = picture('/inside.png');
+    const grouped = { width: 10, height: 10, background: null, items: [{ kind: ItemKind.Group, clip: 'g', items: [inner], opacity: 1, matrix: [1, 0, 0, 1, 0, 0], blur: 0, blend: 'normal' } as never], unsupported: [] };
+
+    await media.ready(grouped);
+
+    expect(media.pictures(inner)?.size).toEqual({ width: 4, height: 4 });
+  });
+
   const fakeVideos = () => {
     const made: { preload?: string }[] = [];
     vi.stubGlobal('document', {

@@ -10,6 +10,7 @@ import { imagesFilled } from '$lib/canvas/figma/images';
 import type { PageTree } from '$lib/server/url-import/page-tree';
 import { capturedIn, scoredIn } from '$lib/server/url-import/fidelity-pages';
 import { band, FOLD, plannedPage, scores, sideBySide } from '$lib/server/url-import/fidelity-score';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { GpuBackend, type WorldInput, type WorldResult } from './gpu-world';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -28,6 +29,7 @@ const captured = capturedIn(process.env.URL_IMPORT_CAPTURED ?? label);
 const only = process.env.URL_IMPORT_ONLY?.split(',');
 const backend = (process.env.URL_IMPORT_GPU_BACKEND ?? GpuBackend.WebGpu) as GpuBackend;
 const headed = process.env.URL_IMPORT_GPU_HEADED === '1';
+const smoothing = (process.env.URL_IMPORT_GPU_SMOOTHING ?? Smoothing.Plain) as Smoothing;
 
 if (!label || !existsSync(captured)) {
   throw new Error(`no capture at ${captured}: set URL_IMPORT_GPU=<label> (and URL_IMPORT_CAPTURED=<capture label>)`);
@@ -134,7 +136,7 @@ for (const name of names) {
     top += item.size.height;
     return placed;
   });
-  const input: WorldInput = { items, assets: local, width: FOLD.width, band: FOLD.height, height: top, backend };
+  const input: WorldInput = { items, assets: local, width: FOLD.width, band: FOLD.height, height: top, backend, smoothing };
   const result = await worldShots(input);
   const drawn = await stitched(result, top);
   writeFileSync(join(out, `${name}-gpu-imported.png`), drawn);
