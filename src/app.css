@@ -114,6 +114,9 @@
 
 :root {
   transition: --ui-mode-solid 150ms var(--ease-expo-out), --ui-mode-text-light 150ms var(--ease-expo-out), --ui-mode-text-dark 150ms var(--ease-expo-out);
+  --ui-mode-solid: #0b6bcb;
+  --ui-mode-text-light: #0b6bcb;
+  --ui-mode-text-dark: #3ab0ff;
   --ink:        #1d1d1f;
   --ink-soft:   #6e6e73;
   --ink-faint:  #86868b;
