@@ -4,7 +4,7 @@ import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
 import { OVERLAY_SELECTOR, type Overlay } from './overlays';
 import { SnapMode, TREE_LIMITS, treeScript, type PageSnap, type PageTree } from '$lib/server/url-import/page-tree';
-import { everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed } from '$lib/server/url-import/page-reveal';
+import { everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed, type Walk } from '$lib/server/url-import/page-reveal';
 import { snapped } from '$lib/server/url-import/page-snaps';
 import { componentMarksOf, MARK_LIMITS, type ComponentUse } from '$lib/server/code-import/component-marks';
 
@@ -41,7 +41,7 @@ export type AppTab = Tab & {
   tree: (maxHeight?: number) => Promise<unknown>;
   reveal: (mode: RevealMode) => Promise<Revealed>;
   seeAll: () => Promise<void>;
-  sample: () => Promise<number>;
+  sample: (walk?: Walk) => Promise<number>;
   settle: (ms: number) => Promise<void>;
   marks: (names: string[]) => Promise<ComponentUse[]>;
   overlay: () => Promise<Overlay | null>;
@@ -315,7 +315,7 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
       await page.evaluateOnNewDocument(everythingInView);
       await page.evaluateOnNewDocument(heldStill);
     },
-    sample: () => page.evaluate(inViewSampled),
+    sample: (walk) => page.evaluate(inViewSampled, walk),
     settle: async (ms) => {
       await page.waitForNetworkIdle({ idleTime: IDLE_MS, timeout: ms }).catch(() => undefined);
       await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, 3_000))])).catch(() => undefined);

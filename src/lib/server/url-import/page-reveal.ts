@@ -1,5 +1,7 @@
 export type Revealed = { height: number; hidden: number };
 
+export type Walk = { steps: number; stepPx: number; pauseMs: number };
+
 export enum RevealMode {
   Loading = 'loading',
   Moving = 'moving',
@@ -178,7 +180,7 @@ export function revealPage(mode: RevealMode): Revealed {
   };
 }
 
-export function inViewSampled(): number {
+export async function inViewSampled(walk: Walk = { steps: 0, stepPx: 0, pauseMs: 0 }): Promise<number> {
   const PROPS = ['opacity', 'transform', 'translate', 'scale', 'rotate', 'filter', 'clip-path', 'visibility', 'stroke-dashoffset'];
   const STYLED = PROPS.map((p) => `[style*="${p}"]`).join(', ');
   const GAIN = 0.01;
@@ -186,48 +188,57 @@ export function inViewSampled(): number {
   const state = window as StillWindow;
   const seen = (state.__feegaInView ??= new Map());
 
-  for (const animation of document.getAnimations()) {
-    const timed = animation.timeline === document.timeline && animation.effect?.getComputedTiming().iterations !== Infinity;
-    if (timed) {
-      try {
-        animation.finish();
-      } catch {
-        continue;
+  const sampled = () => {
+    for (const animation of document.getAnimations()) {
+      const timed = animation.timeline === document.timeline && animation.effect?.getComputedTiming().iterations !== Infinity;
+      if (timed) {
+        try {
+          animation.finish();
+        } catch {
+          continue;
+        }
       }
     }
-  }
-  const moving = new Set<Element>(document.querySelectorAll(STYLED));
-  for (const animation of document.getAnimations()) {
-    const target = (animation.effect as KeyframeEffect | null)?.target;
-    if (target) {
-      moving.add(target);
+    const moving = new Set<Element>(document.querySelectorAll(STYLED));
+    for (const animation of document.getAnimations()) {
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      if (target) {
+        moving.add(target);
+      }
     }
-  }
-  const [vw, vh] = [window.innerWidth, window.innerHeight];
-  for (const el of moving) {
-    const r = el.getBoundingClientRect();
-    const area = r.width * r.height;
-    const w = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
-    const h = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
-    const fraction = area ? (w * h) / Math.min(area, vw * vh) : 0;
-    const centre = Math.abs((r.top + r.bottom) / 2 - vh / 2) / vh;
-    const css = getComputedStyle(el);
-    const values = Object.fromEntries(PROPS.map((p) => [p, css.getPropertyValue(p)]));
-    const opacity = Number(values.opacity);
-    const last = JSON.stringify(values);
-    const held = seen.get(el);
-    if (!held) {
-      seen.set(el, { seen: fraction, opacity, centre, values, last, y: window.scrollY, restless: false });
-      continue;
+    const [vw, vh] = [window.innerWidth, window.innerHeight];
+    for (const el of moving) {
+      const r = el.getBoundingClientRect();
+      const area = r.width * r.height;
+      const w = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
+      const h = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      const fraction = area ? (w * h) / Math.min(area, vw * vh) : 0;
+      const centre = Math.abs((r.top + r.bottom) / 2 - vh / 2) / vh;
+      const css = getComputedStyle(el);
+      const values = Object.fromEntries(PROPS.map((p) => [p, css.getPropertyValue(p)]));
+      const opacity = Number(values.opacity);
+      const last = JSON.stringify(values);
+      const held = seen.get(el);
+      if (!held) {
+        seen.set(el, { seen: fraction, opacity, centre, values, last, y: window.scrollY, restless: false });
+        continue;
+      }
+      held.restless ||= held.y === window.scrollY && held.last !== last;
+      held.last = last;
+      held.y = window.scrollY;
+      const shown = fraction >= IN_VIEW;
+      const better = held.seen < IN_VIEW ? shown || fraction > held.seen + GAIN : shown && (opacity > held.opacity + GAIN || (Math.abs(opacity - held.opacity) <= GAIN && centre < held.centre - GAIN));
+      if (better) {
+        Object.assign(held, { seen: fraction, opacity, centre, values });
+      }
     }
-    held.restless ||= held.y === window.scrollY && held.last !== last;
-    held.last = last;
-    held.y = window.scrollY;
-    const shown = fraction >= IN_VIEW;
-    const better = held.seen < IN_VIEW ? shown || fraction > held.seen + GAIN : shown && (opacity > held.opacity + GAIN || (Math.abs(opacity - held.opacity) <= GAIN && centre < held.centre - GAIN));
-    if (better) {
-      Object.assign(held, { seen: fraction, opacity, centre, values });
-    }
+  };
+
+  sampled();
+  for (let step = 0; step < walk.steps; step++) {
+    window.scrollBy(0, walk.stepPx);
+    await new Promise((done) => setTimeout(done, walk.pauseMs));
+    sampled();
   }
   return seen.size;
 }

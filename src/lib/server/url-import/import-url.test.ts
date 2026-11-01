@@ -113,7 +113,17 @@ describe('importPageAt', () => {
     await importPageAt(ask);
 
     expect(tab.tree).toHaveBeenCalledWith(1800);
-    expect(vi.mocked(tab.scroll).mock.calls.filter(([step]) => 'px' in step).length).toBe(3);
+    expect(tab.sample).toHaveBeenCalledWith(expect.objectContaining({ steps: 3 }));
+  });
+
+  it('walks the page in one call to the browser, not two per screen (stripe on Browserless: 44 round trips to scroll it)', async () => {
+    const { ask, tab } = askOf();
+    vi.mocked(tab.reveal).mockResolvedValue({ height: 14_000, hidden: 0 } as never);
+
+    await importPageAt(ask);
+
+    expect(vi.mocked(tab.scroll).mock.calls.filter(([step]) => 'px' in step)).toEqual([]);
+    expect(tab.sample).toHaveBeenCalledWith({ steps: 20, stepPx: 700, pauseMs: 0 });
   });
 
   it('una pagina pubblica diventa un frame col nome della pagina', async () => {
