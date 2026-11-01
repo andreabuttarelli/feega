@@ -35,6 +35,13 @@ describe('hotspotsOf', () => {
     expect(hotspotsOf(docWith({ kind: TriggerKind.Click }), FRAME, () => null)).toEqual([]);
   });
 
+  it('leaves variant changes to the instance they change', () => {
+    const doc = docWith({ kind: TriggerKind.Click });
+    const changing = putInteraction(doc, 'c0', { id: 'i0', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.ChangeTo, variant: { State: 'Open' } } });
+
+    expect(changing.ok && hotspotsOf(changing.doc, FRAME, () => ({ left: 0, top: 0, width: 10, height: 10 }))).toEqual([]);
+  });
+
   it('leaves after-delay links to the timer', () => {
     const doc = docWith({ kind: TriggerKind.AfterDelay, delayMs: 500 });
 

@@ -27,6 +27,12 @@ CLI `feega import-url`) → `importUrlInto` (`src/lib/server/url-import/canvas-i
 The page is read once, frozen, and the tree, the raster snapshots and the fidelity reference
 screenshot all come from that same frozen state.
 
+Every tab is pinned to light before the page loads (`fenced`, `browser.ts`): the
+`prefers-color-scheme: light` media emulation, a `matchMedia` that answers light to any colour
+scheme query (`lightOnly`, registered after anything else the browser injects — Browserless'
+stealth fingerprint answered dark in 2 of 5 vercel.com reads), `:root{color-scheme:light}`, and the
+`Sec-CH-Prefers-Color-Scheme: light` client hint for sites that pick the theme on the server.
+
 `pagePrepared` (`import-url.ts`):
 
 1. Before the first script (`tab.seeAll`): every IntersectionObserver reports its targets in view
@@ -155,6 +161,10 @@ block is comes from one table, `KINDS` in `component-kinds.ts` (first matching r
   and generic items never nest; a block with its parent's box is not a second component.
 - Occurrences become `INSTANCE` nodes whose `componentId` is the first copy; that copy is the main, placed
   where it was. A main nested in another set's main is homed on its own set frame (`setHomes`).
+- Set frames get a `Background` rect (`SET_BACKDROP`, which `setMainOf` accepts): the most used
+  backdrop of their mains, found by `main-backdrop.ts` walking up from the clip that places the main
+  (through the comps that hold it) to the first opaque solid fill, with its variable binding; a main
+  on another backdrop gets its own rect behind it, its box plus half the set gap.
 - Figma scene: an instance builds its own layers at the main's position and diffs them with the main
   (`instance-diff.ts`). Differences on any clip become overrides (text, fills, geometry, auto layout,
   layout item); inside nested groups they are path overrides. Images that differ on top-level clips
@@ -245,6 +255,16 @@ Before, a narrower frame was the desktop page shrunk (small text, same layout), 
 sometimes scores well; after, text keeps its size and rows built with fixed widths (framer's
 hero, apple's tiles, webflow's grids) run past the frame's edge.
 
+## Interactive parts
+
+`page-patterns.ts` is one in-page table: each row says how to find a part (`<details>`; `[aria-expanded]` with the panel it controls; `[role=tablist]` with its panels; `[role=switch]` and checkboxes; Swiper carousels), its states, how to enter one and which elements lead to which state. The walker (`pageTreeOf`) stamps each part's root (`pattern`) and the elements that lead to another state (`go`), reads the page as it is, then for every other state unfreezes the page for a beat (`__feegaStill` off, a timer rAF), enters it with link navigation blocked, drops focus and reads the root again (`tree.patterns`). A state the page does not take (`shows` false) is skipped, and a part with no other state left loses its marks. Parts nested in a part, rooted at the body, or larger than half the page are left out.
+
+`page-hovers.ts` reads every `:hover` rule whose hover is on the subject (not `.card:hover .title`), applies it through an attribute selector with transitions off, and stamps the changed look and the element's own transition on its node (`hover`). `hover-states.ts` turns that into a Hover element state: fill (background, or colour on a text), stroke, opacity, scale; the CSS timing function becomes a house ease or a bezier.
+
+`pattern-sets.ts` runs at the marker step of `urlPlan`: part roots are set aside so `repeated.ts` does not fold look-alike parts into one main (a repeated block around one is unmarked), then each root becomes the main of its own set (`Accordion 1 / State=Closed`), the other states are inserted beside it as hidden absolute mains so the Figma path builds them, and every `go` becomes a `change_to` link (ADR 0030, amendment). After planning the hidden placements of the other variants are removed; their comps stay in the page doc and go to the Components frame with the set. With breakpoints on, parts stay plain.
+
+The player swaps the instance around a clicked layer (`variant-change.ts`): spots are placed by the precomp path down to the layer (`pathRect`), so each instance of a main has its own.
+
 ## Not yet
 
 - Breakpoint views where the narrower page uses other elements (linear's headline spans, stripe's
@@ -254,6 +274,7 @@ hero, apple's tiles, webflow's grids) run past the frame's edge.
   snapshots); on blocks holding text only their own paint keeps the effect, the text does not.
 - A blend mode passed to text leaves inside an isolated parent blends with less than the page did
   (stripe's hero: fold 0.989 → 0.974).
+- Interactive parts driven by pointer events or by scripts the freeze stops (feega.app's tabs are a Framer component that ignores a synthetic click once frozen), JavaScript hover effects, hover on a descendant (`.card:hover .title`), carousels other than Swiper, interactive parts together with breakpoints.
 
 ## Fidelity
 
@@ -261,6 +282,9 @@ hero, apple's tiles, webflow's grids) run past the frame's edge.
 `fidelity-pages.ts` as the import reads them, plus a reference screenshot;
 `URL_IMPORT_FIDELITY=<label>` (`url-fidelity.browser.test.ts`) draws the plan and scores SSIM above
 the fold and over the whole page. Output in `~/Documents/feega-videos/url-import/fidelity2/`.
+`URL_IMPORT_SHEET=<label>` (`components-page.browser.test.ts`, with `URL_IMPORT_CAPTURED`) draws
+every set frame of the plan where the Components page puts it, on the light canvas grey, as
+`runs/<label>/<page>-components.png`.
 
 The HTML still is not what the canvas draws. `URL_IMPORT_GPU=<label> npx vite-node --config
 scripts/vite-node.config.ts scripts/url-import/gpu-fidelity.ts` (optional `URL_IMPORT_CAPTURED`,

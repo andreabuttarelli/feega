@@ -6,7 +6,8 @@ import { TransitionKind } from '@feega/motion-core/motion/design';
 import { addClip, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { compileScene } from './scene';
-import { leafRectsAt, pickAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from './pick';
+import { leafRectsAt, pathRect, pickAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from './pick';
+import { createComponent } from '../main-component';
 import { groupClips } from '../group';
 import { drawClip } from '../draw-create';
 import { DrawTool } from '../draw-tool';
@@ -117,6 +118,22 @@ describe('rectOf', () => {
     const turned = rectOf(sceneOf(must(setTransform(shape(empty, 'a', 0.5, 0.5, 0.2), 'a', { rotateZ: 45 }))), 'a', 0)!;
 
     expect(turned.width).toBeGreaterThan(flat.width);
+  });
+});
+
+describe('pathRect', () => {
+  it('bounds a clip inside one instance, not every instance of its main', () => {
+    let n = 0;
+    const made = must(createComponent(shape(empty, 'a', 0.2, 0.5, 0.1), ['a'], () => `m${++n}`, 'Dot'));
+    const first = made.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+    const second = must(setTransform(must(addClip(made, { component: 'Precomp', from: 0, durationInFrames: 90, props: { comp: first.props.comp } }, 'second')), 'second', { x: 0.4 }));
+    const scene = sceneOf(second);
+    const one = pathRect(scene, [first.id, 'a'], 0)!;
+    const other = pathRect(scene, ['second', 'a'], 0)!;
+
+    expect(one.width).toBeCloseTo(other.width, 3);
+    expect(other.left - one.left).toBeGreaterThan(one.width);
+    expect(pathRect(scene, ['nobody', 'a'], 0)).toBeNull();
   });
 });
 

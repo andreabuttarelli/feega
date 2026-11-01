@@ -13,6 +13,8 @@ function fakeBrowser() {
     setViewport: vi.fn(async () => undefined),
     setBypassCSP: vi.fn(async () => undefined),
     emulateMediaFeatures: vi.fn(async () => undefined),
+    evaluateOnNewDocument: vi.fn(async () => undefined),
+    setExtraHTTPHeaders: vi.fn(async () => undefined),
     setRequestInterception: vi.fn(async () => undefined),
     on: vi.fn(),
     createCDPSession: vi.fn(async () => ({ send: vi.fn(async () => undefined) })),
@@ -101,6 +103,7 @@ describe('browserless: a hosted browser behind the same tab', () => {
     await browserless({ key: KEY }, { connect: async () => browser, sleep: async () => undefined })();
 
     expect(page.emulateMediaFeatures).toHaveBeenCalledWith([{ name: 'prefers-color-scheme', value: 'light' }]);
+    expect(page.setExtraHTTPHeaders).toHaveBeenCalledWith({ 'sec-ch-prefers-color-scheme': 'light' });
   });
 });
 

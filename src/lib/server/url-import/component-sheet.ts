@@ -1,12 +1,14 @@
 import { Background, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { addClip } from '@feega/motion-core/motion/timeline';
+import { addClip, editClip } from '@feega/motion-core/motion/timeline';
+import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { Destination } from '$lib/canvas/figma/scene';
 import { FrameKind } from '$lib/canvas/motion-node';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
 import { componentSlice } from '$lib/motion/canvas-components';
 import { compBox, reframed, type Box } from '$lib/motion/comp-frame';
 import type { NewId } from '$lib/motion/main-component';
-import { SET_GAP_PX, SET_PAD_PX } from '$lib/motion/component-set';
+import { SET_BACKDROP, SET_GAP_PX, SET_PAD_PX } from '$lib/motion/component-set';
+import { backdropsOf, type Backdrop } from './main-backdrop';
 
 const PAGE_GAP_PX = 120;
 const PAGE_ROW_PX = 2400;
@@ -14,7 +16,7 @@ const PAGE_ROW_PX = 2400;
 export type Homes = Record<number, Record<string, number>>;
 export type ComponentPages = { sets: PlanItem[]; homes: Homes; setHomes: Homes };
 
-type Main = { id: string; comp: MotionComp; box: Box };
+type Main = { id: string; comp: MotionComp; box: Box; backdrop: Backdrop | null };
 type SetOf = { name: string; source: PlanItem; mains: Main[] };
 
 const widthOf = (b: Box) => b.right - b.left;
@@ -25,6 +27,7 @@ function setsOf(items: readonly PlanItem[]): Map<string, SetOf> {
   const seen = new Set<string>();
   for (const item of items) {
     const size = { width: item.doc.width, height: item.doc.height };
+    const backdropOf = backdropsOf(item.doc);
     for (const [id, comp] of Object.entries(item.doc.comps)) {
       const box = comp.component && !seen.has(id) ? compBox(comp, size) : null;
       if (!box) {
@@ -33,7 +36,7 @@ function setsOf(items: readonly PlanItem[]): Map<string, SetOf> {
       seen.add(id);
       const key = comp.component!.set ?? id;
       const set = sets.get(key) ?? { name: comp.component!.set ?? comp.component!.name, source: item, mains: [] };
-      sets.set(key, { ...set, mains: [...set.mains, { id, comp, box }] });
+      sets.set(key, { ...set, mains: [...set.mains, { id, comp, box, backdrop: backdropOf(id) }] });
     }
   }
   return sets;
@@ -43,22 +46,46 @@ const bare = (source: MotionDoc, size: { width: number; height: number }): Motio
 
 const clipIdsIn = (doc: MotionDoc) => new Set(Object.values(doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((clip) => clip.id))));
 
+const backdropKey = (b: Backdrop | null) => (b ? `${b.fill}|${b.bind ?? ''}` : '');
+
+function mostUsed(mains: Main[]): Backdrop | null {
+  const counts = new Map<string, { backdrop: Backdrop; uses: number }>();
+  for (const { backdrop } of mains.filter((m) => m.backdrop)) {
+    const key = backdropKey(backdrop);
+    counts.set(key, { backdrop: backdrop!, uses: (counts.get(key)?.uses ?? 0) + 1 });
+  }
+  return [...counts.values()].sort((a, b) => b.uses - a.uses)[0]?.backdrop ?? null;
+}
+
+function backed(doc: MotionDoc, backdrop: Backdrop, box: Box, newId: NewId): MotionDoc {
+  const id = newId();
+  const props = { shape: ShapeKind.Rect, fill: backdrop.fill, x: (box.left + box.right) / 2 / doc.width, y: (box.top + box.bottom) / 2 / doc.height, width: widthOf(box) / doc.width, height: heightOf(box) / doc.height };
+  const added = addClip(doc, { component: 'Shape', from: 0, durationInFrames: doc.durationInFrames, props }, id);
+  const named = added.ok ? editClip(added.doc, id, (clip) => ({ ...clip, name: SET_BACKDROP, ...(backdrop.bind ? { bind: { ...clip.bind, fill: backdrop.bind } } : {}) })) : added;
+  return named.ok ? named.doc : doc;
+}
+
 function setDoc(set: SetOf, newId: NewId): MotionDoc {
   const source = set.source.doc;
   const size = {
     width: Math.ceil(SET_PAD_PX * 2 + set.mains.reduce((sum, m) => sum + widthOf(m.box) + SET_GAP_PX, -SET_GAP_PX)),
     height: Math.ceil(SET_PAD_PX * 2 + Math.max(...set.mains.map((m) => heightOf(m.box))))
   };
+  const slots = set.mains.map((main, i) => ({ main, left: SET_PAD_PX + set.mains.slice(0, i).reduce((sum, m) => sum + widthOf(m.box) + SET_GAP_PX, 0) }));
+  const common = mostUsed(set.mains);
+  const half = SET_GAP_PX / 2;
   let doc = bare(source, size);
-  let left = SET_PAD_PX;
-  for (const main of set.mains) {
+  doc = common ? backed(doc, common, { left: 0, top: 0, right: size.width, bottom: size.height }, newId) : doc;
+  for (const { main, left } of slots.filter((s) => s.main.backdrop && backdropKey(s.main.backdrop) !== backdropKey(common))) {
+    doc = backed(doc, main.backdrop!, { left: left - half, top: SET_PAD_PX - half, right: left + widthOf(main.box) + half, bottom: SET_PAD_PX + heightOf(main.box) + half }, newId);
+  }
+  for (const { main, left } of slots) {
     const nested = Object.fromEntries(Object.entries(componentSlice(source, main.id).comps).filter(([id]) => id !== main.id && !doc.comps[id]).map(([id, comp]) => [id, reframed(comp, source, size)]));
     const moved = reframed(main.comp, source, size, { x: left - main.box.left, y: SET_PAD_PX - main.box.top });
     const { home: _home, ...component } = main.comp.component!;
     doc = { ...doc, comps: { ...doc.comps, ...nested, [main.id]: { ...moved, component } } };
     const placed = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(main.comp.durationInFrames, doc.durationInFrames), props: { comp: main.id } }, newId());
     doc = placed.ok ? placed.doc : doc;
-    left += widthOf(main.box) + SET_GAP_PX;
   }
   return doc;
 }

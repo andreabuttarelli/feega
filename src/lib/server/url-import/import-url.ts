@@ -8,6 +8,7 @@ import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
 import type { PageOutline } from './page-outline';
+import { PatternKind } from './page-patterns';
 import { sheetFonts, type FetchText } from './sheet-fonts';
 import type { PageView, ViewRead } from './page-views';
 import type { Homes } from './component-sheet';
@@ -88,6 +89,10 @@ const FONT_SHAPE = z.object({ family: z.string(), weight: z.string(), style: z.s
 
 const SNAP_SHAPE = z.object({ ref: z.string(), box: BOX_SHAPE, mode: z.nativeEnum(SnapMode) });
 
+const NODE_SHAPE = z.object({ id: z.string(), type: z.string() }).passthrough();
+
+const PATTERN_SHAPE = z.object({ ix: z.number().int(), kind: z.nativeEnum(PatternKind), prop: z.string().min(1), initial: z.string().min(1), states: z.array(z.string().min(1)), variants: z.array(z.object({ state: z.string().min(1), root: NODE_SHAPE })) });
+
 const TREE_SHAPE = z
   .object({
     title: z.string(),
@@ -99,7 +104,8 @@ const TREE_SHAPE = z
     fonts: z.array(FONT_SHAPE).optional(),
     sheets: z.array(z.string()).optional(),
     snaps: z.array(SNAP_SHAPE).optional(),
-    outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional()
+    outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional(),
+    patterns: z.array(PATTERN_SHAPE).optional()
   })
   .strict();
 

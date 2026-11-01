@@ -17,6 +17,8 @@ import { tokensOf, type SiteBrand } from './page-tokens';
 import { samplesOf, siteName, tokenised } from './token-bind';
 import { componentKit } from './component-kit';
 import { componentPages, type ComponentPages } from './component-sheet';
+import { patternSets, withoutCarriers, withPatterns } from './pattern-sets';
+import { withHoverStates } from './hover-states';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -245,19 +247,29 @@ const REPEATED: Marker = (root) => repeatedOf(root).root;
 
 const UNMARKED: Marker = (root) => root;
 
+const hovered = (tree: PageTree): PageTree => ({
+  ...tree,
+  root: withHoverStates(tree.root),
+  ...(tree.patterns ? { patterns: tree.patterns.map((p) => ({ ...p, variants: p.variants.map((v) => ({ ...v, root: withHoverStates(v.root) })) })) } : {})
+});
+
 export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, shape: PageShape = PLAIN_SHAPE, reads: ViewRead[] = []): UrlPlan | null {
-  const [tree, views] = reads.length ? [joinedTree(read), reads.map((v) => ({ ...v, tree: joinedTree(v.tree) }))] : [read, reads];
+  const [joined, views] = reads.length ? [joinedTree(read), reads.map((v) => ({ ...v, tree: joinedTree(v.tree) }))] : [read, reads];
+  const tree = hovered(joined);
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
-  const shaped = withExtras(flattened((views.length ? UNMARKED : mark)(stacksOf(SECTIONED[shape.sectioning](tree)))), views);
+  const patterns = views.length ? [] : (tree.patterns ?? []);
+  const shaped = withExtras(flattened(withPatterns(stacksOf(SECTIONED[shape.sectioning](tree)), patterns, views.length ? UNMARKED : mark, stacksOf)), views);
   const images = refsOf(shaped);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
   const root = mapped({ ...shaped, name }, keyOf, family);
-  const stack = stacked(slicesOf(root), newId, uploads, views, tree.width);
-  if (!stack) {
+  const planned = stacked(slicesOf(root), newId, uploads, views, tree.width);
+  if (!planned) {
     return null;
   }
+  const dynamic = patternSets(patterns);
+  const stack = { ...planned, items: planned.items.map((item) => ({ ...item, doc: withoutCarriers(item.doc, dynamic) })) };
   const tokening = shape.tokening ?? Tokening.Off;
   const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
   const counts = tokened.items.map((item) => countOf(item.doc));

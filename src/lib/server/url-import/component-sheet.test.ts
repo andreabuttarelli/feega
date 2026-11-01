@@ -107,3 +107,39 @@ describe('a main nested in another main', () => {
     expect(made.setHomes[at('Button')]).toBeUndefined();
   });
 });
+
+const dark = (id: string, x: number, mains: RestNode[]): RestNode => ({ id, type: 'FRAME', name: 'Hero', absoluteBoundingBox: { x, y: 0, width: 300, height: 240 }, fills: solid(0.05, 0.05, 0.05), children: mains });
+const pill = (id: string, x: number, colour: number): RestNode => ({ id, type: 'INSTANCE', name: 'Pill', componentId: id, absoluteBoundingBox: { x, y: 100, width: 100, height: 40 }, fills: solid(colour, colour, colour), children: [label(`${id}t`, 'Go', x + 20, 110)] });
+const backdropsOf = (set: PlanItem) => set.doc.tracks.flatMap((t) => t.clips).filter((c) => c.name === 'Background');
+const backdropPlan = (children: RestNode[]) => {
+  let n = 0;
+  return urlPlan({ title: 'Dark', url: 'https://example.com', width: 600, height: 240, truncated: false, root: { id: 'root', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 600, height: 240 }, fills: solid(1, 1, 1), children } }, () => `id${++n}`, (root) => root, {}, FULL_SHAPE)!;
+};
+
+describe('a main on the Components page', () => {
+  it('keeps the dark section it was designed on as its backdrop, so a light button stays readable', () => {
+    const made = backdropPlan([dark('hero', 0, [pill('p1', 40, 1)])]);
+    const [backdrop] = backdropsOf(made.sets[0]);
+
+    expect(backdrop?.props).toMatchObject({ x: 0.5, y: 0.5, width: 1, height: 1, fill: '#0d0d0d' });
+    expect(made.sets[0].doc.tracks.flatMap((t) => t.clips)[0].name).toBe('Background');
+  });
+
+  it('on the page background gets that background', () => {
+    const made = backdropPlan([pill('p1', 340, 0.2)]);
+
+    expect(backdropsOf(made.sets[0])[0]?.props.fill).toBe('#ffffff');
+  });
+
+  it('in a set whose variants come from a dark and a light section, the odd one gets its own backdrop behind it', () => {
+    const variant = (id: string, x: number, colour: number, style: string): RestNode => ({ ...pill(id, x, colour), name: `Pill / Style=${style}` });
+    const made = backdropPlan([dark('hero', 0, [variant('p1', 40, 1, 'Light')]), variant('p2', 340, 0.2, 'Dark')]);
+
+    expect(made.sets).toHaveLength(1);
+    const [whole, odd] = backdropsOf(made.sets[0]);
+    expect([whole.props.fill, whole.props.width]).toEqual(['#0d0d0d', 1]);
+    expect(odd.props.fill).toBe('#ffffff');
+    expect(Number(odd.props.width)).toBeLessThan(0.6);
+  });
+});
+

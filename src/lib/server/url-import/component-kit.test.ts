@@ -7,6 +7,7 @@ import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { VarType } from '@feega/motion-core/motion/variables-model';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import { defineVariable } from '$lib/motion/variables';
+import { SET_BACKDROP } from '$lib/motion/component-set';
 import { colourDistance } from './page-tokens';
 import { State, stateShade } from './component-kit';
 import { FULL_SHAPE, urlPlan, type UrlPlan } from './url-doc';
@@ -112,13 +113,13 @@ describe('repeated blocks of an imported page become a component kit', () => {
     expect(Object.keys(plan.homes[0]).sort()).toEqual(placed.sort());
   });
 
-  it('a set stands free on the Components page: no frame, no backdrop, only its mains', () => {
+  it('a set stands free on the Components page: no frame, only its mains on the backdrop they were designed on', () => {
     const [set] = planned().sets;
 
     expect(set.destination).toBe(Destination.Free);
     expect(set.kind).toBe(FrameKind.Element);
     expect(set.doc.background).toBe(Background.Transparent);
-    expect(set.doc.tracks.flatMap((t) => t.clips).every((c) => c.component === 'Precomp')).toBe(true);
+    expect(set.doc.tracks.flatMap((t) => t.clips).every((c) => c.component === 'Precomp' || c.name === SET_BACKDROP)).toBe(true);
   });
 });
 

@@ -106,10 +106,42 @@ async function gate(request: HTTPRequest): Promise<void> {
 }
 
 const LIGHT_SCHEME = [{ name: 'prefers-color-scheme', value: 'light' }];
+const LIGHT_HINT = { 'sec-ch-prefers-color-scheme': 'light' };
+
+function lightOnly(): void {
+  const SCHEME = /prefers-color-scheme/;
+  const answered = window.matchMedia.bind(window);
+  const fixed = (query: string): MediaQueryList => ({
+    matches: /light/.test(query) && !/dark/.test(query),
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false
+  });
+  window.matchMedia = (query: string) => (SCHEME.test(query) ? fixed(query) : answered(query));
+  const style = document.createElement('style');
+  style.textContent = ':root{color-scheme:light!important}';
+  const pin = () => document.documentElement?.appendChild(style);
+  if (document.documentElement) {
+    pin();
+    return;
+  }
+  new MutationObserver((_, watch) => {
+    if (document.documentElement) {
+      pin();
+      watch.disconnect();
+    }
+  }).observe(document, { childList: true });
+}
 
 async function fenced(page: Page): Promise<void> {
   await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 });
   await page.emulateMediaFeatures(LIGHT_SCHEME);
+  await page.evaluateOnNewDocument(lightOnly);
+  await page.setExtraHTTPHeaders(LIGHT_HINT);
   await page.setBypassCSP(true);
   await page.setRequestInterception(true);
   page.on('request', (request) => void gate(request));
