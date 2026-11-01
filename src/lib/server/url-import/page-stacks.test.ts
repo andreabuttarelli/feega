@@ -90,6 +90,13 @@ describe('stacksOf', () => {
     expect(row).toMatchObject({ layoutMode: 'HORIZONTAL', primaryAxisAlignItems: 'SPACE_BETWEEN', layoutAlign: 'STRETCH', paddingLeft: 10 });
   });
 
+  it('un paragrafo largo quanto la colonna la riempie e cresce in giù, così va a capo quando la tela si stringe (overreacted.io)', () => {
+    const para = node('TEXT', 20, 0, 360, 60, { characters: 'Right now, this information only exists on my device.', textAutoResize: 'HEIGHT', style: { fontSize: 17, lineHeightPx: 30 } });
+    const made = stacksOf(frame(0, 0, 400, 300, [para, rect(20, 120, 360, 100)], { layoutMode: 'VERTICAL', paddingLeft: 20, paddingRight: 20, itemSpacing: 60 }));
+
+    expect(made.children![0]).toMatchObject({ layoutAlign: 'STRETCH', textAutoResize: 'HEIGHT' });
+  });
+
   it('una pila che arriva già dalla pagina riempie coi figli larghi quanto lei', () => {
     const made = stacksOf(frame(0, 0, 400, 300, [frame(20, 0, 360, 100, []), rect(100, 120, 200, 100)], { layoutMode: 'VERTICAL', paddingLeft: 20, paddingRight: 20, itemSpacing: 20 }));
 

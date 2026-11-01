@@ -66,6 +66,7 @@ export type RestNode = {
   counterAxisSizingMode?: string;
   layoutGrow?: number;
   layoutAlign?: string;
+  maxWidth?: number;
   layoutPositioning?: string;
   fillGeometry?: { path: string; windingRule?: string }[];
   strokeGeometry?: { path: string; windingRule?: string }[];
@@ -246,6 +247,7 @@ function layoutOf(n: RestNode): Partial<FigmaRawNode> {
     stackCounterSizing: sizing(n.counterAxisSizingMode),
     stackChildPrimaryGrow: n.layoutGrow,
     stackChildAlignSelf: n.layoutAlign,
+    maxWidth: n.maxWidth,
     stackPositioning: n.layoutPositioning
   };
 }

@@ -69,6 +69,7 @@ export type FigmaRawNode = {
   stackChildPrimaryGrow?: number;
   stackChildAlignSelf?: string;
   stackPositioning?: string;
+  maxWidth?: number;
   fillGeometry?: { commandsBlob?: number }[];
   strokeGeometry?: { commandsBlob?: number }[];
   internalOnly?: boolean;

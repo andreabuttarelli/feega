@@ -157,6 +157,44 @@ Measured on the nine fidelity pages (SSIM fold/full, HTML, capture `v4`), tablet
 0.90/0.90, blog 0.87/0.41, feega 0.70/0.58. The base view keeps its fidelity (every page ≥ 0.95).
 Breakpoints are opt-in for that reason.
 
+## Resizing
+
+Resizing an imported frame on the canvas (`fitToNode`, constrained) reflows it like the page in a
+narrower window:
+
+- A still frame keeps pixels on resize (`heldPixels`, the rule a breakpoint view uses): text size,
+  stroke widths and the width of laid-out children stay, positions follow constraints and auto
+  layout. Videos still scale with the frame.
+- The page layer spanning the frame is pinned left and right (`pinnedWide`), so it fills the new
+  width.
+- A column whose content sits centred between equal side paddings (`centredColumn`,
+  `page-stacks.ts`) loses those paddings; its full-width children fill it with `maxWidth` at their
+  width (`RestNode.maxWidth` → `layoutItem.maxWidth`, never below the clip's own width), so the
+  content stays centred on desktop and shrinks with a narrower frame.
+- Paragraphs as wide as their column fill it and grow down (`STRETCHED`, `page-stacks.ts`).
+
+`URL_IMPORT_RESIZE=<label> URL_IMPORT_CAPTURED=<capture> URL_IMPORT_ONLY=<pages>`
+(`url-resize-fidelity.browser.test.ts`) resizes the plan to the widths the capture has
+(`<page>@<width>-source.png`) and scores it against the page at that width.
+
+Measured on capture `v4` (SSIM fold/full against the page at that width, before → after):
+
+| page | 768 | 390 |
+|---|---|---|
+| vercel | 0.21/0.37 → 0.27/0.52 | 0.16/0.29 → 0.36/0.39 |
+| linear | 0.45/0.50 → 0.53/0.62 | 0.45/0.35 → 0.83/0.36 |
+| stripe | 0.43/0.37 → 0.38/0.36 | 0.57/0.49 → 0.62/0.56 |
+| apple | 0.44/0.48 → 0.34/0.46 | 0.66/0.50 → 0.60/0.59 |
+| framer | 0.68/0.40 → 0.52/0.39 | 0.70/0.40 → 0.58/0.30 |
+| webflow | 0.68/0.46 → 0.60/0.43 | 0.55/0.46 → 0.49/0.42 |
+| tailwind | 0.42/0.33 → 0.53/0.45 | 0.46/0.38 → 0.60/0.47 |
+| blog | 0.62/0.55 → 0.77/0.59 | 0.56/0.41 → 0.70/0.56 |
+| feega | 0.33/0.29 → 0.61/0.37 | 0.43/0.26 → 0.61/0.34 |
+
+Before, a narrower frame was the desktop page shrunk (small text, same layout), which SSIM
+sometimes scores well; after, text keeps its size and rows built with fixed widths (framer's
+hero, apple's tiles, webflow's grids) run past the frame's edge.
+
 ## Not yet
 
 - Breakpoint views where the narrower page uses other elements (linear's headline spans, stripe's

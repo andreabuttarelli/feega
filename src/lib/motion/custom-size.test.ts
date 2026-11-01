@@ -127,3 +127,23 @@ describe('resizing a frame while ignoring constraints', () => {
     expect(sized.ok && sized.doc.tracks[0].clips[0].constraints).toEqual(own);
   });
 });
+
+describe('resizing a still frame', () => {
+  const page = () => {
+    const base = newMotionDoc(MotionFormat.Landscape);
+    const row = { id: 'row', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 0.5 }, autoLayout: { direction: 'horizontal', gap: 0, padding: { top: 0, right: 0, bottom: 0, left: 0 } }, transform: {}, keyframes: {} };
+    const card = { id: 'card', parent: 'row', from: 0, durationInFrames: 150, component: 'Shape', props: { shape: 'rect', x: 0.125, y: 0.5, width: 0.25, height: 0.5 }, transform: {}, keyframes: {} };
+    const title = { id: 'title', from: 0, durationInFrames: 150, component: 'Text', props: { text: 'Hi', x: 0.25, y: 0.1, width: 0.5, height: 0.1, size: 0.05 }, transform: {}, keyframes: {}, constraints: { horizontal: Horizontal.Left, vertical: Vertical.Top } };
+    return { ...base, still: { frame: 0 }, width: 1280, height: 800, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [row, card, title] }] } as unknown as MotionDoc;
+  };
+  const clip = (doc: MotionDoc, id: string) => doc.tracks[0].clips.find((c) => c.id === id)!;
+
+  it('keeps type size and the pixel width of laid-out children, as a page does in a narrower window', () => {
+    const sized = fitToNode(page(), { width: 768, height: 800 });
+    const doc = sized.ok ? sized.doc : page();
+
+    expect(Number(clip(doc, 'title').props.size) * Math.min(doc.width, doc.height)).toBeCloseTo(40);
+    expect(Number(clip(doc, 'card').props.width) * doc.width).toBeCloseTo(320);
+    expect(Number(clip(doc, 'row').props.width) * doc.width).toBeCloseTo(768);
+  });
+});

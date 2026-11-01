@@ -2,7 +2,8 @@ import { Grouping, planOf, type FigmaPlan, type FontUpload, type PlanItem } from
 import { catalogueFamily, familyFor } from '$lib/motion/vector-ui/piece';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { restMessage, type RestNode, type RestPaint, type RestStyle } from '$lib/server/figma/rest-message';
-import { DESIGN_MAX_SIDE, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DESIGN_MAX_SIDE, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import type { PageFont, PageTree } from './page-tree';
 import { repeatedOf } from './repeated';
@@ -173,12 +174,19 @@ function viewed(plan: FigmaPlan | null, root: RestNode, slice: Slice, views: Vie
   return { ...plan, items: [{ ...item, doc }] };
 }
 
+const PAGE_PIN = { horizontal: Horizontal.LeftRight, vertical: Vertical.Top };
+const WHOLE_WIDTH = 0.999;
+
+const spansPage = (clip: MotionClip) => !clip.parent && Number(clip.props.width) >= WHOLE_WIDTH;
+
+const pinnedWide = (doc: MotionDoc): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (spansPage(c as MotionClip) ? { ...c, constraints: PAGE_PIN } : c)) })) as MotionDoc['tracks'] });
+
 function stacked(slices: { root: RestNode; top: number }[], newId: () => string, uploads: FontUpload[], views: ViewRead[] = [], pagePx = 1): FigmaPlan | null {
   const total = slices.reduce((s, x) => s + x.root.absoluteBoundingBox!.height, 0);
   const plans = slices.flatMap(({ root, top }, i) => {
     const plan = viewed(planOf(restMessage([root], FILE_KEY), newId, uploads, Grouping.Frame), root, i ? Slice.Later : Slice.First, views, pagePx);
     const middle = top + root.absoluteBoundingBox!.height / 2 - total / 2;
-    return plan ? [{ ...plan, items: plan.items.map((item) => ({ ...item, centre: { x: 0, y: middle } })) }] : [];
+    return plan ? [{ ...plan, items: plan.items.map((item) => ({ ...item, doc: pinnedWide(item.doc), centre: { x: 0, y: middle } })) }] : [];
   });
   return plans.length ? { items: plans.flatMap((p) => p.items), skipped: [...new Set(plans.flatMap((p) => p.skipped))], fileKey: plans[0].fileKey } : null;
 }

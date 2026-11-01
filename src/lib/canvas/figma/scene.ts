@@ -81,7 +81,7 @@ export type LayerEffect = Shadow | Blur;
 
 export type Padding = { top: number; right: number; bottom: number; left: number };
 export type AutoLayout = { flow: Flow; wrap: boolean; gap: number; crossGap: number; padding: Padding; justify: Justify; align: Cross; width: Fit; height: Fit };
-export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean };
+export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean; maxWidth?: number };
 
 export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number };
 
@@ -413,7 +413,7 @@ function autoLayoutOf(n: FigmaRawNode, report: Report): AutoLayout | null {
   };
 }
 
-const itemOf = (n: FigmaRawNode): ChildItem => ({ grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE' });
+const itemOf = (n: FigmaRawNode): ChildItem => ({ grow: (n.stackChildPrimaryGrow ?? 0) > 0, stretch: n.stackChildAlignSelf === 'STRETCH', absolute: n.stackPositioning === 'ABSOLUTE', ...(n.maxWidth ? { maxWidth: n.maxWidth } : {}) });
 
 const SPACING_PX: Record<string, (value: number, size: number) => number> = { PIXELS: (v) => v, PERCENT: (v, size) => (v / PERCENT) * size, RAW: (v, size) => v * size };
 

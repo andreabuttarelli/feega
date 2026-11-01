@@ -3575,6 +3575,10 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** an imported phone view places a desktop hero at an FAQ answer's box; node count and distinct ids of the planned tree differ. **Move:** each page read numbers its nodes from 1, so a layer copied from the phone read into the desktop tree reuses a desktop id, and any map by id picks the wrong one. Give copied layers a namespaced id (`<view>:<id>`) and count `new Set(ids).size` against the node count before trusting an id map.
 
+## A size page-stacks measured is not the size the layer gets
+
+**Signal:** a value computed in `page-stacks.ts` from a node box (a max width, a span) shifts a layer by a few px on desktop; dumping clip boxes with and without the change shows the layer narrower than its doc width. **Move:** `page-flatten` runs after stacks and can hand a node a wrapper box; take sizes the layout depends on from the built clip in `figma-doc.ts` (or guard with it), not from the box stacks saw. Diff clip boxes (`withAutoLayout`, every clip including comps) before scoring SSIM.
+
 ## An imported component in a row lands shifted by what it draws outside its box
 
 **Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
