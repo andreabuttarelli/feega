@@ -296,7 +296,7 @@ describe('a page read at desktop and phone width', () => {
   });
 
   it('with breakpoints the page is not cut into section frames, so each element stays one layer the views can match (stripe.com: the hero gradient over its headline on the phone)', () => {
-    const outlined = (page: PageTree): PageTree => ({ ...page, outline: { width: page.width, height: page.height, root: { tag: 'body', box: { x: 0, y: 0, width: page.width, height: page.height }, children: [{ tag: 'header', box: { x: 0, y: 0, width: page.width, height: 100 } }, { tag: 'main', box: { x: 0, y: 100, width: page.width, height: page.height - 100 } }] } } });
+    const outlined = (page: PageTree): PageTree => ({ ...page, outline: { width: page.width, height: page.height, root: { tag: 'body', box: { y: 0, width: page.width, height: page.height }, children: [{ tag: 'header', box: { y: 0, width: page.width, height: 100 } }, { tag: 'main', box: { y: 100, width: page.width, height: page.height - 100 } }] } } });
     const wide = outlined(pageOf(1280, 800, [card('a', { x: 40, y: 20, width: 1200, height: 60 }), card('b', { x: 40, y: 50, width: 1200, height: 650 })]));
     const narrow = outlined(pageOf(390, 1200, [card('a', { x: 20, y: 20, width: 350, height: 60 }), card('b', { x: 20, y: 50, width: 350, height: 1050 })]));
     const plannedAs = (sectioning: Sectioning, reads: { view: (typeof PAGE_VIEWS)[number]; tree: PageTree }[]) => {
