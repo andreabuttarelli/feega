@@ -1,4 +1,4 @@
-import puppeteer, { type Page } from 'puppeteer-core';
+import puppeteer, { type ConnectionTransport, type Page } from 'puppeteer-core';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import type { RestNode } from '$lib/server/figma/rest-message';
@@ -437,6 +437,72 @@ describe.runIf(process.env.CHROMIUM_PATH)('the elements a node came from', () =>
       expect(text('Database')?.dom).toEqual({ tag: 'div', landmark: 'footer', press: 'link' });
       expect(text('Card title')?.dom).toEqual({ tag: 'h3' });
       expect(text('Made by us')?.dom).toEqual({ tag: 'p', landmark: 'footer' });
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const CANVASES = 8;
+const MANY_PICTURES = `<body style="margin:0;background:#fff">${Array.from({ length: CANVASES }, (_, i) => `<canvas width="100" height="100" style="display:block;width:100px;height:100px;margin-bottom:${i * 150}px"></canvas>`).join('')}<script>for (const canvas of document.querySelectorAll('canvas')) { const c = canvas.getContext('2d'); c.fillStyle = '#0a0'; c.fillRect(0, 0, 100, 100); }</script></body>`;
+const ROUND_TRIPS_PER_PICTURE = 2;
+const ROUND_TRIPS_AROUND = 6;
+
+async function counted(endpoint: string): Promise<{ transport: ConnectionTransport; sent: () => number }> {
+  const socket = new WebSocket(endpoint);
+  await new Promise((open) => socket.addEventListener('open', open, { once: true }));
+  let sent = 0;
+  const transport: ConnectionTransport = {
+    send: (message) => {
+      sent++;
+      socket.send(message);
+    },
+    close: () => socket.close()
+  };
+  socket.addEventListener('message', (event) => transport.onmessage?.(String(event.data)));
+  socket.addEventListener('close', () => transport.onclose?.());
+  return { transport, sent: () => sent };
+}
+
+describe.runIf(process.env.CHROMIUM_PATH)('a page with many pictures to take', () => {
+  it('costs a few round trips to the browser per picture, not a dozen (stripe on Browserless: 27 pictures took 70 s of a 120 s session)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const { transport, sent } = await counted(browser.wsEndpoint());
+      const remote = await puppeteer.connect({ transport });
+      const tab = await localBrowser(() => remote.newPage())();
+      await tab.goto(`data:text/html,${encodeURIComponent(MANY_PICTURES)}`);
+      const before = sent();
+      const tree = (await tab.tree()) as PageTree;
+      const trips = sent() - before;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const pictures = all(tree.root).flatMap((n) => n.fills ?? []).filter((f) => f.imageRef?.startsWith('data:image/png'));
+
+      expect(pictures.length).toBe(CANVASES);
+      expect(trips).toBeLessThanOrEqual(CANVASES * ROUND_TRIPS_PER_PICTURE + ROUND_TRIPS_AROUND);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const SMOOTH = `<html style="scroll-behavior:smooth"><body style="margin:0;background:#fff"><div style="height:3000px"></div><canvas id="far" width="100" height="100" style="display:block;width:100px;height:100px"></canvas><div style="height:3000px"></div><script>const c = document.getElementById('far').getContext('2d'); c.fillStyle = '#0a0'; c.fillRect(0, 0, 100, 100);</script></body></html>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a page that scrolls smoothly', () => {
+  it('gets its pictures from where they are and is back at the top when read (supabase.com: seven snapshots cut from a viewport still scrolling, the nav off the reference)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      let page: Page | null = null;
+      const tab = await localBrowser(async () => (page = await browser.newPage()))();
+      await tab.goto(`data:text/html,${encodeURIComponent(SMOOTH)}`);
+      const tree = (await tab.tree()) as PageTree;
+      const top = await page!.evaluate(() => window.scrollY);
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const picture = all(tree.root).flatMap((n) => n.fills ?? []).find((f) => f.imageRef?.startsWith('data:image/png'));
+      const { data } = await sharp(Buffer.from(picture!.imageRef!.split(',')[1], 'base64')).raw().toBuffer({ resolveWithObject: true });
+
+      expect([data[0], data[1], data[2]]).toEqual([0, 170, 0]);
+      expect(top).toBe(0);
     } finally {
       await browser.close();
     }

@@ -33,7 +33,8 @@ screenshot all come from that same frozen state.
    (`everythingInView`); `heldStill` makes every shadow root open, and gates rAF, scroll / resize /
    pointer / focus / visibility listeners, `matchMedia` listeners and ResizeObserver callbacks on
    `__feegaStill`, so nothing the page registered can move it once frozen.
-2. The page settles, scrolls to the bottom in 700 px steps and back. At each step `inViewSampled`
+2. The page settles, scrolls to the bottom in 700 px steps and back. The walk runs inside the page
+   in one call (`inViewSampled` with a `Walk`), waiting a pause and a frame per step. At each step `inViewSampled`
    records, for every element with an animation or inline transform/opacity/filter/clip/visibility,
    the state it reached while on screen: the most visible one (highest opacity, then closest to the
    centre) among the steps where at least half of it was in view.
@@ -49,7 +50,31 @@ screenshot all come from that same frozen state.
 
 `tab.tree()` runs `treeScript`, then takes the raster snapshots (`page-snaps.ts`); a canvas, video or iframe is replaced by its own snapshot afterwards, so
 anything read later sees the same frame. Snapshots see `clipPath` and `mask` sources even when
-the rest of the page is hidden.
+the rest of the page is hidden. Each snapshot is one evaluate that stages it (previous canvas
+swapped for its picture, snapshot style, scroll) and one viewport `page.screenshot`, cropped on the
+server: a clip would cost one more round trip (puppeteer reads the viewport first), and a capture
+on a second CDP session left apple.com missing images in every later screenshot. A second session
+only switches the transparent background, when the mode changes.
+
+## Time
+
+Over Browserless every call to the page is a network round trip (~180 ms measured from Europe to `production-sfo`) and the
+session ends at 120 s (`BROWSERLESS_SESSION_MS`), so the capture keeps calls few and waits on
+events, not fixed times:
+
+- From the first script (`drawnInView`), a WebGL canvas that a native IntersectionObserver
+  reports out of view draws one frame a second (from a `clear`) instead of every frame. Every observer is told
+  its targets are in view, so otherwise every scene draws, and Browserless draws WebGL in
+  software: on stripe.com the main thread stalled 30-40 s.
+- `goto` waits for `load`, then, like `settle`, for a quiet network: nothing started or ended for
+  500 ms and nothing in flight younger than 4 s. Requests puppeteer never sees end (workers,
+  out-of-process iframes: stripe.com has three) do not hold it.
+- `tab.left()` is the time the session has left (unbounded locally). Snapshots stop 5 s before the
+  end and keep the pictures taken; the nodes without one are dropped.
+- A read that comes back unreadable with no time left answers `too_slow` (504) at once. Only an
+  unreadable read with time left (a crashed renderer) is read again, with the native
+  IntersectionObserver.
+
 ## DOM → doc
 
 The page is serialized as a Figma REST-shaped tree, then the existing Figma importer builds the
@@ -154,7 +179,8 @@ palette. Borders, radii and the frame background are listed, not bound.
 ## Breakpoints
 
 With `breakpoints: true` (API, MCP `import_url`, CLI `--breakpoints`, dialog checkbox) the page is
-read again at 768 and 390 px (`PAGE_VIEWS`, `tab.viewport`), each with the same freeze. The
+read again at 768 and 390 px (`PAGE_VIEWS`, `tab.viewport`), each with the same freeze, in its
+own tab at the same time as the desktop read; a width whose tab cannot open is left out. The
 frame gets Tablet and Phone breakpoints (ADR 0022) whose overrides make each view look like the
 page at that width:
 

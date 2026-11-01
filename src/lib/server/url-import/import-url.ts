@@ -20,6 +20,7 @@ export enum UrlImportOutcome {
   NoBrowser = 'no_browser',
   Failed = 'failed',
   Unreadable = 'unreadable',
+  TooSlow = 'too_slow',
   RateLimited = 'rate_limited'
 }
 
@@ -41,6 +42,7 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
   [UrlImportOutcome.NoBrowser]: 503,
   [UrlImportOutcome.Failed]: 502,
   [UrlImportOutcome.Unreadable]: 422,
+  [UrlImportOutcome.TooSlow]: 504,
   [UrlImportOutcome.RateLimited]: 429
 };
 
@@ -134,13 +136,8 @@ export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, plan
   }
   await tab.settle(NETWORK_IDLE_MS);
   const { height } = await tab.reveal(RevealMode.Loading).catch(() => ({ height: TREE_LIMITS.height }));
-  await tab.sample().catch(() => 0);
   const steps = Math.ceil(Math.min(height, maxHeight) / SCROLL_STEP_PX);
-  for (let i = 0; i < steps; i++) {
-    await tab.scroll({ px: SCROLL_STEP_PX }).catch(() => undefined);
-    await pause(settleMs / SCROLL_PAUSES);
-    await tab.sample().catch(() => 0);
-  }
+  await tab.sample({ steps, stepPx: SCROLL_STEP_PX, pauseMs: settleMs / SCROLL_PAUSES }).catch(() => 0);
   await tab.settle(NETWORK_IDLE_MS);
   await tab.scroll({ to: 'top' }).catch(() => undefined);
   await pause(settleMs);
@@ -229,23 +226,28 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
 
   const open = ask.open;
   const planner = ask.planner ?? PLAIN_PLANNER;
+  const unreadable = (read: PageTree | UrlImported) => 'outcome' in read && read.outcome === UrlImportOutcome.Unreadable;
   const readWith = async (sight: Sight) => {
     const tab = await open();
-    return pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+    const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+    return unreadable(read) && tab.left() <= 0 ? refused(UrlImportOutcome.TooSlow) : read;
   };
-  const first = await readWith(Sight.Everything);
-  const read = 'outcome' in first && first.outcome === UrlImportOutcome.Unreadable ? await readWith(Sight.Native) : first;
+  const readPage = async () => {
+    const first = await readWith(Sight.Everything);
+    return unreadable(first) ? readWith(Sight.Native) : first;
+  };
+  const readView = async (view: PageView): Promise<ViewRead[]> => {
+    const tab = await open();
+    await tab.viewport(view.width).catch(() => undefined);
+    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+    return 'outcome' in narrow ? [] : [{ view, tree: narrow }];
+  };
+  const [read, ...narrow] = await Promise.all([readPage(), ...(ask.views ?? []).map((view) => readView(view).catch(() => []))]);
   if ('outcome' in read) {
     return read;
   }
   const tree = await withSheetFonts(ask, read);
-  const views: ViewRead[] = [];
-  for (const view of ask.views ?? []) {
-    const tab = await open();
-    await tab.viewport(view.width).catch(() => undefined);
-    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
-    views.push(...('outcome' in narrow ? [] : [{ view, tree: narrow }]));
-  }
+  const views = narrow.flat();
 
   return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
 }

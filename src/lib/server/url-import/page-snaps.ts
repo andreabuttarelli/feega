@@ -3,6 +3,8 @@ import { SNAP_REF, type PageSnap, type PageTree } from './page-tree';
 
 export type Shoot = (snap: PageSnap) => Promise<string | null>;
 
+const SNAP_RESERVE_MS = 5_000;
+
 function swapped(node: RestNode, shots: Map<string, string>): RestNode | null {
   const ref = node.fills?.find((f) => f.imageRef?.startsWith(SNAP_REF))?.imageRef;
   if (ref) {
@@ -15,9 +17,12 @@ function swapped(node: RestNode, shots: Map<string, string>): RestNode | null {
   return { ...node, children: node.children.flatMap((c) => swapped(c, shots) ?? []) };
 }
 
-export async function snapped(tree: PageTree, shoot: Shoot): Promise<PageTree> {
+export async function snapped(tree: PageTree, shoot: Shoot, left: () => number = () => Infinity): Promise<PageTree> {
   const shots = new Map<string, string>();
   for (const snap of tree.snaps ?? []) {
+    if (left() < SNAP_RESERVE_MS) {
+      break;
+    }
     const url = await shoot(snap).catch(() => null);
     if (url) {
       shots.set(snap.ref, url);
