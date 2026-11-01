@@ -239,4 +239,15 @@ describe('a page read at desktop and phone width', () => {
 
     expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['What is Feega?']);
   });
+
+  it('a picture inside a block faded by a mask that only the phone page has keeps its picture (framer.com: the glowing panel came in as a grey box)', () => {
+    const SHOT = 'https://example.com/panel.png';
+    const fade = { type: 'GRADIENT_LINEAR', gradientHandlePositions: [{ x: 0.5, y: 0 }, { x: 0.5, y: 1 }, { x: 0, y: 0 }], gradientStops: [{ position: 0.6, color: { r: 0, g: 0, b: 0, a: 1 } }, { position: 1, color: { r: 0, g: 0, b: 0, a: 0 } }] };
+    const panel: RestNode = { ...card('panel', { x: 0, y: 300, width: 390, height: 260 }), fills: [{ type: 'SOLID', color: WHITE }], maskGradient: fade, children: [{ ...card('panel/img0', { x: 20, y: 320, width: 200, height: 200 }), fills: [{ type: 'IMAGE', imageRef: SHOT, scaleMode: 'FILL' }] }, card('panel/div1', { x: 240, y: 320, width: 100, height: 100 })] };
+    const made = planned(desktop, [{ view: PAGE_VIEWS[1], tree: { ...phone, root: { ...phone.root, children: [...phone.root.children!, panel] } } }]);
+    const item = made.plan.items[0];
+    const inComps = new Set(Object.values(item.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((k) => k.id))));
+
+    expect(item.images.filter((i) => made.images[i.hash] === SHOT).some((i) => inComps.has(i.clipId))).toBe(true);
+  });
 });

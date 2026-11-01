@@ -290,12 +290,13 @@ function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: Fig
     clips.push(copy);
     after.set(anchor, [...(after.get(anchor) ?? []), copy]);
   }
-  const images = readImages.filter((i) => own.has(i.clipId)).map((i) => ({ ...i, clipId: copyId(view, i.clipId) }));
   const comps = compsCopied(
     readDoc,
     [...own].flatMap((id) => (read.byId.get(id)?.props.comp ? [String(read.byId.get(id)!.props.comp)] : [])),
     view
   );
+  const inner = new Set(Object.values(comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((k) => k.id))));
+  const images = readImages.flatMap((i) => (own.has(i.clipId) ? [{ ...i, clipId: copyId(view, i.clipId) }] : inner.has(i.clipId) ? [i] : []));
   const keys = [...own].flatMap((id) => (read.keys.has(id) ? [[copyId(view, id), read.keys.get(id)!] as [string, string]] : []));
   return { clips, after, images, comps, keys };
 }
