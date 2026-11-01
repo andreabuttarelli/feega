@@ -94,3 +94,12 @@ describe('a button main given hover and pressed states', () => {
   });
 });
 
+describe('a main nested in another main', () => {
+  it('stays homed on its own set, so the Card set does not hold a second Button main', () => {
+    const made = nestedPlan();
+    const at = (name: string) => made.sets.findIndex((s) => s.name === name);
+
+    expect([...new Set(Object.values(made.setHomes[at('Card')]))]).toEqual([at('Button')]);
+    expect(made.setHomes[at('Button')]).toBeUndefined();
+  });
+});
