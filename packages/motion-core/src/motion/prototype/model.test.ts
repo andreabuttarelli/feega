@@ -46,4 +46,12 @@ describe('interactionSchema', () => {
 
     expect(parsed.success && parsed.data.transition).toEqual({ kind: TransitionKind.SmartAnimate, easing: 'standard', durationMs: 300 });
   });
+
+  it('change to carries the variant it picks and no target', () => {
+    const parsed = parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.ChangeTo, variant: { State: 'Open' } } });
+
+    expect(parsed.success && parsed.data.action).toEqual({ kind: ActionKind.ChangeTo, variant: { State: 'Open' } });
+    expect(needsTarget(ActionKind.ChangeTo)).toBe(false);
+    expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.ChangeTo, variant: {} } }).success).toBe(false);
+  });
 });

@@ -368,7 +368,8 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
   for (const child of layer.children) {
     const made = build[child.kind](built.doc, child, p);
     const shown = { ...made, doc: blended(child.hidden ? hiddenAll(made.doc, made.roots) : made.doc, made.roots, child.blend) };
-    const next = masked(shown, child, p);
+    const acting = ownsBehaviour(child) ? { ...shown, doc: behaved(shown.doc, shown.roots, child) } : shown;
+    const next = masked(acting, child, p);
     if (child.ref && next.roots[0] && !p.keys.has(child.ref)) {
       p.keys.set(child.ref, next.roots[0].id);
     }
@@ -425,11 +426,35 @@ function blended(doc: MotionDoc, roots: Root[], blend: BlendMode): MotionDoc {
   }, doc);
 }
 
+const ownsBehaviour = (layer: Layer) => Boolean(layer.behaviour) && !(layer.kind === LayerKind.Frame && layer.component?.inPaste);
+
+function behaved(doc: MotionDoc, roots: Root[], layer: Layer): MotionDoc {
+  if (!layer.behaviour || roots.length !== 1) {
+    return doc;
+  }
+  const set = editClip(doc, roots[0].id, (clip) => ({ ...clip, ...layer.behaviour }));
+  return set.ok ? set.doc : doc;
+}
+
+function withDescendants(doc: MotionDoc, ids: readonly string[]): Set<string> {
+  const all = new Set(ids);
+  const clips = doc.tracks.flatMap((t) => t.clips);
+  let grew = true;
+  while (grew) {
+    const before = all.size;
+    for (const c of clips) {
+      if (c.parent && all.has(c.parent)) {
+        all.add(c.id);
+      }
+    }
+    grew = all.size > before;
+  }
+  return all;
+}
+
 function hiddenAll(doc: MotionDoc, roots: Root[]): MotionDoc {
-  return roots.reduce((d, root) => {
-    const hid = editClip(d, root.id, (clip) => ({ ...clip, hidden: true }));
-    return hid.ok ? hid.doc : d;
-  }, doc);
+  const folded = withDescendants(doc, roots.map((r) => r.id));
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (folded.has(c.id) ? { ...c, hidden: true } : c)) })) };
 }
 
 function faded(doc: MotionDoc, ids: string[], opacity: number, p: Place): MotionDoc {
@@ -478,7 +503,7 @@ function propertiesOf(doc: MotionDoc, compId: string, layer: FrameLayer, compone
 function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: Place): Built {
   const ids = { comp: p.newId(), clip: p.newId() };
   let n = 0;
-  const made = createComponent(built.doc, built.ids, () => (n++ === 0 ? ids.comp : ids.clip), component.name);
+  const made = createComponent(behaved(built.doc, built.roots, layer), built.ids, () => (n++ === 0 ? ids.comp : ids.clip), component.name);
   if (!made.ok) {
     return grouped(built, layer, p);
   }

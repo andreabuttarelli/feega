@@ -3613,6 +3613,14 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** on an imported page Cmd-click selects a label, Enter does nothing, double-click selects a wrapper (often 0×0, named Precomp or Group). **Move:** the label sits inside a Precomp (a group or an instance), so its id is scoped (`host__0__label`) and every top-level lookup (`findClip`, `isLayer`, `textCaretAt`) misses it. Resolve scene ids through `textScope`/`scoped` before editing; for URL imports, plain groups come in as frames (`Grouping.Frame`), never as Precomps.
 
+## A captured page state is the default state again
+
+**Signal:** an imported Tabs (or Disclosure) set whose variants all show the first panel; in the capture JSON `tree.patterns[].variants[].root` has the default's texts. **Move:** the import's `seeAll` scripts can stop a framework from answering a synthetic `click` (feega.app's Framer tabs: they switch with plain puppeteer, never after `seeAll`). Probe the same click with and without `tab.seeAll()` before blaming the walker; a row in `page-patterns.ts` says how to read that a state took (`shows`), and a state that did not is skipped.
+
+## The prototype player shows a black frame
+
+**Signal:** play mode on a long imported page is black; the console says `Texture size ... exceeded maximum texture size ... 8192`. **Move:** a WebGPU surface holds 8192 px per side by default; `drawableOn` sends taller or wider frames to the HTML engine. For screenshots in Playwright, open the player with Fill width and scroll the stage, and take the shot from headless Chromium with GPU flags (`--enable-unsafe-webgpu --use-angle=metal`).
+
 ## A release regression that the fixture does not reproduce
 
 **Signal:** two release builds measure the same on the seeded fixture, while production freezes; the crash telemetry (`[canvas] webcontent-crash-suspected` in Vercel runtime logs, one day of retention) shows the real device and texture bytes. **Move:** seed what the real canvas carries that the fixture lacks (styles, variables, components, images) and measure the reopen, not only the first open; `tests/e2e/canvas-landing-session.spec.ts` against two `build:node` builds served with `node --env-file=.env build` is the comparison.

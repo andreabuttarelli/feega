@@ -75,4 +75,10 @@ describe('player', () => {
     expect(closeTopOverlay(open).state.overlays).toEqual([]);
     expect(closeTopOverlay(startPlayer('a')).move).toBeNull();
   });
+
+  it('change to variant stays on the frame: the frame view swaps the instance', () => {
+    const step = act(startPlayer('a'), { kind: ActionKind.ChangeTo, variant: { State: 'Open' } }, instant, known);
+
+    expect(step).toEqual({ state: startPlayer('a'), move: null });
+  });
 });

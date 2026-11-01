@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RenderEngine, engineFlag, killSwitch } from './engine-flag';
+import { RenderEngine, drawableOn, engineFlag, killSwitch } from './engine-flag';
 
 const url = (q = '') => new URL(`https://feega.app/app/compose/x${q}`);
 
@@ -36,5 +36,13 @@ describe('killSwitch', () => {
     expect(killSwitch(undefined, true)).toBe(true);
     expect(killSwitch(undefined, false)).toBe(false);
     expect(killSwitch('gpu-core', false)).toBe(false);
+  });
+});
+
+describe('drawableOn', () => {
+  it('feega.app imported whole is 16 382 px tall: past the GPU surface limit the frame draws in HTML instead of black', () => {
+    expect(drawableOn(RenderEngine.GpuCore, { width: 1338, height: 16382 })).toBe(RenderEngine.Html);
+    expect(drawableOn(RenderEngine.GpuCore, { width: 1280, height: 8192 })).toBe(RenderEngine.GpuCore);
+    expect(drawableOn(RenderEngine.Html, { width: 100, height: 100 })).toBe(RenderEngine.Html);
   });
 });

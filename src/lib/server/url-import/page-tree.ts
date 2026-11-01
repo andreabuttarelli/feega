@@ -2,6 +2,8 @@ import { DESIGN_MAX_SIDE } from '@feega/motion-core/motion/doc';
 import type { RestColor, RestNode, RestPaint } from '$lib/server/figma/rest-message';
 import { pageKit, type KitMatrix, type KitRect, type PageKit } from './page-kit';
 import { OUTLINE_LIMITS, pageOutlineOf, type PageOutline } from './page-outline';
+import { PATTERN_LIMITS, pagePatterns, type PagePattern, type PatternKit } from './page-patterns';
+import { HOVER_LIMITS, pageHovers, type HoverKit } from './page-hovers';
 
 export enum SnapMode {
   Isolated = 'isolated',
@@ -9,13 +11,13 @@ export enum SnapMode {
   Backdrop = 'backdrop'
 }
 
-export type TreeLimits = { nodes: number; height: number; text: number; snaps: number; useAttr: string; snapAttr: string; hostAttr: string; hideAttr: string; hints: string[] };
+export type TreeLimits = { nodes: number; height: number; text: number; snaps: number; useAttr: string; snapAttr: string; hostAttr: string; hideAttr: string; hints: string[]; patternAttr: string; goAttr: string; standAttr: string };
 
 const PAGE_SLICES = 4;
 
 export const HINT_WORDS = ['avatar', 'badge', 'pill', 'chip', 'tag', 'pricing', 'tier', 'plan', 'testimonial', 'quote', 'review', 'accordion', 'faq', 'tab', 'tooltip', 'toast', 'alert', 'banner', 'input', 'field', 'search', 'button', 'btn', 'cta', 'logo', 'icon', 'card', 'tile', 'feature', 'nav', 'menu', 'link', 'item'];
 
-export const TREE_LIMITS: TreeLimits = { nodes: 10_000, height: DESIGN_MAX_SIDE * PAGE_SLICES, text: 4_000, snaps: 48, useAttr: 'data-feega-use', snapAttr: 'data-feega-snap', hostAttr: 'data-feega-host', hideAttr: 'data-feega-hide', hints: HINT_WORDS };
+export const TREE_LIMITS: TreeLimits = { nodes: 10_000, height: DESIGN_MAX_SIDE * PAGE_SLICES, text: 4_000, snaps: 48, useAttr: 'data-feega-use', snapAttr: 'data-feega-snap', hostAttr: 'data-feega-host', hideAttr: 'data-feega-hide', hints: HINT_WORDS, patternAttr: 'data-feega-pattern', goAttr: 'data-feega-go', standAttr: 'data-feega-stand' };
 
 export const SNAP_REF = 'snap:';
 
@@ -23,12 +25,12 @@ export type PageBox = { x: number; y: number; width: number; height: number };
 export type PageFont = { family: string; weight: string; style: string; url: string };
 export type PageSnap = { ref: string; box: PageBox; mode: SnapMode };
 
-export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; snaps?: PageSnap[]; outline?: PageOutline };
+export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; snaps?: PageSnap[]; outline?: PageOutline; patterns?: PagePattern[] };
 
 export const treeScript = (limits: TreeLimits) =>
-  `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})()).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
+  `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})(), (${pagePatterns.toString()})(${JSON.stringify(PATTERN_LIMITS)}), (${pageHovers.toString()})(${JSON.stringify(HOVER_LIMITS)})).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
 
-export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<PageTree> {
+export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: PatternKit, hovers: HoverKit): Promise<PageTree> {
   const SKIPPED = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|HEAD|META|LINK|TITLE|BR|WBR|DIALOG)$/;
   const RASTER = /^(VIDEO|CANVAS|IFRAME|EMBED|OBJECT)$/;
   const REPLACED = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|EMBED|OBJECT|INPUT|SELECT|TEXTAREA|BUTTON|PICTURE)$/;
@@ -1192,7 +1194,34 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     if (fixed) {
       made.forEach((n) => fixedNodes.add(n));
     }
-    return made;
+    return stamped(el, made);
+  };
+
+  const sameBox = (n: RestNode, r: Rect) => {
+    const b = n.absoluteBoundingBox;
+    return Boolean(b) && Math.abs(b!.x - r.x) <= EXACT && Math.abs(b!.y - r.y) <= EXACT && Math.abs(b!.width - r.width) <= EXACT && Math.abs(b!.height - r.height) <= EXACT;
+  };
+
+  const stamped = (el: Element, made: RestNode[]): RestNode[] => {
+    const hover = hovered.get(el);
+    if (hover && made.length === 1) {
+      made[0].hover = hover;
+    }
+    const pattern = el.getAttribute(limits.patternAttr);
+    const go = el.getAttribute(limits.goAttr);
+    if ((pattern === null && go === null) || !made.length) {
+      return made;
+    }
+    const r = pageRect(el.getBoundingClientRect());
+    const own = made.length === 1 && made[0].type === 'FRAME' && sameBox(made[0], r);
+    const one = own ? made[0] : keyed({ id: id(), type: 'FRAME', name: el.tagName.toLowerCase(), absoluteBoundingBox: box(r), fills: [], clipsContent: false, children: made }, Math.max(...made.map((m) => zOf.get(m) ?? 0)));
+    if (pattern !== null) {
+      one.pattern = Number(pattern);
+    }
+    if (go !== null) {
+      one.go = go;
+    }
+    return [one];
   };
 
   const shape = (el: Element, css: CSSStyleDeclaration, ctx: Ctx): RestNode[] => {
@@ -1312,7 +1341,13 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     ]);
   };
 
-  pseudoElements();
+  const hovered = hovers.read();
+  const found = patterns.found();
+  found.forEach((p, i) => p.root.setAttribute(limits.patternAttr, String(i)));
+  found.forEach((p) => aimed(p, p.initial));
+  if (document.body) {
+    pseudoElements(document.body);
+  }
   const { fonts, sheets } = fontsOf();
   fonts.forEach((f) => declaredFamilies.add(f.family.toLowerCase()));
   await svgImages();
@@ -1322,6 +1357,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   const ground = pageCss && solid(pageCss.backgroundColor).length ? solid(pageCss.backgroundColor) : solid(getComputedStyle(document.documentElement).backgroundColor);
   const top: Ctx = { clip: PAGE, scale: 1, textFills: null, visible: true };
   const children = body ? sorted(childrenOf(body, pageCss!, top)).flatMap((n) => (n.type === 'GROUP' && n.name === 'body' ? (n.children ?? []) : [n])) : [];
+  const captured = await variantsOf(found, top);
+  unstamped(children, new Set(captured.map((p) => p.ix)));
   hosts.forEach((h) => h.remove());
 
   return {
@@ -1333,15 +1370,98 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     fonts,
     sheets,
     snaps: snaps.map((s) => ({ ...s, mode: s.mode as SnapMode })),
+    ...(captured.length ? { patterns: captured } : {}),
     root: { id: id(), type: 'FRAME', name: document.title.trim() || location.hostname, absoluteBoundingBox: { x: 0, y: 0, width, height }, fills: ground.length ? ground : [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], clipsContent: true, children }
   };
 
-  function pseudoElements() {
+  function aimed(p: (typeof found)[number], state: string) {
+    p.root.querySelectorAll(`[${limits.goAttr}]`).forEach((el) => el.removeAttribute(limits.goAttr));
+    p.triggers(state).forEach(([el, target]) => el.setAttribute(limits.goAttr, target));
+  }
+
+  function stayed(event: Event) {
+    if (event.target instanceof Element && event.target.closest('a[href], [type=submit]')) {
+      event.preventDefault();
+    }
+  }
+
+  function unfocused() {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement || active instanceof SVGElement) {
+      active.blur();
+    }
+  }
+
+  function unstamped(nodes: RestNode[], kept: ReadonlySet<number>, within = false) {
+    for (const n of nodes) {
+      const inside = n.pattern === undefined ? within : kept.has(n.pattern);
+      if (!inside) {
+        delete n.pattern;
+        delete n.go;
+      }
+      unstamped(n.children ?? [], kept, inside);
+    }
+  }
+
+  function freshPseudos(scope: Element) {
+    scope.querySelectorAll(`[${limits.standAttr}]`).forEach((el) => el.remove());
+    for (const el of [scope, ...scope.querySelectorAll('[data-feega-before], [data-feega-after]')]) {
+      el.removeAttribute('data-feega-before');
+      el.removeAttribute('data-feega-after');
+    }
+    pseudoElements(scope);
+  }
+
+  async function shifted(p: (typeof found)[number], state: string) {
+    const held = window as unknown as { __feegaStill?: boolean; requestAnimationFrame: typeof requestAnimationFrame };
+    const frozen = held.requestAnimationFrame;
+    const FRAME_MS = 16;
+    held.__feegaStill = false;
+    held.requestAnimationFrame = (callback) => window.setTimeout(() => callback(performance.now()), FRAME_MS);
+    window.addEventListener('click', stayed, true);
+    p.enter(state);
+    window.removeEventListener('click', stayed, true);
+    await new Promise((done) => setTimeout(done, p.settleMs));
+    unfocused();
+    held.requestAnimationFrame = frozen;
+    held.__feegaStill = true;
+    freshPseudos(p.root);
+  }
+
+  async function variantsOf(list: typeof found, ctx: Ctx): Promise<PagePattern[]> {
+    const instant = new CSSStyleSheet();
+    instant.replaceSync('*,*::before,*::after{transition:none!important}');
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, instant];
+    const out: PagePattern[] = [];
+    for (const [ix, p] of list.entries()) {
+      const variants: PagePattern['variants'] = [];
+      for (const state of p.states.filter((s) => s !== p.initial)) {
+        await shifted(p, state);
+        if (!p.shows(state)) {
+          continue;
+        }
+        aimed(p, state);
+        const made = visit(p.root, ctx).find((n) => n.pattern === ix);
+        if (made) {
+          variants.push({ state, root: made });
+        }
+      }
+      await shifted(p, p.initial);
+      aimed(p, p.initial);
+      if (variants.length) {
+        out.push({ ix, kind: p.kind, prop: p.prop, initial: p.initial, states: [p.initial, ...variants.map((v) => v.state)], variants });
+      }
+    }
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== instant);
+    return out;
+  }
+
+  function pseudoElements(scope: Element) {
     const SKIP_PROPS = /^(animation|transition|content$|counter-|quotes$|will-change)/;
     const sheet = new CSSStyleSheet();
     const rules: string[] = [];
     let made = 0;
-    for (const el of document.body ? [...document.body.querySelectorAll('*')] : []) {
+    for (const el of [...(scope === document.body ? [] : [scope]), ...scope.querySelectorAll('*')]) {
       if (REPLACED.test(el.tagName.toUpperCase()) || el instanceof SVGElement || made >= limits.nodes) {
         continue;
       }
@@ -1354,6 +1474,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         const text = [...content.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replace(/\\(.)/g, '$1')).join('');
         const picture = content.match(/url\(["']?([^"')]+)["']?\)/)?.[1];
         const stand = document.createElement(picture ? 'img' : 'feega-pseudo');
+        stand.setAttribute(limits.standAttr, '');
         for (let i = 0; i < pc.length; i++) {
           const prop = pc[i];
           if (!SKIP_PROPS.test(prop)) {

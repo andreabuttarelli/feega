@@ -86,7 +86,7 @@ const sameBox = (a: Box | undefined, b: Box | undefined) => Boolean(a && b) && M
 
 const within = (b: Box | undefined, a: Box | undefined) => Boolean(a && b) && b!.x >= a!.x - EPS && b!.y >= a!.y - EPS && b!.x + b!.width <= a!.x + a!.width + EPS && b!.y + b!.height <= a!.y + a!.height + EPS;
 
-const boundary = (n: RestNode) => n.type === 'INSTANCE' || n.type === 'COMPONENT' || Boolean(n.componentId) || n.use !== undefined || Boolean(n.codeComponent) || n.id.startsWith(SECTION_ID);
+const boundary = (n: RestNode) => n.type === 'INSTANCE' || n.type === 'COMPONENT' || Boolean(n.componentId) || n.use !== undefined || n.pattern !== undefined || n.go !== undefined || Boolean(n.behaviour) || Boolean(n.codeComponent) || n.id.startsWith(SECTION_ID);
 
 const looksLike = (n: RestNode) => shows(n.fills) || shows(n.strokes) || affects(n) || (n.opacity ?? 1) < 1 || Boolean(n.relativeTransform);
 

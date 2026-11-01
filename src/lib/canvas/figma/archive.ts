@@ -1,6 +1,7 @@
 import { inflateSync } from 'fflate';
 import { decompress } from 'fzstd';
 import { compileSchema, decodeBinarySchema } from 'kiwi-schema';
+import type { MotionClip } from '@feega/motion-core/motion/doc';
 
 export type Guid = { sessionID: number; localID: number };
 export type Vec = { x: number; y: number };
@@ -23,6 +24,8 @@ export type Paint = {
 export type Effect = { type: string; color?: Rgba; offset?: Vec; radius?: number; spread?: number; visible?: boolean };
 
 export type CodeComponent = { key: string; name: string; variant: Record<string, string>; texts: Record<string, string> };
+
+export type ClipBehaviour = Partial<Pick<MotionClip, 'interactions' | 'states'>>;
 
 export type FigmaRawNode = {
   guid: Guid;
@@ -87,6 +90,7 @@ export type FigmaRawNode = {
   styleID?: number;
   symbolData?: { symbolID?: Guid; symbolOverrides?: NodePatch[] };
   codeComponent?: CodeComponent;
+  behaviour?: ClipBehaviour;
   derivedSymbolData?: NodePatch[];
 };
 

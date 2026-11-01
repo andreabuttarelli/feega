@@ -25,3 +25,8 @@ export function engineFlag(url: URL, killed: boolean): RenderEngine {
   }
   return ASKED.has(asked) ? (asked as RenderEngine) : DEFAULT_ENGINE;
 }
+
+export const GPU_SURFACE_MAX_SIDE = 8192;
+
+export const drawableOn = (engine: RenderEngine, size: { width: number; height: number }): RenderEngine =>
+  Math.max(size.width, size.height) > GPU_SURFACE_MAX_SIDE ? RenderEngine.Html : engine;

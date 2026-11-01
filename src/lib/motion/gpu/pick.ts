@@ -1,3 +1,4 @@
+import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 import { PaintKind } from './paint-of';
 import { placedAt, type Drawn, type Point, type Quad, type Scene } from './scene';
 
@@ -53,6 +54,19 @@ function spanOf(corners: Point[]): FrameRect {
 
 export function rectOf(scene: Scene, clip: string, time: number): FrameRect | null {
   const corners = drawnOf(scene, clip, time).flatMap((d) => d.quad);
+  return corners.length ? spanOf(corners) : null;
+}
+
+const PATH_STEP = 2;
+
+const pathOfOwner = (owner: string) => owner.split(SEPARATOR).filter((_, i) => i % PATH_STEP === 0);
+
+const samePath = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
+
+export function pathRect(scene: Scene, path: readonly string[], time: number): FrameRect | null {
+  const corners = placedAt(scene, time)
+    .filter((d) => d.layer.owners.some((owner) => samePath(pathOfOwner(owner), path)))
+    .flatMap((d) => d.quad);
   return corners.length ? spanOf(corners) : null;
 }
 

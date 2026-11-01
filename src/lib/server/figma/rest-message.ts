@@ -1,4 +1,4 @@
-import type { CodeComponent, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
+import type { ClipBehaviour, CodeComponent, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
 
 export type RestColor = { r: number; g: number; b: number; a?: number };
 
@@ -77,8 +77,12 @@ export type RestNode = {
   styleOverrideTable?: Record<string, RestStyle>;
   componentId?: string;
   use?: number;
+  pattern?: number;
+  go?: string;
+  hover?: { fill?: string; color?: string; stroke?: string; opacity?: number; scale?: number; durationMs: number; easing: string };
   dom?: { tag: string; role?: string; hint?: string; landmark?: string; press?: string };
   codeComponent?: CodeComponent;
+  behaviour?: ClipBehaviour;
   children?: RestNode[];
 };
 
@@ -314,7 +318,8 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     ...layoutOf(n),
     ...(n.type === 'TEXT' ? textOf(n) : {}),
     ...(symbolID ? { symbolData: { symbolID } } : {}),
-    ...(n.codeComponent ? { codeComponent: n.codeComponent } : {})
+    ...(n.codeComponent ? { codeComponent: n.codeComponent } : {}),
+    ...(n.behaviour ? { behaviour: n.behaviour } : {})
   });
   (n.children ?? []).forEach((child, i) => add(child, { rest: n, guid }, i, build));
 }

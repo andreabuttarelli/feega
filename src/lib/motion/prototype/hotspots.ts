@@ -1,5 +1,5 @@
 import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { TriggerKind, type Interaction } from '@feega/motion-core/motion/prototype/model';
+import { ActionKind, TriggerKind, type Interaction } from '@feega/motion-core/motion/prototype/model';
 
 export const DRAG_THRESHOLD_PX = 8;
 
@@ -15,7 +15,7 @@ export function hotspotsOf(doc: MotionDoc, size: FrameSize, rectOf: (clip: strin
       return [];
     }
     const box = { left: rect.left / size.width, top: rect.top / size.height, width: rect.width / size.width, height: rect.height / size.height };
-    return (clip.interactions ?? []).filter((i) => i.trigger.kind !== TriggerKind.AfterDelay).map((interaction) => ({ clip: clip.id, interaction, box }));
+    return (clip.interactions ?? []).filter((i) => i.trigger.kind !== TriggerKind.AfterDelay && i.action.kind !== ActionKind.ChangeTo).map((interaction) => ({ clip: clip.id, interaction, box }));
   });
 }
 

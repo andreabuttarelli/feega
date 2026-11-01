@@ -19,6 +19,22 @@ Open the insert menu (**+**), go to **Import**, choose **From URL…**, paste th
 
 The page is scrolled to the bottom and back so lazy pictures load and scroll-revealed blocks show. Each block that changes as you scroll (a fade-in, a slide-in, a scroll-linked tab) is kept as it looked while on screen, at its most visible. Running animations are finished, looping ones and carousels go back to their first slide, videos stop, and cookie banners are hidden, including ones that appear late. Then the page is frozen: nothing it does afterwards changes what is read. What the page does not show is not drawn: the answers of a collapsed FAQ come in as hidden layers you can turn on in the layers panel.
 
+## Interactive parts
+
+Parts of the page that change when you use them come in as components you can play. Before freezing the page, the import uses each one and reads every state it can show:
+
+| On the page | Becomes | Variants |
+|---|---|---|
+| An FAQ or any `<details>` | Accordion set | `State=Closed`, `State=Open` |
+| Tabs (`role="tablist"`) | Tabs set | `Tab=` each tab's label |
+| A button that opens a panel or a menu (`aria-expanded`) | Disclosure set | `State=Closed`, `State=Open` |
+| A switch or a checkbox | Toggle set | `State=Off`, `State=On` |
+| A Swiper carousel | Carousel set | `Slide=1` to `Slide=6` |
+| A button, link or card with a CSS `:hover` style | the same layer | a Hover state with the page's own transition |
+
+Each part is its own component set on the **Components** frame; the page shows the variant it was in. The question, tab, button or switch carries a **Change to** link to the other variant, so in the [prototype player](/canvas/prototype-player/) clicking an FAQ question opens its answer and pushes the questions below down, and clicking a tab shows its panel. A part the page does not change when used (its scripts stopped by the freeze) stays a plain block. Hover styles written in JavaScript are not read.
+
+
 ## Stacks
 
 <DemoVideo name="import-layers" caption="Import vercel.com: the whole page, sections zoomed from Layers, the live page, the Components page with variants, a linked instance and its code." />

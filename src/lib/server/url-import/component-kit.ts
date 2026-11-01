@@ -124,9 +124,11 @@ function withStates(doc: MotionDoc, compId: string, site: string, newId: NewId):
   return { ...doc, comps, variables: { ...doc.variables, [site]: { ...collection, vars } } };
 }
 
+const hoversOnItsOwn = (comp: MotionComp) => clipsOf(comp).some((c) => c.states?.length);
+
 export function componentKit(doc: MotionDoc, site: string, newId: NewId): MotionDoc {
   const mains = Object.entries(doc.comps).filter(([, c]) => c.component);
   const propertied: MotionDoc = { ...doc, comps: { ...doc.comps, ...Object.fromEntries(mains.map(([id, c]) => [id, { ...c, component: { ...c.component!, properties: propertiesOf(c, doc) } }])) } };
-  const stateful = mains.filter(([, c]) => kindNamed(c.component!.name)?.stateful && doc.variables?.[site]).map(([id]) => id);
+  const stateful = mains.filter(([, c]) => kindNamed(c.component!.name)?.stateful && doc.variables?.[site] && !hoversOnItsOwn(c)).map(([id]) => id);
   return resolveVariables(stateful.reduce((next, id) => withStates(next, id, site, newId), propertied));
 }
