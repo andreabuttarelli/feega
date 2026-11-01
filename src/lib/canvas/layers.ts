@@ -15,6 +15,8 @@ import { layoutKind } from '@feega/motion-core/motion/layout/stack';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import type { NodeType } from './node-data';
 import { drawClip } from '$lib/motion/draw-create';
+import { layoutParent } from '$lib/motion/layout/ops';
+import { placeInStack } from '$lib/motion/layout/stack-drag';
 import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
 
 const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
@@ -313,7 +315,21 @@ const DROP: Record<LayerKind, (at: number) => Place> = {
 
 export const dropPlace = (kind: LayerKind, at: number): Place => DROP[kind](at);
 
+function intoStack(doc: MotionDoc, dragged: string, target: string, place: Place): OpResult | null {
+  const clip = findClip(doc, target)?.clip as MotionClip | undefined;
+  const stack = clip && place !== Place.Into ? layoutParent(doc, clip) : null;
+  if (!stack || dragged === target) {
+    return null;
+  }
+  const siblings = childrenInOrder(doc.tracks.flatMap((t) => t.clips as MotionClip[]), stack).map((c) => c.id).filter((id) => id !== dragged);
+  return placeInStack(doc, dragged, stack, siblings.indexOf(target) + (place === Place.Below ? 1 : 0));
+}
+
 export function dropLayer(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId): OpResult {
+  const stacked = intoStack(doc, dragged, target, place);
+  if (stacked) {
+    return stacked;
+  }
   const into = place === Place.Into && maskMembers(doc).has(target);
   const moved = restack(doc, dragged, target, into ? Place.Above : place, newId);
   if (!moved.ok) {
