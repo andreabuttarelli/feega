@@ -3,6 +3,9 @@ import { Direction, Sizing } from '../layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, MAX_GRID_ROWS, MAX_LAYOUT_PX, paddingSchema, SIZINGS } from '../layout/model';
 import { HORIZONTALS, VERTICALS } from '../constraints/model';
 import type { MotionClip, MotionDoc } from '../doc';
+import { restretched } from '../layout/resolve';
+import { TEXT_SIZINGS, TEXT_WRAPS } from '../text-sizing';
+import { LINE_HEIGHT } from '../type-units';
 
 export const BASE_BREAKPOINT = 'base';
 export const MAX_BREAKPOINTS = 8;
@@ -17,9 +20,13 @@ export enum OverrideKey {
   Width = 'layoutItem.width',
   Height = 'layoutItem.height',
   ColumnSpan = 'layoutItem.columnSpan',
+  Absolute = 'layoutItem.absolute',
   Hidden = 'hidden',
   FontSize = 'props.size',
   TextAlign = 'props.align',
+  TextSizing = 'props.sizing',
+  LineHeight = 'props.lineHeight',
+  TextWrap = 'props.textWrap',
   X = 'props.x',
   Y = 'props.y',
   BoxWidth = 'props.width',
@@ -42,9 +49,13 @@ const OVERRIDES: Record<OverrideKey, { section: Section; field: string; value: z
   [OverrideKey.Width]: { section: 'layoutItem', field: 'width', value: z.enum(SIZINGS), label: 'Width sizing' },
   [OverrideKey.Height]: { section: 'layoutItem', field: 'height', value: z.enum(SIZINGS), label: 'Height sizing' },
   [OverrideKey.ColumnSpan]: { section: 'layoutItem', field: 'columnSpan', value: z.number().int().min(1).max(MAX_GRID_ROWS), label: 'Column span' },
+  [OverrideKey.Absolute]: { section: 'layoutItem', field: 'absolute', value: z.boolean(), label: 'Ignore auto layout' },
   [OverrideKey.Hidden]: { section: null, field: 'hidden', value: z.boolean(), label: 'Visibility' },
   [OverrideKey.FontSize]: { section: 'props', field: 'size', value: z.number().positive().max(10), label: 'Font size' },
   [OverrideKey.TextAlign]: { section: 'props', field: 'align', value: z.enum(['left', 'center', 'right']), label: 'Text align' },
+  [OverrideKey.TextSizing]: { section: 'props', field: 'sizing', value: z.enum(TEXT_SIZINGS), label: 'Text resizing' },
+  [OverrideKey.LineHeight]: { section: 'props', field: 'lineHeight', value: z.string().regex(LINE_HEIGHT), label: 'Line height' },
+  [OverrideKey.TextWrap]: { section: 'props', field: 'textWrap', value: z.enum(TEXT_WRAPS), label: 'Text wrap' },
   [OverrideKey.X]: { section: 'props', field: 'x', value: fraction, label: 'X' },
   [OverrideKey.Y]: { section: 'props', field: 'y', value: fraction, label: 'Y' },
   [OverrideKey.BoxWidth]: { section: 'props', field: 'width', value: fraction, label: 'Width' },
@@ -56,7 +67,7 @@ const OVERRIDES: Record<OverrideKey, { section: Section; field: string; value: z
 export const OVERRIDE_KEYS = Object.values(OverrideKey);
 export const overrideLabel = (key: OverrideKey) => OVERRIDES[key].label;
 
-export const breakpointSchema = z.object({ id: z.string().min(1).max(40), name: z.string().min(1).max(40), width: z.number().int().min(MIN_BREAKPOINT_WIDTH).max(MAX_LAYOUT_PX) });
+export const breakpointSchema = z.object({ id: z.string().min(1).max(40), name: z.string().min(1).max(40), width: z.number().int().min(MIN_BREAKPOINT_WIDTH).max(MAX_LAYOUT_PX), height: z.number().int().positive().optional() });
 export const breakpointsSchema = z.array(breakpointSchema).max(MAX_BREAKPOINTS).optional();
 export const overridesSchema = z.record(z.string().min(1), z.partialRecord(z.enum(OVERRIDE_KEYS as [OverrideKey, ...OverrideKey[]]), z.unknown())).optional();
 
@@ -77,9 +88,20 @@ export const BASE_NAME = 'Desktop';
 
 type Result = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
-const clipsOf = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips) as MotionClip[];
+type Tracks = MotionDoc['tracks'];
 
-const mapClips = (doc: MotionDoc, fn: (clip: MotionClip) => MotionClip): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => fn(c as MotionClip)) })) as MotionDoc['tracks'] });
+const clipsIn = (tracks: Tracks) => tracks.flatMap((t) => t.clips) as MotionClip[];
+
+const clipsOf = (doc: MotionDoc) => clipsIn(doc.tracks);
+
+const mappedTracks = (tracks: Tracks, fn: (clip: MotionClip) => MotionClip): Tracks => tracks.map((t) => ({ ...t, clips: t.clips.map((c) => fn(c as MotionClip)) })) as Tracks;
+
+const mapTop = (doc: MotionDoc, fn: (clip: MotionClip) => MotionClip): MotionDoc => ({ ...doc, tracks: mappedTracks(doc.tracks, fn) });
+
+const mapClips = (doc: MotionDoc, fn: (clip: MotionClip) => MotionClip): MotionDoc => ({
+  ...mapTop(doc, fn),
+  ...(doc.comps ? { comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: mappedTracks(comp.tracks, fn) }])) as MotionDoc['comps'] } : {})
+});
 
 export function viewsOf(doc: MotionDoc): Breakpoint[] {
   const base = { id: BASE_BREAKPOINT, name: BASE_NAME, width: doc.width };
@@ -126,7 +148,11 @@ export function removeBreakpoint(doc: MotionDoc, id: string): MotionDoc {
   return (left.length ? { ...rest, breakpoints: left } : rest) as MotionDoc;
 }
 
-export function setOverride(doc: MotionDoc, breakpointId: string, clipId: string, key: OverrideKey, value: unknown): Result {
+const tracksAt = (doc: MotionDoc, comp: string | null): Tracks | null => (comp ? (doc.comps?.[comp]?.tracks ?? null) : doc.tracks);
+
+const withTracksAt = (doc: MotionDoc, comp: string | null, tracks: Tracks): MotionDoc => (comp ? { ...doc, comps: { ...doc.comps, [comp]: { ...doc.comps[comp], tracks } } } : { ...doc, tracks });
+
+export function setOverride(doc: MotionDoc, breakpointId: string, clipId: string, key: OverrideKey, value: unknown, comp: string | null = null): Result {
   const spec = OVERRIDES[key];
   if (!spec) {
     return { ok: false, error: `${key} cannot vary per breakpoint; it takes one of ${OVERRIDE_KEYS.join(', ')}` };
@@ -134,7 +160,8 @@ export function setOverride(doc: MotionDoc, breakpointId: string, clipId: string
   if (!(doc.breakpoints ?? []).some((b) => b.id === breakpointId)) {
     return { ok: false, error: `no breakpoint ${breakpointId}: the base frame is edited directly` };
   }
-  if (!clipsOf(doc).some((c) => c.id === clipId)) {
+  const tracks = tracksAt(doc, comp);
+  if (!tracks || !clipsIn(tracks).some((c) => c.id === clipId)) {
     return { ok: false, error: `no clip ${clipId}` };
   }
   const parsed = spec.value.safeParse(value);
@@ -142,11 +169,11 @@ export function setOverride(doc: MotionDoc, breakpointId: string, clipId: string
     return { ok: false, error: `${key}: ${parsed.error.issues[0].message}` };
   }
 
-  return { ok: true, doc: mapClips(doc, (c) => (c.id === clipId ? withOverrides(c, { ...c.overrides, [breakpointId]: { ...c.overrides?.[breakpointId], [key]: parsed.data } }) : c)) };
+  return { ok: true, doc: withTracksAt(doc, comp, mappedTracks(tracks, (c) => (c.id === clipId ? withOverrides(c, { ...c.overrides, [breakpointId]: { ...c.overrides?.[breakpointId], [key]: parsed.data } }) : c))) };
 }
 
 export function clearOverride(doc: MotionDoc, breakpointId: string, clipId: string, key: OverrideKey): MotionDoc {
-  return mapClips(doc, (c) => {
+  return mapTop(doc, (c) => {
     if (c.id !== clipId) {
       return c;
     }
@@ -229,16 +256,16 @@ function rescale(doc: MotionDoc, width: number): MotionDoc {
   const comps = Object.fromEntries(
     Object.entries(doc.comps ?? {}).map(([id, comp]) => [id, comp.frame ? comp : { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => rescaleClip(c as MotionClip, unit, across, Anchor.Pixels)) })) }])
   ) as MotionDoc['comps'];
-  return { ...mapClips(doc, (c) => rescaleClip(c, unit, across)), comps, width };
+  return { ...mapTop(doc, (c) => rescaleClip(c, unit, across)), comps, width };
 }
 
-function cascaded(doc: MotionDoc, breakpointId: string): { doc: MotionDoc; width: number } {
+function cascaded(doc: MotionDoc, breakpointId: string): { doc: MotionDoc; width: number; height: number } {
   const views = viewsOf(doc);
   const target = views.find((v) => v.id === breakpointId) ?? views[0];
   const cascade = views.filter((v) => v.width >= target.width).map((v) => v.id);
 
   const applied = mapClips(doc, (clip) => cascade.reduce((c, id) => Object.entries(clip.overrides?.[id] ?? {}).reduce((acc, [key, value]) => applyOverride(acc, key as OverrideKey, value), c), clip));
-  return { doc: applied, width: target.width };
+  return { doc: applied, width: target.width, height: target.height ?? doc.height };
 }
 
 const changedKeys = (after: MotionClip, before: MotionClip) => OVERRIDE_KEYS.filter((key) => !same(readField(after, key), readField(before, key)));
@@ -256,7 +283,7 @@ function liftClip(edited: MotionClip, source: MotionClip, before: MotionClip, br
 export function carryChanges(into: MotionDoc, before: MotionDoc, after: MotionDoc): MotionDoc {
   const befores = new Map(clipsOf(before).map((c) => [c.id, c]));
   const afters = new Map(clipsOf(after).map((c) => [c.id, c]));
-  return mapClips(into, (clip) => {
+  return mapTop(into, (clip) => {
     const was = befores.get(clip.id);
     const now = afters.get(clip.id);
     if (!was || !now) {
@@ -273,17 +300,19 @@ export function liftEdit(source: MotionDoc, breakpointId: string, edited: Motion
 
   const sources = new Map(clipsOf(source).map((c) => [c.id, c]));
   const befores = new Map(clipsOf(cascaded(source, breakpointId).doc).map((c) => [c.id, c]));
-  const lifted = mapClips(rescale(edited, source.width), (clip) => {
+  const lifted = mapTop(rescale(heightened(edited, source.height), source.width), (clip) => {
     const from = sources.get(clip.id);
     return from ? liftClip(clip, from, befores.get(clip.id)!, breakpointId) : clip;
   });
   return { ...lifted, width: source.width, breakpoints: source.breakpoints };
 }
 
+const heightened = (doc: MotionDoc, height: number) => (doc.height === height ? doc : restretched(doc, height));
+
 export function resolveAt(doc: MotionDoc, breakpointId: string): MotionDoc {
-  const { doc: applied, width } = cascaded(doc, breakpointId);
+  const { doc: applied, width, height } = cascaded(doc, breakpointId);
   const { breakpoints: _bps, ...rest } = rescale(mapClips(applied, (c) => withOverrides(c, undefined)), width);
-  return rest as MotionDoc;
+  return heightened(rest as MotionDoc, height);
 }
 
 export const inView = (doc: MotionDoc, breakpointId: string): MotionDoc => (breakpointId === BASE_BREAKPOINT ? doc : resolveAt(doc, breakpointId));
