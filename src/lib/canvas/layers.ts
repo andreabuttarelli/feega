@@ -218,7 +218,18 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
     const parts = { ...open.parts, ...namedParts(outlines[nodeId] ?? []) };
     return trackRows(frameWalk(open.doc, nodeId, parts, open.mode ?? EditMode.Design, folded), open.doc.tracks, TRACK_DEPTH);
   }
-  return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
+  return unfolded(outlines[nodeId] ?? [], folded).map((row) => ({ ...row, nested: true }));
+}
+
+function unfolded(rows: readonly LayerRow[], folded: ReadonlySet<string>): LayerRow[] {
+  let under: number | null = null;
+  return rows.filter((row) => {
+    if (under !== null && row.depth > under) {
+      return false;
+    }
+    under = folded.has(row.key) ? row.depth : null;
+    return true;
+  });
 }
 
 function elementRows(rows: readonly LayerRow[]): LayerRow[] {
