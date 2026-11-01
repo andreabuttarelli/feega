@@ -137,6 +137,81 @@ describe.runIf(process.env.CHROMIUM_PATH)('collapsed answers of a FAQ', () => {
   }, 30_000);
 });
 
+const DASHED = `<body style="margin:0">
+<div id="a" style="width:200px;height:40px;border:2px dashed #000"></div>
+<div id="b" style="width:200px;height:40px;border:1px dotted #000"></div>
+<div id="c" style="width:200px;height:40px;border:4px dashed #000"></div>
+<svg width="200" height="20"><line x1="0" y1="10" x2="200" y2="10" stroke="#000" stroke-width="2" stroke-dasharray="5 3"/></svg>
+</body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('dashed and dotted lines', () => {
+  it('keep their dash and gap as the browser draws them, on borders and svg strokes (stripe: dashed borders came in solid)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 300 });
+      await page.setContent(DASHED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const dashes = all(tree.root).filter((n) => n.strokes?.length).map((n) => n.strokeDashes);
+
+      expect(dashes).toEqual([
+        [6, 4],
+        [1, 1],
+        [8, 4],
+        [5, 3]
+      ]);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const BLENDED = `<body style="margin:0;background:#ff0"><div style="width:100px;height:50px;background:#0af;mix-blend-mode:multiply"></div><div style="mix-blend-mode:screen"><p>text</p><p>more</p></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a blended block', () => {
+  it('without children of its own comes in as layers with its blend mode, not a snapshot; one with children stays a snapshot (vercel, linear, stripe)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 300 });
+      await page.setContent(BLENDED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.blendMode).map((n) => [n.type, n.blendMode])).toEqual([['FRAME', 'MULTIPLY']]);
+      expect(tree.snaps).toHaveLength(1);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const FADED = `<body style="margin:0"><div style="width:200px;height:100px;background:#0af;-webkit-mask-image:linear-gradient(to bottom, black 60%, transparent);mask-image:linear-gradient(to bottom, black 60%, transparent)"><p style="margin:0">one</p><p style="margin:0">two</p></div><div style="width:200px;height:100px;background:#0af;mask-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=)"></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a block faded by a mask', () => {
+  it('with a linear gradient comes in as layers with that gradient as its mask, an image mask stays a snapshot (framer, webflow)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 300 });
+      await page.setContent(FADED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const faded = all(tree.root).find((n) => n.maskGradient);
+
+      expect(faded?.maskGradient?.gradientStops?.map((s) => [s.position, s.color.a])).toEqual([
+        [0.6, 1],
+        [1, 0]
+      ]);
+      expect(all(faded!).some((n) => n.type === 'TEXT')).toBe(true);
+      expect(tree.snaps).toHaveLength(1);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
 const CLIPPED = `<body style="margin:0"><svg width="40" height="40" viewBox="0 0 20 20"><defs><clipPath id="c"><rect x="0" y="0" width="10" height="20"/></clipPath></defs><g clip-path="url(#c)"><circle cx="10" cy="10" r="8" fill="#e00"/></g></svg></body>`;
 
 describe.runIf(process.env.CHROMIUM_PATH)('an svg clipped by a rectangle', () => {

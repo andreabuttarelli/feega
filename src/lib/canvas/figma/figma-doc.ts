@@ -12,6 +12,8 @@ import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips } from '$lib/motion/main-component';
 import { precompose } from '@feega/motion-core/motion/precomp';
+import { BlendMode } from '@feega/motion-core/motion/blend';
+import { MaskKind, maskSchema } from '@feega/motion-core/motion/mask';
 import { instanceOverrides } from './instance-diff';
 import { Align, Direction, Justify as MotionJustify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
@@ -20,7 +22,7 @@ import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { addClip, editClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { figmaMessage, type FigmaMessage } from './archive';
-import { Clip, Cross, Decoration, Destination, Fit, FillKind, Flow, Justify, LayerKind, PictureFit, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
+import { Clip, Cross, Decoration, Destination, Fit, FillKind, Flow, Justify, LayerKind, MaskBand, PictureFit, figmaScene, type AutoLayout, type ComponentRef, type Fill, type FrameLayer, type Blur, type Layer, type LayerEffect, type Shadow, type ShapeLayer, type Stroke, type TextLayer } from './scene';
 
 type NewId = () => string;
 type Unit = { x: number; y: number };
@@ -86,7 +88,8 @@ function imageSlots(fills: Fill[]): Omit<FigmaImage, 'clipId'>[] {
 function strokeStack(strokes: Stroke[], doc: MotionDoc, p: Place): Painted[] {
   return strokes.flatMap((s) => {
     const paint = MOTION_FILL[s.fill.kind](s.fill);
-    return paint ? [{ paint, width: clamp(round((s.weight * p.scale) / minSide(doc)), 0, MAX_STROKE_WIDTH), align: s.align }] : [];
+    const unit = (px: number) => clamp(round((px * p.scale) / minSide(doc)), 0, MAX_STROKE_WIDTH);
+    return paint ? [{ paint, width: unit(s.weight), align: s.align, ...(s.dash ? { dash: unit(s.dash[0]), gap: unit(s.dash[1]) } : {}) }] : [];
   });
 }
 
@@ -356,7 +359,8 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
   let built: Built = { ...background, roots: holding ? [] : background.roots };
   for (const child of layer.children) {
     const made = build[child.kind](built.doc, child, p);
-    const next = child.hidden ? { ...made, doc: hiddenAll(made.doc, made.roots) } : made;
+    const shown = { ...made, doc: blended(child.hidden ? hiddenAll(made.doc, made.roots) : made.doc, made.roots, child.blend) };
+    const next = masked(shown, child, p);
     built = { doc: next.doc, ids: [...built.ids, ...next.ids], roots: [...built.roots, ...next.roots] };
   }
   const [container] = background.roots;
@@ -371,6 +375,44 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
 }
 
 const OPAQUE = 1;
+
+const MASK_KIND: Record<MaskBand, MaskKind> = { [MaskBand.Solid]: MaskKind.Rect, [MaskBand.Fade]: MaskKind.Linear };
+
+function heldTogether(built: Built, layer: Layer, p: Place): Built {
+  const [groupId, compId] = [p.newId(), p.newId()];
+  let n = 0;
+  const made = groupClips(built.doc, built.ids, () => (n++ === 0 ? compId : groupId));
+  if (!made.ok) {
+    return built;
+  }
+  const named = editClip(made.doc, groupId, (clip) => ({ ...clip, name: layer.name.slice(0, MAX_NAME) }));
+  return { doc: named.ok ? named.doc : made.doc, ids: [groupId], roots: [{ id: groupId, layer }] };
+}
+
+function masked(built: Built, layer: Layer, p: Place): Built {
+  if (!layer.masks.length || !built.roots.length) {
+    return built;
+  }
+  const held = built.ids.length > 1 ? heldTogether(built, layer, p) : built;
+  const unit = toUnit(held.doc, p);
+  const masks = layer.masks.map((m) => {
+    const [x, y] = unit([m.x, m.y]);
+    return maskSchema.parse({ kind: MASK_KIND[m.band], x, y, width: (m.length * p.scale) / held.doc.width, height: (m.span * p.scale) / held.doc.height, rotation: m.rotation, opacity: m.opacity });
+  });
+  const [first, ...rest] = masks;
+  const set = editClip(held.doc, held.roots[0].id, (clip) => ({ ...clip, mask: first, maskStack: rest }));
+  return set.ok ? { ...held, doc: set.doc } : held;
+}
+
+function blended(doc: MotionDoc, roots: Root[], blend: BlendMode): MotionDoc {
+  if (blend === BlendMode.Normal) {
+    return doc;
+  }
+  return roots.reduce((d, root) => {
+    const set = editClip(d, root.id, (clip) => ({ ...clip, blend }));
+    return set.ok ? set.doc : d;
+  }, doc);
+}
 
 function hiddenAll(doc: MotionDoc, roots: Root[]): MotionDoc {
   return roots.reduce((d, root) => {

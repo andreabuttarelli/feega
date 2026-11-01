@@ -214,14 +214,20 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   };
 
   const SIDES = ['Top', 'Right', 'Bottom', 'Left'] as const;
-  const bordersOf = (css: CSSStyleDeclaration, r: Rect): { strokes?: RestPaint[]; strokeWeight?: number; strokeAlign?: string; sides: RestNode[] } => {
+  const THIN_DASH = 3;
+  const DASHES: Record<string, (w: number) => number[]> = {
+    dashed: (w) => (w < THIN_DASH ? [w * 3, w * 2] : [w * 2, w]),
+    dotted: (w) => [w, w]
+  };
+  const bordersOf = (css: CSSStyleDeclaration, r: Rect): { strokes?: RestPaint[]; strokeWeight?: number; strokeAlign?: string; strokeDashes?: number[]; sides: RestNode[] } => {
     const drawn = SIDES.map((s) => ({ side: s, width: px(css.getPropertyValue(`border-${s.toLowerCase()}-width`)), style: css.getPropertyValue(`border-${s.toLowerCase()}-style`), color: css.getPropertyValue(`border-${s.toLowerCase()}-color`) })).filter((b) => b.width > 0 && b.style !== 'none' && b.style !== 'hidden' && colourOf(b.color));
     if (!drawn.length) {
       return { sides: [] };
     }
-    const uniform = drawn.length === 4 && drawn.every((b) => b.width === drawn[0].width && b.color === drawn[0].color);
+    const uniform = drawn.length === 4 && drawn.every((b) => b.width === drawn[0].width && b.color === drawn[0].color && b.style === drawn[0].style);
     if (uniform) {
-      return { strokes: solid(drawn[0].color), strokeWeight: drawn[0].width, strokeAlign: 'INSIDE', sides: [] };
+      const dashes = DASHES[drawn[0].style]?.(drawn[0].width);
+      return { strokes: solid(drawn[0].color), strokeWeight: drawn[0].width, strokeAlign: 'INSIDE', ...(dashes ? { strokeDashes: dashes } : {}), sides: [] };
     }
     const RECT: Record<string, (w: number) => Rect> = {
       Top: (w) => ({ x: r.x, y: r.y, width: r.width, height: w }),
@@ -232,6 +238,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const sides = drawn.flatMap((b) => (take() ? [{ id: id(), type: 'RECTANGLE', name: `border ${b.side.toLowerCase()}`, absoluteBoundingBox: box(RECT[b.side](b.width)), fills: solid(b.color), layoutPositioning: 'ABSOLUTE' }] : []));
     return { sides };
   };
+
+  const strokedBy = ({ sides: _sides, ...stroke }: ReturnType<typeof bordersOf>): Partial<RestNode> => ('strokes' in stroke ? stroke : {});
 
   const outlineOf = (css: CSSStyleDeclaration, r: Rect): RestNode[] => {
     const w = px(css.outlineWidth);
@@ -591,7 +599,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     return [...el.getClientRects()].flatMap((cr) => {
       const r = pageRect(cr);
       const borders = bordersOf(css, r);
-      const stroked = 'strokes' in borders ? { strokes: borders.strokes, strokeWeight: borders.strokeWeight, strokeAlign: borders.strokeAlign } : {};
+      const stroked = strokedBy(borders);
       if ((!fills.length && !('strokes' in borders) && !borders.sides.length) || !shown(r, ctx.clip) || !take()) {
         return [];
       }
@@ -744,8 +752,11 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const opacity = opacityUp(el, svgRoot);
     const path = kit.pathText(ops, frame);
     const node: RestNode = { id: id(), type: 'VECTOR', name: tag, absoluteBoundingBox: box(svgBox), fills, ...(opacity < 1 ? { opacity } : {}), fillGeometry: [{ path, windingRule: (inherit && el.getAttribute('fill-rule') === null ? inherit.fillRule : css.fillRule) === 'evenodd' ? 'EVENODD' : 'NONZERO' }] };
-    const weight = px(css.strokeWidth || '1') * Math.sqrt(Math.abs(frame[0] * frame[3] - frame[1] * frame[2]));
-    return strokes.length ? { ...node, strokes, strokeWeight: round(weight * 100) / 100, strokeAlign: 'CENTER' } : node;
+    const across = Math.sqrt(Math.abs(frame[0] * frame[3] - frame[1] * frame[2]));
+    const weight = px(css.strokeWidth || '1') * across;
+    const pattern = css.strokeDasharray && css.strokeDasharray !== 'none' ? css.strokeDasharray.split(/[\s,]+/).map((v) => px(v) * across) : [];
+    const dashes = pattern.length % 2 ? [...pattern, ...pattern] : pattern;
+    return strokes.length ? { ...node, strokes, strokeWeight: round(weight * 100) / 100, strokeAlign: 'CENTER', ...(dashes.some((d) => d > 0) ? { strokeDashes: dashes.map((d) => round(d * 100) / 100) } : {}) } : node;
   };
 
   const svgText = (el: Element, ctx: Ctx): RestNode | null => {
@@ -940,7 +951,20 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     return [keyed({ id: id(), type: 'GROUP', name: el.tagName.toLowerCase(), absoluteBoundingBox: box(r), use: Number(use), children: made }, Math.max(...made.map((m) => zOf.get(m) ?? 0)))];
   };
 
-  const SIMPLE_EFFECTS = (css: CSSStyleDeclaration) => (css.filter === 'none' || SIMPLE_FILTER.test(css.filter)) && css.mixBlendMode === 'normal' && (css.maskImage === 'none' || !css.maskImage) && (css.webkitMaskImage === 'none' || !css.webkitMaskImage) && (css.clipPath === 'none' || /^inset\(/.test(css.clipPath));
+  const blendsAlone = (el: Element, css: CSSStyleDeclaration) => css.mixBlendMode !== 'normal' && !el.firstElementChild;
+  const maskOf = (css: CSSStyleDeclaration) => (css.maskImage && css.maskImage !== 'none' ? css.maskImage : css.webkitMaskImage && css.webkitMaskImage !== 'none' ? css.webkitMaskImage : '');
+  const gradientMaskOf = (el: Element, css: CSSStyleDeclaration): RestPaint | null => {
+    const mask = maskOf(css);
+    const layers = mask ? kit.splitTop(mask, ',') : [];
+    const plain = /^(auto|auto auto)?$/.test(css.maskSize || css.webkitMaskSize || '') && /^(0% 0%|0px 0px|left top)?$/.test(css.maskPosition || css.webkitMaskPosition || '');
+    if (layers.length !== 1 || !/^linear-gradient\(/.test(layers[0].trim()) || !plain) {
+      return null;
+    }
+    const r = el.getBoundingClientRect();
+    const paint = kit.gradientOf(layers[0], r.width, r.height, rgbaOf) as RestPaint | null;
+    return paint?.type === 'GRADIENT_LINEAR' ? paint : null;
+  };
+  const SIMPLE_EFFECTS = (el: Element, css: CSSStyleDeclaration) => (css.filter === 'none' || SIMPLE_FILTER.test(css.filter)) && (css.mixBlendMode === 'normal' || blendsAlone(el, css)) && (!maskOf(css) || Boolean(gradientMaskOf(el, css))) && (css.clipPath === 'none' || /^inset\(/.test(css.clipPath));
 
   const childrenOf = (el: Element, css: CSSStyleDeclaration, ctx: Ctx): RestNode[] => {
     const out: RestNode[] = [];
@@ -1030,6 +1054,13 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     }
     const ctx = fixed ? { ...within, clip: PAGE } : within;
     const made = shape(el, css, ctx);
+    const fade = maskOf(css) ? gradientMaskOf(el, css) : null;
+    if (fade && made[0]?.type === 'FRAME') {
+      made[0].maskGradient = fade;
+    }
+    if (blendsAlone(el, css)) {
+      made.forEach((n) => (n.blendMode = css.mixBlendMode.toUpperCase().replace(/-/g, '_')));
+    }
     if (fixed) {
       made.forEach((n) => fixedNodes.add(n));
     }
@@ -1054,7 +1085,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const name = el.id || el.getAttribute('aria-label') || tag.toLowerCase();
     const control = (el instanceof HTMLInputElement && !FIELDS.test(el.type) && css.appearance !== 'none') || /^(PROGRESS|METER)$/.test(tag);
     const rasterOnly = RASTER.test(tag);
-    if (!SIMPLE_EFFECTS(css) || (turned(css) && !(el instanceof SVGSVGElement)) || control || rasterOnly) {
+    if (!SIMPLE_EFFECTS(el, css) || (turned(css) && !(el instanceof SVGSVGElement)) || control || rasterOnly) {
       if (!visible) {
         return [];
       }
@@ -1097,7 +1128,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
       return b.x < r.x - EXACT || b.y < r.y - EXACT || b.x + b.width > r.x + r.width + EXACT || b.y + b.height > r.y + r.height + EXACT;
     });
     const opacity = Number(css.opacity);
-    const framed = paintedSelf || overflows || /flex/.test(css.display) || opacity < 1;
+    const masking = Boolean(maskOf(css));
+    const framed = paintedSelf || overflows || /flex/.test(css.display) || opacity < 1 || masking;
     const kidZ = kids.map((k) => zOf.get(k) ?? 0);
     const zEff = stacks(el, css) || clipsSelf ? z : Math.max(z, ...kidZ);
     if (!framed) {
@@ -1133,10 +1165,10 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
           absoluteBoundingBox: box(r),
           ...(opacity < 1 ? { opacity } : {}),
           fills: own.fills,
-          ...('strokes' in borders ? { strokes: borders.strokes, strokeWeight: borders.strokeWeight, strokeAlign: borders.strokeAlign } : {}),
+          ...strokedBy(borders),
           ...(effects ? { effects } : {}),
           ...cornersOf(css, r),
-          clipsContent: overflows,
+          clipsContent: overflows || masking,
           ...(positioned ? { layoutPositioning: 'ABSOLUTE' } : {}),
           ...flow,
           children

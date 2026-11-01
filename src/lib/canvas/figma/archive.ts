@@ -45,6 +45,9 @@ export type FigmaRawNode = {
   rectangleBottomLeftCornerRadius?: number;
   rectangleCornerRadiiIndependent?: boolean;
   frameMaskDisabled?: boolean;
+  dashPattern?: number[];
+  blendMode?: string;
+  maskGradient?: { handles: { x: number; y: number }[]; stops: { position: number; alpha: number }[] };
   collapsed?: boolean;
   resizeToFit?: boolean;
   stackMode?: string;

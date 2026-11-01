@@ -1,3 +1,4 @@
+import { BLEND_MODES, BlendMode } from '@feega/motion-core/motion/blend';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import type { ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, NodePatch, Paint, Rgba, Vec } from './archive';
 import { geometryPath } from './commands';
@@ -72,7 +73,7 @@ export type Fill =
   | { kind: FillKind.Diamond; stops: Stop[]; opacity: number }
   | { kind: FillKind.Image; hash: string; opacity: number; fit: PictureFit; focus: { x: number; y: number } };
 
-export type Stroke = { fill: Fill; weight: number; align: string };
+export type Stroke = { fill: Fill; weight: number; align: string; dash: [number, number] | null };
 
 export type Shadow = { kind: 'drop-shadow' | 'inner-shadow'; x: number; y: number; blur: number; spread: number; color: string; opacity: number };
 export type Blur = { kind: 'layer-blur' | 'background-blur'; radius: number };
@@ -84,7 +85,14 @@ export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean };
 
 export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number };
 
-type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean };
+export enum MaskBand {
+  Solid = 'solid',
+  Fade = 'fade'
+}
+
+export type LayerMask = { band: MaskBand; x: number; y: number; length: number; span: number; rotation: number; opacity: number };
+
+type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[] };
 
 export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
 
@@ -352,7 +360,8 @@ function strokesOf(n: FigmaRawNode, report: Report): Stroke[] {
       report(`${fill.kind} stroke`);
       return [];
     }
-    return [{ fill, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase() }];
+    const [dash, gap = dash] = n.dashPattern ?? [];
+    return [{ fill, weight: round(n.strokeWeight ?? 1), align: (n.strokeAlign ?? 'CENTER').toLowerCase(), dash: dash ? [round(dash), round(gap)] : null }];
   });
 }
 
@@ -530,8 +539,61 @@ function shapePath(n: FigmaRawNode, ctx: Ctx): { path: string; rule: FillRule } 
   return { path: geometry !== undefined && ctx.blobs[geometry] ? geometryPath(ctx.blobs[geometry]) : '', rule: FillRule.NonZero };
 }
 
+const BLENDS = new Set<string>(BLEND_MODES);
+
+const blendOf = (figma: string | undefined): BlendMode => {
+  const css = (figma ?? '').toLowerCase().replace(/_/g, '-');
+  return BLENDS.has(css) ? (css as BlendMode) : BlendMode.Normal;
+};
+
+const SEEN_ALPHA = 0.01;
+const MAX_MASKS = 8;
+const BEYOND = 4;
+const DEGREES = 180 / Math.PI;
+
+function masksOf(gradient: FigmaRawNode['maskGradient'], box: Box): LayerMask[] {
+  const [from, to] = gradient?.handles ?? [];
+  const stops = [...(gradient?.stops ?? [])].sort((a, b) => a.position - b.position);
+  if (!from || !to || stops.length < 2) {
+    return [];
+  }
+  const start = { x: box.x + from.x * box.width, y: box.y + from.y * box.height };
+  const [dx, dy] = [(to.x - from.x) * box.width, (to.y - from.y) * box.height];
+  const along = Math.hypot(dx, dy);
+  if (!along) {
+    return [];
+  }
+  const span = Math.hypot(box.width, box.height) * 2;
+  const rotation = Math.atan2(dy, dx) * DEGREES;
+  const ends = [{ position: -BEYOND, alpha: stops[0].alpha }, ...stops, { position: 1 + BEYOND, alpha: stops[stops.length - 1].alpha }];
+  const band = (t0: number, t1: number, kind: MaskBand, opacity: number, turn: number): LayerMask => {
+    const mid = (t0 + t1) / 2;
+    return { band: kind, x: round(start.x + dx * mid), y: round(start.y + dy * mid), length: round((t1 - t0) * along), span: round(span), rotation: round(rotation + turn), opacity: round(opacity) };
+  };
+  const segments = ends.slice(1).map((stop, i) => ({ t0: ends[i].position, t1: stop.position, a0: ends[i].alpha, a1: stop.alpha }));
+  const flat = (g: { a0: number; a1: number }) => g.a0 === g.a1;
+  const merged = segments.reduce<typeof segments>((out, g) => {
+    const last = out[out.length - 1];
+    if (last && flat(last) && flat(g) && last.a0 === g.a0) {
+      return [...out.slice(0, -1), { ...last, t1: g.t1 }];
+    }
+    return [...out, g];
+  }, []);
+  return merged
+    .flatMap(({ t0, t1, a0, a1 }) => {
+      const [low, high] = [Math.min(a0, a1), Math.max(a0, a1)];
+      if (t1 - t0 <= 0 || high < SEEN_ALPHA) {
+        return [];
+      }
+      const solid = low >= SEEN_ALPHA ? [band(t0, t1, MaskBand.Solid, low, 0)] : [];
+      const fade = high - low >= SEEN_ALPHA ? [band(t0, t1, MaskBand.Fade, high - low, a0 > a1 ? 0 : HALF_TURN)] : [];
+      return [...solid, ...fade];
+    })
+    .slice(0, MAX_MASKS);
+}
+
 function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
-  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true };
+  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true, blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })) };
 }
 
 const DEFAULT_TEXT_SIZE = 12;
@@ -748,6 +810,8 @@ export function figmaScene(message: FigmaMessage): FigmaScene | null {
     effects: [],
     item: { grow: false, stretch: false, absolute: false },
     hidden: false,
+    blend: BlendMode.Normal,
+    masks: [],
     fills: [],
     strokes: [],
     radii: [0, 0, 0, 0],
