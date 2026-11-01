@@ -1,5 +1,5 @@
+import { HIGHLIGHT, HighlightKind } from '../highlight';
 import type { CardFace } from '$lib/canvas/gpu/card-face';
-import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import type { PortTile } from '$lib/canvas/gpu/geometry';
 import type { Box, FrameOnCanvas } from './canvas-scene';
 import { cardItems } from './cards';
@@ -24,7 +24,7 @@ export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
 
 const reachTop = (t: Pick<CardTile, 'zoom'>): number => Math.ceil(CHROME_REACH.top * Math.max(1, labelScale(t.zoom ?? 1)));
 
-export const ringColour = (t: Pick<CardTile, 'outputs'>, theme: Pick<CoreTheme, 'accent'>): string => (t.outputs.length ? CONNECTOR_STYLE[t.outputs[0].type].color : theme.accent);
+export const ringColour = (): string => HIGHLIGHT[HighlightKind.Node];
 
 export enum CardLayer {
   Whole = 'whole',

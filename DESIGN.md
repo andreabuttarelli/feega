@@ -164,8 +164,10 @@ Desktop and tablet keep the right panel as it is. On a phone (< 760px) Propertie
 ### states
 
 Hover is a wash (`--ui-wash`), pressed a deeper grey (`--ui-pressed`), focus an accent ring, selection an accent wash with accent text.
-Hovering a Layers row outlines what it names on the canvas in `--ui-hover-outline` (violet
-`#b14cff`), never the accent: hover and selection must read apart at a glance.
+Hover and selection outlines, on the canvas and in Layers, are one blue (`--ui-highlight`,
+`#0099ff`) for every element, stack, group, text, shape and node. Components, main or instance, are
+purple (`--ui-highlight-component`, `#9747ff`), and so are their Layers rows. One table decides it
+(`HIGHLIGHT` in `src/lib/canvas/highlight.ts`); a new case is a row there.
 Panels that open or fold (the timeline in Design mode) move on `--ease-expo-out`, 320 ms.
 
 ### selecting inside a frame

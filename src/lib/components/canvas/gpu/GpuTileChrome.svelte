@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Tile } from '../flow-types';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
+  import { HIGHLIGHT, HighlightKind } from '$lib/canvas/highlight';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { isNodeType } from '$lib/canvas/node-data';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -20,7 +21,7 @@
   const label = $derived(tile.tag === NameTag.Hidden ? null : tile.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null));
   const ports = $derived(tile.connectable === false ? [] : (tile.connectors ?? []));
   const chrome = $derived(nodeChrome(tile.id, selected, layersSource.video));
-  const ringColor = $derived(tile.output ? CONNECTOR_STYLE[tile.output].color : 'var(--accent, #7c5cff)');
+  const ringColor = HIGHLIGHT[HighlightKind.Node];
   const radius = $derived(cardRadiusOf(tile.kind ?? '') ?? 0);
   const outputs = $derived(tile.connectable === false ? [] : (tile.outputs ?? []));
 </script>
@@ -110,7 +111,7 @@
     inset: 0;
     z-index: 4;
     pointer-events: none;
-    outline: 2px solid var(--ui-hover-outline);
+    outline: 2px solid var(--ui-highlight);
     outline-offset: 1px;
   }
 

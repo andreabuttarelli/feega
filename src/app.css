@@ -192,7 +192,8 @@
   --ui-recording: #ff3b30;
   --ui-accent-ink: #ffffff;
   --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
-  --ui-hover-outline: #b14cff;
+  --ui-highlight: #0099ff;
+  --ui-highlight-component: #9747ff;
   --ui-syntax-comment: #7a8594;
   --ui-syntax-string: #1a7f37;
   --ui-syntax-tag: #c2255c;
