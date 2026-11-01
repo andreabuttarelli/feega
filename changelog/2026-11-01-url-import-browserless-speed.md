@@ -32,6 +32,10 @@ scratch with the native IntersectionObserver in a second session.
   `too_slow` (504) instead of a second session. The second read stays for a renderer crash with
   time left.
 
+- With breakpoints, the tablet and phone widths are read in their own tabs at the same time as
+  the desktop one instead of after it (three sessions in a row before); a width whose browser
+  cannot open (a 429) is left out instead of failing the import.
+
 Discarded: making the native observer the default (45 s on Browserless before `drawnInView`, but
 webflow above the fold 0.989 → 0.886 and framer 0.970 → 0.928).
 

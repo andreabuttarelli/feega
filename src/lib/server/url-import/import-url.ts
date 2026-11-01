@@ -231,19 +231,22 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
     return unreadable(read) && tab.left() <= 0 ? refused(UrlImportOutcome.TooSlow) : read;
   };
-  const first = await readWith(Sight.Everything);
-  const read = unreadable(first) ? await readWith(Sight.Native) : first;
+  const readPage = async () => {
+    const first = await readWith(Sight.Everything);
+    return unreadable(first) ? readWith(Sight.Native) : first;
+  };
+  const readView = async (view: PageView): Promise<ViewRead[]> => {
+    const tab = await open();
+    await tab.viewport(view.width).catch(() => undefined);
+    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+    return 'outcome' in narrow ? [] : [{ view, tree: narrow }];
+  };
+  const [read, ...narrow] = await Promise.all([readPage(), ...(ask.views ?? []).map((view) => readView(view).catch(() => []))]);
   if ('outcome' in read) {
     return read;
   }
   const tree = await withSheetFonts(ask, read);
-  const views: ViewRead[] = [];
-  for (const view of ask.views ?? []) {
-    const tab = await open();
-    await tab.viewport(view.width).catch(() => undefined);
-    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
-    views.push(...('outcome' in narrow ? [] : [{ view, tree: narrow }]));
-  }
+  const views = narrow.flat();
 
   return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
 }

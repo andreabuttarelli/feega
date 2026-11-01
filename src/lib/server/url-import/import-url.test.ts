@@ -141,6 +141,31 @@ describe('importPageAt', () => {
     expect(doc.breakpoints?.map((b) => b.name)).toEqual(['Tablet', 'Phone']);
   });
 
+  it('reads the tablet and phone widths alongside the desktop one, each in its own tab, not one after the other (Browserless: three sessions in a row)', async () => {
+    const tabs = [tabOf(TREE), tabOf(TREE), tabOf(TREE)];
+    let release = () => undefined as void;
+    const held = new Promise<void>((done) => (release = done));
+    for (const tab of tabs) {
+      vi.mocked(tab.goto).mockImplementation(async () => held.then(() => 200));
+    }
+    const open = vi.fn();
+    tabs.forEach((tab) => open.mockResolvedValueOnce(tab));
+    const { ask } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
+
+    const done = importPageAt(ask);
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(3));
+    release();
+
+    expect((await done).outcome).toBe(UrlImportOutcome.Ok);
+  });
+
+  it('a breakpoint whose browser cannot be opened is left out, the page still comes in', async () => {
+    const open = vi.fn().mockResolvedValueOnce(tabOf(TREE)).mockRejectedValue(new Error('Unexpected server response: 429'));
+    const { ask } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
+
+    expect((await importPageAt(ask)).outcome).toBe(UrlImportOutcome.Ok);
+  });
+
   it('una pagina pubblica diventa un frame col nome della pagina', async () => {
     const { ask, docs } = askOf();
 

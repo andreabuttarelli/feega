@@ -154,7 +154,8 @@ palette. Borders, radii and the frame background are listed, not bound.
 ## Breakpoints
 
 With `breakpoints: true` (API, MCP `import_url`, CLI `--breakpoints`, dialog checkbox) the page is
-read again at 768 and 390 px (`PAGE_VIEWS`, `tab.viewport`), each with the same freeze. The
+read again at 768 and 390 px (`PAGE_VIEWS`, `tab.viewport`), each with the same freeze, in its
+own tab at the same time as the desktop read; a width whose tab cannot open is left out. The
 frame gets Tablet and Phone breakpoints (ADR 0022) whose overrides make each view look like the
 page at that width:
 
