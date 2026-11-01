@@ -47,9 +47,7 @@ screenshot all come from that same frozen state.
    (a MutationObserver on the document and on every shadow root), and pauses infinite animations
    created later at their start.
 
-`tab.tree()` runs `treeScript` with the `@font-face` rules of cross-origin stylesheets read from
-the network responses (the page cannot read or fetch them), then takes the raster snapshots
-(`page-snaps.ts`); a canvas, video or iframe is replaced by its own snapshot afterwards, so
+`tab.tree()` runs `treeScript`, then takes the raster snapshots (`page-snaps.ts`); a canvas, video or iframe is replaced by its own snapshot afterwards, so
 anything read later sees the same frame. Snapshots see `clipPath` and `mask` sources even when
 the rest of the page is hidden.
 ## DOM → doc

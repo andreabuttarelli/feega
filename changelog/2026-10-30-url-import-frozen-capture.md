@@ -20,8 +20,6 @@ Capture (`page-reveal.ts`, `import-url.ts`, `web/browser.ts`):
 - Infinite animations and GSAP loops at their start, carousels on the first slide.
 - Cookie banners: also under `<html>`, in shadow roots, rendered late (MutationObserver on the
   document and every shadow root).
-- Fonts of cross-origin stylesheets come from the network responses (stripe's sohne-var was
-  missing).
 - Canvases, videos and iframes are replaced by their own snapshot once read; snapshots see
   `clipPath`/`mask` sources (webflow's footer logo came out empty).
 
@@ -46,18 +44,25 @@ Collapsed content (user report on feega.app: every FAQ answer drawn over the nex
 - feega.app joined the fidelity pages; the capture test fails when the text of a closed
   `<details>` is painted.
 
-## SSIM (fold / full), before → after, HTML still
+## SSIM (fold / full), HTML still, fresh captures on dev b74b667c4
 
-| page | before | after |
+| page | dev | after |
 |---|---|---|
-| vercel | 0.979 / 0.971 | 0.995 / 0.974 |
-| linear | 0.983 / 0.967 | 0.990 / 0.980 |
-| stripe | 0.972 / 0.892 | 0.981 / 0.961 |
-| apple | 0.987 / 0.940 | 0.991 / 0.973 |
-| framer | 0.978 / 0.840 | 0.978 / 0.952 |
-| webflow | 0.742 / 0.867 | 0.991 / 0.969 |
-| tailwind | 0.952 / 0.957 | 0.952 / 0.955 |
-| blog | 0.955 / 0.941 | 0.974 / 0.966 |
+| vercel | 0.979 / 0.970 | 0.996 / 0.972 |
+| linear | 0.989 / 0.971 | 0.989 / 0.979 |
+| stripe | 0.981 / 0.900 | 0.981 / 0.928 |
+| apple | 0.987 / 0.936 | 0.991 / 0.969 |
+| framer | 0.987 / 0.861 | 0.986 / 0.970 |
+| webflow | 0.736 / 0.844 | 0.989 / 0.957 |
+| tailwind | 0.951 / 0.944 | 0.951 / 0.942 |
+| blog | 0.974 / 0.951 | 0.974 / 0.962 |
+| feega | 0.958 / 0.906 | 0.957 / 0.961 |
+
+Stripe and tailwind full lose on lists and a button that the auto layout pass stacks with the
+wrong gaps and size; not this change.
+
+Fonts of cross-origin stylesheets: a reader of network responses was dropped in the rebase, dev's
+`sheetFonts` (server fetch) covers it.
 
 ## Discarded
 
