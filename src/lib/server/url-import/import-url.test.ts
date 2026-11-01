@@ -4,7 +4,7 @@ import type { FrameStore } from '$lib/server/motion/move-element';
 import type { PageTree } from './page-tree';
 import { importPageAt, UrlImportOutcome } from './import-url';
 import { PAGE_VIEWS } from './page-views';
-import { FULL_SHAPE, PLAIN_SHAPE } from './url-doc';
+import { FULL_SHAPE, PLAIN_SHAPE, urlPlan } from './url-doc';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 
 const TREE: PageTree = {
@@ -271,4 +271,24 @@ describe('importPageAt', () => {
     expect(done.outcome).toBe(UrlImportOutcome.Ok);
     expect(Object.values(page.comps).flatMap((c) => (c.component?.set === 'Accordion 1' ? [c.component.variant] : []))).toEqual([{ State: 'Closed' }, { State: 'Open' }]);
   });
+
+  it('a button main inside the card main points at the Button set frame from the Card set frame too', async () => {
+    const solid = [{ type: 'SOLID', color: { r: 0.37, g: 0.42, b: 0.82, a: 1 } }];
+    const label = (id: string, x: number, y: number) => ({ id, type: 'TEXT', characters: 'Go', absoluteBoundingBox: { x, y, width: 60, height: 20 }, fills: solid, style: { fontFamily: 'Inter', fontSize: 14, fontWeight: 500 } });
+    const card = (id: string, x: number) => ({ id, type: 'INSTANCE', name: 'Card', componentId: 'k1', absoluteBoundingBox: { x, y: 600, width: 200, height: 160 }, fills: [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }], children: [label(`${id}t`, x + 10, 610), { id: `${id}b`, type: 'INSTANCE', name: 'Button', componentId: 'k1b', absoluteBoundingBox: { x: x + 10, y: 700, width: 100, height: 40 }, fills: solid, children: [label(`${id}bt`, x + 20, 710)] }] });
+    const tree = { ...TREE, root: { ...TREE.root, children: [...TREE.root.children!, card('k1', 100), card('k2', 400)] } };
+    const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
+    const planner = { prepare: async () => undefined, plan: (t: PageTree, newId: () => string) => urlPlan(t, newId, (root) => root, {}, FULL_SHAPE) };
+    const { ask, docs } = askOf({ open: async () => tabOf(tree), shape: FULL_SHAPE, components, planner });
+
+    await importPageAt(ask);
+
+    const named = (name: string) => [...docs].find(([id, d]) => id !== 'frame-1' && d.name === name)!;
+    const [buttonSet] = named('Button');
+    const cardSet = named('Card')[1].doc as MotionDoc;
+    const nested = Object.values(cardSet.comps).filter((c) => c.component?.name === 'Button');
+    expect(nested.length).toBeGreaterThan(0);
+    expect(nested.every((c) => c.component!.home === buttonSet)).toBe(true);
+  });
 });
+

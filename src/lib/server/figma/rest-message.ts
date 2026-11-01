@@ -80,6 +80,7 @@ export type RestNode = {
   pattern?: number;
   go?: string;
   hover?: { fill?: string; color?: string; stroke?: string; opacity?: number; scale?: number; durationMs: number; easing: string };
+  dom?: { tag: string; role?: string; hint?: string; landmark?: string; press?: string };
   codeComponent?: CodeComponent;
   behaviour?: ClipBehaviour;
   children?: RestNode[];

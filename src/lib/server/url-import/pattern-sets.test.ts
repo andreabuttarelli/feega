@@ -83,12 +83,12 @@ describe('a dynamic part of the page becomes a component with a variant per stat
     expect(Object.values(doc.comps).filter((c) => c.component && !c.component.set?.startsWith('Accordion'))).toEqual([]);
   });
 
-  it('a page with no dynamic parts plans as before', () => {
+  it('a page with no dynamic parts gets no interactive sets', () => {
     const plain = page([item(0, 20, false)], []);
     const { pattern: _p, ...bare } = plain.root.children![0];
     const before = docOf({ ...plain, root: { ...plain.root, children: [{ ...bare, children: bare.children!.map(({ go: _g, ...c }) => c) }] } });
 
-    expect(Object.values(before.comps).some((c) => c.component)).toBe(false);
+    expect(sets(before)).toEqual([]);
   });
 
   it('what a variant keeps folded stays hidden in that variant', () => {

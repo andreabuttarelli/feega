@@ -5,10 +5,9 @@ import { DEFAULT_MODE, keyOf, splitKey } from '@feega/motion-core/motion/variabl
 import type { NewId } from '$lib/motion/main-component';
 import { resolveVariables } from '$lib/motion/variables';
 import { colourDistance } from './page-tokens';
+import { kindNamed } from './component-kinds';
 
 const TEXT_COMPONENTS = new Set(['Text', 'Title', 'Kicker', 'Caption']);
-const LABELLED = /(^| )(Button|Nav link|Link|List item|Item)( \d+)?$/;
-const STATEFUL = /(^| )(Button|Nav link|Link)( \d+)?$/;
 const FILL_TARGET = 'fill';
 const STATE_PROP = 'State';
 const MAX_PROPERTY = 40;
@@ -53,7 +52,7 @@ const stored = (def: PropertyDef): Properties[string] => ({ ...def, kind: `${def
 function propertiesOf(comp: MotionComp, doc: MotionDoc): Properties {
   const direct = clipsOf(comp).filter((c) => !c.parent);
   const texts = clipsOf(comp).filter((c) => TEXT_COMPONENTS.has(c.component)).sort((a, b) => top(a) - top(b));
-  const names = textNames(texts.length, LABELLED.test(comp.component!.name));
+  const names = textNames(texts.length, Boolean(kindNamed(comp.component!.name)?.labelled));
   const text = texts.map((c, i): [string, PropertyDef] => [names[i], { kind: PropertyKind.Text, target: c.id, default: String(c.props.text ?? '') }]);
   const toggles = direct.flatMap((c): [string, PropertyDef][] => (isImage(c) ? [['Show image', { kind: PropertyKind.Boolean, target: c.id, default: true }]] : isIcon(c, doc) ? [['Show icon', { kind: PropertyKind.Boolean, target: c.id, default: true }]] : []));
   const unique = new Map<string, PropertyDef>();
@@ -114,7 +113,7 @@ function withStates(doc: MotionDoc, compId: string, site: string, newId: NewId):
   for (const state of STATES) {
     vars[stateName(painted.name, state)] ??= { type: collection.vars[painted.name].type, values: { [DEFAULT_MODE]: stateShade(painted.hex, state) } };
   }
-  const set = comp.component!.set ?? compId;
+  const set = comp.component!.set ?? comp.component!.name;
   const base = { ...comp.component!.variant, [STATE_PROP]: DEFAULT_VARIANT };
   const comps: MotionDoc['comps'] = { ...doc.comps, [compId]: { ...comp, component: { ...comp.component!, set, variant: base } } };
   for (const state of STATES) {
@@ -130,6 +129,6 @@ const hoversOnItsOwn = (comp: MotionComp) => clipsOf(comp).some((c) => c.states?
 export function componentKit(doc: MotionDoc, site: string, newId: NewId): MotionDoc {
   const mains = Object.entries(doc.comps).filter(([, c]) => c.component);
   const propertied: MotionDoc = { ...doc, comps: { ...doc.comps, ...Object.fromEntries(mains.map(([id, c]) => [id, { ...c, component: { ...c.component!, properties: propertiesOf(c, doc) } }])) } };
-  const stateful = mains.filter(([, c]) => STATEFUL.test(c.component!.name) && doc.variables?.[site] && !hoversOnItsOwn(c)).map(([id]) => id);
+  const stateful = mains.filter(([, c]) => kindNamed(c.component!.name)?.stateful && doc.variables?.[site] && !hoversOnItsOwn(c)).map(([id]) => id);
   return resolveVariables(stateful.reduce((next, id) => withStates(next, id, site, newId), propertied));
 }

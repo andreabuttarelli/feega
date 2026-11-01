@@ -11,6 +11,7 @@ import type { PageOutline } from './page-outline';
 import { PatternKind } from './page-patterns';
 import { sheetFonts, type FetchText } from './sheet-fonts';
 import type { PageView, ViewRead } from './page-views';
+import type { Homes } from './component-sheet';
 import { FULL_SHAPE, fontsWanted, urlPlan, type FontAssets, type PageShape, type UrlPlan } from './url-doc';
 
 export enum UrlImportOutcome {
@@ -202,7 +203,7 @@ async function placedSets(ask: LandAsk, sets: UrlPlan['sets']): Promise<{ frameI
   return { frameIds: placed.frameIds, undo: placed.undo };
 }
 
-async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: UrlPlan['homes']): Promise<void> {
+async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: Homes): Promise<void> {
   for (const [page, comps] of Object.entries(homes)) {
     const pageId = frameIds[Number(page)];
     const frame = pageId ? await store.read(pageId) : null;
@@ -263,6 +264,7 @@ export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: bo
   const placed = await placeFigmaPlan(ask.store, ask.place, made.plan, ask.at);
   const sets = await placedSets(ask, made.sets);
   await homedOnSets(ask.store, placed.frameIds, sets.frameIds, made.homes);
+  await homedOnSets(ask.store, sets.frameIds, sets.frameIds, made.setHomes);
   const assets = await imported(ask, made.images);
   await filled(ask, placed.frameIds, made.plan.items, assets);
   await filled(ask, sets.frameIds, made.sets, assets);
