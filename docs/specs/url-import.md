@@ -27,6 +27,12 @@ CLI `feega import-url`) → `importUrlInto` (`src/lib/server/url-import/canvas-i
 The page is read once, frozen, and the tree, the raster snapshots and the fidelity reference
 screenshot all come from that same frozen state.
 
+Every tab is pinned to light before the page loads (`fenced`, `browser.ts`): the
+`prefers-color-scheme: light` media emulation, a `matchMedia` that answers light to any colour
+scheme query (`lightOnly`, registered after anything else the browser injects — Browserless'
+stealth fingerprint answered dark in 2 of 5 vercel.com reads), `:root{color-scheme:light}`, and the
+`Sec-CH-Prefers-Color-Scheme: light` client hint for sites that pick the theme on the server.
+
 `pagePrepared` (`import-url.ts`):
 
 1. Before the first script (`tab.seeAll`): every IntersectionObserver reports its targets in view
