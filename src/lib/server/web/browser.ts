@@ -206,6 +206,35 @@ function labelOf(el: Element): string {
 }
 
 const IDLE_MS = 500;
+const LONG_LIVED_MS = 4_000;
+const QUIET_POLL_MS = 100;
+const FONTS_MS = 3_000;
+
+function quietOf(page: Page): (ms: number) => Promise<void> {
+  const inflight = new Map<HTTPRequest, number>();
+  let changed = Date.now();
+  page.on('request', (request) => {
+    inflight.set(request, Date.now());
+    changed = Date.now();
+  });
+  for (const ended of ['requestfinished', 'requestfailed'] as const) {
+    page.on(ended, (request) => {
+      inflight.delete(request);
+      changed = Date.now();
+    });
+  }
+
+  const quiet = () => {
+    const now = Date.now();
+    return now - changed >= IDLE_MS && [...inflight.values()].every((at) => now - at >= LONG_LIVED_MS);
+  };
+  return async (ms) => {
+    const until = Date.now() + ms;
+    while (!quiet() && Date.now() < until) {
+      await pause(QUIET_POLL_MS);
+    }
+  };
+}
 
 const HIDE = `[${TREE_LIMITS.hideAttr}]`;
 const hiddenWithin = (scope: string) => `${scope}${HIDE},${scope}${HIDE} *{visibility:hidden!important}`;
@@ -338,8 +367,14 @@ function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
 }
 
 function tabOf(page: Page, close: () => Promise<number>): AppTab {
+  const quiet = quietOf(page);
   return {
-    goto: async (url) => (await page.goto(url, { waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS }))?.status() ?? null,
+    goto: async (url) => {
+      const until = Date.now() + NAV_TIMEOUT_MS;
+      const response = await page.goto(url, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
+      await quiet(until - Date.now());
+      return response?.status() ?? null;
+    },
     url: () => page.url(),
     html: () => page.content(),
     look: () => page.evaluate(lookOf),
@@ -389,8 +424,8 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     },
     sample: (walk) => page.evaluate(inViewSampled, walk),
     settle: async (ms) => {
-      await page.waitForNetworkIdle({ idleTime: IDLE_MS, timeout: ms }).catch(() => undefined);
-      await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, 3_000))])).catch(() => undefined);
+      await quiet(ms);
+      await page.evaluate((fontsMs) => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, fontsMs))]), FONTS_MS).catch(() => undefined);
     },
     marks: (names) => page.evaluate(componentMarksOf, { names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr }),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
