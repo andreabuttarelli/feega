@@ -349,7 +349,7 @@ function clipped(built: Built, container: Root, layer: FrameLayer, p: Place): Bu
   return { ...built, doc, roots: [container] };
 }
 
-const holds = (layer: FrameLayer, need: Background = Background.IfPainted) => Boolean(layer.autoLayout) || layer.clip === Clip.Content || need === Background.InFlow;
+const holds = (layer: FrameLayer, need: Background = Background.IfPainted) => Boolean(layer.autoLayout) || layer.clip === Clip.Content || need !== Background.IfPainted;
 
 function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background.IfPainted): Built {
   const flow = layer.autoLayout;
@@ -482,7 +482,7 @@ function mainFrom(built: Built, layer: FrameLayer, component: ComponentRef, p: P
 
 function ownOverrides(doc: MotionDoc, layer: FrameLayer, main: Main, shift: Unit, p: Place) {
   const images: FigmaImage[] = [];
-  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(p.mains), report: () => undefined }, Background.Always);
+  const own = layersOf(doc, layer, { ...p, centre: { x: p.centre.x - shift.x, y: p.centre.y - shift.y }, images, mains: new Map(), report: () => undefined }, Background.Always);
   const ids = { comp: p.newId(), clip: p.newId() };
   const made = own.ids.length ? precompose(own.doc, own.ids, ids, layer.name) : null;
   return made?.ok ? instanceOverrides(made.doc, ids.comp, main.compId, { own: images, main: main.images }) : null;
