@@ -355,7 +355,8 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
   const build = flow ? BUILD_IN_FLOW : BUILD;
   let built: Built = { ...background, roots: holding ? [] : background.roots };
   for (const child of layer.children) {
-    const next = build[child.kind](built.doc, child, p);
+    const made = build[child.kind](built.doc, child, p);
+    const next = child.hidden ? { ...made, doc: hiddenAll(made.doc, made.roots) } : made;
     built = { doc: next.doc, ids: [...built.ids, ...next.ids], roots: [...built.roots, ...next.roots] };
   }
   const [container] = background.roots;
@@ -370,6 +371,13 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
 }
 
 const OPAQUE = 1;
+
+function hiddenAll(doc: MotionDoc, roots: Root[]): MotionDoc {
+  return roots.reduce((d, root) => {
+    const hid = editClip(d, root.id, (clip) => ({ ...clip, hidden: true }));
+    return hid.ok ? hid.doc : d;
+  }, doc);
+}
 
 function faded(doc: MotionDoc, ids: string[], opacity: number, p: Place): MotionDoc {
   if (opacity >= OPAQUE) {

@@ -116,6 +116,14 @@ describe('a page becomes a frame that looks like the page', () => {
     expect(seen({ ...flow, clipsContent: false })).toBeCloseTo(0.5, 3);
   });
 
+  it('a collapsed answer stays in the frame as a hidden layer, ready to be shown (feega.app FAQ)', () => {
+    const answer = text('Answer', { collapsed: true });
+    const clips = clipsOf(docOf(pageOf([text('Question'), answer])));
+
+    expect(clips.find((c) => c.props.text === 'Question')?.hidden).toBeFalsy();
+    expect(clips.find((c) => c.props.text === 'Answer')?.hidden).toBe(true);
+  });
+
   it('a one pixel rule on a long page stays one pixel thin', () => {
     const height = 14_535;
     const rule = rect([{ type: 'SOLID', color: BLACK }], { x: 0, y: 692, width: 1280, height: 1 });

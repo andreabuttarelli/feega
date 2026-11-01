@@ -952,7 +952,15 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
       run = [];
     };
     const inline = (node: Node, own: CSSStyleDeclaration, fills: RestPaint[] | null) => {
+      const closed = node instanceof HTMLDetailsElement && !node.open;
       for (const child of composed(node)) {
+        if (closed && !(child instanceof HTMLElement && child.tagName === 'SUMMARY')) {
+          flush();
+          const hidden = child instanceof Element ? visit(child, ctx) : [];
+          hidden.forEach((n) => (n.collapsed = true));
+          out.push(...hidden);
+          continue;
+        }
         if (child.nodeType === Node.TEXT_NODE) {
           if (own.visibility === 'visible') {
             run.push({ node: child as Text, css: own, fills, br: false });

@@ -72,6 +72,7 @@ doc. In-page helpers (`page-kit.ts`) are self-contained so they survive being se
 | inline SVG, `<img src=*.svg>` | VECTOR per shape with the exact path (arcs, `use`, symbols, gradients, `currentColor`); a `clip-path` to a single unrotated `rect` as a clipping FRAME | Shape path |
 | borders per side, outline, box-shadow (inset too), `filter: blur`, `backdrop-filter: blur`, radius per corner | strokes or side rectangles, effects | strokes, effects |
 | `::before` / `::after` | real elements before the walk | as any element |
+| content of a closed `<details>` | nodes marked `collapsed` | hidden clips (`hidden: true`) |
 | video, canvas, iframe, masked / blended / filtered / rotated blocks, native controls | snapshot RECTANGLE | image fill |
 | an element partly off the page | box cut at the edge, picture focused on the part that was showing | — |
 

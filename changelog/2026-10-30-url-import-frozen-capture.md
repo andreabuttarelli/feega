@@ -36,6 +36,16 @@ Walker and doc:
 - A picture cut on both sides keeps the part that was showing (apple hero).
 - Auto layout frames applied their opacity to children twice (also affects Figma imports).
 
+Collapsed content (user report on feega.app: every FAQ answer drawn over the next question):
+
+- The content of a closed `<details>` is read as layers marked `collapsed` (RestNode → raw node →
+  scene `hidden` → clip `hidden: true`): not painted, kept in the frame to show later. Figma
+  layers with `visible: false` are still left out, as before.
+- Content under a zero height or zero max-height clip, a `0fr` grid row, `hidden`,
+  `visibility: hidden` or `aria-hidden` collapse is not painted (browser test).
+- feega.app joined the fidelity pages; the capture test fails when the text of a closed
+  `<details>` is painted.
+
 ## SSIM (fold / full), before → after, HTML still
 
 | page | before | after |

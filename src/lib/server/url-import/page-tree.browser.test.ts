@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import { localBrowser } from '$lib/server/web/browser';
 import { TREE_LIMITS, treeScript, type PageTree } from './page-tree';
+import { RevealMode } from './page-reveal';
 
 const PAGE = `<body style="margin:0;background:oklch(0.98 0 0)"><div style="width:200px;height:80px;background:oklch(0.21 0.034 264.665);color:oklch(0.985 0.002 247.839);font:16px sans-serif">Download</div></body>`;
 
@@ -97,6 +98,39 @@ describe.runIf(process.env.CHROMIUM_PATH)('an inline chip with padding and a bor
       expect(text.characters).toBe('aa bb cc');
       expect(spacing).toEqual([0, 0, 7, 0, 7, 0, 0, 0]);
       expect(all(tree.root).find((n) => n.type === 'RECTANGLE' && n.name === 'code')).toMatchObject({ strokes: [{ type: 'SOLID' }], strokeWeight: 1 });
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const COLLAPSED = `<body style="margin:0;font:16px sans-serif">
+<details><summary>Closed details</summary><p>Answer in details</p></details>
+<div style="height:0;overflow:hidden"><p>Answer under zero height</p></div>
+<div style="max-height:0;overflow:hidden"><p>Answer under zero max height</p></div>
+<div style="display:grid;grid-template-rows:0fr"><div style="overflow:hidden;min-height:0"><p>Answer in a 0fr row</p></div></div>
+<div hidden><p>Answer in hidden</p></div>
+<div style="visibility:hidden"><p>Answer invisible</p></div>
+<div aria-hidden="true" style="height:0;overflow:hidden"><p>Answer aria hidden</p></div>
+<p>Next question</p>
+</body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('collapsed answers of a FAQ', () => {
+  it('are not painted, and closed details keep their answer as a hidden layer to open later (feega.app: every answer drawn over the next question)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const tab = await localBrowser(() => browser.newPage())();
+      await tab.goto(`data:text/html,${encodeURIComponent(COLLAPSED)}`);
+      await tab.reveal(RevealMode.Moving);
+      await tab.reveal(RevealMode.Still);
+      const tree = (await tab.tree()) as PageTree;
+      const all = (n: RestNode, shown = true): { n: RestNode; shown: boolean }[] => [{ n, shown: shown && !n.collapsed }, ...(n.children ?? []).flatMap((c) => all(c, shown && !n.collapsed))];
+      const texts = all(tree.root).filter((e) => e.n.type === 'TEXT');
+      const painted = texts.filter((e) => e.shown).map((e) => e.n.characters);
+      const kept = texts.filter((e) => !e.shown).map((e) => e.n.characters);
+
+      expect(painted).toEqual(['Closed details', 'Next question']);
+      expect(kept).toContain('Answer in details');
     } finally {
       await browser.close();
     }
