@@ -35,7 +35,7 @@
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
-  import { frameViews } from '$lib/canvas/view-menu.svelte';
+  import { frameViews, zoomRequest } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
@@ -3028,6 +3028,13 @@
     }
   };
 
+  $effect(() => {
+    const asked = zoomRequest.current;
+    if (asked) {
+      untrack(() => runPaletteCommand(asked.command));
+    }
+  });
+
   function runPaletteCommand(command: Command) {
     if (inside?.level.clip && picks.length && canRunInFrame(command)) {
       void runFrameAction(command);
@@ -3753,7 +3760,6 @@
       commenting={props.commenting}
       onframelibrary={soleFrame ? () => (frameDialog = { nodeId: soleFrame, dialog: FrameDialog.Templates }) : undefined}
       context={barContextFor(soleFrame)}
-      zoom={view.zoom}
     />
   {/if}
 

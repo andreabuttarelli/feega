@@ -12,7 +12,6 @@ test.describe('the + insert menu @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const bar = page.getByTestId('add-bar');
     await expect(bar.getByRole('radiogroup')).toHaveCount(0);
-    await expect(bar.getByTestId('canvas-zoom')).toBeVisible();
     await page.screenshot({ path: `${SHOTS_DIR}/insert-1-bar.png` });
 
     const menu = await openInsert(page);
