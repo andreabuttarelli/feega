@@ -122,4 +122,15 @@ describe('the project style library', () => {
     expect(removed).toEqual(['Headline']);
     expect(sent).toEqual([{ op: LibraryOp.Remove, name: 'Headline' }]);
   });
+  it('a style the project stored with its keys in another order is the same style: no push, or every frame re-commits forever', async () => {
+    const library = new StyleLibrary();
+    const pushed: [string, unknown][] = [];
+    library.connect(sinkOf(pushed));
+    await library.open(store({ Headline: { weight: 600, size: 0.2, kind: StyleKind.Text } }).backend);
+
+    library.found({ Headline: HEADLINE });
+    library.found({ Headline: HEADLINE });
+
+    expect(pushed).toEqual([]);
+  });
 });

@@ -1,6 +1,7 @@
 import type { Collection, Variables } from '@feega/motion-core/motion/variables-model';
 import { LibraryOp, type LibraryAsk } from '$lib/motion/project-library-ops';
 import type { LibraryStore } from './project-library-store';
+import { sameValue } from './node-patch';
 
 export type VariableSink = {
   push: (name: string, collection: Collection) => void;
@@ -9,7 +10,7 @@ export type VariableSink = {
 
 const shared = ({ active: _ownMode, ...collection }: Collection): Collection => collection;
 
-const sameShape = (a: Collection | undefined, b: Collection | undefined) => JSON.stringify(a && shared(a)) === JSON.stringify(b && shared(b));
+const sameShape = (a: Collection | undefined, b: Collection | undefined) => sameValue(a && shared(a), b && shared(b));
 
 export class VariableLibrary {
   collections = $state<Variables>({});

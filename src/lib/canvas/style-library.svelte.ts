@@ -2,6 +2,7 @@ import type { Library } from '$lib/motion/style-library';
 import { LibraryOp, type LibraryAsk } from '$lib/motion/project-library-ops';
 import type { LibraryStore } from './project-library-store';
 import { STYLE_NAME, type Style } from '@feega/motion-core/motion/styles-model';
+import { sameValue } from './node-patch';
 
 export type StyleSink = {
   push: (name: string, style: Style) => void;
@@ -43,7 +44,7 @@ export class StyleLibrary {
       void this.store.send({ op: LibraryOp.Adopt, entries: fresh });
     }
     for (const [name, style] of Object.entries(inDocs)) {
-      if (JSON.stringify(style) !== JSON.stringify(this.styles[name])) {
+      if (!sameValue(style, this.styles[name])) {
         this.sink?.push(name, this.styles[name]);
       }
     }
