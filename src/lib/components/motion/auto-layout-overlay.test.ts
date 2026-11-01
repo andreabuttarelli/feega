@@ -71,4 +71,21 @@ describe('the auto layout overlay', () => {
     unmount(app);
     document.body.innerHTML = '';
   });
+  it('a press on the gap away from its handle leaves the gap alone', () => {
+    let changed = 0;
+    const app = mount(AutoLayoutOverlay, { target: document.body, props: { doc: row, clip: { ...clip(row, 'box'), autoLayout: clip(row, 'box').autoLayout! }, onchange: () => (changed += 1) } });
+    flushSync();
+    const host = document.querySelector<HTMLElement>('[data-testid="auto-layout-overlay"]')!;
+    host.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1080, height: 1080, right: 1080, bottom: 1080, x: 0, y: 0, toJSON: () => ({}) });
+    const band = document.querySelector<HTMLElement>('[data-band="gap"]')!;
+    band.setPointerCapture = () => {};
+    const at = (type: string, x: number) => band.dispatchEvent(Object.assign(new MouseEvent(type, { clientX: x, clientY: 500 }), { pointerId: 1 }));
+    at('pointerdown', 300);
+    at('pointermove', 200);
+    at('pointerup', 200);
+    flushSync();
+    expect(changed).toBe(0);
+    unmount(app);
+    document.body.innerHTML = '';
+  });
 });

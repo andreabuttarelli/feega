@@ -172,8 +172,7 @@
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
-  import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { restoreViewport } from '$lib/canvas/restore-viewport';
+  import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
@@ -251,8 +250,6 @@
   const STEP_ZOOM = 1.2;
   const FIT_MS = 250;
   const EDIT_MAX_ZOOM = 2;
-  const MIN_ZOOM = 0.05;
-  const MAX_ZOOM = 4;
   const INTERACTIVE = 'input, textarea, select, button, a, [contenteditable="true"], .nodrag, video, audio, iframe';
 
   const tiles = $derived(props.tiles ?? []);
@@ -690,14 +687,13 @@
     return { x, y, width: Math.max(...boxes.map((b) => b.x + b.w)) - x, height: Math.max(...boxes.map((b) => b.y + b.h)) - y };
   }
 
-  function fitTo(boxes: WorldRect[], maxZoom = READABLE_ZOOM) {
+  function fitTo(boxes: WorldRect[], purpose: FitPurpose) {
     const b = boundsOf(boxes);
     if (!b) {
       return;
     }
     const s = screenSize();
-    const zoom = Math.max(MIN_ZOOM, Math.min(maxZoom, Math.min(s.width / (b.width * (1 + FIT_PADDING)), s.height / (b.height * (1 + FIT_PADDING)))));
-    animateTo({ zoom, x: s.width / 2 - (b.x + b.width / 2) * zoom, y: s.height / 2 - (b.y + b.height / 2) * zoom });
+    animateTo(fitView(b, { width: s.width, height: s.height }, purpose));
   }
 
   function pickedRects(): WorldRect[] {
@@ -708,11 +704,11 @@
   function zoomToSelection() {
     const rects = pickedRects();
     if (rects.length) {
-      fitTo(rects, MAX_ZOOM);
+      fitTo(rects, FitPurpose.Command);
       return;
     }
     if (selectedBoxes.length) {
-      fitTo(selectedBoxes);
+      fitTo(selectedBoxes, FitPurpose.Command);
     }
   }
 
@@ -783,7 +779,7 @@
       animateTo(frameIn(b, { width: s.width, height: s.height }, free, EDIT_MAX_ZOOM));
       return;
     }
-    fitTo(boxes);
+    fitTo(boxes, FitPurpose.Open);
   }
 
   type Active =
@@ -2919,7 +2915,7 @@
   const ZOOM_RUN: Record<ZoomStep, () => void> = {
     [ZoomStep.In]: () => zoomStep(STEP_ZOOM),
     [ZoomStep.Out]: () => zoomStep(1 / STEP_ZOOM),
-    [ZoomStep.Fit]: () => fitTo(placed)
+    [ZoomStep.Fit]: () => fitTo(placed, FitPurpose.Command)
   };
 
   const pageZoom: CanvasZoom = {
@@ -3003,7 +2999,7 @@
       clearSelection();
     },
     'select-all': () => select(placed.map((t) => t.id)),
-    fit: () => fitTo(placed),
+    fit: () => fitTo(placed, FitPurpose.Command),
     'zoom-actual': () => {
       const s = screenSize();
       view = zoomAt(view, { x: s.width / 2, y: s.height / 2 }, 1 / view.zoom);
