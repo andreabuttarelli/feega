@@ -49,6 +49,7 @@ export type FigmaRawNode = {
   blendMode?: string;
   maskGradient?: { handles: { x: number; y: number }[]; stops: { position: number; alpha: number }[] };
   collapsed?: boolean;
+  ref?: string;
   resizeToFit?: boolean;
   stackMode?: string;
   stackSpacing?: number;
@@ -68,6 +69,7 @@ export type FigmaRawNode = {
   stackChildPrimaryGrow?: number;
   stackChildAlignSelf?: string;
   stackPositioning?: string;
+  maxWidth?: number;
   fillGeometry?: { commandsBlob?: number }[];
   strokeGeometry?: { commandsBlob?: number }[];
   internalOnly?: boolean;

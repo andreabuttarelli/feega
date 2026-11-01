@@ -3567,6 +3567,18 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** an imported card at opacity 0.64 is visibly darker than the page; the same card without auto layout is right. **Move:** `laidOut` (`figma-doc.ts`) parented the children to the container and then faded container and children; parent opacity is inherited, so children got it twice. Fade only the container. Measure with mean brightness of the same region in source and import before blaming text rendering.
 
+## A breakpoint round trip writes overrides nobody made
+
+**Signal:** after making breakpoint code walk compositions, `liftViewEdit` of an untouched view adds overrides to a top-level clip (the landing fixture's `cta`). **Move:** clip ids are unique per composition, not per doc; a `Map` by id over top-level and composition clips mixes two clips with the same id. Keep id lookups scoped (top-level, or one composition), and only walk every composition for per-clip work that needs no lookup.
+
+## Layers copied from another read collide by node id
+
+**Signal:** an imported phone view places a desktop hero at an FAQ answer's box; node count and distinct ids of the planned tree differ. **Move:** each page read numbers its nodes from 1, so a layer copied from the phone read into the desktop tree reuses a desktop id, and any map by id picks the wrong one. Give copied layers a namespaced id (`<view>:<id>`) and count `new Set(ids).size` against the node count before trusting an id map.
+
+## A size page-stacks measured is not the size the layer gets
+
+**Signal:** a value computed in `page-stacks.ts` from a node box (a max width, a span) shifts a layer by a few px on desktop; dumping clip boxes with and without the change shows the layer narrower than its doc width. **Move:** `page-flatten` runs after stacks and can hand a node a wrapper box; take sizes the layout depends on from the built clip in `figma-doc.ts` (or guard with it), not from the box stacks saw. Diff clip boxes (`withAutoLayout`, every clip including comps) before scoring SSIM.
+
 ## An imported component in a row lands shifted by what it draws outside its box
 
 **Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
@@ -3578,3 +3590,27 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A fidelity reference screenshot loses images after a speed-up of the snapshots
 
 **Signal:** `url-fidelity` drops on apple (0.974 to 0.93-0.96) in bands that move between runs; the side by side shows the import with its pictures and the reference (`-source.png`) without them, while the DOM reports every image loaded and visible. **Move:** a `Page.captureScreenshot` sent on a CDP session other than the page's own leaves Chrome painting later `captureBeyondViewport` shots without some images (`Page.enable` on that session does not help). Take screenshots with `page.screenshot`; a second session is fine for `Emulation` overrides.
+
+## A probe script outside the worktree runs old package code
+
+**Signal:** a fix to `packages/motion-core` passes its unit test, but a `vite-node` script you keep in the scratchpad still prints the old numbers, and a debug log you add never shows. **Move:** imports such as `@feega/motion-core/...` resolve from the nearest `node_modules` up the script's path, which may be a stray install, not your worktree. Keep probe scripts inside the worktree (an ignored folder) so they resolve the code you are editing.
+
+## A canvas freezes for minutes right after it opens
+
+**Signal:** after reload the frame stays blank, Ctrl+scroll does nothing, a `longtask` of tens of seconds or more; the CPU profile is all `found` (style or variable library) → `syncStyle` → `commit`, with Svelte's `infinite_loop_guard`. **Move:** a library sync effect compares a doc value with the project copy and re-commits on mismatch; anything that is not key-order free (`JSON.stringify` against jsonb, which reorders keys) never settles. Compare with `sameValue`. Probe with `tests/e2e/url-import-reopen.spec.ts` (`REOPEN_SEED=<file>` reuses one real import).
+
+## A whole nav comes in as one picture
+
+**Signal:** an imported block with links and buttons is a single image layer. **Move:** ask why the walker took the snapshot (`shape` in `page-tree.ts`: filter, mask, clip path, blend with children, `turned`). On supabase.com it was Tailwind's `transform` utility: it computes to `matrix3d(... 0, 0, 999, 1)` (a `translateZ`), which `matrixOf` did not parse, so `turned` read it as a rotation. Blocks holding text never snapshot now (`holdsContent`); a new snapshot reason must still keep them as layers.
+
+## Imported text cannot be typed, double-click climbs to a "Precomp"
+
+**Signal:** on an imported page Cmd-click selects a label, Enter does nothing, double-click selects a wrapper (often 0×0, named Precomp or Group). **Move:** the label sits inside a Precomp (a group or an instance), so its id is scoped (`host__0__label`) and every top-level lookup (`findClip`, `isLayer`, `textCaretAt`) misses it. Resolve scene ids through `textScope`/`scoped` before editing; for URL imports, plain groups come in as frames (`Grouping.Frame`), never as Precomps.
+
+## "A valid external Instance reference no longer exists" on a canvas page
+
+**Signal:** PostHog shows an unhandled `DOMException: OperationError` with that text; the canvas goes blank or stops reacting to zoom, mostly on Windows. **Move:** it is Chrome's WebGPU connection to the GPU process dropping (crash, reset, out of GPU memory), not a bug in one call. Reproduce on any Mac with CDP `Browser.crashGpuProcess` (`browser.newBrowserCDPSession()`), and count `requestDevice` / `GPUDevice.destroy` with an init script: wgpu's web backend never destroys a device on drop, so every raster you `free()` keeps its GPU memory until GC unless `releaseOnDispose` (`gpu-release.ts`) destroys it.
+
+## A dev server keeps serving a package file you edited
+
+**Signal:** a change under `packages/motion-core` is in the file, `curl /node_modules/@feega/motion-core/...` shows it, but the browser still runs the old code and a debug log never prints. **Move:** the app imports it as `/packages/motion-core/...`, a second URL whose transform Vite cached before the edit. `curl` that exact URL (take it from the importing module's served source); if it is stale, restart with `vite dev --force`.

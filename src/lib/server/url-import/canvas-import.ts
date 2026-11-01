@@ -9,6 +9,7 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { importPageAt, UrlImportOutcome, type UrlImported } from './import-url';
+import type { PageView } from './page-views';
 import { Tokening, type PageShape } from './url-doc';
 import type { SiteBrand } from './page-tokens';
 import { findSiteBrand } from '$lib/server/start/site-brand';
@@ -24,7 +25,7 @@ const limiter = rateWindow({ limit: IMPORTS_PER_MINUTE, windowMs: MS_PER_MINUTE 
 
 export type UrlScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
-export type PageAssets = { importImage: (url: string) => Promise<string>; importFont: (url: string) => Promise<string | null>; fetchText: (url: string) => Promise<string> };
+export type PageAssets = { importImage: (url: string) => Promise<string>; importFont: (url: string, page: string) => Promise<string | null>; fetchText: (url: string) => Promise<string> };
 
 export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'projectId'>): PageAssets {
   return {
@@ -35,8 +36,8 @@ export function pageAssets(scope: Pick<UrlScope, 'db' | 'orgId' | 'userId' | 'pr
         : await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.projectId, url, maxBytes: UPLOAD_MAX_BYTES.image });
       return made.asset.id;
     },
-    importFont: async (url) => {
-      const { fileName, bytes } = await fetchCanvasLink({ url, maxBytes: MAX_FONT_BYTES });
+    importFont: async (url, page) => {
+      const { fileName, bytes } = await fetchCanvasLink({ url, maxBytes: MAX_FONT_BYTES, referer: page });
       const saved = await storeFontBytes(scope.db, { orgId: scope.orgId, userId: scope.userId, name: fileName, bytes });
       return saved.ok ? saved.assetId : null;
     },
@@ -60,7 +61,7 @@ async function shapeFor(scope: UrlScope, url: string, shape: PageShape | undefin
   return brand ? { ...shape, brand } : shape;
 }
 
-export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape }): Promise<UrlImported> {
+export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape; views?: PageView[] }): Promise<UrlImported> {
   if (!limiter.allow(scope.userId)) {
     return { outcome: UrlImportOutcome.RateLimited };
   }

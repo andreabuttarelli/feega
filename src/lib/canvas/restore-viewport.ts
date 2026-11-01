@@ -18,10 +18,22 @@ function showsContent(view: Viewport, content: Bounds, screen: Screen): boolean 
   return left < content.x + content.width && content.x < right && top < content.y + content.height && content.y < bottom;
 }
 
-function fit(content: Bounds, screen: Screen): Viewport {
+export const FIT_MAX_ZOOM = 4;
+
+export enum FitPurpose {
+  Open = 'open',
+  Command = 'command'
+}
+
+const FIT_CAP: Record<FitPurpose, number> = {
+  [FitPurpose.Open]: READABLE_ZOOM,
+  [FitPurpose.Command]: FIT_MAX_ZOOM
+};
+
+export function fitView(content: Bounds, screen: Screen, purpose: FitPurpose): Viewport {
   const room = 1 + FIT_PADDING;
   const wanted = Math.min(screen.width / (content.width * room), screen.height / (content.height * room));
-  const zoom = Math.max(MIN_ZOOM, Math.min(READABLE_ZOOM, wanted));
+  const zoom = Math.max(MIN_ZOOM, Math.min(FIT_CAP[purpose], wanted));
 
   return {
     x: screen.width / HALF - (content.x + content.width / HALF) * zoom,
@@ -39,5 +51,5 @@ export function restoreViewport(saved: Viewport | null, content: Bounds | null, 
     return saved;
   }
 
-  return fit({ ...content, width: Math.max(content.width, 1), height: Math.max(content.height, 1) }, screen);
+  return fitView({ ...content, width: Math.max(content.width, 1), height: Math.max(content.height, 1) }, screen, FitPurpose.Open);
 }

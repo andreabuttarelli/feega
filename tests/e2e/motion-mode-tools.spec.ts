@@ -44,7 +44,7 @@ test.describe('Motion mode tools @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.waitForTimeout(SETTLE_MS);
     await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId('motion-node-stage').dblclick({ position: { x: 20, y: 20 } });
-    await page.getByTestId('editor-mode-switch').locator('[data-mode="motion"]').click();
+    await page.getByTestId('editor-mode-switch').locator('[data-value="motion"]').click();
     await expect(page.getByTestId('frame-timeline')).toBeVisible({ timeout: 15_000 });
 
     await page.locator('[data-layer="slide"] .head').click();

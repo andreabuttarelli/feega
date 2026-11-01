@@ -170,7 +170,7 @@ describe.runIf(process.env.CHROMIUM_PATH)('dashed and dotted lines', () => {
 const BLENDED = `<body style="margin:0;background:#ff0"><div style="width:100px;height:50px;background:#0af;mix-blend-mode:multiply"></div><div style="mix-blend-mode:screen"><p>text</p><p>more</p></div></body>`;
 
 describe.runIf(process.env.CHROMIUM_PATH)('a blended block', () => {
-  it('without children of its own comes in as layers with its blend mode, not a snapshot; one with children stays a snapshot (vercel, linear, stripe)', async () => {
+  it('comes in as layers with its blend mode, not a snapshot; one holding text passes its blend to its layers (vercel, linear, stripe)', async () => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
     try {
       const page = await browser.newPage();
@@ -179,8 +179,12 @@ describe.runIf(process.env.CHROMIUM_PATH)('a blended block', () => {
       const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
       const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
 
-      expect(all(tree.root).filter((n) => n.blendMode).map((n) => [n.type, n.blendMode])).toEqual([['FRAME', 'MULTIPLY']]);
-      expect(tree.snaps).toHaveLength(1);
+      expect(all(tree.root).filter((n) => n.blendMode).map((n) => [n.type, n.characters ?? '', n.blendMode])).toEqual([
+        ['FRAME', '', 'MULTIPLY'],
+        ['TEXT', 'text', 'SCREEN'],
+        ['TEXT', 'more', 'SCREEN']
+      ]);
+      expect(tree.snaps ?? []).toHaveLength(0);
     } finally {
       await browser.close();
     }
@@ -206,6 +210,55 @@ describe.runIf(process.env.CHROMIUM_PATH)('a block faded by a mask', () => {
       ]);
       expect(all(faded!).some((n) => n.type === 'TEXT')).toBe(true);
       expect(tree.snaps).toHaveLength(1);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const RESPONSIVE = `<body style="margin:0;font:16px sans-serif"><style>.row{display:flex;gap:20px}@media (max-width:500px){.row{flex-direction:column}.wide{display:none}}</style><div class="row"><div style="background:#0af;padding:10px">Hello <b>bold</b> world</div><div style="background:#fa0;padding:10px">Second</div><div class="wide" style="background:#0f0;padding:10px">Only wide</div></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('the same page read at two widths', () => {
+  it('names each layer by where it sits in the page, so a layer is found again at another width', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      const read = async (width: number) => {
+        await page.setViewport({ width, height: 400 });
+        await page.setContent(RESPONSIVE);
+        const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+        const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+        return all(tree.root);
+      };
+      const [wide, narrow] = [await read(1000), await read(400)];
+      const keyOf = (nodes: RestNode[], text: string) => nodes.find((n) => n.type === 'TEXT' && n.characters?.startsWith(text))?.key;
+      const keys = wide.flatMap((n) => (n.key ? [n.key] : []));
+
+      expect(keyOf(wide, 'Hello')).toBeDefined();
+      expect(keyOf(narrow, 'Hello')).toBe(keyOf(wide, 'Hello'));
+      expect(keyOf(narrow, 'Second')).toBe(keyOf(wide, 'Second'));
+      expect(keyOf(narrow, 'Only wide')).toBeUndefined();
+      expect(new Set(keys).size).toBe(keys.length);
+      expect(wide.slice(1).filter((n) => n.type === 'FRAME' && n.fills?.length).every((n) => n.key)).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const CHIP_STARTS_LINE = `<body style="margin:0"><p style="margin:0;width:120px;font:16px monospace">aaaa bbbb <code style="padding:0 6px;border:1px solid #888;font:16px monospace">cc</code> dd</p></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a paragraph whose line starts with an inline chip', () => {
+  it('stays one text, the chip box counts as where the line starts (blog: paragraphs split into one text per line)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(CHIP_STARTS_LINE);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(['aaaa bbbb cc dd']);
     } finally {
       await browser.close();
     }
@@ -276,6 +329,88 @@ describe.runIf(process.env.CHROMIUM_PATH)('a canvas that keeps drawing after it 
       const { data } = await sharp(Buffer.from(await page!.screenshot({ type: 'png', clip: { x: 50, y: 50, width: 1, height: 1 } }))).raw().toBuffer({ resolveWithObject: true });
 
       expect([data[0], data[1], data[2]]).toEqual([0, 0, 255]);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const HOLDING = `<body style="margin:0;background:#fff;font:16px sans-serif">
+<nav style="position:sticky;top:0;transform:translateZ(999px);display:flex;gap:12px"><a href="#">Pricing</a><button>Sign in</button></nav>
+<div style="width:300px;padding:12px;background:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.25))"><p style="margin:0">Love it</p></div>
+<div style="background:#ff0"><h1 style="margin:0;mix-blend-mode:hard-light">Grow revenue</h1></div>
+<div style="width:300px;padding:24px;background:#0af;clip-path:polygon(0 0,100% 0,100% 80%,0 100%)"><p style="margin:0">Backends</p></div>
+<div style="width:300px;background:#0af;mask-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=)"><p style="margin:0">Masked</p></div>
+<div style="width:300px;filter:grayscale(1)"><a href="#">Logos</a></div>
+</body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a block holding text, links or buttons', () => {
+  it('never comes in as a picture: its words stay editable and the effect lands on the layers (supabase.com: the whole nav came in as one image)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 600, height: 800 });
+      await page.setContent(HOLDING);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const nodes = all(tree.root);
+      const words = nodes.filter((n) => n.type === 'TEXT').map((n) => n.characters);
+
+      expect(words).toEqual(expect.arrayContaining(['Pricing', 'Sign in', 'Love it', 'Grow revenue', 'Backends', 'Masked', 'Logos']));
+      expect(nodes.find((n) => n.characters === 'Grow revenue')?.blendMode).toBe('HARD_LIGHT');
+      expect(nodes.some((n) => n.effects?.some((e) => e.type === 'DROP_SHADOW' && e.radius === 2))).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const FADED_CARD = `<body style="margin:0;background:rgb(8, 9, 10);color:#fff;font:16px sans-serif"><div style="width:400px;height:200px;-webkit-mask-image:linear-gradient(rgb(0,0,0) 40%, rgba(0,0,0,0) 90%), linear-gradient(to right, rgb(0,0,0) 60%, rgba(0,0,0,0));-webkit-mask-composite:source-in;mask-composite:intersect"><p style="margin:0">Backlog</p><p style="margin:0">ENG-2085</p></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a block holding text faded by several gradients', () => {
+  it('keeps its text and fades it with one backdrop-coloured gradient per mask layer laid over it (linear.app: the issue boards came in as pictures)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 600, height: 400 });
+      await page.setContent(FADED_CARD);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const nodes = all(tree.root);
+      const veils = nodes.filter((n) => n.fills?.some((f) => f.type === 'GRADIENT_LINEAR'));
+
+      expect(nodes.filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(['Backlog', 'ENG-2085']);
+      expect(veils).toHaveLength(2);
+      expect(veils.map((v) => v.fills![0].gradientStops!.map((s) => [Math.round(s.color.r * 255), s.color.a]))).toEqual([
+        [
+          [8, 0],
+          [8, 1]
+        ],
+        [
+          [8, 0],
+          [8, 1]
+        ]
+      ]);
+      expect(tree.snaps ?? []).toHaveLength(0);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const LETTERED = `<body style="margin:0;font:16px sans-serif"><nav><a href="#"><p style="margin:0">${[...'Documentation'].map((c) => `<span style="display:inline-block">${c}</span>`).join('')}</p></a> <a href="#"><p style="margin:0">${[...'Get started'].map((c) => `<span style="display:inline-block;white-space:pre">${c}</span>`).join('')}</p></a></nav></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a word split into one span per letter for an animation', () => {
+  it('comes in as one text, spaces kept (feega.app: Documentation was thirteen layers)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 600, height: 200 });
+      await page.setContent(LETTERED);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(['Documentation', 'Get started']);
     } finally {
       await browser.close();
     }

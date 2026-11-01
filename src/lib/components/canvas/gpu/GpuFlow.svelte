@@ -35,7 +35,7 @@
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
-  import { frameViews } from '$lib/canvas/view-menu.svelte';
+  import { frameViews, zoomRequest } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
@@ -44,6 +44,7 @@
   import GradientHandles from '../GradientHandles.svelte';
   import CropHandles from '../CropHandles.svelte';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { sameValue } from '$lib/canvas/node-patch';
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
   import { libraryOf, syncedDoc } from '$lib/motion/style-library';
@@ -59,7 +60,7 @@
   import { ImageTool } from '$lib/image-tools';
   import type { FillOf, FillType } from '@feega/motion-core/motion/fill/model';
   import type { Fill } from '@feega/motion-core/motion/fill/model';
-  import { baseStyle, commitText, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
+  import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
@@ -101,6 +102,8 @@
   import { stackPlaced } from '$lib/motion/layout/ops';
   import { dragInStack, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
+  import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
+  import { mul2d } from '@feega/motion-core/motion/parent';
   import { EditMode, startMode } from '$lib/motion/edit-mode';
   import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
   import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
@@ -172,8 +175,7 @@
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
-  import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { restoreViewport } from '$lib/canvas/restore-viewport';
+  import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
@@ -251,8 +253,6 @@
   const STEP_ZOOM = 1.2;
   const FIT_MS = 250;
   const EDIT_MAX_ZOOM = 2;
-  const MIN_ZOOM = 0.05;
-  const MAX_ZOOM = 4;
   const INTERACTIVE = 'input, textarea, select, button, a, [contenteditable="true"], .nodrag, video, audio, iframe';
 
   const tiles = $derived(props.tiles ?? []);
@@ -690,14 +690,13 @@
     return { x, y, width: Math.max(...boxes.map((b) => b.x + b.w)) - x, height: Math.max(...boxes.map((b) => b.y + b.h)) - y };
   }
 
-  function fitTo(boxes: WorldRect[], maxZoom = READABLE_ZOOM) {
+  function fitTo(boxes: WorldRect[], purpose: FitPurpose) {
     const b = boundsOf(boxes);
     if (!b) {
       return;
     }
     const s = screenSize();
-    const zoom = Math.max(MIN_ZOOM, Math.min(maxZoom, Math.min(s.width / (b.width * (1 + FIT_PADDING)), s.height / (b.height * (1 + FIT_PADDING)))));
-    animateTo({ zoom, x: s.width / 2 - (b.x + b.width / 2) * zoom, y: s.height / 2 - (b.y + b.height / 2) * zoom });
+    animateTo(fitView(b, { width: s.width, height: s.height }, purpose));
   }
 
   function pickedRects(): WorldRect[] {
@@ -708,15 +707,21 @@
   function zoomToSelection() {
     const rects = pickedRects();
     if (rects.length) {
-      fitTo(rects, MAX_ZOOM);
+      fitTo(rects, FitPurpose.Command);
       return;
     }
     if (selectedBoxes.length) {
-      fitTo(selectedBoxes);
+      fitTo(selectedBoxes, FitPurpose.Command);
     }
   }
 
   let tween = 0;
+
+  function takeCamera() {
+    glide = null;
+    cancelAnimationFrame(tween);
+  }
+
   function animateTo(target: Viewport) {
     cancelAnimationFrame(tween);
     const from = view;
@@ -783,7 +788,7 @@
       animateTo(frameIn(b, { width: s.width, height: s.height }, free, EDIT_MAX_ZOOM));
       return;
     }
-    fitTo(boxes);
+    fitTo(boxes, FitPurpose.Open);
   }
 
   type Active =
@@ -917,17 +922,20 @@
     const deeper = framePickAt(world, picks);
     const id = hit.kind === HitKind.Node ? hit.nodeId : (deeper?.nodeId ?? null);
     const doc = id ? liveOf(id)?.doc : null;
-    const entered = id && deeper && doc && inside?.nodeId === id ? (enteredFrom(deeper.picker.chain(world, deeper.space), picks) ?? (deeper.clip ? childBelow(doc, deeper.clip, picks) : null)) : null;
+    const held = id && deeper && inside?.nodeId === id ? picks : [];
+    const chain = deeper && held.length ? deeper.picker.chain(world, deeper.space) : [];
+    const entered = doc && held.length ? (enteredFrom(chain, held) ?? (deeper?.clip ? childBelow(doc, deeper.clip, held) : null)) : null;
     if (id && entered) {
       pickMany(id, [entered]);
       return;
     }
     if (id && deeper?.clip) {
+      const target = doubledOn(chain, held, deeper.clip);
       select([id]);
-      goInside(id, Gesture.Double, deeper.clip);
+      goInside(id, Gesture.Double, target);
       if (editable) {
-        void startTyping(id, deeper.clip);
-        startCrop(id, deeper.clip);
+        void startTyping(id, target);
+        startCrop(id, target);
       }
       return;
     }
@@ -1458,7 +1466,7 @@
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && JSON.stringify(present.styles?.[name]) !== JSON.stringify(style) ? syncedDoc(present, name, style) : null;
+      const synced = present && !sameValue(present.styles?.[name], style) ? syncedDoc(present, name, style) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -1499,12 +1507,12 @@
     variableLibrary.found(variableLibraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
   });
 
-  const sharedShape = (c: Collection | undefined) => JSON.stringify(c && { modes: c.modes, vars: c.vars });
+  const sharedShape = (c: Collection | undefined) => c && { modes: c.modes, vars: c.vars };
 
   function syncCollection(name: string, collection: Collection) {
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.variables?.[name])) {
       const present = saverOf(frame.id)?.history.present;
-      const synced = present && sharedShape(present.variables?.[name]) !== sharedShape(collection) ? syncedCollection(present, name, collection) : null;
+      const synced = present && !sameValue(sharedShape(present.variables?.[name]), sharedShape(collection)) ? syncedCollection(present, name, collection) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} variables`);
       }
@@ -1949,18 +1957,20 @@
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
-    const found = doc ? findClip(doc, clip)?.clip : null;
+    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live)) : null;
+    const found = scope ? findClip(scope.view, scope.id)?.clip : null;
     const size = at?.picker.frameSize();
-    if (editedView(nodeId) || !saver || !at || !doc || !found || !size || !editsText(doc, clip)) {
+    if (editedView(nodeId) || !saver || !at || !doc || !scope || !found || !size || !editsText(scope.view, scope.id)) {
       return;
     }
-    const caret = await caretSource(() => at.live.tokens, () => at.live.assets)(doc, clip);
-    if (!caret || saver.history.present !== doc) {
+    const laid = await caretSource(() => at.live.tokens, () => at.live.assets)(scope.view, scope.id);
+    if (!laid || saver.history.present !== doc) {
       return;
     }
-    const look = textEditStyle({ clip: found as MotionClip, doc, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, doc, at.live.tokens) };
-    liveDocs.set(nodeId, { ...at.live, doc: hideText(doc, clip) });
+    const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
+    const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens) };
+    liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
   let typeOnArrival = $state<{ nodeId: string; clip: string | null } | null>(null);
@@ -2066,7 +2076,7 @@
     if (!open || !saver) {
       return;
     }
-    const result = commitText(saver.history.present, open.clip, text, runs, lists);
+    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }));
     liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
     if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs) || JSON.stringify(lists) !== JSON.stringify(open.lists))) {
       commit(open.nodeId, result, 'Edited text');
@@ -2354,7 +2364,7 @@
   let hostPress: PointerEvent | null = null;
 
   function onDown(e: PointerEvent) {
-    glide = null;
+    takeCamera();
     dropHover();
     markBusy();
     measureSurface();
@@ -2758,14 +2768,14 @@
       return;
     }
     return watchPinch(el, (factor, x, y) => {
-      glide = null;
+      takeCamera();
       markBusy();
       view = zoomAt(view, local({ clientX: x, clientY: y }), factor);
     });
   });
 
   function onWheel(e: WheelEvent) {
-    glide = null;
+    takeCamera();
     markBusy();
     props.onUserPan?.();
     const target = e.target as HTMLElement;
@@ -2919,7 +2929,7 @@
   const ZOOM_RUN: Record<ZoomStep, () => void> = {
     [ZoomStep.In]: () => zoomStep(STEP_ZOOM),
     [ZoomStep.Out]: () => zoomStep(1 / STEP_ZOOM),
-    [ZoomStep.Fit]: () => fitTo(placed)
+    [ZoomStep.Fit]: () => fitTo(placed, FitPurpose.Command)
   };
 
   const pageZoom: CanvasZoom = {
@@ -3003,7 +3013,7 @@
       clearSelection();
     },
     'select-all': () => select(placed.map((t) => t.id)),
-    fit: () => fitTo(placed),
+    fit: () => fitTo(placed, FitPurpose.Command),
     'zoom-actual': () => {
       const s = screenSize();
       view = zoomAt(view, { x: s.width / 2, y: s.height / 2 }, 1 / view.zoom);
@@ -3027,6 +3037,13 @@
       }
     }
   };
+
+  $effect(() => {
+    const asked = zoomRequest.current;
+    if (asked) {
+      untrack(() => runPaletteCommand(asked.command));
+    }
+  });
 
   function runPaletteCommand(command: Command) {
     if (inside?.level.clip && picks.length && canRunInFrame(command)) {
@@ -3401,6 +3418,7 @@
     untrack(() => {
       select([pick.nodeId]);
       goInside(pick.nodeId, Gesture.Click, clip);
+      requestAnimationFrame(zoomToSelection);
     });
   });
 
@@ -3753,7 +3771,6 @@
       commenting={props.commenting}
       onframelibrary={soleFrame ? () => (frameDialog = { nodeId: soleFrame, dialog: FrameDialog.Templates }) : undefined}
       context={barContextFor(soleFrame)}
-      zoom={view.zoom}
     />
   {/if}
 

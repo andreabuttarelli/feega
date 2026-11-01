@@ -1,7 +1,7 @@
 import { compOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { MAX_COMP_DEPTH, SEPARATOR, viewOf, type CompPath } from '@feega/motion-core/motion/precomp';
 import { mergeScope, scopeView } from '$lib/motion/instance-view';
-import { apply2d, invert2d, worldAt } from '@feega/motion-core/motion/parent';
+import { IDENTITY, apply2d, invert2d, mul2d, worldAt, type Affine } from '@feega/motion-core/motion/parent';
 import type { Pt } from '$lib/motion/scene-select';
 import { Reach, clickTarget, framePage } from './frame-select';
 
@@ -33,7 +33,7 @@ export function scopeOf(doc: MotionDoc, sceneId: string): { scope: Scope; id: st
   return null;
 }
 
-export type Scoped = { view: MotionDoc; ids: string[]; frame: number; merge: (view: MotionDoc) => MotionDoc; scene: (ids: readonly string[]) => string[]; toView: (p: Pt) => Pt };
+export type Scoped = { view: MotionDoc; ids: string[]; frame: number; merge: (view: MotionDoc) => MotionDoc; scene: (ids: readonly string[]) => string[]; toView: (p: Pt) => Pt; fromView: Affine };
 
 function descend(doc: MotionDoc, scope: Scope, frame: number) {
   let at = frame;
@@ -44,7 +44,7 @@ function descend(doc: MotionDoc, scope: Scope, frame: number) {
     at = at - host.from + host.trimStart;
     return world;
   });
-  return { frame: at, toView: (p: Pt) => worlds.reduce<Pt>((q, w) => apply2d(invert2d(w), q) as Pt, p) };
+  return { frame: at, toView: (p: Pt) => worlds.reduce<Pt>((q, w) => apply2d(invert2d(w), q) as Pt, p), fromView: worlds.reduce<Affine>((m, w) => mul2d(m, w), IDENTITY) };
 }
 
 export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: number): Scoped | null {
@@ -60,7 +60,8 @@ export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: numbe
     frame: inside.frame,
     merge: (view) => mergeScope(doc, scope, view),
     scene: (ids) => ids.map((id) => `${scope.prefix}${id}`),
-    toView: inside.toView
+    toView: inside.toView,
+    fromView: inside.fromView
   };
 }
 

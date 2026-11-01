@@ -9,6 +9,7 @@ import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
 import type { PageOutline } from './page-outline';
 import { sheetFonts, type FetchText } from './sheet-fonts';
+import type { PageView, ViewRead } from './page-views';
 import { FULL_SHAPE, fontsWanted, urlPlan, type FontAssets, type PageShape, type UrlPlan } from './url-doc';
 
 export enum UrlImportOutcome {
@@ -46,9 +47,9 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
 
 export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
 
-export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, shape: PageShape) => UrlPlan | null };
+export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, shape: PageShape, views: ViewRead[]) => UrlPlan | null };
 
-export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts, shape) => urlPlan(tree, newId, undefined, fonts, shape) };
+export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts, shape, views) => urlPlan(tree, newId, undefined, fonts, shape, views) };
 
 export type PageAsk = {
   url: string;
@@ -58,7 +59,7 @@ export type PageAsk = {
   open: OpenAppBrowser | null;
   guard: (url: URL) => Promise<void>;
   importImage: (url: string) => Promise<string | null>;
-  importFont?: (url: string) => Promise<string | null>;
+  importFont?: (url: string, page: string) => Promise<string | null>;
   fetchText?: FetchText;
   newId: () => string;
   settleMs?: number;
@@ -66,6 +67,7 @@ export type PageAsk = {
   maxHeight?: number;
   shape?: PageShape;
   components?: () => Promise<ComponentsPage>;
+  views?: PageView[];
 };
 
 export type ComponentsPage = { place: Place; at: { x: number; y: number } };
@@ -178,7 +180,7 @@ export async function fontsFor(ask: LandAsk, tree: PageTree): Promise<FontAssets
   if (!importFont) {
     return {};
   }
-  const entries = await Promise.all(fontsWanted(tree).map(async (face) => [face.url, await importFont(face.url).catch(() => null)] as const));
+  const entries = await Promise.all(fontsWanted(tree).map(async (face) => [face.url, await importFont(face.url, tree.url).catch(() => null)] as const));
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
@@ -235,8 +237,15 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     return read;
   }
   const tree = await withSheetFonts(ask, read);
+  const views: ViewRead[] = [];
+  for (const view of ask.views ?? []) {
+    const tab = await open();
+    await tab.viewport(view.width).catch(() => undefined);
+    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+    views.push(...('outcome' in narrow ? [] : [{ view, tree: narrow }]));
+  }
 
-  return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE), tree.truncated);
+  return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
 }
 
 export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: boolean): Promise<UrlImported> {

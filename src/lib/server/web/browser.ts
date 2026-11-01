@@ -43,6 +43,7 @@ export type AppTab = Tab & {
   reveal: (mode: RevealMode) => Promise<Revealed>;
   seeAll: () => Promise<void>;
   sample: (walk?: Walk) => Promise<number>;
+  viewport: (width: number) => Promise<void>;
   settle: (ms: number) => Promise<void>;
   marks: (names: string[]) => Promise<ComponentUse[]>;
   overlay: () => Promise<Overlay | null>;
@@ -104,8 +105,11 @@ async function gate(request: HTTPRequest): Promise<void> {
   await request.continue(headers ? { headers } : undefined).catch(() => undefined);
 }
 
+const LIGHT_SCHEME = [{ name: 'prefers-color-scheme', value: 'light' }];
+
 async function fenced(page: Page): Promise<void> {
   await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 });
+  await page.emulateMediaFeatures(LIGHT_SCHEME);
   await page.setBypassCSP(true);
   await page.setRequestInterception(true);
   page.on('request', (request) => void gate(request));
@@ -422,6 +426,7 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
       await page.evaluateOnNewDocument(heldStill);
     },
     sample: (walk) => page.evaluate(inViewSampled, walk),
+    viewport: (width) => page.setViewport({ ...VIEWPORT, width, deviceScaleFactor: 1 }),
     settle: async (ms) => {
       await quiet(ms);
       await page.evaluate((fontsMs) => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, fontsMs))]), FONTS_MS).catch(() => undefined);

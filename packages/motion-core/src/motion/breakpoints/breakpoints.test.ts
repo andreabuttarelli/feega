@@ -74,6 +74,34 @@ describe('breakpoints', () => {
     expect(overriddenIn(doc, 'title', OverrideKey.FontSize)).toEqual(['tab']);
   });
 
+  it('a child can leave its stack on one view and keep its own box there, as an imported phone layout does', () => {
+    const doc = ok(setOverride(withViews(), 'ph', 'title', OverrideKey.Absolute, true));
+
+    expect(clipOf(resolveAt(doc, 'ph'), 'title').layoutItem?.absolute).toBe(true);
+    expect(clipOf(resolveAt(doc, 'tab'), 'title').layoutItem?.absolute).toBe(false);
+  });
+
+  it('a clip inside a composition takes its overrides too, so every copy of a component follows the phone layout', () => {
+    const base = withViews();
+    const doc = { ...base, comps: { card: { name: 'Card', durationInFrames: 30, tracks: [{ id: 'ct', kind: 'visual', name: '', clips: [clip('label')] }] } } } as unknown as MotionDoc;
+    const hidden = ok(setOverride(doc, 'ph', 'label', OverrideKey.Hidden, true, 'card'));
+    const inComp = (d: MotionDoc) => d.comps.card.tracks[0].clips[0];
+
+    expect(inComp(resolveAt(hidden, 'ph')).hidden).toBe(true);
+    expect(inComp(resolveAt(hidden, 'tab')).hidden).toBeUndefined();
+    expect(inComp(resolveAt(hidden, 'ph')).overrides).toBeUndefined();
+  });
+
+  it('a text can wrap and change its line height on one view, as a headline does on a phone', () => {
+    const wraps = ok(setOverride(withViews(), 'ph', 'title', OverrideKey.TextSizing, 'auto-height'));
+    const spaced = ok(setOverride(wraps, 'ph', 'title', OverrideKey.LineHeight, '40px'));
+
+    const unwrapped = ok(setOverride(spaced, 'ph', 'title', OverrideKey.TextWrap, 'wrap'));
+
+    expect(clipOf(resolveAt(unwrapped, 'ph'), 'title').props).toMatchObject({ sizing: 'auto-height', lineHeight: '40px', textWrap: 'wrap' });
+    expect(setOverride(withViews(), 'ph', 'title', OverrideKey.LineHeight, 'tall').ok).toBe(false);
+  });
+
   it('refuses a prop outside the whitelist and a value of the wrong shape', () => {
     expect(setOverride(withViews(), 'ph', 'title', 'props.text' as OverrideKey, 'x').ok).toBe(false);
     expect(setOverride(withViews(), 'ph', 'row', OverrideKey.Gap, 'wide').ok).toBe(false);
@@ -172,6 +200,16 @@ describe('what a view shows', () => {
 
     expect(inView(doc, BASE_BREAKPOINT)).toBe(doc);
     expect(inView(doc, 'ph').width).toBe(390);
+  });
+
+  it('a breakpoint can carry its own height, as a phone page runs longer than the desktop one', () => {
+    const doc = ok(addBreakpoint(landing(), { name: 'Phone', width: 390, height: 1800 }, 'ph'));
+    const placed = ok(setOverride(doc, 'ph', 'title', OverrideKey.Y, 1.5));
+    const phone = resolveAt(placed, 'ph');
+
+    expect([phone.width, phone.height]).toEqual([390, 1800]);
+    expect(Number(clipOf(phone, 'title').props.y) * phone.height).toBeCloseTo(1350);
+    expect(liftEdit(placed, 'ph', phone).tracks).toEqual(placed.tracks);
   });
 
   it('lists the overrides a clip carries at one view', () => {

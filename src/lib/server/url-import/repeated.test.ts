@@ -102,4 +102,22 @@ describe('repeatedOf', () => {
     expect(components[0].variants).toHaveLength(3);
     expect(root.children!.map((c) => c.name)).toEqual(['Logo / Variant=1', 'Logo', 'Logo / Variant=2', 'Logo', 'Logo / Variant=3', 'Logo']);
   });
+  it('two Button components are named after their sections, not Button and Button 2', () => {
+    const iconButton = (label: string, x: number): RestNode => {
+      const base = button(label, x, BLUE);
+      return { ...base, children: [{ id: id(), type: 'VECTOR', name: 'path', absoluteBoundingBox: { x: x + 4, y: 30, width: 12, height: 12 }, fills: [{ type: 'SOLID', color: WHITE }] }, ...base.children!] };
+    };
+    const section = (name: string, y: number, children: RestNode[]): RestNode => ({ id: id(), type: 'FRAME', name, absoluteBoundingBox: { x: 0, y, width: 1280, height: 200 }, children });
+    const { components } = repeatedOf(page([section('Hero', 0, [button('Start', 0, BLUE), button('Docs', 140, BLUE)]), section('Pricing', 300, [iconButton('Buy', 0), iconButton('Try', 140)])]));
+
+    expect(components.map((c) => c.name).sort()).toEqual(['Hero Button', 'Pricing Button']);
+  });
+
+  it('logo variants are named by their label, so the code says LogoNotion, not Logo4', () => {
+    const vector = (x: number): RestNode => ({ id: id(), type: 'VECTOR', name: 'path', absoluteBoundingBox: { x, y: 500, width: 30, height: 30 }, fills: [{ type: 'SOLID', color: BLACK }] });
+    const mark = (x: number, marks: number, label: string): RestNode => ({ id: id(), type: 'FRAME', name: label, absoluteBoundingBox: { x, y: 500, width: 100, height: 40 }, children: Array.from({ length: marks }, (_, i) => vector(x + i * 40)) });
+    const { root } = repeatedOf(page([mark(0, 1, 'Notion'), mark(120, 1, 'Notion logo'), mark(240, 2, 'Zapier'), mark(360, 2, 'Zapier')]));
+
+    expect(root.children!.map((c) => c.name)).toEqual(['Logo / Variant=Notion', 'Logo', 'Logo / Variant=Zapier', 'Logo']);
+  });
 });

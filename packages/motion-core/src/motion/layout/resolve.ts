@@ -162,6 +162,37 @@ function boxesOf(clips: readonly MotionClip[], size: Size, content: Content, mea
   return boxes;
 }
 
+type Shift = readonly [number, number];
+
+function carriedShifts(clips: readonly MotionClip[], boxes: Map<string, Box>, size: Size): Map<string, Shift> {
+  const byId: Clips = new Map(clips.map((c) => [c.id, c]));
+  const shifts = new Map<string, Shift>();
+  for (const clip of clips) {
+    if (boxes.has(clip.id)) {
+      continue;
+    }
+    let carrier = byId.get(clip.parent ?? '');
+    while (carrier && !boxes.has(carrier.id)) {
+      carrier = byId.get(carrier.parent ?? '');
+    }
+    if (!carrier) {
+      continue;
+    }
+    const laid = boxes.get(carrier.id)!;
+    const own = pivotBox(carrier.props, size);
+    shifts.set(clip.id, [laid.left - own.left, laid.top - own.top]);
+  }
+  return shifts;
+}
+
+function carriedAlong(clip: MotionClip, shift: Shift | undefined, size: Size): MotionClip {
+  const { x, y } = clip.props;
+  if (!shift || typeof x !== 'number' || typeof y !== 'number') {
+    return clip;
+  }
+  return { ...clip, props: { ...clip.props, x: x + shift[0] / size.width, y: y + shift[1] / size.height } };
+}
+
 function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, content: Content = NO_CONTENT): MotionTrack[] {
   const clips = visualClips(tracks);
   const boxes = boxesOf(clips, size, content, measure);
@@ -169,10 +200,11 @@ function laidOut(tracks: MotionTrack[], size: Size, measure: TextMeasure, conten
     return tracks;
   }
 
+  const carried = carriedShifts(clips, boxes, size);
   const place = (clip: MotionClip): MotionClip => {
     const box = boxes.get(clip.id);
     if (!box) {
-      return clip;
+      return carriedAlong(clip, carried.get(clip.id), size);
     }
     const shown = content(clip);
     if (shown) {

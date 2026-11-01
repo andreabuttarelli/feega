@@ -12,6 +12,7 @@ function fakeBrowser() {
   const page = {
     setViewport: vi.fn(async () => undefined),
     setBypassCSP: vi.fn(async () => undefined),
+    emulateMediaFeatures: vi.fn(async () => undefined),
     setRequestInterception: vi.fn(async () => undefined),
     on: vi.fn(),
     createCDPSession: vi.fn(async () => ({ send: vi.fn(async () => undefined) })),
@@ -92,6 +93,14 @@ describe('browserless: a hosted browser behind the same tab', () => {
 
     expect(page.setRequestInterception).toHaveBeenCalledWith(true);
     expect(page.on).toHaveBeenCalledWith('request', expect.any(Function));
+  });
+
+  it('opens every page in light mode, so two imports of a light site never come back one light and one dark', async () => {
+    const { browser, page } = fakeBrowser();
+
+    await browserless({ key: KEY }, { connect: async () => browser, sleep: async () => undefined })();
+
+    expect(page.emulateMediaFeatures).toHaveBeenCalledWith([{ name: 'prefers-color-scheme', value: 'light' }]);
   });
 });
 

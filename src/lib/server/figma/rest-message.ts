@@ -36,6 +36,7 @@ export type RestNode = {
   type: string;
   visible?: boolean;
   collapsed?: boolean;
+  key?: string;
   opacity?: number;
   size?: Vec;
   absoluteBoundingBox?: { x: number; y: number; width: number; height: number };
@@ -65,6 +66,7 @@ export type RestNode = {
   counterAxisSizingMode?: string;
   layoutGrow?: number;
   layoutAlign?: string;
+  maxWidth?: number;
   layoutPositioning?: string;
   fillGeometry?: { path: string; windingRule?: string }[];
   strokeGeometry?: { path: string; windingRule?: string }[];
@@ -245,6 +247,7 @@ function layoutOf(n: RestNode): Partial<FigmaRawNode> {
     stackCounterSizing: sizing(n.counterAxisSizingMode),
     stackChildPrimaryGrow: n.layoutGrow,
     stackChildAlignSelf: n.layoutAlign,
+    maxWidth: n.maxWidth,
     stackPositioning: n.layoutPositioning
   };
 }
@@ -290,6 +293,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     name: n.name,
     visible: n.visible,
     collapsed: n.collapsed,
+    ref: n.id,
     opacity: n.opacity,
     size: sizeOf(n),
     transform: transformOf(n, parent.rest),

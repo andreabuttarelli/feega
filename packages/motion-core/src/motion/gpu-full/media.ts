@@ -48,6 +48,7 @@ const coverPicture = (src: string): ImageItem => ({ kind: ItemKind.Image, clip: 
 function needed(items: Item[]): ImageItem[] {
   return items.flatMap((i) => [
     ...(i.kind === ItemKind.Image ? [i] : []),
+    ...(i.kind === ItemKind.Group ? needed(i.items) : []),
     ...needed(i.matte?.items ?? []),
     ...(i.masks ?? []).flatMap((m) => (m.cover.kind === CoverKind.Picture ? [coverPicture(m.cover.src)] : []))
   ]);

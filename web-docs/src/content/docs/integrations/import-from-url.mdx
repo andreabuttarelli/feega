@@ -9,7 +9,7 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 <DemoVideo name="import-url" caption="Open vercel.com, import it from its address, then edit a heading and a text colour, browse the detected components and open the code." />
 
-Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text in the page's own fonts, the page is rebuilt as stacks (see below), backgrounds, gradients, borders, corners, shadows and blurs become fills, strokes and effects, pictures are copied into your project, SVG icons and logos become vector paths. Dashed borders stay dashed strokes, blended pictures keep their blend mode, and blocks that fade out at an edge keep an editable gradient mask. It is not a screenshot: only what a frame cannot hold as layers (a video, a canvas, an embedded page, a block masked by a picture, a blended block with content inside) comes in as a picture of itself.
+Paste the address of a public web page and Feega draws it as a frame you can edit: text stays text in the page's own fonts, the page is rebuilt as stacks (see below), backgrounds, gradients, borders, corners, shadows and blurs become fills, strokes and effects, pictures are copied into your project, SVG icons and logos become vector paths. Dashed borders stay dashed strokes, blended pictures keep their blend mode, and blocks that fade out at an edge keep an editable gradient mask. It is not a screenshot: only what a frame cannot hold as layers (a video, a canvas, an embedded page, a decorative block masked by a picture) comes in as a picture of itself. A block with text, links or buttons inside never does: its words and controls stay layers, and the effect is kept on what can carry it (a shadow, a blend mode, a fade over the content, a picture of its own background).
 
 ## In the app
 
@@ -27,9 +27,11 @@ The imported frame is laid out like a well-built Figma file. The page is a verti
 
 Only what really overlaps stays absolute: decorations behind or above the content, overlays like a cookie banner, glyph-by-glyph counters, and anything inside a block that clips an overflowing child. Every layer lands where the page drew it.
 
-Only layers that do something are kept. A wrapper that draws nothing and holds one layer is removed and its padding moves to the stack around it, so a button holds its label directly; empty layers go; nested stacks running the same way merge. Layers are named by role or content (Nav, Logo, Button, Icon, the label's text), never by HTML tag. Wrappers that clip, and anything inside a component, stay when removing them would change how the page looks or break the link to the main component.
+Only layers that do something are kept. A wrapper that draws nothing and holds one layer is removed and its padding moves to the stack around it, so a button holds its label directly; empty layers go; nested stacks running the same way merge. Layers are named by role or content (Nav, Logo, Button, Icon, the label's text), never by HTML tag. Wrappers that clip, and anything inside a component, stay when removing them would change how the page looks or break the link to the main component. A block that holds several layers comes in as a frame with its own size and name, like a group you make yourself: double-click to go inside, Esc to come back out. Double-click or press Enter on a text to type, also inside a button or a card (the change is an override of that instance). In Layers an instance shows its content directly, so a button appears once.
 
 Make the page stack narrower or wider (select the stack under the frame, change W) and sections fill the new width, full-width rows stretch, and wide rows spread their items. Text keeps the size and line breaks it had in the page.
+
+Resizing the imported frame itself works the same way: text and laid-out blocks keep their size in pixels, the page fills the frame, centred content stays centred and narrows with it, and paragraphs that span their column rewrap. Layouts the page changes at a breakpoint (a menu that collapses, columns that stack) do not follow on their own.
 
 ## Fonts
 
@@ -38,9 +40,10 @@ Web fonts the page loads are copied into your workspace's uploaded fonts and use
 ## Limits
 
 - Public `http`/`https` pages only. Private network addresses and pages behind a login are refused.
+- The page is read in light mode: a site with a dark theme comes in light, a dark-only site comes in dark.
 - The page is read at desktop width (1280 px), down to 65 536 px from the top, up to 10 000 layers. A page taller than 16 384 px comes in as frames stacked one under the other.
 - Four imports a minute per person.
-- Not yet: tablet and phone layouts as breakpoints.
+- Tablet and phone layouts as breakpoints are experimental: tick **Add tablet and phone layouts as breakpoints** (or pass `--breakpoints`) and the frame gets Tablet (768) and Phone (390) views read from the page at those widths. Pages that build their phone layout from different elements come out rough; components are not marked when breakpoints are on.
 
 ## Design tokens
 
@@ -50,7 +53,7 @@ Starting from a website on `/start` makes the brand first, so the first import a
 
 ## Components
 
-Blocks the page repeats (cards, logos, buttons, list items) become one main component and linked instances. Each instance keeps its own text, pictures and colours as overrides, so editing the main updates every copy and **Reset** brings one back to the main. An instance colour that matches the main's token is not kept as an override, so it stays bound to the variable. Blocks with the same structure but a different background, border or shadow become variants of one component (`Style=Primary`, `Style=Secondary`); buttons and links of up to three heights also get `Size=Small`/`Medium`/`Large`. Names come from what the block is: button, card, feature card, nav link, logo. Painted buttons and links that share a structure become one Button set even when each style appears once (a purple and a white call to action), and logos with different marks are variants (`Variant=1`, `Variant=2`) of one Logo set.
+Blocks the page repeats (cards, logos, buttons, list items) become one main component and linked instances. Each instance keeps its own text, pictures and colours as overrides, so editing the main updates every copy and **Reset** brings one back to the main. An instance colour that matches the main's token is not kept as an override, so it stays bound to the variable. Blocks with the same structure but a different background, border or shadow become variants of one component (`Style=Primary`, `Style=Secondary`); buttons and links of up to three heights also get `Size=Small`/`Medium`/`Large`. Names come from what the block is: button, card, feature card, nav link, logo. When several components share a role, each takes the name of the section it is in (`Hero Button`, `Pricing Button`) or of its label; logo variants are named by their label or image (`Variant=Notion`) and numbered only when the page gives no name. Painted buttons and links that share a structure become one Button set even when each style appears once (a purple and a white call to action), and logos with different marks are variants (`Variant=1`, `Variant=2`) of one Logo set.
 
 Each main has properties: its texts, nested ones included (`Label` on a button, `Title` and `Text` on a card) and toggles to show or hide its icon or picture. Buttons and links whose background is a colour variable get `State=Default`, `Hover` and `Pressed` variants, bound to `Primary hover` and `Primary pressed` (a shade of the same colour, always far enough from it to see), so changing Primary restyles every state.
 

@@ -31,13 +31,14 @@
   let site = $state<string | null>(null);
   let sections = $state(true);
   let tokens = $state(true);
+  let breakpoints = $state(false);
 
   const title = $derived(site ? (busy ? `Importing ${site}…` : `Couldn't import ${site}`) : 'Import from URL');
 
   async function bring(typed: string, extent?: ImportExtent) {
     busy = true;
     message = null;
-    const got = await importPage({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent, sections, tokens });
+    const got = await importPage({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent, sections, tokens, breakpoints });
     busy = false;
     if (!got.ok) {
       message = REFUSALS[got.error] ?? FALLBACK_REFUSAL;
@@ -75,6 +76,7 @@
     </form>
     <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={sections} data-testid="url-import-sections" /> Split into sections (Nav, Hero, Footer…)</label>
     <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={tokens} data-testid="url-import-tokens" /> Extract styles and variables (colours, type, effects)</label>
+    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={breakpoints} data-testid="url-import-breakpoints" /> Add tablet and phone layouts as breakpoints</label>
     {/if}
     {#if message}
       <p class="ui-note" role="alert" data-testid="url-import-message">{message}</p>

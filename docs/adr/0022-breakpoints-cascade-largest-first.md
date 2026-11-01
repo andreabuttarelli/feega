@@ -8,8 +8,9 @@ Status: accepted 2026-10-28.
   doc itself is the base view (`base`, named Desktop); it takes no overrides.
 - A clip carries `overrides: { [breakpointId]: { [OverrideKey]: value } }`. Only keys in the
   `OVERRIDES` table in `packages/motion-core/src/motion/breakpoints/model.ts` are accepted:
-  direction, wrap, gap, padding, columns, width/height sizing, column span, hidden, font size,
-  text align, x/y/width/height, constraints.
+  direction, wrap, gap, padding, columns, width/height sizing, column span, ignore auto layout
+  (`layoutItem.absolute`), hidden, font size, text align, text resizing (`props.sizing`), line
+  height, text wrap (`props.textWrap`), x/y/width/height, constraints.
 - `resolveAt(doc, id)` applies the overrides of every view at least as wide as the target, widest
   first, then drops `breakpoints` and `overrides`. The result is a plain doc any renderer reads.
 - A view keeps pixels: text size, stroke widths and the width of laid-out children are rescaled
@@ -32,3 +33,23 @@ Status: accepted 2026-10-28.
   hidden rules are not inspectable.
 - **Overrides stored at doc level keyed by clip.** Deleting or duplicating a clip would need a
   second bookkeeping pass; on the clip they travel with it.
+
+## Amendment 2026-11-01: imported pages and compositions
+
+URL import (`docs/specs/url-import.md`, Breakpoints) reads a page again at 768 and 390 px and
+writes what changed as overrides. That needed three things the hand-drawn case did not:
+
+- **Overrides on clips inside compositions.** A component's main lives in `doc.comps`; its phone
+  layout is the same for every copy. `setOverride(doc, bp, clipId, key, value, comp)` writes on a
+  clip of that composition, and `resolveAt` applies overrides in every composition. Clip ids are
+  unique per composition, not per doc, so lookups by id stay scoped; editing on a view still lifts
+  top-level clips only.
+- **`layoutItem.absolute`.** A stacked row on desktop can be a column on the phone; rather than
+  infer a new auto layout, the imported phone view takes each flowing child out of the flow with
+  its own box.
+- **`props.sizing`, `props.lineHeight` and `props.textWrap`.** A headline kept on one line at
+  desktop (`textWrap: none`) wraps on a phone, and pixel line heights change with the font size.
+- **A breakpoint's own height.** `Breakpoint.height` is optional; when set, `resolveAt`
+  restretches the view to it (clip y/height keep their pixels) and `liftEdit` restretches an edit
+  back before lifting it. A phone page runs longer than the desktop one; without it the view kept
+  the desktop height and cut the content it pushed down.
