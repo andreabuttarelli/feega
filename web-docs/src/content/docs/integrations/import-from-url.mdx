@@ -29,6 +29,8 @@ Only layers that do something are kept. A wrapper that draws nothing and holds o
 
 Make the page stack narrower or wider (select the stack under the frame, change W) and sections fill the new width, full-width rows stretch, and wide rows spread their items. Text keeps the size and line breaks it had in the page.
 
+Resizing the imported frame itself works the same way: text and laid-out blocks keep their size in pixels, the page fills the frame, centred content stays centred and narrows with it, and paragraphs that span their column rewrap. Layouts the page changes at a breakpoint (a menu that collapses, columns that stack) do not follow on their own.
+
 ## Fonts
 
 Web fonts the page loads are copied into your workspace's uploaded fonts and used by the frame, so text wraps where it wraps on the page. Text set in system fonts uses the closest free face (Inter for the system UI font, Arimo for Helvetica and Arial, Tinos for Times, Gelasio for Georgia, JetBrains Mono for monospace).

@@ -315,7 +315,7 @@ const TEXT_ITEM: Record<TextSizing, Partial<{ width: Sizing; height: Sizing }>> 
   [TextSizing.AutoWidth]: { width: Sizing.Hug, height: Sizing.Hug }
 };
 
-function itemFor(child: Layer, parent: AutoLayout): Partial<{ width: Sizing; height: Sizing; absolute: boolean }> {
+function itemFor(child: Layer, parent: AutoLayout, scale: number, width: number): Partial<{ width: Sizing; height: Sizing; absolute: boolean; maxWidth: number }> {
   const row = parent.flow === Flow.Row;
   const fillsWidth = row ? child.item.grow : child.item.stretch;
   const fillsHeight = row ? child.item.stretch : child.item.grow;
@@ -323,14 +323,15 @@ function itemFor(child: Layer, parent: AutoLayout): Partial<{ width: Sizing; hei
     ...(child.kind === LayerKind.Text ? TEXT_ITEM[child.sizing] : {}),
     ...(fillsWidth ? { width: Sizing.Fill } : {}),
     ...(fillsHeight ? { height: Sizing.Fill } : {}),
-    ...(child.item.absolute ? { absolute: true } : {})
+    ...(child.item.absolute ? { absolute: true } : {}),
+    ...(child.item.maxWidth ? { maxWidth: Math.max(child.item.maxWidth * scale, width) } : {})
   };
 }
 
 function laidOut(built: Built, container: Root, layer: FrameLayer, flow: AutoLayout, p: Place): Built {
   const own: Step[] = [(d) => setAutoLayout(d, container.id, flowOf(flow, p)), (d) => setLayoutItem(d, container.id, { width: FIT[flow.width], height: FIT[flow.height] })];
   const kids = built.roots.filter((r) => r.id !== container.id);
-  const children = kids.flatMap((kid): Step[] => [(d) => setParent(d, kid.id, container.id, { at: p.frame }), (d) => setLayoutItem(d, kid.id, itemFor(kid.layer, flow))]);
+  const children = kids.flatMap((kid): Step[] => [(d) => setParent(d, kid.id, container.id, { at: p.frame }), (d) => setLayoutItem(d, kid.id, itemFor(kid.layer, flow, p.scale, Number(findClip(d, kid.id)?.clip.props.width ?? 0) * d.width))]);
   const clipped: Step[] = layer.clip === Clip.Content ? [(d) => editClip(d, container.id, (c) => ({ ...c, clipContent: true }))] : [];
   const doc = applied(built.doc, [...own, ...children, ...clipped], p, `auto layout of ${layer.name}`);
   return { ...built, doc: faded(doc, [container.id], layer.opacity, p), roots: [container] };
