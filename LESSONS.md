@@ -3665,3 +3665,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## An imported frame lands empty, the import answers 200
 
 **Signal:** a URL import returns 200 and a frame named after the page, but the frame is 16:9 with no layers and its head revision is the default doc. **Move:** the plan doc failed `parseMotionDoc` and `frameStore.create` ignores the `Invalid` write. Run the plan on a capture (`urlPlan` + `parseMotionDoc` over `fidelity2/captures/<label>`) and read the refusal: a font only one breakpoint read uses was the cause once.
+
+## URL import answers 500 with `Error: [object Object]` from `connected`
+
+**Signal:** the preview log shows `unhandled server error` on `/url-import` with `Error: [object Object]` at `hidden` → `connected`; imports with breakpoints fail about half the time, a breakpoint view goes missing the rest. **Move:** the Browserless plan admits two sessions; a third connect gets `429`, which the server bundle receives as an `ErrorEvent` (stringified to `[object Object]`). Count the sessions one import opens at once (`importPageAt` reads views in turn beside the desktop read) and probe the limit with parallel `puppeteer.connect` calls before blaming the page.

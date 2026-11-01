@@ -248,7 +248,14 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
     const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
     return 'outcome' in narrow ? [] : [{ view, tree: narrow }];
   };
-  const [read, ...narrow] = await Promise.all([readPage(), ...(ask.views ?? []).map((view) => readView(view).catch(() => []))]);
+  const readViewsInTurn = async () => {
+    const reads: ViewRead[][] = [];
+    for (const view of ask.views ?? []) {
+      reads.push(await readView(view).catch(() => []));
+    }
+    return reads;
+  };
+  const [read, narrow] = await Promise.all([readPage(), readViewsInTurn()]);
   if ('outcome' in read) {
     return read;
   }
