@@ -3761,9 +3761,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     urlImportAt = { x: 0, y: 0 };
   }
 
-  $effect(() => {
-    untrack(takeStartUrl);
-  });
+  afterNavigate(takeStartUrl);
 
   function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
     landImported(landed);
