@@ -92,6 +92,17 @@ describe('masks on a group', () => {
     expect(masksOn(drawn.items).map((m) => m.mode)).toEqual([MaskMode.Add]);
     expect([Math.min(...xs), Math.max(...xs)]).toEqual([0, 960]);
   });
+
+  it('masks everything a group holds as one layer, not one per clip', () => {
+    const two = must(addClip(withCard, { component: 'Shape', from: 0, durationInFrames: 90, props: square }, 'second'));
+    let n = 0;
+    const grouped = must(groupClips(two, ['card', 'second'], () => (n++ === 0 ? 'inner' : 'group')));
+    const doc = patch(grouped, 'group', { mask: mask({ kind: MaskKind.Rect, x: 0.25, y: 0.5, width: 0.5, height: 1 }) });
+    const groups = displayListAt(doc, 0, FEEGA_TOKENS).items.filter((i) => i.kind === ItemKind.Group && i.masks?.length);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].kind === ItemKind.Group && groups[0].items).toHaveLength(2);
+  });
 });
 
 describe('content clipped by a parent', () => {

@@ -587,31 +587,47 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     return projected([{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }]);
   }
 
-  function groupMasked(clip: MotionClip, drawn: Item[]): Item[] | Unsupported {
-    let held = drawn;
-    for (const id of [...(enclosing.get(clip.id) ?? [])].reverse()) {
-      const group = byId.get(id);
-      if (!group?.mask) {
+  type Drawn = { chain: string[]; items: Item[] };
+
+  const maskedChain = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).filter((id) => byId.get(id)?.mask);
+
+  function nested(drawn: Drawn[], depth: number): Item[] {
+    const out: Item[] = [];
+    let at = 0;
+    while (at < drawn.length) {
+      const id = drawn[at].chain[depth];
+      if (!id) {
+        out.push(...drawn[at].items);
+        at++;
         continue;
       }
-      const masks = maskLayers(group, frame, size, worldAt(doc, id, frame, size), asset);
-      if (!masks) {
-        return Unsupported.Mask;
+      let end = at;
+      while (end < drawn.length && drawn[end].chain[depth] === id) {
+        end++;
       }
-      held = [{ kind: ItemKind.Group, clip: clip.id, items: held, opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal, masks }];
+      const inner = nested(drawn.slice(at, end), depth + 1);
+      const masks = maskLayers(byId.get(id)!, frame, size, worldAt(doc, id, frame, size), asset);
+      if (masks) {
+        out.push({ kind: ItemKind.Group, clip: id, items: inner, opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal, masks });
+      } else {
+        unsupported.push({ clip: id, component: GROUP_COMPONENT, reason: Unsupported.Mask });
+        out.push(...inner);
+      }
+      at = end;
     }
-    return held;
+    return out;
   }
 
+  const drawn: Drawn[] = [];
   for (const clip of drawable) {
     const own = clipItems(clip);
-    const drawn = Array.isArray(own) ? groupMasked(clip, own) : own;
-    if (Array.isArray(drawn)) {
-      items.push(...drawn);
+    if (Array.isArray(own)) {
+      drawn.push({ chain: maskedChain(clip), items: own });
       continue;
     }
-    unsupported.push({ clip: clip.id, component: clip.component, reason: drawn });
+    unsupported.push({ clip: clip.id, component: clip.component, reason: own });
   }
+  items.push(...nested(drawn, 0));
   const background = doc.surface ? CLEAR : doc.background === Background.Transparent ? null : colour('brand.background');
   const cut = frameCut(doc);
   const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;
