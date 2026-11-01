@@ -1,5 +1,8 @@
-import { DESIGN_MAX_SIDE, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { addBreakpoint, OverrideKey, setOverride } from '@feega/motion-core/motion/breakpoints/model';
+import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { addBreakpoint, liftEdit, resolveAt } from '@feega/motion-core/motion/breakpoints/model';
+import { DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
+import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import type { FigmaImage, PlanItem } from '$lib/canvas/figma/figma-doc';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 
@@ -12,20 +15,11 @@ export const PAGE_VIEWS: PageView[] = [
 
 export type ViewRead = { view: PageView; tree: PageTree };
 
+export type ViewPlan = { view: PageView; item: PlanItem; root: RestNode };
+
 export const viewsOf = (breakpoints: boolean): PageView[] => (breakpoints ? PAGE_VIEWS : []);
 
 type Box = { x: number; y: number; width: number; height: number };
-type Shift = { x: number; y: number };
-
-const keyed = (n: RestNode, into = new Map<string, RestNode>()): Map<string, RestNode> => {
-  if (n.key && !n.collapsed) {
-    into.set(n.key, n);
-  }
-  (n.children ?? []).forEach((c) => keyed(c, into));
-  return into;
-};
-
-const moved = (b: Box, by: Shift): Box => ({ ...b, x: b.x + by.x, y: b.y + by.y });
 
 const unionOf = (boxes: Box[]): Box | null => {
   if (!boxes.length) {
@@ -34,20 +28,6 @@ const unionOf = (boxes: Box[]): Box | null => {
   const [x, y] = [Math.min(...boxes.map((b) => b.x)), Math.min(...boxes.map((b) => b.y))];
   return { x, y, width: Math.max(...boxes.map((b) => b.x + b.width)) - x, height: Math.max(...boxes.map((b) => b.y + b.height)) - y };
 };
-
-type Seen = { nodes: Map<string, RestNode>; paths: Set<string> };
-
-const elementOf = (key: string) => key.split('~')[0];
-
-function seenIn(root: RestNode): Seen {
-  const nodes = keyed(root);
-  const paths = new Set<string>();
-  for (const key of nodes.keys()) {
-    const parts = elementOf(key).split('/');
-    parts.forEach((_, i) => paths.add(parts.slice(0, i + 1).join('/')));
-  }
-  return { nodes, paths };
-}
 
 const LINE = /^(.*)\.(\d+)$/;
 const NAME_CHARS = 40;
@@ -100,105 +80,19 @@ function joinedLines(n: RestNode): RestNode {
 
 export const joinedTree = (tree: PageTree): PageTree => ({ ...tree, root: joinedLines(tree.root) });
 
-function counterpart(key: string, seen: Seen): RestNode | null {
-  const own = seen.nodes.get(key);
-  if (own) {
-    return own;
-  }
-  const lines = [...seen.nodes.entries()].filter(([k]) => k.startsWith(`${key}.`)).map(([, n]) => n);
-  const box = unionOf(lines.map((n) => n.absoluteBoundingBox!));
-  if (box) {
-    return { ...lines[0], absoluteBoundingBox: box };
-  }
-  const line = key.match(LINE);
-  const whole = line ? seen.nodes.get(line[1]) : undefined;
-  return whole && line?.[2] === '0' ? whole : null;
-}
-
-function topOf(n: RestNode, seen: Seen): number {
-  const own = n.key ? counterpart(n.key, seen)?.absoluteBoundingBox?.y : undefined;
-  return Math.min(own ?? Infinity, ...(n.children ?? []).map((c) => topOf(c, seen)));
-}
-
-function placed(n: RestNode, seen: Seen, carry: Shift, up: number): RestNode {
-  const box = n.absoluteBoundingBox!;
-  const found = n.key ? counterpart(n.key, seen) : null;
-  const gone = Boolean(n.key) && !found && !seen.paths.has(elementOf(n.key!));
-  if (gone) {
-    return { ...n, collapsed: true, absoluteBoundingBox: moved(box, carry), ...(n.children ? { children: n.children.map((c) => placed(c, seen, carry, up)) } : {}) };
-  }
-  const there = found ? { ...found.absoluteBoundingBox!, y: found.absoluteBoundingBox!.y - up } : null;
-  const shift = there ? { x: there.x - box.x, y: there.y - box.y } : carry;
-  const children = n.children?.map((c) => placed(c, seen, shift, up));
-  const own = there ?? (children?.length ? (unionOf(children.filter((c) => !c.collapsed).map((c) => c.absoluteBoundingBox!)) ?? moved(box, carry)) : moved(box, carry));
-  const text = found?.type === 'TEXT' && n.type === 'TEXT' ? { style: { ...n.style, ...found.style }, textAutoResize: found.textAutoResize } : {};
-  return { ...n, ...text, ...(found ? { collapsed: undefined } : {}), absoluteBoundingBox: own, ...(children ? { children } : {}) };
-}
-
-const pathsOf = (root: RestNode) => seenIn(root).paths;
-
-function extrasIn(n: RestNode, known: Set<string>, into: RestNode[]): RestNode[] {
-  if (n.key && !n.collapsed && !known.has(elementOf(n.key))) {
+const keyedNodes = (n: RestNode, into: RestNode[] = []): RestNode[] => {
+  if (n.key) {
     into.push(n);
-    return into;
   }
-  (n.children ?? []).forEach((c) => extrasIn(c, known, into));
+  (n.children ?? []).forEach((c) => keyedNodes(c, into));
   return into;
-}
-
-const hiddenCopy = (n: RestNode, top: number, view: string): RestNode => ({ ...n, id: `${view}:${n.id}`, collapsed: true, absoluteBoundingBox: { ...n.absoluteBoundingBox!, y: top }, ...(n.children ? { children: n.children.map((c) => hiddenCopy(c, top, view)) } : {}) });
-
-export function withExtras(root: RestNode, views: ViewRead[]): RestNode {
-  const known = pathsOf(root);
-  const extras = new Map(views.flatMap(({ view, tree }) => extrasIn(tree.root, known, []).map((n) => hiddenCopy(n, root.absoluteBoundingBox!.y, view.id))).map((n) => [n.key!, n]));
-  if (!extras.size) {
-    return root;
-  }
-  return { ...root, children: [...(root.children ?? []), ...extras.values()] };
-}
-
-export enum Slice {
-  First = 'first',
-  Later = 'later'
-}
-
-const LIFT: Record<Slice, (root: RestNode, seen: Seen) => number> = {
-  [Slice.First]: () => 0,
-  [Slice.Later]: (root, seen) => {
-    const up = Math.min(...(root.children ?? []).map((c) => topOf(c, seen))) - Math.min(...(root.children ?? []).map((c) => c.absoluteBoundingBox!.y));
-    return Number.isFinite(up) ? up : 0;
-  }
 };
 
-export function viewedRoot(root: RestNode, view: PageTree, slice: Slice): RestNode {
-  const seen = seenIn(view.root);
-  const lift = LIFT[slice](root, seen);
-  const children = (root.children ?? []).map((c) => placed(c, seen, { x: 0, y: 0 }, lift));
-  return { ...root, absoluteBoundingBox: reaching({ ...root.absoluteBoundingBox!, width: view.width }, children), children };
-}
-
-function reaching(box: Box, children: RestNode[]): Box {
-  const bottoms = children.filter((c) => !c.collapsed).map((c) => c.absoluteBoundingBox!.y + c.absoluteBoundingBox!.height);
-  return bottoms.length ? { ...box, height: Math.max(...bottoms) - box.y } : box;
-}
-
-type Write = [string, OverrideKey, unknown];
-
-enum Anchor {
-  Frame = 'frame',
-  Pixels = 'pixels'
-}
-
-type Placed = { clip: MotionClip; comp: string | null; parentFlows: boolean };
-
-function clipsById(doc: MotionDoc): Map<string, Placed> {
-  const scopes: [string | null, MotionClip[]][] = [[null, doc.tracks.flatMap((t) => t.clips) as MotionClip[]], ...Object.entries(doc.comps ?? {}).map(([comp, c]) => [comp, c.tracks.flatMap((t) => t.clips) as MotionClip[]] as [string, MotionClip[]])];
-  return new Map(
-    scopes.flatMap(([comp, clips]) => {
-      const byId = new Map(clips.map((c) => [c.id, c]));
-      return clips.map((clip) => [clip.id, { clip, comp, parentFlows: Boolean(clip.parent && byId.get(clip.parent)?.autoLayout) && !clip.layoutItem?.absolute }] as const);
-    })
-  );
+export function narrowCuts(base: RestNode, narrow: RestNode, tops: number[]): number[] {
+  const there = new Map(keyedNodes(narrow).map((n) => [n.key!, n.absoluteBoundingBox!.y]));
+  const placed = keyedNodes(base).flatMap((n) => (there.has(n.key!) ? [{ y: n.absoluteBoundingBox!.y, at: there.get(n.key!)! }] : []));
+  const bottom = narrow.absoluteBoundingBox!.y + narrow.absoluteBoundingBox!.height;
+  return tops.map((top, i) => (i ? Math.min(bottom, ...placed.filter((p) => p.y >= top).map((p) => p.at)) : narrow.absoluteBoundingBox!.y)).map((cut, i, all) => Math.max(cut, ...all.slice(0, i)));
 }
 
 const nodesById = (n: RestNode, into = new Map<string, RestNode>()): Map<string, RestNode> => {
@@ -207,69 +101,222 @@ const nodesById = (n: RestNode, into = new Map<string, RestNode>()): Map<string,
   return into;
 };
 
-const NEAR_PX = 0.5;
-const TEXT = 'Text';
-const NO_WRAP = 'none';
-const PRECOMP = 'Precomp';
-
-const near = (a: number, b: number) => Math.abs(a - b) <= NEAR_PX;
-
-function writesFor(placed: Placed, before: RestNode, after: RestNode, root: Box, across: number, scale: number): Write[] {
-  const { clip } = placed;
-  const id = clip.id;
-  if (after.collapsed && !before.collapsed) {
-    return [[id, OverrideKey.Hidden, true]];
-  }
-  const shown: Write[] = before.collapsed && !after.collapsed ? [[id, OverrideKey.Hidden, false]] : [];
-  if (after.collapsed) {
-    return shown;
-  }
-  const [a, b] = [before.absoluteBoundingBox!, after.absoluteBoundingBox!];
-  const moved = clip.component !== PRECOMP && (!near(a.x, b.x) || !near(a.y, b.y) || !near(a.width, b.width) || !near(a.height, b.height) || placed.parentFlows);
-  const anchor = placed.comp ? Anchor.Pixels : Anchor.Frame;
-  const wide = (v: number) => (anchor === Anchor.Frame ? v * across : v);
-  const width = b.width / root.width;
-  const box: Write[] = moved
-    ? [
-        [id, OverrideKey.X, wide((b.x - root.x + b.width / 2) / root.width)],
-        [id, OverrideKey.Y, (b.y - root.y + b.height / 2) / root.height],
-        [id, OverrideKey.BoxWidth, clip.parent || anchor === Anchor.Pixels ? width : wide(width)],
-        [id, OverrideKey.BoxHeight, b.height / root.height]
-      ]
-    : [];
-  const flow: Write[] = placed.parentFlows ? [[id, OverrideKey.Absolute, true]] : [];
-  const sized: Write[] = clip.autoLayout && moved ? [[id, OverrideKey.Width, 'fixed'], [id, OverrideKey.Height, 'fixed']] : [];
-  const unit = Math.min(root.width, root.height);
-  const [fa, fb] = [before.style?.fontSize, after.style?.fontSize];
-  const text: Write[] =
-    clip.component === TEXT
-      ? [
-          ...(!near(a.width, b.width) ? ([[id, OverrideKey.TextSizing, 'auto-height'], ...(clip.props.textWrap === NO_WRAP ? [[id, OverrideKey.TextWrap, 'wrap']] : [])] as Write[]) : []),
-          ...(fa && fb && !near(fa, fb) ? ([[id, OverrideKey.FontSize, fb / unit]] as Write[]) : []),
-          ...(after.style?.lineHeightPx && before.style?.lineHeightPx !== after.style.lineHeightPx ? ([[id, OverrideKey.LineHeight, `${Math.round(after.style.lineHeightPx * scale * 100) / 100}px`]] as Write[]) : [])
-        ]
-      : [];
-  return [...shown, ...box, ...flow, ...sized, ...text];
+function clipKeys(item: PlanItem, root: RestNode): Map<string, string> {
+  const nodes = nodesById(root);
+  return new Map(
+    Object.entries(item.keys ?? {}).flatMap(([ref, clipId]) => {
+      const key = nodes.get(ref)?.key;
+      return key ? [[clipId, key] as const] : [];
+    })
+  );
 }
 
-export function withView(base: MotionDoc, keys: Record<string, string>, root: RestNode, viewed: RestNode, view: PageView, pagePx: number): MotionDoc {
-  const width = Math.round(view.width * (base.width / pagePx));
-  const height = Math.min(DESIGN_MAX_SIDE, Math.round(base.height * (viewed.absoluteBoundingBox!.height / root.absoluteBoundingBox!.height)));
-  const added = addBreakpoint(base, { name: view.name, width, height }, view.id);
-  if (!added.ok) {
-    return base;
+const PRECOMP = 'Precomp';
+const LAYOUT_PROPS = new Set(['x', 'y', 'width', 'height', 'size', 'lineHeight', 'letterSpacing', 'axes', 'align', 'sizing', 'textWrap', 'path']);
+const FREE_FIELDS = new Set(['id', 'parent', 'name', 'overrides', 'hidden', 'layoutItem', 'autoLayout', 'constraints', 'locked', 'props']);
+const RELATIVE = 1e-3;
+const ABSOLUTE = 1e-6;
+
+function alike(a: unknown, b: unknown): boolean {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return Math.abs(a - b) <= Math.max(ABSOLUTE, RELATIVE * Math.max(Math.abs(a), Math.abs(b)));
   }
-  const across = base.width / width;
-  const [before, after, clips] = [nodesById(root), nodesById(viewed), clipsById(base)];
-  const box = root.absoluteBoundingBox!;
-  return Object.entries(keys).reduce((doc, [ref, clipId]) => {
-    const [b, a, placed] = [before.get(ref), after.get(ref), clips.get(clipId)];
-    if (!b || !a || !placed) {
-      return doc;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => alike(v, b[i]));
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    return [...keys].every((k) => alike((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+  }
+  return a === b;
+}
+
+const painted = (clip: MotionClip): Record<string, unknown> => ({
+  ...Object.fromEntries(Object.entries(clip).filter(([k]) => !FREE_FIELDS.has(k))),
+  props: Object.fromEntries(Object.entries(clip.props).filter(([k]) => !LAYOUT_PROPS.has(k)))
+});
+
+type Pictured = (clipId: string) => Omit<FigmaImage, 'clipId'>[];
+
+const picturedBy = (images: FigmaImage[]): Pictured => {
+  const grouped = Map.groupBy(images, (i) => i.clipId);
+  return (id) => (grouped.get(id) ?? []).map(({ clipId: _id, ...rest }) => rest);
+};
+
+type Scope = { byId: Map<string, MotionClip>; kids: Map<string | null, MotionClip[]>; keys: Map<string, string>; pictured: Pictured; page: string | null; surface: string | null };
+
+function scopeOf(doc: MotionDoc, keys: Map<string, string>, images: FigmaImage[], page: string | null): Scope {
+  const clips = doc.tracks.flatMap((t) => t.clips) as MotionClip[];
+  const byId = new Map(clips.map((c) => [c.id, c]));
+  const kids = Map.groupBy(clips, (c) => (c.parent && byId.has(c.parent) ? c.parent : null));
+  return { byId, kids, keys, pictured: picturedBy(images), page, surface: doc.surface ?? null };
+}
+
+const kidsOf = (scope: Scope, id: string | null) => scope.kids.get(id) ?? [];
+
+const sameLayer = (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => a.component !== PRECOMP && b.component !== PRECOMP && alike(painted(a), painted(b)) && alike(base.pictured(a.id), read.pictured(b.id));
+
+function pairsOf(base: Scope, read: Scope): Map<string, string> {
+  const byKey = Map.groupBy([...read.keys].map(([id, key]) => ({ id, key })), (e) => e.key);
+  const used = new Set<string>();
+  const pairs = new Map<string, string>();
+  if (base.page && read.page) {
+    pairs.set(base.page, read.page);
+    used.add(read.page);
+  }
+  const walk = (clip: MotionClip, ok: boolean) => {
+    const key = base.keys.get(clip.id);
+    const partner = ok && key && !pairs.has(clip.id) ? (byKey.get(key) ?? []).find((e) => !used.has(e.id) && sameLayer(base, clip, read, read.byId.get(e.id)!)) : undefined;
+    if (partner) {
+      pairs.set(clip.id, partner.id);
+      used.add(partner.id);
     }
-    return writesFor(placed, b, a, box, across, base.width / box.width).reduce((d, [id, key, value]) => {
-      const set = setOverride(d, view.id, id, key, value, placed.comp);
-      return set.ok ? set.doc : d;
-    }, doc);
-  }, added.doc);
+    kidsOf(base, clip.id).forEach((k) => walk(k, pairs.has(clip.id) || (ok && !key)));
+  };
+  kidsOf(base, null).forEach((c) => walk(c, true));
+  return pairs;
+}
+
+const flows = (scope: Scope, clip: MotionClip) => Boolean(clip.parent && scope.byId.get(clip.parent)?.autoLayout);
+
+const fixedItem = (clip: MotionClip, flowing: boolean): Partial<MotionClip> =>
+  flowing || clip.autoLayout ? { layoutItem: { ...(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM), ...(flowing ? { absolute: true } : {}), width: Sizing.Fixed, height: Sizing.Fixed } } : {};
+
+const layoutOf = (from: MotionClip) => Object.fromEntries(Object.entries(from.props).filter(([k]) => LAYOUT_PROPS.has(k)));
+
+const boxOf = (clip: MotionClip): Box => {
+  const p = clip.props as { x: number; y: number; width: number; height: number };
+  return { x: p.x - p.width / 2, y: p.y - p.height / 2, width: p.width, height: p.height };
+};
+
+const centred = (b: Box) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2, width: b.width, height: b.height });
+
+const WHOLE: Box = { x: 0, y: 0, width: 1, height: 1 };
+
+function settled(base: Scope, read: Scope, pairs: Map<string, string>): Map<string, MotionClip> {
+  const out = new Map<string, MotionClip>();
+  const settle = (clip: MotionClip): Box | null => {
+    if (clip.id === base.surface) {
+      return null;
+    }
+    const kids = kidsOf(base, clip.id)
+      .map(settle)
+      .filter((b): b is Box => Boolean(b));
+    const partner = read.byId.get(pairs.get(clip.id) ?? '');
+    const page = clip.id === base.page;
+    const reach = page ? WHOLE : partner ? boxOf(partner) : base.keys.has(clip.id) ? null : unionOf(kids);
+    if (!reach) {
+      out.set(clip.id, { ...clip, hidden: true });
+      return null;
+    }
+    out.set(clip.id, { ...clip, hidden: false, props: { ...clip.props, ...(partner ? layoutOf(partner) : {}), ...centred(reach) }, ...fixedItem(clip, flows(base, clip)) });
+    return reach;
+  };
+  kidsOf(base, null).forEach(settle);
+  return out;
+}
+
+const copyId = (view: string, id: string) => `${view}:${id}`;
+
+type Copies = { clips: MotionClip[]; after: Map<string, MotionClip[]>; images: FigmaImage[]; comps: MotionDoc['comps']; keys: [string, string][] };
+
+function ownedIn(read: Scope, paired: Set<string>): Set<string> {
+  const own = new Set<string>();
+  const visit = (clip: MotionClip): boolean => {
+    const kids = kidsOf(read, clip.id).map(visit);
+    const mine = !paired.has(clip.id) && (read.keys.has(clip.id) || !kids.length || kids.some(Boolean));
+    if (mine) {
+      own.add(clip.id);
+    }
+    return mine;
+  };
+  kidsOf(read, null).forEach(visit);
+  return own;
+}
+
+const withComp = (clip: MotionClip, view: string): MotionClip => (clip.props.comp ? { ...clip, props: { ...clip.props, comp: copyId(view, String(clip.props.comp)) } } : clip);
+
+function compsCopied(doc: MotionDoc, ids: string[], view: string, into: MotionDoc['comps'] = {}): MotionDoc['comps'] {
+  for (const id of ids) {
+    const comp = doc.comps[id];
+    if (!comp || into[copyId(view, id)]) {
+      continue;
+    }
+    const clips = comp.tracks.flatMap((t) => t.clips as MotionClip[]);
+    into[copyId(view, id)] = { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => withComp(c, view)) })) } as MotionDoc['comps'][string];
+    compsCopied(
+      doc,
+      clips.flatMap((c) => (c.props.comp ? [String(c.props.comp)] : [])),
+      view,
+      into
+    );
+  }
+  return into;
+}
+
+function copiesOf(view: string, read: Scope, readDoc: MotionDoc, readImages: FigmaImage[], pairs: Map<string, string>, base: Scope): Copies {
+  const partnerOf = new Map([...pairs].map(([b, r]) => [r, b]));
+  const own = ownedIn(read, new Set([...partnerOf.keys(), ...(read.surface ? [read.surface] : [])]));
+  const after = new Map<string, MotionClip[]>();
+  const clips: MotionClip[] = [];
+  let anchor = '';
+  for (const clip of readDoc.tracks.flatMap((t) => t.clips) as MotionClip[]) {
+    if (partnerOf.has(clip.id)) {
+      anchor = partnerOf.get(clip.id)!;
+      continue;
+    }
+    if (!own.has(clip.id)) {
+      continue;
+    }
+    const parent = clip.parent ? (partnerOf.get(clip.parent) ?? (own.has(clip.parent) ? copyId(view, clip.parent) : null)) : null;
+    const flowing = Boolean(parent && base.byId.get(parent)?.autoLayout);
+    const { autoLayout: _flow, layoutItem: _item, ...rest } = withComp(clip, view);
+    const copy = { ...rest, id: copyId(view, clip.id), parent, ...(flowing ? { layoutItem: { ...DEFAULT_LAYOUT_ITEM, absolute: true } } : {}) } as MotionClip;
+    clips.push(copy);
+    after.set(anchor, [...(after.get(anchor) ?? []), copy]);
+  }
+  const images = readImages.filter((i) => own.has(i.clipId)).map((i) => ({ ...i, clipId: copyId(view, i.clipId) }));
+  const comps = compsCopied(
+    readDoc,
+    [...own].flatMap((id) => (read.byId.get(id)?.props.comp ? [String(read.byId.get(id)!.props.comp)] : [])),
+    view
+  );
+  const keys = [...own].flatMap((id) => (read.keys.has(id) ? [[copyId(view, id), read.keys.get(id)!] as [string, string]] : []));
+  return { clips, after, images, comps, keys };
+}
+
+function placedTracks(doc: MotionDoc, settledClips: Map<string, MotionClip>, after: Map<string, MotionClip[]>): MotionDoc['tracks'] {
+  const lead = after.get('') ?? [];
+  return doc.tracks.map((t, i) => ({ ...t, clips: [...(i ? [] : lead), ...(t.clips as MotionClip[]).flatMap((c) => [settledClips.get(c.id) ?? c, ...(after.get(c.id) ?? [])])] })) as MotionDoc['tracks'];
+}
+
+const shownOnlyAt = (clip: MotionClip, view: string): MotionClip => ({ ...clip, hidden: true, overrides: { [view]: { hidden: false } } });
+
+type State = { doc: MotionDoc; images: FigmaImage[]; keys: Map<string, string>; page: string | null };
+
+function viewed(state: State, plan: ViewPlan): State {
+  const { view, item } = plan;
+  const added = addBreakpoint(state.doc, { name: view.name, width: item.doc.width, height: item.doc.height }, view.id);
+  if (!added.ok) {
+    return state;
+  }
+  const resolved = resolveAt(added.doc, view.id);
+  const base = scopeOf(resolved, state.keys, state.images, state.page);
+  const read = scopeOf(item.doc, clipKeys(item, plan.root), item.images, item.keys?.[plan.root.id] ?? null);
+  const pairs = pairsOf(base, read);
+  const copies = copiesOf(view.id, read, item.doc, item.images, pairs, base);
+  const wanted = { ...resolved, tracks: placedTracks(resolved, settled(base, read, pairs), copies.after), comps: { ...resolved.comps, ...copies.comps } } as MotionDoc;
+  const lifted = liftEdit(added.doc, view.id, wanted);
+  const copied = new Set(copies.clips.map((c) => c.id));
+  const doc = { ...lifted, tracks: lifted.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (copied.has(c.id) ? shownOnlyAt(c, view.id) : c)) })) } as MotionDoc;
+  return { doc, images: [...state.images, ...copies.images], keys: new Map([...state.keys, ...copies.keys]), page: state.page };
+}
+
+export function withViews(item: PlanItem, root: RestNode, plans: ViewPlan[]): PlanItem {
+  if (!plans.length) {
+    return item;
+  }
+  const start: State = { doc: item.doc, images: item.images, keys: clipKeys(item, root), page: item.keys?.[root.id] ?? null };
+  const done = plans.reduce(viewed, start);
+  return { ...item, doc: done.doc, images: done.images };
 }

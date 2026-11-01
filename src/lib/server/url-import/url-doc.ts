@@ -11,7 +11,7 @@ import { windowed } from './page-window';
 import { sectionsOf } from './page-sections';
 import { sectionFramed } from './section-frames';
 import { stacksOf } from './page-stacks';
-import { joinedTree, Slice, viewedRoot, withExtras, withView, type ViewRead } from './page-views';
+import { joinedTree, narrowCuts, withViews, type PageView, type ViewRead } from './page-views';
 import { flattened } from './page-flatten';
 import { tokensOf, type SiteBrand } from './page-tokens';
 import { samplesOf, siteName, tokenised } from './token-bind';
@@ -41,7 +41,7 @@ const hexOf = (index: number) => index.toString(16).padStart(HEX_WIDTH, '0');
 
 const familyKey = (family: string) => family.replace(/["']/g, '').trim().toLowerCase();
 
-function refsOf(root: RestNode): ImageRefs {
+function refsOf(roots: RestNode[]): ImageRefs {
   const keyOf = new Map<string, string>();
   const visit = (n: RestNode) => {
     for (const paint of n.fills ?? []) {
@@ -51,7 +51,7 @@ function refsOf(root: RestNode): ImageRefs {
     }
     (n.children ?? []).forEach(visit);
   };
-  visit(root);
+  roots.forEach(visit);
   return Object.fromEntries([...keyOf].map(([url, key]) => [key, url]));
 }
 
@@ -158,23 +158,23 @@ function lifted(n: RestNode, by: number): RestNode {
   return { ...n, absoluteBoundingBox: { ...b, y: b.y - by }, ...(n.children ? { children: n.children.map((c) => lifted(c, by)) } : {}) };
 }
 
-function slicesOf(root: RestNode): { root: RestNode; top: number }[] {
+type Slice = { root: RestNode; top: number };
+
+function slicesAt(root: RestNode, cuts: number[]): Slice[] {
   const page = root.absoluteBoundingBox!;
-  return Array.from({ length: Math.max(1, Math.ceil(page.height / SLICE)) }, (_, i) => {
-    const [top, bottom] = [i * SLICE, Math.min(page.height, (i + 1) * SLICE)];
-    const part = windowed(root, { left: 0, top, right: page.width, bottom })!;
+  return cuts.map((top, i) => {
+    const bottom = cuts[i + 1] ?? page.y + page.height;
+    const part = windowed(root, { left: page.x, top, right: page.x + page.width, bottom }) ?? { ...root, children: [] };
     return { root: lifted({ ...part, name: i ? `${root.name} ${i + 1}` : root.name, absoluteBoundingBox: { ...page, y: top, height: bottom - top } }, top), top };
   });
 }
 
-function viewed(plan: FigmaPlan | null, root: RestNode, slice: Slice, views: ViewRead[], pagePx: number): FigmaPlan | null {
-  if (!plan || plan.items.length !== 1 || !views.length) {
-    return plan;
-  }
-  const [item] = plan.items;
-  const doc = views.reduce((base, { view, tree }) => withView(base, item.keys ?? {}, root, viewedRoot(root, tree, slice), view, pagePx), item.doc);
-  return { ...plan, items: [{ ...item, doc }] };
-}
+const slicesOf = (root: RestNode): Slice[] => slicesAt(root, Array.from({ length: Math.max(1, Math.ceil(root.absoluteBoundingBox!.height / SLICE)) }, (_, i) => i * SLICE));
+
+type ViewSlices = { view: PageView; slices: Slice[] };
+
+const viewSlicesOf = (base: Slice[], root: RestNode, reads: { view: PageView; root: RestNode }[]): ViewSlices[] =>
+  reads.map(({ view, root: narrow }) => ({ view, slices: slicesAt(narrow, narrowCuts(root, narrow, base.map((s) => s.top))) }));
 
 const PAGE_PIN = { horizontal: Horizontal.LeftRight, vertical: Vertical.Top };
 const WHOLE_WIDTH = 0.999;
@@ -183,10 +183,26 @@ const spansPage = (clip: MotionClip) => !clip.parent && Number(clip.props.width)
 
 const pinnedWide = (doc: MotionDoc): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (spansPage(c as MotionClip) ? { ...c, constraints: PAGE_PIN } : c)) })) as MotionDoc['tracks'] });
 
-function stacked(slices: { root: RestNode; top: number }[], newId: () => string, uploads: FontUpload[], views: ViewRead[] = [], pagePx = 1): FigmaPlan | null {
+const planned = (root: RestNode, newId: () => string, uploads: FontUpload[], units?: number) => planOf(restMessage([root], FILE_KEY), newId, uploads, Grouping.Frame, units);
+
+function sliceItems(root: RestNode, i: number, newId: () => string, uploads: FontUpload[], views: ViewSlices[]): FigmaPlan | null {
+  const plan = planned(root, newId, uploads);
+  if (!views.length || plan?.items.length !== 1) {
+    return plan;
+  }
+  const units = plan.items[0].doc.width / root.absoluteBoundingBox!.width;
+  const reads = views.map(({ view, slices }) => ({ view, root: slices[i].root }));
+  const plans = reads.flatMap(({ view, root: narrow }) => {
+    const own = planned(narrow, newId, uploads, units);
+    return own?.items.length === 1 ? [{ view, item: own.items[0], root: narrow }] : [];
+  });
+  return { ...plan, items: [withViews(plan.items[0], root, plans)] };
+}
+
+function stacked(slices: Slice[], newId: () => string, uploads: FontUpload[], views: ViewSlices[] = []): FigmaPlan | null {
   const total = slices.reduce((s, x) => s + x.root.absoluteBoundingBox!.height, 0);
   const plans = slices.flatMap(({ root, top }, i) => {
-    const plan = viewed(planOf(restMessage([root], FILE_KEY), newId, uploads, Grouping.Frame), root, i ? Slice.Later : Slice.First, views, pagePx);
+    const plan = sliceItems(root, i, newId, uploads, views);
     const middle = top + root.absoluteBoundingBox!.height / 2 - total / 2;
     return plan ? [{ ...plan, items: plan.items.map((item) => ({ ...item, doc: pinnedWide(item.doc), centre: { x: 0, y: middle } })) }] : [];
   });
@@ -254,22 +270,25 @@ const hovered = (tree: PageTree): PageTree => ({
 });
 
 export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, shape: PageShape = PLAIN_SHAPE, reads: ViewRead[] = []): UrlPlan | null {
-  const [joined, views] = reads.length ? [joinedTree(read), reads.map((v) => ({ ...v, tree: joinedTree(v.tree) }))] : [read, reads];
+  const [joined, views] = reads.length ? [joinedTree(read), reads.map((v) => ({ ...v, tree: hovered(joinedTree(v.tree)) }))] : [read, reads];
   const tree = hovered(joined);
   const name = (tree.title || new URL(tree.url).hostname).slice(0, MAX_NAME);
   const patterns = views.length ? [] : (tree.patterns ?? []);
-  const shaped = withExtras(flattened(withPatterns(stacksOf(SECTIONED[shape.sectioning](tree)), patterns, views.length ? UNMARKED : mark, stacksOf)), views);
-  const images = refsOf(shaped);
+  const shapedOf = (t: PageTree, marker: Marker, parts: typeof patterns) => flattened(withPatterns(stacksOf(SECTIONED[shape.sectioning](t)), parts, marker, stacksOf));
+  const shaped = shapedOf(tree, views.length ? UNMARKED : mark, patterns);
+  const narrow = views.map(({ view, tree: t }) => ({ view, root: shapedOf(t, UNMARKED, []) }));
+  const images = refsOf([shaped, ...narrow.map((n) => n.root)]);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
   const { uploads, names } = uploadsOf(tree, fonts);
   const family = (raw: string) => names.get(familyKey(raw)) ?? stackFamily(raw);
   const root = mapped({ ...shaped, name }, keyOf, family);
-  const planned = stacked(slicesOf(root), newId, uploads, views, tree.width);
-  if (!planned) {
+  const slices = slicesOf(root);
+  const made = stacked(slices, newId, uploads, viewSlicesOf(slices, root, narrow.map((n) => ({ view: n.view, root: mapped({ ...n.root, name }, keyOf, family) }))));
+  if (!made) {
     return null;
   }
   const dynamic = patternSets(patterns);
-  const stack = { ...planned, items: planned.items.map((item) => ({ ...item, doc: withoutCarriers(item.doc, dynamic) })) };
+  const stack = { ...made, items: made.items.map((item) => ({ ...item, doc: withoutCarriers(item.doc, dynamic) })) };
   const tokening = shape.tokening ?? Tokening.Off;
   const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
   const counts = tokened.items.map((item) => countOf(item.doc));

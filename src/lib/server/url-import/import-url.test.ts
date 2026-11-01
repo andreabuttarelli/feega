@@ -130,14 +130,16 @@ describe('importPageAt', () => {
   });
 
   it('asked for tablet and phone, the page is read again at each width and the frame gets those breakpoints', async () => {
-    const { ask, docs, tab } = askOf({ views: PAGE_VIEWS, shape: PLAIN_SHAPE });
-    const keyedTree = { ...TREE, root: { ...TREE.root, children: TREE.root.children!.map((c) => ({ ...c, key: c.id })) } };
-    vi.mocked(tab.tree).mockResolvedValue(keyedTree as never);
+    const keyedAt = (width: number): PageTree => ({ ...TREE, width, root: { ...TREE.root, absoluteBoundingBox: { ...TREE.root.absoluteBoundingBox!, width }, children: TREE.root.children!.map((c) => ({ ...c, key: c.id })) } });
+    const tabs = [tabOf(keyedAt(1280)), tabOf(keyedAt(768)), tabOf(keyedAt(390))];
+    const open = vi.fn();
+    tabs.forEach((tab) => open.mockResolvedValueOnce(tab));
+    const { ask, docs } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
 
     await importPageAt(ask);
     const doc = docs.get('frame-1')!.doc as { breakpoints?: { name: string }[] };
 
-    expect(vi.mocked(tab.viewport).mock.calls.map(([w]) => w)).toEqual([768, 390]);
+    expect(tabs.flatMap((tab) => vi.mocked(tab.viewport).mock.calls.map(([w]) => w))).toEqual([768, 390]);
     expect(doc.breakpoints?.map((b) => b.name)).toEqual(['Tablet', 'Phone']);
   });
 

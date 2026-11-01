@@ -5,7 +5,8 @@ import { HORIZONTALS, VERTICALS } from '../constraints/model';
 import type { MotionClip, MotionDoc } from '../doc';
 import { restretched } from '../layout/resolve';
 import { TEXT_SIZINGS, TEXT_WRAPS } from '../text-sizing';
-import { LINE_HEIGHT } from '../type-units';
+import { AXES, LETTER_SPACING, LINE_HEIGHT } from '../type-units';
+import { pathString } from '../shape/schema';
 
 export const BASE_BREAKPOINT = 'base';
 export const MAX_BREAKPOINTS = 8;
@@ -27,6 +28,9 @@ export enum OverrideKey {
   TextSizing = 'props.sizing',
   LineHeight = 'props.lineHeight',
   TextWrap = 'props.textWrap',
+  LetterSpacing = 'props.letterSpacing',
+  FontAxes = 'props.axes',
+  Outline = 'props.path',
   X = 'props.x',
   Y = 'props.y',
   BoxWidth = 'props.width',
@@ -56,6 +60,9 @@ const OVERRIDES: Record<OverrideKey, { section: Section; field: string; value: z
   [OverrideKey.TextSizing]: { section: 'props', field: 'sizing', value: z.enum(TEXT_SIZINGS), label: 'Text resizing' },
   [OverrideKey.LineHeight]: { section: 'props', field: 'lineHeight', value: z.string().regex(LINE_HEIGHT), label: 'Line height' },
   [OverrideKey.TextWrap]: { section: 'props', field: 'textWrap', value: z.enum(TEXT_WRAPS), label: 'Text wrap' },
+  [OverrideKey.LetterSpacing]: { section: 'props', field: 'letterSpacing', value: z.string().regex(LETTER_SPACING), label: 'Letter spacing' },
+  [OverrideKey.FontAxes]: { section: 'props', field: 'axes', value: z.string().regex(AXES), label: 'Font axes' },
+  [OverrideKey.Outline]: { section: 'props', field: 'path', value: pathString, label: 'Outline' },
   [OverrideKey.X]: { section: 'props', field: 'x', value: fraction, label: 'X' },
   [OverrideKey.Y]: { section: 'props', field: 'y', value: fraction, label: 'Y' },
   [OverrideKey.BoxWidth]: { section: 'props', field: 'width', value: fraction, label: 'Width' },

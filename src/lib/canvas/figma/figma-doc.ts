@@ -591,11 +591,13 @@ function sceneOf(html: string) {
 
 const wholeSize = (size: Size): Size => ({ width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) });
 
-function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<string>, uploads: readonly FontUpload[], grouping: Grouping): PlanItem {
+const atScale = (doc: MotionDoc, size: Size, unitsPerPx: number | undefined): MotionDoc => (unitsPerPx ? { ...doc, width: Math.round(size.width * unitsPerPx), height: Math.round(size.height * unitsPerPx) } : doc);
+
+function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<string>, uploads: readonly FontUpload[], grouping: Grouping, unitsPerPx?: number): PlanItem {
   const size = wholeSize(layer.box);
-  const blank = withUploads(drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0), uploads, skipped);
+  const blank = withUploads(atScale(drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0), size, unitsPerPx), uploads, skipped);
   const images: FigmaImage[] = [];
-  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map(), texts: new Map(), keys: new Map(), grouping };
+  const place: Place = { centre: CENTRE, scale: unitsPerPx ?? blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map(), texts: new Map(), keys: new Map(), grouping };
   const built = layersOf(blank, { ...layer, clip: Clip.None }, place);
   if (layer.ref && built.roots[0]) {
     place.keys.set(layer.ref, built.roots[0].id);
@@ -635,14 +637,14 @@ export function figmaPlan(html: string, newId: NewId): FigmaPlan | null {
 
 const isStage = (layer: Layer, destination: Destination): layer is FrameLayer => layer.kind === LayerKind.Frame && destination === Destination.Frame && layer.fills.length > 0;
 
-export function planOf(message: FigmaMessage, newId: NewId, uploads: readonly FontUpload[] = [], grouping = Grouping.Precomp): FigmaPlan | null {
+export function planOf(message: FigmaMessage, newId: NewId, uploads: readonly FontUpload[] = [], grouping = Grouping.Precomp, unitsPerPx?: number): FigmaPlan | null {
   const scene = figmaScene(message);
   if (!scene) {
     return null;
   }
   const skipped = new Set(scene.skipped);
   const items = scene.placements.flatMap((pl) => {
-    const made = isStage(pl.layer, pl.destination) ? frameItem(pl.layer, pl.centre, newId, skipped, uploads, grouping) : freeItem(pl.layer, pl.size, pl.centre, newId, skipped, uploads, grouping);
+    const made = isStage(pl.layer, pl.destination) ? frameItem(pl.layer, pl.centre, newId, skipped, uploads, grouping, unitsPerPx) : freeItem(pl.layer, pl.size, pl.centre, newId, skipped, uploads, grouping);
     return made ? [made] : [];
   });
   return items.length ? { items, skipped: [...skipped], fileKey: message.meta.fileKey ?? null } : null;
