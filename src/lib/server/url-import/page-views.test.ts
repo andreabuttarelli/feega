@@ -230,4 +230,13 @@ describe('a page read at desktop and phone width', () => {
 
     expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['However, because these concepts have been given agreed-upon names (', 'for a', 'paragraph,']);
   });
+
+  it('an answer the phone page keeps folded stays hidden on the phone view (feega.app: every FAQ answer drawn over the next question)', () => {
+    const folded = (key: string, box: Box, characters: string): RestNode => ({ ...textOf(key, box, characters), collapsed: true });
+    const wide = pageOf(1280, 800, [textOf('q', { x: 40, y: 100, width: 600, height: 30 }, 'What is Feega?'), folded('a', { x: 40, y: 140, width: 600, height: 30 }, 'One infinite canvas.')]);
+    const narrow = pageOf(390, 800, [textOf('q', { x: 16, y: 100, width: 300, height: 30 }, 'What is Feega?'), folded('a', { x: 16, y: 140, width: 300, height: 60 }, 'One infinite canvas.'), folded('b', { x: 16, y: 220, width: 300, height: 60 }, 'Only on phones.')]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+
+    expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['What is Feega?']);
+  });
 });

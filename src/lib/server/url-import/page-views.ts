@@ -224,7 +224,7 @@ function settled(base: Scope, read: Scope, pairs: Map<string, string>): Map<stri
       out.set(clip.id, { ...clip, hidden: true });
       return null;
     }
-    out.set(clip.id, { ...clip, hidden: false, props: { ...clip.props, ...(partner ? layoutOf(partner) : {}), ...centred(reach) }, ...fixedItem(clip, flows(base, clip)) });
+    out.set(clip.id, { ...clip, hidden: Boolean(partner?.hidden), props: { ...clip.props, ...(partner ? layoutOf(partner) : {}), ...centred(reach) }, ...fixedItem(clip, flows(base, clip)) });
     return reach;
   };
   kidsOf(base, null).forEach(settle);
@@ -305,7 +305,7 @@ function placedTracks(doc: MotionDoc, settledClips: Map<string, MotionClip>, aft
   return doc.tracks.map((t, i) => ({ ...t, clips: [...(i ? [] : lead), ...(t.clips as MotionClip[]).flatMap((c) => [settledClips.get(c.id) ?? c, ...(after.get(c.id) ?? [])])] })) as MotionDoc['tracks'];
 }
 
-const shownOnlyAt = (clip: MotionClip, view: string): MotionClip => ({ ...clip, hidden: true, overrides: { [view]: { hidden: false } } });
+const shownOnlyAt = (clip: MotionClip, view: string): MotionClip => ({ ...clip, hidden: true, ...(clip.hidden ? {} : { overrides: { [view]: { hidden: false } } }) });
 
 type State = { doc: MotionDoc; images: FigmaImage[]; keys: Map<string, string>; page: string | null };
 
