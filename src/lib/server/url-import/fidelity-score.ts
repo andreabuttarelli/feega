@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { similarity } from '$lib/server/web/ui-fidelity';
 import type { PageTree } from './page-tree';
 import { fontsWanted, urlPlan, type UrlPlan } from './url-doc';
+import { sheetFonts } from './sheet-fonts';
 
 export const FOLD = { width: 1280, height: 800 };
 
@@ -23,7 +24,10 @@ async function inlined(url: string): Promise<string> {
   return `data:font/woff2;base64,${Buffer.from(await response.arrayBuffer()).toString('base64')}`;
 }
 
-export async function plannedPage(tree: PageTree): Promise<PlannedPage> {
+const sheetText = (referer: string) => (url: string) => fetch(url, { headers: { referer } }).then((r) => (r.ok ? r.text() : ''));
+
+export async function plannedPage(read: PageTree): Promise<PlannedPage> {
+  const tree = { ...read, fonts: [...(read.fonts ?? []), ...(await sheetFonts(read.sheets ?? [], sheetText(read.url)))] };
   let n = 0;
   const faces = fontsWanted(tree);
   const fonts = Object.fromEntries(faces.map((f, i) => [f.url, `font-${i}`]));
