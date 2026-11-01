@@ -31,9 +31,9 @@ type Root = { id: string; layer: Layer };
 type Built = { doc: MotionDoc; ids: string[]; roots: Root[] };
 export type FigmaImage = { clipId: string; hash: string; at: number; innerId?: string; fit?: PictureFit; focus?: Unit };
 type Main = { compId: string; at: Unit; images: FigmaImage[] };
-type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[]; mains: Map<string, Main>; texts: Map<Layer, string> };
+type Place = { centre: Unit; scale: number; frame: number; newId: NewId; report: (what: string) => void; rootSize: Size; images: FigmaImage[]; mains: Map<string, Main>; texts: Map<Layer, string>; keys: Map<string, string> };
 
-export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind; images: FigmaImage[] };
+export type PlanItem = { destination: Destination; doc: MotionDoc; size: Size; centre: Unit; name: string; kind: FrameKind; images: FigmaImage[]; keys?: Record<string, string> };
 export type FigmaPlan = { items: PlanItem[]; skipped: string[]; fileKey: string | null };
 export type FontUpload = { family: string; variants: FontVariant[] };
 export type FigmaPasted = { doc: MotionDoc; selection: string[]; skipped: string[]; images: FigmaImage[]; fileKey: string | null };
@@ -361,6 +361,9 @@ function layersOf(doc: MotionDoc, layer: FrameLayer, p: Place, need = Background
     const made = build[child.kind](built.doc, child, p);
     const shown = { ...made, doc: blended(child.hidden ? hiddenAll(made.doc, made.roots) : made.doc, made.roots, child.blend) };
     const next = masked(shown, child, p);
+    if (child.ref && next.roots[0] && !p.keys.has(child.ref)) {
+      p.keys.set(child.ref, next.roots[0].id);
+    }
     built = { doc: next.doc, ids: [...built.ids, ...next.ids], roots: [...built.roots, ...next.roots] };
   }
   const [container] = background.roots;
@@ -536,9 +539,12 @@ function frameItem(layer: FrameLayer, centre: Unit, newId: NewId, skipped: Set<s
   const size = wholeSize(layer.box);
   const blank = withUploads(drawnFrame({ left: 0, top: 0, ...size }, MotionFormat.Custom, 0), uploads, skipped);
   const images: FigmaImage[] = [];
-  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map(), texts: new Map() };
+  const place: Place = { centre: CENTRE, scale: blank.width / layer.box.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: layer.box, images, mains: new Map(), texts: new Map(), keys: new Map() };
   const built = layersOf(blank, { ...layer, clip: Clip.None }, place);
-  return { destination: Destination.Frame, doc: built.doc, size, centre, name: layer.name, kind: FrameKind.Frame, images };
+  if (layer.ref && built.roots[0]) {
+    place.keys.set(layer.ref, built.roots[0].id);
+  }
+  return { destination: Destination.Frame, doc: built.doc, size, centre, name: layer.name, kind: FrameKind.Frame, images, keys: Object.fromEntries(place.keys) };
 }
 
 function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped: Set<string>, uploads: readonly FontUpload[]): PlanItem | null {
@@ -550,7 +556,7 @@ function freeItem(layer: Layer, size: Size, centre: Unit, newId: NewId, skipped:
   }
   const blank = { ...empty, doc: withUploads(empty.doc, uploads, skipped) };
   const images: FigmaImage[] = [];
-  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images, mains: new Map(), texts: new Map() };
+  const place: Place = { centre: CENTRE, scale: blank.doc.width / size.width, frame: 0, newId, report: (w) => skipped.add(w), rootSize: size, images, mains: new Map(), texts: new Map(), keys: new Map() };
   const built = BUILD[layer.kind](blank.doc, layer, place);
   const one = layer.kind === LayerKind.Frame ? grouped(built, layer, place) : built;
   const first = one.doc.tracks.flatMap((t) => t.clips)[0];
@@ -589,7 +595,7 @@ export function figmaIntoFrame(doc: MotionDoc, html: string, at: Unit, scale: nu
   const { scene, fileKey } = found;
   const skipped = new Set(scene.skipped);
   const images: FigmaImage[] = [];
-  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box, images, mains: new Map(), texts: new Map() };
+  const place: Place = { centre: at, scale, frame, newId, report: (w) => skipped.add(w), rootSize: scene.combined.box, images, mains: new Map(), texts: new Map(), keys: new Map() };
   const built = grouped(layersOf(doc, scene.combined, place), scene.combined, place);
   return built.ids.length ? { doc: built.doc, selection: built.ids, skipped: [...skipped], images, fileKey } : null;
 }

@@ -212,6 +212,55 @@ describe.runIf(process.env.CHROMIUM_PATH)('a block faded by a mask', () => {
   }, 30_000);
 });
 
+const RESPONSIVE = `<body style="margin:0;font:16px sans-serif"><style>.row{display:flex;gap:20px}@media (max-width:500px){.row{flex-direction:column}.wide{display:none}}</style><div class="row"><div style="background:#0af;padding:10px">Hello <b>bold</b> world</div><div style="background:#fa0;padding:10px">Second</div><div class="wide" style="background:#0f0;padding:10px">Only wide</div></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('the same page read at two widths', () => {
+  it('names each layer by where it sits in the page, so a layer is found again at another width', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      const read = async (width: number) => {
+        await page.setViewport({ width, height: 400 });
+        await page.setContent(RESPONSIVE);
+        const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+        const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+        return all(tree.root);
+      };
+      const [wide, narrow] = [await read(1000), await read(400)];
+      const keyOf = (nodes: RestNode[], text: string) => nodes.find((n) => n.type === 'TEXT' && n.characters?.startsWith(text))?.key;
+      const keys = wide.flatMap((n) => (n.key ? [n.key] : []));
+
+      expect(keyOf(wide, 'Hello')).toBeDefined();
+      expect(keyOf(narrow, 'Hello')).toBe(keyOf(wide, 'Hello'));
+      expect(keyOf(narrow, 'Second')).toBe(keyOf(wide, 'Second'));
+      expect(keyOf(narrow, 'Only wide')).toBeUndefined();
+      expect(new Set(keys).size).toBe(keys.length);
+      expect(wide.slice(1).filter((n) => n.type === 'FRAME' && n.fills?.length).every((n) => n.key)).toBe(true);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const CHIP_STARTS_LINE = `<body style="margin:0"><p style="margin:0;width:120px;font:16px monospace">aaaa bbbb <code style="padding:0 6px;border:1px solid #888;font:16px monospace">cc</code> dd</p></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a paragraph whose line starts with an inline chip', () => {
+  it('stays one text, the chip box counts as where the line starts (blog: paragraphs split into one text per line)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(CHIP_STARTS_LINE);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+
+      expect(all(tree.root).filter((n) => n.type === 'TEXT').map((n) => n.characters)).toEqual(['aaaa bbbb cc dd']);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
 const CLIPPED = `<body style="margin:0"><svg width="40" height="40" viewBox="0 0 20 20"><defs><clipPath id="c"><rect x="0" y="0" width="10" height="20"/></clipPath></defs><g clip-path="url(#c)"><circle cx="10" cy="10" r="8" fill="#e00"/></g></svg></body>`;
 
 describe.runIf(process.env.CHROMIUM_PATH)('an svg clipped by a rectangle', () => {

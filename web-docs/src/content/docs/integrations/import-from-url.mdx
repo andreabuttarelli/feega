@@ -38,7 +38,7 @@ Web fonts the page loads are copied into your workspace's uploaded fonts and use
 - Public `http`/`https` pages only. Private network addresses and pages behind a login are refused.
 - The page is read at desktop width (1280 px), down to 65 536 px from the top, up to 10 000 layers. A page taller than 16 384 px comes in as frames stacked one under the other.
 - Four imports a minute per person.
-- Not yet: tablet and phone layouts as breakpoints.
+- Tablet and phone layouts as breakpoints are experimental: tick **Add tablet and phone layouts as breakpoints** (or pass `--breakpoints`) and the frame gets Tablet (768) and Phone (390) views read from the page at those widths. Pages that build their phone layout from different elements come out rough; components are not marked when breakpoints are on.
 
 ## Design tokens
 

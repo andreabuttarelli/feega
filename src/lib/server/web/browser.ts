@@ -42,6 +42,7 @@ export type AppTab = Tab & {
   reveal: (mode: RevealMode) => Promise<Revealed>;
   seeAll: () => Promise<void>;
   sample: () => Promise<number>;
+  viewport: (width: number) => Promise<void>;
   settle: (ms: number) => Promise<void>;
   marks: (names: string[]) => Promise<ComponentUse[]>;
   overlay: () => Promise<Overlay | null>;
@@ -316,6 +317,7 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
       await page.evaluateOnNewDocument(heldStill);
     },
     sample: () => page.evaluate(inViewSampled),
+    viewport: (width) => page.setViewport({ ...VIEWPORT, width, deviceScaleFactor: 1 }),
     settle: async (ms) => {
       await page.waitForNetworkIdle({ idleTime: IDLE_MS, timeout: ms }).catch(() => undefined);
       await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, 3_000))])).catch(() => undefined);

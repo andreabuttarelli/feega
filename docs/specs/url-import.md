@@ -123,9 +123,45 @@ writes them as the frame's variable collection (named after the site) and styles
 and binds the layers whose value matches. A brand of the same host pulls close colours to its
 palette. Borders, radii and the frame background are listed, not bound.
 
+## Breakpoints
+
+With `breakpoints: true` (API, MCP `import_url`, CLI `--breakpoints`, dialog checkbox) the page is
+read again at 768 and 390 px (`PAGE_VIEWS`, `tab.viewport`), each with the same freeze. The
+frame gets Tablet and Phone breakpoints (ADR 0022) whose overrides make each view look like the
+page at that width:
+
+- The walker names every layer by where it sits in the DOM (`RestNode.key`: element path, `~n`
+  for the n-th text run of an element, `.i` for a line). Keys match across widths.
+- `joinedTree`: a paragraph the walker split into lines comes in as one wrapping text (alignment
+  read from the line edges), on every read, so it can rewrap at another width.
+- `withExtras`: layers only a narrower page shows (a phone menu) are added to the frame hidden,
+  with ids of their own (`<view>:<id>`) and their images.
+- `viewedRoot`: the desktop layer tree, after sections and stacks, takes each keyed layer's box
+  and text style from the narrower read; layers whose element is not on that page are collapsed;
+  unnamed layers move with their parent; wrappers take the union of their children; the root
+  takes the page's width and runs as long as its content.
+- `planOf` records which clip each layer became (`PlanItem.keys`, layer id → clip id); `withView`
+  compares each layer's two boxes and writes: hidden, x/y/width/height, font size, line height,
+  text resizing and wrap; a child of an auto layout leaves the flow (`layoutItem.absolute`). The
+  breakpoint carries the view's own height (capped at the frame maximum).
+- With breakpoints the page is not marked into components: an instance's layout can differ per
+  copy on a phone, which per-composition overrides cannot say.
+
+Values are stored in the base frame's units (x in view fractions, widths of children in base
+units, ADR 0022), so `resolveView` draws the view at its own width and height.
+
+Measured on the nine fidelity pages (SSIM fold/full, HTML, capture `v4`), tablet: vercel
+0.69/0.89, linear 0.55/0.79, stripe 0.49/0.80, apple 0.93/0.71, framer 0.94/0.74, webflow
+0.96/0.87, tailwind 0.94/0.94, blog 0.92/0.83, feega 0.84/0.87; phone: vercel 0.69/0.84, linear
+0.28/0.68, stripe 0.53/0.55, apple 0.60/0.59, framer 0.82/0.75, webflow 0.80/0.74, tailwind
+0.90/0.90, blog 0.87/0.41, feega 0.70/0.58. The base view keeps its fidelity (every page ≥ 0.95).
+Breakpoints are opt-in for that reason.
+
 ## Not yet
 
-- Tablet/phone captures as breakpoint overrides (ADR 0022).
+- Breakpoint views where the narrower page uses other elements (linear's headline spans, stripe's
+  logo marquee), pictures whose crop changes with the width, components together with
+  breakpoints, phone pages taller than the frame maximum (16,384 px).
 - Image and radial `mask-image`, blend modes on blocks with children (they come in as snapshots).
 
 ## Fidelity

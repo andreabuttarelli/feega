@@ -8,6 +8,7 @@ import { capturedIn, FIDELITY_PAGES } from './fidelity-pages';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
+import { PAGE_VIEWS } from './page-views';
 import { pagePrepared, PLAIN_PLANNER } from './import-url';
 
 const LABEL = process.env.URL_IMPORT_CAPTURE ?? '';
@@ -27,6 +28,8 @@ async function fullShot(page: Page): Promise<Buffer> {
 
 const paintedTexts = (n: RestNode): string[] => (n.collapsed ? [] : [...(n.type === 'TEXT' ? [n.characters ?? ''] : []), ...(n.children ?? []).flatMap(paintedTexts)]);
 
+const VIEWS = process.env.URL_IMPORT_VIEWS ? PAGE_VIEWS : [];
+
 const PAGES = Object.entries(FIDELITY_PAGES).filter(([name]) => !ONLY || ONLY.includes(name));
 
 describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import reads it, and its screenshot', () => {
@@ -44,6 +47,15 @@ describe.runIf(LABEL && process.env.CHROMIUM_PATH)('capture a page as the import
       writeFileSync(join(dir, `${name}.json`), JSON.stringify(tree));
       await tab.reveal(RevealMode.Still);
       writeFileSync(join(dir, `${name}-source.png`), await fullShot(page!));
+
+      for (const view of VIEWS) {
+        const narrow = await open();
+        await narrow.viewport(view.width);
+        await pagePrepared(narrow, new URL(url), SETTLE_MS, PLAIN_PLANNER);
+        writeFileSync(join(dir, `${name}@${view.width}.json`), JSON.stringify(await narrow.tree()));
+        await narrow.reveal(RevealMode.Still);
+        writeFileSync(join(dir, `${name}@${view.width}-source.png`), await fullShot(page!));
+      }
 
       expect(refusal).toBeNull();
       expect(tree.root).toBeDefined();
