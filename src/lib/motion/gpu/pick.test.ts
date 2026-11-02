@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
-import { addClip, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, removeClips, setProps, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+import { wrapInStack } from '../layout/ops';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { compileScene } from './scene';
 import { leafRectsAt, pathRect, pickAt, pickOwnersAt, pickStackAt, quadOf, rectOf } from './pick';
@@ -222,5 +223,17 @@ describe('pickStackAt', () => {
     const apart = shape(stacked, 'far', 0.9, 0.1, 0.05);
 
     expect(pickStackAt(sceneOf(apart), centre(apart, 'a'), 0)).toEqual(['c', 'b', 'a']);
+  });
+});
+
+describe('an element with no area', () => {
+  it('never catches a click away from it', () => {
+    const stacked = must(wrapInStack(shape(shape(empty, 'under', 0.5, 0.5, 0.5), 'kid', 0.3, 0.3, 0.05), ['kid'], 'zero', 'lane'));
+    const filled = must(setProps(stacked, 'zero', { fills: [{ type: 'solid', color: '#ff0000', opacity: 1, visible: true, blend: 'normal' }] }));
+    const doc = must(removeClips(filled, ['kid']));
+    const [x, y] = centre(doc, 'under');
+
+    expect(pickAt(sceneOf(doc), [x + 200, y + 100], 0)).toBe('under');
+    expect(pickStackAt(sceneOf(doc), [x + 200, y + 100], 0)).toEqual(['under']);
   });
 });

@@ -20,7 +20,7 @@
   import { EditMode } from '$lib/motion/edit-mode';
   import { drawStart } from '$lib/motion/draw-create';
   import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
-  import { editsPoints, enterPointEdit, landsOn } from '$lib/motion/shape/vector-edit';
+  import { editsPoints, enterPointEdit, landsOn, pointDraft } from '$lib/motion/shape/vector-edit';
   import type { Pt } from '@feega/motion-core/motion/shape/geometry';
   import { isTyping } from '$lib/motion/shortcuts';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -66,7 +66,9 @@
 
   const only = $derived(picks.length === 1 ? (findClip(doc, picks[0])?.clip ?? null) : null);
   const fit = $derived(containFit(size, { width: doc.width, height: doc.height }));
-  const shown = $derived(shownOverlays({ doc, clip: only, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views, mode, onion: onionSetting.skin }));
+  const drafted = $derived(pointDraft(doc, pointEdit));
+  const pointClip = $derived(pointEdit && only?.id === pointEdit ? (findClip(drafted, pointEdit)?.clip ?? only) : only);
+  const shown = $derived(shownOverlays({ doc, clip: pointClip, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views, mode, onion: onionSetting.skin }));
   const laidOut = $derived(only && shown.has(FrameOverlay.Corners) ? (findClip(withAutoLayout(doc), only.id)?.clip ?? only) : null);
 
   $effect(() => {
@@ -86,22 +88,18 @@
   }
 
   function editPoints(e: Event, clip: NonNullable<typeof only>) {
-    const entered = enterPointEdit(doc, clip);
-    if (!entered.ok) {
+    if (!enterPointEdit(doc, clip).ok) {
       return;
     }
     e.preventDefault();
     e.stopPropagation();
-    if (entered.doc !== doc) {
-      edit(entered.doc, 'Edited the shape as a path');
-    }
     pointEdit = clip.id;
   }
 
   const editable = (e: Event) => (tool === DrawTool.Select && !pointEdit && only && editsPoints(doc, only) && !isTyping(e.target as HTMLElement | null) ? only : null);
 
   function enter(e: KeyboardEvent) {
-    const clip = e.key === 'Enter' ? editable(e) : null;
+    const clip = e.key === 'Enter' && !e.shiftKey ? editable(e) : null;
     if (clip) {
       editPoints(e, clip);
     }
@@ -128,8 +126,8 @@
   {#if shown.has(FrameOverlay.Guides)}<LayoutGuidesOverlay {doc} />{/if}
   {#if shown.has(FrameOverlay.Rulers)}<Rulers {doc} size={{ width: fit.width, height: fit.height }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Mask)}<MaskOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
-  {#if only && shown.has(FrameOverlay.Pen)}<PenOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
-  {#if only && shown.has(FrameOverlay.Vector)}<VectorOverlay {doc} clip={only} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
+  {#if pointClip && shown.has(FrameOverlay.Pen)}<PenOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
+  {#if pointClip && shown.has(FrameOverlay.Vector)}<VectorOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
   {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}

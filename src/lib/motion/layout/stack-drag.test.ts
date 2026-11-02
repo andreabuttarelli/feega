@@ -5,7 +5,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { guessedBoxes } from '../move-element';
 import { setAutoLayout, wrapInStack } from './ops';
-import { StackDrop, dragInStack } from './stack-drag';
+import { StackDrop, dragInStack, dropInStack, followCursor } from './stack-drag';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -23,6 +23,7 @@ const doc = (() => {
   }
   d = must(addClip(d, shape(0.2, 0.8), 'p'));
   d = must(addClip(d, shape(0.5, 0.8), 'q'));
+  d = must(addClip(d, shape(0.9, 0.5), 'free'));
   d = must(wrapInStack(d, ['a', 'b', 'c'], 'row', 'lane-row'));
   d = must(wrapInStack(d, ['p', 'q'], 'col', 'lane-col'));
   return must(setAutoLayout(d, 'col', { direction: Direction.Vertical }));
@@ -62,5 +63,38 @@ describe('dragging a stack child', () => {
     const moved = must(dropped.result);
     expect(findClip(moved, 'a')?.clip.parent).toBeNull();
     expect(dropped.line).toBeNull();
+  });
+});
+
+describe('dragging an element that is not in a stack', () => {
+  it('drops it into the stack under the cursor, at the slot it shows', () => {
+    const [x, y] = centreOf('b');
+    const dropped = dropInStack(doc, 'free', boxes, [x - 1, y]);
+    expect(dropped?.kind).toBe(StackDrop.Join);
+    const moved = must(dropped!.result);
+    expect(findClip(moved, 'free')?.clip.parent).toBe('row');
+    expect(order(moved, 'row')).toEqual(['a', 'free', 'b', 'c']);
+    expect(dropped?.line).not.toBeNull();
+  });
+
+  it('leaves it a plain move when no stack is under the cursor', () => {
+    expect(dropInStack(doc, 'free', boxes, [boxes.free.left + 1, boxes.free.top + 1])).toBeNull();
+  });
+
+  it('never drops a stack into itself', () => {
+    const [x, y] = centreOf('a');
+    expect(dropInStack(doc, 'row', boxes, [x, y])).toBeNull();
+  });
+});
+
+describe('while a stack child is dragged', () => {
+  it('follows the cursor by the distance dragged, its slot held open', () => {
+    const shown = must(followCursor(doc, 'a', [40, 25]));
+    const moved = findClip(shown, 'a')!.clip;
+
+    expect(moved.transform.x).toBeCloseTo(40 / doc.width);
+    expect(moved.transform.y).toBeCloseTo(25 / doc.height);
+    expect(moved.parent).toBe('row');
+    expect(order(shown, 'row')).toEqual(order(doc, 'row'));
   });
 });

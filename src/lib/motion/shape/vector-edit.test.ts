@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setParent } from '$lib/motion/parent-ops';
-import { canEditPoints, editsPoints, enterPointEdit, landsOn, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
+import { canEditPoints, editsPoints, enterPointEdit, pointDraft, landsOn, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -91,5 +91,20 @@ describe('vector edit mode', () => {
 
   it('the reach is a fixed number of screen pixels, whatever the zoom', () => {
     expect(snapReach(1000, 500)).toBe(2 * snapReach(1000, 1000));
+  });
+});
+
+describe('a rectangle in point edit', () => {
+  const rect = withShape('rect');
+
+  it('is edited as a path draft while the doc keeps the rectangle', () => {
+    const draft = pointDraft(rect, 's');
+
+    expect(findClip(draft, 's')!.clip.props.shape).toBe('path');
+    expect(findClip(rect, 's')!.clip.props.shape).toBe('rect');
+  });
+
+  it('shows the doc itself when nothing is in point edit', () => {
+    expect(pointDraft(rect, null)).toBe(rect);
   });
 });

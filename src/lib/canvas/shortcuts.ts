@@ -4,6 +4,7 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { Command, SHORTCUTS, commandFor } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
+import { EditMode } from '$lib/motion/edit-mode';
 
 export const NUDGE_STEP = 1;
 export const NUDGE_STEP_BIG = 10;
@@ -97,8 +98,8 @@ function codeModeFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }) === Command.ToggleDevMode;
 }
 
-function toolFor(e: KeyboardEvent): DrawTool | null {
-  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
+function toolFor(e: KeyboardEvent, mode: EditMode = EditMode.Motion): DrawTool | null {
+  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey }, mode);
   return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
 }
 
@@ -220,7 +221,7 @@ function isControl(target: EventTarget | null): boolean {
 
 const ownsKey = (e: KeyboardEvent): boolean => isTypingTarget(e.target) || (ACTIVATION_KEYS.has(e.key) && isControl(e.target));
 
-export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
+export function matchCanvasShortcut(e: KeyboardEvent, mode: EditMode = EditMode.Motion): CanvasCommand | null {
   if (e.altKey) return altCommand(e);
 
   if (ownsKey(e)) return null;
@@ -251,7 +252,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (editModeFor(e)) return { id: 'edit-mode' };
   if (sectionFor(e)) return { id: 'section' };
 
-  const tool = toolFor(e);
+  const tool = toolFor(e, mode);
   if (tool) return { id: 'tool', tool };
 
   if (key === 'Backspace' || key === 'Delete') return { id: 'delete' };
@@ -278,6 +279,10 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
 
   return null;
 }
+
+const selectsParent = (e: KeyboardEvent): boolean => !isTypingTarget(e.target) && commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }) === Command.SelectParent;
+
+export const climbsUp = (e: KeyboardEvent): boolean => e.key === 'Escape' || selectsParent(e);
 
 export function preventable(c: CanvasCommand): boolean {
   return c.id !== 'deselect';

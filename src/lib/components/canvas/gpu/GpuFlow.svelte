@@ -84,7 +84,7 @@
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { Press, Reach, Root, childBelow, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
-  import { pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
+  import { clickPick, pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
@@ -101,7 +101,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { stackPlaced } from '$lib/motion/layout/ops';
-  import { dragInStack, type DropLine } from '$lib/motion/layout/stack-drag';
+  import { dragInStack, dropInStack, followCursor, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
@@ -182,7 +182,7 @@
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
-  import { CANVAS_COMMAND_OF, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import { CANVAS_COMMAND_OF, climbsUp, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Command } from '$lib/motion/shortcuts';
   import { HTML_MIME, Pasted, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
   import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
@@ -1103,7 +1103,7 @@
   }
 
   function hoverElement(w: Point, reach: Reach) {
-    const hit = elementAt(w, reach);
+    const hit = elementAt(w, reach, clickPick);
     const quad = hit ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
     pickHover = hit && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id, highlight: highlightOf(liveOf(hit.nodeId)!.doc, hit.clip) } : null;
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
@@ -1218,7 +1218,7 @@
       return false;
     }
     if (hit.clip) {
-      pickMany(hit.nodeId, toggleId(picks, hit.clip));
+      pickMany(hit.nodeId, toggleId(picks, elementAt(w, Reach.Top)?.clip ?? hit.clip));
       return true;
     }
     const clips = liveOf(hit.nodeId)?.doc.tracks.flatMap((t) => t.clips.map((c) => c.id)) ?? [];
@@ -1245,13 +1245,13 @@
     return true;
   }
 
-  function elementAt(w: Point, reach: Reach) {
+  function elementAt(w: Point, reach: Reach, choose: typeof pickTarget = pickTarget) {
     const hit = framePickAt(w);
     const doc = hit?.clip && !frameChrome(kindOfNode(hit.nodeId)).dragsHost ? liveOf(hit.nodeId)?.doc : null;
     if (!hit?.clip || !doc) {
       return null;
     }
-    const clip = pickTarget(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
+    const clip = choose(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
     return clip ? { ...hit, clip } : null;
   }
 
@@ -2208,6 +2208,18 @@
     gesturing = true;
   }
 
+  function pickOnRelease(nodeId: string, grip: Grip, e: PointerEvent) {
+    const w = toWorld(view, local(e));
+    const hit = grip === Grip.Move ? (e.shiftKey ? elementAt(w, Reach.Top) : elementAt(w, Reach.Top, clickPick)) : null;
+    if (hit?.nodeId !== nodeId) {
+      return;
+    }
+    const next = e.shiftKey ? toggleId(picks, hit.clip) : [hit.clip];
+    if (next.join() !== picks.join()) {
+      pickMany(nodeId, next);
+    }
+  }
+
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
     if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
       resizeHost(nodeId, handle, e);
@@ -2257,6 +2269,7 @@
 
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
     const stackChild = grip === Grip.Move && inScope.ids.length === 1 && stackPlaced(inScope.view, inScope.ids[0]) ? inScope.ids[0] : null;
+    const joinable = grip === Grip.Move && inScope.ids.length === 1 && !stackChild;
 
     const leaving = (ev: PointerEvent, now: Carry): ElementOut | null => {
       const [clipId] = inScope.ids;
@@ -2280,16 +2293,23 @@
         carried = !!out;
       }
       if (stackChild) {
-        const dropped = dragInStack(inScope.view, stackChild, boxes, framePt(ev));
+        const to = framePt(ev);
+        const dropped = dragInStack(inScope.view, stackChild, boxes, to);
         result = dropped.result.ok ? { ok: true, doc: lifted(inScope.merge(dropped.result.doc)) } : dropped.result;
         frameGuides = { nodeId, guides: [], gaps: [], drop: dropped.line };
+        const followed = followCursor(inScope.view, stackChild, [to[0] - from[0], to[1] - from[1]]);
+        if (followed.ok) {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(followed.doc)) });
+        }
         return;
       }
       const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
-      result = dragged.result.ok ? { ok: true, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
-      frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
-      if (result.ok) {
-        liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: result.doc });
+      const shown = dragged.result.ok ? { ok: true as const, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
+      const into = joinable ? dropInStack(inScope.view, inScope.ids[0], boxes, framePt(ev)) : null;
+      result = into?.result.ok ? { ok: true, doc: lifted(inScope.merge(into.result.doc)) } : shown;
+      frameGuides = into?.result.ok ? { nodeId, guides: [], gaps: [], drop: into.line } : { nodeId, guides: dragged.guides, gaps: dragged.gaps };
+      if (shown.ok) {
+        liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: shown.doc });
       }
     };
     const up = (ev: PointerEvent) => {
@@ -2297,6 +2317,7 @@
       window.removeEventListener('pointerup', up);
       frameGuides = null;
       if (!started) {
+        pickOnRelease(nodeId, grip, ev);
         return;
       }
       const out = leaving(ev, carry(ev));
@@ -2305,9 +2326,11 @@
         props.onElementOut?.(nodeId, out, DragPhase.Drop);
         return;
       }
-      if (result?.ok) {
-        commit(nodeId, result, GRIP_SUMMARY[grip]);
+      if (!result?.ok) {
+        liveDocs.set(nodeId, at.live);
+        return;
       }
+      commit(nodeId, result, GRIP_SUMMARY[grip]);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -3116,12 +3139,13 @@
       endCrop(e.key === 'Enter');
       return;
     }
-    const group = e.key === 'Escape' && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
+    const up = climbsUp(e);
+    const group = up && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
     if (inside && group) {
       pickMany(inside.nodeId, [group]);
       return;
     }
-    if (e.key === 'Escape' && inside?.level.clip) {
+    if (up && inside?.level.clip) {
       goInside(inside.nodeId, Gesture.Leave, null);
       return;
     }
@@ -3147,7 +3171,7 @@
       void runFrameAction(frameAction);
       return;
     }
-    const command = matchCanvasShortcut(e);
+    const command = matchCanvasShortcut(e, frameMode);
     if (!command) {
       return;
     }
@@ -3785,7 +3809,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && !inside}
+  {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}

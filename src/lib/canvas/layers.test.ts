@@ -2,12 +2,13 @@ import { withSurface } from '@feega/motion-core/motion/surface';
 import { describe, expect, it } from 'vitest';
 import { layerMenuActions } from './frame-inspector';
 import { wrapInStack } from '$lib/motion/layout/ops';
+import { setParent } from '$lib/motion/parent-ops';
 import { LayoutKind } from '@feega/motion-core/motion/layout/stack';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { findClip } from '@feega/motion-core/motion/doc';
-import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -708,5 +709,42 @@ describe('dropping a layer onto a stack child', () => {
 
     expect(findClip(doc, 'loose')!.clip.parent).toBe('box');
     expect(orderOf(doc)).toEqual(['a', 'b', 'loose', 'c']);
+  });
+});
+
+describe('dropping a layer on a container row', () => {
+  const stacked = (() => {
+    let doc = newMotionDoc(MotionFormat.Square);
+    for (const [id, x] of [['a', 0.2], ['b', 0.5]] as const) {
+      doc = ok(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } }, id));
+    }
+    doc = ok(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.9, width: 0.1, height: 0.1 } }, 'loose'));
+    return ok(wrapInStack(doc, ['a', 'b'], 'box', 'lane'));
+  })();
+  const rowOf = (doc: MotionDoc, id: string) => frameRows(doc, 'n').find((r) => r.id === id)!;
+
+  it('the middle of a stack row drops inside it, its edges beside it', () => {
+    expect(rowDrop(rowOf(stacked, 'box'), 0.5)).toBe(Place.Into);
+    expect(rowDrop(rowOf(stacked, 'box'), 0.1)).toBe(Place.Above);
+    expect(rowDrop(rowOf(stacked, 'box'), 0.9)).toBe(Place.Below);
+  });
+
+  it('a leaf row still has only above and below', () => {
+    expect(rowDrop(rowOf(stacked, 'loose'), 0.5)).toBe(Place.Below);
+  });
+
+  it('dropped inside a stack, a layer joins it at the end', () => {
+    const doc = ok(dropLayer(stacked, 'loose', 'box', Place.Into));
+
+    expect(findClip(doc, 'loose')!.clip.parent).toBe('box');
+    expect(findClip(doc, 'box')!.clip.autoLayout!.order).toEqual(['a', 'b', 'loose']);
+  });
+
+  it('dropped inside a container that is not a stack, a layer becomes its child', () => {
+    const carded = ok(addClip(ok(addClip(stacked, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.4, height: 0.4 } }, 'card')), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.1 } }, 'dot'));
+    const framed = ok(setParent(carded, 'dot', 'card'));
+    expect(rowDrop(rowOf(framed, 'card'), 0.5)).toBe(Place.Into);
+
+    expect(findClip(ok(dropLayer(framed, 'loose', 'card', Place.Into)), 'loose')!.clip.parent).toBe('card');
   });
 });

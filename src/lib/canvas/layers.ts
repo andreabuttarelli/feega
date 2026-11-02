@@ -12,11 +12,12 @@ import { TrackKind } from '@feega/motion-core/motion/components';
 import { joinMask, leaveMask, maskMembers, maskOf } from '$lib/motion/mask-group';
 import { NODE_KIND_LABEL } from './node-label';
 import { elementName } from '$lib/motion/element-name';
-import { layoutKind } from '@feega/motion-core/motion/layout/stack';
+import { LayoutKind, layoutKind } from '@feega/motion-core/motion/layout/stack';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import type { NodeType } from './node-data';
 import { drawClip } from '$lib/motion/draw-create';
-import { layoutParent } from '$lib/motion/layout/ops';
+import { layoutParent, leaveStack } from '$lib/motion/layout/ops';
+import { setParent } from '$lib/motion/parent-ops';
 import { placeInStack } from '$lib/motion/layout/stack-drag';
 import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
 
@@ -336,6 +337,28 @@ const DROP: Record<LayerKind, (at: number) => Place> = {
 
 export const dropPlace = (kind: LayerKind, at: number): Place => DROP[kind](at);
 
+type DropRow = { kind: LayerKind; type: string; foldable?: boolean };
+
+const LAYOUT_TYPES: ReadonlySet<string> = new Set(Object.values(LayoutKind));
+
+const holdsLayers = (row: DropRow): boolean => row.kind === LayerKind.Clip && (LAYOUT_TYPES.has(row.type) || !!row.foldable);
+
+export const rowDrop = (row: DropRow, at: number): Place => (holdsLayers(row) ? GROUP_DROP(at) : dropPlace(row.kind, at));
+
+function intoContainer(doc: MotionDoc, dragged: string, target: string): OpResult | null {
+  const container = findClip(doc, target)?.clip as MotionClip | undefined;
+  const moving = findClip(doc, dragged)?.clip as MotionClip | undefined;
+  if (!container || !moving || dragged === target) {
+    return null;
+  }
+  if (container.autoLayout) {
+    const count = childrenInOrder(doc.tracks.flatMap((t) => t.clips as MotionClip[]), container as MotionClip & { autoLayout: AutoLayout }).filter((c) => c.id !== dragged).length;
+    return placeInStack(doc, dragged, container as MotionClip & { autoLayout: AutoLayout }, count);
+  }
+  const left = layoutParent(doc, moving) ? leaveStack(doc, dragged) : { ok: true as const, doc };
+  return left.ok ? setParent(left.doc, dragged, target) : left;
+}
+
 function intoStack(doc: MotionDoc, dragged: string, target: string, place: Place): OpResult | null {
   const clip = findClip(doc, target)?.clip as MotionClip | undefined;
   const stack = clip && place !== Place.Into ? layoutParent(doc, clip) : null;
@@ -352,6 +375,10 @@ export function dropLayer(doc: MotionDoc, dragged: string, target: string, place
     return stacked;
   }
   const into = place === Place.Into && maskMembers(doc).has(target);
+  const contained = place === Place.Into && !into ? intoContainer(doc, dragged, target) : null;
+  if (contained) {
+    return contained;
+  }
   const moved = restack(doc, dragged, target, into ? Place.Above : place, newId);
   if (!moved.ok) {
     return moved;

@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { groupClips } from '$lib/motion/group';
+import { wrapInStack } from '$lib/motion/layout/ops';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { landingDoc } from '@feega/motion-core/motion/codegen/fixtures/landing';
 import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { withSurface } from '@feega/motion-core/motion/surface';
 import { framePicker } from './frame-pick';
 import { Reach, childBelow } from './frame-select';
-import { parentPick, pickTarget, reachOf } from './frame-scope';
+import { clickPick, parentPick, pickTarget, reachOf } from './frame-scope';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -100,6 +101,28 @@ describe('a frame whose only layer is a full-frame page', () => {
   it('Esc climbs to the container, and from a section to the frame', () => {
     expect(parentPick(doc, 'hero-actions')).toBe('hero');
     expect(parentPick(doc, 'hero')).toBeNull();
+  });
+});
+
+describe('clickPick: a click within the picked container', () => {
+  const t = nested();
+  const overText = [t.section, t.card, t.text];
+
+  it.each([
+    ['section picked: its direct child under the pointer', overText, [t.section], Reach.Top, t.card],
+    ['card picked: its direct child under the pointer', overText, [t.card], Reach.Top, t.text],
+    ['a leaf picked: its sibling, as before', [t.section, t.card, t.label], [t.text], Reach.Top, t.label],
+    ['nothing picked: the frame child, as before', overText, [], Reach.Top, t.section],
+    ['deep: the deepest element', overText, [t.section], Reach.Deep, t.text]
+  ])('%s', (_name, chain, picks, reach, expected) => {
+    expect(clickPick(t.doc, chain, picks, reach)).toBe(expected);
+  });
+
+  it('a stack picked: the child under the pointer, by parent link', () => {
+    let doc = shape(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2), 'b', 0.4);
+    doc = must(wrapInStack(doc, ['a', 'b'], 'row', 'lane'));
+
+    expect(clickPick(doc, ['b'], ['row'], Reach.Top)).toBe('b');
   });
 });
 

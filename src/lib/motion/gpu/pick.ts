@@ -15,9 +15,13 @@ function inside(quad: Quad, [x, y]: Point): boolean {
   return !turns.some((s) => s > 0) || !turns.some((s) => s < 0);
 }
 
+const doubleArea = (quad: Quad): number => SIDES.reduce<number>((sum, i) => sum + quad[i][0] * quad[(i + 1) % SIDES.length][1] - quad[(i + 1) % SIDES.length][0] * quad[i][1], 0);
+
+const covers = (quad: Quad, p: Point): boolean => doubleArea(quad) !== 0 && inside(quad, p);
+
 const pickable = (d: Drawn) => (d.paint.kind !== PaintKind.Html || d.layer.bounds !== undefined) && d.opacity > 0;
 
-const holds = (d: Drawn, p: Point) => inside(d.quad, p) && d.clips.every((c) => inside(c, p));
+const holds = (d: Drawn, p: Point) => covers(d.quad, p) && d.clips.every((c) => covers(c, p));
 
 const holding = (scene: Scene, point: Point, time: number) => placedAt(scene, time).filter(pickable).filter((d) => holds(d, point));
 
