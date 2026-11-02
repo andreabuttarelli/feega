@@ -76,14 +76,15 @@
   const rotation = $derived((host?.box.rotation ?? 0) + own);
   const scale = $derived({ x: space.width / doc.width, y: space.height / doc.height });
   const seat = $derived(host ? { x: host.box.x, y: host.box.y } : { x: 0, y: 0 });
-  const shownX = $derived(Math.round(seat.x + (box.left - origin.left) * scale.x));
-  const shownY = $derived(Math.round(seat.y + (box.top - origin.top) * scale.y));
+  const offset = $derived({ x: (clip.transform.x ?? 0) * doc.width, y: (clip.transform.y ?? 0) * doc.height });
+  const shownX = $derived(Math.round(seat.x + (box.left + offset.x - origin.left) * scale.x));
+  const shownY = $derived(Math.round(seat.y + (box.top + offset.y - origin.top) * scale.y));
   const hostEdit = liveEdits<() => void>({ show: () => {}, record: (run) => run() });
   const gesture = $derived(host ? hostEdit : null);
 
   const rotate = (degrees: number) => (host ? hostEdit.edit(() => host.turn(degrees - own), 'Rotated the element') : onchange(setTransform(doc, clip.id, { rotateZ: degrees }), 'Rotated the layer'));
-  const moveX = (x: number) => (host ? hostEdit.edit(() => host.move(host.box.x + x - shownX, host.box.y), 'Moved horizontally') : onchange(placeLayer(doc, clip.id, { x: ((x - seat.x) / scale.x + origin.left + box.width / 2) / doc.width }), 'Moved horizontally'));
-  const moveY = (y: number) => (host ? hostEdit.edit(() => host.move(host.box.x, host.box.y + y - shownY), 'Moved vertically') : onchange(placeLayer(doc, clip.id, { y: ((y - seat.y) / scale.y + origin.top + box.height / 2) / doc.height }), 'Moved vertically'));
+  const moveX = (x: number) => (host ? hostEdit.edit(() => host.move(host.box.x + x - shownX, host.box.y), 'Moved horizontally') : onchange(placeLayer(doc, clip.id, { x: ((x - seat.x) / scale.x + origin.left - offset.x + box.width / 2) / doc.width }), 'Moved horizontally'));
+  const moveY = (y: number) => (host ? hostEdit.edit(() => host.move(host.box.x, host.box.y + y - shownY), 'Moved vertically') : onchange(placeLayer(doc, clip.id, { y: ((y - seat.y) / scale.y + origin.top - offset.y + box.height / 2) / doc.height }), 'Moved vertically'));
   const pinH = (h: Horizontal) => onchange(setConstraints(doc, [clip.id], { horizontal: h }), 'Changed the horizontal constraint');
   const pinV = (v: Vertical) => onchange(setConstraints(doc, [clip.id], { vertical: v }), 'Changed the vertical constraint');
   const tickH = (side: Side, e: MouseEvent) => pinH(toggleHorizontal(horizontal, side, e.shiftKey ? Toggle.Both : Toggle.One));

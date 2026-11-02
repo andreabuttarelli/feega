@@ -47,6 +47,19 @@ const hosted = (box = { x: 30, y: 40, w: 200, h: 120, rotation: 90 }) => {
   return body;
 };
 
+describe('a layer aligned in its frame', () => {
+  it('reads X where align put it, offset included', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 }, transform: { x: 0.1 } }, 'a'));
+    const session = new FrameEditSession(
+      { head: { version: 1, doc }, selection: ['a'] },
+      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    );
+    const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
+
+    expect(valueOf(body, 'data-testid="position-x"')).toBe(String(Math.round(0.4 * doc.width + 0.1 * doc.width)));
+  });
+});
+
 describe('a free element reads as one object on the canvas', () => {
   it('its rotation is the node rotation, not the upright root inside its doc', () => {
     expect(valueOf(hosted(), 'data-testid="rotation-field"')).toBe('90');
