@@ -244,6 +244,27 @@ describe('undo action: returns the redo gesture, with the version undo left behi
   });
 });
 
+describe('redo of a node only known by its position', () => {
+  it('brings the row back without blanking its size or its data', async () => {
+    const input = event(
+      { items: JSON.stringify([{ kind: 'node.delete', nodeId: NODE, before: { position: { x: 10, y: 20, z: 0 } } }]) },
+      {
+        nodes: [
+          { id: NODE, canvas_id: 'canvas', project_id: 'project', type: 'element', display_name: 'Stack', x: 10, y: 20, z: 0, width: 300, height: 80, data: { kind: 'element' }, version: 1, deleted_at: '2026-11-02T00:00:00Z' }
+        ]
+      }
+    );
+
+    expect(await actions.undo(input as never)).toMatchObject({ outcome: 'undone' });
+
+    const update = input.calls.find((c) => c.table === 'nodes' && c.op === 'update')?.payload as Record<string, unknown>;
+    expect(update).toMatchObject({ deleted_at: null, x: 10, y: 20 });
+    expect(update).not.toHaveProperty('width');
+    expect(update).not.toHaveProperty('height');
+    expect(update).not.toHaveProperty('data');
+  });
+});
+
 describe('undo action: edge.create/edge.delete', () => {
   it('deletes the edge a connect gesture made', async () => {
     const input = event(

@@ -26,6 +26,7 @@ import {
   listConnections,
   listNodes,
   moveNode,
+  nodeRowExists,
   setConnectionMode,
   patchNodeData,
   DataCheck,
@@ -168,6 +169,13 @@ function canvasFrames(scope: Scope) {
 
 function canvasMembers(scope: Scope) {
   return nodeMembers(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope) });
+}
+
+async function madeBefore(scope: Scope, id: string | undefined): Promise<Moved | null> {
+  if (!id || !(await nodeRowExists(scope.db, { orgId: scope.orgId, nodeId: id }))) {
+    return null;
+  }
+  return { outcome: MoveOutcome.Done, frameId: id, clipId: '', created: false, versions: {}, undo: [] };
 }
 
 function movedAnswer(moved: Moved) {
@@ -1438,7 +1446,7 @@ export const actions: Actions<CanvasParams> = {
     if (!ask.success) {
       return fail(400, { error: 'invalid group' });
     }
-    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
+    return movedAnswer((await madeBefore(scope, ask.data.id)) ?? (await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id)));
   },
 
   stackElements: async ({ request, params, locals }) => {
@@ -1448,7 +1456,7 @@ export const actions: Actions<CanvasParams> = {
     if (!ask.success) {
       return fail(400, { error: 'invalid stack' });
     }
-    return movedAnswer(await stackElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
+    return movedAnswer((await madeBefore(scope, ask.data.id)) ?? (await stackElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id)));
   },
 
   wrapSection: async ({ request, params, locals }) => {

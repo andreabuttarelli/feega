@@ -6,7 +6,7 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 type Point = { x: number; y: number };
-type DrawnClip = { component: string; props: Record<string, unknown> };
+type DrawnClip = { component: string; props: Record<string, unknown>; autoLayout?: unknown };
 type ToFlow = (screen: Point) => Point;
 
 const TOOL_OF_CLIP: Record<string, DrawTool> = {
@@ -18,7 +18,7 @@ const TOOL_OF_CLIP: Record<string, DrawTool> = {
   'Shape:path': DrawTool.Pen
 };
 
-const toolOf = (clip: DrawnClip): DrawTool | undefined => TOOL_OF_CLIP[clip.component] ?? TOOL_OF_CLIP[`${clip.component}:${String(clip.props.shape)}`];
+const toolOf = (clip: DrawnClip): DrawTool | undefined => (clip.autoLayout ? DrawTool.Stack : (TOOL_OF_CLIP[clip.component] ?? TOOL_OF_CLIP[`${clip.component}:${String(clip.props.shape)}`]));
 
 const SOLID = 'solid';
 const NO_FILL = 'none';

@@ -5,11 +5,12 @@ import { setKeyframes } from '@feega/motion-core/motion/timeline';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { setClipFlags } from '@feega/motion-core/motion/organize';
-import { Grip, aabb, handlesOf, quadOf, type Bounds } from '$lib/motion/scene-select';
+import { Grip, aabb, handlesOf, quadOf, type Bounds, type Pt } from '$lib/motion/scene-select';
 import { guessedBoxes } from '$lib/motion/move-element';
 import { transformAt } from '@feega/motion-core/motion/parent';
 import { GuideAlign, GuideKind, newGuide, setLayoutGuides } from '$lib/motion/layout-guides/guides';
 import { wrapInStack } from '$lib/motion/layout/ops';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { SnapMode, dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
 
 const must = (r: OpResult): MotionDoc => {
@@ -243,5 +244,38 @@ describe('arrow keys on a stack child', () => {
 
   it('do nothing across the stack', () => {
     expect(nudgeClips(stacked, ['card'], 0, [0, 1], EditMode.Design).ok).toBe(false);
+  });
+});
+
+describe('resizing a Hug stack in a frame', () => {
+  const stacked = must(wrapInStack(DOC, ['card', 'side'], 'row', 'lane'));
+  const boxes = guessedBoxes(stacked);
+  const RIGHT_EDGE = 7;
+  const laidRow = (doc: MotionDoc) => findClip(withAutoLayout(doc), 'row')!.clip;
+  const resize = (handle: number, by: Pt) => {
+    const b = boxes.row;
+    const { at } = handlesOf([[b.left, b.top], [b.left + b.width, b.top], [b.left + b.width, b.top + b.height], [b.left, b.top + b.height]])[handle];
+    return must(dragClips({ doc: stacked, ids: ['row'], frame: 0, boxes, grip: Grip.Scale, handle, from: at, to: [at[0] + by[0], at[1] + by[1]], keys: NO_KEYS, reach: 0, snap: SnapMode.Off, mode: EditMode.Design }).result);
+  };
+
+  it('an edge drag makes it wider and Fixed, children untouched', () => {
+    const next = resize(RIGHT_EDGE, [192, 0]);
+
+    const row = findClip(next, 'row')!.clip;
+    expect(row.layoutItem).toMatchObject({ width: 'fixed', height: 'hug' });
+    const laid = laidRow(next).props as { x: number; width: number };
+    expect(laid.width * next.width).toBeCloseTo(boxes.row.width + 192, 0);
+    expect(laid.x * next.width - (laid.width * next.width) / 2).toBeCloseTo(boxes.row.left, 0);
+    expect(findClip(next, 'card')!.clip.props.width).toBe(findClip(stacked, 'card')!.clip.props.width);
+  });
+
+  it('a corner drag sizes it, never scales it', () => {
+    const next = resize(CORNER_BOTTOM_RIGHT, [192, 108]);
+
+    const row = findClip(next, 'row')!.clip;
+    expect(row.transform.scaleX ?? 1).toBe(1);
+    expect(row.transform.scaleY ?? 1).toBe(1);
+    expect(row.layoutItem).toMatchObject({ width: 'fixed', height: 'fixed' });
+    expect((laidRow(next).props.height as number) * next.height).toBeCloseTo(boxes.row.height + 108, 0);
   });
 });

@@ -694,8 +694,8 @@ export async function restoreNode(
     orgId: string;
     nodeId: string;
     position: { x: number; y: number; z: number };
-    size: { width: number | null; height: number | null };
-    data: Record<string, unknown>;
+    size?: { width: number | null; height: number | null };
+    data?: Record<string, unknown>;
     actor?: Actor;
   }
 ): Promise<CanvasNodeRecord | null> {
@@ -704,9 +704,8 @@ export async function restoreNode(
     x: input.position.x,
     y: input.position.y,
     z: input.position.z,
-    width: input.size.width,
-    height: input.size.height,
-    data: input.data,
+    ...(input.size ? { width: input.size.width, height: input.size.height } : {}),
+    ...(input.data ? { data: input.data } : {}),
     ...actorCols(input.actor),
     updated_at: new Date().toISOString()
   } as NodeUpdate;

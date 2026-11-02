@@ -33,13 +33,13 @@ describe('drawing a frame inside a frame', () => {
 });
 
 describe('drawing a stack', () => {
-  it('is an empty vertical auto layout, 8 apart, 16 padded, hugging, with no paint', () => {
+  it('is an empty vertical auto layout, 8 apart, 16 padded, the size it was drawn, with no paint', () => {
     const clip = findClip(ok(drawClip(video(), DrawTool.Stack, BOX, 0, 's1')), 's1')!.clip;
 
     expect(clip.component).toBe('Shape');
     expect(clip.props).toMatchObject({ shape: 'rect', fill: 'transparent', ...BOX });
     expect(clip.autoLayout).toMatchObject({ direction: 'vertical', gap: 8, padding: { top: 16, right: 16, bottom: 16, left: 16 }, order: [] });
-    expect(clip.layoutItem).toMatchObject({ width: 'hug', height: 'hug' });
+    expect(clip.layoutItem).toMatchObject({ width: 'fixed', height: 'fixed' });
   });
 
   it('stands alone on the canvas as an element', () => {

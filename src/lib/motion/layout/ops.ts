@@ -10,6 +10,7 @@ import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layo
 import { childrenInOrder, shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
+import { flowOf } from './flow';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -182,14 +183,8 @@ export function leaveStack(doc: MotionDoc, clipId: string): OpResult {
 type Placed = { clip: MotionClip; trackIndex: number; box: { left: number; top: number; width: number; height: number } };
 
 function guessFlow(placed: Placed[]): Pick<AutoLayout, 'direction' | 'gap' | 'order'> {
-  const centre = (p: Placed, axis: 'left' | 'top') => p.box[axis] + (axis === 'left' ? p.box.width : p.box.height) / 2;
-  const spread = (axis: 'left' | 'top') => Math.max(...placed.map((p) => centre(p, axis))) - Math.min(...placed.map((p) => centre(p, axis)));
-  const direction = spread('left') >= spread('top') ? Direction.Horizontal : Direction.Vertical;
-  const [start, length] = direction === Direction.Horizontal ? (['left', 'width'] as const) : (['top', 'height'] as const);
-  const sorted = [...placed].sort((a, b) => a.box[start] - b.box[start]);
-  const spaces = sorted.slice(1).map((p, i) => p.box[start] - (sorted[i].box[start] + sorted[i].box[length]));
-  const gap = spaces.length ? Math.max(0, spaces.reduce((a, b) => a + b, 0) / spaces.length) : 0;
-  return { direction, gap: roundPx(gap), order: sorted.map((p) => p.clip.id) };
+  const { direction, gap, order } = flowOf(placed.map((p) => p.box));
+  return { direction, gap: roundPx(gap), order: order.map((i) => placed[i].clip.id) };
 }
 
 function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string): MotionDoc {
@@ -362,4 +357,25 @@ export function reordered(doc: MotionDoc, parentId: string | null, stackId: stri
   const rest = ids.filter((id) => !kids.includes(id));
   const at = rest.indexOf(stackId);
   return setAutoLayout(doc, parent.id, { order: [...rest.slice(0, at), ...kids, ...rest.slice(at + 1)] });
+}
+
+const UNCHANGED = 1e-6;
+
+export function sizeStackAround(doc: MotionDoc, stackId: string, anchor: readonly [number, number], fx: number, fy: number): OpResult {
+  const laid = laidClip(doc, stackId);
+  if (!laid?.autoLayout || !hasBox(laid)) {
+    return fail(`${stackId} is not a stack`);
+  }
+  const box = pivotBox(laid.props, { width: doc.width, height: doc.height });
+  const left = anchor[0] + (box.left - anchor[0]) * fx;
+  const top = anchor[1] + (box.top - anchor[1]) * fy;
+  const width = Math.abs(box.width * fx);
+  const height = Math.abs(box.height * fy);
+  const item = laid.layoutItem ?? DEFAULT_LAYOUT_ITEM;
+  const fixed = (axis: 'width' | 'height', f: number) => (Math.abs(f - 1) > UNCHANGED && item[axis] === Sizing.Hug ? { [axis]: Sizing.Fixed } : {});
+  const sized = withClip(doc, stackId, (c) => ({
+    ...c,
+    props: { ...c.props, x: (Math.min(left, left + box.width * fx) + width / 2) / doc.width, y: (Math.min(top, top + box.height * fy) + height / 2) / doc.height, width: width / doc.width, height: height / doc.height }
+  }));
+  return setLayoutItem(sized, stackId, { ...fixed('width', fx), ...fixed('height', fy) });
 }

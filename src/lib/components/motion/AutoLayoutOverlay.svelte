@@ -26,7 +26,23 @@
   const strips = $derived(layoutStrips(shown, clip.id));
   const layout = $derived(live ? { ...clip.autoLayout, ...live } : clip.autoLayout);
 
-  const place = (b: Box) => `left: ${(b.left / doc.width) * 100}%; top: ${(b.top / doc.height) * 100}%; width: ${(b.width / doc.width) * 100}%; height: ${(b.height / doc.height) * 100}%;`;
+  type Anchor = { x: 'left' | 'right'; y: 'top' | 'bottom'; inset: 'x' | 'y' | null };
+
+  const ANCHORS: Record<string, Anchor> = {
+    gap: { x: 'left', y: 'top', inset: null },
+    left: { x: 'left', y: 'top', inset: 'x' },
+    right: { x: 'right', y: 'top', inset: 'x' },
+    top: { x: 'left', y: 'top', inset: 'y' },
+    bottom: { x: 'left', y: 'bottom', inset: 'y' }
+  };
+
+  const percent = (part: number, whole: number) => `${(part / whole) * 100}%`;
+
+  function place(b: Box, anchor: Anchor) {
+    const x = anchor.x === 'left' ? b.left : doc.width - b.left - b.width;
+    const y = anchor.y === 'top' ? b.top : doc.height - b.top - b.height;
+    return `${anchor.x}: ${percent(x, doc.width)}; ${anchor.y}: ${percent(y, doc.height)}; width: ${percent(b.width, doc.width)}; height: ${percent(b.height, doc.height)};`;
+  }
   const valueOf = (strip: Strip) => (strip.kind === StripKind.Gap ? layout.gap : layout.padding[strip.side]);
   const keyOf = (strip: Strip) => (strip.kind === StripKind.Gap ? 'gap' : strip.side);
   const nameOf = (strip: Strip) => (strip.kind === StripKind.Gap ? 'gap' : `${strip.side} padding`);
@@ -67,7 +83,8 @@
 
 <div class="overlay" bind:this={host} data-testid="auto-layout-overlay" role="presentation">
   {#each strips as strip, i (i)}
-    <div class="band" class:active={grab && keyOf(grab.strip) === keyOf(strip)} data-band={keyOf(strip)} style={place(strip.box)}>
+    {@const anchor = ANCHORS[keyOf(strip)]}
+    <div class="band" class:active={grab && keyOf(grab.strip) === keyOf(strip)} data-band={keyOf(strip)} data-inset={anchor.inset} style={place(strip.box, anchor)}>
       <button
         type="button"
         class="handle"
@@ -97,6 +114,14 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
+  }
+
+  .band[data-inset='x'] {
+    min-width: 16px;
+  }
+
+  .band[data-inset='y'] {
+    min-height: 16px;
   }
 
   .band:has(.handle:hover),

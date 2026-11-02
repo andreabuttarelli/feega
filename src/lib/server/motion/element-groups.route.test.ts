@@ -5,6 +5,8 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { drawnElement, type CanvasBox } from '$lib/motion/draw-create';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { pivotBox } from '@feega/motion-core/motion/parent';
 
 const A = '44444444-4444-4444-4444-444444444444';
 const B = '55555555-5555-4555-8555-555555555555';
@@ -177,5 +179,109 @@ describe('wrapping free elements with a stack', () => {
     const input = event({ ids: JSON.stringify([FRAME]) }, { nodes: [frame], motion_revisions: [revisionRow(FRAME, box('f', AT_A))] });
 
     expect(await actions.stackElements(input as never)).not.toMatchObject({ outcome: 'done' });
+  });
+
+  it('a stack sent again with an id that already exists inserts nothing and removes nothing', async () => {
+    const id = '88888888-8888-4888-8888-888888888888';
+    const rows = two();
+    const input = event({ ids: JSON.stringify([A, B]), node_id: id }, { ...rows, nodes: [...rows.nodes, { ...elementRow(id, AT_A), display_name: 'Stack', deleted_at: '2026-11-02T00:00:00Z' }] });
+
+    const result = await actions.stackElements(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: id, created: false, undo: [] });
+    expect(inserted(input)).toEqual([]);
+    expect(deletedIds(input)).toEqual([]);
+  });
+});
+
+describe('wrapping free elements with a stack, as they are laid out', () => {
+  const C = '12121212-1212-4212-8212-121212121212';
+  const D = '13131313-1313-4313-8313-131313131313';
+  const S1 = '14141414-1414-4414-8414-141414141414';
+  const S2 = '15151515-1515-4515-8515-151515151515';
+
+  const rects = (at: Record<string, CanvasBox>) => ({
+    nodes: Object.entries(at).map(([id, b]) => elementRow(id, b)),
+    motion_revisions: Object.entries(at).map(([id, b]) => revisionRow(id, box(`clip-${id.slice(0, 2)}`, b)))
+  });
+
+  async function wrap(rows: Record<string, unknown[]>, ids: string[], id: string) {
+    const input = event({ ids: JSON.stringify(ids), node_id: id }, rows);
+    const result = await actions.stackElements(input as never);
+    const [node] = inserted(input);
+    return { result, node, doc: revisions(input)[0]?.doc };
+  }
+
+  function laidBoxes(node: Inserted, doc: MotionDoc) {
+    const laid = withAutoLayout(doc);
+    return Object.fromEntries(
+      clipsOf(laid).map((c) => {
+        const b = pivotBox(c.props, { width: node.width, height: node.height });
+        return [c.id, { left: node.x + b.left, top: node.y + b.top, width: b.width, height: b.height }];
+      })
+    );
+  }
+
+  const stackRow = (id: string, n: Inserted) => ({ ...elementRow(id, { left: n.x, top: n.y, width: n.width, height: n.height }), display_name: 'Stack' });
+
+  it('wrapping two stacks keeps each stack with its own children', async () => {
+    const top = await wrap(rects({ [A]: { left: 0, top: 0, width: 100, height: 80 }, [B]: { left: 160, top: 0, width: 100, height: 80 } }), [A, B], S1);
+    const bottom = await wrap(rects({ [C]: { left: 0, top: 200, width: 100, height: 80 }, [D]: { left: 160, top: 200, width: 100, height: 80 } }), [C, D], S2);
+
+    const outer = await wrap({ nodes: [stackRow(S1, top.node), stackRow(S2, bottom.node)], motion_revisions: [revisionRow(S1, top.doc), revisionRow(S2, bottom.doc)] }, [S1, S2], '16161616-1616-4616-8616-161616161616');
+
+    expect(outer.result).toMatchObject({ outcome: 'done' });
+    const all = clipsOf(outer.doc);
+    const root = all.filter((c) => !c.parent);
+    expect(root).toHaveLength(1);
+    const inner = all.filter((c) => c.parent === root[0].id);
+    expect(inner).toHaveLength(2);
+    expect(inner.every((c) => c.autoLayout)).toBe(true);
+    expect(inner.map((s) => all.filter((c) => c.parent === s.id).length)).toEqual([2, 2]);
+    expect(root[0].autoLayout).toMatchObject({ direction: 'vertical' });
+    const boxes = laidBoxes(outer.node, outer.doc);
+    const leaves = all.filter((c) => !c.autoLayout).map((c) => boxes[c.id]).sort((p, q) => p.top - q.top || p.left - q.left);
+    expect(leaves.map((b) => [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)])).toEqual([
+      [0, 0, 100, 80],
+      [160, 0, 100, 80],
+      [0, 200, 100, 80],
+      [160, 200, 100, 80]
+    ]);
+  });
+
+  it('three rects 60 apart keep the gap of 60 and do not move', async () => {
+    const at = { [A]: { left: 0, top: 0, width: 100, height: 80 }, [B]: { left: 160, top: 0, width: 100, height: 80 }, [C]: { left: 320, top: 0, width: 100, height: 80 } };
+    const { node, doc } = await wrap(rects(at), [A, B, C], S1);
+
+    expect(node).toMatchObject({ x: 0, y: 0, width: 420, height: 80 });
+    const root = clipsOf(doc).find((c) => !c.parent)!;
+    expect((root.autoLayout!.gap * node.width) / doc.width).toBeCloseTo(60, 0);
+    const boxes = laidBoxes(node, doc);
+    const lefts = clipsOf(doc).filter((c) => c.parent === root.id).map((c) => Math.round(boxes[c.id].left)).sort((p, q) => p - q);
+    expect(lefts).toEqual([0, 160, 320]);
+  });
+
+  it('rects placed one under the other become a vertical stack', async () => {
+    const at = { [A]: { left: 0, top: 0, width: 100, height: 80 }, [B]: { left: 0, top: 120, width: 100, height: 80 } };
+    const { node, doc } = await wrap(rects(at), [A, B], S1);
+
+    expect(clipsOf(doc).find((c) => !c.parent)!.autoLayout).toMatchObject({ direction: 'vertical' });
+    expect(node).toMatchObject({ width: 100, height: 200 });
+  });
+
+  it('staggered rects are hugged whole, none clipped', async () => {
+    const at = { [A]: { left: -420, top: 240, width: 60, height: 40 }, [B]: { left: -300, top: 260, width: 60, height: 40 }, [C]: { left: -180, top: 280, width: 60, height: 40 } };
+    const { node, doc } = await wrap(rects(at), [A, B, C], S1);
+
+    expect(node.height).toBe(40);
+    const geometry = (d: MotionDoc) => clipsOf(d).map((c) => [c.id, ...['x', 'y', 'width', 'height'].map((k) => Number((c.props[k] as number).toFixed(3)))]);
+    expect(geometry(doc)).toEqual(geometry(withAutoLayout(doc)));
+    const boxes = laidBoxes(node, doc);
+    for (const c of clipsOf(doc).filter((k) => k.parent)) {
+      const b = boxes[c.id];
+      expect(Math.round(b.height)).toBe(40);
+      expect(b.top).toBeGreaterThanOrEqual(node.y - 0.5);
+      expect(b.top + b.height).toBeLessThanOrEqual(node.y + node.height + 0.5);
+    }
   });
 });

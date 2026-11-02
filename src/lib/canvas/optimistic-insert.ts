@@ -62,6 +62,8 @@ const GHOST_STROKE = '#111111';
 
 const GHOST_PAINT = `fill="${GHOST_FILL}" stroke="${GHOST_STROKE}" stroke-width="1.5" vector-effect="non-scaling-stroke"`;
 
+const GHOST_OUTLINE = `fill="none" stroke="${GHOST_STROKE}" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"`;
+
 type Ghost = { wire: DrawnWire; box: CanvasBox; doc: MotionDoc };
 
 function ghostText({ box, doc }: Ghost): string {
@@ -87,7 +89,7 @@ const GHOST_SHAPE: Record<DrawnWire['tool'], (ghost: Ghost) => string> = {
   [DrawTool.Line]: ghostLine,
   [DrawTool.Arrow]: ghostLine,
   [DrawTool.Frame]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`,
-  [DrawTool.Stack]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_PAINT}/>`
+  [DrawTool.Stack]: ({ box }) => `<rect width="${box.width}" height="${box.height}" ${GHOST_OUTLINE}/>`
 };
 
 function ghostSvg(ghost: Ghost): string {
