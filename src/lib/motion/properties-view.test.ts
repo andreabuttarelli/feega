@@ -85,7 +85,13 @@ describe('which sections each selection kind gets', () => {
     expect(sections.indexOf(Section.Layout)).toBeLessThan(sections.indexOf(Section.Fill));
     expect(sections.indexOf(Section.Fill)).toBeLessThan(sections.indexOf(Section.Stroke));
     expect(sections.indexOf(Section.Stroke)).toBeLessThan(sections.indexOf(Section.Effects));
-    expect(sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Motion).indexOf(Section.Effects)).toBeLessThan(sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Motion).indexOf(Section.Text));
+  });
+
+  it('a text reads alignment, layout, appearance, typography, then paint', () => {
+    const sections = sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Design);
+    const order = [Section.Align, Section.Layout, Section.Layer, Section.Text, Section.Fill, Section.Stroke, Section.Effects];
+
+    expect(sections.filter((s) => order.includes(s))).toEqual(order);
   });
 });
 

@@ -41,6 +41,10 @@ const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
   [ClipFamily.Adjustment]: VISUAL
 };
 
+const TEXT_ORDER: readonly Section[] = [Section.Align, Section.Layout, Section.Stack, Section.Constraints, Section.Content, Section.Layer, Section.Text, Section.Fill, Section.Stroke, Section.Effects, Section.Transform, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
+
+const FAMILY_ORDER: Partial<Record<ClipFamily, readonly Section[]>> = { [ClipFamily.Text]: TEXT_ORDER };
+
 const PART_SECTIONS: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Transform, Section.Layer, Section.Fill, Section.Stroke, Section.Text]);
 const FRAME_SECTIONS: ReadonlySet<Section> = new Set([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
 
@@ -62,5 +66,5 @@ export const positionShown = (placement: Placement): boolean => PLACEMENT[placem
 export function sectionsFor(family: ClipFamily, view: PropertiesView, mode: EditMode, placement: Placement = Placement.Free): Section[] {
   const allowed = new Set(FAMILY_SECTIONS[family]);
   const hidden = (s: Section) => MODE_HIDES[mode].has(s) || PLACEMENT[placement].hides.has(s);
-  return SECTION_ORDER.filter((s) => allowed.has(s) && !hidden(s) && (VIEW_KEEPS[view]?.has(s) ?? true));
+  return (FAMILY_ORDER[family] ?? SECTION_ORDER).filter((s) => allowed.has(s) && !hidden(s) && (VIEW_KEEPS[view]?.has(s) ?? true));
 }

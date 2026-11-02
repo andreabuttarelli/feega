@@ -11,6 +11,7 @@ import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
 import { precompose } from '@feega/motion-core/motion/precomp';
 import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor, stacksWholeElement } from './frame-inspector';
 import { findClip } from '@feega/motion-core/motion/doc';
+import { barActions, headerActions } from '$lib/motion/clip-bar';
 import { copyElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
 import { addTrack } from '@feega/motion-core/motion/timeline';
@@ -386,5 +387,13 @@ describe('wrap with stack on a free element', () => {
     expect(stacksWholeElement(Action.WrapStack, doc, ['a', 'b'])).toBe(true);
     expect(stacksWholeElement(Action.WrapStack, doc, ['a'])).toBe(false);
     expect(stacksWholeElement(Action.Group, doc, ['a', 'b'])).toBe(false);
+  });
+});
+
+describe('the text header', () => {
+  it('shows create component inline beside the layer name', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Text', from: 0, props: { text: 'Hi' } }, 't'));
+
+    expect(headerActions(barActions(doc, ['t'], frameBarActions(doc, ['t']))).inline).toContain(Action.CreateComponent);
   });
 });
