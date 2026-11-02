@@ -23,15 +23,12 @@
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
-  import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
   import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
   import { tileFaded } from '$lib/canvas/tile-opacity';
   import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
-  import { followDocks } from '$lib/canvas/dock-lift';
-  import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
@@ -286,14 +283,6 @@
     }
   });
   let area = $state({ width: 0, height: 0 });
-  let docked = $state(0);
-  $effect(() => {
-    void picks;
-    if (!surface) {
-      return;
-    }
-    return followDocks(surface, () => [...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')], (px) => (docked = px));
-  });
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
@@ -3736,7 +3725,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
@@ -3755,7 +3744,7 @@
         {/if}
         {@const viewLive = inside?.nodeId === nodeId ? viewLives.get(frame.id) : null}
         {#if viewLive}
-          <FrameTools doc={viewLive.doc} frame={frameOfLive(viewLive)} views={contentViews(frameViews.all)} boxes={outlineBoxes(frame.id, viewLive.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} picks={[]} tool={DrawTool.Select} side={AlignSide.Below} apply={() => {}} ondrawn={() => {}} onleave={() => {}} />
+          <FrameTools doc={viewLive.doc} frame={frameOfLive(viewLive)} views={contentViews(frameViews.all)} boxes={outlineBoxes(frame.id, viewLive.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} picks={[]} tool={DrawTool.Select} apply={() => {}} ondrawn={() => {}} onleave={() => {}} />
         {/if}
       {/snippet}
     </FrameOverlays>
