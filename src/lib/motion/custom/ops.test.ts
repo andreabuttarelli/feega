@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { CheckState, ComponentMode, sourceHash } from '@feega/motion-core/motion/custom/component';
-import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from './ops';
+import { MAX_HTML, MAX_JS, MAX_SOURCE_TOTAL } from '@feega/motion-core/motion/custom/component';
+import { Occurrence, READ_LINES, readSource, recordCheck, removeComponent, updateComponent, writeComponent } from './ops';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -114,5 +115,60 @@ describe('a live component', () => {
 
     expect(must(updateComponent(doc, 'Game', [{ file: 'js', find: 'f()', replace: 'g()', occurrence: Occurrence.All }])).components.Game.mode).toBe(ComponentMode.Live);
   });
-});
 
+  it('line edits replace, insert and delete numbered lines, applied with find/replace in one write', () => {
+    const doc = must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'NodeGraph', { ...NODES, source: { ...NODES.source, css: 'a{}\nb{}\nc{}\nd{}' } }));
+    const out = updateComponent(doc, 'NodeGraph', [
+      { file: 'css', lines: [2, 3], text: 'B{}' },
+      { file: 'css', after_line: 0, text: 'top{}' },
+      { file: 'css', lines: [4, 4] },
+      { file: 'css', find: 'a{}', replace: 'A{}' }
+    ]);
+
+    expect(must(out).components.NodeGraph.source.css).toBe('top{}\nA{}\nB{}');
+    expect(out.ok && out.diff[0]).toEqual({ file: 'css', replaced: 2, before: 'b{}\nc{}', after: 'B{}' });
+  });
+
+  it('a line edit outside the file is refused and nothing is written', () => {
+    expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', lines: [1, 2], text: '' }])).toMatchObject({ ok: false, error: expect.stringContaining('css has 1 line') });
+    expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', lines: [2, 1], text: '' }]).ok).toBe(false);
+    expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', after_line: 2, text: 'x{}' }]).ok).toBe(false);
+  });
+
+  it('read_component reads one file by numbered lines, bounded by default', () => {
+    const js = Array.from({ length: READ_LINES + 50 }, (_, i) => `tl.set(root,{x:${i}});`).join('\n');
+    const read = readSource({ ...NODES.source, js }, { file: 'js' });
+
+    expect(read).toMatchObject({ file: 'js', total_lines: READ_LINES + 50, from: 1, to: READ_LINES, more: true });
+    expect(read.text?.split('\n')[0]).toBe('1\ttl.set(root,{x:0});');
+    expect(readSource({ ...NODES.source, js }, { file: 'js', offset: READ_LINES + 49, limit: 10 })).toMatchObject({ from: READ_LINES + 49, to: READ_LINES + 50, more: false });
+  });
+
+  it('read_component searches a pattern and answers the matching lines with their numbers', () => {
+    const read = readSource({ ...NODES.source, css: 'a{}\n.n{width:10px}\nb{}' }, { pattern: 'width' });
+
+    expect(read.matches).toEqual([{ file: 'css', line: 2, text: '.n{width:10px}' }]);
+  });
+
+  it('a 100k-char file fits: the agent edits by find/replace and line ranges, so size no longer costs a rewrite', () => {
+    const big = { html: '<i></i>'.repeat(Math.floor(MAX_HTML / 7)), css: NODES.source.css, js: '{ tl.set(root,{x:1}); }\n'.repeat(Math.floor(MAX_JS / 24)) };
+
+    expect(MAX_JS).toBeGreaterThanOrEqual(100_000);
+    expect(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Big', { ...NODES, source: big }).ok).toBe(true);
+  });
+
+  it('the source of all components stays under the 1 MB a realtime revision row carries', () => {
+    const half = { html: '', css: NODES.source.css, js: '{ tl.set(root,{x:1}); }\n'.repeat(Math.floor(MAX_JS / 24)) };
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    let refused = '';
+    for (let i = 0; i < 20 && !refused; i++) {
+      const r = writeComponent(doc, `C${i}`, { ...NODES, source: half });
+      refused = r.ok ? '' : r.error;
+      doc = r.ok ? r.doc : doc;
+    }
+
+    expect(MAX_SOURCE_TOTAL).toBeLessThan(1_000_000);
+    expect(refused).toContain(`${MAX_SOURCE_TOTAL}`);
+    expect(JSON.stringify(doc).length).toBeLessThan(1_024 * 1_024);
+  });
+});

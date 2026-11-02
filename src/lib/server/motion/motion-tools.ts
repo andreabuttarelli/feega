@@ -150,7 +150,7 @@ import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { Quality, blocking, docProblems, frameProblems, vanishes, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '@feega/motion-core/motion/custom/component';
 import { PARAM_GUIDE } from '@feega/motion-core/motion/custom/params';
-import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from '$lib/motion/custom/ops';
+import { Occurrence, READ_LINES, readSource, recordCheck, removeComponent, updateComponent, writeComponent } from '$lib/motion/custom/ops';
 import { CaptureSession, FIDELITY_MIN, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
 import { StoreKind } from '$lib/server/web/store';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
@@ -388,6 +388,15 @@ const fidelityOf = (fidelity: number | undefined) => {
   const low = fidelity < FIDELITY_MIN ? { low_fidelity: `the rebuild matches the page at ${Math.round(fidelity * 100)}% even after a second read: the page was still loading or is mostly pictures; recreate_ui it again or film another screen` } : {};
   return { fidelity: Math.round(fidelity * 100) / 100, ...low };
 };
+
+function validPattern(pattern: string): boolean {
+  try {
+    new RegExp(pattern);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
@@ -2857,14 +2866,23 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     [READ_COMPONENT]: tool({
-      description: 'Read the code (html, css, js), props schema, version and determinism check of a custom component.',
-      inputSchema: z.object({ name: z.string() }),
+      description: `Read a custom component: props schema, version, determinism check and its code. With no file or pattern, every file of up to ${READ_LINES} lines comes whole; a longer one is listed in long_files, read it with file. file (html, css or js) returns numbered lines "N\\t..." from offset (1-based) for limit lines (default ${READ_LINES}); more says if lines remain. pattern (a regular expression, optionally with file) returns the matching lines with their numbers. Numbered lines pair with update_components line edits.`,
+      inputSchema: z.object({ name: z.string(), file: z.enum(SOURCE_FILES).optional(), offset: z.number().int().min(1).optional(), limit: z.number().int().min(1).max(2000).optional(), pattern: z.string().min(1).max(200).optional() }),
       execute: async (input) => {
         const component = session.doc.components[input.name];
         if (!component) {
           return { ok: false, error: `no custom component ${input.name}; this video has ${Object.keys(session.doc.components).join(', ') || 'none'}` };
         }
-        return { ok: true, name: input.name, ...component.source, props_schema: component.propsSchema, mode: modeOf(component), version: component.version, check: checkState(component), problems: component.check?.problems ?? [] };
+        const meta = { ok: true, name: input.name, props_schema: component.propsSchema, mode: modeOf(component), version: component.version, check: checkState(component), problems: component.check?.problems ?? [] };
+        if (input.pattern && !validPattern(input.pattern)) {
+          return { ok: false, error: `pattern is not a regular expression: ${input.pattern}` };
+        }
+        if (input.file || input.pattern) {
+          return { ...meta, ...readSource(component.source, input) };
+        }
+        const long = SOURCE_FILES.filter((f) => component.source[f].split('\n').length > READ_LINES);
+        const whole = Object.fromEntries(SOURCE_FILES.filter((f) => !long.includes(f)).map((f) => [f, component.source[f]]));
+        return { ...meta, ...whole, ...(long.length ? { long_files: long.map((f) => ({ file: f, total_lines: component.source[f].split('\n').length })) } : {}) };
       }
     }),
 
@@ -3030,10 +3048,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     [UPDATE_COMPONENTS]: tool({
-      description: 'Change a custom component by replacing text in its html, css or js. Each find must occur exactly once unless occurrence names first, last or all. Cheaper than rewriting it. Lint and the determinism check run again; returns a small diff.',
+      description: 'Change a custom component without rewriting it. An edit either replaces text ({ file, find, replace }: find must occur exactly once unless occurrence names first, last or all), replaces lines ({ file, lines: [N, M], text }: lines N..M, 1-based, inclusive; no text deletes them) or inserts ({ file, after_line: N, text }: 0 inserts at the top). Line numbers are those read_component shows, counted on the file as the edits before have left it. All edits land together or none; lint and the determinism check run again; returns a small diff.',
       inputSchema: z.object({
         component: z.string(),
-        edits: z.array(z.object({ file: z.enum(SOURCE_FILES), find: z.string().min(1), replace: z.string(), occurrence: z.enum(Occurrence).optional() })).min(1).max(20)
+        edits: z
+          .array(
+            z.union([
+              z.object({ file: z.enum(SOURCE_FILES), find: z.string().min(1), replace: z.string(), occurrence: z.enum(Occurrence).optional() }).strict(),
+              z.object({ file: z.enum(SOURCE_FILES), lines: z.tuple([z.number().int().min(1), z.number().int().min(1)]), text: z.string().optional() }).strict(),
+              z.object({ file: z.enum(SOURCE_FILES), after_line: z.number().int().min(0), text: z.string() }).strict()
+            ])
+          )
+          .min(1)
+          .max(20)
       }),
       execute: async (input, { toolCallId }) => {
         const result = updateComponent(session.doc, input.component, input.edits);

@@ -16,6 +16,8 @@ import { OpsOutcome, commitDoc } from './frame-ops';
 import { templateLibrary } from './templates';
 import { exportStill } from './still-export';
 import { speakVoiceover } from './voiceover';
+import { layMusic } from './music';
+import { analyzeSounds, storageAnalysis } from './audio-analysis';
 import { withOrgContext } from '$lib/server/ai-log';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { frameMover, frameStore } from './move-element';
@@ -48,7 +50,7 @@ export type ToolRunTurn = { sessions: Map<string, MotionSession>; selection: str
 export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string };
 
 export const TOOL_RUN_AGENT_KEY = 'mcp';
-export const SPENDING_TOOLS: ReadonlySet<string> = new Set(['generate_voiceover']);
+export const SPENDING_TOOLS: ReadonlySet<string> = new Set(['generate_voiceover', 'add_music']);
 
 export enum FrameToolAccess {
   Read = 'read',
@@ -59,7 +61,7 @@ export enum FrameToolAccess {
 
 const READ_TOOLS = ['get_motion_doc', 'read_layer_css', 'measure_text', 'list_components', 'list_assets', 'beat_times', 'list_effects', 'list_layouts', 'list_fields', 'list_fonts', 'read_component', 'list_shots', 'list_templates', 'get_template', 'list_revisions', 'view_frames', 'describe_frames', 'list_ui_kinds'];
 
-const EDITOR_ONLY_TOOLS = ['read_video_reference', 'render_batch', 'spawn_agent', 'render_video', 'analyze_site', 'write_storyboard', 'read_storyboard', 'update_storyboard_card', 'link_storyboard_beat', 'use_brand', 'import_asset', 'recreate_ui', 'add_music'];
+const EDITOR_ONLY_TOOLS = ['read_video_reference', 'render_batch', 'spawn_agent', 'render_video', 'analyze_site', 'write_storyboard', 'read_storyboard', 'update_storyboard_card', 'link_storyboard_beat', 'use_brand', 'import_asset', 'recreate_ui'];
 
 const FRAME_ACCESS: ReadonlyMap<string, FrameToolAccess> = new Map([
   ...READ_TOOLS.map((name) => [name, FrameToolAccess.Read] as const),
@@ -161,6 +163,8 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
     fonts: () => orgFontFamilies(db, scope.orgId),
     lettering: async (doc) => letteringOf(await tokens(), assetUrls(assets))(doc),
     voiceover: (voice) => withOrgContext(scope.orgId, () => speakVoiceover(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId, userId: scope.userId, actor }, voice)),
+    music: (ask) => withOrgContext(scope.orgId, () => layMusic(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId, userId: scope.userId, actor }, ask)),
+    analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId: scope.orgId, projectId: saved.project.id }, assets, [assetId]))[assetId] ?? null,
     embed: async (action) => embedAction(db, { nodeId: scope.nodeId, doc: session.doc, tokens: await tokens(), assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: saved.project.mode }, action)
   }, frames);
   return { saved, session, tools, actor, nodeScope };
