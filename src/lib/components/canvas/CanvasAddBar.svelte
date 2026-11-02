@@ -161,7 +161,6 @@
   }
 
   const offered = (what: Addable) => !(isOff(LocalOff.CloudNodes) && CLOUD_ADDABLE.has(what)) && !(isOff(LocalOff.AiNodes) && AI_ADDABLE.has(what));
-  const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
 
   let fileInput = $state<HTMLInputElement | null>(null);
 
@@ -240,7 +239,7 @@
 
   type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof Plus; run: () => void; hint?: string; drag?: Addable; tool?: DrawTool; model?: HotModel };
 
-  const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], hint: `${ADDABLE_LABEL[what]} (${slot(what)})`, icon: ADDABLE_ICON[what], run: () => onpick?.(what), drag: what });
+  const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], hint: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what), drag: what });
   const toolTile = (t: (typeof DRAW_TOOLS)[number]): Tile => ({ id: `draw-${t.tool}`, label: t.name, hint: t.label, icon: t.icon, run: () => (frameBar.tool = t.tool), tool: t.tool });
   const modelTile = (m: HotModel): Tile => ({ id: `model-${m.id}`, label: m.label, hint: m.label, icon: Plus, run: () => onmodel?.(m), model: m });
   const optional = (tile: Tile, shown: unknown): Tile[] => (shown ? [tile] : []);
