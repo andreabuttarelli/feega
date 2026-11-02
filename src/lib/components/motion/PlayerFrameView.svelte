@@ -5,8 +5,8 @@
   import { hotspotsOf, isDrag, type Hotspot } from '$lib/motion/prototype/hotspots';
   import { TriggerKind } from '@feega/motion-core/motion/prototype/model';
   import { ElementState } from '@feega/motion-core/motion/states/model';
-  import { clipsOf } from '@feega/motion-core/motion/doc';
-  import { stateSpotsOf } from '$lib/motion/states/spots';
+  import { parentsOf, stateSpotsOf, statesUnder } from '$lib/motion/states/spots';
+  import { flatClips } from '$lib/motion/states/nested';
   import { hasVariantStates } from '$lib/motion/states/variant-states';
   import { previewDoc, type StatePicks } from '$lib/motion/states/preview';
   import { amountAt, settled, type TweenRun } from '$lib/motion/states/tween';
@@ -18,6 +18,10 @@
   const percent = (fraction: number) => `${fraction * 100}%`;
 
   const stateSpots = $derived(interactive ? stateSpotsOf(live.doc, picker.frameSize(), (clip) => picker.frameRect(clip)) : []);
+  const clips = $derived(flatClips(live.doc));
+  const parents = $derived(parentsOf(live.doc));
+  let view: HTMLDivElement;
+  let under: string[] = [];
   let runs: Record<string, { state: ElementState; run: TweenRun }> = {};
   let statePicks = $state<StatePicks>({});
   let ticking = 0;
@@ -32,7 +36,8 @@
 
   function tweenTo(clip: string, target: ElementState, to: number) {
     const row = clipRow(clip, target);
-    if (!row && hasVariantStates(live.doc, clip)) {
+    const flat = clips.get(clip);
+    if (!row && flat && hasVariantStates(live.doc, flat)) {
       statePicks = { ...statePicks, [clip]: { state: target, amount: to } };
       return;
     }
@@ -46,7 +51,32 @@
     }
   }
 
-  const clipRow = (clip: string, target: ElementState) => clipsOf(live.doc).find((c) => c.id === clip)?.states?.find((r) => r.state === target);
+  const clipRow = (clip: string, target: ElementState) => clips.get(clip)?.states?.find((r) => r.state === target);
+
+  function hoverAt(e: PointerEvent) {
+    const rect = view.getBoundingClientRect();
+    const next = rect.width && rect.height ? statesUnder(stateSpots, parents, { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height }) : [];
+    for (const clip of under.filter((id) => !next.includes(id))) {
+      tweenTo(clip, statePicks[clip]?.state ?? ElementState.Hover, 0);
+    }
+    for (const clip of next.filter((id) => !under.includes(id))) {
+      tweenTo(clip, ElementState.Hover, 1);
+    }
+    under = next;
+  }
+
+  function leaveAll() {
+    for (const clip of under) {
+      tweenTo(clip, statePicks[clip]?.state ?? ElementState.Hover, 0);
+    }
+    under = [];
+  }
+
+  function stateAll(target: ElementState) {
+    for (const clip of under) {
+      tweenTo(clip, target, 1);
+    }
+  }
 
   let pressed: { id: string; x: number; y: number } | null = null;
 
@@ -84,19 +114,14 @@
   }
 </script>
 
-<div class="view">
+<div class="view" bind:this={view} role="presentation" onpointermove={hoverAt} onpointerleave={leaveAll} onpointerdown={() => stateAll(ElementState.Pressed)} onpointerup={() => stateAll(ElementState.Hover)}>
   <CompositionPlayer doc={shown} assets={live.assets} tokens={live.tokens} />
   {#each stateSpots as spot (spot.clip)}
     <div
       class="state-spot"
       data-testid="state-spot"
       data-clip={spot.clip}
-      role="presentation"
       style={`left:${percent(spot.box.left)};top:${percent(spot.box.top)};width:${percent(spot.box.width)};height:${percent(spot.box.height)}`}
-      onpointerenter={() => tweenTo(spot.clip, ElementState.Hover, 1)}
-      onpointerleave={() => tweenTo(spot.clip, statePicks[spot.clip]?.state ?? ElementState.Hover, 0)}
-      onpointerdown={() => tweenTo(spot.clip, ElementState.Pressed, 1)}
-      onpointerup={() => tweenTo(spot.clip, ElementState.Hover, 1)}
     ></div>
   {/each}
   {#if interactive}
@@ -128,6 +153,7 @@
 
   .state-spot {
     position: absolute;
+    pointer-events: none;
   }
 
   .spot {

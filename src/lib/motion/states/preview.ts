@@ -1,6 +1,7 @@
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { mixState, type ElementState } from '@feega/motion-core/motion/states/model';
 import { inVariantState, pastHalfway } from './variant-states';
+import { isNested, withNestedPicks } from './nested';
 
 export type StatePick = { state: ElementState; amount: number };
 export type StatePicks = Record<string, StatePick>;
@@ -16,10 +17,19 @@ const withPicks = (tracks: Tracks, picks: StatePicks): Tracks =>
     })
   }));
 
-export function previewDoc(doc: MotionDoc, picks: StatePicks): MotionDoc {
+const split = (picks: StatePicks, nested: boolean): StatePicks => Object.fromEntries(Object.entries(picks).filter(([id]) => isNested(id) === nested));
+
+function withOwnPicks(doc: MotionDoc, picks: StatePicks): MotionDoc {
   if (!Object.keys(picks).length) {
     return doc;
   }
   const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: withPicks(comp.tracks, picks) }]));
-  return Object.entries(picks).reduce((shown, [clip, pick]) => (pastHalfway(pick.amount) ? (inVariantState(shown, clip, pick.state) ?? shown) : shown), { ...doc, tracks: withPicks(doc.tracks, picks), comps });
+  return Object.entries(picks).reduce((at, [clip, pick]) => (pastHalfway(pick.amount) ? (inVariantState(at, clip, pick.state) ?? at) : at), { ...doc, tracks: withPicks(doc.tracks, picks), comps });
+}
+
+export function previewDoc(doc: MotionDoc, picks: StatePicks): MotionDoc {
+  if (!Object.keys(picks).length) {
+    return doc;
+  }
+  return withNestedPicks(withOwnPicks(doc, split(picks, false)), split(picks, true));
 }

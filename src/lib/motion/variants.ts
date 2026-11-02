@@ -74,9 +74,17 @@ export function setVariant(doc: MotionDoc, instanceId: string, picked: Variant):
   if (!instance) {
     return fail(`${instanceId} is not an instance of a component`);
   }
-  const wanted = { ...instance.comp.component!.variant, ...picked };
-  const match = setMembers(doc, instance.compId).find(([, c]) => sameVariant(c.component!.variant ?? {}, wanted));
-  return match ? swapInstance(doc, instanceId, match[0]) : fail(`no variant ${JSON.stringify(wanted)} in ${instance.comp.component!.name}`);
+  const match = variantOf(doc, instance.compId, picked);
+  return match ? swapInstance(doc, instanceId, match) : fail(`no variant ${JSON.stringify({ ...instance.comp.component!.variant, ...picked })} in ${instance.comp.component!.name}`);
+}
+
+export function variantOf(doc: MotionDoc, compId: string, picked: Variant): string | null {
+  const main = doc.comps[compId]?.component;
+  if (!main) {
+    return null;
+  }
+  const wanted = { ...main.variant, ...picked };
+  return setMembers(doc, compId).find(([, c]) => sameVariant(c.component!.variant ?? {}, wanted))?.[0] ?? null;
 }
 
 export const pickVariant = (doc: MotionDoc, instanceId: string, prop: string, value: string): OpResult => setVariant(doc, instanceId, { [prop]: value });

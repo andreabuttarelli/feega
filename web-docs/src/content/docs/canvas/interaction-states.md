@@ -54,3 +54,9 @@ The agent uses `set_element_state` and `remove_element_state`; MCP clients reach
 HTML and Svelte exports turn each state into a CSS rule — Hover is `:hover`, Pressed is
 `:active`, Focus is `:focus-visible` — with a `transition` using the state's easing and
 duration. React export adds the same values as `hover:`, `active:` and `focus-visible:` classes.
+
+## Nested components
+
+States work at any depth: a Button with a Hover state inside a Card instance reacts in the
+prototype player, and the Card reacts too, like `:hover` on a parent. Only that instance changes,
+never the main component. Exports carry the inner rules inside the component that owns them.

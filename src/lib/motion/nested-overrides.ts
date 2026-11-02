@@ -36,4 +36,4 @@ function applied(doc: MotionDoc, compId: string, base: Overrides, [head, ...rest
   return { ...base, [head]: { ...base[head], overrides: applied(doc, inner, below, rest, props) } };
 }
 
-export const nestedOverrides = (doc: MotionDoc, compId: string, changes: readonly PathChange[]): Overrides => changes.reduce<Overrides>((acc, change) => applied(doc, compId, acc, change.path, change.props), {});
+export const nestedOverrides = (doc: MotionDoc, compId: string, changes: readonly PathChange[], base: Overrides = {}): Overrides => changes.reduce<Overrides>((acc, change) => applied(doc, compId, acc, change.path, change.props), base);

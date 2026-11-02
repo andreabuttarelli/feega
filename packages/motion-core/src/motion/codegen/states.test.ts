@@ -4,6 +4,7 @@ import { ElementState, statesSchema } from '../states/model';
 import { Ease } from '../design';
 import { CodeTarget, exportCode, type CodeExport } from './index';
 import { absoluteDoc } from './fixtures/small';
+import { landingDoc } from './fixtures/landing';
 
 const withStates = (doc: MotionDoc, clipId: string, rows: unknown): MotionDoc => ({
   ...doc,
@@ -46,5 +47,26 @@ describe('element states in exported code', () => {
 
   it('Svelte scopes the same rules in its style tag', () => {
     expect(css(exportCode(badge(), { name: 'Poster', target: CodeTarget.Svelte }))).toContain('.badge:hover {');
+  });
+});
+
+const checkHovered = (): MotionDoc => {
+  const doc = landingDoc();
+  const comp = doc.comps['c-check'];
+  const [root] = comp.tracks.flatMap((t) => t.clips);
+  const rows = statesSchema.parse([{ state: ElementState.Hover, overrides: { opacity: 0.5 } }]);
+  const tracks = comp.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === root.id ? { ...c, states: rows } : c)) }));
+  return { ...doc, comps: { ...doc.comps, 'c-check': { ...comp, tracks } } };
+};
+
+describe('element states on an instance nested inside another component', () => {
+  const all = (out: CodeExport) => out.files.map((f) => f.content).join('\n');
+
+  it.each([CodeTarget.Html, CodeTarget.Svelte])('%s writes the inner hover rule', (target) => {
+    expect(all(exportCode(checkHovered(), { name: 'Landing', target }))).toMatch(/\.[\w-]+:hover \{\n\s*opacity: 0\.5;/);
+  });
+
+  it('React writes the hover class on the inner component', () => {
+    expect(all(exportCode(checkHovered(), { name: 'Landing' }))).toContain('hover:opacity-');
   });
 });
