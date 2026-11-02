@@ -1,7 +1,8 @@
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { setParent } from './parent-ops';
 import { duplicateLayer } from './layout/ops';
-import { removeClips, splitClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { removeLayers } from './remove-layers';
+import { splitClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum ClipOp {
   Split = 'split',
@@ -49,7 +50,7 @@ function duplicate(ctx: ClipCtx): ClipDone {
 const CLIP_OPS: Record<ClipOp, (ctx: ClipCtx) => ClipDone> = {
   [ClipOp.Split]: (ctx) => done(eachSelected(ctx, (doc, id) => splitClip(doc, id, ctx.frame, ctx.newId())), 'Split', [...ctx.selection]),
   [ClipOp.Duplicate]: duplicate,
-  [ClipOp.Delete]: (ctx) => done(removeClips(ctx.doc, ctx.selection), 'Deleted', []),
+  [ClipOp.Delete]: (ctx) => done(removeLayers(ctx.doc, ctx.selection), 'Deleted', []),
   [ClipOp.Parent]: (ctx) => done(eachSelected(ctx, (doc, id) => setParent(doc, id, ctx.parent, { at: ctx.frame })), ctx.parent ? 'Parented' : 'Unparented', [...ctx.selection])
 };
 

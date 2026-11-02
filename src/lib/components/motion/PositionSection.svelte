@@ -14,7 +14,7 @@
   import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
-  import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+  import { setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
   import { HORIZONTALS, Horizontal, VERTICALS, Vertical } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { Side, Toggle, pinnedHorizontally, pinnedVertically, toggleHorizontal, toggleVertical } from '$lib/motion/constraints/sides';
@@ -24,6 +24,7 @@
   import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
   import { Placement } from '@feega/motion-core/motion/layout/stack';
   import { positionShown } from '$lib/motion/properties-view';
+  import { placeLayer } from '$lib/motion/light-group';
   import type { NodeTurn } from '$lib/motion/element-turn';
 
   let { doc, clip, part, placement = Placement.Free, within = null, turn = null, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; turn?: NodeTurn | null; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
@@ -68,8 +69,8 @@
 
   const numberOf = (e: Event) => Number((e.currentTarget as HTMLInputElement).value);
   const rotate = (degrees: number) => (turn ? turn.set(degrees) : onchange(setTransform(doc, clip.id, { rotateZ: degrees }), 'Rotated the layer'));
-  const moveX = (e: Event) => onchange(setProps(doc, clip.id, { x: (numberOf(e) + origin.left + box.width / 2) / doc.width }), 'Moved horizontally');
-  const moveY = (e: Event) => onchange(setProps(doc, clip.id, { y: (numberOf(e) + origin.top + box.height / 2) / doc.height }), 'Moved vertically');
+  const moveX = (e: Event) => onchange(placeLayer(doc, clip.id, { x: (numberOf(e) + origin.left + box.width / 2) / doc.width }), 'Moved horizontally');
+  const moveY = (e: Event) => onchange(placeLayer(doc, clip.id, { y: (numberOf(e) + origin.top + box.height / 2) / doc.height }), 'Moved vertically');
   const pinH = (h: Horizontal) => onchange(setConstraints(doc, [clip.id], { horizontal: h }), 'Changed the horizontal constraint');
   const pinV = (v: Vertical) => onchange(setConstraints(doc, [clip.id], { vertical: v }), 'Changed the vertical constraint');
   const tickH = (side: Side, e: MouseEvent) => pinH(toggleHorizontal(horizontal, side, e.shiftKey ? Toggle.Both : Toggle.One));

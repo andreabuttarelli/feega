@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PropertiesView, positionShown, propertiesFor, sectionsFor } from './properties-view';
+import { PropertiesView, fieldShownFor, positionShown, propertiesFor, sectionsFor } from './properties-view';
 import { Placement } from '@feega/motion-core/motion/layout/stack';
 import { Section } from './inspector-sections';
 import { ClipFamily } from './track-style';
@@ -107,5 +107,19 @@ describe('a stack child in Properties', () => {
     expect(positionShown(Placement.Free)).toBe(true);
     expect(positionShown(Placement.Flow)).toBe(false);
     expect(positionShown(Placement.Absolute)).toBe(true);
+  });
+});
+
+describe('what a group shows', () => {
+  it('places, aligns and layers it, with no fill, stroke or path of its own', () => {
+    const sections = sectionsFor(ClipFamily.Group, PropertiesView.Clip, EditMode.Design);
+
+    expect(sections).toEqual(expect.arrayContaining([Section.Align, Section.Layout, Section.Layer, Section.Effects]));
+    expect(sections.filter((s) => [Section.Fill, Section.Stroke, Section.Shape, Section.Content].includes(s))).toEqual([]);
+  });
+
+  it('keeps only its box among the fields of the shape it is drawn with', () => {
+    expect(['x', 'y', 'width', 'height', 'roundness', 'morphs', 'fills', 'clipContent'].filter((k) => fieldShownFor(ClipFamily.Group, k))).toEqual(['x', 'y', 'width', 'height']);
+    expect(fieldShownFor(ClipFamily.Shape, 'roundness')).toBe(true);
   });
 });

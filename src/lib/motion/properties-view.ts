@@ -38,7 +38,8 @@ const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
   [ClipFamily.Camera]: [Section.Content, Section.Layout, Section.Transform, Section.Timing, Section.Animate, Section.ThreeD],
   [ClipFamily.Mask]: VISUAL,
   [ClipFamily.Precomp]: VISUAL,
-  [ClipFamily.Adjustment]: VISUAL
+  [ClipFamily.Adjustment]: VISUAL,
+  [ClipFamily.Group]: [...PLACED, Section.Layer, Section.Effects, Section.Timing, Section.Animate, Section.Parent]
 };
 
 const TEXT_ORDER: readonly Section[] = [Section.Align, Section.Layout, Section.Stack, Section.Constraints, Section.Content, Section.Layer, Section.Text, Section.Fill, Section.Stroke, Section.Effects, Section.Transform, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
@@ -60,6 +61,10 @@ const PLACEMENT: Record<Placement, { hides: ReadonlySet<Section>; position: bool
   [Placement.Flow]: { hides: new Set([Section.Align, Section.Constraints]), position: false },
   [Placement.Absolute]: { hides: new Set([Section.Constraints]), position: true }
 };
+
+const FAMILY_FIELDS: Partial<Record<ClipFamily, ReadonlySet<string>>> = { [ClipFamily.Group]: new Set(['x', 'y', 'width', 'height']) };
+
+export const fieldShownFor = (family: ClipFamily, key: string): boolean => FAMILY_FIELDS[family]?.has(key) ?? true;
 
 export const positionShown = (placement: Placement): boolean => PLACEMENT[placement].position;
 

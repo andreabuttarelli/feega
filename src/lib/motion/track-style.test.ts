@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
-import { CLIP_FAMILIES, ClipFamily, Preview, familyOf, tileFrames } from './track-style';
+import { CLIP_FAMILIES, ClipFamily, Preview, clipFamily, familyOf, tileFrames } from './track-style';
 
 describe('track-style', () => {
   it('every component belongs to a family', () => {
@@ -50,5 +50,12 @@ describe('tileFrames', () => {
 
   it('returns nothing for a source with no samples', () => {
     expect(tileFrames({ samples: 0, sourceSeconds: 0, trimSeconds: 0, clipSeconds: 3, tiles: 3 })).toEqual([]);
+  });
+});
+
+describe('the family of a clip', () => {
+  it('is Group for a group, whatever it is drawn with', () => {
+    expect(clipFamily({ component: 'Shape', group: true })).toBe(ClipFamily.Group);
+    expect(clipFamily({ component: 'Shape' })).toBe(ClipFamily.Shape);
   });
 });

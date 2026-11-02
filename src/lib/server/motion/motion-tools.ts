@@ -1,7 +1,8 @@
 import { ungroupClip } from '$lib/motion/group';
 import { dropSurface, withSurface } from '@feega/motion-core/motion/surface';
 import { addBreakpoint, BreakpointPreset, clearOverride, OVERRIDE_KEYS, OverrideKey, removeBreakpoint, setOverride, stackOn } from '@feega/motion-core/motion/breakpoints/model';
-import { groupLight, settleGroups, ungroupLight } from '$lib/motion/light-group';
+import { groupLight, placeLayer, settleGroups, ungroupLight } from '$lib/motion/light-group';
+import { removeLayers } from '$lib/motion/remove-layers';
 import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
 import { StyleAction, StyleKind, StyleSlot, applyStyle, defineStyle, detachStyle, removeStyle, renameStyle, saveAsStyle, stylesOf } from '$lib/motion/styles';
 import { STYLE_NAME, styleSchema } from '@feega/motion-core/motion/styles-model';
@@ -1063,7 +1064,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_props: tool({
-      description: `Change some props of a clip; the rest are kept (left/top keep the size, x/y the centre). ${PX_FIELDS_GUIDE} Validated against the component. A Shape and text (Title, Text, Kicker, Caption) take fills (see add_shape; fills replaces a text colour, colours may carry alpha as #rrggbbaa); a poster photo slot in a media list ({assetId, kind}) takes fills too, the same layer stack. The same Shape and text clips take strokes (see add_shape); text draws its first visible stroke.`,
+      description: `Change some props of a clip; the rest are kept (left/top keep the size, x/y the centre). ${PX_FIELDS_GUIDE} Validated against the component. A Shape and text (Title, Text, Kicker, Caption) take fills (see add_shape; fills replaces a text colour, colours may carry alpha as #rrggbbaa); a poster photo slot in a media list ({assetId, kind}) takes fills too, the same layer stack. The same Shape and text clips take strokes (see add_shape); text draws its first visible stroke. On a group (frame_clips group true) x, y, width and height move and scale its members, as the editor does.`,
       inputSchema: z.object({ clip_id: z.string(), props: z.record(z.string(), z.unknown()) }),
       execute: async (raw) => {
         const input = { ...raw, props: editFromPx(raw.clip_id, raw.props) };
@@ -1079,7 +1080,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (outside) {
           return { ok: false, error: outside };
         }
-        const result = setProps(session.doc, input.clip_id, storedRecord(propsOf(input.clip_id), input.props, session.doc));
+        const result = placeLayer(session.doc, input.clip_id, storedRecord(propsOf(input.clip_id), input.props, session.doc));
         if (!result.ok) {
           return { ok: false, error: propsError(session.doc, input.clip_id, input.props, result.error) };
         }
@@ -1199,9 +1200,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     remove_clip: tool({
-      description: 'Remove one or more clips. When the content then ends earlier, the video is fitted to it (fit_duration).',
+      description: 'Remove one or more clips, like the editor Delete: a container (stack, group, frame) goes with everything it holds, a Null lets go of the clips it rigs. When the content then ends earlier, the video is fitted to it (fit_duration).',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
-      execute: async (input) => apply(shortened(removeClips(session.doc, input.clip_ids)), `removed ${input.clip_ids.length} clip(s)`)
+      execute: async (input) => apply(shortened(removeLayers(session.doc, input.clip_ids)), `removed ${input.clip_ids.length} clip(s)`)
     }),
 
     split_clip: tool({
@@ -3200,7 +3201,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     ungroup: tool({
-      description: 'Ungroup: put the clips of a group back on the top level, at the same place and time. A light group (frame_clips group true, ⌘G) just lets go of its members; a Precomp made by precompose carries its offset to each clip and is refused when scaled, rotated or animated.',
+      description: 'Ungroup: put the clips of a group back where the group was, at the same place and time. A light group (frame_clips group true, ⌘G) hands its members to its own parent, into a stack where the group stood; a Precomp made by precompose carries its offset to each clip and is refused when scaled, rotated or animated.',
       inputSchema: z.object({ clip_id: z.string() }),
       execute: async (input) => apply(findClip(session.doc, input.clip_id)?.clip.group ? ungroupLight(session.doc, input.clip_id) : ungroupClip(session.doc, input.clip_id, deps.newId), 'ungrouped')
     }),

@@ -43,6 +43,18 @@ Selecting a frame opens its properties in the right bar.
 - **Selection colours** lists every colour used in the frame, nested groups and pasted Figma vectors included, most used first with a count. Changing one swatch recolours every element that uses it, in one step you can undo.
 - With several elements selected inside a frame, the right bar shows the properties they all have: text properties when all are text, plus layout, opacity and their selection colours. Values that differ read **Mixed**; editing one applies it to every selected element at once.
 
+## Groups and frames inside a frame
+
+- **Cmd/Ctrl+G** groups the selection. A group has no fill, radius or stroke of its own: its
+  box is the box around what it holds, and the right bar shows its position, size, appearance
+  and effects. Changing X, Y, W or H moves and scales everything inside it.
+- **Shift+Cmd/Ctrl+G** ungroups. Inside a stack, the layers go back into the stack where the
+  group was.
+- **Option/Alt+Cmd/Ctrl+G** wraps the selection in a **Frame** and selects it.
+- Grouping or framing children of a stack keeps the new group or frame in the stack, at their
+  place.
+- Deleting a stack, a group or a frame deletes what it holds.
+
 ## Edits show at once
 
 Delete, group, ungroup, wrap with stack, wrap in a section, bring to front or back, rename,
@@ -55,6 +67,9 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Key | Action |
 |---|---|
 | Backspace / Delete | Delete the selection |
+| Cmd/Ctrl+G | Group |
+| Shift+Cmd/Ctrl+G | Ungroup |
+| Option/Alt+Cmd/Ctrl+G | Frame the selection |
 | Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
 | Cmd/Ctrl+C | Copy |
 | Cmd/Ctrl+V | Paste at the centre of the view |

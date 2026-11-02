@@ -214,6 +214,8 @@ enum Container {
 
 const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.Stack]: 'Stack', [Container.Group]: 'Group' };
 
+const CONTAINER_NAME: Partial<Record<Container, string>> = { [Container.Frame]: CONTAINER_TRACK[Container.Frame] };
+
 export const wrapInStack = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Stack);
 
 export const wrapInGroup = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Group);
@@ -280,8 +282,19 @@ function takePlace(doc: MotionDoc, parentId: string | null, taken: readonly stri
   return setAutoLayout(placed.doc, parent.id, { order });
 }
 
+const BAKES_LAID: Record<Container, boolean> = { [Container.Frame]: true, [Container.Stack]: false, [Container.Group]: true };
+
+function bakedLaid(doc: MotionDoc, clipIds: readonly string[]): MotionDoc {
+  const laid = withAutoLayout(doc);
+  return clipIds.reduce((next, clipId) => {
+    const props = findClip(laid, clipId)?.clip.props;
+    return props ? withClip(next, clipId, (c) => ({ ...c, props: { ...c.props, x: props.x, y: props.y, width: props.width, height: props.height } })) : next;
+  }, doc);
+}
+
 function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string, container: Container): OpResult {
-  const doc = ownTracks(source, clipIds, trackId);
+  const own = ownTracks(source, clipIds, trackId);
+  const doc = BAKES_LAID[container] ? bakedLaid(own, clipIds.filter((c) => stackPlaced(own, c))) : own;
   const size = { width: doc.width, height: doc.height };
   const placed: Placed[] = clipIds.flatMap((c) => {
     const found = findClip(doc, c);
@@ -306,6 +319,8 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
   result = result.ok ? takePlace(result.doc, sharedParent(placed), placed.map((p) => p.clip.id), id) : result;
   result = container === Container.Stack && result.ok ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
   result = container === Container.Group && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, group: true })) } : result;
+  const name = CONTAINER_NAME[container];
+  result = name && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, name })) } : result;
   for (const p of placed) {
     if (!result.ok) {
       return result;
@@ -338,7 +353,7 @@ export function removeStack(doc: MotionDoc, stackId: string): OpResult {
   return result.ok ? { ok: true, doc: { ...result.doc, tracks: result.doc.tracks.filter((t) => t.id !== found.track.id || t.clips.length > 0) } } : result;
 }
 
-function reordered(doc: MotionDoc, parentId: string | null, stackId: string, kids: readonly string[]): OpResult {
+export function reordered(doc: MotionDoc, parentId: string | null, stackId: string, kids: readonly string[]): OpResult {
   const parent = parentId ? findClip(doc, parentId)?.clip : undefined;
   if (!parent?.autoLayout) {
     return { ok: true, doc };

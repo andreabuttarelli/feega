@@ -233,6 +233,10 @@ describe('wrapInFrame', () => {
     expect(clip(framed, 'a').props.x).toBe(0.2);
     expect(clip(framed, 'b').layoutItem).toBeFalsy();
   });
+
+  it('is called Frame, not the box it is drawn with', () => {
+    expect(clip(framed, 'box').name).toBe('Frame');
+  });
 });
 
 describe('resizeToFit', () => {

@@ -144,10 +144,13 @@ export function isLocked(doc: MotionDoc, clipId: string): boolean {
 
 export type TrackView = { solo: readonly string[]; shy: readonly string[]; hideShy: boolean; filter: string };
 
-export function clipName(clip: Pick<MotionClip, 'component' | 'props'> & Partial<Pick<MotionClip, 'autoLayout'>>): string {
+const GROUP_NAME = 'Group';
+
+export function clipName(clip: Pick<MotionClip, 'component' | 'props'> & Partial<Pick<MotionClip, 'autoLayout' | 'group' | 'name'>>): string {
   const p = clip.props as { text?: string; title?: string; name?: string };
   const kind = layoutKind(clip);
-  return (clip.component === 'Custom' ? p.name : undefined) ?? p.text?.split('\n')[0] ?? p.title ?? (kind ? LAYOUT_KIND_LABEL[kind] : COMPONENTS[clip.component].label);
+  const label = kind ? LAYOUT_KIND_LABEL[kind] : clip.group ? GROUP_NAME : COMPONENTS[clip.component].label;
+  return clip.name || ((clip.component === 'Custom' ? p.name : undefined) ?? p.text?.split('\n')[0] ?? p.title ?? label);
 }
 
 export function shownTracks(doc: MotionDoc, view: TrackView): MotionTrack[] {
