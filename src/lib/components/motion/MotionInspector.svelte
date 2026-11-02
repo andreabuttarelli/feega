@@ -155,7 +155,8 @@
     title = null,
     here = null,
     onrename = null,
-    onalign
+    onalign,
+    fillOpen = $bindable(null)
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -185,6 +186,7 @@
     here?: string | null;
     onrename?: ((name: string) => void) | null;
     onalign?: (edge: AlignEdge) => void;
+    fillOpen?: number | null;
   } = $props();
 
   function leaveOnEscape(e: KeyboardEvent) {
@@ -708,7 +710,7 @@
     {@const fillBind = fillTarget(clip)}
     <div class="stack bindable" data-prop={field.key}>
       {#if fillBind && clip.bind?.[fillBind]}<BindChip {doc} {clip} target={fillBind} {commit} />{:else}
-        <FillStack {gesture} {palette} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
+        <FillStack {gesture} {palette} keys={fillKeys} bind:open={fillOpen} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
         {#if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
       {/if}
     </div>

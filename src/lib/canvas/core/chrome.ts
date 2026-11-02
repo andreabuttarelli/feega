@@ -107,7 +107,7 @@ function roundBand(t: ChromeTile, width: number, radius: number): number[][] {
 const band = (t: ChromeTile, width: number) => (t.radius ? roundBand(t, width, t.radius) : line(outline(t, width), width, true));
 
 function hover(t: StateTile): PathItem[] {
-  if (!t.hovered || t.ring !== NodeChrome.None) {
+  if (!t.hovered || t.ring === NodeChrome.Selected) {
     return [];
   }
   return [item(t, ChromePart.Hover, band(t, widthOf(t, HOVER_SCREEN_PX)), HOVER_COLOR)];

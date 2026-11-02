@@ -1,4 +1,4 @@
-import { DocNodeType, FrameKind, docKindOf } from '../motion-node';
+import { DocNodeType, FrameKind, docKindOf, posterFresh } from '../motion-node';
 import { NODE_KIND_LABEL, NameTag } from '../node-label';
 import { NODE_EMPTY_HINT } from '../node-empty';
 import { isNodeType, type NodeType } from '../node-data';
@@ -44,7 +44,6 @@ export type CardFace = {
   kind: NodeType | null;
   label: string | null;
   media: Media | null;
-  live: string | null;
   prompt: string;
   model: string | null;
   running: boolean;
@@ -149,15 +148,14 @@ const listFace: Draw = (d, asset) => {
   };
 };
 
-const docFace = (type: DocNodeType): Draw => (d, asset, t) => {
+const docFace = (type: DocNodeType): Draw => (d, _asset, t) => {
   const kind = docKindOf(type, d.kind);
-  const live = str(d.lastRenderAssetId);
-  const rev = typeof d.docHeadRevision === 'number' && d.docHeadRevision ? `Rev ${d.docHeadRevision}` : 'Empty';
+  const head = typeof d.docHeadRevision === 'number' ? d.docHeadRevision : 0;
+  const posterRevision = typeof d.posterRevision === 'number' ? d.posterRevision : undefined;
   return {
     surface: kind === FrameKind.Frame ? Surface.Frame : Surface.Graphic,
-    subtitle: rev,
-    media: t.poster ? { url: t.poster.url, video: false } : null,
-    live: live ? asset(live) : null
+    subtitle: head ? `Rev ${head}` : 'Empty',
+    media: t.poster && posterFresh({ docHeadRevision: head, posterRevision }) ? { url: t.poster.url, video: false } : null
   };
 };
 
@@ -191,7 +189,6 @@ const BLANK: CardFace = {
   kind: null,
   label: null,
   media: null,
-  live: null,
   prompt: '',
   model: null,
   running: false,
@@ -232,4 +229,4 @@ export function faceOf(t: FaceTile, data: Data, asset: AssetUrl, view: NodeView 
   return face.surface === Surface.Generate ? { ...face, gen } : face;
 }
 
-export const handedToCore = (face: CardFace): CardFace => ({ ...face, media: null, live: null });
+export const handedToCore = (face: CardFace): CardFace => ({ ...face, media: null });

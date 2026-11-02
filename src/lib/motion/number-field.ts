@@ -55,6 +55,20 @@ export function nudged(value: number, direction: Nudge, precision: Precision, ra
 
 export const formatValue = (value: number, step: number): string => value.toFixed(decimals(step));
 
+export enum FieldText {
+  Step = 'step',
+  Precise = 'precise'
+}
+
+const PRECISE_DECIMALS = 2;
+
+const FIELD_TEXT: Record<FieldText, (value: number, step: number) => string> = {
+  [FieldText.Step]: formatValue,
+  [FieldText.Precise]: (value) => String(Number(value.toFixed(PRECISE_DECIMALS)))
+};
+
+export const fieldText = (value: number, step: number, text: FieldText): string => FIELD_TEXT[text](value, step);
+
 export const fillShare = (value: number, range: Range): number => Math.min(1, Math.max(0, (value - range.min) / (range.max - range.min)));
 
 export const valueAtShare = (share: number, range: Range): number => settle(range.min + share * (range.max - range.min), range, range.step);

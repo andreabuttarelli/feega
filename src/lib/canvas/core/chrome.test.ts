@@ -126,6 +126,10 @@ describe('tileChrome', () => {
     expect(ofPart(tile({ hovered: true, ring: NodeChrome.Selected }), ChromePart.Hover)).toHaveLength(0);
   });
 
+  it('outlines a frame being edited inside when the pointer is on its empty area, like Figma', () => {
+    expect(ofPart(tile({ hovered: true, ring: NodeChrome.Editing }), ChromePart.Hover)).toHaveLength(1);
+  });
+
   it('spaces input ports evenly on the left edge, outside the box, in their connector colour', () => {
     const ports = ofPart(tile({ inputs: marks('text', 'images') }), ChromePart.PortIn);
 

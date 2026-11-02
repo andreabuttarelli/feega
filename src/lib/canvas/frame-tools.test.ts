@@ -47,6 +47,14 @@ describe('shownOverlays', () => {
     expect(shownOverlays({ ...plain, clip: clip({ props: { shape: 'ellipse' } }), picks: 1, active: true }).has(FrameOverlay.Corners)).toBe(false);
   });
 
+  it('shows two endpoint handles for one straight line, like Figma, not the box', () => {
+    const line = clip({ props: { shape: 'path', path: 'M 0 0 L 100 40' } });
+    expect(shownOverlays({ ...plain, clip: line, picks: 1, active: true }).has(FrameOverlay.LineEnds)).toBe(true);
+    expect(shownOverlays({ ...plain, clip: line, picks: 2, active: true }).has(FrameOverlay.LineEnds)).toBe(false);
+    expect(shownOverlays({ ...plain, clip: line, picks: 1, active: true, pointEdit: 'c' }).has(FrameOverlay.LineEnds)).toBe(false);
+    expect(shownOverlays({ ...plain, clip: clip({ props: { shape: 'path', path: 'M 0 0 L 100 40 L 50 90' } }), picks: 1, active: true }).has(FrameOverlay.LineEnds)).toBe(false);
+  });
+
   describe('in Motion', () => {
     const motion = { ...plain, mode: EditMode.Motion, picks: 1 };
     const slides = clip({ keyframes: { x: [{ frame: 0, value: 0 }, { frame: 10, value: 0.5 }] } as never });

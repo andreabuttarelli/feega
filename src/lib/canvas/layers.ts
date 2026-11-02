@@ -500,6 +500,8 @@ export const tileHovered = (hover: LayerHover, nodeId: string, openNodeId: strin
 
 export const frameRinged = (hover: LayerHover, nodeId: string, openNodeId: string | null, pointerOn: string | null): boolean => tileHovered(hover, nodeId, openNodeId) && !(pointerOn === nodeId && hover?.id !== nodeId);
 
+export const emptyAreaRinged = (hover: LayerHover, nodeId: string, openNodeId: string | null, pointerOn: string | null): boolean => !hover && pointerOn === nodeId && openNodeId === nodeId;
+
 export const frameHover = (hover: LayerHover, openNodeId: string | null): string | null => (hover && hover.nodeId === openNodeId && hover.id !== openNodeId ? hover.id : null);
 
 export function rowsInside<R extends { key: string; depth: number }>(rows: readonly R[], picked: (row: R) => boolean): Set<string> {

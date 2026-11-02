@@ -31,6 +31,7 @@ export class FrameProperties {
   place = $state.raw<NodePlace | null>(null);
   rename = $state.raw<((name: string) => void) | null>(null);
   host = $state.raw<ElementHost | null>(null);
+  editingFill = $state<number | null>(null);
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
     this.nodeId = nodeId;
@@ -65,6 +66,7 @@ export class FrameProperties {
     this.exportRows = null;
     this.runAction = null;
     this.place = null;
+    this.editingFill = null;
     this.rename = null;
     this.host = null;
   }

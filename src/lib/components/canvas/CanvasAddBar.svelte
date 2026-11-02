@@ -426,7 +426,9 @@
 
   {#if menuOpen && !phone}
     <div class="insert-menu" role="menu" aria-label={INSERT_LABEL} data-testid="insert-menu" style:max-height={`${menuMaxPx}px`}>
-      {@render insertMenu()}
+      <div class="insert-scroll">
+        {@render insertMenu()}
+      </div>
     </div>
   {/if}
 </div>
@@ -485,12 +487,19 @@
     bottom: calc(100% + 10px);
     left: 50%;
     transform: translateX(-50%);
+    display: flex;
     width: min(440px, calc(100vw - 32px));
-    overflow-y: auto;
-    padding: 4px 10px 10px;
+    overflow: hidden;
     border-radius: var(--ui-radius-md);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
+  }
+
+  .insert-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 10px 10px;
   }
 
   .insert-menu .insert-tile {

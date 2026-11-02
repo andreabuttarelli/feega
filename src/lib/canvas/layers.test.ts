@@ -9,7 +9,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { findClip } from '@feega/motion-core/motion/doc';
-import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -662,6 +662,18 @@ describe('dragging several layers at once', () => {
     const doc = stacked();
 
     expect(order(ok(dropLayers(doc, ['b', 'c'], 'c', Place.Above, order(doc))))).toEqual(order(ok(dropLayer(doc, 'b', 'c', Place.Above))));
+  });
+});
+
+describe('the open frame, its child selected, under the pointer on its empty area', () => {
+  it('rings, so the frame reads as what a click would pick', () => {
+    expect(emptyAreaRinged(null, 'm1', 'm1', 'm1')).toBe(true);
+  });
+
+  it('does not ring while an element under the pointer is hovered, or for another tile', () => {
+    expect(emptyAreaRinged({ nodeId: 'm1', id: 't1' }, 'm1', 'm1', 'm1')).toBe(false);
+    expect(emptyAreaRinged(null, 'm2', 'm1', 'm2')).toBe(false);
+    expect(emptyAreaRinged(null, 'm1', 'm1', null)).toBe(false);
   });
 });
 

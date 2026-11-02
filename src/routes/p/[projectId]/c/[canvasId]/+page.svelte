@@ -3252,7 +3252,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
     const motion = motionOf(n);
-    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
+    return motion ? { poster: posterFresh(motion) ? assetUrl(motion.posterAssetId) : null, still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
   }
 
   $effect(() =>
