@@ -77,20 +77,20 @@ describe('a Stack in Properties', () => {
 });
 
 describe('Properties for one clip', () => {
-  it('a title: its name and kind on top, then layout, layer, fill, effects, text, animation in that order', () => {
+  it('a title: its name and kind on top, then layout, layer, typography, fill, effects, animation in that order', () => {
     const html = inspect('Title');
 
     expect(html).toMatch(/class="name[^"]*"[^>]*value="Better marketing/);
     expect(html).toMatch(/class="kind[^"]*">Title</);
     const order = sections(html).filter((s) => ['layout', 'layer', 'fill', 'effects', 'text', 'animate'].includes(s));
-    expect(order).toEqual(['layout', 'layer', 'fill', 'effects', 'text', 'animate']);
+    expect(order).toEqual(['layout', 'layer', 'text', 'fill', 'effects', 'animate']);
   });
 
   it('a title shows each value with an English label and its unit, never a glyph or a bare ratio', () => {
     const html = inspect('Title');
 
     expect(html).toContain('>Spacing</span>');
-    expect(html).toContain('>em</span>');
+    expect(html).toContain('>%</span>');
     expect(html).toContain('Transform');
     expect(html).not.toContain('>ΔX</span>');
     expect(html).not.toContain('>↔</span>');

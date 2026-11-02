@@ -59,7 +59,7 @@ export const SECTION_TITLE: Record<Section, string> = {
   [Section.Layer]: 'Appearance',
   [Section.Fill]: 'Fill',
   [Section.Stroke]: 'Stroke',
-  [Section.Text]: 'Text',
+  [Section.Text]: 'Typography',
   [Section.Shape]: 'Path',
   [Section.Effects]: 'Effects',
   [Section.Colours]: 'Selection colours',
@@ -236,7 +236,7 @@ export type FieldLook = { short: string | null; unit: string; fill: FieldFill };
 
 const DEGREES = '°';
 const EM = 'em';
-const TIMES = '×';
+const PERCENT_SIGN = '%';
 const SECONDS = 's';
 
 const LOOKS: Record<string, Partial<FieldLook>> = {
@@ -252,13 +252,13 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   weight: { short: 'Weight' },
   fontWeight: { short: 'Weight' },
   size: { short: 'Size' },
-  tracking: { short: 'Spacing', unit: EM },
+  tracking: { short: 'Spacing', unit: PERCENT_SIGN },
   stretch: { short: 'Width' },
   slant: { short: 'Slant' },
   maxLines: { short: 'Max lines' },
   decorationThickness: { short: 'Thickness' },
   decorationOffset: { short: 'Offset' },
-  leading: { short: 'Line', unit: TIMES },
+  leading: { short: 'Line', unit: PERCENT_SIGN },
   paragraphSpacing: { short: 'Paragraph', unit: EM },
   paragraphIndent: { short: 'Indent', unit: EM },
   rotateX: { short: 'Tilt X', unit: DEGREES },
