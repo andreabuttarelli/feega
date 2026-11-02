@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  joinGestures,
   inverseOf,
   checkPrecondition,
   checkGesture,
@@ -248,5 +249,15 @@ describe('parseUndoItem: a gesture as the client sent it', () => {
     expect(parseUndoItem({ kind: 'node.explode', nodeId: NODE })).toBeNull();
     expect(parseUndoItem({ kind: 'node.update', nodeId: NODE, expectedVersion: 1.5 })).toBeNull();
     expect(parseUndoItem(null)).toBeNull();
+  });
+});
+
+describe('joinGestures', () => {
+  it('turns the writes of one toggle on many nodes into one undo step', () => {
+    const a = { items: [{ kind: 'doc.revision' as const, nodeId: 'a', before: 1, after: 2 }] };
+    const b = { items: [{ kind: 'doc.revision' as const, nodeId: 'b', before: 3, after: 4 }] };
+
+    expect(joinGestures([a, b])).toEqual({ items: [...a.items, ...b.items] });
+    expect(joinGestures([])).toBeNull();
   });
 });

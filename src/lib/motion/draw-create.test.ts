@@ -4,7 +4,7 @@ import { setStill } from '@feega/motion-core/motion/still';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
 import { EditMode } from './edit-mode';
-import { CANVAS_INK, CanvasTheme, drawClip, drawStart, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
+import { CANVAS_INK, CanvasTheme, blankElement, drawClip, drawStart, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
 import { parsePath, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
@@ -370,3 +370,10 @@ describe('shape tools', () => {
   });
 });
 
+
+describe('blankElement', () => {
+  it('a box off by float noise keeps the pixels of the box it means', () => {
+    const made = blankElement({ left: -320, top: -149.99999999999994, width: 400, height: 119.99999999999994 });
+    expect(made.ok && { width: made.doc.width, height: made.doc.height }).toEqual({ width: 400, height: 120 });
+  });
+});

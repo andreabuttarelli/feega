@@ -121,6 +121,12 @@ describe('copyPlan', () => {
     expect(plan.nodes[0].data.posterRevision).toBeUndefined();
   });
 
+  it('a copy keeps the name of its source', () => {
+    const plan = copyPlan({ ids: ['a'], nodes: [{ ...node('a', 'image', {}), displayName: 'beach.jpg' }], edges: [], offset: DUPLICATE_OFFSET });
+
+    expect(plan.nodes[0].displayName).toBe('beach.jpg');
+  });
+
   it('a copy takes the id the canvas already shows it under', () => {
     const plan = copyPlan({ ids: ['a', 'b'], nodes: [node('a', 'text', {}), node('b', 'image', {})], edges: [], offset: DUPLICATE_OFFSET, copyIds: { a: 'a2', b: 'b2' } });
 

@@ -3683,3 +3683,8 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## test:gate red while the product is fine: selectors of a UI that was replaced
 
 **Signal:** most gate specs time out waiting for `motion-editor`, `editor-stage` or `input.hex`; the same flows work by hand. **Move:** probe the live DOM once (list `data-testid`s after the action) before editing specs; the inspector is `motion-inspector`, the fill hex is `Fill colour hex`, a text node mounts its prompt on click, `gpu-canvas` is `core-canvas`. A selector that matches a Vite dev module URL (`/frame-outlines`) is a test bug, match the API path.
+
+## Agent worktrees
+
+### The Vite dev server in a worktree serves stale code after an edit
+**Signal:** a browser check after an edit shows the old behaviour, client or server side, as if the change was never made; the test for it is green. **Move:** stop the dev server and start it again after every change, before each browser check; never trust HMR or a server-side reload in an agent worktree.
