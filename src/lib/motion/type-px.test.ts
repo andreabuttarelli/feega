@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fractionOf, pxOf, textMeta } from './type-px';
+import { fractionOf, pxOf, textFace, textMetrics } from './type-px';
 
 describe('type px', () => {
   it('converts a frame fraction to px and back on the short side', () => {
@@ -8,7 +8,9 @@ describe('type px', () => {
   });
 
   it('describes a text style in px with leading as a ratio', () => {
-    expect(textMeta({ font: 'Manrope', weight: 500, size: 0.0364, leading: 1 }, 1080)).toBe('Manrope 500 · 39 px / 1');
-    expect(textMeta({}, 1080)).toBe('');
+    const look = { font: 'Manrope', weight: 500, size: 0.0364, leading: 1 };
+    expect(textFace(look)).toBe('Manrope 500');
+    expect(textMetrics(look, 1080)).toBe('39 px / 1');
+    expect(textFace({}) + textMetrics({}, 1080)).toBe('');
   });
 });

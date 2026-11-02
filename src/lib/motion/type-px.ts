@@ -4,9 +4,9 @@ export const pxOf = (fraction: number, unit: number) => Math.round(fraction * un
 
 export const fractionOf = (px: number, unit: number) => px / unit;
 
-export function textMeta(look: TextLook, unit: number): string {
-  const face = [look.font, look.weight].filter((v) => v !== undefined).join(' ');
+export const textFace = (look: TextLook) => [look.font, look.weight].filter((v) => v !== undefined).join(' ');
+
+export function textMetrics(look: TextLook, unit: number): string {
   const size = look.size === undefined ? '' : `${pxOf(look.size, unit)} px`;
-  const metrics = [size, look.leading === undefined ? '' : `${look.leading}`].filter(Boolean).join(' / ');
-  return [face, metrics].filter(Boolean).join(' · ');
+  return [size, look.leading === undefined ? '' : `${look.leading}`].filter(Boolean).join(' / ');
 }

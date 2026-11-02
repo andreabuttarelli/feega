@@ -5,13 +5,15 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import ColorField from './ColorField.svelte';
   import NumberField from './NumberField.svelte';
+  import FontPicker from './FontPicker.svelte';
+  import { fontPreviewHref } from '$lib/design/font-preview';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
   import { TYPE, TYPE_SIZE } from '@feega/motion-core/motion/components';
   import { styleLabel } from '$lib/motion/style-library';
   import { swatchOf } from '$lib/motion/fill/swatch';
-  import { fractionOf, pxOf, textMeta } from '$lib/motion/type-px';
+  import { fractionOf, pxOf, textFace, textMetrics } from '$lib/motion/type-px';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
 
   const DEFAULT_UNIT = 1080;
@@ -37,10 +39,21 @@
   };
   const meta = (style: Style) => {
     if (style.kind === StyleKind.Text) {
-      return textMeta(style, unit);
+      return { face: textFace(style), metrics: textMetrics(style, unit) };
     }
-    return style.kind === StyleKind.Colour ? color(style.color) : styleLabel(style);
+    return { face: '', metrics: style.kind === StyleKind.Colour ? color(style.color) : styleLabel(style) };
   };
+
+  const SAMPLE = 'Aa';
+  const previews = $derived.by(() => {
+    const weights = new Map<string, Set<number>>();
+    for (const [, style] of entries) {
+      if (style.kind === StyleKind.Text && style.font) {
+        weights.set(style.font, (weights.get(style.font) ?? new Set()).add(style.weight ?? 400));
+      }
+    }
+    return [...weights].map(([font, w]) => fontPreviewHref([font], { text: SAMPLE, weights: [...w].sort((a, b) => a - b) }));
+  });
 
   let open = $state<string | null>(null);
 
@@ -94,6 +107,10 @@
   };
 </script>
 
+<svelte:head>
+  {#each previews as href (href)}<link rel="stylesheet" {href} />{/each}
+</svelte:head>
+
 <section class="library" data-testid="style-library">
   {#if styleLibrary.failed}<p class="muted" data-testid="style-library-failed">A style change could not be saved and was undone.</p>{/if}
   {#each GROUPS as group (group.title)}
@@ -112,13 +129,14 @@
           <Popover.Root open={open === name} onOpenChange={(next) => toggle(name, next)}>
             <Popover.Trigger class="row" data-testid="style-library-row" data-kind={style.kind} data-style={name}>
               {#if style.kind === StyleKind.Text}
-                <span class="aa" style:font-family={style.font ? `'${style.font}', sans-serif` : null} style:font-weight={style.weight}>Aa</span>
+                <span class="aa" style:font-family={style.font ? `'${style.font}', sans-serif` : null} style:font-weight={style.weight}>{SAMPLE}</span>
               {:else}
                 <span class="swatch" data-testid={`style-library-swatch-${name}`} style:background={chip ?? 'var(--ui-input)'}></span>
               {/if}
+              {@const m = meta(style)}
               <span class="name">{name}</span>
-              <span class="muted meta">{meta(style)}</span>
-              {#if style.kind === StyleKind.Text && chip}<span class="dot" style:background={chip}></span>{/if}
+              <span class="muted meta"><span class="face">{m.face}</span>{#if m.face && m.metrics}<span>&nbsp;·&nbsp;</span>{/if}<span class="metrics">{m.metrics}</span></span>
+              <span class="trail">{#if style.kind === StyleKind.Text && chip}<span class="dot" style:background={chip}></span>{/if}</span>
             </Popover.Trigger>
             <Popover.Content side="left" class="style-editor w-64 gap-2 p-3" onkeydown={closeOnEnter}>
               <div class="head">
@@ -131,7 +149,7 @@
                 </DropdownMenu.Root>
               </div>
               {#if style.kind === StyleKind.Text}
-                <input class="text" type="text" placeholder="Font" value={style.font ?? ''} aria-label="Font" data-testid={`style-library-font-${name}`} onchange={(e) => edit(name, style, { font: e.currentTarget.value.trim() || undefined })} />
+                <span data-testid={`style-library-font-${name}`}><FontPicker value={style.font ?? ''} fonts={[]} brand={tokens.fonts ?? []} onpick={(family) => edit(name, style, { font: family })} /></span>
                 <div class="grid">
                   <span data-testid={`style-library-size-${name}`}><NumberField label="Size" name="Size" unit="px" value={pxOf(style.size ?? 0, unit)} range={{ min: Math.ceil(TYPE_SIZE.min * unit), max: TYPE_SIZE.max * unit, step: 1 }} onchange={(px) => edit(name, style, { size: fractionOf(px, unit) })} /></span>
                   <span data-testid={`style-library-weight-${name}`}><NumberField label="W" name="Weight" value={style.weight ?? 400} range={{ min: TYPE.weight.min, max: TYPE.weight.max, step: 100 }} onchange={(v) => edit(name, style, { weight: Math.round(v) })} /></span>
@@ -178,7 +196,7 @@
 
   .library :global(.row) {
     display: grid;
-    grid-template-columns: 24px auto 1fr auto;
+    grid-template-columns: 24px minmax(0, auto) minmax(0, 1fr) 8px;
     align-items: center;
     gap: var(--ui-space-2);
     width: 100%;
@@ -221,11 +239,31 @@
     white-space: nowrap;
   }
 
-  .meta {
+  .name {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .meta {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
     white-space: nowrap;
-    text-align: right;
+  }
+
+  .face {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .metrics {
+    flex: none;
+  }
+
+  .trail {
+    display: grid;
+    place-items: center;
   }
 
   .muted {
