@@ -4,8 +4,8 @@ import { STROKED, elementStrokes, strokeReplaces } from './elements';
 import { strokesSchema } from './model';
 
 describe('which elements take a stroke stack', () => {
-  it('shapes, paths and text do', () => {
-    expect(Object.keys(STROKED).sort()).toEqual(['Caption', 'Kicker', 'Shape', 'Text', 'Title']);
+  it('shapes, paths, images and text do', () => {
+    expect(Object.keys(STROKED).sort()).toEqual(['Caption', 'Image', 'Kicker', 'Shape', 'Text', 'Title']);
   });
 
   it('every stroked component stores strokes in its schema', () => {

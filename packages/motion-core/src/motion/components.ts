@@ -231,6 +231,11 @@ export const MAX_COMPOSITION_MEDIA = 40;
 
 const fillStack = () => fillsSchema.optional().meta({ control: Control.Fills, label: 'Fill', group: Group.Style });
 const strokeStack = () => strokesSchema.optional().meta({ control: Control.Strokes, label: 'Stroke', group: Group.Style });
+const rounding = () => ({
+  roundness: range(0, 0.5, 0.01, 0, 'Roundness', Group.Content),
+  corners: z.array(z.number().min(0).max(0.5)).max(4).default([]).meta({ control: Control.Corners, label: 'Corners', group: Group.Content }),
+  smoothing: range(0, 1, 0.01, 0, 'Corner smoothing', Group.Content)
+});
 const managed = (label: string) => ({ control: Control.Managed, label, group: Group.Content });
 const compositionParams = (label: string) => z.record(z.string(), z.union([z.number(), z.string()])).default({}).meta(managed(label));
 
@@ -344,10 +349,10 @@ export const COMPONENTS = {
   },
   Image: {
     label: 'Image',
-    description: 'A picture from the canvas assets. zoom (1..4) scales it inside its box around focusX/focusY, which also pan; all three take set_keyframes. Never zoom past the picture\'s pixels.',
+    description: 'A picture from the canvas assets. zoom (1..4) scales it inside its box around focusX/focusY, which also pan; all three take set_keyframes. Never zoom past the picture\'s pixels. roundness/corners/smoothing round its corners like a rect; fills paint over the picture and strokes draw around it, as on a Shape.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...crop(), zoom: range(IMAGE_ZOOM.min, IMAGE_ZOOM.max, IMAGE_ZOOM.step, IMAGE_ZOOM.fallback, IMAGE_ZOOM.label, Group.Style), ...layout({ width: 1, height: 1 }) }).strict()
+    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...crop(), zoom: range(IMAGE_ZOOM.min, IMAGE_ZOOM.max, IMAGE_ZOOM.step, IMAGE_ZOOM.fallback, IMAGE_ZOOM.label, Group.Style), ...rounding(), fills: fillStack(), strokes: strokeStack(), ...layout({ width: 1, height: 1 }) }).strict()
   },
   Video: {
     label: 'Video',
@@ -386,9 +391,7 @@ export const COMPONENTS = {
         shape: choice(SHAPES_2D, ShapeKind.Line, 'Shape', Group.Content),
         path: pathString.default('').meta(managed('Path')),
         network: networkSchema.optional().meta(managed('Vector network')),
-        roundness: range(0, 0.5, 0.01, 0, 'Roundness', Group.Content),
-        corners: z.array(z.number().min(0).max(0.5)).max(4).default([]).meta({ control: Control.Corners, label: 'Corners', group: Group.Content }),
-        smoothing: range(0, 1, 0.01, 0, 'Corner smoothing', Group.Content),
+        ...rounding(),
         sides: range(3, 64, 1, 6, 'Sides', Group.Content),
         points: range(3, 64, 1, 5, 'Points', Group.Content),
         innerRadius: range(0.05, 1, 0.01, 0.5, 'Inner radius', Group.Content),

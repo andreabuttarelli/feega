@@ -25,10 +25,11 @@ const ALL: readonly Section[] = SECTION_ORDER;
 const PLACED = [Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Transform];
 const VISUAL = [Section.Content, ...PLACED, Section.Layer, Section.Fill, Section.Effects, Section.Colours, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
 const PICTURE = [Section.Content, ...PLACED, Section.Layer, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
+const DRESSED_PICTURE = [...PICTURE, Section.Fill, Section.Stroke];
 
 const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
   [ClipFamily.Text]: [...VISUAL, Section.Stroke, Section.Text],
-  [ClipFamily.Image]: PICTURE,
+  [ClipFamily.Image]: DRESSED_PICTURE,
   [ClipFamily.Video]: PICTURE,
   [ClipFamily.Audio]: [Section.Content, Section.Timing, Section.Animate],
   [ClipFamily.Shape]: [...VISUAL, Section.Stroke, Section.Shape],
