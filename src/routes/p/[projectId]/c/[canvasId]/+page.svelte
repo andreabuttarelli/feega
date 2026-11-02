@@ -62,6 +62,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { exportFailure } from '$lib/canvas/export-failure';
   import { joinGestures, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
+  import { planPlaceMany, reverseEach, type PlacedChange } from '$lib/canvas/place-many';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { inverseResize, resizeStale, sameBox, type ResizeGesture } from '$lib/canvas/resize-gesture';
   import type { TileBox } from '$lib/components/canvas/flow-types';
@@ -619,7 +620,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const turn = box.rotation - (layoutOf(node.data).rotation ?? 0);
     if (turn) {
-      turnGroup({ id, degrees: turn });
+      void turnGroup({ id, degrees: turn });
     }
     if (box.x !== node.x || box.y !== node.y) {
       void move(id, box.x, box.y);
@@ -635,10 +636,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  function turnGroup({ id, degrees }: Turn): boolean {
+  function turnGroup({ id, degrees }: Turn): Promise<unknown> | null {
     const group = nodes.find((n) => n.id === id);
     if (!group) {
-      return false;
+      return null;
     }
     const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
     const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
@@ -646,8 +647,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       const t = turned.get(n.id);
       return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
     });
-    void post('rotateGroup', { id, degrees: String(degrees) });
-    return true;
+    return post('rotateGroup', { id, degrees: String(degrees) });
   }
 
   function groupElements(ids: string[], after?: (groupId: string) => Promise<void>) {
@@ -1687,7 +1687,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
   type ResizeEntry = { source: 'resize'; gesture: ResizeGesture; inner: StackEntry[] };
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -2946,7 +2946,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await sized;
   }
 
-  async function resizeTile(id: string, before: TileBox, after: TileBox) {
+  async function resizedEntry(id: string, before: TileBox, after: TileBox): Promise<ResizeEntry | null> {
     const moved = after.x !== before.x || after.y !== before.y;
     const inner = await undoStack.collect(async () => {
       const placed = moved ? move(id, after.x, after.y) : null;
@@ -2956,9 +2956,43 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const node = nodes.find((n) => n.id === id);
     const landed = node ? { x: node.x, y: node.y, w: node.w, h: node.h } : after;
     if (sameBox(landed, before) && !inner.length) {
-      return;
+      return null;
     }
-    undoStack.push({ source: 'resize', gesture: { nodeId: id, before, after: landed }, inner });
+    return { source: 'resize', gesture: { nodeId: id, before, after: landed }, inner };
+  }
+
+  async function resizeTile(id: string, before: TileBox, after: TileBox) {
+    const entry = await resizedEntry(id, before, after);
+    if (entry) {
+      undoStack.push(entry);
+    }
+  }
+
+  async function placeMany(changes: PlacedChange[]) {
+    const plan = planPlaceMany(changes);
+    const landing = plan.turns.map((turn) => ({ turn, landed: turnGroup(turn) }));
+    await Promise.all(landing.map((t) => t.landed));
+    const turned: StackEntry[] = landing.filter((t) => t.landed).map(({ turn }) => ({ source: 'turn', turn }));
+    const gesture = buildMoveGesture(
+      plan.moves.map((m) => ({ nodeId: m.id, after: { x: m.x, y: m.y } })),
+      (nodeId) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        return node ? { x: node.x, y: node.y } : null;
+      }
+    );
+    const placed = Promise.all(plan.moves.map((m) => move(m.id, m.x, m.y)));
+    const sized: ResizeEntry[] = [];
+    for (const r of plan.resizes) {
+      const entry = await resizedEntry(r.id, r.before, r.after);
+      if (entry) {
+        sized.push(entry);
+      }
+    }
+    await placed;
+    const steps = [...turned, ...(gesture ? [{ source: 'move', gesture } as const] : []), ...sized];
+    if (steps.length) {
+      undoStack.push({ source: 'many', steps });
+    }
   }
 
   async function putBox(id: string, box: TileBox) {
@@ -4159,10 +4193,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     if (entry.source === 'turn') {
       const back = undoTurn(entry.turn);
-      return turnGroup(back) ? { source: 'turn', turn: back } : null;
+      const landed = turnGroup(back);
+      await landed;
+      return landed ? { source: 'turn', turn: back } : null;
     }
     if (entry.source === 'resize') {
       return reverseResize(entry, way);
+    }
+    if (entry.source === 'many') {
+      const steps = await reverseEach(entry.steps, (step) => reverse(step, way));
+      return steps.length ? { source: 'many', steps } : null;
     }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => (out = { source: 'move', gesture: redo }));
@@ -4365,6 +4405,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onMoveEnd={moveEnd}
     onResize={resize}
     onResizeEnd={resizeTile}
+    onPlaceMany={placeMany}
     onPlace={storeSize}
     onSettle={settleHost}
     onRename={renameNode}

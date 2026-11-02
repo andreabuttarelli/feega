@@ -4,6 +4,7 @@ import { MotionFormat, findClip, newMotionDoc } from '@feega/motion-core/motion/
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { MAX_VIEWS_PER_TURN } from './frames';
+import { compBox } from '$lib/motion/comp-frame';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -454,6 +455,18 @@ describe('component variants through the agent', () => {
 
     const picked = String(findClip(session.doc, instance)?.clip.props.comp);
     expect(session.doc.comps[picked].component?.variant).toEqual({ Size: 'L', State: 'hover' });
+  });
+
+  it('resize-set-main gives the main of a set the size asked, in frame px', async () => {
+    const { run, session, comp, instance } = await withButton();
+
+    const out = await run('component', { action: 'resize-set-main', clip_id: instance, width: 300, height: 120 });
+    const box = compBox(session.doc.comps[comp], session.doc)!;
+
+    expect(out.ok).toBe(true);
+    expect(Math.round(box.right - box.left)).toBe(300);
+    expect(Math.round(box.bottom - box.top)).toBe(120);
+    expect((await run('component', { action: 'resize-set-main', clip_id: instance })).ok).toBe(false);
   });
 
   it('set-preferred stores the suggested swaps of an instance-swap property', async () => {

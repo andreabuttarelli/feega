@@ -143,8 +143,7 @@
   import { appendVariant } from '$lib/motion/variants';
   import VariantPlus from '../VariantPlus.svelte';
   import ComponentSetOutline from '../ComponentSetOutline.svelte';
-  import { addSetVariant, resizeSetMain, setMainOf } from '$lib/motion/component-set';
-  import { compBox } from '$lib/motion/comp-frame';
+  import { addSetVariant, mainDragged, setMainOf } from '$lib/motion/component-set';
   import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
@@ -242,7 +241,8 @@
   import { engineOf } from '@feega/motion-core/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
-  import { dragAngle, followGroup } from '$lib/canvas/node-layout';
+  import { dragAngle, followGroup, type Placed } from '$lib/canvas/node-layout';
+  import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
@@ -322,8 +322,9 @@
   const tier = $derived(assetTier(view.zoom));
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
-  let turning = $state<{ id: string; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) }, liveOf(t.id)?.doc ?? null)));
+  let turning = $state<ReadonlyMap<string, number>>(new Map());
+  let spin = $state<{ box: Box; degrees: number } | null>(null);
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -614,6 +615,28 @@
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && !selectedBoxes[0].locked && editable ? selectedBoxes[0] : null);
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && !selectedBoxes[0].locked && editable);
+  const transformable = (t: (typeof placed)[number]) => t.minW != null && t.minH != null && !t.locked;
+  const placedOf = (t: (typeof placed)[number]): Placed => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 });
+  const many = $derived(editable && selectedBoxes.length > 1 && selectedBoxes.every(transformable) ? selectedBoxes.map(placedOf) : []);
+  const manyBox = $derived(many.length ? selectionBox(many) : null);
+  const manyQuad = $derived.by(() => {
+    const box = spin?.box ?? manyBox;
+    if (!box) {
+      return null;
+    }
+    const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    const r = ((spin?.degrees ?? 0) * Math.PI) / 180;
+    return [
+      [box.x, box.y],
+      [box.x + box.w, box.y],
+      [box.x + box.w, box.y + box.h],
+      [box.x, box.y + box.h]
+    ].map(([x, y]) => {
+      const dx = x - centre.x;
+      const dy = y - centre.y;
+      return [view.x + (centre.x + dx * Math.cos(r) - dy * Math.sin(r)) * view.zoom, view.y + (centre.y + dx * Math.sin(r) + dy * Math.cos(r)) * view.zoom] as const;
+    });
+  });
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
@@ -815,8 +838,10 @@
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
-    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number }; main?: string }
+    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number }; main?: string; dragged?: Box }
     | { kind: GestureKind.Rotate; id: string; centre: Point; start: Point; base: number; degrees: number }
+    | { kind: GestureKind.ResizeMany; unit: [number, number]; start: Point; box: Box; items: Placed[] }
+    | { kind: GestureKind.TurnMany; centre: Point; start: Point; box: Box; items: Placed[] }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
     | { kind: GestureKind.PickEdge; edgeId: string };
@@ -1618,7 +1643,8 @@
       runQuote: props.runQuoteFor?.(ids) ?? null,
       onpropertychange: (patch) => props.onPropertyChange?.(ids, patch),
       onalign: (edge) => alignSelection(ids, edge),
-      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis))
+      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis)),
+      box: many.length ? { items: many, set: (field, value) => placeAll(many, withField(many, field, value)) } : null
     });
     return () => selectionProperties.clear();
   });
@@ -1703,21 +1729,37 @@
     return main?.component === 'Precomp' ? main.id : undefined;
   }
 
-  function resizeSetMainBy(nodeId: string, clip: string, by: { w: number; h: number }, was: Box) {
-    const saver = saverOf(nodeId);
-    const before = saver?.history.present;
-    const main = before?.tracks.flatMap((t) => t.clips).find((c) => c.id === clip);
-    const box = before && main ? compBox(before.comps[String(main.props.comp)], before) : null;
-    if (!before || !box) {
+  function mainResizedTo(nodeId: string, clip: string, was: Box, to: Box) {
+    const before = saverOf(nodeId)?.history.present;
+    return before ? mainDragged(before, clip, { w: to.w - was.w, h: to.h - was.h }, was) : null;
+  }
+
+  function showMainResized(nodeId: string, clip: string, was: Box, to: Box) {
+    const dragged = mainResizedTo(nodeId, clip, was, to);
+    const live = liveOf(nodeId);
+    if (!dragged?.result.ok || !live) {
       return;
     }
-    const perPx = { x: before.width / was.w, y: before.height / was.h };
-    const size = { width: box.right - box.left + by.w * perPx.x, height: box.bottom - box.top + by.h * perPx.y };
-    const resized = resizeSetMain(before, clip, size);
-    commit(nodeId, resized, 'Resized the main component');
-    if (resized.ok) {
-      props.onNodeSize?.(nodeId, resized.doc.width / perPx.x, resized.doc.height / perPx.y);
+    liveDocs.set(nodeId, { ...live, doc: dragged.result.doc });
+    overrides = new Map([[nodeId, { x: was.x, y: was.y, ...dragged.node }]]);
+  }
+
+  function unshowMainResized(nodeId: string) {
+    const live = liveOf(nodeId);
+    const present = saverOf(nodeId)?.history.present;
+    if (live && present) {
+      liveDocs.set(nodeId, { ...live, doc: present });
     }
+  }
+
+  function resizeSetMainBy(nodeId: string, clip: string, was: Box, to: Box) {
+    const dragged = mainResizedTo(nodeId, clip, was, to);
+    if (!dragged?.result.ok) {
+      unshowMainResized(nodeId);
+      return;
+    }
+    commit(nodeId, dragged.result, 'Resized the main component');
+    props.onNodeSize?.(nodeId, dragged.node.w, dragged.node.h);
   }
 
   function editFrameDoc(nodeId: string, change: FrameDocEdit, summary: string): boolean {
@@ -2270,6 +2312,48 @@
     gesturing = true;
   }
 
+  const MANY_MIN = { w: 1, h: 1 };
+
+  function grabMany(grip: Grip, handle: number, e: PointerEvent) {
+    const turns = grip === Grip.Rotate && selectedBoxes.every((t) => t.rotatable);
+    if (!manyBox || e.button !== PRIMARY_BUTTON || (grip !== Grip.Scale && !turns)) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    const start = toWorld(view, local(e));
+    const centre = { x: manyBox.x + manyBox.w / 2, y: manyBox.y + manyBox.h / 2 };
+    active = turns ? { kind: GestureKind.TurnMany, centre, start, box: manyBox, items: many } : { kind: GestureKind.ResizeMany, unit: handlesOf(UNIT_SQUARE)[handle].unit, start, box: manyBox, items: many };
+    gesturing = true;
+  }
+
+  function placeAll(before: Placed[], after: Placed[]) {
+    props.onPlaceMany?.(before.map((b, i) => ({ before: b, after: after[i] })));
+  }
+
+  function showMany(next: Placed[]) {
+    overrides = new Map(next.map((n) => [n.id, { x: n.x, y: n.y, w: n.w, h: n.h }]));
+    turning = new Map(next.map((n) => [n.id, n.rotation]));
+    props.onLive?.(next.map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h })));
+  }
+
+  function endMany(items: Placed[]) {
+    props.onLive?.([]);
+    const changes = items.flatMap((before) => {
+      const box = overrides.get(before.id);
+      return box ? [{ before, after: { ...before, ...box, rotation: turning.get(before.id) ?? before.rotation } }] : [];
+    });
+    if (changes.length) {
+      props.onPlaceMany?.(changes);
+    }
+    spin = null;
+    turning = new Map();
+    settleOverrides();
+  }
+
   function resizeHost(nodeId: string, handle: number, e: PointerEvent, main?: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -2611,7 +2695,9 @@
         ghost = { from, at: w, ok: false };
         return { kind: GestureKind.Connect, from };
       },
-      [GestureKind.PickEdge]: () => (hit.kind === HitKind.Edge ? { kind: GestureKind.PickEdge, edgeId: hit.edgeId } : null)
+      [GestureKind.PickEdge]: () => (hit.kind === HitKind.Edge ? { kind: GestureKind.PickEdge, edgeId: hit.edgeId } : null),
+      [GestureKind.ResizeMany]: () => null,
+      [GestureKind.TurnMany]: () => null
     };
     active = START[kind]();
     gesturing = active !== null;
@@ -2709,12 +2795,17 @@
         props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
       },
       [GestureKind.Resize]: (a) => {
-        if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id))) {
+        if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id) && !overrides.has(a.id))) {
+          return;
+        }
+        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
+        const box = snapResized(a, free, e.shiftKey, e.altKey);
+        if (a.main) {
+          a.dragged = box;
+          showMainResized(a.id, a.main, a.box, box);
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
-        const box = snapResized(a, free, e.shiftKey, e.altKey);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
@@ -2724,7 +2815,23 @@
         }
         const target = a.base + dragAngle(a.centre, a.start, w);
         a.degrees = e.shiftKey ? Math.round(target / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : target;
-        turning = byId.get(a.id)?.members?.length ? null : { id: a.id, degrees: a.degrees };
+        turning = byId.get(a.id)?.members?.length ? new Map() : new Map([[a.id, a.degrees]]);
+      },
+      [GestureKind.ResizeMany]: (a) => {
+        if (a.kind !== GestureKind.ResizeMany || (!far && !overrides.size)) {
+          return;
+        }
+        const to = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, MANY_MIN, { shift: e.shiftKey, alt: e.altKey }, 0);
+        showMany(scaledTo(a.items, a.box, to));
+      },
+      [GestureKind.TurnMany]: (a) => {
+        if (a.kind !== GestureKind.TurnMany || (!far && !spin)) {
+          return;
+        }
+        const swept = dragAngle(a.centre, a.start, w);
+        const degrees = e.shiftKey ? Math.round(swept / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : swept;
+        spin = { box: a.box, degrees };
+        showMany(turnedAbout(a.items, a.centre, degrees));
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -2801,15 +2908,15 @@
         props.onLive?.([]);
         snapGuides = [];
         const box = overrides.get(a.id);
-        if (box && a.main) {
-          resizeSetMainBy(a.id, a.main, { w: box.w - a.box.w, h: box.h - a.box.h }, a.box);
+        if (a.main && a.dragged) {
+          resizeSetMainBy(a.id, a.main, a.box, a.dragged);
         } else if (box) {
           props.onResizeEnd?.(a.id, a.box, { x: box.x, y: box.y, w: box.w, h: box.h });
         }
         settleOverrides();
       },
       [GestureKind.Rotate]: () => {
-        turning = null;
+        turning = new Map();
         if (a.kind === GestureKind.Rotate && a.degrees !== a.base) {
           props.onRotate?.(a.id, a.degrees - a.base);
         }
@@ -2835,6 +2942,8 @@
           props.onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
         }
       },
+      [GestureKind.ResizeMany]: () => a.kind === GestureKind.ResizeMany && endMany(a.items),
+      [GestureKind.TurnMany]: () => a.kind === GestureKind.TurnMany && endMany(a.items),
       [GestureKind.PickEdge]: () => {
         if (a.kind !== GestureKind.PickEdge) {
           return;
@@ -2851,8 +2960,12 @@
   }
 
   function cancelGesture() {
+    if (active?.kind === GestureKind.Resize && active.main) {
+      unshowMainResized(active.id);
+    }
     active = null;
-    turning = null;
+    turning = new Map();
+    spin = null;
     gesturing = false;
     resizing = new Set();
     marquee = null;
@@ -3813,6 +3926,9 @@
         {/if}
       {/snippet}
     </FrameOverlays>
+    {#if manyQuad}
+      <FrameSelection clip="" quad={manyQuad} kind={SelectionKind.Many} ongrab={grabMany} />
+    {/if}
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />

@@ -1,3 +1,4 @@
+import type { PlacedChange } from '$lib/canvas/place-many';
 import type { ActionResult } from '@sveltejs/kit';
 import type { Snippet } from 'svelte';
 import type { Offset } from '$lib/canvas/duplicate-plan';
@@ -181,6 +182,7 @@ export type FlowProps = {
   ) => void;
   onResize?: (id: string, w: number, h: number) => void;
   onResizeEnd?: (id: string, before: TileBox, after: TileBox) => void;
+  onPlaceMany?: (changes: PlacedChange[]) => void;
   onPlace?: (id: string, w: number, h: number) => void;
   onSettle?: (id: string, box: HostBox) => void;
   peers?: CanvasPeer[];
