@@ -5,7 +5,7 @@ import { mainNav } from './main-nav.svelte';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
 import { ungroupClip } from '$lib/motion/group';
 import { groupLight, ungroupLight } from '$lib/motion/light-group';
-import { removeStack, resizeToFit, wrapInFrame, wrapWithStack } from '$lib/motion/layout/ops';
+import { addAutoLayout, removeStack, resizeToFit, wrapInFrame, wrapWithStack } from '$lib/motion/layout/ops';
 import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
@@ -105,7 +105,16 @@ function framed(ctx: BarCtx): Done | null {
   return done(wrapInFrame(ctx.doc, ctx.selection, container, ctx.newId()), 'Framed the selection', [container]);
 }
 
+const loneFrame = (doc: MotionDoc, selection: readonly string[]): MotionClip | null => {
+  const [clip] = selection.length === 1 ? clipsOf(doc, selection) : [];
+  return clip?.clipContent && !clip.autoLayout ? clip : null;
+};
+
 function wrapStack(ctx: BarCtx): Done | null {
+  const frame = loneFrame(ctx.doc, ctx.selection);
+  if (frame) {
+    return done(addAutoLayout(ctx.doc, frame.id), 'Added auto layout', [frame.id]);
+  }
   const { result, containerId } = wrapWithStack(ctx.doc, ctx.selection, ctx.newId);
   return done(result, 'Wrapped with a stack', [containerId]);
 }

@@ -334,7 +334,7 @@ const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.s
 const stackElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 1') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
-const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a frame, element or group on the canvas; a group turns its members with it'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
 const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });

@@ -4,12 +4,14 @@ import type { FrameExtras } from '$lib/canvas/frame-extras.svelte';
 import { docMode, type DocMode } from '@feega/motion-core/motion/doc';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { ElementHost } from '$lib/motion/element-host';
+import type { Flip } from '$lib/motion/layer-props';
+import type { Edge } from '$lib/motion/space';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
 export const UNNAMED_FRAME = 'Frame';
 const TEXT_FIELDS = new Set(['TEXTAREA', 'INPUT']);
 
-export type NodePlace = { x: number; y: number; set: (x: number, y: number) => void };
+export type NodePlace = { x: number; y: number; rotation: number; set: (x: number, y: number) => void; turn: (degrees: number) => void; flip: (flip: Flip) => void; align: ((edge: Edge) => void) | null };
 
 export type OpenFrame = { nodeId: string; selection: string[]; playhead: number; mode: DocMode };
 

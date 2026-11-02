@@ -1412,7 +1412,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       displayName: n.displayName,
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
-      rotatable: !!motionOf(n) && chrome.turns,
+      rotatable: !!motionOf(n),
       behind: chrome.behind || n.type === SECTION_TYPE,
       members: chrome.behind || n.type === SECTION_TYPE ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
@@ -1684,7 +1684,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
   type ResizeEntry = { source: 'resize'; gesture: ResizeGesture; inner: StackEntry[] };
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'batch'; entries: StackEntry[] };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -4148,8 +4148,27 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     [Way.Forward]: (step) => step.forward()
   };
 
+  async function reverseAll(entries: readonly StackEntry[], way: Way): Promise<StackEntry> {
+    const order = way === Way.Back ? [...entries].reverse() : entries;
+    const done: StackEntry[] = [];
+    for (const entry of order) {
+      const again = await reverse(entry, way);
+      if (again) {
+        done.push(again);
+      }
+    }
+    return { source: 'batch', entries: way === Way.Back ? done.reverse() : done };
+  }
+
+  function batch(run: () => void) {
+    void undoStack.collect(async () => run()).then((entries) => entries.length && undoStack.push({ source: 'batch', entries }));
+  }
+
   async function reverse(entry: StackEntry, way: Way): Promise<StackEntry | null> {
     let out: StackEntry | null = null;
+    if (entry.source === 'batch') {
+      return reverseAll(entry.entries, way);
+    }
     if (entry.source === 'frame') {
       STEP[way](entry.step);
       return entry;
@@ -4391,6 +4410,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDraw={drawElement}
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
+    onBatch={batch}
     onAddBeside={addFrameBeside}
     onSection={wrapInSection}
     onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}

@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
-import { laidClip, setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
+import { laidClip, setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame, addAutoLayout, stackFrame } from './ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 import { ClipOp, runClipOp } from '../clip-ops';
@@ -236,6 +236,33 @@ describe('wrapInFrame', () => {
 
   it('is called Frame, not the box it is drawn with', () => {
     expect(clip(framed, 'box').name).toBe('Frame');
+  });
+
+  it('clips its content, as a frame does', () => {
+    expect(clip(framed, 'box').clipContent).toBe(true);
+  });
+});
+
+describe('auto layout added to a frame', () => {
+  it('a frame inside a frame lays out the children it already holds', () => {
+    const stacked = must(addAutoLayout(must(wrapInFrame(row, ['a', 'b'], 'box', 'lane')), 'box'));
+
+    expect(clip(stacked, 'box').autoLayout?.order).toEqual(['a', 'b']);
+    expect(clip(stacked, 'box').autoLayout?.direction).toBe(Direction.Horizontal);
+  });
+
+  it('a frame on the canvas lays out every layer on its own surface, keeping its size', () => {
+    const stacked = must(stackFrame(row, 'surface'));
+    const surface = clip(stacked, stacked.surface!);
+
+    expect(['a', 'b', 'k'].map((id) => clip(stacked, id).parent)).toEqual([surface.id, surface.id, surface.id]);
+    expect(surface.autoLayout?.order).toEqual(['a', 'b', 'k']);
+    expect(surface.layoutItem?.width ?? Sizing.Fixed).toBe(Sizing.Fixed);
+    expect(clip(withAutoLayout(stacked), 'b').props.x).not.toBe(0.5);
+  });
+
+  it('refuses a container with nothing to lay out', () => {
+    expect(addAutoLayout(row, 'a').ok).toBe(false);
   });
 });
 

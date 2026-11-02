@@ -27,6 +27,8 @@
   import FrameColoursSection from '$lib/components/motion/FrameColoursSection.svelte';
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
   import FramePlaceSection from './FramePlaceSection.svelte';
+  import FrameAutoLayoutEntry from './FrameAutoLayoutEntry.svelte';
+  import { stackFrame } from '$lib/motion/layout/ops';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -107,8 +109,9 @@
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
 
 {#snippet frameLead()}
-  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} host={frameProperties.host} />{/if}
+  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} />{/if}
   {#if doc}<FramePresetSection {doc} onchange={editGuides} />{/if}
+  {#if surfaced && !surface?.autoLayout}<FrameAutoLayoutEntry onadd={() => surfaced && editGuides(stackFrame(surfaced, SURFACE_ID), 'Added auto layout')} />{/if}
 {/snippet}
 
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}

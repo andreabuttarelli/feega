@@ -16,6 +16,7 @@ import { Command } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 import { EditMode } from '$lib/motion/edit-mode';
+import { Flip } from '$lib/motion/layer-props';
 
 describe('frame view shortcuts', () => {
   it('toggles the rulers with alt+shift+R even where alt rewrites the key', () => {
@@ -412,5 +413,15 @@ describe('node hide and lock keys', () => {
   it('⇧⌘H hides and ⇧⌘L locks the selected nodes', () => {
     expect(matchCanvasShortcut({ key: 'h', shiftKey: true, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'toggle-hidden' });
     expect(matchCanvasShortcut({ key: 'L', shiftKey: true, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'toggle-locked' });
+  });
+});
+
+describe('flipping nodes on the canvas', () => {
+  const at = { tagName: 'DIV' } as unknown as EventTarget;
+  const press = (key: string) => matchCanvasShortcut({ key, shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent);
+
+  it('⇧H and ⇧V flip the selected frames and groups', () => {
+    expect(press('H')).toEqual({ id: 'flip', flip: Flip.Horizontal });
+    expect(press('V')).toEqual({ id: 'flip', flip: Flip.Vertical });
   });
 });

@@ -100,7 +100,7 @@
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-  import { stackPlaced } from '$lib/motion/layout/ops';
+  import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
   import { dragInStack, dropInStack, followCursor, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
@@ -202,7 +202,7 @@
   import { GraphScope } from '$lib/canvas/run-graph';
   import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, enabledFor, isCanvasAction, shownFor, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
-  import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { STACK_GAP, alignTiles, alignWithin, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
@@ -241,7 +241,8 @@
   import { engineOf } from '@feega/motion-core/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
-  import { dragAngle, followGroup } from '$lib/canvas/node-layout';
+  import { dragAngle, followGroup, mirrorGroup, type Placed } from '$lib/canvas/node-layout';
+  import { Flip, flipStage } from '$lib/motion/layer-props';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
@@ -2142,7 +2143,7 @@
 
   function nodePlaceOf(nodeId: string): NodePlace | null {
     const tile = byId.get(nodeId);
-    return tile ? { x: tile.x, y: tile.y, set: (x, y) => props.onMove?.(nodeId, x, y) } : null;
+    return tile ? { x: tile.x, y: tile.y, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) } : null;
   }
 
   const hostLedger = new HostLedger();
@@ -2992,6 +2993,71 @@
   }
 
   const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+
+  const holderOf = (id: string) => placed.find((t) => t.members?.includes(id)) ?? null;
+
+  function alignInHolder(id: string): ((edge: Edge) => void) | null {
+    const holder = holderOf(id);
+    const [tile] = placedBoxes([id]);
+    return holder && tile ? (edge) => placeTiles(alignWithin(tile, { id: holder.id, x: holder.x, y: holder.y, width: holder.w, height: holder.h }, edge)) : null;
+  }
+
+  const FLIP_SUMMARY: Record<Flip, string> = { [Flip.Horizontal]: 'Flipped horizontally', [Flip.Vertical]: 'Flipped vertically' };
+
+  const placedOf = (id: string): Placed | null => {
+    const t = byId.get(id);
+    return t ? { id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 } : null;
+  };
+
+  function flipOwn(id: string, flip: Flip, rotation: number) {
+    const box = placedOf(id);
+    const session = saverOf(id);
+    if (!box) {
+      return;
+    }
+    mirrorAround(byId.get(id)?.members ?? [], box, flip);
+    if (session) {
+      commit(id, { ok: true, doc: flipStage(session.history.present, flip) }, FLIP_SUMMARY[flip]);
+    }
+    if (rotation !== box.rotation) {
+      props.onRotate?.(id, rotation - box.rotation);
+    }
+  }
+
+  function mirrorAround(ids: readonly string[], about: Placed, flip: Flip) {
+    const boxes = ids.flatMap((id) => placedOf(id) ?? []);
+    const mirrored = mirrorGroup(about, boxes, flip);
+    placeTiles(mirrored.filter((m, i) => m.x !== boxes[i].x || m.y !== boxes[i].y).map(({ id, x, y }) => ({ id, x, y })));
+    for (const m of mirrored) {
+      flipOwn(m.id, flip, m.rotation);
+    }
+  }
+
+  function flipNodes(ids: readonly string[], flip: Flip) {
+    const flippable = ids.filter((id) => holdsDoc(summaries.get(id)?.type ?? '') && !byId.get(id)?.locked);
+    const boxes = flippable.flatMap((id) => placedOf(id) ?? []);
+    if (!boxes.length) {
+      return;
+    }
+    const [left, top] = [Math.min(...boxes.map((b) => b.x)), Math.min(...boxes.map((b) => b.y))];
+    const about: Placed = boxes.length === 1 ? boxes[0] : { id: '', x: left, y: top, w: Math.max(...boxes.map((b) => b.x + b.w)) - left, h: Math.max(...boxes.map((b) => b.y + b.h)) - top, rotation: 0 };
+    const run = () => mirrorAround(flippable, about, flip);
+    if (props.onBatch) {
+      props.onBatch(run);
+      return;
+    }
+    run();
+  }
+
+  function stackFrameNode(id: string): boolean {
+    const session = kindOfNode(id) === FrameKind.Frame ? saverOf(id) : null;
+    const result = session ? stackFrame(session.history.present, crypto.randomUUID().slice(0, 8)) : null;
+    if (!result?.ok) {
+      return false;
+    }
+    commit(id, result, 'Added auto layout');
+    return true;
+  }
   const alignRun = (id: AlignActionId) => (ids: string[]) => alignHere(ids, ALIGN_EDGE[id]);
 
   function selectSibling(direction: Direction) {
@@ -3129,7 +3195,8 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    'wrap-stack': () => shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected),
+    'wrap-stack': () => (selected.length === 1 && stackFrameNode(selected[0])) || (shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected)),
+    flip: (c) => c.id === 'flip' && flipNodes(selected, c.flip),
     'edit-mode': () => editorMode.toggleMotion(),
     'code-mode': () => editorMode.toggleCode(),
     timeline: () => editorMode.toggleTimeline(),
