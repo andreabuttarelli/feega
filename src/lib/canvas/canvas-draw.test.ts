@@ -6,7 +6,8 @@ import { TEXT_CLICK_PX, canvasTextClick, drawnInFrame, drawnOnCanvas } from './c
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
-import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
+import { FEEGA_TOKENS, resolveColor } from '@feega/motion-core/motion/brand';
+import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
 
 const HOST = { left: 100, top: 50, width: 1000, height: 500 };
 const ZOOM_TWO = (p: { x: number; y: number }) => ({ x: (p.x - 100) / 2, y: (p.y - 50) / 2 });
@@ -85,10 +86,17 @@ describe('a shape drawn over a frame lands inside it, on the gesture', () => {
     expect(made.ok && clipOf(made.doc, 'p1')?.props).toMatchObject({ shape: 'path', x: 0.5, y: 0.5, width: 1, height: 1 });
   });
 
-  it('a stroked path takes the ink of the frame, not of the canvas', () => {
-    const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Pen, path: 'M 200 100 L 700 500', fill: null, stroke: CANVAS_INK[CanvasTheme.Light] }, 0, 'p2');
+  it('a stroked path takes the ink the frame tools draw with, not the canvas one', () => {
+    const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Pen, path: 'M 200 100 L 700 500', fill: null, stroke: CANVAS_INK[CanvasTheme.Dark] }, 0, 'p2');
 
-    expect(made.ok && clipOf(made.doc, 'p2')?.props).toMatchObject({ fillKind: 'none', stroke: 'brand.text' });
+    expect(made.ok && clipOf(made.doc, 'p2')?.props).toMatchObject({ fillKind: 'none', stroke: DEFAULT_COLOUR.ink });
+  });
+
+  it('a line drawn from the canvas into a white frame stays visible on it', () => {
+    const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Line, from: { x: 300, y: 200 }, to: { x: 400, y: 300 } }, 0, 'l1');
+    const stroke = made.ok ? clipOf(made.doc, 'l1')?.props.stroke : null;
+
+    expect(resolveColor(stroke, FEEGA_TOKENS)).toBe(DEFAULT_COLOUR.ink);
   });
 });
 

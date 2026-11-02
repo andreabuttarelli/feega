@@ -4,6 +4,7 @@ import { CANVAS_INK, CanvasTheme, LINE_PAINT, drawClip, drawnElement, drawnOf, p
 import { mapOutline, parsePath, pathData } from '@feega/motion-core/motion/shape/geometry';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
+import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 type Point = { x: number; y: number };
@@ -66,7 +67,7 @@ export function drawnOnCanvas(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow, 
 
 type FrameBox = { x: number; y: number; w: number; h: number };
 
-const FRAME_INK = 'brand.text';
+const FRAME_INK = DEFAULT_COLOUR.ink;
 
 const framePaint = (stroked: boolean): Record<string, unknown> => (stroked ? penPaint(LINE_PAINT[DrawTool.Line](FRAME_INK)) : {});
 
