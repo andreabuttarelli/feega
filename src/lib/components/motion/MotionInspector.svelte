@@ -47,6 +47,7 @@
   import { hasSegments, segmentsOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
   import { snappedValue, steppedRange } from '$lib/motion/weight-steps';
+  import { percentShown, percentSlider, percentStored } from '$lib/motion/type-percent';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import FamilyIcon from './FamilyIcon.svelte';
   import { CLIP_FAMILIES, familyOf } from '$lib/motion/track-style';
@@ -234,8 +235,8 @@
   const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));
-  const PLACED_KEYS: ReadonlySet<string> = new Set(['x', 'y']);
-  const STACKED_KEYS: ReadonlySet<string> = new Set([...PLACED_KEYS, 'width', 'height']);
+  const SIZE_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
+  const PLACED_SIZE_KEYS: ReadonlySet<string> = new Set(['x', 'y', ...SIZE_KEYS]);
   const NO_SKIP: ReadonlySet<string> = new Set();
   const RADIUS_KEYS: ReadonlySet<string> = new Set(['roundness', 'corners']);
   const threeDProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.ThreeD));
@@ -475,9 +476,9 @@
   const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, doc));
   const depthRange = $derived(slider({ key: 'depth', ...DEPTH }));
   const fieldRange = (field: Field): Ranged => ({ key: field.key, min: field.min ?? 0, max: field.max ?? 0, step: field.step ?? 1 });
-  const fieldShown = (field: Field) => toShown(propsOwner(clip.component), field.key, Number(value(field)), doc);
-  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, v, doc);
-  const fieldSlider = (field: Field) => steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), doc));
+  const fieldShown = (field: Field) => percentShown(field.key, toShown(propsOwner(clip.component), field.key, Number(value(field)), doc));
+  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, percentStored(field.key, v), doc);
+  const fieldSlider = (field: Field) => percentSlider(field.key, steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), doc)));
   const LAID_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
   const laid = $derived(stackParent || clip.autoLayout ? (laidClip(doc, clip.id) ?? clip) : clip);
   const resolved = (key: string) => ((LAID_KEYS.has(key) ? laid : clip).props as Record<string, unknown>)[key];
@@ -836,7 +837,14 @@
 
 {#snippet layoutBody()}
   {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
-  {@render groupFields(Section.Layout, clip.autoLayout ? STACKED_KEYS : positioned ? PLACED_KEYS : NO_SKIP)}
+  {@const sizeFields = clip.autoLayout ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
+  {#if sizeFields.length}
+    <div class="size-row" data-testid="size-row">
+      <div class="grid2">{#each sizeFields as field (field.key)}<div class="grid-cell" data-prop={field.key}>{@render rangeField(field)}</div>{/each}</div>
+      <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={16} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={() => commit(setClipFlags(doc, clip.id, { lockRatio: !clip.lockRatio }), clip.lockRatio ? 'Unlocked the aspect ratio' : 'Locked the aspect ratio')} />
+    </div>
+  {/if}
+  {@render groupFields(Section.Layout, positioned || clip.autoLayout ? PLACED_SIZE_KEYS : SIZE_KEYS)}
   {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
 {/snippet}
 
@@ -1365,6 +1373,22 @@
     width: 100%;
   }
 
+  .size-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .size-row .grid2 {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .size-row > :global(.ib) {
+    flex: 0 0 var(--ui-row);
+    height: var(--ui-row);
+  }
+
   .grid2 {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1460,9 +1484,10 @@
     flex: 1;
     min-width: 0;
     height: 100%;
-    padding: 0 2px;
+    padding: 0 16px 0 2px;
     border: 0;
-    background: transparent;
+    background-color: transparent;
+    background-position: right 2px center;
     font: inherit;
     font-variant-numeric: tabular-nums;
   }
@@ -1481,17 +1506,26 @@
     padding: 0 10px;
     border: 1px solid transparent;
     border-radius: var(--ui-radius-md);
-    background: var(--ui-input);
+    background-color: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
     font-size: var(--ui-text-sm);
     transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
+  select {
+    padding-right: 26px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4l2.5 2.5L7.5 4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px 10px;
+  }
+
   input[type='text']:hover,
   textarea:hover,
   select:hover {
-    background: var(--ui-input-hover);
+    background-color: var(--ui-input-hover);
   }
 
   .appear {
@@ -1522,11 +1556,11 @@
   .blend select {
     padding-left: 32px;
     border-color: var(--ui-divider-strong);
-    background: transparent;
+    background-color: transparent;
   }
 
   .blend select:hover {
-    background: var(--ui-wash);
+    background-color: var(--ui-wash);
   }
 
   textarea {

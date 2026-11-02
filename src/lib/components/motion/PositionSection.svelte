@@ -15,9 +15,6 @@
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
-  import { setClipFlags } from '@feega/motion-core/motion/organize';
-  import { Action } from '$lib/motion/actions';
-  import IconButton from './IconButton.svelte';
   import { HORIZONTALS, Horizontal, VERTICALS, Vertical } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { Side, Toggle, pinnedHorizontally, pinnedVertically, toggleHorizontal, toggleVertical } from '$lib/motion/constraints/sides';
@@ -75,8 +72,6 @@
   const pinV = (v: Vertical) => onchange(setConstraints(doc, [clip.id], { vertical: v }), 'Changed the vertical constraint');
   const tickH = (side: Side, e: MouseEvent) => pinH(toggleHorizontal(horizontal, side, e.shiftKey ? Toggle.Both : Toggle.One));
   const tickV = (side: Side, e: MouseEvent) => pinV(toggleVertical(vertical, side, e.shiftKey ? Toggle.Both : Toggle.One));
-  const sized = $derived(typeof clip.props.width === 'number' && typeof clip.props.height === 'number');
-  const toggleRatio = () => onchange(setClipFlags(doc, clip.id, { lockRatio: !clip.lockRatio }), clip.lockRatio ? 'Unlocked the aspect ratio' : 'Locked the aspect ratio');
   const centre = () => onchange(setConstraints(doc, [clip.id], { horizontal: Horizontal.Center, vertical: Vertical.Center }), 'Centred the constraints');
 </script>
 
@@ -100,9 +95,6 @@
     <div class="row xy">
       <label class="field"><span>X</span><input type="number" step="1" value={Math.round(box.left - origin.left)} data-testid="position-x" onchange={moveX} /></label>
       <label class="field"><span>Y</span><input type="number" step="1" value={Math.round(box.top - origin.top)} data-testid="position-y" onchange={moveY} /></label>
-      {#if sized}
-        <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={ICON} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={toggleRatio} />
-      {/if}
     </div>
   {/if}
 
@@ -240,6 +232,12 @@
     font: inherit;
     outline: none;
     appearance: textfield;
+  }
+
+  .select select {
+    padding-right: 18px;
+    appearance: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4l2.5 2.5L7.5 4'/%3E%3C/svg%3E") no-repeat right 0 center / 10px 10px;
   }
 
   .field input::-webkit-inner-spin-button,

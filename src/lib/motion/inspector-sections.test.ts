@@ -36,6 +36,7 @@ describe('inspector sections', () => {
 
   it('names the look section Appearance', () => {
     expect(SECTION_TITLE[Section.Layer]).toBe('Appearance');
+    expect(SECTION_TITLE[Section.Text]).toBe('Typography');
   });
 
   it('sums a closed section up in one line', () => {
@@ -81,8 +82,8 @@ describe('inspector sections', () => {
 
   it('labels each value in English with its unit, and fills only where the range means something', () => {
     expect(fieldLook('rotateZ')).toEqual({ short: 'Rotate', unit: '°', fill: FieldFill.None });
-    expect(fieldLook('tracking')).toMatchObject({ short: 'Spacing', unit: 'em' });
-    expect(fieldLook('leading')).toMatchObject({ short: 'Line', unit: '×' });
+    expect(fieldLook('tracking')).toMatchObject({ short: 'Spacing', unit: '%' });
+    expect(fieldLook('leading')).toMatchObject({ short: 'Line', unit: '%' });
     expect(fieldLook('opacity').fill).toBe(FieldFill.Range);
     expect(fieldLook('lineHeight').short).toBeNull();
     expect(fieldLook('x', Source.Transform).short).toBe('Offset X');
