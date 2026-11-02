@@ -2158,10 +2158,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name}`;
-    if (!hold) {
-      await uploadOnCanvas(file, path, at);
+    if (hold) {
+      await uploadPicture(file, path, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at });
       return;
     }
+    if (kindOfFile(file.type) === MediaKind.Image) {
+      await uploadPicture(file, path, { on: DropOn.Canvas, x: at.x, y: at.y });
+      return;
+    }
+    await uploadOnCanvas(file, path, at);
+  }
+
+  async function uploadPicture(file: File, path: string, drop: Drop) {
     const up = await supabase.storage
       .from('canvas-assets')
       .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
@@ -2173,7 +2181,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const size = await pictureSize(file);
     await landed(post('upload', {
       path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
-      drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
+      drop: JSON.stringify(drop)
     }));
   }
 
@@ -2182,17 +2190,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function uploadOnCanvas(file: File, path: string, at: { x: number; y: number }) {
     const id = crypto.randomUUID();
-    const local = URL.createObjectURL(file);
-    if (kindOfFile(file.type) === MediaKind.Image) {
-      catalogPosters.set(id, local);
-    }
     uploadProgress.set(id, 0);
     const fields = { path, file_name: file.name, mime_type: file.type, bytes: String(file.size), x: String(at.x), y: String(at.y), node_id: id };
     const stored = storeFile(supabase, path, file, (fraction) => uploadProgress.set(id, fraction));
     await runUpload(optimisticOp(OptimisticAction.Upload, { record: pendingPicture(id, { x: at.x + UPLOAD_TILE.w / 2, y: at.y + UPLOAD_TILE.h / 2 }, UPLOAD_TILE), fields }, { nodes, edges }, { toTile: (record) => toTile(record), toEdge }, async (name, sent) => ((await stored) ? null : post(name, sent))));
     uploadProgress.delete(id);
-    catalogPosters.delete(id);
-    URL.revokeObjectURL(local);
   }
 
   const RENDER_VIEW_GAP = 24;

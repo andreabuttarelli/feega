@@ -314,6 +314,13 @@ export async function placeMedia(store: FrameStore, output: Output, drop: Extrac
   return isLanded(landed) ? done(landed) : landed;
 }
 
+export async function placeFreeMedia(store: FrameStore, place: Place & { id?: string }, output: Output, drop: CanvasDrop): Promise<Moved> {
+  const element = mediaElement(output);
+  const landing = landFree(element, drop, FRAME_OF_OUTPUT[output.kind], null, outputStage(element), newId, StillAt.Settled);
+  const landed = await land(store, place, landing, null, SUMMARY.placed);
+  return isLanded(landed) ? done(landed) : landed;
+}
+
 async function linkFrame(store: FrameStore, ask: { sourceNodeId: string; frameNodeId: string }): Promise<Moved> {
   const [found, frame] = await Promise.all([store.output(ask.sourceNodeId), store.read(ask.frameNodeId)]);
   if (!frame) {

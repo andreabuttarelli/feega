@@ -168,8 +168,6 @@
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
-  import { isSvgFile } from '$lib/canvas/system-clipboard';
-  import { isLottieFile } from '$lib/canvas/lottie-file';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
@@ -3524,7 +3522,7 @@
     const files = [...(e.dataTransfer?.files ?? [])];
     if (files.length && props.onUpload) {
       e.preventDefault();
-      files.forEach((file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? toFlow(at) : undefined));
+      files.forEach((file) => props.onUpload?.(file, toFlow(at)));
       return;
     }
     const feedImage = parseFeedImageDrag(e.dataTransfer?.getData(CANVAS_DRAG_FEED_IMAGE) ?? '');
@@ -3826,7 +3824,7 @@
       onpick={addAtCentre}
       models={hotTiles((medium) => props.modelChoicesFor?.(medium) ?? [])}
       onmodel={(model) => props.onCreateFilled?.(hotDrag(model), viewCentre())}
-      onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? viewCentre() : undefined) : undefined}
+      onupload={props.onUpload ? (file) => props.onUpload?.(file, viewCentre()) : undefined}
       oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       techniques={props.techniques}
