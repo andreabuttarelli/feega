@@ -64,10 +64,11 @@ describe('a Stack in Properties', () => {
     }
     const clip = findClip(hugged.doc, 'stack')!.clip;
     const html = render(MotionInspector, { props: { doc: hugged.doc, clip, tokens: FEEGA_TOKENS, assets: [], frame: 0, mode: EditMode.Design, onchange: () => {} } }).body;
-    const layout = html.slice(html.indexOf('data-section="layout"'));
+    const stack = html.slice(html.indexOf('data-section="stack"'));
+    const height = stack.match(/<input[^>]*data-testid="stack-size-height"[^>]*>/)?.[0] ?? '';
 
-    expect(layout).toMatch(/value="108"/);
-    expect(layout.slice(0, layout.indexOf('data-section=', 30))).not.toMatch(/value="640"/);
+    expect(height).toMatch(/value="108"/);
+    expect(html).not.toMatch(/value="640"/);
   });
 
   it('shows no Stack section on a clip outside any stack', () => {

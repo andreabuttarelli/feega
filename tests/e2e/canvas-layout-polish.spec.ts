@@ -66,6 +66,7 @@ test.describe('layout polish on the canvas @real', () => {
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, 'polish-space-between');
 
+    await page.getByTestId('auto-layout-advanced').click();
     await page.getByTestId('auto-layout-strokes-included').getByRole('radio', { name: 'No' }).click();
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, 'polish-strokes-off');
@@ -89,7 +90,8 @@ test.describe('layout polish on the canvas @real', () => {
     await page.mouse.click(r.x + r.width * 0.07, empty.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(r.x + r.width * 0.07, empty.y);
-    await expect(page.getByTestId('auto-layout-first-on-top')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('auto-layout-advanced').click({ timeout: 15_000 });
+    await expect(page.getByTestId('auto-layout-first-on-top')).toBeVisible();
     await shot(page, 'stacking-track-order');
 
     await page.getByTestId('auto-layout-first-on-top').getByRole('radio', { name: 'Yes' }).click();

@@ -23,7 +23,7 @@ export function propertiesFor(selection: { count: number; clip: string | null; p
 
 const ALL: readonly Section[] = SECTION_ORDER;
 const PLACED = [Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Transform];
-const VISUAL = [Section.Content, ...PLACED, Section.Layer, Section.Fill, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
+const VISUAL = [Section.Content, ...PLACED, Section.Layer, Section.Fill, Section.Effects, Section.Colours, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
 const PICTURE = [Section.Content, ...PLACED, Section.Layer, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
 
 const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {

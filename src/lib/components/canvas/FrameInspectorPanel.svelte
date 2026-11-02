@@ -1,5 +1,6 @@
 <script lang="ts">
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
+  import ExportSection from './ExportSection.svelte';
   import MultiInspector from '$lib/components/motion/MultiInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
@@ -166,6 +167,7 @@
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
       <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} onalign={alignPicks} />
+      {#if frameProperties.exportPicks}<ExportSection onexport={frameProperties.exportPicks} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}
         <StatesSection doc={shownDoc!} clip={shown.clip} current={statePreview.stateOf(nodeId, shown.clip.id)} commit={commitShown} onpreview={(next) => statePreview.pick(nodeId, shown.clip.id, next)} />

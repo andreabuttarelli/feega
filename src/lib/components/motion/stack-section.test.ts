@@ -23,28 +23,32 @@ const row = (() => {
 })();
 
 const clip = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip;
-const html = (doc: MotionDoc, id: string) => render(StackSection, { props: { doc, clip: clip(doc, id), commit: () => {} } }).body;
+const html = (doc: MotionDoc, id: string, advanced = false) => render(StackSection, { props: { doc, clip: clip(doc, id), commit: () => {}, advanced } }).body;
 
 describe('the stack section', () => {
-  it('a stack shows direction, alignment, stretch, gap and padding', () => {
+  it('a stack shows direction, alignment, gap and padding, and stretch in its advanced settings', () => {
     const body = html(row, 'box');
-    for (const id of ['auto-layout-align', 'auto-layout-gap', 'auto-layout-padding', 'auto-layout-stretch']) {
+    expect(body).not.toContain('data-testid="auto-layout-stretch"');
+    expect(html(row, 'box', true)).toContain('data-testid="auto-layout-stretch"');
+    for (const id of ['auto-layout-align', 'auto-layout-gap', 'auto-layout-padding-x', 'auto-layout-advanced']) {
       expect(body).toContain(`data-testid="${id}"`);
     }
     expect(body).toMatch(/aria-label="Horizontal"[^>]*aria-checked="true"|aria-checked="true"[^>]*aria-label="Horizontal"/);
     expect(body).not.toContain('auto-layout-leave');
   });
 
-  it('marks the alignment spot and space between that the layout uses', () => {
+  it('marks the alignment spot the layout uses, and space between as an Auto gap', () => {
     expect(html(row, 'box')).toMatch(/aria-label="Align start start"[^>]*aria-pressed="true"/);
-    expect(html(must(setAutoLayout(row, 'box', { justify: Justify.SpaceBetween })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-space-between"|data-testid="auto-layout-space-between"[^>]*aria-pressed="true"/);
+    const spread = html(must(setAutoLayout(row, 'box', { justify: Justify.SpaceBetween })), 'box');
+    expect(spread).toMatch(/<option[^>]*value="auto"[^>]*selected/);
+    expect(spread).toMatch(/data-testid="auto-layout-gap"[^>]*disabled|disabled[^>]*data-testid="auto-layout-gap"/);
   });
 
   it.each([
     [Justify.SpaceAround, 'auto-layout-space-around'],
     [Justify.SpaceEvenly, 'auto-layout-space-evenly']
   ])('marks %s as pressed', (justify, testid) => {
-    expect(html(must(setAutoLayout(row, 'box', { justify })), 'box')).toMatch(new RegExp(`aria-pressed="true"[^>]*data-testid="${testid}"|data-testid="${testid}"[^>]*aria-pressed="true"`));
+    expect(html(must(setAutoLayout(row, 'box', { justify })), 'box', true)).toMatch(new RegExp(`aria-pressed="true"[^>]*data-testid="${testid}"|data-testid="${testid}"[^>]*aria-pressed="true"`));
   });
 
   it('a child offers fill, absolute, reorder and leaving', () => {
@@ -56,9 +60,9 @@ describe('the stack section', () => {
     expect(body).not.toContain('auto-layout-gap');
   });
 
-  it('a child sizes in px, %, Fill or Hug, typed or picked', () => {
+  it('a child sizes Fixed, %, Fill or Hug, typed or picked', () => {
     const body = html(row, 'a');
-    for (const unit of ['>px<', '>%<', '>Fill<', '>Hug<']) {
+    for (const unit of ['>Fixed<', '>%<', '>Fill<', '>Hug<']) {
       expect(body).toContain(unit);
     }
     expect(body).toContain('data-testid="stack-size-width"');
@@ -71,7 +75,7 @@ describe('the stack section', () => {
     expect(even).not.toContain('data-testid="auto-layout-padding-top"');
     const uneven = html(must(setAutoLayout(row, 'box', { padding: { top: 8, right: 0, bottom: 0, left: 0 } })), 'box');
     expect(uneven).toContain('data-testid="auto-layout-padding-top"');
-    expect(uneven).not.toContain('data-testid="auto-layout-padding"');
+    expect(uneven).not.toContain('data-testid="auto-layout-padding-x"');
   });
 
   it('absolute is a Yes / No', () => {
@@ -85,7 +89,7 @@ describe('the stack section', () => {
   });
 
   it('marks stretch when the stack stretches its children', () => {
-    expect(html(must(setAutoLayout(row, 'box', { align: Align.Stretch })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-stretch"|data-testid="auto-layout-stretch"[^>]*aria-pressed="true"/);
+    expect(html(must(setAutoLayout(row, 'box', { align: Align.Stretch })), 'box', true)).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-stretch"|data-testid="auto-layout-stretch"[^>]*aria-pressed="true"/);
   });
 });
 
@@ -111,8 +115,8 @@ describe('grid fields', () => {
 
 describe('baseline', () => {
   it('a row offers baseline alignment and marks it', () => {
-    expect(html(must(setAutoLayout(row, 'box', { align: Align.Baseline })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-baseline"|data-testid="auto-layout-baseline"[^>]*aria-pressed="true"/);
-    expect(html(must(setAutoLayout(row, 'box', { direction: Direction.Vertical })), 'box')).not.toContain('auto-layout-baseline');
+    expect(html(must(setAutoLayout(row, 'box', { align: Align.Baseline })), 'box', true)).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-baseline"|data-testid="auto-layout-baseline"[^>]*aria-pressed="true"/);
+    expect(html(must(setAutoLayout(row, 'box', { direction: Direction.Vertical })), 'box', true)).not.toContain('auto-layout-baseline');
   });
 });
 

@@ -34,7 +34,8 @@
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
-  import { documentColours } from '$lib/motion/selection-colours';
+  import { clipColours, documentColours, recolourClip } from '$lib/motion/selection-colours';
+  import ColourRow from './ColourRow.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Settings2 from '@lucide/svelte/icons/settings-2';
@@ -72,9 +73,8 @@
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import StackSection from './StackSection.svelte';
-  import { laidClip, layoutParent, removeStack } from '$lib/motion/layout/ops';
+  import { laidClip, layoutParent } from '$lib/motion/layout/ops';
   import { LAYOUT_KIND_LABEL, layoutKind, placementOf } from '@feega/motion-core/motion/layout/stack';
-  import Minus from '@lucide/svelte/icons/minus';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
   import BindChip from './BindChip.svelte';
@@ -197,6 +197,7 @@
 
   let error = $state('');
   const palette = () => documentColours(doc);
+  const colours = $derived(clipColours(doc, clip.id));
   const voices = $derived(voicesOver(doc, clip.id));
   const pulsable = $derived(PULSE_PROPS.filter((p) => isAnimatable(clip.component, p)));
   let voice = $state('');
@@ -233,6 +234,7 @@
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));
   const PLACED_KEYS: ReadonlySet<string> = new Set(['x', 'y']);
+  const STACKED_KEYS: ReadonlySet<string> = new Set([...PLACED_KEYS, 'width', 'height']);
   const NO_SKIP: ReadonlySet<string> = new Set();
   const RADIUS_KEYS: ReadonlySet<string> = new Set(['roundness', 'corners']);
   const threeDProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.ThreeD));
@@ -484,6 +486,7 @@
   const visual = $derived(spec.track === TrackKind.Visual);
 
   const view = $derived(as ?? (focus ? PropertiesView.Part : PropertiesView.Clip));
+  const clipsOwnContent = $derived(!clip.autoLayout && (hasChildren || view === PropertiesView.Frame));
   const layerExtras = $derived(visual && view !== PropertiesView.Frame);
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
@@ -500,11 +503,12 @@
     [Section.Shape]: clip.component === 'Shape',
     [Section.Animate]: visual || TEXT_COMPONENTS.has(clip.component) || pulseShown || (voices.length > 0 && shows(Part.Ducking, family)) || fieldsIn(Section.Animate).length > 0 || !!(clip.keyframes.x?.length && clip.keyframes.y?.length),
     [Section.Effects]: visual && clip.component !== 'Null',
+    [Section.Colours]: layerExtras && hasChildren && colours.length > 0,
     [Section.ThreeD]: threeDProps.length > 0 || sceneProps.length > 0 || fieldsIn(Section.ThreeD).length > 0 || visual,
     [Section.Parent]: visual || maskProps.length > 0
   });
 
-  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(clip.autoLayout ? { [Section.Stack]: removeStackButton } : {}), ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
+  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
 
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
@@ -521,6 +525,7 @@
     [Section.Shape]: shapeBody,
     [Section.Animate]: animateBody,
     [Section.Effects]: effectsBody,
+    [Section.Colours]: coloursBody,
     [Section.ThreeD]: threeDBody,
     [Section.Parent]: parentBody
   });
@@ -830,7 +835,7 @@
 
 {#snippet layoutBody()}
   {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
-  {@render groupFields(Section.Layout, positioned ? PLACED_KEYS : NO_SKIP)}
+  {@render groupFields(Section.Layout, clip.autoLayout ? STACKED_KEYS : positioned ? PLACED_KEYS : NO_SKIP)}
   {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
 {/snippet}
 
@@ -865,7 +870,7 @@
   {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{#each layerProps as prop (prop.key)}<div class="stack" data-prop={prop.key}>{@render animField(prop, true)}</div>{/each}</div>{/if}
   {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
-    {#if hasChildren || view === PropertiesView.Frame}
+    {#if clipsOwnContent}
       <div class="line" data-prop="clipContent">
         <span class="label">Clip content</span>
         <SegmentedField name="Clip content" options={YES_NO} value={answerOf(clip.clipContent)} onchange={(v) => commit(setClipFlags(doc, clip.id, { clipContent: v === Answer.Yes }), 'Changed clip content')} />
@@ -878,6 +883,14 @@
       </div>
     {/if}
   {/if}
+{/snippet}
+
+{#snippet coloursBody()}
+  <div data-testid="clip-colours">
+    {#each colours as { colour, count } (colour)}
+      <ColourRow {colour} {count} {palette} onchange={(to) => commit(recolourClip(doc, clip.id, colour, to), `Recoloured ${colour} to ${to}`)} />
+    {/each}
+  </div>
 {/snippet}
 
 {#snippet timingBody()}
@@ -1048,9 +1061,6 @@
   <StackSection {doc} {clip} {commit} />
 {/snippet}
 
-{#snippet removeStackButton()}
-  <ShellIconButton label="Remove stack" shortcut="⌥⇧A" data-testid="auto-layout-remove" onclick={() => commit(removeStack(doc, clip.id), 'Removed the stack')}><Minus /></ShellIconButton>
-{/snippet}
 
 {#snippet addStrokeButton()}
   <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props)) }), 'Add stroke')}><Plus /></ShellIconButton>

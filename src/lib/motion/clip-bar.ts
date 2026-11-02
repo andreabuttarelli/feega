@@ -46,7 +46,7 @@ const MENU_ORDER: readonly Placement[] = [Placement.Structure, Placement.Shape, 
 
 const PLACEMENT: Partial<Record<ActionId, Placement>> = {
   [Action.Duplicate]: Placement.Inline,
-  [Action.CreateComponent]: Placement.Structure,
+  [Action.CreateComponent]: Placement.Inline,
   [Action.DetachInstance]: Placement.Structure,
   [Action.GoToMain]: Placement.Structure,
   [Action.PushInstance]: Placement.Structure,

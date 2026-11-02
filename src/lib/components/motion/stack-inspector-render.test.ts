@@ -26,9 +26,9 @@ describe('a Stack wrapping one text shows its own visual properties', () => {
   });
 
   it('shows padding, radius and clip content', () => {
-    expect(html).toContain('data-testid="auto-layout-padding"');
+    expect(html).toContain('data-testid="auto-layout-padding-x"');
     expect(html).toContain('data-testid="radius-per-corner"');
-    expect(html).toContain('data-prop="clipContent"');
+    expect(html).toContain('data-testid="stack-clip-content"');
   });
 
   it('is not the text inspector', () => {

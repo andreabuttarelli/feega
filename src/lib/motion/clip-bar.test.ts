@@ -63,4 +63,8 @@ describe('the inspector header: one table decides inline, menu group or dropped'
     expect(groups.at(-1)).toEqual([Action.Delete]);
     expect(groups.flat()).toEqual(expect.arrayContaining([Action.Split, Action.Group, Action.Union]));
   });
+
+  it('shows create component inline beside the name', () => {
+    expect(headerActions([Action.Duplicate, Action.CreateComponent]).inline).toEqual([Action.Duplicate, Action.CreateComponent]);
+  });
 });
