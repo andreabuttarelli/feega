@@ -245,7 +245,7 @@
   import { Flip, flipStage } from '$lib/motion/layer-props';
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -1631,6 +1631,7 @@
     frameProperties.name = placed.find((t) => t.id === panelNodeId)?.displayName?.trim() || UNNAMED_FRAME;
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
+    frameProperties.exportRows = (rows) => (picks.length ? props.onExportElementRows?.(panelNodeId, picks, rows) : props.onExportRows?.([panelNodeId], rows)) ?? Promise.resolve('Export failed');
     frameProperties.runAction = runSelectionAction;
     frameProperties.place = nodePlaceOf(panelNodeId);
     frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
@@ -3390,6 +3391,7 @@
     'toggle-hidden': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Hidden),
     'toggle-locked': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Locked),
     help: () => (shortcutHelp.open = true),
+    export: () => selected.length && SELECTION_RUN.export(selected),
     view: (c) => {
       if (c.id === 'view') {
         frameViews.flip(c.view);

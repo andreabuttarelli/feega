@@ -4468,6 +4468,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFigmaImages={figmaImagesAnswered}
     onFigmaPaste={figmaPasted}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
+    onExportElementRows={(frameId, elementIds, rows) => exportPicked({ frameId, elementIds }, rows)}
     onTemplate={insertTemplate}
     techniques={techniqueShelf.list}
     onTechnique={insertTechnique}

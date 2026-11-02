@@ -147,6 +147,7 @@
       </div>
     {/if}
     <LayoutGuidesSection {doc} onchange={editGuides} />
+    {#if frameProperties.exportRows}<ExportSection name={frameProperties.name} onexport={frameProperties.exportRows} />{/if}
     <details class="frame-settings" data-testid="frame-settings">
       <summary>Frame settings</summary>
       <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
@@ -173,7 +174,7 @@
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
       <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} onchange={editShown} onalign={alignPicks} />
-      {#if frameProperties.exportPicks}<ExportSection onexport={frameProperties.exportPicks} />{/if}
+      {#if frameProperties.exportRows}<ExportSection name="selection" onexport={frameProperties.exportRows} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}
         <StatesSection doc={shownDoc!} clip={shown.clip} current={statePreview.stateOf(nodeId, shown.clip.id)} commit={commitShown} onpreview={(next) => statePreview.pick(nodeId, shown.clip.id, next)} />

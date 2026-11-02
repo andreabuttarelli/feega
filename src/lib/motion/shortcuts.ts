@@ -75,6 +75,7 @@ export enum Command {
   SelectSameStroke = 'select-same-stroke',
   SelectSameFont = 'select-same-font',
   SelectSameEffect = 'select-same-effect',
+  Export = 'export',
   BringForward = 'bring-forward',
   SendBackward = 'send-backward',
   BringToFront = 'bring-to-front',

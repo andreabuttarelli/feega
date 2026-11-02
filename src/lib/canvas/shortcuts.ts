@@ -46,6 +46,7 @@ export type CanvasCommandId =
   | 'toggle-hidden'
   | 'toggle-locked'
   | 'flip'
+  | 'export'
   | 'view';
 
 export type CanvasCommand =
@@ -138,6 +139,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.SendToBack]: { id: 'send-back' },
   [Command.ToggleHidden]: { id: 'toggle-hidden' },
   [Command.ToggleLocked]: { id: 'toggle-locked' },
+  [Command.Export]: { id: 'export' },
   [Command.PreviewZoomIn]: { id: 'zoom-in' },
   [Command.PreviewZoomOut]: { id: 'zoom-out' },
   [Command.PreviewFit]: { id: 'fit' },
