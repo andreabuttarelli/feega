@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { brotliCompressSync, deflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { readFontMeta } from './font-meta';
@@ -93,6 +94,10 @@ describe('reading a font file', () => {
   it('cleans a family name into one the video model accepts', () => {
     const tables = [{ tag: 'name', data: nameTable({ 1: '  Weird™ Font/Name  ' }) }];
     expect(readFontMeta(sfnt(TRUETYPE, tables))).toEqual({ family: 'Weird Font Name', weight: 400, italic: false });
+  });
+
+  it('reads the weight range of a variable font instead of its default instance', () => {
+    expect(readFontMeta(new Uint8Array(readFileSync('static/fonts/inter-latin.woff2')))).toEqual({ family: 'Inter', weight: 100, maxWeight: 900, italic: false });
   });
 
   it('gives null for bytes that are not a readable font, never throws', () => {

@@ -5,6 +5,7 @@ import { FontFormat, deleteFontFamily, fontFormatOf, orgFontPrefix, orgFontFamil
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const FRAUNCES = new Uint8Array(readFileSync('static/fonts/fraunces-latin.woff2'));
+const INTER_VARIABLE = new Uint8Array(readFileSync('static/fonts/inter-latin.woff2'));
 const WOFF2_STUB = new Uint8Array([0x77, 0x4f, 0x46, 0x32, 1, 2, 3]);
 
 const USER = '22222222-2222-2222-2222-222222222222';
@@ -54,6 +55,14 @@ describe('font uploads', () => {
 
     const row = calls.find((c) => c.op === 'insert' && c.table === 'org_fonts')?.payload;
     expect(row).toEqual({ id: saved.ok ? saved.assetId : null, org_id: ORG, family: 'Fraunces', weight: expect.any(Number), style: 'normal', path: INSIDE, uploaded_by: USER });
+  });
+
+  it('lists a variable upload with its whole weight range, and a rename keeps it', async () => {
+    const { db } = withStorage(INTER_VARIABLE);
+    await saveFontUpload(db, { orgId: ORG, userId: USER, path: INSIDE });
+    await renameFontFamily(db, { orgId: ORG, family: 'Inter', to: 'Brand Sans' });
+
+    expect((await orgFontFamilies(db, ORG))[0]).toMatchObject({ family: 'Brand Sans', variants: [{ weight: 100, maxWeight: 900, italic: false }] });
   });
 
   it('refuses a path outside the org font folder and deletes a file that is not a font', async () => {

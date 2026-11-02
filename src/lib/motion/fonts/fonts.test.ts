@@ -116,6 +116,16 @@ describe('fonts', () => {
     expect(registerUpload(ok(setFont(doc, 'title', { family: 'Inter' }, CATALOGUE)), { family: 'Inter', variants: [bold] })).toMatchObject({ ok: false });
   });
 
+  it('a variable upload keeps its whole weight range, so a 600 title renders at 600, not at the file default', () => {
+    let doc = ok(registerUpload(titled(), { family: 'Brand Sans', variants: [{ assetId: 'v', weight: 100, maxWeight: 900, italic: false }] }));
+    doc = ok(setFont(doc, 'title', { family: 'Brand Sans', weight: 600 }, CATALOGUE));
+    const html = compose(doc, { v: 'https://x/v.woff2' });
+
+    expect(doc.fonts[0]).toMatchObject({ weights: [100, 200, 300, 400, 500, 600, 700, 800, 900], axes: [['wght', 100, 900]] });
+    expect(html).toContain('src:url("https://x/v.woff2");font-weight:100 900;font-style:normal');
+    expect(html).toContain("font-family:'Brand Sans', system-ui, sans-serif;font-weight:600");
+  });
+
   it('a deleted upload is reported missing, so the editor can warn instead of silently falling back', () => {
     const doc = ok(registerUpload(titled(), { family: 'Acme Grotesk', variants: [{ assetId: 'gone', weight: 400, italic: false }] }));
 

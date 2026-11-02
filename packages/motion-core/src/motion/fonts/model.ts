@@ -50,14 +50,14 @@ export const fontFaceSchema = z.object({
   italic: z.boolean().default(false),
   axes: z.array(z.tuple([z.string().regex(AXIS_TAG), z.number(), z.number()])).max(MAX_AXES).default([]),
   assetId: z.string().min(1).optional(),
-  variants: z.array(z.object({ assetId: z.string().min(1), weight: z.number().int().min(1).max(MAX_WEIGHT), italic: z.boolean() })).max(MAX_VARIANTS).optional()
+  variants: z.array(z.object({ assetId: z.string().min(1), weight: z.number().int().min(1).max(MAX_WEIGHT), maxWeight: z.number().int().min(1).max(MAX_WEIGHT).optional(), italic: z.boolean() })).max(MAX_VARIANTS).optional()
 });
 
 export const fontsSchema = z.array(fontFaceSchema).max(MAX_FONTS).default([]);
 
 export type FontFace = z.infer<typeof fontFaceSchema>;
 
-export type FontVariant = { assetId: string; weight: number; italic: boolean };
+export type FontVariant = { assetId: string; weight: number; maxWeight?: number; italic: boolean };
 
 export function variantsOf(face: FontFace): FontVariant[] {
   if (face.variants?.length) {
@@ -161,10 +161,12 @@ export function declaredFamilyCss(faces: readonly Face[], registry: readonly Fon
   return [...google].map((family) => `@font-face{font-family:'${family}';${DECLARED}}`).join('');
 }
 
+export const variantWeight = (v: Pick<FontVariant, 'weight' | 'maxWeight'>) => (v.maxWeight ? `${v.weight} ${v.maxWeight}` : `${v.weight}`);
+
 export function uploadFaceCss(registry: readonly FontFace[], assets: Record<string, string>): string {
   return registry
     .filter((f) => f.source === FontSource.Upload)
-    .flatMap((f) => variantsOf(f).filter((v) => assets[v.assetId]).map((v) => `@font-face{font-family:'${f.family}';src:url(${JSON.stringify(assets[v.assetId])});font-weight:${v.weight};font-style:${v.italic ? 'italic' : 'normal'};font-display:block}`))
+    .flatMap((f) => variantsOf(f).filter((v) => assets[v.assetId]).map((v) => `@font-face{font-family:'${f.family}';src:url(${JSON.stringify(assets[v.assetId])});font-weight:${variantWeight(v)};font-style:${v.italic ? 'italic' : 'normal'};font-display:block}`))
     .join('');
 }
 
