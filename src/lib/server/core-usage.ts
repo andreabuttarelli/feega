@@ -120,7 +120,7 @@ export function coreEvent<E extends CoreEvent>(userId: string | null | undefined
   }
 
   const send = sink;
-  const body = { event, distinct_id: userId, properties: { ...props, ...personless } };
+  const body: Omit<CoreBody, 'api_key'> = { event, distinct_id: userId, properties: { ...props, ...personless } };
   if (!internal) {
     send(body);
     return;
