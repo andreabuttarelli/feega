@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inverseResize, resizeStale, type ResizeGesture } from './resize-gesture';
+import { inverseResize, resizeStale, sameBox, type ResizeGesture } from './resize-gesture';
 
 const gesture: ResizeGesture = { nodeId: 'n', before: { x: 0, y: 0, w: 120, h: 80 }, after: { x: -30, y: -20, w: 150, h: 100 } };
 
@@ -12,5 +12,12 @@ describe('annullare un ridimensionamento', () => {
     expect(resizeStale(gesture, { x: -30, y: -20 })).toBe(false);
     expect(resizeStale(gesture, { x: 10, y: -20 })).toBe(true);
     expect(resizeStale(gesture, null)).toBe(true);
+  });
+});
+
+describe('a resize that changed nothing', () => {
+  it('lands on the same box it started from', () => {
+    expect(sameBox(gesture.before, { ...gesture.before })).toBe(true);
+    expect(sameBox(gesture.before, gesture.after)).toBe(false);
   });
 });

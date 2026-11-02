@@ -59,12 +59,12 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
-  import { createUndoStack } from '$lib/canvas/undo-stack';
+  import { Way, createUndoStack } from '$lib/canvas/undo-stack';
   import { exportFailure } from '$lib/canvas/export-failure';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
-  import { inverseResize, resizeStale, type ResizeGesture } from '$lib/canvas/resize-gesture';
+  import { inverseResize, resizeStale, sameBox, type ResizeGesture } from '$lib/canvas/resize-gesture';
   import type { TileBox } from '$lib/components/canvas/flow-types';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { landTiles } from '$lib/canvas/land-tiles';
@@ -426,7 +426,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     clean.searchParams.delete(MAIN_PARAM);
     replaceState(clean, page.state);
     if (nodes.some((n) => n.id === id)) {
-      focusOn([id], undefined, FocusMode.Select);
+      focusOn([id], undefined, compId ? FocusMode.Pick : FocusMode.Select);
       mainPick = compId ? { nodeId: id, compId, key: (mainPick?.key ?? 0) + 1 } : mainPick;
     }
   }
@@ -435,7 +435,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function showMain(frameId: string, compId: string) {
     if (nodes.some((n) => n.id === frameId)) {
-      focusOn([frameId], undefined, FocusMode.Select);
+      focusOn([frameId], undefined, FocusMode.Pick);
       mainPick = { nodeId: frameId, compId, key: (mainPick?.key ?? 0) + 1 };
       return;
     }
@@ -1664,7 +1664,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'resize'; gesture: ResizeGesture } | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
+  type ResizeEntry = { source: 'resize'; gesture: ResizeGesture; inner: StackEntry[] };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -2923,26 +2924,43 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await sized;
   }
 
-  async function placeBox(id: string, before: TileBox, after: TileBox) {
+  async function resizeTile(id: string, before: TileBox, after: TileBox) {
     const moved = after.x !== before.x || after.y !== before.y;
-    const placed = moved ? move(id, after.x, after.y) : null;
-    await resize(id, after.w, after.h);
+    const inner = await undoStack.collect(async () => {
+      const placed = moved ? move(id, after.x, after.y) : null;
+      await resize(id, after.w, after.h);
+      await placed;
+    });
+    const node = nodes.find((n) => n.id === id);
+    const landed = node ? { x: node.x, y: node.y, w: node.w, h: node.h } : after;
+    if (sameBox(landed, before) && !inner.length) {
+      return;
+    }
+    undoStack.push({ source: 'resize', gesture: { nodeId: id, before, after: landed }, inner });
+  }
+
+  async function putBox(id: string, box: TileBox) {
+    const node = nodes.find((n) => n.id === id);
+    const placed = node && (node.x !== box.x || node.y !== box.y) ? move(id, box.x, box.y) : null;
+    await storeSize(id, box.w, box.h);
     await placed;
   }
 
-  async function resizeTile(id: string, before: TileBox, after: TileBox) {
-    await undoStack.muted(() => placeBox(id, before, after));
-    undoStack.push({ source: 'resize', gesture: { nodeId: id, before, after } });
-  }
-
-  async function applyResizeUndo(gesture: ResizeGesture, onAccepted: (redo: ResizeGesture) => void) {
-    const node = nodes.find((n) => n.id === gesture.nodeId);
-    if (resizeStale(gesture, node ? { x: node.x, y: node.y } : null)) {
+  async function reverseResize(entry: ResizeEntry, way: Way): Promise<StackEntry | null> {
+    const node = nodes.find((n) => n.id === entry.gesture.nodeId);
+    if (resizeStale(entry.gesture, node ? { x: node.x, y: node.y } : null)) {
       failed = 'Undo skipped: someone else already changed this node';
-      return;
+      return null;
     }
-    await undoStack.muted(() => placeBox(gesture.nodeId, gesture.after, gesture.before));
-    onAccepted(inverseResize(gesture));
+    const inner: StackEntry[] = [];
+    for (const step of [...entry.inner].reverse()) {
+      const back = await reverse(step, way);
+      if (back) {
+        inner.push(back);
+      }
+    }
+    await putBox(entry.gesture.nodeId, entry.gesture.before);
+    return { source: 'resize', gesture: inverseResize(entry.gesture), inner };
   }
 
   let liveAsk: { id: string; w: number; h: number } | null = null;
@@ -4099,52 +4117,42 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let historyTurn: Promise<void> = Promise.resolve();
   const inTurn = (step: () => Promise<void>) => (historyTurn = historyTurn.then(step, step));
 
-  async function undo() {
-    const entry = await undoStack.popUndo();
-    if (!entry) { return; }
+  const STEP: Record<Way, (step: FrameStep) => void> = {
+    [Way.Back]: (step) => step.back(),
+    [Way.Forward]: (step) => step.forward()
+  };
+
+  async function reverse(entry: StackEntry, way: Way): Promise<StackEntry | null> {
+    let out: StackEntry | null = null;
     if (entry.source === 'frame') {
-      entry.step.back();
-      undoStack.pushRedo(entry);
-      return;
+      STEP[way](entry.step);
+      return entry;
     }
     if (entry.source === 'turn') {
       const back = undoTurn(entry.turn);
-      if (turnGroup(back)) { undoStack.pushRedo({ source: 'turn', turn: back }); }
-      return;
-    }
-    if (entry.source === 'move') {
-      await applyMoveUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'move', gesture: redo }));
-      return;
+      return turnGroup(back) ? { source: 'turn', turn: back } : null;
     }
     if (entry.source === 'resize') {
-      await applyResizeUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'resize', gesture: redo }));
-      return;
+      return reverseResize(entry, way);
     }
-    await applyUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'server', gesture: redo }));
+    if (entry.source === 'move') {
+      await applyMoveUndo(entry.gesture, (redo) => (out = { source: 'move', gesture: redo }));
+      return out;
+    }
+    await applyUndo(entry.gesture, (redo) => (out = { source: 'server', gesture: redo }));
+    return out;
+  }
+
+  async function undo() {
+    const entry = await undoStack.popUndo();
+    const redo = entry ? await reverse(entry, Way.Back) : null;
+    if (redo) { undoStack.pushRedo(redo); }
   }
 
   async function redo() {
     const entry = undoStack.popRedo();
-    if (!entry) { return; }
-    if (entry.source === 'frame') {
-      entry.step.forward();
-      undoStack.pushUndo(entry);
-      return;
-    }
-    if (entry.source === 'turn') {
-      const back = undoTurn(entry.turn);
-      if (turnGroup(back)) { undoStack.pushUndo({ source: 'turn', turn: back }); }
-      return;
-    }
-    if (entry.source === 'move') {
-      await applyMoveUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'move', gesture: redo }));
-      return;
-    }
-    if (entry.source === 'resize') {
-      await applyResizeUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'resize', gesture: redo }));
-      return;
-    }
-    await applyUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'server', gesture: redo }));
+    const again = entry ? await reverse(entry, Way.Forward) : null;
+    if (again) { undoStack.pushUndo(again); }
   }
 
   /**

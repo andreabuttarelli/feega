@@ -52,6 +52,20 @@ describe('a component made by hand moves its main to the Components page', () =>
     expect(frames.get('page')!.doc.comps[compId].component!.home).toBe(setId);
   });
 
+  it('the main lands at the size the source shows on the canvas, not at the doc size', async () => {
+    const atDocSize = storeWith(designWithButton());
+    await homeComponents(atDocSize.store, PAGE, 'page', newId);
+    const full = vi.mocked(atDocSize.store.create).mock.calls[0][2]!;
+
+    const halved = storeWith(designWithButton());
+    halved.frames.set('page', { ...halved.frames.get('page')!, stage: { width: 720, height: 450 } });
+    await homeComponents(halved.store, PAGE, 'page', newId);
+    const shape = vi.mocked(halved.store.create).mock.calls[0][2]!;
+
+    expect(shape.width).toBe(Math.round(full.width / 2));
+    expect(shape.height).toBe(Math.round(full.height / 2));
+  });
+
   it('does nothing for a frame already on the Components page', async () => {
     const { store } = storeWith(designWithButton());
 

@@ -397,3 +397,23 @@ describe('the text header', () => {
     expect(headerActions(barActions(doc, ['t'], frameBarActions(doc, ['t']))).inline).toContain(Action.CreateComponent);
   });
 });
+
+describe('⌥⌘K names the main after the layer it was made from', () => {
+  const mainName = (doc: MotionDoc | undefined) => Object.values(doc?.comps ?? {}).find((c) => c.component)?.component?.name;
+  const named = (name: string) => {
+    const doc = fixture();
+    return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'a' ? { ...c, name } : c)) })) };
+  };
+
+  it('takes the name of the one layer selected', () => {
+    expect(mainName(barAction(Action.CreateComponent, { doc: named('Card'), selection: ['a'], frame: 0, newId: ids() })?.doc)).toBe('Card');
+  });
+
+  it('takes the name the canvas shows for a whole element', () => {
+    expect(mainName(barAction(Action.CreateComponent, { doc: fixture(), selection: ['a'], frame: 0, newId: ids(), layer: 'Box' })?.doc)).toBe('Box');
+  });
+
+  it('falls back to the layer kind, never to a numbered "Component"', () => {
+    expect(mainName(barAction(Action.CreateComponent, { doc: fixture(), selection: ['a'], frame: 0, newId: ids() })?.doc)).toBe('Title');
+  });
+});

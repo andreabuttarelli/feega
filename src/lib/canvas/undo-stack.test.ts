@@ -102,16 +102,18 @@ describe('createUndoStack: uno stack per scheda, undo e redo', async () => {
 });
 
 describe('un gesto che scrive in più passi lascia una voce sola', () => {
-  it('quello che si spinge mentre lo stack tace non entra', async () => {
+  it('quello che si spinge durante il gesto torna a chi lo raccoglie, non entra nello stack', async () => {
     const stack = createUndoStack<string>();
     stack.push('before');
 
-    await stack.muted(async () => {
+    const inner = await stack.collect(async () => {
       stack.push('inner');
       stack.pushPending(Promise.resolve('pending'));
+      stack.pushPending(Promise.resolve(null));
     });
     stack.push('gesture');
 
+    expect(inner).toEqual(['inner', 'pending']);
     expect(await stack.popUndo()).toBe('gesture');
     expect(await stack.popUndo()).toBe('before');
   });
@@ -119,7 +121,7 @@ describe('un gesto che scrive in più passi lascia una voce sola', () => {
   it('torna a registrare anche quando il gesto fallisce', async () => {
     const stack = createUndoStack<string>();
 
-    await stack.muted(async () => {
+    await stack.collect(async () => {
       throw new Error('boom');
     }).catch(() => undefined);
     stack.push('after');
