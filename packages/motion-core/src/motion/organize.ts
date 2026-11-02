@@ -64,7 +64,7 @@ export function setWorkArea(doc: MotionDoc, area: Area | null): OpResult {
   return watchable(doc, { from, to }) ? ok({ ...doc, workArea: { from, to } }) : fail(`the work area needs at least ${MIN_WORK_AREA_S}s between its in and out points`);
 }
 
-export function loopRange(doc: MotionDoc): Area {
+export function loopRange(doc: Pick<MotionDoc, 'workArea' | 'fps' | 'durationInFrames'>): Area {
   const area = doc.workArea;
   return area && watchable(doc, area) ? area : { from: 0, to: doc.durationInFrames };
 }

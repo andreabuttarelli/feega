@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Resolution } from './render-quote';
-import { AudioMode, BROWSER_RESOLUTIONS, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
+import { AudioMode, BROWSER_RESOLUTIONS, ExportRange, Support, eta, exportRanges, rangeSeconds, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
 import { BROWSER_SAMPLES } from '@feega/motion-core/motion/motion-blur';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -89,5 +89,21 @@ describe('export plan', () => {
   it('without H.264 at 1080p, 720p is the fallback', () => {
     expect(exportSupport({ webCodecs: true, h264: false, h264At720: true, aac: true }).support).toBe(Support.Only720);
     expect(exportSupport({ webCodecs: true, h264: false, h264At720: false, aac: true }).support).toBe(Support.None);
+  });
+});
+
+describe('what part of the video an export covers', () => {
+  const doc = { ...newMotionDoc(MotionFormat.Portrait), fps: 30, durationInFrames: 450 } as MotionDoc;
+
+  it('is the whole video when there is no work area', () => {
+    expect(exportRanges(doc)).toEqual([ExportRange.Whole]);
+    expect(rangeSeconds(doc, ExportRange.Whole)).toEqual({ from: 0, to: 15 });
+  });
+
+  it('offers the work area first when one is set, so a 6 s loop region exports a 6 s file', () => {
+    const looped = { ...doc, workArea: { from: 0, to: 180 } };
+
+    expect(exportRanges(looped)).toEqual([ExportRange.WorkArea, ExportRange.Whole]);
+    expect(rangeSeconds(looped, ExportRange.WorkArea)).toEqual({ from: 0, to: 6 });
   });
 });
