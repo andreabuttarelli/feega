@@ -150,7 +150,6 @@
   let done = $state(0);
   let startedAt = $state(0);
   let now = $state(0);
-  let paused = $state(false);
   let error = $state('');
   let downloadUrl = $state('');
   let savedNote = $state('');
@@ -278,7 +277,6 @@
           done = n;
           now = performance.now();
         },
-        onPause: (p) => (paused = p),
         onJolts: (jolts) => (smoothNote = joltNote(jolts, target.fps))
       });
       downloadUrl = URL.createObjectURL(blob);
@@ -457,7 +455,6 @@
           <div class="track"><div class="fill" style={`width: ${(done / total) * 100}%`}></div></div>
           <span>{PROGRESS_LABEL[phase]} {#if phase === Phase.Rendering}{done}/{total} · {etaLabel(remaining)}{/if}</span>
         </div>
-        {#if paused}<p class="warn" role="alert" data-testid="export-paused">Paused: this tab is in the background. Come back to resume.</p>{/if}
       {/if}
       {#if phase === Phase.Failed}<p class="warn" role="alert">Export failed: {error}</p>{/if}
 

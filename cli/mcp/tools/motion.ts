@@ -92,7 +92,8 @@ export function registerMotionTools(server: McpServer) {
         '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
         'to the project. Show the link to the user. With no user, open `headless_url` in any headless Chromium: it starts with no click; keep it open until `get_render` says done. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. ' +
         'A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. ' +
-        'Poll `get_render` with the `run_id` for the file.',
+        'Poll `get_render` with the `run_id` for the file. To check a frame or a few seconds before the whole video, pass `from` and `to` (seconds, browser only): ' +
+        'only that stretch renders, silent, through the same pipeline as the full export, so its pixels match; one frame is `to = from + 1/fps`.',
       inputSchema: z.object({
         org,
         node_id: z.string(),
@@ -101,11 +102,14 @@ export function registerMotionTools(server: McpServer) {
         format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif, apng'),
         quality: z.enum(['standard', 'high', 'max']).optional(),
         fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60), z.literal(120)]).optional().describe('120 renders on our servers only'),
+        from: z.number().min(0).optional().describe('seconds: render from here (browser only)'),
+        to: z.number().positive().optional().describe('seconds: render up to here, exclusive (browser only)'),
         gif: z.object({ loop: z.enum(['forever', 'once', 'boomerang']).optional(), fps: z.number().int().min(8).max(30).optional(), width: z.number().int().min(64).max(1920).optional() }).optional().describe('format gif only: loop forever (default), once or boomerang; fps 8-30 (15); width 64-1920 px (640); the video can be up to 30 s')
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
-    async ({ org, node_id, mode, resolution, format, quality, fps, gif }) => withAuth((token) => motionApi.render(token, node_id, { mode, resolution, format, quality, fps, gif }, org))
+    async ({ org, node_id, mode, resolution, format, quality, fps, gif, from, to }) =>
+      withAuth((token) => motionApi.render(token, node_id, { mode, resolution, format, quality, fps, gif, range: from === undefined && to === undefined ? undefined : { from: from ?? 0, to: to ?? Number.MAX_SAFE_INTEGER } }, org))
   );
 
   server.registerTool(

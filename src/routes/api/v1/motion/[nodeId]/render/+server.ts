@@ -21,8 +21,9 @@ const HTTP_UNAVAILABLE = 503;
 
 const bodySchema = z.object({
   mode: z.enum([RenderMode.Browser, RenderMode.Server]).default(RenderMode.Browser),
-  settings: settingsSchema.partial().optional()
-});
+  settings: settingsSchema.partial().optional(),
+  range: z.object({ from: z.number().min(0), to: z.number().positive() }).refine((r) => r.to > r.from, 'range.to must be after range.from').optional()
+}).refine((b) => !b.range || b.mode === RenderMode.Browser, { message: 'a range renders in the browser only', path: ['range'] });
 
 const STATUS_OF: Record<string, number> = {
   [RenderAsk.NotFound]: HTTP_NOT_FOUND,
@@ -64,7 +65,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   }
 
   const settings = { ...settingsOf(Preset.Social), ...body.data.settings };
-  const asked = await requestRender(db, { orgId, userId, nodeId: params.nodeId ?? '', mode, settings, origin: url.origin, actor: agentActor(userId, MCP_AGENT_KEY) });
+  const asked = await requestRender(db, { orgId, userId, nodeId: params.nodeId ?? '', mode, settings, origin: url.origin, actor: agentActor(userId, MCP_AGENT_KEY), range: body.data.range });
   if (!asked.ok) {
     return json({ error: asked.error, detail: asked.detail }, { status: STATUS_OF[asked.error] ?? HTTP_UNAVAILABLE });
   }

@@ -74,6 +74,15 @@ describe('POST /api/v1/motion/[nodeId]/render', () => {
     expect(store.farm).toEqual([]);
   });
 
+  it('a range renders only that stretch, in seconds, and only in the browser', async () => {
+    const res = await post({ range: { from: 1, to: 1.5 } });
+
+    expect(res.status).toBe(201);
+    expect(store.runs[0]).toMatchObject({ params: { range: { from: 1, to: 1.5 } } });
+    expect((await post({ range: { from: 2, to: 1 } })).status).toBe(400);
+    expect((await post({ mode: 'server', range: { from: 0, to: 1 } })).status).toBe(400);
+  });
+
   it('a browser link also comes as a headless url that starts the render with no click', async () => {
     const body = await (await post({})).json();
 

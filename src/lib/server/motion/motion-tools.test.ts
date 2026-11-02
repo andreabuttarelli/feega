@@ -426,6 +426,15 @@ describe('render_video', () => {
 
     expect(renderLink.mock.calls).toEqual([['high'], ['max']]);
   });
+
+  it('renders a stretch of seconds to check it before the whole video', async () => {
+    const renderLink = vi.fn(async () => ({ ok: true }));
+    const { run } = setup({ renderLink });
+
+    await run('render_video', { from: 2, to: 2.5 });
+
+    expect(renderLink.mock.calls).toEqual([['high', { from: 2, to: 2.5 }]]);
+  });
 });
 
 describe('component variants through the agent', () => {

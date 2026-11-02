@@ -8,7 +8,7 @@
   import { audioPlan } from '$lib/motion/audio-plan';
   import { BROWSER_RESOLUTIONS, eta, exportSize, type Capabilities } from '$lib/motion/export-plan';
   import { capabilities } from '$lib/motion/export/encode';
-  import { BrowserStage, renderInBrowser } from '$lib/motion/export/browser-render';
+  import { BrowserStage, framesOf, renderInBrowser } from '$lib/motion/export/browser-render';
   import { cancelLink, saveToLink } from '$lib/motion/export/link-upload';
   import { RenderPlace, renderPlace, thisDevice, type Device, type PlaceVerdict } from '$lib/motion/render-place';
   import { Preset, settingsOf } from '$lib/motion/export-formats';
@@ -36,8 +36,9 @@
   const html = render ? composeHtml({ doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses }) : '';
   const fullDoc = render ? { doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses } : null;
   const readsOf = render ? (only?: ReadonlySet<string>) => composeHtml({ doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses, only }) : null;
-  const total = render?.doc.durationInFrames ?? 0;
-  const seconds = render ? render.doc.durationInFrames / render.doc.fps : 0;
+  const span = render ? framesOf(render.doc, render.range) : { from: 0, to: 0 };
+  const total = span.to - span.from;
+  const seconds = render ? total / render.doc.fps : 0;
   const hasAudio = render ? audioPlan(render.doc, render.assetUrls).length > 0 : false;
 
   let preview = $state<MotionPreview | null>(null);
@@ -51,7 +52,6 @@
   let done = $state(0);
   let startedAt = $state(0);
   let now = $state(0);
-  let paused = $state(false);
   let error = $state('');
   let file = $state<File | null>(null);
   let downloadUrl = $state('');
@@ -126,6 +126,7 @@
         size,
         quality: render.quality,
         withAudio: Boolean(caps?.aac),
+        range: render.range,
         frames: tapFrames(
           (times, s, onFrame, signal) => preview!.render(times, s, onFrame, signal, html, profileOf(page.url.searchParams.get(CAPTURE_PARAM))),
           (bitmap) => {
@@ -142,8 +143,7 @@
         onFrame: (n) => {
           done = n;
           now = performance.now();
-        },
-        onPause: (p) => (paused = p)
+        }
       });
       file = new File([blob], `${render.name}.mp4`, { type: MIME });
       downloadUrl = URL.createObjectURL(blob);
@@ -190,7 +190,7 @@
     {:else if render}
       <header>
         <h1>{render.name.toLowerCase()}</h1>
-        <span class="meta">v{render.revision} · {Math.round(seconds)} s · {render.doc.fps} fps · {render.doc.width}×{render.doc.height}</span>
+        <span class="meta">v{render.revision} · {+seconds.toFixed(2)} s · {render.doc.fps} fps · {render.doc.width}×{render.doc.height}</span>
       </header>
 
       <div class="stage" style={`aspect-ratio: ${render.doc.width} / ${render.doc.height}`}>
@@ -229,7 +229,6 @@
             </div>
           </div>
           <p class="notice" role="status">Keep this screen on and this tab open.</p>
-          {#if paused}<p class="warn" role="alert" data-testid="render-paused">Paused: this tab is in the background. Come back to resume.</p>{/if}
         {/if}
 
         {#if phase === Phase.Failed}<p class="warn" role="alert">Render failed: {error}</p>{/if}

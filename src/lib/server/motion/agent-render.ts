@@ -12,7 +12,7 @@ import { renderPagePath, headlessUrl } from '$lib/motion/render-link';
 import type { RenderSettings } from '$lib/motion/export-formats';
 import type { RenderQuote } from '$lib/motion/render-quote';
 import { headOrNew } from './editor';
-import { createRenderLink, isBrowserRender } from './render-link';
+import { createRenderLink, isBrowserRender, type SecondsRange } from './render-link';
 import { isRenderRun } from './render-run';
 import { startFarmRender } from './render-start';
 
@@ -27,7 +27,7 @@ export enum RenderAsk {
   RunNotFound = 'render_not_found'
 }
 
-export type RenderAskInput = { orgId: string; userId: string; nodeId: string; mode: RenderMode; settings: RenderSettings; origin: string; actor: Actor };
+export type RenderAskInput = { orgId: string; userId: string; nodeId: string; mode: RenderMode; settings: RenderSettings; origin: string; actor: Actor; range?: SecondsRange };
 export type RenderAnswer = { ok: true; body: Record<string, unknown> } | { ok: false; error: string; detail?: string };
 
 const FILE_URL_TTL_S = 60 * 60;
@@ -47,7 +47,7 @@ export async function requestRender(db: Db, input: RenderAskInput): Promise<Rend
   }
 
   if (input.mode === RenderMode.Browser) {
-    const link = await createRenderLink(db, { orgId: input.orgId, nodeId: input.nodeId, version: head.version, quality: input.settings.quality, actor: input.actor });
+    const link = await createRenderLink(db, { orgId: input.orgId, nodeId: input.nodeId, version: head.version, quality: input.settings.quality, actor: input.actor, range: input.range });
     return { ok: true, body: { mode: RenderMode.Browser, run_id: link.runId, render_url: `${input.origin}${renderPagePath(link.token)}`, headless_url: headlessUrl(`${input.origin}${renderPagePath(link.token)}`), expires_at: link.expiresAt, revision: head.version, credits: BROWSER_RENDER_CREDITS } };
   }
 

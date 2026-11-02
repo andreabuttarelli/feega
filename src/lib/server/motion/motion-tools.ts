@@ -309,7 +309,7 @@ export type MotionToolDeps = {
   trackReader?: (src: string) => LumaReader;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
-  renderLink?: (quality: ExportQuality) => Promise<Record<string, unknown>>;
+  renderLink?: (quality: ExportQuality, range?: { from: number; to: number }) => Promise<Record<string, unknown>>;
   embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
   templates?: TemplateLibrary;
   revisions?: RevisionLibrary;
@@ -2366,9 +2366,14 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     render_video: tool({
       description:
-        'Render the saved video to an MP4 for free on the user\'s own device. Returns render_url: give it to the user as a markdown link titled "Render on this device"; they open it (on this or another device), it renders there and lands in the project assets. The link works once and expires in 30 minutes. The saved video is rendered, so edits of this turn must be saved first.',
-      inputSchema: z.object({ quality: z.enum(ExportQuality).optional().describe('Encoding quality: standard (smaller file), high (default), max (largest file, finest grain and lines)') }).strict(),
-      execute: async ({ quality = ExportQuality.High }) => (deps.renderLink ? deps.renderLink(quality) : { ok: false, error: 'rendering is not available here' })
+        'Render the saved video to an MP4 for free on the user\'s own device. Returns render_url: give it to the user as a markdown link titled "Render on this device"; they open it (on this or another device), it renders there and lands in the project assets. The link works once and expires in 30 minutes. The saved video is rendered, so edits of this turn must be saved first. from/to (seconds) render only that stretch, silent, with the same pixels as the full export: a frame is from t to t + 1/fps.',
+      inputSchema: z.object({ quality: z.enum(ExportQuality).optional().describe('Encoding quality: standard (smaller file), high (default), max (largest file, finest grain and lines)'), from: z.number().min(0).optional(), to: z.number().positive().optional() }).strict(),
+      execute: async ({ quality = ExportQuality.High, from, to }) => {
+        if (!deps.renderLink) {
+          return { ok: false, error: 'rendering is not available here' };
+        }
+        return from === undefined && to === undefined ? deps.renderLink(quality) : deps.renderLink(quality, { from: from ?? 0, to: to ?? Number.MAX_SAFE_INTEGER });
+      }
     }),
 
     set_style: tool({
