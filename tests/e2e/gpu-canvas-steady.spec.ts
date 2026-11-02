@@ -86,7 +86,7 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     await frame(admin, session, seedNode, 520, { posterAssetId: null }, doc);
     await frame(admin, session, seedNode, 1040, { kind: 'element', posterAssetId: null }, sheet('rect'));
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(8000);
 
     const viewBefore = await page.locator('[data-canvas-surface]').getAttribute('data-view');
@@ -119,7 +119,7 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     const box = await frame(admin, session, seedNode, 80, { kind: 'element', posterAssetId: null }, sheet('rect'));
     await admin.from('nodes').update({ width: 200, height: 120 }).eq('id', box.id);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     const tile = page.locator(`.svelte-flow__node[data-id="${box.id}"]`);
     await expect(tile).toBeVisible();
     const rowOf = async () => (await admin.from('nodes').select('x, y, width, height').eq('id', box.id).single()).data!;
@@ -148,7 +148,7 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
 
     const settled = await rowOf();
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     await expect.poll(async () => (await rowOf()).x).toBe(settled.x);
     const shown = (await page.locator(`.svelte-flow__node[data-id="${box.id}"]`).getAttribute('data-box'))!.split(',').map(Number);
     expect(shown[0], 'no revert after reload').toBe(settled.x);
@@ -159,7 +159,7 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     await seedNode({ type: 'text', x: 200, y: 200, data: { prompt: 'Some words to highlight' } });
     await seedNode({ type: 'text', x: 700, y: 200, data: { prompt: 'More words to highlight' } });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(1500);
     const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
     await page.mouse.move(pane.x + 20, pane.y + 20);
@@ -174,7 +174,7 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     const box = await frame(admin, session, seedNode, 80, { kind: 'element', posterAssetId: null }, sheet('rect'));
     await admin.from('nodes').update({ width: 200, height: 120 }).eq('id', box.id);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     const tile = page.locator(`.svelte-flow__node[data-id="${box.id}"]`);
     await expect(tile).toBeVisible();
     const place = async () => (await tile.getAttribute('data-box'))!.split(',').slice(0, 2).join(',');
@@ -203,7 +203,7 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     const image = await seedNode({ type: 'image', x: 700, y: 120, data: { prompt: 'b' } });
     expect((await admin.from('nodes_connections').insert({ org_id: session.orgId, canvas_id: session.canvasId, source_node_id: text.id, target_node_id: image.id, target_handle: 'text', actor_kind: 'user', actor_id: session.userId })).error).toBeNull();
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
     const zoomOf = async () => Number(((await page.locator('[data-canvas-surface]').getAttribute('data-view')) ?? '0,0,1').split(',')[2]);
     await page.locator('[data-canvas-surface]').click({ position: { x: 5, y: 5 } });

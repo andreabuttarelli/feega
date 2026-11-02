@@ -43,7 +43,7 @@ async function unpainted(page: Page): Promise<string[]> {
 
 async function open(page: Page) {
   await gotoHydrated(page, `/p/${process.env.GPU_FIXTURE_PROJECT}/c/${process.env.GPU_FIXTURE_CANVAS}`);
-  await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(SETTLE_MS);
 }
 
