@@ -8,6 +8,7 @@ function row() {
   kit.frame('row', { name: 'Row', box: box(0, 0, 1000, 200), layout: { direction: Direction.Horizontal }, item: { width: Sizing.Fixed, height: Sizing.Fixed } });
   kit.frame('wide', { name: 'Wide', parent: 'row', box: box(0, 0, 100, 100), item: { width: Sizing.Fill, widthGrow: 2 } });
   kit.frame('half', { name: 'Half', parent: 'row', box: box(0, 0, 100, 100), item: { width: Sizing.Percent, widthPercent: 50, alignSelf: Align.End } });
+  kit.frame('capped', { name: 'Capped', parent: 'row', box: box(0, 0, 100, 100), item: { width: Sizing.Fill, maxWidthPercent: 40, minWidth: 120 } });
   kit.frame('pin', { name: 'Pin', parent: 'row', box: box(10, 10, 40, 40), item: { absolute: true } });
   return kit.doc();
 }
@@ -19,6 +20,11 @@ const css = () =>
     .join('\n');
 
 describe('a stack child in code', () => {
+  it('writes min in px and max in percent', () => {
+    expect(css()).toMatch(/\.capped \{[^}]*min-width: 120px;/);
+    expect(css()).toMatch(/\.capped \{[^}]*max-width: 40%;/);
+  });
+
   it('grows by its fill weight', () => {
     expect(css()).toMatch(/\.wide \{[^}]*flex: 2 1 0;/);
   });

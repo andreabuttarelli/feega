@@ -119,6 +119,8 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, cont
     sizing: { width: own.width, height: own.height },
     min: { width: own.minWidth, height: own.minHeight },
     max: { width: own.maxWidth, height: own.maxHeight },
+    minPercent: { width: own.minWidthPercent, height: own.minHeightPercent },
+    maxPercent: { width: own.maxWidthPercent, height: own.maxHeightPercent },
     absolute: own.absolute,
     grow: { width: own.widthGrow, height: own.heightGrow },
     percent: { width: own.widthPercent, height: own.heightPercent },
