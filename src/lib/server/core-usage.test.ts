@@ -9,7 +9,7 @@ import { appendRevision } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
 import { Build, coreEvent, postHogSink, useCoreSink, type CoreBody } from './core-usage';
 
-vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })) }));
+vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })), findNode: vi.fn(async () => null) }));
 
 const ORG = 'org-a';
 const NODE = 'node-1';
