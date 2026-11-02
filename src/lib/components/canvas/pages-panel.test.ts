@@ -32,6 +32,11 @@ describe('Pages: the canvases of the project', () => {
     expect(pages).toMatch(/data-testid="canvas-comments"/);
   });
 
+  it('scrolls the page you are on into the list, so a page just added is never hidden below the fold', () => {
+    expect(pages).toMatch(/<li class="page-row"[^>]*{@attach isCurrent \? revealRow : undefined}/);
+    expect(pages).toMatch(/scrollIntoView\(\{ block: 'nearest' \}\)/);
+  });
+
   it('imports and downloads .feega from the panel menu', () => {
     expect(pages).toMatch(/data-testid="pages-menu"/);
     expect(pages).toMatch(/data-testid="canvas-import-feega"/);
