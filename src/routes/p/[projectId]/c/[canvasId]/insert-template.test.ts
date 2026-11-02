@@ -72,3 +72,18 @@ describe('actions.template', () => {
     expect(result).toMatchObject({ status: 400 });
   });
 });
+
+describe('template_inserted', () => {
+  it('fires when the template lands, never for one that does not exist', async () => {
+    const { useCoreSink } = await import('$lib/server/core-usage');
+    const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+    const [template] = CANVAS_TEMPLATES;
+
+    await actions.template(event({ template_id: 'nope', x: '0', y: '0' }, fakeDb({ nodes: [], nodes_connections: [] }).db));
+    await actions.template(event({ template_id: template.id, x: '0', y: '0' }, fakeDb({ nodes: [], nodes_connections: [] }).db));
+    useCoreSink(null);
+
+    expect(sent).toMatchObject([{ event: 'template_inserted', distinct_id: 'user-1', properties: { kind: 'canvas', template_id: template.id } }]);
+  });
+});

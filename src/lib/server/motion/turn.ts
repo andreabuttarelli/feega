@@ -78,6 +78,8 @@ import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
 import { breakdownReader } from '$lib/server/video-reference';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, MotionEditKind } from '$lib/core-usage';
 import { Client, PLATFORM_TIMING, closedByModel, landingWatch, writeText, type Stop, type TurnStep, type TurnTiming } from '$lib/server/agents/turn-core';
 import { CHECK_WAIT_MS, Browser, BROWSER_VISION, EDITOR_DRAWS, BROWSER_DRAWS, Round, MAX_DELIVERY_ATTEMPTS, STILL_OPEN_ID, LAST_LOOK_ID, CRITIC_ID, LOOP_SEAM_ID, CUT_PROBE_ID, CUT_REVIEW_ID, SHEET_FILE, awaitsUser, ROUND_ROLE, shotCrews, crewTools, crewBrief, RESEARCH_BRIEF, RESEARCH_DONE, SOUND_PASS, ROUND_STOPS, ROUND_CHOICE, importFollowed, BUDGET_ID, budgetTool, writeCard, cannedTurn, type MotionTurn, type TurnOutcome } from './motion-session';
 
@@ -589,6 +591,10 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     }
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
+    if (written) {
+      coreEvent(userId, CoreEvent.MotionEdited, { frame_id: motion.record.id, kind: MotionEditKind.Prompt });
+    }
+
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
     return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card, scripted: role === StudioRole.Director && written !== null };
   }

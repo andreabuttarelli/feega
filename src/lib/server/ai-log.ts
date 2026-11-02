@@ -214,6 +214,8 @@ export function withToolContext<T>(tool: string | null | undefined, fn: () => T)
   return tool ? toolStorage.run(tool, fn) : fn();
 }
 
+export const activeTool = (): string | null => toolStorage.getStore() ?? null;
+
 /**
  * Prefisso perché `context` è già una colonna di etichette prefissate (`music:pro:30s`,
  * `sandbox:render:12s`): «quanto è costato ogni tool» si chiede con `context like 'tool:%'`, senza

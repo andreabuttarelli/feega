@@ -61,3 +61,16 @@ describe('canvas page load', () => {
     expect(cardPreviews).toHaveBeenCalled();
   });
 });
+
+describe('canvas_opened', () => {
+  it('fires once the canvas has loaded, for the user who opened it', async () => {
+    const { useCoreSink } = await import('$lib/server/core-usage');
+    const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+
+    await load(event);
+    useCoreSink(null);
+
+    expect(sent).toMatchObject([{ event: 'canvas_opened', distinct_id: 'user-1', properties: { canvas_id: 'canvas-1' } }]);
+  });
+});

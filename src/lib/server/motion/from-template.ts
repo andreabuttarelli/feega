@@ -1,4 +1,6 @@
 import { json } from '@sveltejs/kit';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, TemplateKind } from '$lib/core-usage';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
@@ -80,6 +82,7 @@ export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: I
   if (write.outcome !== RevisionOutcome.Written) {
     return { outcome: FromTemplate.Invalid, error: write.outcome === RevisionOutcome.Invalid ? write.error : 'conflict' };
   }
+  coreEvent(actor.id, CoreEvent.TemplateInserted, { kind: TemplateKind.Frame, template_id: input.templateId });
   return { outcome: FromTemplate.Started, start, node, version: write.head.version };
 }
 

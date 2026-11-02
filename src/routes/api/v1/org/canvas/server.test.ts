@@ -16,6 +16,16 @@ vi.mock('$lib/server/canvas-catalogue', () => {
   return { canvasModelCatalogue: async () => ({ text: none, image: none, video: none, audio: none, model3d: none }) };
 });
 vi.mock('$lib/server/ai-models-sync', () => ({ modalitiesOf: async () => [] }));
+vi.mock('$lib/server/motion/selection-export-ports', async () => {
+  const { MotionFormat, newMotionDoc } = await import('@feega/motion-core/motion/doc');
+  return {
+    selectionPorts: () => ({
+      read: async () => ({ name: 'Frame', doc: newMotionDoc(MotionFormat.Square) }),
+      draw: async () => ({ bytes: Buffer.from('x'), skipped: [] }),
+      store: async () => ({ asset_id: 'asset', url: 'https://x/y' })
+    })
+  };
+});
 
 import { POST } from './+server';
 
@@ -265,5 +275,87 @@ describe('POST /api/v1/org/canvas — the chat canvas ops, for CLI and MCP', () 
 
     expect(res.status).toBe(404);
     expect(body).toEqual({ error: 'project_not_found' });
+  });
+});
+
+describe('core usage from CLI and MCP', async () => {
+  const { useCoreSink } = await import('$lib/server/core-usage');
+  const { withToolContext } = await import('$lib/server/ai-log');
+  const { CANVAS_TEMPLATES } = await import('$lib/canvas/templates');
+  const canvases = [{ id: CANVAS, org_id: ORG, project_id: PROJECT }];
+
+  async function events(run: () => unknown) {
+    const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+    await run();
+    useCoreSink(null);
+    return sent;
+  }
+
+  const draw = () => call({ project_id: PROJECT, op: 'draw_frame', input: { canvasId: CANVAS, x: 0, y: 0, w: 720, h: 450 } });
+
+  it('an op that lands is agent_action via cli, after the frame it made', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow], canvases }, { filter: true }).db);
+
+    const sent = await events(draw);
+
+    expect(sent.map((b) => b.event)).toEqual(['frame_created', 'agent_action']);
+    expect(sent[1]).toMatchObject({ distinct_id: USER, properties: { via: 'cli', op: 'draw_frame' } });
+  });
+
+  it('the same op called by an MCP tool is via mcp', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow], canvases }, { filter: true }).db);
+
+    const sent = await events(() => withToolContext('edit', draw));
+
+    expect(sent.find((b) => b.event === 'agent_action')?.properties.via).toBe('mcp');
+  });
+
+  it('a read op is no agent_action', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db);
+
+    expect(await events(() => call({ project_id: PROJECT, op: 'list_nodes', input: { canvasId: CANVAS } }))).toEqual([]);
+  });
+
+  it('a refused write is no agent_action', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db, false);
+
+    expect(await events(() => call({ project_id: PROJECT, op: 'delete_node', input: { nodeId: NODE } }))).toEqual([]);
+  });
+
+  it('insert_template is template_inserted on the canvas', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [], nodes_connections: [], canvases }, { filter: true }).db);
+    const [template] = CANVAS_TEMPLATES;
+
+    const sent = await events(() => call({ project_id: PROJECT, op: 'insert_template', input: { canvasId: CANVAS, templateId: template.id, x: 0, y: 0 } }));
+
+    expect(sent.find((b) => b.event === 'template_inserted')?.properties).toMatchObject({ kind: 'canvas', template_id: template.id });
+  });
+
+  it('export_code_frame is export_completed as code, in the frame framework', async () => {
+    const codeRow = { ...nodeRow, type: 'iframe', data: { framework: 'svelte', files: { 'App.svelte': '<h1>hi</h1>' } } };
+    caller(fakeDb({ projects: [projectRow], nodes: [codeRow] }, { filter: true }).db);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ version: '1.0.0' }))));
+
+    const sent = await events(() => call({ project_id: PROJECT, op: 'export_code_frame', input: { nodeId: NODE } }));
+    vi.unstubAllGlobals();
+
+    expect(sent.find((b) => b.event === 'export_completed')?.properties).toMatchObject({ format: 'code', target: 'svelte' });
+  });
+});
+
+describe('image export from CLI and MCP', async () => {
+  const { useCoreSink } = await import('$lib/server/core-usage');
+
+  it('export_selection is export_completed as image, once per format exported', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db);
+    const sent: { event: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+
+    const { res } = await call({ project_id: PROJECT, op: 'export_selection', input: { frameIds: [NODE], rows: [{ format: 'svg', by: 'scale', value: 1 }, { format: 'svg', by: 'scale', value: 2, suffix: '@2x' }] } });
+    useCoreSink(null);
+
+    expect(res.status).toBe(200);
+    expect(sent.filter((b) => b.event === 'export_completed').map((b) => b.properties)).toEqual([{ format: 'image', target: 'svg', $process_person_profile: false, $geoip_disable: true, $ip: null }]);
   });
 });

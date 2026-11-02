@@ -6,6 +6,8 @@ import { RevisionOutcome, readRevision, type Checkpoint, type MotionHead, type R
 import type { Actor } from '$lib/server/repos/actor';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { headOrNew, saveMotionDoc } from './editor';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, motionEdits } from '$lib/core-usage';
 
 export enum OpsOutcome {
   Written = 'written',
@@ -24,6 +26,12 @@ export type OpsAsk = FrameScope & { baseVersion: number; ops: readonly DocOp[]; 
 
 export const COMMIT_ATTEMPTS = 5;
 
+function noteEdits(ask: { nodeId: string; actor: Actor }, ops: readonly DocOp[]) {
+  for (const kind of motionEdits(ops)) {
+    coreEvent(ask.actor.id, CoreEvent.MotionEdited, { frame_id: ask.nodeId, kind });
+  }
+}
+
 export async function commitOps(db: Db, ask: OpsAsk): Promise<OpsCommit> {
   const scope = { orgId: ask.orgId, nodeId: ask.nodeId };
 
@@ -39,6 +47,7 @@ export async function commitOps(db: Db, ask: OpsAsk): Promise<OpsCommit> {
 
     const write = await saveMotionDoc(db, { ...scope, expectedVersion: head.version, doc: applyOps(head.doc, ask.ops), actor: ask.actor, summary: ask.summary, checkpoint: ask.checkpoint });
     if (write.outcome === RevisionOutcome.Written) {
+      noteEdits(ask, ask.ops);
       return { outcome: OpsOutcome.Written, head: write.head, rebased };
     }
     if (write.outcome === RevisionOutcome.Invalid) {
@@ -58,6 +67,7 @@ export async function commitDoc(db: Db, ask: DocAsk): Promise<OpsCommit> {
 
   const write = await saveMotionDoc(db, { orgId: ask.orgId, nodeId: ask.nodeId, expectedVersion: ask.base.version, doc: ask.doc, actor: ask.actor, summary: ask.summary, known: ask.record, checkpoint: ask.checkpoint });
   if (write.outcome === RevisionOutcome.Written) {
+    noteEdits(ask, ops);
     return { outcome: OpsOutcome.Written, head: write.head, rebased: false };
   }
   if (write.outcome === RevisionOutcome.Invalid) {

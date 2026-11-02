@@ -2,6 +2,8 @@ import type { Db } from '$lib/server/db/client';
 import { parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { actorCols, type Actor } from './actor';
 import { Attempt, recordConflict } from './canvas-conflicts';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, type ActorKind } from '$lib/core-usage';
 
 export type MotionHead = { version: number; doc: MotionDoc; summary: string | null; actorKind: string };
 
@@ -290,6 +292,8 @@ export async function appendRevision(
     await noteStaleHead(db, { ...input, doc: parsed.doc });
     return { outcome: RevisionOutcome.Conflict };
   }
+
+  coreEvent(input.actor.id, input.expectedVersion === 0 ? CoreEvent.FrameCreated : CoreEvent.FrameEdited, { frame_id: input.nodeId, actor: input.actor.kind as ActorKind });
   return { outcome: RevisionOutcome.Written, head: { version: input.expectedVersion + 1, doc: parsed.doc, summary, actorKind: input.actor.kind } };
 }
 

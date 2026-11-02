@@ -1,4 +1,6 @@
 import { zipSync } from 'fflate';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, ExportKind } from '$lib/core-usage';
 import { Bundle, FILE, bundleOf, exportFiles, type ExportFile, type ExportRow } from '$lib/motion/export-rows';
 import { Background, findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { elementName } from '$lib/motion/element-name';
@@ -48,6 +50,12 @@ export type SelectionExported =
 const asDrawn = (doc: MotionDoc, row: ExportRow): MotionDoc => (row.transparent ? { ...doc, background: Background.Transparent } : doc);
 
 const keyOf = (target: ExportTarget) => `${target.nodeId}#${target.elementId ?? ''}`;
+
+export function noteImageExport(userId: string, rows: readonly ExportRow[]) {
+  for (const target of new Set(rows.map((r) => r.format))) {
+    coreEvent(userId, CoreEvent.ExportCompleted, { format: ExportKind.Image, target });
+  }
+}
 
 export async function exportSelection(ports: SelectionPorts, ask: SelectionAsk): Promise<SelectionExported> {
   const frames = new Map<string, SelectionFrame>();

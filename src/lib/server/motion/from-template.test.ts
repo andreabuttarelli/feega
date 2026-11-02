@@ -74,3 +74,17 @@ describe('a video started from a component', () => {
     expect(d.createNode).not.toHaveBeenCalled();
   });
 });
+
+describe('template_inserted for a frame', () => {
+  it('fires when the started frame lands, not for a template that does not exist', async () => {
+    const { useCoreSink } = await import('$lib/server/core-usage');
+    const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+
+    await startFromTemplate(db, deps(), { ...input, templateId: 'builtin:nope' });
+    await startFromTemplate(db, deps(), input);
+    useCoreSink(null);
+
+    expect(sent).toMatchObject([{ event: 'template_inserted', distinct_id: 'u1', properties: { kind: 'frame', template_id: PROMPT_TEMPLATE_ID } }]);
+  });
+});

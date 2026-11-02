@@ -532,6 +532,21 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
       expect.objectContaining({ resolution: '2K' })
     );
   });
+
+  it('an image that lands is node_generated as image, for the user who ran it', async () => {
+    const { useCoreSink } = await import('$lib/server/core-usage');
+    const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
+    generateImagesWithoutBrand.mockReset();
+    generateImagesWithoutBrand.mockResolvedValue({ ok: true, media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }], costUsd: 0.02 });
+    const imageNodeRow = { ...freshNodeRow, type: 'image' };
+    const { db } = fakeDb({ nodes: [imageNodeRow], assets: [] }, { updateRows: { nodes: [{ ...imageNodeRow, version: 2 }] } });
+    useCoreSink((b) => sent.push(b));
+
+    await runGenNode(db, { orgId: ORG, projectId: PROJECT, canvasId: CANVAS, nodeId: NODE, userId: USER, medium: 'image', prompt: 'a cat', model: 'bytedance-seed/seedream-4.5', params: {}, expectedVersion: 1 });
+    useCoreSink(null);
+
+    expect(sent).toMatchObject([{ event: 'node_generated', distinct_id: USER, properties: { medium: 'image' } }]);
+  });
 });
 
 /**
