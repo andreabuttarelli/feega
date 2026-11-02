@@ -25,6 +25,14 @@ describe('frame view shortcuts', () => {
     expect(matchCanvasShortcut({ key: 'Â', code: 'KeyR', shiftKey: true, metaKey: false, ctrlKey: false, altKey: true, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Rulers });
   });
 
+  it('toggles the rulers with shift+R in Design, as in Figma, not the rectangle tool', () => {
+    expect(matchCanvasShortcut(ev('R', { shiftKey: true }), EditMode.Design)).toEqual({ id: 'view', view: FrameView.Rulers });
+  });
+
+  it('toggles the layout grid with shift+G in Design', () => {
+    expect(matchCanvasShortcut(ev('G', { shiftKey: true }), EditMode.Design)).toEqual({ id: 'view', view: FrameView.Guides });
+  });
+
   it('toggles the pixel grid, the guides and the outlines', () => {
     const at = { tagName: 'DIV', isContentEditable: false };
 

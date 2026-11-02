@@ -289,6 +289,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'b', mod: true, command: Command.ToggleChat, label: '⌘B', does: 'Show / hide the agent', group: ShortcutGroup.View },
   { key: 'b', mod: true, alt: true, command: Command.ToggleInspector, label: '⌥⌘B', does: 'Show / hide properties', group: ShortcutGroup.View },
   { key: '"', shift: true, command: Command.TogglePixelGrid, label: "⇧'", does: 'Show / hide the pixel grid when zoomed in', group: ShortcutGroup.View },
+  { key: 'r', shift: true, mode: EditMode.Design, command: Command.ToggleRulers, label: '⇧R', does: 'Show / hide the rulers; drag from a ruler to pull a guide', group: ShortcutGroup.View },
   { key: 'r', alt: true, shift: true, command: Command.ToggleRulers, label: '⌥⇧R', does: 'Show / hide the rulers; drag from a ruler to pull a guide', group: ShortcutGroup.View },
   { key: 'g', shift: true, command: Command.ToggleLayoutGuides, label: '⇧G', does: 'Show / hide layout guides', group: ShortcutGroup.View },
   { key: 'r', alt: true, mode: EditMode.Design, command: Command.TogglePivot, label: '⌥R', does: 'Show the rotation origin to drag it', group: ShortcutGroup.View },
