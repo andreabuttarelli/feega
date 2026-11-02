@@ -90,6 +90,17 @@ describe('displayListAt', () => {
     expect(pathOf(graded, 'card')?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
   });
 
+  it('turns a linear gradient on a wide card by its true angle, as the HTML engine and the handles do', () => {
+    const fills = [{ type: FillType.Linear, angle: 45, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const paint = pathOf(graded, 'card')?.paint as { from: number[]; to: number[] };
+
+    expect(paint.from[0]).toBeCloseTo(21);
+    expect(paint.from[1]).toBeCloseTo(-21);
+    expect(paint.to[0]).toBeCloseTo(171);
+    expect(paint.to[1]).toBeCloseTo(129);
+  });
+
   it('samples a keyed gradient stop colour and angle at the frame drawn', () => {
     const fills = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
     const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
