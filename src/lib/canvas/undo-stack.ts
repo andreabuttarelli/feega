@@ -1,3 +1,8 @@
+export enum Way {
+  Back = 'back',
+  Forward = 'forward'
+}
+
 export type UndoStack<T> = {
   push: (entry: T) => void;
   pushPending: (landing: Promise<T | null>) => void;
@@ -7,16 +12,17 @@ export type UndoStack<T> = {
   pushUndo: (entry: T) => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
-  muted: <R>(run: () => Promise<R>) => Promise<R>;
+  collect: (run: () => Promise<unknown>) => Promise<T[]>;
 };
 
 export function createUndoStack<T>(): UndoStack<T> {
   const undo: Promise<T | null>[] = [];
   const redo: T[] = [];
-  let silent = 0;
+  let collecting: Promise<T | null>[] | null = null;
 
   function pushPending(landing: Promise<T | null>) {
-    if (silent) {
+    if (collecting) {
+      collecting.push(landing.catch(() => null));
       return;
     }
     undo.push(landing.catch(() => null));
@@ -42,13 +48,17 @@ export function createUndoStack<T>(): UndoStack<T> {
     pushUndo: (entry: T) => undo.push(Promise.resolve(entry)),
     canUndo: () => undo.length > 0,
     canRedo: () => redo.length > 0,
-    muted: async (run) => {
-      silent += 1;
+    collect: async (run) => {
+      const outer = collecting;
+      const caught: Promise<T | null>[] = [];
+      collecting = caught;
       try {
-        return await run();
+        await run();
       } finally {
-        silent -= 1;
+        collecting = outer;
       }
+      const landed: (T | null)[] = await Promise.all(caught);
+      return landed.filter((entry): entry is T => entry !== null);
     }
   };
 }

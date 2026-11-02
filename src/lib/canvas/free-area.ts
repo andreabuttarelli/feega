@@ -66,8 +66,26 @@ export function frameIn(node: Bounds, screen: Screen, free: Insets, maxZoom: num
 export enum FocusMode {
   Frame = 'frame',
   Select = 'select',
-  Reveal = 'reveal'
+  Reveal = 'reveal',
+  Pick = 'pick'
 }
+
+export enum Placement {
+  Fit = 'fit',
+  Slide = 'slide',
+  Centre = 'centre'
+}
+
+const FOCUS: Record<FocusMode, { selects: boolean; placement: Placement }> = {
+  [FocusMode.Frame]: { selects: false, placement: Placement.Fit },
+  [FocusMode.Select]: { selects: true, placement: Placement.Fit },
+  [FocusMode.Reveal]: { selects: false, placement: Placement.Slide },
+  [FocusMode.Pick]: { selects: true, placement: Placement.Centre }
+};
+
+export const focusSelects = (mode: FocusMode): boolean => FOCUS[mode].selects;
+
+export const focusPlacement = (mode: FocusMode): Placement => FOCUS[mode].placement;
 
 export type FocusRequest = { ids: string[]; key: number; free?: Insets; mode?: FocusMode };
 
@@ -97,4 +115,8 @@ export function revealIn(node: Bounds, view: Viewport, screen: Screen, free: Ins
   const dx = slide(left, node.width * view.zoom, free.left, screen.width - free.right);
   const dy = slide(top, node.height * view.zoom, free.top, screen.height - free.bottom);
   return { x: view.x + dx, y: view.y + dy, zoom: view.zoom };
+}
+
+export function centreIn(node: Bounds, view: Viewport, screen: Screen): Viewport {
+  return { x: screen.width / 2 - (node.x + node.width / 2) * view.zoom, y: screen.height / 2 - (node.y + node.height / 2) * view.zoom, zoom: view.zoom };
 }

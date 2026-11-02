@@ -179,7 +179,7 @@
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
-  import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
+  import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
@@ -728,6 +728,16 @@
     }
   }
 
+  function centreSelection() {
+    const rects = pickedRects();
+    const b = boundsOf(rects.length ? rects : selectedBoxes);
+    if (!b) {
+      return;
+    }
+    const s = screenSize();
+    animateTo(centreIn(b, view, { width: s.width, height: s.height }));
+  }
+
   let tween = 0;
 
   function takeCamera() {
@@ -772,17 +782,24 @@
     if (!ids?.length) {
       return;
     }
-    if (f?.mode === FocusMode.Select) {
+    const mode = f?.mode ?? FocusMode.Frame;
+    if (focusSelects(mode)) {
       untrack(() => select([...ids]));
     }
     if (f?.mode !== FocusMode.Frame) {
       const b = untrack(() => boundsOf(ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []))));
       const s = untrack(() => screenSize());
-      if (b && untrack(() => inView(b, view, { width: s.width, height: s.height }, f?.free))) {
+      const screen = { width: s.width, height: s.height };
+      const placement = focusPlacement(mode);
+      if (b && placement === Placement.Centre) {
+        untrack(() => animateTo(centreIn(b, view, screen)));
         return;
       }
-      if (b && f?.mode === FocusMode.Reveal) {
-        untrack(() => animateTo(revealIn(b, view, { width: s.width, height: s.height }, f?.free)));
+      if (b && untrack(() => inView(b, view, screen, f?.free))) {
+        return;
+      }
+      if (b && placement === Placement.Slide) {
+        untrack(() => animateTo(revealIn(b, view, screen, f?.free)));
         return;
       }
     }
@@ -1274,6 +1291,8 @@
     return true;
   }
 
+  const elementName = (nodeId: string): string | undefined => (frameChrome(kindOfNode(nodeId)).root === Root.Own ? (byId.get(nodeId)?.displayName ?? undefined) : undefined);
+
   async function runFrameAction(id: ActionId) {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
@@ -1293,7 +1312,7 @@
       pickMany(nodeId, at.scene(picked));
       return;
     }
-    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets) });
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets), layer: elementName(nodeId) });
     if (!done) {
       return;
     }
@@ -1646,7 +1665,7 @@
   });
 
   function variantMark(nodeId: string) {
-    const mark = picks.length === 1 && !typing ? selectionMarks(nodeId)[0] : null;
+    const mark = picks.length === 1 && !typing && !isComponentSet(nodeId) ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
     const instance = mark && saver ? instanceOf(saver.history.present, mark.clip) : null;
     return mark && instance ? { rect: quadBox(mark.quad), compId: instance.compId } : null;
@@ -3509,7 +3528,7 @@
     untrack(() => {
       select([pick.nodeId]);
       goInside(pick.nodeId, Gesture.Click, clip);
-      requestAnimationFrame(zoomToSelection);
+      requestAnimationFrame(centreSelection);
     });
   });
 

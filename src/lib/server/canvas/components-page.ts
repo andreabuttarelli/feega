@@ -2,7 +2,7 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createCanvas, listCanvases, listNodes, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
-import { placeFigmaPlan, type FrameStore } from '$lib/server/motion/move-element';
+import { placeFigmaPlan, type FrameStore, type StoredFrame } from '$lib/server/motion/move-element';
 import type { ComponentsPage } from '$lib/server/url-import/import-url';
 import { componentPages } from '$lib/server/url-import/component-sheet';
 import { homedAt } from '$lib/motion/canvas-components';
@@ -48,6 +48,14 @@ const NOTHING: HomedOutcome = { moved: [], setIds: [] };
 
 const HOMED_SUMMARY = 'Moved the main to the Components page';
 
+const shownScale = (frame: StoredFrame): number => (frame.stage ? frame.stage.width / frame.doc.width : 1);
+
+const scaled = (item: PlanItem, scale: number): PlanItem => ({
+  ...item,
+  size: { width: item.size.width * scale, height: item.size.height * scale },
+  centre: { x: item.centre.x * scale, y: item.centre.y * scale }
+});
+
 export async function homeComponents(store: FrameStore, page: () => Promise<ComponentsPage>, nodeId: string, newId: NewId): Promise<HomedOutcome> {
   const frame = await store.read(nodeId);
   if (!frame) {
@@ -64,7 +72,8 @@ export async function homeComponents(store: FrameStore, page: () => Promise<Comp
 
   const item: PlanItem = { destination: Destination.Frame, doc: frame.doc, size: { width: frame.doc.width, height: frame.doc.height }, centre: { x: 0, y: 0 }, name: COMPONENTS_PAGE, kind: FrameKind.Frame, images: [] };
   const { sets, homes } = componentPages([item], newId);
-  const placed = await placeFigmaPlan(store, where.place, { items: sets, skipped: [], fileKey: null }, where.at);
+  const scale = shownScale(frame);
+  const placed = await placeFigmaPlan(store, where.place, { items: sets.map((set) => scaled(set, scale)), skipped: [], fileKey: null }, where.at);
   const byComp = Object.fromEntries(Object.entries(homes[0] ?? {}).flatMap(([compId, set]) => (placed.frameIds[set] ? [[compId, placed.frameIds[set]]] : [])));
   await store.write(nodeId, frame.version, homedAt(frame.doc, byComp), HOMED_SUMMARY);
   return { moved: Object.keys(byComp), setIds: placed.frameIds };
