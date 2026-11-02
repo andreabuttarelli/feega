@@ -19,7 +19,7 @@
   import SplitVertical from '@lucide/svelte/icons/square-split-vertical';
   import Columns from '@lucide/svelte/icons/columns-3';
   import type { Component } from 'svelte';
-  import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
+  import { FOCUS_RING, IconButton, IconSize, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -33,6 +33,7 @@
   import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
   import NumberField from './NumberField.svelte';
+  import { FieldKind } from '$lib/motion/number-field';
   import StackSizeChip from './StackSizeChip.svelte';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
@@ -123,6 +124,9 @@
 
   const SPOT = cn('size-4 rounded-full bg-ui-input transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover aria-pressed:bg-ui-accent-solid', FOCUS_RING);
   const TRAIL = cn('h-full max-w-16 shrink-0 cursor-pointer appearance-none rounded-sm bg-transparent pr-2 pl-1 text-right text-ui-label text-ui-text-2 outline-none hover:text-ui-text', FOCUS_RING);
+  const SELECT_CHIP = 'flex h-7 min-w-0 items-center gap-1 rounded-md bg-ui-input pl-2 text-ui-label';
+  const CHIP_SELECT = cn('h-full min-w-0 flex-1 cursor-pointer appearance-none rounded-sm bg-transparent pr-2 text-right text-ui-label outline-none', FOCUS_RING);
+  const SPAN_RANGE = { min: 1, max: MAX_GRID_COLUMNS, step: 1 };
   const LIMIT_CHIP = 'flex h-7 items-center gap-1 rounded-md bg-ui-input pl-2 text-ui-label';
 </script>
 
@@ -211,34 +215,41 @@
   {/if}
 
   {#if inGrid}
-    <Field label="Span">
-      <input aria-label="Column span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.columnSpan} data-testid="auto-layout-column-span" onchange={(e) => size({ columnSpan: span(e.currentTarget.value) }, 'Changed the column span')} />
-      <input aria-label="Row span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.rowSpan} data-testid="auto-layout-row-span" onchange={(e) => size({ rowSpan: span(e.currentTarget.value) }, 'Changed the row span')} />
-    </Field>
-    <Field label="In cell">
-      <select aria-label="Horizontal in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellX ?? ''} data-testid="auto-layout-cell-x" onchange={(e) => size({ cellX: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
-        {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
-      </select>
-      <select aria-label="Vertical in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellY ?? ''} data-testid="auto-layout-cell-y" onchange={(e) => size({ cellY: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
-        {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
-      </select>
-    </Field>
+    <div class="grid grid-cols-2 gap-1.5" data-testid="auto-layout-span">
+      <div data-testid="auto-layout-column-span"><NumberField label="Cols" kind={FieldKind.Named} name="Column span" value={item.columnSpan} range={SPAN_RANGE} onchange={(v) => size({ columnSpan: span(String(v)) }, 'Changed the column span')} /></div>
+      <div data-testid="auto-layout-row-span"><NumberField label="Rows" kind={FieldKind.Named} name="Row span" value={item.rowSpan} range={SPAN_RANGE} onchange={(v) => size({ rowSpan: span(String(v)) }, 'Changed the row span')} /></div>
+    </div>
+    <div class="grid grid-cols-2 gap-1.5">
+      <label class={SELECT_CHIP}>
+        <span class="text-ui-text-2">X</span>
+        <select aria-label="Horizontal in cell" class={CHIP_SELECT} value={item.cellX ?? ''} data-testid="auto-layout-cell-x" onchange={(e) => size({ cellX: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+          {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
+        </select>
+      </label>
+      <label class={SELECT_CHIP}>
+        <span class="text-ui-text-2">Y</span>
+        <select aria-label="Vertical in cell" class={CHIP_SELECT} value={item.cellY ?? ''} data-testid="auto-layout-cell-y" onchange={(e) => size({ cellY: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+          {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
+        </select>
+      </label>
+    </div>
   {/if}
 
   {#if parent && !inGrid && !item.absolute}
-    <Field label="Align self">
-      <select aria-label="Align self" class={cn(FIELD_INPUT, 'w-full')} value={item.alignSelf ?? ''} data-testid="stack-align-self" onchange={(e) => size({ alignSelf: cellAlign(e.currentTarget.value) }, 'Aligned in the stack')}>
+    <label class={SELECT_CHIP}>
+      <span class="text-ui-text-2">Align</span>
+      <select aria-label="Align self" class={CHIP_SELECT} value={item.alignSelf ?? ''} data-testid="stack-align-self" onchange={(e) => size({ alignSelf: cellAlign(e.currentTarget.value) }, 'Aligned in the stack')}>
         {#each SELF_ALIGNS as value (value)}<option {value}>{SELF_ALIGN_LABEL[value]}</option>{/each}
       </select>
-    </Field>
+    </label>
   {/if}
 
   {#if parent}
-    <Field label="In layout">
+    <div class="flex items-center gap-1.5">
       <div class="flex min-w-0 flex-1" data-testid="auto-layout-absolute"><SegmentedField name="Absolute position" options={YES_NO} value={answerOf(item.absolute)} onchange={(v) => size({ absolute: v === Answer.Yes }, 'Changed absolute position')} /></div>
       <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the stack')}><ChevronUp /></IconButton>
       <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the stack')}><ChevronDown /></IconButton>
       <IconButton label="Take out of the stack" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the stack')}><LogOut /></IconButton>
-    </Field>
+    </div>
   {/if}
 </div>

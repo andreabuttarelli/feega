@@ -97,13 +97,14 @@
   import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
   import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '@feega/motion-core/motion/shape/schema';
   import { cornerRadii, withCorner } from '@feega/motion-core/motion/shape/geometry';
+  import { radiusRange, radiusShown, radiusStored } from '$lib/motion/radius-px';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '@feega/motion-core/motion/text-animators/model';
   import { TEXT_COMPONENTS, removeAnimator, setAnimator } from '@feega/motion-core/motion/text-animators/ops';
   import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '@feega/motion-core/motion/expression/bake';
-  import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
+  import { Unit, propsOwner, sliderOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
@@ -172,8 +173,6 @@
 
   const CORNER_NAMES = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'] as const;
   const CORNER_SHORT = ['TL', 'TR', 'BR', 'BL'] as const;
-  const PERCENT = 100;
-  const CORNER_PERCENT_MAX = 50;
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
   const MARK: Record<(typeof KEY_STATE)[keyof typeof KEY_STATE], KeyMark> = { [KEY_STATE.On]: KeyMark.Here, [KEY_STATE.Lane]: KeyMark.Animated, [KEY_STATE.None]: KeyMark.None };
   const EDGE_GLYPH: Record<Side, string> = { [Side.In]: '↗', [Side.Out]: '↘' };
@@ -480,6 +479,10 @@
   const fieldSlider = (field: Field) => steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), doc));
   const LAID_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
   const laid = $derived(stackParent || clip.autoLayout ? (laidClip(doc, clip.id) ?? clip) : clip);
+  const radiusBox = $derived({ width: Number(laid.props.width ?? 0) * doc.width, height: Number(laid.props.height ?? 0) * doc.height });
+  type FieldScale = { shown: number; range: Slider; stored: (v: number) => number };
+  const unitScale = (field: Field): FieldScale => ({ shown: fieldShown(field), range: fieldSlider(field), stored: (v) => fieldStored(field, v) });
+  const radiusScale = (): FieldScale => ({ shown: radiusShown(Number(clip.props.roundness ?? 0), radiusBox), range: { ...radiusRange(radiusBox), unit: Unit.Px }, stored: (v) => radiusStored(v, radiusBox) });
   const resolved = (key: string) => ((LAID_KEYS.has(key) ? laid : clip).props as Record<string, unknown>)[key];
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : resolved(field.key));
 
@@ -623,22 +626,22 @@
   {/each}
 {/snippet}
 
-{#snippet rangeField(field: Field)}
+{#snippet rangeField(field: Field, scale: FieldScale = unitScale(field))}
   {@const keyed = keyedField(clip.component, field.key, animated.params)}
   {@const look = fieldLook(field.key)}
-  {@const range = fieldSlider(field)}
+  {@const range = scale.range}
   <NumberField
     {gesture}
     label={look.short ?? field.label}
     kind={look.short ? FieldKind.Glyph : FieldKind.Named}
     name={field.label}
-    value={fieldShown(field)}
+    value={scale.shown}
     {range}
     unit={range.unit ?? look.unit}
     fill={look.fill}
     mark={keyed ? MARK[keyState(field.key)] : null}
     expression={clip.expressions[field.key] !== undefined}
-    onchange={(v) => setProp(field, fieldStored(field, snappedValue(field.key, v)))}
+    onchange={(v) => setProp(field, scale.stored(snappedValue(field.key, v)))}
     onkey={() => toggle(field.key)}
     onexpression={keyed ? () => toggleExpression(field.key) : undefined}
   />
@@ -713,7 +716,7 @@
           {#if split}
             <div class="corners" data-testid="corners">
               {#each CORNER_NAMES as name, i (name)}
-                <input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} />
+                <input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} />
               {/each}
             </div>
           {/if}
@@ -733,7 +736,7 @@
   {@const radii = cornerRadii(Number(clip.props.roundness ?? 0), corners)}
   {@const split = corners.length > 0}
   <div class="radius" data-testid="radius">
-    <div class="radius-main bindable">{#if clip.bind?.[round.key]}<BindChip {doc} {clip} target={round.key} {commit} />{:else}{@render rangeField(round)}<BindChip {doc} {clip} target={round.key} {commit} />{/if}</div>
+    <div class="radius-main bindable">{#if clip.bind?.[round.key]}<BindChip {doc} {clip} target={round.key} {commit} />{:else}{@render rangeField(round, radiusScale())}<BindChip {doc} {clip} target={round.key} {commit} />{/if}</div>
     {#if cornersField}
       <button type="button" class="radius-split" class:on={split} data-testid="radius-per-corner" aria-pressed={split} aria-label="Per-corner radius" title="Per-corner radius" onclick={() => setProp(cornersField, split ? [] : radii)}><SquareDashed size={15} /></button>
     {/if}
@@ -741,7 +744,7 @@
   {#if cornersField && split}
     <div class="corners" data-testid="corners">
       {#each CORNER_NAMES as name, i (name)}
-        <label class="corner" title={name}><span>{CORNER_SHORT[i]}</span><input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(cornersField, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} /></label>
+        <label class="corner" title={name}><span>{CORNER_SHORT[i]}</span><input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(cornersField, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} /></label>
       {/each}
     </div>
   {/if}
