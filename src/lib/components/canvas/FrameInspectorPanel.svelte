@@ -90,6 +90,15 @@
   const commitShown = (result: OpResult, summary: string) => result.ok && editShown(result.doc, summary);
   const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
 
+  function resizeFrame(result: OpResult, summary: string) {
+    if (!result.ok || !doc) {
+      return;
+    }
+    const before = { width: doc.width, height: doc.height };
+    edit(result.doc, summary);
+    frameProperties.place?.follow(before, result.doc);
+  }
+
   const alignPicks = (edge: Edge) => doc && session && editGuides(alignSpace(doc, session.selection, session.playhead, propBoxes(doc), edge, session.mode), `Aligned ${edge}`);
   const distributePicks = (axis: Axis, spacing?: number) => doc && session && editGuides(distributeSpace(doc, session.selection, session.playhead, propBoxes(doc), axis, session.mode, spacing), `Distributed along ${axis}`);
 
@@ -110,7 +119,7 @@
 
 {#snippet frameLead()}
   {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} />{/if}
-  {#if doc}<FramePresetSection {doc} onchange={editGuides} />{/if}
+  {#if doc}<FramePresetSection {doc} onchange={resizeFrame} />{/if}
   {#if surfaced && !surface?.autoLayout}<FrameAutoLayoutEntry onadd={() => surfaced && editGuides(stackFrame(surfaced, SURFACE_ID), 'Added auto layout')} />{/if}
 {/snippet}
 

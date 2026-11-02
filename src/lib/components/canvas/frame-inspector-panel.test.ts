@@ -92,7 +92,7 @@ describe('a free element reads as one object on the canvas', () => {
 const html = (selection: string[], part: string | null = null) => render(FrameInspectorPanel, { props: { session: sessionOf(selection), tokens: FEEGA_TOKENS, part } }).body;
 
 describe('the frame itself', () => {
-  const placed = (patch: Partial<NodePlace> = {}): NodePlace => ({ x: 120, y: 40, rotation: 0, set: () => undefined, turn: () => undefined, flip: () => undefined, align: null, ...patch });
+  const placed = (patch: Partial<NodePlace> = {}): NodePlace => ({ x: 120, y: 40, rotation: 0, set: () => undefined, turn: () => undefined, flip: () => undefined, align: null, follow: () => undefined, ...patch });
 
   it('places the frame with X and Y and heads the panel with its name', () => {
     frameProperties.place = placed();
