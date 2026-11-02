@@ -151,7 +151,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
-  import { FORMATS, MotionFormat, formatOf } from '@feega/motion-core/motion/doc';
+  import { FORMATS, MotionFormat, formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
@@ -2887,12 +2887,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     resizeMode = e.metaKey || e.ctrlKey ? ResizeMode.Ignored : ResizeMode.Constrained;
   };
 
-  async function sizeFrameDoc(id: string, picture: { width: number; height: number }, was: { width: number; height: number } | null = null) {
+  type Picture = { width: number; height: number };
+
+  function elementSizeOf(id: string): Picture | null {
+    const row = nodes.find((n) => n.id === id);
+    return row && motionOf(row)?.kind === FrameKind.Element ? { width: row.w, height: row.h } : null;
+  }
+
+  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Picture | null, mode: ResizeMode) => (was ? fitElementToNode(keepTextSize(doc, was, picture), picture) : fitToNode(doc, picture, mode));
+
+  async function sizeFrameDoc(id: string, picture: Picture, was: Picture | null = null) {
     const mode = resizeMode;
-    if (frameDocs.edit(id, (doc) => (was ? fitElementToNode(keepTextSize(doc, was, picture), picture) : fitToNode(doc, picture, mode)), 'Resized the frame')) {
+    if (frameDocs.edit(id, (doc) => resizedDoc(doc, picture, was, mode), 'Resized the frame')) {
       return;
     }
-    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: resizeMode });
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: was ? ResizeMode.Element : resizeMode });
     if (result?.undo) {
       pushGesture({ items: result.undo as UndoItem[] });
     }
@@ -2909,8 +2918,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     const plan = framePlan(id, width, height);
-    const before = nodes.find((n) => n.id === id);
-    const was = before && motionOf(before)?.kind === FrameKind.Element ? { width: before.w, height: before.h } : null;
+    const was = elementSizeOf(id);
     liveResized([]);
     livePreview(id, null);
     const sized = plan?.picture ? sizeFrameDoc(id, plan.picture, was) : null;
@@ -2922,13 +2930,15 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   let liveFrame = 0;
 
   function livePreview(id: string, size: { w: number; h: number } | null) {
+    const base = frameDocs.doc(id);
+    const plan = size && base ? framePlan(id, size.w, size.h) : null;
+    const fitted = base && plan?.picture ? resizedDoc(base, plan.picture, elementSizeOf(id), resizeMode) : null;
+    const shown = fitted?.ok ? fitted.doc : null;
+    frameDocs.preview(id, shown);
     const open = layersSource.video;
-    if (open?.nodeId !== id) {
-      return;
+    if (open?.nodeId === id) {
+      open.preview(shown);
     }
-    const plan = size ? framePlan(id, size.w, size.h) : null;
-    const fitted = plan?.picture ? fitToNode(open.doc, plan.picture, resizeMode) : null;
-    open.preview(fitted?.ok ? fitted.doc : null);
   }
 
   function liveResized(boxes: { id: string; w?: number; h?: number }[]) {

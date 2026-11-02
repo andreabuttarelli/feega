@@ -63,6 +63,7 @@
   import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
+  import { elementTurn } from '$lib/motion/element-turn';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
@@ -170,7 +171,7 @@
   import { isSvgFile } from '$lib/canvas/system-clipboard';
   import { isLottieFile } from '$lib/canvas/lottie-file';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, leftEmpty } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -1160,6 +1161,7 @@
   };
   const resolveViews = heldViews();
   const bpViews = $derived(resolveViews(coreFrames, viewDocOf));
+  const heldInResize = $derived(new Set([...resizing].filter((id) => frameChrome(kindOfNode(id)).resize === ResizePaint.Held)));
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;
     const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
@@ -1388,6 +1390,7 @@
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(doc, statePreview.picksOf(nodeId)) }),
         recorded: () => {
           settle.edited(nodeId);
+          queueMicrotask(() => turnHost(nodeId));
           autosize(nodeId);
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
@@ -1709,7 +1712,15 @@
     });
   }
 
-  onMount(() => frameDocs.publish({ edit: editFrameDoc, doc: frameDocOf, hold: holdFrameDoc }));
+  function previewFrameDoc(nodeId: string, doc: MotionDoc | null) {
+    const live = liveOf(nodeId);
+    const shown = doc ?? frameDocOf(nodeId);
+    if (live && shown && frameChrome(kindOfNode(nodeId)).resize === ResizePaint.Relaid) {
+      liveDocs.set(nodeId, { ...live, doc: previewDoc(shown, statePreview.picksOf(nodeId)) });
+    }
+  }
+
+  onMount(() => frameDocs.publish({ edit: editFrameDoc, doc: frameDocOf, hold: holdFrameDoc, preview: previewFrameDoc }));
 
   function startTrailer() {
     if (panelNodeId) {
@@ -2109,6 +2120,18 @@
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
     return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+  }
+
+  function turnHost(nodeId: string) {
+    const saver = savers.get(nodeId);
+    const live = liveOf(nodeId);
+    const turn = saver && live && frameChrome(kindOfNode(nodeId)).root === Root.Own ? elementTurn(saver.history.present) : null;
+    if (!saver || !live || !turn) {
+      return;
+    }
+    saver.amendRoot(turn.doc, 'Rotated the element');
+    liveDocs.set(nodeId, { ...live, doc: previewDoc(turn.doc, statePreview.picksOf(nodeId)) });
+    props.onRotate?.(nodeId, turn.degrees);
   }
 
   const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
@@ -3590,7 +3613,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
