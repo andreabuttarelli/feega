@@ -3,7 +3,7 @@ import { editAt, valueAt } from './inspector';
 import { withParams } from '@feega/motion-core/motion/custom/params';
 import type { KeyValue } from '@feega/motion-core/motion/keyframes';
 import { setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
-import { VideoControl, controlShown } from '@feega/motion-core/motion/still';
+import { VideoControl, animateStill, controlShown } from '@feega/motion-core/motion/still';
 import { timelineFits } from '@feega/motion-core/motion/editor-mount';
 
 export enum EditMode {
@@ -39,8 +39,9 @@ export function designWarning(mode: EditMode, clip: MotionClip): string | null {
 
 export const readMode = (stored: string | null): EditMode => (Object.values(EditMode) as string[]).includes(stored ?? '') ? (stored as EditMode) : EditMode.Design;
 
-export function startMode(doc: MotionDoc, stored: string | null): EditMode {
-  return controlShown(doc, VideoControl.EditMode) && timelineFits(doc) ? readMode(stored) : EditMode.Design;
+export function timelineDoc(doc: MotionDoc): MotionDoc {
+  const animated = animateStill(doc);
+  return animated.ok ? animated.doc : doc;
 }
 
 export const MODE_LABEL: Record<EditMode, string> = { [EditMode.Design]: 'Design: edits set the resting state', [EditMode.Motion]: 'Animate: edits key at the playhead' };

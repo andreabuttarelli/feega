@@ -104,7 +104,7 @@
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
-  import { EditMode, startMode } from '$lib/motion/edit-mode';
+  import { EditMode, readMode, timelineDoc } from '$lib/motion/edit-mode';
   import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
   import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import { elementKey } from '$lib/canvas/prototype-arrows';
@@ -1352,12 +1352,12 @@
     picks = [];
   });
 
-  const frameMode = (doc: LiveDoc['doc']): EditMode => startMode(doc, editorMode.spec.edit);
+  const frameMode = $derived(readMode(editorMode.spec.edit));
 
   $effect(() => {
     const edit = editorMode.spec.edit;
     for (const session of savers.values()) {
-      session.mode = startMode(session.history.present, edit);
+      session.mode = readMode(edit);
       session.access = editorMode.spec.access;
     }
   });
@@ -1371,7 +1371,7 @@
     }
     const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
     const session: FrameEditSession = new FrameEditSession(
-      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: frameMode(live.doc) },
+      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: frameMode },
       {
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
@@ -1774,9 +1774,9 @@
   const timeline = $derived.by(() => {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
-    const mode = nodeId && live ? frameMode(live.doc) : EditMode.Design;
+    const mode = nodeId && live ? frameMode : EditMode.Design;
     const access = nodeId ? frameTimeline(editorMode.timeline, frameChrome(kindOfNode(nodeId)).timeline, mode) : TimelineAccess.Hidden;
-    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: live.doc, frame: frameOfLive(live), access } : null;
+    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), frame: frameOfLive(live), access } : null;
   });
 
   const TIMELINE_CHANGE: Record<TimelineAccess, (nodeId: string) => (doc: LiveDoc['doc'], summary: string) => void> = {
@@ -2043,7 +2043,7 @@
     }
     const { frame, live } = under;
     const clip = crypto.randomUUID().slice(0, 8);
-    const made = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode(live.doc), frameOfLive(live)), clip);
+    const made = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode, frameOfLive(live)), clip);
     if (!made.ok) {
       return false;
     }
@@ -3543,7 +3543,7 @@
         doc={timeline.doc}
         frame={timeline.frame}
         selection={picks.length > 1 ? picks : inside?.level.clip ? [inside.level.clip] : []}
-        mode={frameMode(timeline.doc)}
+        mode={frameMode}
         onmode={() => editorMode.toggleMotion()}
         onframe={(f) => scrubTo(nodeId, f)}
         onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}
@@ -3626,7 +3626,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
