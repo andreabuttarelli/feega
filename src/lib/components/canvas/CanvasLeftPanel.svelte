@@ -13,6 +13,7 @@
   import ProjectComponentsPanel from './ProjectComponentsPanel.svelte';
   import HistoryPanel from './HistoryPanel.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
+  import { StyleLayout } from '$lib/components/motion/style-layout';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import X from '@lucide/svelte/icons/x';
   import Search from '@lucide/svelte/icons/search';
@@ -74,11 +75,11 @@
         <X />
       </IconButton>
     </div>
-    <div class="left-panel-body is-flush">
+    <div class="left-panel-body is-flush" class:is-split={kind === 'styles'}>
       {#if kind === 'components'}
         <ProjectComponentsPanel {projectId} />
       {:else if kind === 'styles'}
-        <StyleLibrarySection tokens={FEEGA_TOKENS} />
+        <StyleLibrarySection tokens={FEEGA_TOKENS} layout={StyleLayout.Split} />
       {:else if kind === 'history'}
         {#if pages.currentId}
           <HistoryPanel {projectId} canvasId={pages.currentId} />
@@ -119,6 +120,13 @@
     min-height: 0;
     overflow-y: auto;
     padding: 6px;
+  }
+
+  .left-panel-body.is-split {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
   }
 
   .is-tree .left-panel-body,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { readChatTab, writeChatTab, readRulers, writeRulers } from './shell-prefs';
+import { readChatTab, writeChatTab, readRulers, writeRulers, readStylesSplit, writeStylesSplit, STYLES_SPLIT } from './shell-prefs';
 import { FRAME_VIEW_DEFAULT, FrameView } from './canvas/frame-view';
 
 function fakeLocalStorage() {
@@ -58,5 +58,28 @@ describe('i righelli della tela', () => {
   it('accesi e riletti restano accesi', () => {
     writeRulers(true);
     expect(readRulers()).toBe(true);
+  });
+});
+
+describe('the Styles panel split between text and colour', () => {
+  beforeEach(() => {
+    testLocalStorage = fakeLocalStorage();
+    (globalThis as { localStorage?: unknown }).localStorage = testLocalStorage;
+  });
+
+  it('starts at half', () => {
+    expect(readStylesSplit()).toBe(0.5);
+  });
+
+  it('reads back what was written', () => {
+    writeStylesSplit(0.3);
+    expect(readStylesSplit()).toBe(0.3);
+  });
+
+  it('clamps so neither region vanishes', () => {
+    writeStylesSplit(0.99);
+    expect(readStylesSplit()).toBe(STYLES_SPLIT.MAX);
+    testLocalStorage.setItem('feega.stylesSplit', 'nope');
+    expect(readStylesSplit()).toBe(0.5);
   });
 });

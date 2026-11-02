@@ -8,7 +8,8 @@ export const SHELL_PREF_KEYS = {
   chatPanelPx: 'feega.chatPanelPx',
   chatOpen: 'feega.chatOpen',
   chatTab: 'feega.chatTab',
-  rulers: 'feega.rulers'
+  rulers: 'feega.rulers',
+  stylesSplit: 'feega.stylesSplit'
 } as const;
 
 const SHELL_PREF_KEYS_LEGACY = {
@@ -18,7 +19,8 @@ const SHELL_PREF_KEYS_LEGACY = {
   chatPanelPx: 'dazero.chatPanelPx',
   chatOpen: 'dazero.chatOpen',
   chatTab: 'dazero.chatTab',
-  rulers: 'dazero.rulers'
+  rulers: 'dazero.rulers',
+  stylesSplit: 'dazero.stylesSplit'
 } as const;
 
 export const CHAT_TABS = ['chat', 'guide', 'properties'] as const;
@@ -173,4 +175,23 @@ export function readRulers(): boolean {
 
 export function writeRulers(on: boolean) {
   writeRaw(SHELL_PREF_KEYS.rulers, on ? 'true' : 'false');
+}
+
+export const STYLES_SPLIT = { DEFAULT: 0.5, MIN: 0.15, MAX: 0.85 } as const;
+
+export function readStylesSplit(): number {
+  const raw = readRaw(SHELL_PREF_KEYS.stylesSplit);
+  const n = raw === null ? NaN : Number(raw);
+  if (!Number.isFinite(n)) {
+    return STYLES_SPLIT.DEFAULT;
+  }
+  return clampStylesSplit(n);
+}
+
+export function clampStylesSplit(ratio: number): number {
+  return Math.min(STYLES_SPLIT.MAX, Math.max(STYLES_SPLIT.MIN, ratio));
+}
+
+export function writeStylesSplit(ratio: number) {
+  writeRaw(SHELL_PREF_KEYS.stylesSplit, String(ratio));
 }
