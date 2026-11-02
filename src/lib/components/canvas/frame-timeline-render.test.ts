@@ -15,6 +15,13 @@ describe('the timeline under a frame on the canvas', () => {
     expect(body).toContain(`${(45 / doc.fps).toFixed(2)}s`);
   });
 
+  it('shows the video duration in seconds, editable', () => {
+    const doc = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 180 };
+    const body = render(FrameTimeline, { props: { doc, frame: 0, selection: [], onframe: () => {}, onselect: () => {}, onchange: () => {} } }).body;
+
+    expect(body).toMatch(/<input[^>]*data-testid="frame-timeline-duration"[^>]*value="6"|<input[^>]*value="6"[^>]*data-testid="frame-timeline-duration"/);
+  });
+
   it('offers the proxies toggle, on by default', () => {
     const doc = newMotionDoc(MotionFormat.Landscape);
     const body = render(FrameTimeline, { props: { doc, frame: 0, selection: [], onframe: () => {}, onselect: () => {}, onchange: () => {} } }).body;

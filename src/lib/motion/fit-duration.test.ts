@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { MotionStyle } from '@feega/motion-core/motion/style-model';
-import { contentEnd, fitDuration, fitNewVideo } from './fit-duration';
+import { contentEnd, fitDuration, fitNewVideo, setDuration } from './fit-duration';
 import { docProblems, Quality } from './direction';
 
 function must(r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
@@ -60,5 +60,39 @@ describe('fit duration to content', () => {
 
   it('a video that already had content is left alone', () => {
     expect(fitNewVideo(phones(), phones()).durationInFrames).toBe(15 * SECOND);
+  });
+});
+
+describe('the duration of a video', () => {
+  const clipsOf = (doc: MotionDoc) => Object.fromEntries(doc.tracks.flatMap((t) => t.clips.map((c) => [c.id, [c.from, c.durationInFrames]])));
+
+  it('shortens a 15 s video to 6 s by trimming the clips that run past the new end', () => {
+    const doc = must(setDuration(phones(), 6 * SECOND));
+
+    expect(doc.durationInFrames).toBe(6 * SECOND);
+    expect(clipsOf(doc)).toMatchObject({ bg: [0, 6 * SECOND], phones: [0, 6 * SECOND] });
+  });
+
+  it('drops a clip that starts after the new end', () => {
+    const late = must(addClip(phones(), { component: 'Shape', from: 10 * SECOND, durationInFrames: SECOND, props: {} }, 'late'));
+
+    expect(clipsOf(must(setDuration(late, 6 * SECOND)))).not.toHaveProperty('late');
+  });
+
+  it('lengthens the clips that reached the old end, and leaves the others', () => {
+    const doc = must(setDuration(phones(), 20 * SECOND));
+
+    expect(clipsOf(doc)).toMatchObject({ bg: [0, 20 * SECOND], phones: [0, 6 * SECOND] });
+  });
+
+  it('drops a work area that no longer fits', () => {
+    const looped = { ...phones(), workArea: { from: 0, to: 12 * SECOND } };
+
+    expect(must(setDuration(looped, 6 * SECOND)).workArea).toBeNull();
+    expect(must(setDuration({ ...looped, workArea: { from: 0, to: 3 * SECOND } }, 6 * SECOND)).workArea).toEqual({ from: 0, to: 3 * SECOND });
+  });
+
+  it('refuses a video longer than the limit', () => {
+    expect(setDuration(phones(), 100_000).ok).toBe(false);
   });
 });
