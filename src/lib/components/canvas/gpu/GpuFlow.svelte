@@ -67,7 +67,7 @@
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
-  import { frameProperties, UNNAMED_FRAME } from '../frame-properties.svelte';
+  import { frameProperties, UNNAMED_FRAME, type NodePlace } from '../frame-properties.svelte';
   import { selectionProperties } from '../selection-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
@@ -1586,6 +1586,8 @@
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     frameProperties.runAction = runSelectionAction;
     frameProperties.turn = nodeTurnOf(panelNodeId);
+    frameProperties.place = nodePlaceOf(panelNodeId);
+    frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
     return () => frameProperties.clear();
   });
 
@@ -2121,6 +2123,11 @@
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
     return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+  }
+
+  function nodePlaceOf(nodeId: string): NodePlace | null {
+    const tile = byId.get(nodeId);
+    return tile ? { x: tile.x, y: tile.y, set: (x, y) => props.onMove?.(nodeId, x, y) } : null;
   }
 
   function nodeTurnOf(nodeId: string): NodeTurn | null {

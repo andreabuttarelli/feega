@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { parsePath, pathData, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
-import { drawnInFrame, drawnOnCanvas } from './canvas-draw';
+import { TEXT_CLICK_PX, canvasTextClick, drawnInFrame, drawnOnCanvas } from './canvas-draw';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -88,5 +89,17 @@ describe('a shape drawn over a frame lands inside it, on the gesture', () => {
     const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Pen, path: 'M 200 100 L 700 500', fill: null, stroke: CANVAS_INK[CanvasTheme.Light] }, 0, 'p2');
 
     expect(made.ok && clipOf(made.doc, 'p2')?.props).toMatchObject({ fillKind: 'none', stroke: 'brand.text' });
+  });
+});
+
+describe('a click with the text tool on the canvas', () => {
+  const leading = COMPONENTS.Text.schema.parse({}).leading as number;
+
+  it('makes a box for 16 px type, whatever the zoom', () => {
+    expect(TEXT_CLICK_PX.size).toBe(16);
+    const atTwo = canvasTextClick((p) => ({ x: p.x / 2, y: p.y / 2 }));
+    expect(atTwo.height).toBeCloseTo(16 * leading * 2);
+    const atOne = canvasTextClick((p) => p);
+    expect(atOne.height).toBeCloseTo(16 * leading);
   });
 });

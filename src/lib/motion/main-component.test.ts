@@ -6,7 +6,7 @@ import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/time
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { wrapInStack } from './layout/ops';
-import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
+import { ComponentRole, InstancePart, componentOf, createComponent, instanceParts, roleOf, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -24,6 +24,34 @@ function button(): MotionDoc {
 }
 
 const flatText = (doc: MotionDoc) => flattenComps(doc).tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.component === 'Text').map((c) => c.props.text);
+
+describe('a main component and its instances in Properties', () => {
+  const placed = () => {
+    const doc = must(createComponent(button(), ['bg', 'label'], newId, 'Button'));
+    return { doc, id: doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!.id };
+  };
+  const homed = (doc: MotionDoc, home: string): MotionDoc => ({ ...doc, comps: Object.fromEntries(Object.entries(doc.comps).map(([k, c]) => [k, c.component ? { ...c, component: { ...c.component, home } } : c])) });
+
+  it('the component in the frame that owns it is the main', () => {
+    const { doc, id } = placed();
+    expect(roleOf(doc, id, 'node-a')).toBe(ComponentRole.Main);
+    expect(roleOf(homed(doc, 'node-a'), id, 'node-a')).toBe(ComponentRole.Main);
+  });
+
+  it('a placement in another frame is an instance', () => {
+    const { doc, id } = placed();
+    expect(roleOf(homed(doc, 'node-a'), id, 'node-b')).toBe(ComponentRole.Instance);
+  });
+
+  it('a main offers properties and variants, never swap, reset, push or detach', () => {
+    const main = instanceParts(ComponentRole.Main);
+    for (const part of [InstancePart.Swap, InstancePart.Reset, InstancePart.Push, InstancePart.Detach, InstancePart.GoToMain, InstancePart.Overrides]) {
+      expect(main.has(part)).toBe(false);
+    }
+    expect(main.has(InstancePart.Variants)).toBe(true);
+    expect(instanceParts(ComponentRole.Instance).has(InstancePart.Detach)).toBe(true);
+  });
+});
 
 describe('main components and instances', () => {
   it('creating a component turns the selection into a main and leaves one instance in place', () => {
