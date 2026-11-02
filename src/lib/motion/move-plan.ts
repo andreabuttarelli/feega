@@ -1,9 +1,11 @@
 import { Background, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { shownBox } from '@feega/motion-core/motion/layout/resolve';
 import { docMode, type DocMode } from '@feega/motion-core/motion/still';
 import { FrameKind, elementNodeOf, frameNodeOf, leftEmpty, type DocNodeType } from '$lib/canvas/motion-node';
 import { blankElement, canvasReady } from './draw-create';
 import { elementName } from './element-name';
 import { homed, placeInstance } from './canvas-components';
+import { reframed } from './comp-frame';
 import { DropOn, clipCentre, elementBox, frameOf, liftElement, placeElement, type Box, type Drop, type Element, type NewId, type Point } from './move-element';
 
 export enum MoveOutcome {
@@ -135,15 +137,34 @@ export function planCopy(source: FrameSnap, target: FrameSnap | null, ask: MoveA
 export function planComponent(source: FrameSnap, compId: string, drop: CanvasDrop, newId: NewId): MovePlan {
   const instanceId = newId();
   const from = homed(source.doc, source.nodeId);
-  const placed = placeInstance(from, from, compId, () => instanceId);
+  const measured = placeInstance(from, from, compId, () => instanceId);
+  if (!measured.ok) {
+    return refusal(MoveOutcome.Invalid, measured.error);
+  }
+
+  const box = shownBox(measured.doc, instanceId);
+  const hugged = box ? huggedSnap(source, from, compId, box) : { ...source, doc: from };
+  const placed = box ? placeInstance(hugged.doc, from, compId, () => instanceId) : measured;
   if (!placed.ok) {
     return refusal(MoveOutcome.Invalid, placed.error);
   }
+
   const lifted = liftElement(placed.doc, instanceId);
   if (!lifted.ok) {
     return refusal(MoveOutcome.NoElement, lifted.error);
   }
-  return { ok: true, landing: landOut(source, lifted.element, drop, null, newId), source: { left: Left.Kept } };
+  return { ok: true, landing: landOut(hugged, lifted.element, drop, null, newId), source: { left: Left.Kept } };
+}
+
+function huggedSnap(source: FrameSnap, from: MotionDoc, compId: string, box: Box): FrameSnap {
+  const size = { width: Math.max(1, Math.round(box.width)), height: Math.max(1, Math.round(box.height)) };
+  const sheet = { ...from, ...size, tracks: from.tracks.map((t) => ({ ...t, clips: [] })), comps: {} };
+  const copied = placeInstance(sheet, from, compId, () => compId);
+  const comps = copied.ok ? copied.doc.comps : {};
+  const main = comps[compId];
+  const doc = { ...sheet, comps: main ? { ...comps, [compId]: reframed(main, size, size, { x: -box.left, y: -box.top }) } : comps };
+  const stage = source.stage && { width: (source.stage.width * size.width) / from.width, height: (source.stage.height * size.height) / from.height };
+  return { ...source, doc, stage };
 }
 
 export function planFree(source: FrameSnap, target: FrameSnap, drop: FrameDrop, newId: NewId): LandingPlan {
