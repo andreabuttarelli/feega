@@ -1,23 +1,19 @@
 <script lang="ts">
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { IN_OUT_PRESETS, PresetSide, applyInOut, presetsFor, type InOutPreset } from '$lib/motion/in-out-presets';
+  import { IN_OUT_PRESETS, PRESET_PLACE_LABEL, PresetPlace, PresetSide, applyInOut, presetStart, presetsFor, type InOutPreset } from '$lib/motion/in-out-presets';
+  import { presetPlace } from '$lib/motion/preset-place.svelte';
 
   let { doc, clip, frame, commit }: { doc: MotionDoc; clip: MotionClip; frame: number; commit: (result: OpResult, summary: string) => void } = $props();
 
-  const Where = { Edge: 'edge', Playhead: 'playhead' } as const;
-  type Where = (typeof Where)[keyof typeof Where];
-
   const SIDE_LABEL: Record<PresetSide, string> = { [PresetSide.In]: 'In', [PresetSide.Out]: 'Out' };
-  const WHERE_LABEL: Record<Where, string> = { [Where.Edge]: 'Clip edge', [Where.Playhead]: 'Playhead' };
 
   let side = $state<PresetSide>(PresetSide.In);
-  let where = $state<Where>(Where.Edge);
 
   const choices = $derived(presetsFor(clip.component, side));
 
   function run(preset: InOutPreset) {
-    const at = where === Where.Playhead ? Math.max(0, frame - clip.from) : undefined;
+    const at = presetPlace.current === PresetPlace.Playhead ? presetStart(PresetPlace.Playhead, frame, clip) : undefined;
     commit(applyInOut(doc, clip.id, { preset, side, at }, () => crypto.randomUUID().slice(0, 8)), `${IN_OUT_PRESETS[preset].label} ${side}`);
   }
 </script>
@@ -31,8 +27,8 @@
       {/each}
     </div>
     <div class="seg" role="group" aria-label="Preset position">
-      {#each Object.values(Where) as w (w)}
-        <button type="button" class:on={where === w} aria-pressed={where === w} data-testid={`preset-where-${w}`} onclick={() => (where = w)}>{WHERE_LABEL[w]}</button>
+      {#each Object.values(PresetPlace) as w (w)}
+        <button type="button" class:on={presetPlace.current === w} aria-pressed={presetPlace.current === w} data-testid={`preset-where-${w}`} onclick={() => (presetPlace.current = w)}>{PRESET_PLACE_LABEL[w]}</button>
       {/each}
     </div>
   </div>

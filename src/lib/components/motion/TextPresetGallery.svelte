@@ -5,6 +5,8 @@
   import { PRESETS, PRESET_LABEL, TEXT_PRESETS, applyPreset, type TextPreset } from '@feega/motion-core/motion/text-animators/ops';
   import { startLook } from '$lib/motion/text-animators/preset-preview';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { presetStart } from '$lib/motion/in-out-presets';
+  import { presetPlace } from '$lib/motion/preset-place.svelte';
 
   let { doc, clip, frame, commit }: { doc: MotionDoc; clip: MotionClip; frame: number; commit: (result: OpResult, summary: string) => void } = $props();
 
@@ -24,7 +26,7 @@
 
   function add(preset: TextPreset) {
     const duration = Math.max(1, Math.round(length * doc.fps));
-    commit(applyPreset(doc, clip.id, preset, { start: Math.max(0, frame - clip.from), duration }, crypto.randomUUID().slice(0, 8)), `Added ${PRESET_LABEL[preset]}`);
+    commit(applyPreset(doc, clip.id, preset, { start: presetStart(presetPlace.current, frame, clip), duration }, crypto.randomUUID().slice(0, 8)), `Added ${PRESET_LABEL[preset]}`);
   }
 
   function tileStyle(preset: TextPreset): string {
