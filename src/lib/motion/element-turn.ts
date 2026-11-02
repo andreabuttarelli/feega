@@ -2,6 +2,8 @@ import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 
 export type ElementTurn = { doc: MotionDoc; degrees: number };
 
+export type NodeTurn = { clipId: string; degrees: number; set: (degrees: number) => void };
+
 const rootsOf = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => !c.parent);
 
 export function elementTurn(doc: MotionDoc): ElementTurn | null {

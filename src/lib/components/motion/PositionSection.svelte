@@ -24,8 +24,9 @@
   import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
   import { Placement } from '@feega/motion-core/motion/layout/stack';
   import { positionShown } from '$lib/motion/properties-view';
+  import type { NodeTurn } from '$lib/motion/element-turn';
 
-  let { doc, clip, part, placement = Placement.Free, within = null, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
+  let { doc, clip, part, placement = Placement.Free, within = null, turn = null, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; turn?: NodeTurn | null; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
 
   const ICON = 15;
   const PIVOT_STOPS = [0, 0.5, 1] as const;
@@ -63,9 +64,10 @@
   const down = $derived(pinnedVertically(vertical));
   const pivotX = $derived(clip.transform.anchorX ?? TRANSFORM.anchorX.fallback);
   const pivotY = $derived(clip.transform.anchorY ?? TRANSFORM.anchorY.fallback);
-  const rotation = $derived(clip.transform.rotateZ ?? 0);
+  const rotation = $derived(turn ? turn.degrees : (clip.transform.rotateZ ?? 0));
 
   const numberOf = (e: Event) => Number((e.currentTarget as HTMLInputElement).value);
+  const rotate = (degrees: number) => (turn ? turn.set(degrees) : onchange(setTransform(doc, clip.id, { rotateZ: degrees }), 'Rotated the layer'));
   const moveX = (e: Event) => onchange(setProps(doc, clip.id, { x: (numberOf(e) + origin.left + box.width / 2) / doc.width }), 'Moved horizontally');
   const moveY = (e: Event) => onchange(setProps(doc, clip.id, { y: (numberOf(e) + origin.top + box.height / 2) / doc.height }), 'Moved vertically');
   const pinH = (h: Horizontal) => onchange(setConstraints(doc, [clip.id], { horizontal: h }), 'Changed the horizontal constraint');
@@ -127,7 +129,7 @@
   {#if part === PositionPart.Rotation}
     <div class="row turn">
       <div class="rotation">
-        <label class="field"><Triangle size={ICON} /><input type="number" step="1" value={rotation} aria-label="Rotation" data-testid="rotation-field" onchange={(e) => onchange(setTransform(doc, clip.id, { rotateZ: numberOf(e) }), 'Rotated the layer')} /><span>°</span></label>
+        <label class="field"><Triangle size={ICON} /><input type="number" step="1" value={rotation} aria-label="Rotation" data-testid="rotation-field" onchange={(e) => rotate(numberOf(e))} /><span>°</span></label>
         <div class="pivot" role="group" aria-label="Pivot">
           {#each PIVOT_STOPS as py (py)}
             {#each PIVOT_STOPS as px (px)}
