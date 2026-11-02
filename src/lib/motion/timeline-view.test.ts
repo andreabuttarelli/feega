@@ -5,7 +5,7 @@ import { Source } from '@feega/motion-core/motion/keyframes';
 import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 import { feegaTrailerV2 } from './trailer-v2';
 import { withParams } from '@feega/motion-core/motion/custom/params';
-import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode, headerPx, fitZoom, ZOOM_MIN } from './timeline-view';
+import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode, headerPx, fitZoom, ZOOM_MIN, axisTicks } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -161,5 +161,17 @@ describe('timeline header and fit', () => {
 
   it('a very long video stays within the zoom limits', () => {
     expect(fitZoom({ durationInFrames: 30 * 3600, fps: 30 }, 900)).toBe(ZOOM_MIN);
+  });
+});
+
+describe('graph editor axes', () => {
+  it('labels a range with round steps that stay inside it', () => {
+    expect(axisTicks([0, 1], 5)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1]);
+    expect(axisTicks([-3, 47], 5)).toEqual([0, 10, 20, 30, 40]);
+  });
+
+  it('gives a flat range one tick, and never an endless list', () => {
+    expect(axisTicks([0.5, 0.5], 5)).toEqual([0.5]);
+    expect(axisTicks([0, 1e9], 5).length).toBeLessThanOrEqual(11);
   });
 });

@@ -165,3 +165,19 @@ export function fitZoom(doc: { durationInFrames: number; fps: number }, lanesPx:
   const seconds = doc.durationInFrames / doc.fps;
   return clampZoom((lanesPx * FIT_SLACK) / (BASE_PX_PER_SECOND * seconds));
 }
+
+const NICE_STEPS = [1, 2, 5, 10];
+const TICK_PRECISION = 12;
+
+export function axisTicks([from, to]: readonly [number, number], count: number): number[] {
+  const span = to - from;
+  if (!(span > 0)) {
+    return [from];
+  }
+  const rough = span / count;
+  const power = 10 ** Math.floor(Math.log10(rough));
+  const step = NICE_STEPS.map((n) => n * power).find((s) => s >= rough)!;
+  const first = Math.ceil(from / step);
+  const last = Math.floor(to / step);
+  return Array.from({ length: last - first + 1 }, (_, i) => Number(((first + i) * step).toPrecision(TICK_PRECISION)));
+}
