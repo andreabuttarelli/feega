@@ -107,7 +107,7 @@ describe('the frame itself', () => {
 describe('a free group or image', () => {
   it('turns from the panel with the node rotation', () => {
     frameProperties.place = { x: 0, y: 0, set: () => undefined };
-    frameProperties.turn = { clipId: 'a', degrees: 30, set: () => undefined };
+    frameProperties.host = { clipId: 'a', box: { x: 0, y: 0, w: 10, h: 10, rotation: 30 }, move: () => undefined, resize: () => undefined, turn: () => undefined };
     const body = html([]);
     frameProperties.clear();
 
