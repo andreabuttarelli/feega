@@ -406,3 +406,11 @@ describe('climbing to the parent', () => {
     expect(climbsUp(ev('Enter', { shiftKey: true, target: TEXTAREA }))).toBe(false);
   });
 });
+
+describe('node hide and lock keys', () => {
+  const at = { tagName: 'DIV' } as unknown as EventTarget;
+  it('⇧⌘H hides and ⇧⌘L locks the selected nodes', () => {
+    expect(matchCanvasShortcut({ key: 'h', shiftKey: true, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'toggle-hidden' });
+    expect(matchCanvasShortcut({ key: 'L', shiftKey: true, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'toggle-locked' });
+  });
+});

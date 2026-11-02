@@ -4,6 +4,7 @@ import type { OpResult } from "@feega/motion-core/motion/timeline";
 import type { CanvasLayer, LayerHover } from "./layers";
 import type { HeldDocs } from "./frame-outlines";
 import type { ActionId } from "$lib/motion/actions";
+import type { NodeFlag } from "./node-flags";
 
 export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
@@ -11,6 +12,7 @@ export type CanvasSide = {
   select(ids: string[]): void;
   open(nodeId: string): void;
   rename(nodeId: string, name: string): void;
+  flag(ids: string[], flag: NodeFlag): void;
 };
 
 export type VideoSide = {
