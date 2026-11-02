@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CHAT_MAX, HEARTBEAT_MS, viewportCentredOn, SETTLE_MS, TICK_MS, centreOf, followed, landedAt, presenterOf, presentControlsShown, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
 import { MARK_STALE_MS } from './frame-presence';
+import { AGENT_IDLE_MS } from './canvas-presence';
 
 const self = { sessionId: 's-me', userId: 'me', name: 'me' };
 
@@ -93,7 +94,7 @@ describe('canvasHub receiver', () => {
     port.listen((mark) => got.push(mark));
     line.receive({ nope: true });
     line.receive({ sessionId: 's-u', userId: 'u', name: 'u', cursor: null, selection: [], live: [], at: 1 });
-    expect(got).toEqual([{ sessionId: 's-u', userId: 'u', name: 'u', cursor: null, selection: [], live: [], view: null, presenting: false, chat: null, at: 42 }]);
+    expect(got).toEqual([{ sessionId: 's-u', userId: 'u', name: 'u', cursor: null, selection: [], live: [], view: null, presenting: false, chat: null, agent: null, at: 42 }]);
   });
 });
 
@@ -113,6 +114,13 @@ describe('canvasPeersOf', () => {
   it('shows my other tab, in my colour', () => {
     const marks = keepCanvasMark(keepCanvasMark(new Map(), mark('me', 0)), mark('me', 0, 's-other-tab'));
     expect(canvasPeersOf(marks, 's-me', 1).map((p) => p.sessionId)).toEqual(['s-other-tab']);
+  });
+
+  it('an idle agent leaves sooner than a person', () => {
+    const agentMark = { ...mark('agent:mcp:s', 0), agent: { doing: 'set text' } };
+    const marks = keepCanvasMark(keepCanvasMark(new Map(), mark('human', 0)), agentMark);
+    expect(canvasPeersOf(marks, 's-me', AGENT_IDLE_MS - 1).map((p) => p.userId)).toEqual(['human', 'agent:mcp:s']);
+    expect(canvasPeersOf(marks, 's-me', AGENT_IDLE_MS + 1).map((p) => p.userId)).toEqual(['human']);
   });
 
   it('rejects coordinates that are not finite', () => {
