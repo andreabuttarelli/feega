@@ -3,7 +3,7 @@ import { MAX_COMP_DEPTH, SEPARATOR, viewOf, type CompPath } from '@feega/motion-
 import { mergeScope, scopeView } from '$lib/motion/instance-view';
 import { IDENTITY, apply2d, invert2d, mul2d, worldAt, type Affine } from '@feega/motion-core/motion/parent';
 import type { Pt } from '$lib/motion/scene-select';
-import { Reach, Root, clickTarget, framePage } from './frame-select';
+import { Reach, Root, childBelow, clickTarget, framePage } from './frame-select';
 
 export type Scope = { path: CompPath; prefix: string; hosts: string[]; parents: string[] };
 
@@ -95,6 +95,13 @@ export function enteredFrom(chain: readonly string[], picks: readonly string[]):
   const at = picks.length === 1 ? chain.indexOf(picks[0]) : -1;
   return at >= 0 ? (chain[at + 1] ?? null) : null;
 }
+
+export function childUnder(doc: MotionDoc, chain: readonly string[], picks: readonly string[]): string | null {
+  const leaf = chain.at(-1);
+  return enteredFrom(chain, picks) ?? (leaf ? childBelow(doc, leaf, picks) : null);
+}
+
+export const clickPick = (doc: MotionDoc, chain: readonly string[], picks: readonly string[], reach: Reach): string | null => (reach === Reach.Top ? childUnder(doc, chain, picks) : null) ?? pickTarget(doc, chain, picks, reach);
 
 function linkedParent(doc: MotionDoc, id: string, root: Root): string | null {
   const up = findClip(doc, id)?.clip.parent ?? null;

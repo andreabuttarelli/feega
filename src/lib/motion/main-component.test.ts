@@ -5,6 +5,7 @@ import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc }
 import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+import { wrapInStack } from './layout/ops';
 import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
 
 const must = (r: OpResult): MotionDoc => {
@@ -179,5 +180,23 @@ describe('pushing instance changes to the main', () => {
 
   it('refuses a clip that is not an instance', () => {
     expect(pushOverrides(button(), 'bg').ok).toBe(false);
+  });
+});
+
+describe('a component made from a stack child', () => {
+  const stacked = () => {
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    for (const [id, x] of [['a', 0.2], ['b', 0.4], ['c', 0.6]] as const) {
+      doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } }, id));
+    }
+    return must(wrapInStack(doc, ['a', 'b', 'c'], 'row', 'lane'));
+  };
+
+  it('keeps the instance in the stack, where the child was', () => {
+    const doc = must(createComponent(stacked(), ['b'], newId, 'Chip'));
+    const instance = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+
+    expect(instance.parent).toBe('row');
+    expect(findClip(doc, 'row')!.clip.autoLayout!.order).toEqual(['a', instance.id, 'c']);
   });
 });

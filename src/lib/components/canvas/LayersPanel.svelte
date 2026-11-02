@@ -41,7 +41,7 @@
   import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
   import type { DrawTool } from '$lib/motion/draw-tool';
   import { highlightStyle, rowHighlight } from '$lib/canvas/highlight';
-  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, dropPlace, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, rowDrop, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -139,7 +139,7 @@
     }
     e.preventDefault();
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    landing = { key: row.key, place: dropPlace(row.kind, (e.clientY - box.top) / box.height) };
+    landing = { key: row.key, place: rowDrop(row, (e.clientY - box.top) / box.height) };
   }
 
   const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard, [LayoutKind.Stack]: StretchHorizontal, [LayoutKind.Grid]: LayoutGrid };

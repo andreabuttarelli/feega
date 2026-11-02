@@ -27,7 +27,7 @@ Wrapping elements that already sit in a Stack nests the new Stack in their place
 
 ## The Stack section
 
-Select a Stack (its row in **Layers**, a click on it on the canvas, or `Esc` from one of its children) and the right bar reads top to bottom like Figma's auto layout panel:
+Select a Stack (its row in **Layers**, a click on it on the canvas, or `Esc` / `⇧↵` from one of its children). With a Stack selected, a click on one of its children selects that child; pressing and dragging still moves the Stack and the right bar reads top to bottom like Figma's auto layout panel:
 
 1. The header: the name, then **Create component** and the **…** menu.
 2. **Alignment**: left, centre, right; top, middle, bottom.
@@ -53,7 +53,7 @@ The Stack places its children, like flexbox. Select a child and the right bar dr
 - **Absolute position**: takes the child out of the flow (Figma's *ignore auto layout*). X and Y come back, measured from the Stack's top-left corner.
 - **Move earlier / later** and **Take out of the stack**.
 
-On the canvas, dragging a child reorders it: a line shows where it lands between its siblings. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it. In **Layers**, dragging a child above or below another reorders it in that Stack, or moves it into the Stack of the row it lands on.
+On the canvas, dragging a child reorders it: the child follows the cursor and a line shows where it lands between its siblings. Dragging any other element of the frame onto a Stack inserts it at the line the same way. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it. In **Layers**, dragging a child above or below another reorders it in that Stack, or moves it into the Stack of the row it lands on. Dropping on the middle of a Stack row puts the layer inside it, at the end.
 
 Fills, per-side strokes, corner radius, opacity, blend, shadows, blur and clip content are the usual sections.
 

@@ -1,5 +1,5 @@
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
@@ -35,11 +35,11 @@ function within(doc: MotionDoc, id: string, ancestorId: string): boolean {
   return false;
 }
 
-function stackUnder(doc: MotionDoc, clipId: string, own: Stack, boxes: Record<string, Box>, to: Pt): Stack | null {
+function stackUnder(doc: MotionDoc, clipId: string, own: Stack | null, boxes: Record<string, Box>, to: Pt): Stack | null {
   const area = (c: MotionClip) => boxes[c.id].width * boxes[c.id].height;
   const hits = allClips(doc)
     .filter((c): c is Stack => !!c.autoLayout && !!boxes[c.id] && c.id !== clipId && !within(doc, c.id, clipId))
-    .filter((c) => contains(boxes[c.id], to, c.id === own.id ? LEAVE_MARGIN_PX : 0))
+    .filter((c) => contains(boxes[c.id], to, c.id === own?.id ? LEAVE_MARGIN_PX : 0))
     .sort((a, b) => area(a) - area(b));
   return hits[0] ?? null;
 }
@@ -95,4 +95,21 @@ export function dragInStack(doc: MotionDoc, clipId: string, boxes: Record<string
     return { kind: StackDrop.Reorder, result: reorderChild(doc, own.id, clipId, index), line };
   }
   return { kind: StackDrop.Join, result: join(doc, clipId, target, index), line };
+}
+
+export function dropInStack(doc: MotionDoc, clipId: string, boxes: Record<string, Box>, to: Pt): StackDragged | null {
+  const target = findClip(doc, clipId) ? stackUnder(doc, clipId, null, boxes, to) : null;
+  if (!target) {
+    return null;
+  }
+  const { index, line } = slotOf(doc, target, clipId, boxes, to);
+  return { kind: StackDrop.Join, result: join(doc, clipId, target, index), line };
+}
+
+export function followCursor(doc: MotionDoc, clipId: string, [dx, dy]: Pt): OpResult {
+  const clip = findClip(doc, clipId)?.clip;
+  if (!clip) {
+    return { ok: false, error: `no clip ${clipId}` };
+  }
+  return setTransform(doc, clipId, { x: (clip.transform.x ?? 0) + dx / doc.width, y: (clip.transform.y ?? 0) + dy / doc.height });
 }

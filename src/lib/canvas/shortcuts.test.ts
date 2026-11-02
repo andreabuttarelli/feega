@@ -7,6 +7,7 @@ import {
   NUDGE_STEP_BIG,
   addableOf,
   matchCanvasShortcut,
+  climbsUp,
   canvasToolKeys,
   nudgeOf,
   type CanvasCommand
@@ -16,6 +17,7 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { Command } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
+import { EditMode } from '$lib/motion/edit-mode';
 
 describe('frame view shortcuts', () => {
   it('toggles the rulers with alt+shift+R even where alt rewrites the key', () => {
@@ -100,6 +102,16 @@ describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
     expect(matchCanvasShortcut(ev('O', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Ellipse });
     expect(matchCanvasShortcut(ev('P', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Pen });
     expect(matchCanvasShortcut(ev('v'))).toEqual({ id: 'tool', tool: DrawTool.Select });
+  });
+
+  it('R and O arm the rectangle and the ellipse in Design, as in Figma', () => {
+    expect(matchCanvasShortcut(ev('r'), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Rectangle });
+    expect(matchCanvasShortcut(ev('o'), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Ellipse });
+  });
+
+  it('R and O stay the timeline keys in Motion', () => {
+    expect(matchCanvasShortcut(ev('r'), EditMode.Motion)).toBeNull();
+    expect(matchCanvasShortcut(ev('o'), EditMode.Motion)).toBeNull();
   });
 
   it('⇧F disegna un frame, come gli altri strumenti della tela', () => {
@@ -381,5 +393,17 @@ describe('a focused control keeps its own activation keys', () => {
   it('other shortcuts still work with a button focused, and Enter on the canvas still enters', () => {
     expect(press('Delete', { tagName: 'BUTTON' })).toEqual({ id: 'delete' });
     expect(press('Enter', { tagName: 'DIV', isContentEditable: false })).toEqual({ id: 'enter' });
+  });
+});
+
+describe('climbing to the parent', () => {
+  it('Esc and ⇧↵ climb to the parent', () => {
+    expect(climbsUp(ev('Escape'))).toBe(true);
+    expect(climbsUp(ev('Enter', { shiftKey: true }))).toBe(true);
+  });
+
+  it('↵ alone goes inside, and ⇧↵ in a field writes a newline', () => {
+    expect(climbsUp(ev('Enter'))).toBe(false);
+    expect(climbsUp(ev('Enter', { shiftKey: true, target: TEXTAREA }))).toBe(false);
   });
 });

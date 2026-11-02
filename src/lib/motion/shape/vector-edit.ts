@@ -21,6 +21,12 @@ export function enterPointEdit(doc: MotionDoc, clip: MotionClip): OpResult {
   return NEEDS_PATH.has(String(clip.props.shape)) ? setPath(doc, clip.id, shapePath(clip.props as unknown as ShapeParams)) : { ok: true, doc };
 }
 
+export function pointDraft(doc: MotionDoc, pointEdit: string | null): MotionDoc {
+  const clip = pointEdit ? (findClip(doc, pointEdit)?.clip as MotionClip | undefined) : undefined;
+  const entered = clip ? enterPointEdit(doc, clip) : null;
+  return entered?.ok ? entered.doc : doc;
+}
+
 export function landsOn(doc: MotionDoc, clipId: string, frame: number, at: Pt): boolean {
   const [u, v] = pathSpace(doc, clipId, frame).toLocal(at);
   return u >= 0 && u <= 1 && v >= 0 && v <= 1;

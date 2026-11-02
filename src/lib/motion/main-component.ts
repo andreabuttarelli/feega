@@ -1,6 +1,10 @@
 import { compOf, findClip, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { precompose, withOverride } from '@feega/motion-core/motion/precomp';
 import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
+import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
+import { KeepWorld, setParent } from './parent-ops';
+import { reorderChild } from './layout/ops';
 
 export type NewId = () => string;
 
@@ -50,6 +54,24 @@ export function soleFrame(comp: MotionComp): string | null {
   return comp.component && roots.length === 1 && clips.some((c) => c.parent === root.id) ? root.id : null;
 }
 
+function sharedParent(doc: MotionDoc, clipIds: readonly string[]): string | null {
+  const parents = new Set(clipIds.map((id) => findClip(doc, id)?.clip.parent ?? null));
+  const [only] = parents;
+  return parents.size === 1 && only && !clipIds.includes(only) ? only : null;
+}
+
+function inPlace(before: MotionDoc, after: MotionDoc, clipIds: readonly string[], instance: string): OpResult {
+  const parentId = sharedParent(before, clipIds);
+  const parent = parentId ? (findClip(after, parentId)?.clip as MotionClip | undefined) : undefined;
+  if (!parent?.autoLayout) {
+    return parentId ? setParent(after, instance, parentId) : { ok: true, doc: after };
+  }
+  const order = childrenInOrder(before.tracks.flatMap((t) => t.clips as MotionClip[]), parent as MotionClip & { autoLayout: AutoLayout }).map((c) => c.id);
+  const at = order.findIndex((id) => clipIds.includes(id));
+  const placed = setParent(after, instance, parent.id, { keep: KeepWorld.No });
+  return placed.ok ? reorderChild(placed.doc, parent.id, instance, Math.max(0, at)) : placed;
+}
+
 export function createComponent(doc: MotionDoc, clipIds: readonly string[], newId: NewId, name: string): OpResult {
   const ids = { comp: newId(), clip: newId() };
   const made = precompose(doc, clipIds, ids, name);
@@ -57,7 +79,8 @@ export function createComponent(doc: MotionDoc, clipIds: readonly string[], newI
     return made;
   }
   const comp = made.doc.comps[ids.comp];
-  return { ok: true, doc: { ...made.doc, comps: { ...made.doc.comps, [ids.comp]: { ...comp, component: { name: comp.name } } } } };
+  const named = { ...made.doc, comps: { ...made.doc.comps, [ids.comp]: { ...comp, component: { name: comp.name } } } };
+  return inPlace(doc, named, clipIds, ids.clip);
 }
 
 export function overrideInstance(doc: MotionDoc, instanceId: string, innerId: string, props: Record<string, unknown>): OpResult {
