@@ -15,8 +15,8 @@ import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
 import { pasteOverElements, replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
 import { setClipFlags } from '@feega/motion-core/motion/organize';
-import { BooleanOp, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
-import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
+import { BooleanOp, combineShapes, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
+import { bakeBooleanGroup, isBooleanGroup } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type LetteringLoader } from '$lib/motion/text-outline-run';
 import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
@@ -137,7 +137,7 @@ const combine = (op: BooleanOp): BarOp => ({
     if (group) {
       return kept(ctx, setProps(ctx.doc, group.id, { boolean: op }), `Changed boolean to ${op}`);
     }
-    return regrouped(ctx, liveCombine(ctx.doc, ctx.selection, op, ctx.newId), `Combined shapes: ${op}`);
+    return kept(ctx, combineShapes(ctx.doc, ctx.selection, op, ctx.frame), `Combined shapes: ${op}`);
   }
 });
 

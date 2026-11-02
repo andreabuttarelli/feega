@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import type { Outline, Pt } from '@feega/motion-core/motion/shape/geometry';
+import { pathSpace } from '@feega/motion-core/motion/shape/space';
 import { setParent } from '$lib/motion/parent-ops';
-import { canEditPoints, editsPoints, enterPointEdit, pointDraft, landsOn, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
+import { canEditPoints, commitOutline, editsPoints, enterPointEdit, pointDraft, landsOn, pointBounds, snapPoint, snapReach, snapTargets } from './vector-edit';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -106,5 +108,27 @@ describe('a rectangle in point edit', () => {
 
   it('shows the doc itself when nothing is in point edit', () => {
     expect(pointDraft(rect, null)).toBe(rect);
+  });
+});
+
+describe('editing a point refits the box', () => {
+  const square = () => must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'path', path: 'M0 0 L1 0 L1 1 L0 1 Z', x: 0.5, y: 0.5, width: 0.2, height: 0.2 } }, 'p'));
+  const dragged: Outline = [{ closed: true, vertices: ([[0, 0], [1, 0], [1, 2], [0, 1]] as Pt[]).map((p) => ({ p, in: p, out: p })) }];
+
+  it('a point dragged below the box grows the height and keeps the shape where it was', () => {
+    const doc = must(commitOutline(square(), 'p', dragged, 0));
+    const props = findClip(doc, 'p')!.clip.props;
+
+    expect(Number(props.height)).toBeCloseTo(0.4, 5);
+    expect(Number(props.width)).toBeCloseTo(0.2, 5);
+    expect(Number(props.y)).toBeCloseTo(0.6, 5);
+    expect(pathSpace(doc, 'p', 0).toFrame([0, 0])).toEqual(pathSpace(square(), 'p', 0).toFrame([0, 0]).map((n) => expect.closeTo(n, 5)));
+  });
+
+  it('a morphing path keeps its box, so the morph targets stay aligned', () => {
+    const morphing = must(setProps(square(), 'p', { morphs: ['M0 0 L1 1 Z'] }));
+    const props = findClip(must(commitOutline(morphing, 'p', dragged, 0)), 'p')!.clip.props;
+
+    expect(Number(props.height)).toBeCloseTo(0.2, 5);
   });
 });
