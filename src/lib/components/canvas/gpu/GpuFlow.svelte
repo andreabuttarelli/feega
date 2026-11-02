@@ -2228,9 +2228,9 @@
     [0, 1]
   ];
 
-  function resizeOf(nodeId: string, unit: [number, number], start: Point): Active {
+  function resizeOf(nodeId: string, unit: [number, number], start: Point, main?: string): Active {
     const t = byId.get(nodeId)!;
-    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 }, main };
   }
 
   function rotateOf(nodeId: string, start: Point): Active {
@@ -2254,7 +2254,7 @@
     downAt = local(e);
     captureId = e.pointerId;
     holdSelection(true);
-    active = { ...resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e))), main };
+    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)), main);
     gesturing = true;
   }
 
