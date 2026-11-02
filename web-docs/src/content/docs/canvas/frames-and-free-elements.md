@@ -36,7 +36,8 @@ Scenes, camera, breakpoints, prototype flow, styles and variables sit in the fol
 ## Selecting
 
 - Right-click on stacked layers lists them so you can pick the one underneath.
-- Right-click a layer to hide (`⇧⌘H`), lock (`⇧⌘L`), copy properties (`⌥⌘C`) or paste them (`⌥⌘V`).
+- Right-click a layer to hide (`⇧⌘H`), lock (`⇧⌘L`), copy properties (`⌥⌘C`) or paste them (`⌥⌘V`). A locked layer, and everything inside it, stays put when dragged.
+- Hold `Alt` while dragging an element inside a frame to drag a copy; the original stays where it was.
 - Hold `Cmd`/`Ctrl` and drag across a frame to select elements inside groups, not the groups.
 - `Cmd+F` finds any node by name, text or prompt.
 

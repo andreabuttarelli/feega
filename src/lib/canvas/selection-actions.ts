@@ -230,6 +230,7 @@ const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1
 
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ...FRAME_DIALOG_SHOWN,
+  'run-workflow': (summaries) => summaries.some((n) => GENERATIVE_TYPES.has(n.type)),
   'frame-history': isOneFrame,
   'run-technique': isOneTechnique,
   'run-technique-rows': isOneTechnique,

@@ -289,3 +289,15 @@ describe('editor modes: the context menu reaches every layer op', () => {
     }
   });
 });
+
+describe('Run flow on a selection of drawings', () => {
+  const shape = { type: 'motion', data: { format: '1:1', kind: 'element' } };
+
+  it('is not offered when nothing selected generates', () => {
+    expect(shownFor('run-workflow', [shape, shape])).toBe(false);
+  });
+
+  it('is offered when a generating node is selected', () => {
+    expect(shownFor('run-workflow', [shape, { type: 'image', data: {} }])).toBe(true);
+  });
+});
