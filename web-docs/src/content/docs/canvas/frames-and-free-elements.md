@@ -31,6 +31,14 @@ A free element behaves like a single object, as in Figma ([ADR 0032](/architectu
 - New layers are pinned left and top, so resizing a frame keeps their size and distance from the edges.
 - `Resize to fit` (`⌥⇧⌘R`) fits a frame to its contents.
 
+## A frame's numbers are canvas pixels
+
+A frame works in design units, as in Figma ([ADR 0033](/architecture/adr/0033-a-frame-is-its-size-on-the-canvas/)): a frame 700 px wide on the canvas reads **W 700**, and every number of the layers inside it (width, height, type size, radius, stroke, gap, padding, effects, camera) is in the same canvas pixels. A radius of 12 draws 12 px.
+
+- **Frame size**, **W** and **H** set the size of the frame on the canvas, the same as dragging its handle. A preset (Phone 393 × 852, Desktop 1440 × 1024…) makes the frame that big on the canvas.
+- Frames made before this change keep their content untouched; their numbers read in canvas pixels too.
+- The resolution of a file is picked when you export it: see [Export](/motion/export/).
+
 ## Styling the frame
 
 With nothing inside the frame selected, the right bar shows the frame's own look, with the same controls as a layer:

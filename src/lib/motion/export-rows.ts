@@ -77,11 +77,13 @@ export const EXPORT_PRESETS: readonly { label: string; row: ExportRow }[] = [
   { label: FILE[FileFormat.Svg].label, row: { format: FileFormat.Svg, by: SizeBy.Scale, value: 1, suffix: '', transparent: true } }
 ];
 
+export const FIRST_SCALE = 2;
+
 export const scaleSuffix = (value: number) => (value === 1 ? '' : `@${value}x`);
 
 export function nextExportRow(rows: readonly ExportRow[]): ExportRow {
   const last = rows.at(-1);
-  const value = last ? Math.min(MAX_SCALE, Math.floor(last.value) + 1) : 1;
+  const value = last ? Math.min(MAX_SCALE, Math.floor(last.value) + 1) : FIRST_SCALE;
   return { format: last?.format ?? FileFormat.Png, by: SizeBy.Scale, value, suffix: scaleSuffix(value), transparent: false };
 }
 

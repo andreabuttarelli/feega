@@ -8,7 +8,7 @@
   import { STAGE_LIGHT_ABOUT, STAGE_LIGHT_KINDS, type StageLightKind } from '@feega/motion-core/motion/lights';
   import { addStageLight } from '@feega/motion-core/motion/lights-ops';
   import { parseDecimal } from '$lib/motion/inspector';
-  import { sliderOf, toShown, toStored } from '$lib/motion/units';
+  import { sliderOf, spaceOf, toShown, toStored } from '$lib/motion/units';
   import NumberField from './NumberField.svelte';
   import { FieldKind } from '$lib/motion/number-field';
   import { fieldLook } from '$lib/motion/inspector-sections';
@@ -17,7 +17,9 @@
   import { setCameraExpression } from '@feega/motion-core/motion/expression/ops';
   import { expressionErrors } from '@feega/motion-core/motion/expression/bake';
 
-  let { doc, frame, onchange }: { doc: MotionDoc; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, frame, scale = 1, onchange }: { doc: MotionDoc; frame: number; scale?: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+
+  const space = $derived(spaceOf(doc, scale));
 
   const GROUPS: { title: string; keys: CameraKey[] }[] = [
     { title: 'Position', keys: ['x', 'y', 'z'] },
@@ -53,10 +55,10 @@
     onchange(result.doc, summary);
   }
 
-  const shown = (key: CameraKey) => toShown(CAMERA_LANE, key, Math.round(cameraValueAt(doc, key, frame) * 1000) / 1000, doc);
+  const shown = (key: CameraKey) => toShown(CAMERA_LANE, key, Math.round(cameraValueAt(doc, key, frame) * 1000) / 1000, space);
 
   function edit(key: CameraKey, value: number) {
-    const stored = toStored(CAMERA_LANE, key, value, doc);
+    const stored = toStored(CAMERA_LANE, key, value, space);
     commit(cameraEditAt(doc, key, Math.min(CAMERA[key].max, Math.max(CAMERA[key].min, stored)), frame), `Edited the camera ${CAMERA[key].label.toLowerCase()}`);
   }
 
@@ -135,7 +137,7 @@
     {#snippet valueRow(key: CameraKey)}
       {@const spec = CAMERA[key]}
       {@const look = fieldLook(key)}
-      {@const range = sliderOf(CAMERA_LANE, { key, ...spec }, doc)}
+      {@const range = sliderOf(CAMERA_LANE, { key, ...spec }, space)}
       <div class="row anim" data-camera-prop={key}>
         <NumberField
           label={spec.label}

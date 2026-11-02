@@ -12,9 +12,7 @@ const BAR_SELECTOR = '[data-testid="right-bar"]';
 export const UNNAMED_FRAME = 'Frame';
 const TEXT_FIELDS = new Set(['TEXTAREA', 'INPUT']);
 
-type Size = { width: number; height: number };
-
-export type NodePlace = { x: number; y: number; rotation: number; set: (x: number, y: number) => void; turn: (degrees: number) => void; flip: (flip: Flip) => void; align: ((edge: Edge) => void) | null; follow: (before: Size, after: Size) => void };
+export type NodePlace = { x: number; y: number; w: number; h: number; rotation: number; set: (x: number, y: number) => void; resize: (w: number, h: number) => void; turn: (degrees: number) => void; flip: (flip: Flip) => void; align: ((edge: Edge) => void) | null };
 
 export type ExportMade = { url: string; name: string; files: string[]; skipped?: string[] };
 

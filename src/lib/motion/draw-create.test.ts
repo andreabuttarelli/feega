@@ -149,10 +149,10 @@ describe('drawing an element on the canvas, outside any frame', () => {
     expect([drawn.doc.width, drawn.doc.height]).toEqual([300, 100]);
   });
 
-  it('a drawn frame keeps two pixels for each canvas pixel, for a sharp export', () => {
+  it('a drawn frame has a pixel for each canvas pixel: the export scale makes it sharp', () => {
     const frame = drawnFrame({ left: 0, top: 0, width: 300, height: 100 });
 
-    expect([frame.width, frame.height]).toEqual([600, 200]);
+    expect([frame.width, frame.height]).toEqual([300, 100]);
   });
 
   it('a pen path takes the box of its points', () => {

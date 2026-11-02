@@ -27,9 +27,9 @@ export enum ExportOutcome {
   NoElement = 'element_not_found'
 }
 
-export type SelectionFrame = { name: string; doc: MotionDoc };
+export type SelectionFrame = { name: string; doc: MotionDoc; docScale: number };
 
-export type DrawTarget = { nodeId: string; doc: MotionDoc; elementId?: string };
+export type DrawTarget = { nodeId: string; doc: MotionDoc; docScale: number; elementId?: string };
 
 export type Drawn = { bytes: Buffer; skipped: string[] };
 
@@ -84,7 +84,8 @@ export async function exportSelection(ports: SelectionPorts, ask: SelectionAsk):
       const drawn = await ports.draw(
         file.targets.map((listedTarget) => {
           const target = byKey.get(listedTarget.id)!;
-          return { nodeId: target.nodeId, doc: asDrawn(frames.get(target.nodeId)!.doc, file.row), ...(target.elementId ? { elementId: target.elementId } : {}) };
+          const frame = frames.get(target.nodeId)!;
+          return { nodeId: target.nodeId, doc: asDrawn(frame.doc, file.row), docScale: frame.docScale, ...(target.elementId ? { elementId: target.elementId } : {}) };
         }),
         file.row
       );

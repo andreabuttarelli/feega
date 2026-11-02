@@ -400,6 +400,8 @@ function validPattern(pattern: string): boolean {
   }
 }
 
+const IN_DOC_PX = 1;
+
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
 const AVOIDED_REF = { ok: false as const, error: 'the user marked this reference as avoid: never use it as a target' };
@@ -2720,7 +2722,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     export_image: tool({
-      description: `Draw one frame of the video as an image file at full resolution and save it to the project: ${IMAGE_FORMATS.join(', ')}, scale 1 (the canvas size) or 2 (double). A still graphic draws its still frame; a video draws \`time\` (default its first frame). Returns the file url and asset id. Use it to deliver a post or a poster, not to check your work (view_frames is free and faster).`,
+      description: `Draw one frame of the video as an image file at full resolution and save it to the project: ${IMAGE_FORMATS.join(', ')}, scale 1 (the frame's px) or 2 (double). A still graphic draws its still frame; a video draws \`time\` (default its first frame). Returns the file url and asset id. Use it to deliver a post or a poster, not to check your work (view_frames is free and faster).`,
       inputSchema: z.object({ format: z.enum(IMAGE_FORMATS).optional(), scale: z.literal(IMAGE_SCALES).optional(), time: z.number().min(0).optional() }),
       execute: async (input) => {
         if (!deps.exportStill) {
@@ -2730,7 +2732,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!pinned.ok) {
           return pinned;
         }
-        return deps.exportStill(pinned.doc, stillExport(input.format ?? ImageFormat.Png, input.scale ?? ImageScale.One));
+        return deps.exportStill(pinned.doc, stillExport(input.format ?? ImageFormat.Png, input.scale ?? ImageScale.One, IN_DOC_PX));
       }
     }),
 

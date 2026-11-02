@@ -16,6 +16,12 @@ describe('export plan', () => {
     expect(exportSize(portrait, Resolution.P720)).toEqual({ width: 720, height: 900 });
   });
 
+  it('the browser draws a small frame up to the resolution, as the farm does', () => {
+    const small = { width: 700, height: 460 };
+
+    expect(exportSize(small, Resolution.P1080)).toEqual({ width: outputSize(small, Resolution.P1080).width, height: 1080 });
+  });
+
   it('one frame every 1/30 s, for the whole length', () => {
     const doc = { ...newMotionDoc(MotionFormat.Square), durationInFrames: 3 };
 

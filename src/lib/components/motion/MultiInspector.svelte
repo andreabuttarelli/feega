@@ -8,7 +8,7 @@
   import { valueAt } from '$lib/motion/inspector';
   import { withParams } from '@feega/motion-core/motion/custom/params';
   import { TRANSFORM, isAnimatable } from '@feega/motion-core/motion/keyframes';
-  import { sliderOf, toShown, toStored } from '$lib/motion/units';
+  import { sliderOf, spaceOf, toShown, toStored } from '$lib/motion/units';
   import { fieldLook, optionLabel } from '$lib/motion/inspector-sections';
   import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
@@ -26,7 +26,9 @@
   import BoxFields from './BoxFields.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
 
-  let { doc, ids, frame, mode = EditMode.Motion, gesture = null, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, ids, frame, mode = EditMode.Motion, gesture = null, scale = 1, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; gesture?: LiveGesture | null; scale?: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+
+  const space = $derived(spaceOf(doc, scale));
 
   const HUNDREDTHS = 100;
   const PROP_RANGE = { min: 0, max: 100000, step: 1 };
@@ -43,7 +45,7 @@
   const styleFields = $derived(sharedFields(clips));
   const sameColour = (c: string) => c;
 
-  const numberOf = (clip: MotionClip, key: SharedKey) => toShown(clip.component, key, Math.round(Number(valueAt(withParams(doc, clip), key, frame, sameColour) ?? TRANSFORM[key].fallback) * 1000) / 1000, doc);
+  const numberOf = (clip: MotionClip, key: SharedKey) => toShown(clip.component, key, Math.round(Number(valueAt(withParams(doc, clip), key, frame, sameColour) ?? TRANSFORM[key].fallback) * 1000) / 1000, space);
   const valueOf = (key: SharedKey): Shared<number> => shared(clips.filter((c) => isAnimatable(c.component, key)).map((c) => numberOf(c, key)));
   const blend = $derived(shared(clips.map((c) => c.blend)));
 
@@ -63,7 +65,7 @@
     onchange(next, summary);
   }
 
-  const setNumber = (key: SharedKey, shown: number) => across((d, clip) => (isAnimatable(clip.component, key) ? editIn(mode, d, clip, key, toStored(clip.component, key, shown, d), frame) : { ok: true, doc: d }), `Edited ${TRANSFORM[key].label.toLowerCase()} on ${ids.length} clips`);
+  const setNumber = (key: SharedKey, shown: number) => across((d, clip) => (isAnimatable(clip.component, key) ? editIn(mode, d, clip, key, toStored(clip.component, key, shown, space), frame) : { ok: true, doc: d }), `Edited ${TRANSFORM[key].label.toLowerCase()} on ${ids.length} clips`);
 
   const GAP_RANGE = { min: -100000, max: 100000, step: 1 };
   const GAP_FIELDS = [
@@ -99,7 +101,7 @@
     }
   }
 
-  const numberShown = (key: string, value: unknown): Shared<number> => (value === MIXED ? MIXED : toShown(first.component, key, Number(value), doc));
+  const numberShown = (key: string, value: unknown): Shared<number> => (value === MIXED ? MIXED : toShown(first.component, key, Number(value), space));
   const colourShown = (value: unknown) => (typeof value === 'string' && HEX.test(value) ? value : FALLBACK_COLOUR);
   const textShown = (value: unknown) => (value === MIXED ? '' : String(value ?? ''));
 
@@ -141,7 +143,7 @@
       <div class="grid2">
         {#each SHARED_KEYS as key (key)}
           {@const look = fieldLook(key)}
-          {@const range = sliderOf(first.component, { key, ...TRANSFORM[key] }, doc)}
+          {@const range = sliderOf(first.component, { key, ...TRANSFORM[key] }, space)}
           <div data-prop={key}>
             <NumberField {gesture} label={look.short ?? TRANSFORM[key].label} kind={FieldKind.Glyph} name={TRANSFORM[key].label} value={valueOf(key)} {range} unit={range.unit ?? look.unit} onchange={(v) => setNumber(key, v)} />
           </div>
@@ -154,7 +156,7 @@
         {#each styleFields as { field: f, value } (f.key)}
           {#if f.control === Control.Range}
             <div data-prop={f.key}>
-              <NumberField {gesture} label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
+              <NumberField {gesture} label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, space))} />
             </div>
           {:else if f.control === Control.Color}
             <label class="line" data-prop={f.key}>
