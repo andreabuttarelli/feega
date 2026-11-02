@@ -10,7 +10,6 @@ export enum FrameOverlay {
   Draw = 'draw',
   Guides = 'guides',
   Rulers = 'rulers',
-  Align = 'align',
   Mask = 'mask',
   Pen = 'pen',
   ShapeBuilder = 'shape-builder',
@@ -26,27 +25,6 @@ export enum FrameOverlay {
 type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews; mode: EditMode; onion: OnionSkin };
 
 const MIN_ALIGNED = 2;
-const ALIGN_BAR_PX = { width: 280, height: 42 };
-
-export enum AlignSide {
-  Below = 'below',
-  Right = 'right',
-  Above = 'above'
-}
-
-type Screen = { left: number; top: number; width: number; height: number };
-type Clear = { width: number; bottom: number };
-
-export function alignSide(frame: Screen, clear: Clear): AlignSide {
-  if (frame.top + frame.height + ALIGN_BAR_PX.height <= clear.bottom) {
-    return AlignSide.Below;
-  }
-  if (frame.left + frame.width + ALIGN_BAR_PX.width <= clear.width) {
-    return AlignSide.Right;
-  }
-  return AlignSide.Above;
-}
-
 const POINT_OVERLAY: Record<string, FrameOverlay> = { path: FrameOverlay.Pen, vector: FrameOverlay.Vector };
 
 const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
@@ -54,7 +32,6 @@ const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
   [FrameOverlay.ShapeBuilder]: (c) => c.tool === DrawTool.ShapeBuilder && c.picks >= MIN_ALIGNED,
   [FrameOverlay.Guides]: (c) => Boolean(c.doc.layoutGuides?.length) && shows(c.views, FrameView.Guides),
   [FrameOverlay.Rulers]: (c) => shows(c.views, FrameView.Rulers),
-  [FrameOverlay.Align]: (c) => c.picks >= MIN_ALIGNED,
   [FrameOverlay.Mask]: (c) => Boolean(c.clip?.mask) && c.active,
   [FrameOverlay.Pen]: (c) => pointsOf(c) === FrameOverlay.Pen,
   [FrameOverlay.Vector]: (c) => pointsOf(c) === FrameOverlay.Vector,

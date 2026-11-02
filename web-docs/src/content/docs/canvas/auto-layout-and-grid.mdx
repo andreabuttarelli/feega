@@ -17,7 +17,6 @@ A **Stack** is an element that lays its children out in a row or a column, like 
 2. Press `Shift+A`, or pick **Wrap with stack** from any of these:
    - right-click on the element on the canvas;
    - right-click on its row in **Layers**;
-   - the **…** menu of the floating selection toolbar;
    - the **…** menu in the header of the right bar.
 3. A new Stack holds the selection. Its direction and gap are guessed from where the elements were; text hugs its words and the Stack hugs its children.
 
@@ -91,8 +90,8 @@ A Stack exports as a `div` with `display: flex`, its direction, gap, padding, `j
 <DemoVideo name="arrange-selection" caption="Tidy up and stack four image nodes from the context menu, then the same ops from the CLI, and undo_last." />
 
 1. Select two or more nodes: click one, hold `Shift` and click the others, or drag a box around them.
-2. Right-click one of the selected nodes. With two or more selected, the menu lists **Align left / horizontal centres / right / top / vertical centres / bottom**, **Tidy up** and **Stack tiles**.
-3. **Tidy up** untangles overlaps, **Stack tiles** puts the selection in a row or column, the align items line up the edges. Distribute is in the toolbar when three or more are selected.
+2. Right-click one of the selected nodes. With two or more selected, the menu lists **Tidy up** and **Stack tiles**.
+3. **Tidy up** untangles overlaps, **Stack tiles** puts the selection in a row or column. Align and distribute live in the right bar, or on `Alt+A/H/D/W/V/S`.
 4. `Cmd+Z` undoes the arrangement.
 
 ### From an agent, MCP or CLI

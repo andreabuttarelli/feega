@@ -1,9 +1,5 @@
 <script lang="ts">
-  import Maximize2 from '@lucide/svelte/icons/maximize-2';
-  import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import { genPropertiesOf } from '$lib/canvas/gen-properties';
-  import { panelActionsFor } from '$lib/canvas/selection-actions';
-  import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import ModelMenu from './ModelMenu.svelte';
@@ -15,9 +11,6 @@
   let { panel }: { panel: SelectionPanel } = $props();
 
   const gen = $derived(genPropertiesOf(panel.summaries, panel.choicesFor));
-  const actions = $derived(panelActionsFor(panel.summaries));
-  const only = $derived(panel.summaries.length === 1 ? panel.summaries[0] : null);
-  const viewable = $derived(!!only && only.type in OUTPUT_KIND_OF && typeof only.data.refId === 'string');
 </script>
 
 <aside class="node-inspector" data-testid="node-inspector" aria-label="Properties">
@@ -43,19 +36,6 @@
     <section class="block" aria-label="Align">
       <h3>Align</h3>
       <AlignBar count={panel.summaries.length} onalign={panel.onalign} ondistribute={(axis) => panel.ondistribute(axis)} />
-    </section>
-  {/if}
-
-  {#if actions.length || viewable}
-    <section class="block" aria-label="Actions">
-      <h3>Actions</h3>
-      {#if viewable}
-        <button type="button" class="row" data-testid="panel-view-output" onclick={() => panel.onview()}><Maximize2 size={14} />View output</button>
-      {/if}
-      {#each actions as action (action.id)}
-        {@const Icon = SELECTION_ACTION_ICON[action.id]}
-        <button type="button" class="row" data-testid={`panel-${action.id}`} onclick={() => panel.onaction(action.id)}><Icon size={14} />{action.label}</button>
-      {/each}
     </section>
   {/if}
 </aside>

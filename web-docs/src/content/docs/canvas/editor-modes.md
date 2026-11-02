@@ -33,13 +33,14 @@ The mode used to live in a row at the top of each frame's properties. That row i
 
 The right panel follows the selection, whatever is selected:
 
-- **A generated image or video:** its model and settings (the same pickers as the selection toolbar), View output, and the tools: Remove background, Upscale, Inpaint, Outpaint, Reframe, Split into layers, Layers to frame.
-- **Several free elements or nodes:** Align (left, centre, right, top, middle, bottom) and Distribute horizontally or vertically, plus Duplicate, Group, Tidy up.
+- **A generated image or video:** its model and settings, the same pickers as the selection toolbar.
+- **Several free elements or nodes:** Align (left, centre, right, top, middle, bottom) and Distribute horizontally or vertically.
 - **Several layers inside a frame:** X, Y, W and H (Mixed where the layers differ; typing sets each layer), spacing (blank where they overlap), rotation, opacity, the same Align and Distribute bar, and **Use as mask**: the bottom-most selected layer cuts the layers above it. **Remove mask** undoes it. Both are in the right-click menu too.
 - **An instance:** its name, *Instance of* its main component, and X, Y, W and H; swap the main component in the instance panel.
 - **One layer, in Design:** alignment, layout, constraints, appearance, fill, stroke and effects. Timing, Transform, 3D, Parent & mask and Animation appear only in Motion; so do Morph and the liquid presets, and Morph only on a shape that has morph targets. A 3D model keeps its 3D section in both.
 - **A frame itself:** its name in the header, X and Y on the canvas (and Rotate for a free group or image), size, then its look.
 - **A main component:** its properties and variants, with X, Y, W and H; Swap, Reset overrides, Push to main and Detach are on its instances only.
-- **A frame with nothing inside picked:** Export, Components, Templates, Version history, Branches, Interactive, Chat history, Save as template, Publish, Copy id, Report — the same entries as the frame's "…" menu.
+
+Properties live in the right bar, actions in the right-click menu: Duplicate, Group, Export, the image tools and the frame entries (Components, Templates, History, Publish…) are there, each once, with its shortcut. Aligning is only in the right bar; the bar that used to float under a frame is gone.
 
 On a phone or tablet, press and hold a node or a layer to open the same menu a right click opens.
