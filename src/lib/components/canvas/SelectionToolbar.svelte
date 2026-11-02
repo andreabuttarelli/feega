@@ -133,7 +133,7 @@
   const providerValue = $derived(gen.providerValue);
   const controls = $derived(gen.controls);
 
-  const primary = $derived(actionsIn('primary', count));
+  const primary = $derived(actionsIn('primary', count).filter((a) => shownFor(a.id, nodeSummaries)));
   const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
   const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
   const danger = $derived(actionsIn('danger', count));

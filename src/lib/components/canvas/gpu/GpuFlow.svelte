@@ -84,6 +84,8 @@
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { Press, Reach, Root, childBelow, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { holdsLock, ownLocked } from '$lib/canvas/locks';
+  import { altCopies } from '$lib/canvas/alt-copy';
   import { clickPick, pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
@@ -2252,10 +2254,11 @@
     const start = shownView ? at.live.doc : source;
     const lifted = (doc: MotionDoc) => (shownView ? liftViewEdit(source, shownView.breakpointId, start, doc) : doc);
     const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }));
-    if (!inScope) {
+    if (!inScope || holdsLock(inScope.view, inScope.ids)) {
       return;
     }
-    const boxes = guessedBoxes(withAutoLayout(inScope.view));
+    const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8)) : null) ?? { doc: inScope.view, ids: inScope.ids };
+    const boxes = guessedBoxes(withAutoLayout(work.doc));
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
@@ -2268,16 +2271,16 @@
     const edited = { left: box.x, top: box.y, width: box.w, height: box.h };
 
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
-    const stackChild = grip === Grip.Move && inScope.ids.length === 1 && stackPlaced(inScope.view, inScope.ids[0]) ? inScope.ids[0] : null;
-    const joinable = grip === Grip.Move && inScope.ids.length === 1 && !stackChild;
+    const stackChild = grip === Grip.Move && work.ids.length === 1 && stackPlaced(work.doc, work.ids[0]) ? work.ids[0] : null;
+    const joinable = grip === Grip.Move && work.ids.length === 1 && !stackChild;
 
     const leaving = (ev: PointerEvent, now: Carry): ElementOut | null => {
-      const [clipId] = inScope.ids;
-      if (now !== Carry.Out || grip !== Grip.Move || inScope.ids.length !== 1) {
+      const [clipId] = work.ids;
+      if (now !== Carry.Out || grip !== Grip.Move || work.ids.length !== 1 || work.doc !== inScope.view) {
         return null;
       }
       const b = boxes[clipId];
-      const { width, height } = inScope.view;
+      const { width, height } = work.doc;
       return { clipId, client: { x: ev.clientX, y: ev.clientY }, box: b ? { left: b.left / width, top: b.top / height, width: b.width / width, height: b.height / height } : null };
     };
 
@@ -2294,18 +2297,18 @@
       }
       if (stackChild) {
         const to = framePt(ev);
-        const dropped = dragInStack(inScope.view, stackChild, boxes, to);
+        const dropped = dragInStack(work.doc, stackChild, boxes, to);
         result = dropped.result.ok ? { ok: true, doc: lifted(inScope.merge(dropped.result.doc)) } : dropped.result;
         frameGuides = { nodeId, guides: [], gaps: [], drop: dropped.line };
-        const followed = followCursor(inScope.view, stackChild, [to[0] - from[0], to[1] - from[1]]);
+        const followed = followCursor(work.doc, stackChild, [to[0] - from[0], to[1] - from[1]]);
         if (followed.ok) {
           liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(followed.doc)) });
         }
         return;
       }
-      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
+      const dragged = dragClips({ doc: work.doc, ids: work.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
       const shown = dragged.result.ok ? { ok: true as const, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
-      const into = joinable ? dropInStack(inScope.view, inScope.ids[0], boxes, framePt(ev)) : null;
+      const into = joinable ? dropInStack(work.doc, work.ids[0], boxes, framePt(ev)) : null;
       result = into?.result.ok ? { ok: true, doc: lifted(inScope.merge(into.result.doc)) } : shown;
       frameGuides = into?.result.ok ? { nodeId, guides: [], gaps: [], drop: into.line } : { nodeId, guides: dragged.guides, gaps: dragged.gaps };
       if (shown.ok) {
@@ -2331,6 +2334,9 @@
         return;
       }
       commit(nodeId, result, GRIP_SUMMARY[grip]);
+      if (work.doc !== inScope.view) {
+        pickMany(nodeId, inScope.scene(work.ids));
+      }
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -2488,6 +2494,11 @@
     startGesture(kind, hit, w, e);
   }
 
+  function nodeHeld(nodeId: string): boolean {
+    const live = liveOf(nodeId);
+    return !!live && frameChrome(kindOfNode(nodeId)).root === Root.Own && ownLocked(live.doc);
+  }
+
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
     const START: Record<GestureKind, () => Active | null> = {
       [GestureKind.Pan]: () => {
@@ -2500,17 +2511,17 @@
           return null;
         }
         const ids = selected.includes(hit.nodeId) && !e.shiftKey ? selected : clicked(selected, hit.nodeId, e.shiftKey || e.metaKey || e.ctrlKey);
-        const origins = new Map(ids.flatMap((id) => (byId.get(id) ? [[id, { x: byId.get(id)!.x, y: byId.get(id)!.y }] as const] : [])));
+        const origins = new Map(ids.flatMap((id) => (byId.get(id) && !nodeHeld(id) ? [[id, { x: byId.get(id)!.x, y: byId.get(id)!.y }] as const] : [])));
         return { kind: GestureKind.Drag, id: hit.nodeId, start: w, origins, moved: false, toggle: e.shiftKey || e.metaKey || e.ctrlKey };
       },
       [GestureKind.Resize]: () => {
-        if (hit.kind !== HitKind.Corner) {
+        if (hit.kind !== HitKind.Corner || nodeHeld(hit.nodeId)) {
           return null;
         }
         return resizeOf(hit.nodeId, hit.unit, w);
       },
       [GestureKind.Rotate]: () => {
-        if (hit.kind !== HitKind.Rotate) {
+        if (hit.kind !== HitKind.Rotate || nodeHeld(hit.nodeId)) {
           return null;
         }
         return rotateOf(hit.nodeId, w);

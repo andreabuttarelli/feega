@@ -239,7 +239,7 @@ function elementRows(row: LayerRow, rows: readonly LayerRow[]): LayerRow[] {
   if (roots.length !== 1) {
     return [row];
   }
-  return [{ ...row, own: roots[0].id }, ...rows.filter((r) => r.depth > TRACK_DEPTH).map((r) => ({ ...r, depth: r.depth - 1 }))];
+  return [{ ...row, own: roots[0].id, hidden: roots[0].hidden, locked: roots[0].locked }, ...rows.filter((r) => r.depth > TRACK_DEPTH).map((r) => ({ ...r, depth: r.depth - 1 }))];
 }
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {

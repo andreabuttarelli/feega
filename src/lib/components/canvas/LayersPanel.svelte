@@ -153,6 +153,7 @@
   const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
+  const flagTarget = (row: LayerRow): string | null => (editable(row) ? row.id : row.own && video?.nodeId === row.id ? row.own : null);
   const renamable = (row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
   function enterRow(row: LayerRow, e: KeyboardEvent) {
@@ -341,12 +342,12 @@
         <IconButton size={IconSize.Sm} label="Bring forward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Up, SUMMARY[LayerAction.Up]))}><ChevronUp /></IconButton>
         <IconButton size={IconSize.Sm} label="Send backward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Down, SUMMARY[LayerAction.Down]))}><ChevronDown /></IconButton>
       {/if}
-      {#if editable(row)}
+      {#if flagTarget(row)}
         <span class="toggles" class:held={row.hidden || row.locked}>
-        <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
+        <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([flagTarget(row)!], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
           {#if row.hidden}<EyeOff />{:else}<Eye />{/if}
         </IconButton>
-        <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
+        <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([flagTarget(row)!], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
           {#if row.locked}<Lock />{:else}<LockOpen />{/if}
         </IconButton>
         </span>

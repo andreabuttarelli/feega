@@ -81,6 +81,13 @@ describe('layer rows', () => {
     expect(rows.map((r) => [r.id, r.kind, r.label, r.nodeId])).toEqual([['e1', LayerKind.Node, 'Rectangle', 'e1']]);
   });
 
+  it('a free element row shows its own layer hidden and locked', () => {
+    const doc = ok(layerEdit(ok(layerEdit(video(), 't1', LayerAction.Hide)), 't1', LayerAction.Lock));
+    const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], { nodeId: 'e1', doc }, { e1: frameRows(doc, 'e1') });
+
+    expect(row).toMatchObject({ own: 't1', hidden: true, locked: true });
+  });
+
   it('draws a free element with a shape icon, not the frame clapperboard', () => {
     const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], null);
 
