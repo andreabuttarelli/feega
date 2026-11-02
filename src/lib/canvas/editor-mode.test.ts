@@ -104,6 +104,16 @@ describe('editor mode', () => {
     expect(mode.timeline).toBe(TimelineAccess.Hidden);
   });
 
+  it('entering Motion reopens the timeline after it was hidden', () => {
+    const mode = new EditorModeState(new MemoryStore());
+    mode.set(EditorMode.Motion);
+    mode.toggleTimeline();
+    expect(mode.timeline).toBe(TimelineAccess.Hidden);
+    mode.set(EditorMode.Design);
+    mode.set(EditorMode.Motion);
+    expect(mode.timeline).toBe(TimelineAccess.Edit);
+  });
+
   it('Play and Code never show the timeline', () => {
     const mode = new EditorModeState(new MemoryStore());
     mode.set(EditorMode.Code);
