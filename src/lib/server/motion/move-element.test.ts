@@ -5,7 +5,7 @@ import { setStill } from '@feega/motion-core/motion/still';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import { createComponent } from '$lib/motion/main-component';
-import { DropOn, MoveOutcome, copyElement, moveElement, placeComponent, pastedSchema, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
+import { DropOn, MoveOutcome, copyElement, moveElement, placeComponent, pastedSchema, placeFreeMedia, placeMedia, placeOutput, retireFrameInputs, type FrameStore, type NodeShape, type StoredFrame } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '33333333-2222-4333-8444-555555555555';
@@ -17,12 +17,13 @@ function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string 
   return result.doc;
 }
 
-type Memory = { store: FrameStore; frames: Map<string, StoredFrame[]>; outputs: Map<string, Output>; removed: string[] };
+type Memory = { store: FrameStore; frames: Map<string, StoredFrame[]>; outputs: Map<string, Output>; removed: string[]; shapes: Map<string, NodeShape | undefined> };
 
 function memory(): Memory {
   const frames = new Map<string, StoredFrame[]>();
   const outputs = new Map<string, Output>();
   const removed: string[] = [];
+  const shapes = new Map<string, NodeShape | undefined>();
   let made = 0;
   const head = (id: string) => frames.get(id)?.at(-1) ?? null;
 
@@ -36,8 +37,9 @@ function memory(): Memory {
       frames.get(nodeId)!.push({ ...now, version: expected + 1, doc });
       return { outcome: RevisionOutcome.Written, head: { version: expected + 1, doc, summary: null, actorKind: 'user' } };
     },
-    create: async (place, doc) => {
-      const nodeId = `frame-${++made}`;
+    create: async (place, doc, shape) => {
+      const nodeId = place.id ?? `frame-${++made}`;
+      shapes.set(nodeId, shape);
       frames.set(nodeId, [{ nodeId, projectId: place.projectId, canvasId: place.canvasId, version: 1, doc }]);
       return nodeId;
     },
@@ -49,7 +51,7 @@ function memory(): Memory {
       return output ? { output, projectId: 'p1', canvasId: 'c1' } : null;
     }
   };
-  return { store, frames, outputs, removed };
+  return { store, frames, outputs, removed, shapes };
 }
 
 function seed(m: Memory, nodeId: string, doc: MotionDoc) {
@@ -172,6 +174,18 @@ describe('a pasted picture over a frame', () => {
 
   it('an unknown frame is refused', async () => {
     expect((await placeMedia(memory().store, { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'x' }, { on: DropOn.Frame, nodeId: 'nope', at: { x: 0.5, y: 0.5 } })).outcome).toBe(MoveOutcome.NotFound);
+  });
+});
+
+describe('a picture uploaded on the empty canvas', () => {
+  it('becomes a free image element, not a generative node', async () => {
+    const m = memory();
+
+    const placed = await placeFreeMedia(m.store, { projectId: 'p1', canvasId: 'c1', id: 'up' }, { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'photo.png', width: 400, height: 300 }, { on: DropOn.Canvas, x: 100, y: 50 });
+
+    expect(placed).toMatchObject({ outcome: MoveOutcome.Done, frameId: 'up', created: true });
+    expect(m.shapes.get('up')).toMatchObject({ type: 'element' });
+    expect(clipsOf(headOf(m, 'up').doc)).toMatchObject([{ component: 'Image', props: { assetId: IMAGE_ID } }]);
   });
 });
 
