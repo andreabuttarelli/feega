@@ -338,6 +338,27 @@ describe('importPageAt', () => {
     expect('undo' in done ? done.undo.map((u) => (u as { nodeId: string }).nodeId).sort() : []).toEqual(['frame-1', ...sets].sort());
   });
 
+  it('a component set the schema rejects is left out, the page still lands and says what was dropped', async () => {
+    const button = (id: string, x: number, label: string) => ({ id, type: 'FRAME', name: 'button', absoluteBoundingBox: { x, y: 600, width: 140, height: 44 }, fills: [{ type: 'SOLID', color: { r: 0.37, g: 0.42, b: 0.82, a: 1 } }], children: [{ id: `${id}t`, type: 'TEXT', characters: label, absoluteBoundingBox: { x: x + 20, y: 612, width: 90, height: 20 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 15, fontWeight: 500 } }] });
+    const tree = { ...TREE, root: { ...TREE.root, children: [...TREE.root.children!, button('b1', 100, 'Start'), button('b2', 300, 'Sign up')] } };
+    const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
+    const { ask, docs } = askOf({ open: async () => tabOf(tree), shape: FULL_SHAPE, components });
+    const reason = 'comps.c1.tracks.0.clips.11.transform.x: Too big: expected number to be <=2';
+    const create = ask.store.create;
+    ask.store.create = vi.fn(async (at, doc, shape) => {
+      if (at.canvasId === 'components') {
+        throw new DocRejected(reason);
+      }
+      return create(at, doc, shape);
+    });
+
+    const done = await importPageAt(ask);
+
+    expect(done.outcome).toBe(UrlImportOutcome.Ok);
+    expect(docs.has('frame-1')).toBe(true);
+    expect('skipped' in done ? done.skipped.join(' ') : '').toContain(reason);
+  });
+
   it('feega.app FAQ: an accordion lands as a set whose open variant stays with the page, unplaced', async () => {
     const summary = (id: string, y: number, go: string) => ({ id, type: 'FRAME', name: 'summary', go, absoluteBoundingBox: { x: 100, y, width: 400, height: 40 }, fills: [], children: [{ id: `${id}t`, type: 'TEXT', characters: 'Is it free?', absoluteBoundingBox: { x: 110, y: y + 10, width: 200, height: 20 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 16, fontWeight: 500 } }] });
     const item = (id: string, open: boolean) => ({ id, type: 'FRAME', name: 'details', pattern: 0, absoluteBoundingBox: { x: 100, y: 600, width: 400, height: open ? 90 : 40 }, fills: [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95, a: 1 } }], children: [summary(`${id}s`, 600, open ? 'Closed' : 'Open'), ...(open ? [{ id: `${id}a`, type: 'TEXT', characters: 'Yes.', absoluteBoundingBox: { x: 110, y: 650, width: 200, height: 20 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 16, fontWeight: 400 } }] : [])] });

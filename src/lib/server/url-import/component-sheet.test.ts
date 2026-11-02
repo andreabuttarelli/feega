@@ -46,11 +46,12 @@ describe('each main or set gets its own frame, sized to its content', () => {
     expect(Math.max(...sets.map((s) => s.doc.width * s.doc.height))).toBeLessThan((page.width * page.height) / 4);
   });
 
-  it('linear: variants of one set share one frame and every page main has a home', () => {
+  it('linear: variants of one set share one frame and every page main has a home, unless its set was left out', () => {
     const made = planOf('linear');
     const { plan, sets, homes } = made;
     const setNames = sets.map((_, at) => new Set(ownMainsIn(made, at).map(([, c]) => c.component!.set ?? c.component!.name)));
-    const pageMains = plan.items.flatMap((item) => Object.entries(item.doc.comps).filter(([, c]) => c.component).map(([id]) => id));
+    const leftOut = new Set(plan.skipped.map((s) => s.split(':')[0]));
+    const pageMains = plan.items.flatMap((item) => Object.entries(item.doc.comps).filter(([, c]) => c.component && !leftOut.has(c.component.set ?? c.component.name)).map(([id]) => id));
 
     expect(setNames.every((names) => names.size === 1)).toBe(true);
     expect(new Set(Object.values(homes).flatMap((h) => Object.keys(h)))).toEqual(new Set(pageMains));
