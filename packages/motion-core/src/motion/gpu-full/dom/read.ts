@@ -1175,6 +1175,7 @@ const familyOf = (s: Style) =>
   (splitTop(s["font-family"] ?? "")[0] ?? "").replace(/^["']|["']$/g, "");
 
 const upright = (m: Affine) =>
+  Math.abs(m[0]) > UNIT_EPSILON &&
   Math.abs(m[1]) < UNIT_EPSILON &&
   Math.abs(m[2]) < UNIT_EPSILON &&
   Math.abs(m[3]) > UNIT_EPSILON;
