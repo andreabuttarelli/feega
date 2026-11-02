@@ -38,7 +38,7 @@ type StepRun = StepResult;
 
 const nodeSel = (id: string) => `.svelte-flow__node[data-id="${id}"]`;
 const contentSel = (id: string) => `[data-id="${id}"]`;
-const fillHex = (page: Page) => page.getByTestId('fill-editor').locator('input.hex').first();
+const fillHex = (page: Page) => page.getByLabel('Fill colour hex');
 
 async function testAccount(): Promise<{ db: SupabaseClient; userId: string }> {
   const db = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
@@ -332,7 +332,7 @@ async function openFill(page: Page) {
   await expect(fillHex(page)).toBeVisible({ timeout: OPEN_MS });
 }
 
-const FILL_WATCH: Watch = { id: 'fill hex', selector: '[data-testid="fill-editor"] input.hex', read: Read.Value };
+const FILL_WATCH: Watch = { id: 'fill hex', selector: '[aria-label="Fill colour hex"]', read: Read.Value };
 const ROTATE_WATCH: Watch = { id: 'rotate', selector: 'aside.props input.num[aria-label="Rotate Z"]', read: Read.Value };
 const WIDTH_WATCH: Watch = { id: 'width', selector: 'aside.props input.num[aria-label="Width"]', read: Read.Value };
 const RESIZE_BY = 60;

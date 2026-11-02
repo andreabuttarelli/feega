@@ -43,7 +43,7 @@ test.describe('a cold GPU canvas paints every node at once @real', () => {
     }
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(PAINT_BUDGET_MS);
 
     const blank: string[] = [];

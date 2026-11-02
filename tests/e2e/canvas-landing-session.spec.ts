@@ -29,7 +29,7 @@ const MODES = ['motion', 'play', 'design'];
 const MB = 1024 * 1024;
 const LAYERS = 'nav[data-dock="left-bar"] button[aria-label="Layers"]';
 const LANDING_LAYER = 'Ledgerline landing';
-const OWN_FETCH = /\/frame-outlines/;
+const OWN_FETCH = /\/api\/[^?]*\/frame-outlines/;
 
 const BUDGET = { longestTaskMs: 2000, heapMb: 500, zoomStepMs: 1000 };
 

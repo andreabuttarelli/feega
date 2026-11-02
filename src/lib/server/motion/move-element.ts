@@ -63,6 +63,13 @@ export type Place = { projectId: string; canvasId: string };
 
 export type NodeShape = { type: DocNodeType; data: Record<string, unknown>; width: number; height: number; displayName?: string };
 
+export class DocRejected extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'DocRejected';
+  }
+}
+
 export type FrameStore = {
   read: (nodeId: string) => Promise<StoredFrame | null>;
   write: (nodeId: string, expectedVersion: number, doc: MotionDoc, summary: string) => Promise<RevisionWrite>;
@@ -404,8 +411,15 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
     create: async (at, doc, shape) => {
       const { type, data, ...size } = shape ?? frameShape(doc);
       const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type, x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
-      await appendRevision(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
-      return node.id;
+      const written = await appendRevision(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
+      if (written.outcome === RevisionOutcome.Written) {
+        return node.id;
+      }
+
+      const reason = written.outcome === RevisionOutcome.Invalid ? written.error : 'the first revision lost a race';
+      console.error('[frame create] doc rejected, frame removed', { nodeId: node.id, projectId: at.projectId, reason });
+      await deleteNode(db, { orgId, nodeId: node.id, actor });
+      throw new DocRejected(reason);
     },
     remove: (nodeId) => deleteNode(db, { orgId, nodeId, actor }),
     output: async (nodeId) => inScope(await generatedOutput(db, orgId, nodeId))
@@ -521,7 +535,10 @@ export async function placeFigmaPlan(store: FrameStore, place: Place, plan: Figm
   for (const item of plan.items) {
     const shaped = ITEM_SHAPE[item.destination](item);
     const at = { x: Math.round(centre.x + item.centre.x - item.size.width / 2), y: Math.round(centre.y + item.centre.y - item.size.height / 2) };
-    const frameId = await store.create({ ...place, ...at }, item.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name });
+    const frameId = await store.create({ ...place, ...at }, item.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name }).catch(async (e) => {
+      await Promise.all(frameIds.map((made) => store.remove(made).catch(() => undefined)));
+      throw e;
+    });
     frameIds.push(frameId);
     undo.push(created(frameId, at));
     if (item.images.length) {

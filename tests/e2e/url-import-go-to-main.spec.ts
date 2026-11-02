@@ -29,14 +29,15 @@ test('go to main from an imported instance lands on the Components page with the
   const compId = String(instance.props.comp);
   const home = doc.comps[compId].component!.home!;
   const { data: homeNode } = await admin.from('nodes').select('canvas_id').eq('id', home).single();
-  const main = (await headOf(admin, home)).tracks.flatMap((t) => t.clips).find((c) => c.props.comp === compId)!;
+  expect((await headOf(admin, home)).tracks.flatMap((t) => t.clips).some((c) => c.props.comp === compId)).toBe(true);
 
   await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}?frame=${frameId}`);
   await page.getByRole('button', { name: 'Layers', exact: true }).click();
+  await page.getByTestId('layers-search-toggle').click({ timeout: UI_MS });
   await page.getByTestId('layers-search').fill(instance.name ?? '', { timeout: UI_MS });
   await page.locator(`[data-testid="layers"] [data-layer="${instance.id}"]`).first().click({ timeout: UI_MS });
   await page.getByTestId('instance-go-main').click({ timeout: UI_MS });
 
   await expect(page).toHaveURL(new RegExp(`/c/${homeNode!.canvas_id}`), { timeout: UI_MS });
-  await expect(page.locator(`[data-testid="layers"] [data-layer="${main.id}"][aria-selected="true"]`)).toBeAttached({ timeout: UI_MS });
+  await expect(page.locator(`[data-testid="layers"] [data-layer="${home}"][aria-selected="true"]`)).toBeAttached({ timeout: UI_MS });
 });

@@ -38,11 +38,10 @@ async function watchTile(page: Page, nodeId: string) {
       if (img?.complete && img.naturalWidth > 0) {
         return true;
       }
-      if (tile.querySelector('[data-testid=motion-node-stage] [data-drawn="true"]')) {
+      if (tile.querySelector('[data-testid=motion-node-stage][data-drawn="true"]')) {
         return true;
       }
-      const stage = document.querySelector('[data-testid=editor-stage]') as HTMLElement | null;
-      return !!tile.querySelector('[data-testid=motion-node-editing]') && stage?.dataset.shown === 'true' && getComputedStyle(stage).visibility !== 'hidden';
+      return false;
     };
     const tick = () => {
       if (!painted()) {
@@ -69,7 +68,7 @@ const emptyCanvasPoint = (page: Page) =>
     return null;
   });
 
-const fillHex = (page: Page) => page.getByTestId('fill-editor').locator('input.hex').first();
+const fillHex = (page: Page) => page.getByLabel('Fill colour hex');
 
 async function recolour(page: Page, colour: string) {
   if (!(await fillHex(page).isVisible())) {
@@ -82,7 +81,7 @@ async function recolour(page: Page, colour: string) {
 async function deselect(page: Page) {
   const empty = (await emptyCanvasPoint(page))!;
   await page.mouse.click(empty.x, empty.y);
-  await expect(page.getByTestId('motion-editor')).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByTestId('motion-inspector')).toHaveCount(0, { timeout: 10_000 });
 }
 
 test.describe('a free element tile is never blank @real', () => {
@@ -104,7 +103,7 @@ test.describe('a free element tile is never blank @real', () => {
       const element = page.locator('[data-kind="element"][data-motion-node]');
       await expect(element).toHaveCount(1, { timeout: 15_000 });
       const nodeId = (await element.getAttribute('data-motion-node'))!;
-      await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+      await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
       await watchTile(page, nodeId);
 
       for (const colour of COLOURS) {
@@ -113,7 +112,7 @@ test.describe('a free element tile is never blank @real', () => {
         await deselect(page);
         await page.waitForTimeout(WATCH_MS);
         await element.click();
-        await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+        await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
         await page.waitForTimeout(WATCH_MS);
       }
       await deselect(page);
@@ -138,7 +137,7 @@ test.describe('a free element tile is never blank @real', () => {
     await page.mouse.move(from.x + 240, from.y + 120);
     await page.mouse.up();
     const element = page.locator('[data-kind="element"][data-motion-node]');
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
 
     await recolour(page, COLOURS[0]);
     await page.waitForTimeout(300);
@@ -148,7 +147,7 @@ test.describe('a free element tile is never blank @real', () => {
     expect(await redShare(page, clip), 'the tile shows the red box').toBeGreaterThan(0.3);
 
     await element.click();
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
     await recolour(page, COLOURS[1]);
     await page.waitForTimeout(300);
     const empty = (await emptyCanvasPoint(page))!;
@@ -174,7 +173,7 @@ test.describe('a free element tile is never blank @real', () => {
     await page.mouse.down();
     await page.mouse.move(from.x + 240, from.y + 120);
     await page.mouse.up();
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
     await recolour(page, COLOURS[1]);
     await page.waitForTimeout(300);
 
@@ -212,7 +211,7 @@ test.describe('a free element tile is never blank @real', () => {
     await page.mouse.move(from.x + 240, from.y + 120);
     await page.mouse.up();
     const element = page.locator('[data-kind="element"][data-motion-node]');
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
     await recolour(page, COLOURS[1]);
     await page.waitForTimeout(300);
     await deselect(page);
@@ -234,7 +233,7 @@ test.describe('a free element tile is never blank @real', () => {
       requestAnimationFrame(tick);
     });
     await element.click();
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(1000);
 
     expect(await page.evaluate(() => (window as unknown as { __loading: number }).__loading), 'frames showing the loading state').toBe(0);

@@ -106,7 +106,8 @@ test.describe('own pending writes never block or fail a run @real', () => {
     while (Date.now() < until) {
       await input.pressSequentially('ab', { delay: KEY_DELAY_MS });
       await input.press('Tab');
-      await input.click();
+      await input.focus();
+      await input.press('End');
       typed += 'ab';
       await expect(page.locator(`.svelte-flow__node[data-id="${node.id}"]`).locator(LOADING_SELECTORS)).toHaveCount(0);
       await expect(input).toHaveValue(typed);

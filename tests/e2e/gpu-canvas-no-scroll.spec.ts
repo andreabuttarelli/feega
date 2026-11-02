@@ -7,7 +7,7 @@ test.describe('the GPU canvas never scrolls under the camera @real', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'here' } });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
     const bar = await page.getByTestId('add-bar').boundingBox();
 
     const wrap = page.locator('.wrap.svelte-flow');

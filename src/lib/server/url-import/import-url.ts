@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { imagesFilled, type ImageAssets } from '$lib/canvas/figma/images';
-import { placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
+import { DocRejected, placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { homedAt } from '$lib/motion/canvas-components';
 import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
+import { BrowserBusy } from '$lib/server/web/browser-slots';
 import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
@@ -22,7 +23,9 @@ export enum UrlImportOutcome {
   Failed = 'failed',
   Unreadable = 'unreadable',
   TooSlow = 'too_slow',
-  RateLimited = 'rate_limited'
+  RateLimited = 'rate_limited',
+  Busy = 'busy',
+  Rejected = 'rejected'
 }
 
 export enum PageExtent {
@@ -44,7 +47,9 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
   [UrlImportOutcome.Failed]: 502,
   [UrlImportOutcome.Unreadable]: 422,
   [UrlImportOutcome.TooSlow]: 504,
-  [UrlImportOutcome.RateLimited]: 429
+  [UrlImportOutcome.RateLimited]: 429,
+  [UrlImportOutcome.Busy]: 503,
+  [UrlImportOutcome.Rejected]: 422
 };
 
 export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
@@ -221,7 +226,7 @@ async function filled(ask: LandAsk, frameIds: string[], items: UrlPlan['sets'], 
   }
 }
 
-export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
+async function readAndLand(ask: PageAsk): Promise<UrlImported> {
   const url = await publicUrl(ask.url, ask.guard);
   if (!url) {
     return refused(UrlImportOutcome.NotPublic);
@@ -263,6 +268,20 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   const views = narrow.flat();
 
   return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
+}
+
+export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
+  try {
+    return await readAndLand(ask);
+  } catch (e) {
+    if (e instanceof BrowserBusy) {
+      return refused(UrlImportOutcome.Busy);
+    }
+    if (e instanceof DocRejected) {
+      return refused(UrlImportOutcome.Rejected, e.message);
+    }
+    throw e;
+  }
 }
 
 export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: boolean): Promise<UrlImported> {
