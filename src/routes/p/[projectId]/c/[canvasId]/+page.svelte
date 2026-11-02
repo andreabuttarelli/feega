@@ -1414,7 +1414,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       displayName: n.displayName,
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
-      rotatable: !!motionOf(n) && chrome.turns,
+      rotatable: !!motionOf(n),
       behind: chrome.behind || n.type === SECTION_TYPE,
       members: chrome.behind || n.type === SECTION_TYPE ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
@@ -4185,6 +4185,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     [Way.Forward]: (step) => step.forward()
   };
 
+  function batch(run: () => void) {
+    void undoStack.collect(async () => run()).then((entries) => entries.length && undoStack.push({ source: 'many', steps: entries }));
+  }
+
   async function reverse(entry: StackEntry, way: Way): Promise<StackEntry | null> {
     let out: StackEntry | null = null;
     if (entry.source === 'frame') {
@@ -4435,6 +4439,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onDraw={drawElement}
     onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
+    onBatch={batch}
     onAddBeside={addFrameBeside}
     onSection={wrapInSection}
     onSectionChange={(id, patch) => void write(id, patch, SaveTiming.Now)}

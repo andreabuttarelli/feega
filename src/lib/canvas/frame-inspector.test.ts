@@ -152,6 +152,15 @@ describe('barAction', () => {
     expect([...removed.selection].sort()).toEqual(['bottom', 'top']);
   });
 
+  it('⇧A on a frame gives the frame itself auto layout, like Figma, instead of wrapping it', () => {
+    const framed = barAction(Action.FrameSelection, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const done = barAction(Action.WrapStack, { doc: framed.doc, selection: framed.selection, frame: 0, newId: fresh() })!;
+
+    expect(done.selection).toEqual(framed.selection);
+    expect(findClip(done.doc, framed.selection[0])?.clip.autoLayout?.order.sort()).toEqual(['bottom', 'top']);
+    expect(findClip(done.doc, framed.selection[0])?.clip.parent ?? null).toBeNull();
+  });
+
   it('wraps a stack in another stack on a second run', () => {
     const added = barAction(Action.WrapStack, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
     const again = barAction(Action.WrapStack, { doc: added.doc, selection: added.selection, frame: 0, newId: () => `w${added.doc.tracks.length}${Math.random().toString(36).slice(2, 6)}` })!;

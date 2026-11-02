@@ -200,7 +200,7 @@ export async function ungroupElement(store: FrameStore, members: Members, place:
 
 export async function rotateNodeGroup(store: FrameStore, members: Members, id: string, degrees: number): Promise<Moved> {
   const [group] = await members.read([id]);
-  if (!group || !frameChrome((await store.read(id))?.kind ?? FrameKind.Frame).turns) {
+  if (!group || !(await store.read(id))) {
     return refused(MoveOutcome.NotFound, `nothing to turn at ${id}`);
   }
   const inside = await members.inGroup(id);

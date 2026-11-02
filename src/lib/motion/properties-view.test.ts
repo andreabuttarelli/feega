@@ -31,13 +31,13 @@ describe('which sections each selection kind gets', () => {
     expect(sections.indexOf(Section.Stack)).toBeLessThan(sections.indexOf(Section.Fill));
   });
 
-  it('the frame itself and a poster part get no Stack section', () => {
-    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).not.toContain(Section.Stack);
+  it('a poster part gets no Stack section; the frame itself gets one once it has auto layout', () => {
+    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toContain(Section.Stack);
     expect(sectionsFor(ClipFamily.Text, PropertiesView.Part, EditMode.Design)).not.toContain(Section.Stack);
   });
 
-  it('the frame itself: layer (opacity, corners), fill, stroke and effects, never a shape kind', () => {
-    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toEqual([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
+  it('the frame itself: stack, layer (opacity, corners), fill, stroke and effects, never a shape kind', () => {
+    expect(sectionsFor(ClipFamily.Shape, PropertiesView.Frame, EditMode.Design)).toEqual([Section.Stack, Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
   });
 
 

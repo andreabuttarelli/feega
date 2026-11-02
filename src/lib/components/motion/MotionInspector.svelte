@@ -541,7 +541,7 @@
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
     [Section.Layout]: positioned || fieldsIn(Section.Layout).length > 0,
-    [Section.Stack]: layerExtras && (!!clip.autoLayout || layoutParent(doc, clip) !== null),
+    [Section.Stack]: visual && (!!clip.autoLayout || (layerExtras && layoutParent(doc, clip) !== null)),
     [Section.Align]: positioned && visual,
     [Section.Constraints]: pinnable,
     [Section.Transform]: layoutProps.length > 0,

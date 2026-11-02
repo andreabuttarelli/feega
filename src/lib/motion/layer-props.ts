@@ -1,5 +1,7 @@
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setKeyframes, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { pivotOf } from '@feega/motion-core/motion/parent';
+import { TrackKind } from '@feega/motion-core/motion/components';
 
 export enum Flip {
   Horizontal = 'horizontal',
@@ -70,4 +72,36 @@ export function turnClips(doc: MotionDoc, ids: readonly string[], degrees: numbe
 
 export function flipClips(doc: MotionDoc, ids: readonly string[], flip: Flip): OpResult {
   return ids.reduce<OpResult>((r, id) => (r.ok ? flipOne(r.doc, id, flip) : r), { ok: true, doc });
+}
+
+type Mirror = (value: number) => number;
+
+const OFFSET: Record<Flip, { key: 'x' | 'y'; pivot: 0 | 1 }> = {
+  [Flip.Horizontal]: { key: 'x', pivot: 0 },
+  [Flip.Vertical]: { key: 'y', pivot: 1 }
+};
+
+const NEGATED = ['rotateZ', 'skewX', 'skewY'] as const;
+
+const negate: Mirror = (value) => -value;
+
+const UNIT_STAGE = { width: 1, height: 1 };
+
+function mirrorsOf(clip: MotionClip, flip: Flip): Record<string, Mirror> {
+  const { key, pivot } = OFFSET[flip];
+  const across = pivotOf(clip, UNIT_STAGE)[pivot];
+  return { [key]: (value) => 1 - 2 * across - value, [AXIS[flip]]: negate, ...Object.fromEntries(NEGATED.map((k) => [k, negate])) };
+}
+
+function mirrored(clip: MotionClip, flip: Flip): MotionClip {
+  const mirrors = mirrorsOf(clip, flip);
+  const seeded = { ...clip.transform, [OFFSET[flip].key]: clip.transform[OFFSET[flip].key] ?? 0, [AXIS[flip]]: clip.transform[AXIS[flip]] ?? 1 };
+  const transform = Object.fromEntries(Object.entries(seeded).map(([k, v]) => [k, mirrors[k] && typeof v === 'number' ? mirrors[k](v) : v]));
+  const keyframes = Object.fromEntries(Object.entries(clip.keyframes).map(([k, track]) => [k, mirrors[k] ? track.map((f) => ({ ...f, value: mirrors[k](Number(f.value)) })) : track]));
+  return { ...clip, transform, keyframes };
+}
+
+export function flipStage(doc: MotionDoc, flip: Flip): MotionDoc {
+  const flipsRoot = (kind: string, clip: MotionClip) => kind === TrackKind.Visual && !clip.parent;
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (flipsRoot(t.kind, c as MotionClip) ? mirrored(c as MotionClip, flip) : c)) })) };
 }

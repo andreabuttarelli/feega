@@ -20,12 +20,12 @@ export enum ResizePaint {
   Held = 'held'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; root: Root; resize: ResizePaint };
+type Chrome = { bar: boolean; dragsHost: boolean; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; root: Root; resize: ResizePaint };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, root: Root.Page, resize: ResizePaint.Held },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, root: Root.Own, resize: ResizePaint.Relaid },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, root: Root.Page, resize: ResizePaint.Held }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, root: Root.Page, resize: ResizePaint.Held },
+  [FrameKind.Element]: { bar: false, dragsHost: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, root: Root.Own, resize: ResizePaint.Relaid },
+  [FrameKind.Group]: { bar: false, dragsHost: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, root: Root.Page, resize: ResizePaint.Held }
 };
 
 export enum TileBody {
