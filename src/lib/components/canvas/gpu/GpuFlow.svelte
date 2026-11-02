@@ -105,7 +105,7 @@
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
   import { EditMode, readMode, timelineDoc } from '$lib/motion/edit-mode';
-  import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
+  import { CanvasLines, EditorMode, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
   import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import { elementKey } from '$lib/canvas/prototype-arrows';
   import type { PrototypeLink } from '$lib/motion/prototype/links';
@@ -603,7 +603,12 @@
       return;
     }
     modeShown = mode;
-    untrack(() => rightBar.select(BarTab.Properties));
+    untrack(() => {
+      rightBar.select(BarTab.Properties);
+      if (mode === EditorMode.Motion && selected.length === 0 && coreFrames[0]) {
+        select([coreFrames[0].id]);
+      }
+    });
   });
   const curves = $derived(
     (showsPrototype ? [] : edges).flatMap((e) => {
