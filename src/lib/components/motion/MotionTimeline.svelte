@@ -16,7 +16,8 @@
   import { withParams } from '@feega/motion-core/motion/custom/params';
   import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped, WorkEdge } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
-  import { KeyGlyph, KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
+  import { layerLabel } from '$lib/motion/element-name';
+  import { KeyGlyph, KeyMark, RowKind, keyGlyph, keyMark, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '@feega/motion-core/motion/mask';
   import type { MotionTrack } from '@feega/motion-core/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '@feega/motion-core/motion/keyframes';
@@ -527,7 +528,7 @@
 
   function parentName(clip: MotionClip): string {
     const parent = shown.tracks.flatMap((t) => t.clips).find((c) => c.id === clip.parent);
-    return parent ? parent.id : '';
+    return parent ? layerLabel(parent, doc.comps) : '';
   }
 
   function startScrub(e: PointerEvent) {
@@ -943,7 +944,7 @@
         {@const wave = waveOf(clip)}
         {@const twirlable = lanesOf(clip).length > 0}
         <div class="row layer" data-layer={clip.id} data-track-id={track.id} class:selected={selection.includes(clip.id)} style={hueOf(clipFamily)}>
-          <div class="head" role="button" tabindex="-1" aria-label={`Select ${layerName(clip, doc.comps)}`} onpointerdown={(e) => pickLayer(e, clip)}>
+          <div class="head" role="button" tabindex="-1" aria-label={`Select ${layerLabel(clip, doc.comps)}`} onpointerdown={(e) => pickLayer(e, clip)}>
             <span class="indent" style={`width: ${12 + INDENT_PX * ancestorsOf(shown, clip.id).length}px;`}></span>
             {#if twirlable}
               <button type="button" class="twirl" aria-label="Show keyframes" aria-expanded={isOpen(clip)} onpointerdown={(e) => e.stopPropagation()} onclick={() => toggleOpen(clip.id)}>{#if isOpen(clip)}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}</button>
@@ -951,7 +952,7 @@
               <span class="twirl"></span>
             {/if}
             <span class="swatch"></span>
-            <span class="layer-name" title={layerName(clip, doc.comps)}>{#if clip.parent}<em class="parent">↳ {parentName(clip)}</em>{/if}{layerName(clip, doc.comps)}</span>
+            <span class="layer-name" title={layerLabel(clip, doc.comps)}>{#if clip.parent}<em class="parent">↳ {parentName(clip)}</em>{/if}{layerLabel(clip, doc.comps)}</span>
             <span class="flags">
               {#if track.kind === TrackKind.Visual}
                 <IconButton action={Action.ParentWhip} size={12} class="whip" data-whip={clip.id} onpointerdown={(e) => startWhip(e, clip.id)} />
