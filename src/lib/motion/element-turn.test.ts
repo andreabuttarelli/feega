@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
+import { Ease } from '@feega/motion-core/motion/design';
 import { turnClips, QUARTER_TURN } from './layer-props';
 import { wrapInStack } from './layout/ops';
 import { elementTurn } from './element-turn';
@@ -36,7 +37,7 @@ describe('rotating a free element turns its node, not its content inside the nod
   });
 
   it('an animated turn stays in the doc, where its keyframes live', () => {
-    const animated = must(setKeyframes(stack, 'stack', 'rotateZ', [{ frame: 0, value: 0 }, { frame: 10, value: 90 }]));
+    const animated = must(setKeyframes(stack, 'stack', 'rotateZ', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 10, value: 90, ease: Ease.Linear }]));
 
     expect(elementTurn(animated)).toBeNull();
   });
