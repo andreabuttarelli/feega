@@ -4,13 +4,15 @@ type Filled = { replaces: readonly string[]; legacy: (props: Record<string, unkn
 
 const textColour = (props: Record<string, unknown>): Fill[] => fillsSchema.parse([{ type: FillType.Solid, color: String(props.color ?? '#000000') }]);
 const TEXT: Filled = { replaces: ['color'], legacy: textColour };
+const PICTURE: Filled = { replaces: [], legacy: () => [] };
 
 export const FILLED: Record<string, Filled> = {
   Shape: { replaces: ['fillKind', 'fill', 'fill2', 'gradientAngle'], legacy: fillsOf },
   Title: TEXT,
   Text: TEXT,
   Kicker: TEXT,
-  Caption: TEXT
+  Caption: TEXT,
+  Image: PICTURE
 };
 
 export function elementFills(component: string, props: Record<string, unknown>): Fill[] {

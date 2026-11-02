@@ -55,4 +55,15 @@ describe('motionAssets — the library a frame can use', () => {
     expect(assets.find((a) => a.id === 'org-font')?.label).toBe('Acme Grotesk 700');
     expect(urls).toEqual({ 'org-font': `signed:${ORG}/fonts/acme.woff2`, 'far-font': `signed:${ORG}/far-font` });
   });
+
+  it('names an uploaded picture by its file, a generated one by its kind and date', async () => {
+    const uploaded = { ...asset('photo', 'image', 'image/png', '2026-10-03T00:00:00Z'), url: `${ORG}/${PROJECT}/3f2c1a9e-1b2c-4d5e-8f90-123456789abc-hero.png` };
+    const generated = { ...asset('made', 'image', 'image/png', '2026-10-02T00:00:00Z'), source: 'generated' };
+    const { db } = fakeDb({ assets: [uploaded, generated] }, { filter: true });
+
+    const assets = await motionAssets({ db, orgId: ORG, projectId: PROJECT, canvasId: 'c', sign: async () => new Map() });
+
+    expect(assets.find((a) => a.id === 'photo')?.label).toBe('hero.png');
+    expect(assets.find((a) => a.id === 'made')?.label).toMatch(/^image · 2026-10-02/);
+  });
 });

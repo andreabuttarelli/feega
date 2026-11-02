@@ -54,12 +54,18 @@ describe('which sections each selection kind gets', () => {
     expect(sections).not.toContain(Section.Text);
   });
 
-  it('an image: no fill, stroke or text', () => {
+  it('an image: fill and stroke like a rectangle, no text', () => {
     const sections = sectionsFor(ClipFamily.Image, PropertiesView.Clip, EditMode.Motion);
 
-    expect(sections).toContain(Section.Layout);
-    expect(sections).not.toContain(Section.Fill);
+    expect(sections).toEqual(expect.arrayContaining([Section.Layout, Section.Layer, Section.Fill, Section.Stroke]));
     expect(sections).not.toContain(Section.Text);
+  });
+
+  it('a video keeps no fill or stroke', () => {
+    const sections = sectionsFor(ClipFamily.Video, PropertiesView.Clip, EditMode.Motion);
+
+    expect(sections).not.toContain(Section.Fill);
+    expect(sections).not.toContain(Section.Stroke);
   });
 
   it('audio: no layout at all', () => {

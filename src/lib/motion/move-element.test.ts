@@ -195,6 +195,19 @@ describe('a picture inserted into a frame', () => {
 
     expect({ from: clip.from, end: clip.from + clip.durationInFrames }).toEqual({ from: 0, end: doc.durationInFrames });
   });
+
+  it('is pinned left and top like a drawn layer, not scaled with the frame', () => {
+    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen' });
+    const doc = must(placeElement(target(), element, { at: { x: 0.5, y: 0.5 }, frame: 0 }, ids()));
+    const clip = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Image')!;
+
+    expect(clip.constraints).toEqual({ horizontal: 'left', vertical: 'top' });
+  });
+
+  it('is named by its file, cut to the longest name a layer takes', () => {
+    expect(mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'hero.png' }).clip.name).toBe('hero.png');
+    expect(mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'x'.repeat(80) }).clip.name).toHaveLength(60);
+  });
 });
 
 describe('an output linked to a frame', () => {

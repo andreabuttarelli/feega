@@ -278,7 +278,10 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   objectRotateY: { short: 'Turn Y', unit: DEGREES },
   objectRotateZ: { short: 'Turn Z', unit: DEGREES },
   orbit: { short: 'Orbit', unit: DEGREES },
-  fov: { short: 'FOV', unit: DEGREES }
+  fov: { short: 'FOV', unit: DEGREES },
+  focusX: { short: 'Crop X', unit: PERCENT_SIGN },
+  focusY: { short: 'Crop Y', unit: PERCENT_SIGN },
+  zoom: { short: 'Zoom', unit: PERCENT_SIGN }
 };
 
 const SOURCE_LOOKS: Partial<Record<Source, Record<string, Partial<FieldLook>>>> = {

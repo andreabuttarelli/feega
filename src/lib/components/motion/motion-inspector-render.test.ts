@@ -173,11 +173,11 @@ describe('Properties for one clip', () => {
     expect(list).not.toContain('text');
   });
 
-  it('an image has no fill, stroke or text', () => {
+  it('an image has fill and stroke like a rectangle, no text', () => {
     const list = sections(inspect('Image'));
 
     expect(list).toContain('layout');
-    expect(list).not.toContain('fill');
+    expect(list).toContain('fill');
     expect(list).not.toContain('text');
   });
 
