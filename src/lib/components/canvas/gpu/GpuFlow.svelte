@@ -603,7 +603,12 @@
       return;
     }
     modeShown = mode;
-    untrack(() => rightBar.select(BarTab.Properties));
+    untrack(() => {
+      rightBar.select(BarTab.Properties);
+      if (mode === EditorMode.Motion && selected.length === 0 && coreFrames[0]) {
+        select([coreFrames[0].id]);
+      }
+    });
   });
   const curves = $derived(
     (showsPrototype ? [] : edges).flatMap((e) => {

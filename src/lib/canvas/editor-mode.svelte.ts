@@ -125,6 +125,7 @@ export class EditorModeState {
 
   set(mode: EditorMode) {
     this.current = mode;
+    this.opened[mode] = this.opened[mode] || mode === EditorMode.Motion;
     paint(mode);
     remember(this.store, mode);
   }
