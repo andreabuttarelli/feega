@@ -23,7 +23,7 @@ import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion
 import { Command, OPACITY_KEYS, commandFor, isTyping } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
-import { ALIGN_ACTIONS, type SelectionActionId } from './selection-actions';
+import type { SelectionActionId } from './selection-actions';
 import { siblingsOf } from './frame-select';
 import { EditMode } from '$lib/motion/edit-mode';
 import { propBoxes, tidySpace } from '$lib/motion/space';
@@ -327,14 +327,7 @@ export function frameKeyAction(e: KeyboardEvent): ActionId | null {
 const shownIn = (id: ActionId, doc: MotionDoc, selection: readonly string[]) => (BAR_OPS[id] ?? LATER_OPS[id])?.shown(doc, selection) ?? runs(id);
 
 export const elementMenuIds = (doc: MotionDoc, picks: readonly string[]): ReadonlySet<SelectionActionId> =>
-  new Set([...[...FRAME_ELEMENT_MENU].filter((id) => shownIn(frameMenuAction(id)!, doc, picks)), ...(picks.length ? ALIGN_ACTIONS : [])]);
-
-const TOOLBAR_ELEMENT_ACTIONS: readonly SelectionActionId[] = ['wrap-stack', 'remove-stack', 'go-to-main'];
-
-export const elementToolbarActions = (doc: MotionDoc, picks: readonly string[]): SelectionActionId[] => {
-  const shown = elementMenuIds(doc, picks);
-  return picks.length ? TOOLBAR_ELEMENT_ACTIONS.filter((id) => shown.has(id)) : [];
-};
+  new Set([...FRAME_ELEMENT_MENU].filter((id) => shownIn(frameMenuAction(id)!, doc, picks)));
 
 const LAYER_ACTIONS: readonly ActionId[] = [Action.WrapStack, Action.RemoveStack, Action.CreateComponent, Action.GoToMain, Command.UseAsMask, Command.RemoveMask, Action.ToggleHidden, Action.ToggleLocked, Action.Delete];
 

@@ -1,32 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { FRAME_DIALOG_ACTIONS } from './frame-dialogs';
-import { CANVAS_MENU, FRAME_PANEL_ACTIONS, SELECTION_ACTIONS, actionsIn, enabledFor, menuFor, panelActionsFor, shownFor, toolbarSlots } from './selection-actions';
+import { ALIGN_EDGE, CANVAS_MENU, SELECTION_ACTIONS, actionsIn, canvasMenuIds, enabledFor, menuFor, shownFor } from './selection-actions';
 
-describe('right bar of a canvas selection', () => {
-  const image = { id: 'i', type: 'image', data: { refId: 'r1' } };
+describe('the context menu is the one home for selection actions', () => {
+  const soundPanel = new Set(['frame-voice', 'frame-music', 'run-workflow']);
 
-  it('offers the generated-image tools of the toolbar', () => {
-    const ids = panelActionsFor([image]).map((a) => a.id);
+  it('lists every action the selection bar used to fold away', () => {
+    const menu = new Set(CANVAS_MENU.map((a) => a.id));
+    const homeless = SELECTION_ACTIONS.filter((a) => !soundPanel.has(a.id) && !menu.has(a.id) && !(a.id in ALIGN_EDGE));
 
-    expect(ids).toEqual(expect.arrayContaining(['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers']));
-    expect(ids).not.toContain('layers-to-frame');
+    expect(homeless.map((a) => a.id)).toEqual([]);
   });
 
-  it('offers reframe on a generated video', () => {
-    expect(panelActionsFor([{ type: 'video', data: { refId: 'r1' } }]).map((a) => a.id)).toContain('reframe');
-  });
-
-  it('gives every frame "…" entry a home in the frame right bar', () => {
-    const home = new Set(FRAME_PANEL_ACTIONS.map((a) => a.id));
-    const motionPanel = new Set(['frame-voice', 'frame-music', 'frame-code']);
-    const elsewhere = new Set(['copy-link', 'wrap-stack']);
-    const overflow = SELECTION_ACTIONS.filter((a) => (a.group === 'overflow' || a.group === 'fixed') && !motionPanel.has(a.id) && !elsewhere.has(a.id));
-
-    expect(overflow.filter((a) => !home.has(a.id)).map((a) => a.id)).toEqual([]);
-  });
-
-  it('offers no media tool on a node without output', () => {
-    expect(panelActionsFor([{ type: 'text', data: {} }]).map((a) => a.id)).not.toContain('upscale-image');
+  it('leaves aligning to the inspector', () => {
+    expect(CANVAS_MENU.map((a) => a.id).filter((id) => id in ALIGN_EDGE)).toEqual([]);
+    expect([...canvasMenuIds()].filter((id) => id in ALIGN_EDGE)).toEqual([]);
   });
 });
 
@@ -51,21 +39,37 @@ describe('group and ungroup', () => {
       ['group', 'Mod+G'],
       ['ungroup', 'Mod+Shift+G'],
       ['duplicate', 'Mod+D'],
+      ['run-technique', null],
+      ['run-downstream', null],
+      ['run-stale', null],
+      ['connect-new', null],
+      ['connect-existing', null],
+      ['remove-background', null],
+      ['upscale-image', null],
+      ['inpaint', null],
+      ['outpaint', null],
+      ['reframe', null],
+      ['split-layers', null],
+      ['layers-to-frame', null],
       ['create-formats', null],
       ['combine-video', null],
       ['export', null],
+      ['frame-code', null],
+      ['frame-interactive', null],
+      ['frame-components', null],
+      ['frame-templates', null],
+      ['frame-history', null],
+      ['frame-chat', null],
+      ['frame-save-template', null],
+      ['frame-publish', null],
       ['copy', 'Mod+C'],
       ['paste', 'Mod+V'],
       ['copy-properties', 'Mod+Alt+C'],
       ['paste-properties', 'Mod+Alt+V'],
+      ['copy-link', null],
+      ['copy-id', null],
       ['bring-front', 'Mod+]'],
       ['send-back', 'Mod+['],
-      ['align-left', 'Alt+A'],
-      ['align-center', 'Alt+H'],
-      ['align-right', 'Alt+D'],
-      ['align-top', 'Alt+W'],
-      ['align-middle', 'Alt+V'],
-      ['align-bottom', 'Alt+S'],
       ['tidy-up', 'Mod+Alt+T'],
       ['stack', null],
       ['section-selection', 'Shift+S'],
@@ -100,6 +104,7 @@ describe('group and ungroup', () => {
       ['reset-instance', null],
       ['hide', 'Mod+Shift+H'],
       ['lock', 'Mod+Shift+L'],
+      ['report', null],
       ['delete', 'Backspace']
     ]);
   });
@@ -154,7 +159,7 @@ describe('group and ungroup', () => {
   });
 
   it('each surface shows the shared menu, in its order, limited to what it can run', () => {
-    expect(menuFor(new Set(['delete', 'group', 'align-left']), [box, group]).map((a) => a.id)).toEqual(['group', 'align-left', 'delete']);
+    expect(menuFor(new Set(['delete', 'group', 'copy']), [box, group]).map((a) => a.id)).toEqual(['group', 'copy', 'delete']);
   });
 });
 
@@ -257,26 +262,6 @@ describe('combine into video', () => {
     expect(shownFor('combine-video', [frame])).toBe(false);
     expect(shownFor('combine-video', [frame, { type: 'motion', data: { format: '16:9', kind: 'element' } }])).toBe(false);
     expect(CANVAS_MENU.map((a) => a.id)).toContain('combine-video');
-  });
-});
-
-describe('the selection bar shows a few actions and folds the rest', () => {
-  const byId = (ids: string[]) => SELECTION_ACTIONS.filter((a) => ids.includes(a.id));
-
-  it('pins the most used actions in priority order and moves the rest to the overflow, delete last', () => {
-    const slots = toolbarSlots(byId(['upscale-image', 'connect-new', 'duplicate', 'run-downstream', 'remove-background', 'export', 'delete']));
-
-    expect(slots.pinned.map((a) => a.id)).toEqual(['duplicate', 'run-downstream', 'upscale-image']);
-    expect(slots.overflow.map((a) => a.id)).toEqual(['remove-background', 'connect-new', 'export']);
-    expect(slots.danger.map((a) => a.id)).toEqual(['delete']);
-  });
-
-  it('keeps copy link as a fixed icon and also lists it in the overflow', () => {
-    const slots = toolbarSlots(byId(['copy-link', 'duplicate', 'export', 'delete']));
-
-    expect(slots.fixed.map((a) => a.id)).toEqual(['copy-link']);
-    expect(slots.pinned.map((a) => a.id)).toEqual(['duplicate']);
-    expect(slots.overflow.map((a) => a.id)).toEqual(['copy-link', 'export']);
   });
 });
 

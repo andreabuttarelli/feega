@@ -10,7 +10,7 @@ A motion frame can get a voice-over and a music track as Audio clips, without le
 ## Step by step
 
 1. Select the motion frame.
-2. Open the selection toolbar or the right-click menu and pick **Add voice-over…** or **Add music…**.
+2. In Motion mode, pick **Voice-over…** or **Music…** in the Sound section of the right bar.
 3. Voice-over: write the **Script** (up to 2,000 characters). Music: describe the music and set **Length (s)**, 3 to 60, prefilled with the length of the frame.
 4. Press **Generate · uses credits**.
 5. The audio is placed as an Audio clip on the timeline, starting at the current playhead position.

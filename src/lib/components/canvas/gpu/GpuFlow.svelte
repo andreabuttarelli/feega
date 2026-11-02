@@ -25,7 +25,7 @@
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
   import { tileFaded } from '$lib/canvas/tile-opacity';
-  import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
+  import { canRunInFrame, barAction, barActionLater, elementMenuIds, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
@@ -200,7 +200,7 @@
   import { focusEdges } from '$lib/canvas/edge-focus';
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
-  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, shownFor, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, enabledFor, isCanvasAction, shownFor, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
   import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
@@ -1608,9 +1608,7 @@
       summaries: selectedSummaries,
       choicesFor: props.modelChoicesFor,
       runQuote: props.runQuoteFor?.(ids) ?? null,
-      onaction: runSelectionAction,
       onpropertychange: (patch) => props.onPropertyChange?.(ids, patch),
-      onview: () => props.onViewOutput?.(ids[0]),
       onalign: (edge) => alignSelection(ids, edge),
       ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis))
     });
@@ -3442,10 +3440,6 @@
   };
 
   function runSelectionAction(id: SelectionActionId) {
-    if (pickedToolbarActions.includes(id)) {
-      runElementMenu(id);
-      return;
-    }
     if (selected.length === 1 && isFrameModeAction(id)) {
       editorMode.set(FRAME_MODE_ACTIONS[id]);
       return;
@@ -3460,11 +3454,8 @@
   }
 
   const selectedSummaries = $derived((props.nodeSummaries ?? []).filter((n) => selected.includes(n.id)));
-  const pickedToolbarActions = $derived.by(() => {
-    const doc = inside && picks.length ? liveOf(inside.nodeId)?.doc : null;
-    return doc ? elementToolbarActions(doc, picks) : [];
-  });
   const selectionEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
+  const selectionMenuIds = $derived(new Set([...canvasMenuIds()].filter((id) => (id !== 'copy-link' || props.onCopyLink) && enabledFor(id, selectedSummaries, selectionEdges, props.stale ?? []).enabled)));
   const selectionMedium = $derived(
     selectedSummaries.length && selectedSummaries.every((n) => n.type === selectedSummaries[0].type) ? (selectedSummaries[0].type as GenPropertyType) : null
   );
@@ -3894,16 +3885,12 @@
       choicesFor={props.modelChoicesFor}
       catalogueSynced={selectionMedium && props.catalogueSyncedFor ? props.catalogueSyncedFor(selectionMedium) : true}
       runQuote={props.runQuoteFor?.(selected) ?? null}
-      frameTools
-      musicEnabled={props.musicEnabled}
-      withheld={props.onCopyLink ? [] : ['copy-link']}
       onrun={() => props.onRunNode?.(selected[0])}
       variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
       oncancelvariants={() => props.onCancelVariants?.(selected[0])}
       history={selected.length === 1 ? (props.historyFor?.(selected[0]) ?? null) : null}
       onstop={() => props.onCancelRun?.(selected[0])}
       onaction={runSelectionAction}
-      elementActions={pickedToolbarActions}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
       oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
@@ -3951,7 +3938,7 @@
   {/if}
 
   {#if menuAt && spec.chrome}
-    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={canvasMenuIds(selected.length)} layers={menuLayers} onpick={runSelectionAction} onlayer={(id) => select([id])} onclose={() => (menuAt = null)} />
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={selectionMenuIds} layers={menuLayers} onpick={runSelectionAction} onlayer={(id) => select([id])} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}

@@ -46,8 +46,6 @@
   import SoundSection from './SoundSection.svelte';
   import PlayInspector from './PlayInspector.svelte';
   import NodeInspector from './NodeInspector.svelte';
-  import { FRAME_PANEL_ACTIONS } from '$lib/canvas/selection-actions';
-  import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import { selectionProperties } from './selection-properties.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import { frameSurface, withSurface } from '@feega/motion-core/motion/surface';
@@ -148,15 +146,6 @@
       <StyleLibrarySection {tokens} unit={Math.min(doc.width, doc.height)} />
       <VariablesLibrarySection {doc} onchange={editGuides} />
     </details>
-    {#if frameProperties.runAction}
-      {@const run = frameProperties.runAction}
-      <section class="frame-actions" aria-label="Frame actions" data-testid="frame-actions">
-        {#each FRAME_PANEL_ACTIONS as action (action.id)}
-          {@const Icon = SELECTION_ACTION_ICON[action.id]}
-          <button type="button" data-testid={`frame-action-${action.id}`} onclick={() => run(action.id)}><Icon size={14} />{action.label}</button>
-        {/each}
-      </section>
-    {/if}
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
@@ -209,27 +198,6 @@
     font-weight: 600;
     cursor: pointer;
     border-bottom: 1px solid var(--ui-line);
-  }
-
-  .frame-actions {
-    display: flex;
-    flex-direction: column;
-    padding: var(--ui-space-2) var(--ui-space-3);
-  }
-
-  .frame-actions button {
-    display: flex;
-    align-items: center;
-    gap: var(--ui-space-2);
-    min-height: 32px;
-    padding: 0 var(--ui-space-2);
-    border-radius: var(--ui-radius-sm);
-    font-size: var(--ui-type-caption);
-    color: var(--ui-text);
-  }
-
-  .frame-actions button:hover {
-    background: var(--ui-wash);
   }
 
   .empty {

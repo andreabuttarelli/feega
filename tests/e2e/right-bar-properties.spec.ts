@@ -52,8 +52,7 @@ test.describe('right bar for canvas selections @real', () => {
     await openProperties(page);
     const inspector = page.getByTestId('node-inspector');
     await expect(inspector).toBeVisible();
-    await expect(inspector.getByTestId('panel-upscale-image')).toBeVisible();
-    await expect(inspector.getByTestId('panel-remove-background')).toBeVisible();
+    await expect(inspector.getByTestId('panel-upscale-image')).toHaveCount(0);
     await shoot(page, 'view2-generated-image');
 
     const boxA = await nodeBox(page, a.id);
@@ -69,8 +68,9 @@ test.describe('right bar for canvas selections @real', () => {
 
     const frameBox = await nodeBox(page, frame.id);
     await page.mouse.click(frameBox.x + 8, frameBox.y + 8);
-    await expect(page.getByTestId('frame-actions')).toBeVisible();
-    await shoot(page, 'view2-frame-actions');
+    await expect(page.getByTestId('frame-inspector')).toBeVisible();
+    await expect(page.getByTestId('frame-actions')).toHaveCount(0);
+    await shoot(page, 'view2-frame-inspector');
 
     await page.keyboard.press('Escape');
     const at = { x: boxA.x + boxA.width / 2, y: boxA.y + boxA.height / 2 };

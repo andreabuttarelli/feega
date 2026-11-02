@@ -5,20 +5,20 @@ import { selectionProperties, type NodeSummary } from './selection-properties.sv
 
 const noop = () => undefined;
 
-const panelOf = (summaries: NodeSummary[]) => ({ summaries, runQuote: null, onaction: noop, onpropertychange: noop, onview: noop, onalign: noop, ondistribute: noop });
+const panelOf = (summaries: NodeSummary[]) => ({ summaries, runQuote: null, onpropertychange: noop, onalign: noop, ondistribute: noop });
 
 const html = () => render(FrameInspectorPanel, { props: { session: null, tokens: null } }).body;
 
 describe('right bar of a canvas selection', () => {
   afterEach(() => selectionProperties.clear());
 
-  it('shows a generated image with its toolbar actions', () => {
+  it('shows a generated image with properties only, its actions left to the context menu', () => {
     selectionProperties.publish(panelOf([{ id: 'i', type: 'image', data: { refId: 'r1' } }]));
     const body = html();
 
     expect(body).toContain('data-testid="node-inspector"');
-    expect(body).toContain('data-testid="panel-remove-background"');
-    expect(body).toContain('data-testid="panel-view-output"');
+    expect(body).not.toContain('data-testid="panel-remove-background"');
+    expect(body).not.toContain('data-testid="panel-view-output"');
   });
 
   it('aligns and distributes several free elements', () => {

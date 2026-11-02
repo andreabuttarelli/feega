@@ -64,13 +64,12 @@ describe('a free group or image', () => {
 });
 
 describe('frame inspector panel', () => {
-  it('lists the frame "…" entries in the right bar', () => {
+  it('keeps frame actions in the context menu, out of the right bar', () => {
     frameProperties.runAction = () => undefined;
     const body = html([]);
     frameProperties.clear();
 
-    expect(body).toContain('data-testid="frame-action-frame-history"');
-    expect(body).toContain('data-testid="frame-action-export"');
+    expect(body).not.toContain('data-testid="frame-actions"');
   });
 
   it('offers voice-over and music in Motion only', () => {
