@@ -3683,3 +3683,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## test:gate red while the product is fine: selectors of a UI that was replaced
 
 **Signal:** most gate specs time out waiting for `motion-editor`, `editor-stage` or `input.hex`; the same flows work by hand. **Move:** probe the live DOM once (list `data-testid`s after the action) before editing specs; the inspector is `motion-inspector`, the fill hex is `Fill colour hex`, a text node mounts its prompt on click, `gpu-canvas` is `core-canvas`. A selector that matches a Vite dev module URL (`/frame-outlines`) is a test bug, match the API path.
+
+## An undo entry vanishes when two edits record at once
+
+**Signal:** after a gesture that writes several nodes, Cmd+Z undoes the step before it (a create), not the gesture. **Move:** `undoStack.collect` is not reentrant: two collects awaited in parallel restore the wrong outer bucket, and every later push lands in a finished collection. Run collecting writes one after another (`for … await`), never in `Promise.all`.

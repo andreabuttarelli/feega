@@ -26,7 +26,9 @@ export enum GestureKind {
   Rotate = 'rotate',
   Marquee = 'marquee',
   Connect = 'connect',
-  PickEdge = 'pick-edge'
+  PickEdge = 'pick-edge',
+  ResizeMany = 'resize-many',
+  TurnMany = 'turn-many'
 }
 
 export enum Pointer {

@@ -5,8 +5,12 @@
   import ModelMenu from './ModelMenu.svelte';
   import NodeSettings from './NodeSettings.svelte';
   import type { SelectionPanel } from './selection-properties.svelte';
+  import NumberField from '$lib/components/motion/NumberField.svelte';
+  import { FieldKind } from '$lib/motion/number-field';
+  import { SELECTION_FIELDS, fieldValue } from '$lib/canvas/selection-box';
 
   const MIN_ALIGNED = 2;
+  const BOX_RANGE = { min: -100000, max: 100000, step: 1 };
 
   let { panel }: { panel: SelectionPanel } = $props();
 
@@ -14,6 +18,17 @@
 </script>
 
 <aside class="node-inspector" data-testid="node-inspector" aria-label="Properties">
+  {#if panel.box}
+    {@const box = panel.box}
+    <section class="block" aria-label="Selection">
+      <h3>Selection</h3>
+      <div class="fields" data-testid="selection-box-fields">
+        {#each SELECTION_FIELDS as f (f.field)}
+          <NumberField label={f.label} kind={FieldKind.Glyph} name={f.name} value={fieldValue(box.items, f.field)} range={BOX_RANGE} unit={f.unit} onchange={(v) => box.set(f.field, v)} />
+        {/each}
+      </div>
+    </section>
+  {/if}
   {#if gen.properties.type}
     <section class="block" aria-label="Model">
       <h3>Model</h3>
@@ -54,6 +69,12 @@
     gap: var(--ui-space-1);
     padding: var(--ui-space-3) var(--ui-space-4);
     border-bottom: 1px solid var(--ui-line);
+  }
+
+  .fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
   }
 
   h3 {

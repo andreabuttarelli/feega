@@ -36,6 +36,8 @@ The Layers panel lists what the canvas has loaded: a page far off screen shows a
 
 With several nodes selected, dragging one moves all, and the selection bar shows the shared properties, editable once for all.
 
+Several shapes, texts or frames selected on the canvas get one box around them all. Its handles resize the whole selection (Shift keeps the ratio, Alt scales from the centre) and the corners just outside it rotate the selection around its centre (Shift snaps to 15°). Properties stays open with X, Y, W, H and rotation for the selection: a value the nodes share is shown, the others read **Mixed**, and typing one applies it to every node. One undo puts the whole selection back.
+
 ## Properties of a frame or a multi-selection
 
 Selecting a frame opens its properties in the right bar.
