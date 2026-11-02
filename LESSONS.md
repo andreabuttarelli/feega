@@ -3673,3 +3673,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## Two imports at once: `busy`, or 429 behind `[object Object]`
 
 **Signal:** concurrent imports answer 503 `busy` or the dialog shows "Browsers are busy, retrying…"; a log line shows `BrowserBusy`. **Move:** one import opens two Browserless sessions, the plan admits two. `sessionSlots` queues connects per server process (`BROWSERLESS_MAX_SESSIONS`, wait 10 s); it does not span deployments, so two instances can still meet a 429, which now retries with backoff and then reads as `BrowserBusy`. A refusal that is not an `Error` goes through `errorText`, never `String(e)`.
+
+## test:gate red while the product is fine: selectors of a UI that was replaced
+
+**Signal:** most gate specs time out waiting for `motion-editor`, `editor-stage` or `input.hex`; the same flows work by hand. **Move:** probe the live DOM once (list `data-testid`s after the action) before editing specs; the inspector is `motion-inspector`, the fill hex is `Fill colour hex`, a text node mounts its prompt on click, `gpu-canvas` is `core-canvas`. A selector that matches a Vite dev module URL (`/frame-outlines`) is a test bug, match the API path.
