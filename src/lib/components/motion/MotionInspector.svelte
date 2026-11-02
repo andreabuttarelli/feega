@@ -36,7 +36,9 @@
   import BoxFields from './BoxFields.svelte';
   import { layerKind, layerLabel } from '$lib/motion/element-name';
   import { ComponentRole, componentOf, roleOf } from '$lib/motion/main-component';
-  import type { NodeTurn } from '$lib/motion/element-turn';
+  import { Ratio, resizedSide, sideOf, type ElementHost } from '$lib/motion/element-host';
+  import { liveEdits } from '$lib/motion/live-edit';
+  import { DESIGN_MAX_SIDE } from '@feega/motion-core/motion/doc';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
@@ -113,7 +115,7 @@
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '@feega/motion-core/motion/expression/bake';
-  import { Unit, propsOwner, sliderOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
+  import { Unit, propsOwner, sliderOf, spaceOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
@@ -147,7 +149,7 @@
     actions,
     mode = EditMode.Motion,
     as = null,
-    turn = null,
+    host = null,
     title = null,
     here = null,
     onrename = null,
@@ -175,7 +177,7 @@
     actions?: Snippet;
     mode?: EditMode;
     as?: PropertiesView | null;
-    turn?: NodeTurn | null;
+    host?: ElementHost | null;
     title?: string | null;
     here?: string | null;
     onrename?: ((name: string) => void) | null;
@@ -250,7 +252,8 @@
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
   const positioned = $derived(transformProps.length > 0);
   const ownBox = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number');
-  const pinnable = $derived(positioned && ownBox && !clip.parent);
+  const own = $derived(host?.clipId === clip.id ? host : null);
+  const pinnable = $derived(positioned && ownBox && !clip.parent && !own);
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));
   const SIZE_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
@@ -498,19 +501,31 @@
     }
     commit(result, summary);
   }
-  const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
-  const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
-  const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, doc));
+  const space = $derived(spaceOf(doc, host?.box ?? null));
+  const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, space);
+  const stored = (key: string, v: number) => toStored(clip.component, key, v, space);
+  const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, space));
   const depthRange = $derived(slider({ key: 'depth', ...DEPTH }));
   const fieldRange = (field: Field): Ranged => ({ key: field.key, min: field.min ?? 0, max: field.max ?? 0, step: field.step ?? 1 });
-  const fieldShown = (field: Field) => percentShown(field.key, toShown(propsOwner(clip.component), field.key, Number(value(field)), doc));
-  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, percentStored(field.key, v), doc);
-  const fieldSlider = (field: Field) => percentSlider(field.key, steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), doc)));
+  const fieldShown = (field: Field) => percentShown(field.key, toShown(propsOwner(clip.component), field.key, Number(value(field)), space));
+  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, percentStored(field.key, v), space);
+  const fieldSlider = (field: Field) => percentSlider(field.key, steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), space)));
   const LAID_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
   const laid = $derived(stackParent || clip.autoLayout ? (laidClip(doc, clip.id) ?? clip) : clip);
-  const radiusBox = $derived({ width: Number(laid.props.width ?? 0) * doc.width, height: Number(laid.props.height ?? 0) * doc.height });
-  type FieldScale = { shown: number; range: Slider; stored: (v: number) => number };
+  const radiusBox = $derived({ width: Number(laid.props.width ?? 0) * space.width, height: Number(laid.props.height ?? 0) * space.height });
+  type FieldScale = { shown: number; range: Slider; stored: (v: number) => number; commit?: (v: number) => void; gesture?: LiveGesture };
   const unitScale = (field: Field): FieldScale => ({ shown: fieldShown(field), range: fieldSlider(field), stored: (v) => fieldStored(field, v) });
+  const hostEdit = liveEdits<() => void>({ show: () => {}, record: (run) => run() });
+  const HOST_SIDE: Slider = { unit: Unit.Px, min: 1, max: DESIGN_MAX_SIDE, step: 1 };
+  const hostScale = (on: ElementHost, field: Field): FieldScale => {
+    const side = sideOf(field.key);
+    const resize = (v: number) => {
+      const size = resizedSide(on.box, side, v, clip.lockRatio ? Ratio.Locked : Ratio.Free);
+      on.resize(size.w, size.h);
+    };
+    return { shown: Math.round(on.box[side]), range: HOST_SIDE, stored: (v) => v, commit: (v) => hostEdit.edit(() => resize(v), `Resized the ${field.key}`), gesture: hostEdit };
+  };
+  const sizeScale = (field: Field): FieldScale => (own ? hostScale(own, field) : unitScale(field));
   const radiusScale = (): FieldScale => ({ shown: radiusShown(Number(clip.props.roundness ?? 0), radiusBox), range: { ...radiusRange(radiusBox), unit: Unit.Px }, stored: (v) => radiusStored(v, radiusBox) });
   const resolved = (key: string) => ((LAID_KEYS.has(key) ? laid : clip).props as Record<string, unknown>)[key];
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : resolved(field.key));
@@ -662,7 +677,7 @@
   {@const look = fieldLook(field.key)}
   {@const range = scale.range}
   <NumberField
-    {gesture}
+    gesture={scale.gesture ?? gesture}
     label={look.short ?? field.label}
     kind={look.short ? FieldKind.Glyph : FieldKind.Named}
     name={field.label}
@@ -672,7 +687,7 @@
     fill={look.fill}
     mark={keyed ? MARK[keyState(field.key)] : null}
     expression={clip.expressions[field.key] !== undefined}
-    onchange={(v) => setProp(field, scale.stored(snappedValue(field.key, v)))}
+    onchange={(v) => (scale.commit ? scale.commit(v) : setProp(field, scale.stored(snappedValue(field.key, v))))}
     onkey={() => toggle(field.key)}
     onexpression={keyed ? () => toggleExpression(field.key) : undefined}
     {trailing}
@@ -695,7 +710,7 @@
       {/if}
     </div>
   {:else if field.control === Control.Strokes}
-    <div class="stack" data-prop={field.key}><StrokeStack {gesture} {palette} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><StrokeStack {gesture} {palette} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(space.width, space.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
@@ -885,7 +900,7 @@
 {/snippet}
 
 {#snippet layoutBody()}
-  {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned}<PositionSection {doc} {clip} {placement} host={own} {space} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
   {#if positioned && !ownBox}<BoxFields {doc} ids={[clip.id]} {frame} {mode} {gesture} {onchange} />{/if}
   {@const sizeFields = clip.autoLayout || !sizeShown(placement) ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
   {@const sizing = textField('sizing')}
@@ -897,12 +912,12 @@
   {/if}
   {#if sizeFields.length}
     <div class="size-row" data-testid="size-row">
-      <div class="grid2">{#each sizeFields as field (field.key)}{@const mode = modes?.[field.key as 'width' | 'height']}<div class="grid-cell" data-prop={field.key}>{#if mode}{#snippet tag()}{@render modeTag(mode)}{/snippet}{@render rangeField(field, tag)}{:else}{@render rangeField(field)}{/if}</div>{/each}</div>
+      <div class="grid2">{#each sizeFields as field (field.key)}{@const mode = modes?.[field.key as 'width' | 'height']}<div class="grid-cell" data-prop={field.key}>{#if mode}{#snippet tag()}{@render modeTag(mode)}{/snippet}{@render rangeField(field, tag, sizeScale(field))}{:else}{@render rangeField(field, undefined, sizeScale(field))}{/if}</div>{/each}</div>
       <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={16} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={() => commit(setClipFlags(doc, clip.id, { lockRatio: !clip.lockRatio }), clip.lockRatio ? 'Unlocked the aspect ratio' : 'Locked the aspect ratio')} />
     </div>
   {/if}
   {@render groupFields(Section.Layout, positioned || clip.autoLayout ? PLACED_SIZE_KEYS : SIZE_KEYS)}
-  {#if positioned}<PositionSection {doc} {clip} {turn} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned}<PositionSection {doc} {clip} host={own} {space} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
 {/snippet}
 
 {#snippet alignBody()}
@@ -1129,7 +1144,7 @@
 {/snippet}
 
 {#snippet stackBody()}
-  <StackSection {doc} {clip} {commit} />
+  <StackSection {doc} {clip} scale={space.scale ?? 1} {commit} />
 {/snippet}
 
 

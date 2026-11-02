@@ -20,6 +20,7 @@
     disabled = false,
     icon = null,
     blank = null,
+    testid = undefined,
     trailing,
     gesture = null,
     onchange,
@@ -38,6 +39,7 @@
     disabled?: boolean;
     icon?: Component | null;
     blank?: string | null;
+    testid?: string;
     trailing?: Snippet;
     gesture?: LiveGesture | null;
     onchange: (value: number) => void;
@@ -221,7 +223,7 @@
 
 <div class="field {kind}" class:ranged={fill === FieldFill.Range} class:disabled class:expression data-field={name} class:mixed={shown === MIXED} style={fill === FieldFill.Range && shown !== MIXED ? `--fill: ${fillShare(shown, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
   <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={leaveScrub} onlostpointercapture={leaveScrub} aria-hidden="true">{#if icon}{@const Icon = icon}<Icon size={14} />{/if}{icon ? '' : label}</span>
-  <input bind:this={input} {@attach fieldKeys} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={hint} onpointerdown={pressValue} onpointermove={dragValue} onpointerup={releaseValue} onpointercancel={releaseValue} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
+  <input bind:this={input} {@attach fieldKeys} class="num" type="text" inputmode="decimal" aria-label={name} data-testid={testid} {disabled} value={text} placeholder={hint} onpointerdown={pressValue} onpointermove={dragValue} onpointerup={releaseValue} onpointercancel={releaseValue} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
   {#if unit}<span class="unit" aria-hidden="true">{unit}</span>{/if}
   {@render trailing?.()}
   {#if fill === FieldFill.Range}

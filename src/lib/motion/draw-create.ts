@@ -209,7 +209,7 @@ export function penPaint({ fill, stroke, gradient, fillRule }: PenPaint): Record
 
 export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
 
-const PIXELS_PER_CANVAS_PX = 2;
+const PIXELS_PER_CANVAS_PX = 1;
 const MIN_DOC_SIDE = 16;
 const FULL_BOX: DrawBox = { x: 0.5, y: 0.5, width: 1, height: 1 };
 

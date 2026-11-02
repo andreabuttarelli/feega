@@ -35,7 +35,7 @@
   import { FieldKind } from '$lib/motion/number-field';
   import StackSizeChip from './StackSizeChip.svelte';
 
-  let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, scale = 1, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; commit: (result: OpResult, summary: string) => void } = $props();
 
   const GapMode = { Fixed: 'fixed', Auto: 'auto' } as const;
   type GapMode = (typeof GapMode)[keyof typeof GapMode];
@@ -98,9 +98,11 @@
   const set = (patch: Partial<AutoLayout>, summary: string) => commit(setAutoLayout(doc, clip.id, patch), summary);
   const size = (patch: Partial<LayoutItem>, summary: string) => commit(setLayoutItem(doc, clip.id, patch), summary);
   const whole = (value: number) => Math.max(0, Math.round(value));
+  const shown = (px: number) => Math.round(px * scale * 100) / 100;
+  const kept = (value: number) => value / scale;
   const span = (value: string) => Math.max(1, Math.round(Number(value) || 1));
   const cellAlign = (value: string) => (value === '' ? undefined : (value as Align));
-  const typeGap = (value: number) => set({ gap: Math.round(value), ...(gapMode === GapMode.Auto ? { justify: Justify.Start } : {}) }, 'Changed the gap');
+  const typeGap = (value: number) => set({ gap: Math.round(kept(value)), ...(gapMode === GapMode.Auto ? { justify: Justify.Start } : {}) }, 'Changed the gap');
   const pickGapMode = (mode: GapMode) => set({ justify: mode === GapMode.Auto ? Justify.SpaceBetween : Justify.Start }, 'Changed the gap');
 
   function toggleSides(padding: Padding, view: PaddingView) {
@@ -176,11 +178,11 @@
       </div>
       <div class="flex min-w-0 flex-1 flex-col gap-1.5">
         <div data-testid="auto-layout-gap" data-mode={gapMode}>
-          <NumberField label="Gap" name="Gap" icon={GAP_ICON[layout.direction]} value={layout.gap} blank={gapMode === GapMode.Auto ? GAP_MODE_LABEL[GapMode.Auto] : null} range={GAP_RANGE} trailing={gapTrail} onchange={typeGap} />
+          <NumberField label="Gap" name="Gap" icon={GAP_ICON[layout.direction]} value={shown(layout.gap)} blank={gapMode === GapMode.Auto ? GAP_MODE_LABEL[GapMode.Auto] : null} range={GAP_RANGE} trailing={gapTrail} onchange={typeGap} />
         </div>
         {#if lined}
           <div data-testid="auto-layout-cross-gap">
-            <NumberField label="Line gap" name="Gap between lines" icon={CROSS_GAP_ICON[layout.direction]} value={layout.crossGap} range={GAP_RANGE} onchange={(v) => set({ crossGap: Math.round(v) }, 'Changed the gap between lines')} />
+            <NumberField label="Line gap" name="Gap between lines" icon={CROSS_GAP_ICON[layout.direction]} value={shown(layout.crossGap)} range={GAP_RANGE} onchange={(v) => set({ crossGap: Math.round(kept(v)) }, 'Changed the gap between lines')} />
           </div>
         {/if}
       </div>
@@ -191,7 +193,7 @@
         <div class="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
           {#each SIDE_ORDER as side (side)}
             <div data-testid={`auto-layout-padding-${side}`}>
-              <NumberField label={SIDE_NAME[side]} name={`${SIDE_NAME[side]} padding`} icon={SIDE_ICON[side]} value={layout.padding[side]} range={PX_RANGE} onchange={(v) => set({ padding: { ...layout.padding, [side]: whole(v) } }, 'Changed the padding')} />
+              <NumberField label={SIDE_NAME[side]} name={`${SIDE_NAME[side]} padding`} icon={SIDE_ICON[side]} value={shown(layout.padding[side])} range={PX_RANGE} onchange={(v) => set({ padding: { ...layout.padding, [side]: whole(kept(v)) } }, 'Changed the padding')} />
             </div>
           {/each}
         </div>
@@ -199,7 +201,7 @@
         <div class="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
           {#each PADDING_AXES as pad (pad.axis)}
             <div data-testid={`auto-layout-padding-${pad.axis === 'horizontal' ? 'x' : 'y'}`}>
-              <NumberField label={pad.label} name={pad.label} icon={pad.icon} value={layout.padding[pad.first]} range={PX_RANGE} onchange={(v) => set({ padding: axisPatch(layout.padding, pad.axis, whole(v)) }, 'Changed the padding')} />
+              <NumberField label={pad.label} name={pad.label} icon={pad.icon} value={shown(layout.padding[pad.first])} range={PX_RANGE} onchange={(v) => set({ padding: axisPatch(layout.padding, pad.axis, whole(kept(v))) }, 'Changed the padding')} />
             </div>
           {/each}
         </div>

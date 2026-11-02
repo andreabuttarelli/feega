@@ -3,7 +3,7 @@ import { ANIMATABLE } from '@feega/motion-core/motion/keyframes';
 import { COMPONENT_IDS } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE } from '@feega/motion-core/motion/camera';
-import { Unit, propsOwner, sliderOf, toShown, toStored, unitOf } from './units';
+import { Unit, propsOwner, sliderOf, spaceOf, toShown, toStored, unitOf } from './units';
 
 const PORTRAIT = { width: 1080, height: 1920 };
 const MIN_STEPS = 20;
@@ -103,5 +103,35 @@ describe('physics units', () => {
     expect(unitOf('Shape', 'velocityX')).toBe(Unit.PxPerSecond);
     expect(unitOf('Shape', 'gravity')).toBe(Unit.PxPerSecondSquared);
     expect(toShown('Shape', 'gravity', 2400, PORTRAIT)).toBe(2400);
+  });
+});
+
+describe('an element on the canvas reads in canvas px', () => {
+  const doc = { width: 400, height: 240 };
+  const space = spaceOf(doc, { w: 200, h: 120 });
+
+  it('the stage of an element is its node, two doc px to a canvas px', () => {
+    expect(space).toEqual({ width: 200, height: 120, scale: 0.5 });
+  });
+
+  it('a frame reads in its own pixels', () => {
+    expect(spaceOf(doc, null)).toEqual(doc);
+  });
+
+  it('a width, a type size and a blur all come out in canvas px', () => {
+    expect(toShown('Shape', 'width', 1, space)).toBe(200);
+    expect(toShown('Title', 'size', 0.1, space)).toBe(12);
+    expect(toShown('Shape', 'blur', 20, space)).toBe(10);
+    expect(toStored('Shape', 'blur', 10, space)).toBe(20);
+  });
+
+  it('an effect length is a canvas px, an effect opacity is not', () => {
+    expect(toShown('Shape', 'fx.e1.blur', 24, space)).toBe(12);
+    expect(toStored('Shape', 'fx.e1.x', 5, space)).toBe(10);
+    expect(toShown('Shape', 'fx.e1.opacity', 0.5, space)).toBe(0.5);
+  });
+
+  it('rotation is degrees at any scale', () => {
+    expect(toShown('Shape', 'rotateZ', 30, space)).toBe(30);
   });
 });
