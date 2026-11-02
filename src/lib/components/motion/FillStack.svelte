@@ -17,6 +17,8 @@
   import MediaPicker from './MediaPicker.svelte';
   import type { MediaUploader } from './media-upload';
   import { MediaKind, type MediaPick } from '$lib/motion/media/pick';
+  import { PAINT_GRIP, PAINT_INLINE_INPUT, PAINT_META, PAINT_NAME, PAINT_ROW, PAINT_SWATCH, PAINT_TEXT } from './paint-row';
+  import MinusGlyph from './MinusGlyph.svelte';
 
   const NO_COLOURS = () => [];
 
@@ -156,7 +158,7 @@
   {#each topFirst as { fill, index } (index)}
     <div
       bind:this={rowEls[index]}
-      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_56px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !fill.visible && '[&>.dim]:opacity-40')}
+      class={cn(PAINT_ROW, open === index && 'bg-ui-selected', !fill.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
@@ -172,10 +174,10 @@
         drop(index);
       }}
     >
-      <span class="cursor-grab text-ui-text-3 select-none" aria-hidden="true">⋮</span>
+      <span class={PAINT_GRIP} aria-hidden="true">⋮</span>
       <button
         type="button"
-        class={cn('dim size-[18px] rounded-xs border border-ui-divider p-0', FOCUS_RING)}
+        class={PAINT_SWATCH}
         data-testid="fill-swatch"
         aria-label={`Edit ${TYPE_LABEL[fill.type].toLowerCase()} fill`}
         aria-expanded={open === index}
@@ -185,8 +187,12 @@
           toggle(index);
         }}
       ></button>
-      <span class={cn(LABEL, 'dim truncate')} data-testid="fill-label">{rowLabel(fill)}</span>
-      <input class={cn(FIELD_INPUT, 'dim')} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />
+      <span class={PAINT_TEXT}>
+        <span class={PAINT_NAME} data-testid="fill-label">{rowLabel(fill)}</span>
+        <span class={PAINT_META} data-testid="fill-meta">
+          <input class={PAINT_INLINE_INPUT} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />% · {TYPE_LABEL[fill.type]}
+        </span>
+      </span>
       <button
         type="button"
         class={ICON}
@@ -205,7 +211,7 @@
         onclick={(e) => {
           e.stopPropagation();
           remove(index);
-        }}>−</button
+        }}><MinusGlyph /></button
       >
     </div>
 

@@ -265,6 +265,7 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   skewY: { short: 'Skew Y', unit: DEGREES },
   perspective: { short: 'Persp.', unit: 'px' },
   opacity: { short: 'Opacity', fill: FieldFill.Range },
+  roundness: { short: 'Radius', fill: FieldFill.Range },
   blur: { short: 'Blur', unit: 'px' },
   volume: { short: 'Volume', fill: FieldFill.Range },
   pan: { short: 'Pan' },

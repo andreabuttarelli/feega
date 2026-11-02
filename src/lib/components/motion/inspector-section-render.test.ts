@@ -27,4 +27,17 @@ describe('inspector section', () => {
     expect(open).toMatch(/<button[^>]*class="section-head[^"]*"[^>]*aria-expanded="true"/);
     expect(html(false)).toMatch(/aria-expanded="false"/);
   });
+
+  it('the actions come before the chevron, which closes the row', () => {
+    const actions = createRawSnippet(() => ({ render: () => '<button>add</button>' }));
+    const out = render(InspectorSection, { props: { title: 'Fill', section: 'fill', open: true, ontoggle: () => {}, actions, children: body } }).body;
+
+    expect(out).toContain('>add<');
+    expect(out.indexOf('class="chevron')).toBeGreaterThan(out.indexOf('>add<'));
+  });
+
+  it('a closed section is marked so its title reads muted', () => {
+    expect(html(false)).toMatch(/<section class="[^"]*"[^>]*data-open="false"/);
+    expect(html(true)).toMatch(/<section class="[^"]*"[^>]*data-open="true"/);
+  });
 });

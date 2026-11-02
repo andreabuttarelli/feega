@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Gesture, Nudge, Precision, clockText, gestureOf, fillShare, formatValue, nudged, parseClock, precisionOf, scrubbed } from './number-field';
+import { Gesture, Nudge, Precision, clockText, gestureOf, fillShare, formatValue, nudged, parseClock, precisionOf, scrubbed, valueAtShare } from './number-field';
 
 const opacity = { min: 0, max: 1, step: 0.01 };
 const rotation = { min: -1080, max: 1080, step: 1 };
@@ -51,5 +51,13 @@ describe('number field', () => {
     expect(parseClock('45f', 30)).toBe(45);
     expect(parseClock('1.5', 30)).toBe(45);
     expect(parseClock('soon', 30)).toBeNull();
+  });
+
+  it('a point on the slider track maps back to the value at that share, on the step', () => {
+    expect(valueAtShare(0.5, opacity)).toBe(0.5);
+    expect(valueAtShare(0.333, opacity)).toBe(0.33);
+    expect(valueAtShare(-1, opacity)).toBe(0);
+    expect(valueAtShare(2, opacity)).toBe(1);
+    expect(valueAtShare(0.25, rotation)).toBe(-540);
   });
 });

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { parseDecimal } from '$lib/motion/inspector';
   import { KeyMark } from '$lib/motion/timeline-layers';
-  import { FieldFill, FieldKind, Gesture, Nudge, fillShare, gestureOf, formatValue, nudged, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
+  import { FieldFill, FieldKind, Gesture, Nudge, fillShare, gestureOf, formatValue, nudged, precisionOf, scrubbed, valueAtShare, type Range } from '$lib/motion/number-field';
   import { MIXED, type Shared } from '$lib/motion/mixed';
   import type { LiveGesture } from '$lib/motion/live-edit';
 
@@ -153,6 +153,36 @@
     }
   }
 
+  let sliding = false;
+
+  function slideTo(e: PointerEvent) {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (box.width) {
+      scrubTo(valueAtShare((e.clientX - box.left) / box.width, range));
+    }
+  }
+
+  function startSlide(e: PointerEvent) {
+    if (disabled || e.button !== 0) {
+      return;
+    }
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    sliding = true;
+    slideTo(e);
+  }
+
+  function moveSlide(e: PointerEvent) {
+    if (sliding) {
+      slideTo(e);
+    }
+  }
+
+  function endSlide() {
+    sliding = false;
+    endScrub();
+  }
+
   function commit(text: string) {
     const parsed = parseDecimal(text);
     if (parsed === null) {
@@ -188,10 +218,13 @@
   }
 </script>
 
-<div class="field {kind}" class:disabled class:expression data-field={name} class:mixed={shown === MIXED} style={fill === FieldFill.Range && shown !== MIXED ? `--fill: ${fillShare(shown, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
+<div class="field {kind}" class:ranged={fill === FieldFill.Range} class:disabled class:expression data-field={name} class:mixed={shown === MIXED} style={fill === FieldFill.Range && shown !== MIXED ? `--fill: ${fillShare(shown, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
   <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={leaveScrub} onlostpointercapture={leaveScrub} aria-hidden="true">{label}</span>
   <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={value === MIXED ? MIXED_TEXT : undefined} onpointerdown={pressValue} onpointermove={dragValue} onpointerup={releaseValue} onpointercancel={releaseValue} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
   {#if unit}<span class="unit" aria-hidden="true">{unit}</span>{/if}
+  {#if fill === FieldFill.Range}
+    <span class="track" data-slider aria-hidden="true" onpointerdown={startSlide} onpointermove={moveSlide} onpointerup={endSlide} onlostpointercapture={endSlide}><span class="rail"><span class="thumb"></span></span></span>
+  {/if}
   {#if mark}
     <button type="button" class="mark" data-mark={mark} title={mark === KeyMark.Here ? 'Remove the keyframe here' : 'Add a keyframe here'} aria-label={`Keyframe ${name}`} aria-pressed={mark === KeyMark.Here} {disabled} onclick={onkey}></button>
   {/if}
@@ -204,28 +237,17 @@
     align-items: center;
     height: var(--ui-row);
     min-width: 0;
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
-    border: 1px solid transparent;
-  }
-
-  .field::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--fill, 0);
-    background: var(--ui-accent-wash);
-    pointer-events: none;
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
   .field:hover {
-    border-color: var(--ui-line-strong);
+    background: var(--ui-input-hover);
   }
 
   .field:focus-within {
-    border-color: var(--ui-accent);
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
   }
 
   .field.disabled {
@@ -237,10 +259,10 @@
     flex-shrink: 0;
     min-width: 22px;
     max-width: 64px;
-    padding: 0 6px 0 8px;
+    padding: 0 4px 0 8px;
     text-align: left;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-text-sm);
+    color: var(--ui-text-2);
     text-overflow: ellipsis;
     cursor: ew-resize;
     touch-action: none;
@@ -265,19 +287,16 @@
 
   .named {
     background: linear-gradient(90deg, transparent var(--named-label), var(--ui-input) var(--named-label));
-    border-color: transparent;
     background-clip: padding-box;
     --named-label: 96px;
   }
 
-  .named:hover,
-  .named:focus-within {
-    border-color: transparent;
+  .named:hover {
+    background: linear-gradient(90deg, transparent var(--named-label), var(--ui-input-hover) var(--named-label));
   }
 
-  .named::before {
-    left: var(--named-label);
-    border-radius: var(--ui-radius-sm);
+  .named:focus-within {
+    box-shadow: none;
   }
 
   .named .num:focus-visible {
@@ -291,6 +310,10 @@
     color: var(--ui-ink-2);
   }
 
+  .named .label + .num {
+    padding-left: 10px;
+  }
+
   .label:hover {
     color: var(--ui-ink);
   }
@@ -302,12 +325,11 @@
     height: 100%;
     padding: 0 2px;
     border: 0;
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
     background: transparent;
     color: var(--ui-ink);
     font: inherit;
-    font-size: var(--ui-text-xs);
-    font-variant-numeric: tabular-nums;
+    font-size: var(--ui-text-sm);
     outline: none;
     cursor: ew-resize;
   }
@@ -332,8 +354,50 @@
     position: relative;
     flex-shrink: 0;
     padding-right: 6px;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-text-sm);
+    color: var(--ui-text-3);
+  }
+
+  .ranged .num {
+    flex: 0 1 44px;
+  }
+
+  .track {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 0;
+    min-width: 48px;
+    height: 100%;
+    padding: 0 12px;
+    border-left: 1px solid var(--ui-divider);
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .rail {
+    position: relative;
+    flex: 1;
+    height: 4px;
+    border-radius: var(--ui-radius-full);
+    background: linear-gradient(90deg, var(--ui-accent) var(--fill, 0), var(--ui-line-strong) var(--fill, 0));
+  }
+
+  .thumb {
+    position: absolute;
+    top: 50%;
+    left: var(--fill, 0);
+    width: 14px;
+    height: 14px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent-ink);
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.2), 0 1px 3px rgb(0 0 0 / 0.3);
+    transform: translate(-50%, -50%);
+  }
+
+  .disabled .track {
+    cursor: default;
+    opacity: 0.5;
   }
 
   .mark {
@@ -342,8 +406,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 16px;
-    height: 26px;
+    width: 14px;
+    height: 100%;
     border: 0;
     border-radius: var(--ui-radius-sm);
     background: none;
