@@ -45,6 +45,8 @@
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import { IconButton as ShellIconButton, Menu, MenuContent, MenuItem, MenuTrigger } from '$lib/components/ui/shell';
   import { hasSegments, segmentsOf } from '$lib/motion/segments';
+  import { SIZE_PRESETS } from '$lib/motion/size-presets';
+  import { AxisMode, TextSizing, axisModes } from '@feega/motion-core/motion/text-sizing';
   import SegmentedField from './SegmentedField.svelte';
   import { snappedValue, steppedRange } from '$lib/motion/weight-steps';
   import { percentShown, percentSlider, percentStored } from '$lib/motion/type-percent';
@@ -624,7 +626,7 @@
   {/each}
 {/snippet}
 
-{#snippet rangeField(field: Field)}
+{#snippet rangeField(field: Field, trailing?: Snippet)}
   {@const keyed = keyedField(clip.component, field.key, animated.params)}
   {@const look = fieldLook(field.key)}
   {@const range = fieldSlider(field)}
@@ -642,6 +644,7 @@
     onchange={(v) => setProp(field, fieldStored(field, snappedValue(field.key, v)))}
     onkey={() => toggle(field.key)}
     onexpression={keyed ? () => toggleExpression(field.key) : undefined}
+    {trailing}
   />
 {/snippet}
 
@@ -788,6 +791,20 @@
   {/if}
 {/snippet}
 
+{#snippet sizePresets()}
+  {@const size = textField('size')}
+  {#if size}
+    <select class="trail" aria-label="Size presets" data-testid="size-presets" value="" onchange={(e) => e.currentTarget.value && setProp(size, fieldStored(size, Number(e.currentTarget.value)))}>
+      <option value="" disabled hidden></option>
+      {#each SIZE_PRESETS as preset (preset)}<option value={String(preset)}>{preset}</option>{/each}
+    </select>
+  {/if}
+{/snippet}
+
+{#snippet modeTag(mode: AxisMode)}
+  <span class="mode-tag" data-mode={mode}>{mode}</span>
+{/snippet}
+
 {#snippet advancedToggle()}
   <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={15} /></button>
 {/snippet}
@@ -807,13 +824,14 @@
 
 {#snippet textBody()}
   {@const font = textField('font')}
+  {@const size = textField('size')}
   {@const aligns = ['align', 'verticalAlign'].map(textField).filter((f) => f !== undefined)}
   {@const italic = textField('italic')}
   {@const casing = textField('textCase')}
   {@const advanced = textFields.filter((f) => textTier(f.key, decorationNow) === TextTier.Advanced)}
   <div class="text-primary">
     {#if font}<div class="font-row">{@render fieldRow(font)}</div>{/if}
-    <div class="grid2">{@render pair(['weight', 'fontWeight', 'size'])}</div>
+    <div class="grid2">{@render pair(['weight', 'fontWeight'])}{#if size}<div class="grid-cell" data-prop="size">{@render rangeField(size, sizePresets)}</div>{/if}</div>
     <div class="grid2">{@render pair(['leading', 'tracking'])}</div>
     {#if aligns.length}<div class="align-row" data-testid="text-aligns"><div class="grid2">{#each aligns as field (field.key)}{@render alignCell(field)}{/each}</div>{@render advancedToggle()}</div>{/if}
     <div class="tgl-row" data-testid="text-styles" bind:this={advancedRow}>
@@ -838,9 +856,16 @@
 {#snippet layoutBody()}
   {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
   {@const sizeFields = clip.autoLayout ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
+  {@const sizing = textField('sizing')}
+  {@const modes = sizing ? axisModes(value(sizing) as TextSizing) : null}
+  {#if sizing}
+    <div class="stack" data-testid="text-resizing" data-prop="sizing">
+      <SegmentedField name={sizing.label} options={segmentsOf(sizing.key, sizing.options ?? [])} value={String(value(sizing))} onchange={(v) => setProp(sizing, v)} />
+    </div>
+  {/if}
   {#if sizeFields.length}
     <div class="size-row" data-testid="size-row">
-      <div class="grid2">{#each sizeFields as field (field.key)}<div class="grid-cell" data-prop={field.key}>{@render rangeField(field)}</div>{/each}</div>
+      <div class="grid2">{#each sizeFields as field (field.key)}{@const mode = modes?.[field.key as 'width' | 'height']}<div class="grid-cell" data-prop={field.key}>{#if mode}{#snippet tag()}{@render modeTag(mode)}{/snippet}{@render rangeField(field, tag)}{:else}{@render rangeField(field)}{/if}</div>{/each}</div>
       <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={16} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={() => commit(setClipFlags(doc, clip.id, { lockRatio: !clip.lockRatio }), clip.lockRatio ? 'Unlocked the aspect ratio' : 'Locked the aspect ratio')} />
     </div>
   {/if}
@@ -1371,6 +1396,23 @@
   .adv :global(.line > label),
   .adv :global(.line > .label) {
     width: 100%;
+  }
+
+  .mode-tag {
+    flex-shrink: 0;
+    padding-right: 6px;
+    color: var(--ui-ink-2);
+    font-size: 11px;
+  }
+
+  .trail {
+    flex-shrink: 0;
+    width: 18px;
+    height: 100%;
+    border: 0;
+    background-color: transparent;
+    color: var(--ui-ink-2);
+    cursor: pointer;
   }
 
   .size-row {

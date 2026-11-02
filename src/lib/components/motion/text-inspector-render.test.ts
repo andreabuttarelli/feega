@@ -37,4 +37,30 @@ describe('the text inspector', () => {
     expect(size.indexOf('data-prop="height"')).toBeGreaterThan(-1);
     expect(size.indexOf('data-prop="height"')).toBeLessThan(size.indexOf('data-testid="ratio-lock"'));
   });
+
+  it('puts the resizing control above W/H in Layout, not in advanced type', () => {
+    const html = inspect({ sizing: 'auto-height' });
+    const resize = html.indexOf('data-testid="text-resizing"');
+
+    expect(resize).toBeGreaterThan(-1);
+    expect(resize).toBeLessThan(html.indexOf('data-testid="size-row"'));
+    expect(html.indexOf('data-testid="text-resizing"')).toBeLessThan(html.indexOf('data-testid="text-aligns"'));
+  });
+
+  it.each([
+    ['auto', 'Hug', 'Hug'],
+    ['auto-height', 'Fixed', 'Hug'],
+    ['fixed', 'Fixed', 'Fixed']
+  ])('labels W/H per resizing %s', (sizing, width, height) => {
+    const html = inspect({ sizing });
+
+    expect(html.split('data-prop="width"')[1]?.split('data-prop="height"')[0]).toContain(`data-mode="${width}"`);
+    expect(html.split('data-prop="height"')[1]?.split('data-testid="ratio-lock"')[0]).toContain(`data-mode="${height}"`);
+  });
+
+  it('offers font size presets beside the size field', () => {
+    const presets = inspect({}).split('data-testid="size-presets"')[1]?.split('</select>')[0] ?? '';
+
+    expect([...presets.matchAll(/<option value="(\d+)"/g)].map((m) => Number(m[1]))).toEqual([12, 14, 16, 20, 24, 32, 48, 64, 96]);
+  });
 });

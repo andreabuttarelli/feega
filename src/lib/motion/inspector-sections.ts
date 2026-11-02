@@ -164,7 +164,7 @@ const TEXT_TIER: Record<string, TextTier> = {
   paragraphIndent: TextTier.Advanced,
   textWrap: TextTier.Advanced,
   leadingTrim: TextTier.Advanced,
-  sizing: TextTier.Advanced,
+  sizing: TextTier.Hidden,
   features: TextTier.Advanced,
   lineHeight: TextTier.Hidden,
   letterSpacing: TextTier.Hidden,
