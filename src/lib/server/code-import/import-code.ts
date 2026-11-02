@@ -36,7 +36,9 @@ const FROM_URL_IMPORT: Record<Exclude<UrlImportOutcome, UrlImportOutcome.Ok>, Ex
   [UrlImportOutcome.Failed]: CodeImportOutcome.Failed,
   [UrlImportOutcome.Unreadable]: CodeImportOutcome.Unreadable,
   [UrlImportOutcome.TooSlow]: CodeImportOutcome.Failed,
-  [UrlImportOutcome.RateLimited]: CodeImportOutcome.RateLimited
+  [UrlImportOutcome.RateLimited]: CodeImportOutcome.RateLimited,
+  [UrlImportOutcome.Busy]: CodeImportOutcome.RateLimited,
+  [UrlImportOutcome.Rejected]: CodeImportOutcome.Unreadable
 };
 
 export enum Crop {

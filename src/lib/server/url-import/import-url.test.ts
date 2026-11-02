@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppTab } from '$lib/server/web/browser';
-import type { FrameStore } from '$lib/server/motion/move-element';
+import { DocRejected, type FrameStore } from '$lib/server/motion/move-element';
+import { BrowserBusy } from '$lib/server/web/browser-slots';
 import type { PageTree } from './page-tree';
 import { importPageAt, UrlImportOutcome } from './import-url';
 import { PAGE_VIEWS } from './page-views';
@@ -223,6 +224,29 @@ describe('importPageAt', () => {
     const { ask } = askOf({ open: null });
 
     expect((await importPageAt(ask)).outcome).toBe(UrlImportOutcome.NoBrowser);
+  });
+
+  it('browsers all in use say busy, so the dialog can wait and ask again', async () => {
+    const { ask } = askOf({
+      open: async () => {
+        throw new BrowserBusy();
+      }
+    });
+
+    expect((await importPageAt(ask)).outcome).toBe(UrlImportOutcome.Busy);
+  });
+
+  it('a doc the schema rejects fails the import with the reason, and no frame is left', async () => {
+    const { ask, docs } = askOf();
+    const reason = 'tracks.0.clips.2.props.fontSize: expected number';
+    ask.store.create = vi.fn(async () => {
+      throw new DocRejected(reason);
+    });
+
+    const done = await importPageAt(ask);
+
+    expect(done).toEqual({ outcome: UrlImportOutcome.Rejected, error: reason });
+    expect(docs.size).toBe(0);
   });
 
   it('le immagini della pagina vengono importate e messe nel frame', async () => {

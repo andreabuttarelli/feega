@@ -3669,3 +3669,7 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## URL import answers 500 with `Error: [object Object]` from `connected`
 
 **Signal:** the preview log shows `unhandled server error` on `/url-import` with `Error: [object Object]` at `hidden` → `connected`; imports with breakpoints fail about half the time, a breakpoint view goes missing the rest. **Move:** the Browserless plan admits two sessions; a third connect gets `429`, which the server bundle receives as an `ErrorEvent` (stringified to `[object Object]`). Count the sessions one import opens at once (`importPageAt` reads views in turn beside the desktop read) and probe the limit with parallel `puppeteer.connect` calls before blaming the page.
+
+## Two imports at once: `busy`, or 429 behind `[object Object]`
+
+**Signal:** concurrent imports answer 503 `busy` or the dialog shows "Browsers are busy, retrying…"; a log line shows `BrowserBusy`. **Move:** one import opens two Browserless sessions, the plan admits two. `sessionSlots` queues connects per server process (`BROWSERLESS_MAX_SESSIONS`, wait 10 s); it does not span deployments, so two instances can still meet a 429, which now retries with backoff and then reads as `BrowserBusy`. A refusal that is not an `Error` goes through `errorText`, never `String(e)`.

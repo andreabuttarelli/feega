@@ -13,6 +13,7 @@ import type { ProjectMode } from '$lib/project-mode';
 import { SearchEngine, exaSearch, openRouterSearch, searchEngineOf, type SearchPort } from './search';
 import { readPage } from './read-page';
 import { vectorCapture, type UiCapture } from './vector-capture';
+import { sessionSlots, type SessionSlots } from './browser-slots';
 import { browserless, localBrowser, type BrowserlessUse, type OpenAppBrowser } from './browser';
 import { appBrowse, savedSession } from './app-browse';
 import { appAccountStore } from '$lib/server/repos/app-accounts';
@@ -51,6 +52,15 @@ const PICTURES_PER_PRODUCT = 2;
 const VIEW_MAX_BYTES = 15_000_000;
 const BROWSERLESS_LABEL = 'browserless';
 const BROWSERLESS_MODEL = 'stealth';
+const BROWSERLESS_PLAN_SESSIONS = 2;
+const BROWSERLESS_SLOT_WAIT_MS = 10_000;
+
+let slotsKept: SessionSlots | null = null;
+
+function browserlessSlots(): SessionSlots {
+  const limit = Number(env.BROWSERLESS_MAX_SESSIONS) || BROWSERLESS_PLAN_SESSIONS;
+  return (slotsKept ??= sessionSlots({ limit, waitMs: BROWSERLESS_SLOT_WAIT_MS }));
+}
 const EXA_CONTENTS_LABEL = 'site-read-exa';
 
 const ENGINES: Record<SearchEngine, () => { port: SearchPort; provider: 'exa' | 'llm'; model: string }> = {
@@ -163,7 +173,7 @@ export function liveBrowser(scope: Metered): OpenAppBrowser | null {
   const key = env.BROWSERLESS_API_KEY?.trim();
   if (key) {
     const meter = (use: BrowserlessUse) => logged(scope, { label: BROWSERLESS_LABEL, provider: 'browserless', model: BROWSERLESS_MODEL, ms: use.ms, usd: use.usd, units: use.units });
-    return browserless({ key, base: env.BROWSERLESS_BASE_URL?.trim() || undefined }, { connect: connectBrowserless, meter });
+    return browserless({ key, base: env.BROWSERLESS_BASE_URL?.trim() || undefined }, { connect: connectBrowserless, meter, slots: browserlessSlots() });
   }
   return serverFramesOpen() ? localBrowser(() => chromiumPage()) : null;
 }

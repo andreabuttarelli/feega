@@ -5,6 +5,7 @@ vi.mock('$env/dynamic/private', () => ({ env: {} }));
 
 import type { Browser } from 'puppeteer-core';
 import { BROWSERLESS_UNIT_USD, browserless, browserlessEndpoint, originHeaders } from './browser';
+import { BrowserBusy, sessionSlots } from './browser-slots';
 
 const KEY = 'secret-key';
 
@@ -72,6 +73,55 @@ describe('browserless: a hosted browser behind the same tab', () => {
     const connect = vi.fn().mockRejectedValue(new Error(`connect failed wss://production-sfo.browserless.io/stealth?token=${KEY}`));
 
     await expect(browserless({ key: KEY }, { connect, sleep: async () => undefined })()).rejects.toThrow(/^(?!.*secret-key)/);
+  });
+
+  it('reads a refusal that is an object, not an Error (the server build logged [object Object] and 429 was never recognised)', async () => {
+    const { browser } = fakeBrowser();
+    const refusedByPlan = { type: 'error', message: 'Unexpected server response: 429' };
+    const connect = vi.fn().mockRejectedValueOnce(refusedByPlan).mockResolvedValueOnce(browser);
+
+    await browserless({ key: KEY }, { connect, sleep: async () => undefined })();
+
+    expect(connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('names the status of a refusal that only carries one', async () => {
+    const connect = vi.fn().mockRejectedValue({ statusCode: 401 });
+
+    await expect(browserless({ key: KEY }, { connect, sleep: async () => undefined })()).rejects.toThrow('401');
+  });
+
+  it('never reports [object Object]', async () => {
+    const connect = vi.fn().mockRejectedValue({ reason: 'nope' });
+
+    await expect(browserless({ key: KEY }, { connect, sleep: async () => undefined })()).rejects.toThrow(/nope/);
+  });
+
+  it('says busy once the rate limit outlasts every retry', async () => {
+    const connect = vi.fn().mockRejectedValue(new Error('Unexpected server response: 429'));
+
+    await expect(browserless({ key: KEY }, { connect, sleep: async () => undefined })()).rejects.toBeInstanceOf(BrowserBusy);
+  });
+
+  it('holds a slot while the tab is open and frees it on close', async () => {
+    const { browser } = fakeBrowser();
+    const slots = sessionSlots({ limit: 1, waitMs: 1 });
+    const open = browserless({ key: KEY }, { connect: async () => browser, sleep: async () => undefined, slots });
+
+    const tab = await open();
+    await expect(open()).rejects.toBeInstanceOf(BrowserBusy);
+    await tab.close();
+
+    await expect(open()).resolves.toBeDefined();
+  });
+
+  it('frees the slot when the connection fails', async () => {
+    const slots = sessionSlots({ limit: 1, waitMs: 1 });
+    const connect = vi.fn().mockRejectedValue(new Error('Unexpected server response: 401'));
+
+    await browserless({ key: KEY }, { connect, sleep: async () => undefined, slots })().catch(() => undefined);
+
+    expect(slots.busy()).toBe(0);
   });
 
   it('bills whole 30-second units on close and meters them', async () => {

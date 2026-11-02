@@ -23,7 +23,7 @@ export const POST: RequestHandler = async (event) => {
 
   const done = await importUrlInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, ask.data.canvasId, { url: ask.data.url, at: { x: ask.data.x, y: ask.data.y }, maxHeight: PAGE_EXTENT_HEIGHT[ask.data.extent], shape: { sectioning: sectioningOf(ask.data.sections), tokening: tokeningOf(ask.data.tokens) }, views: viewsOf(ask.data.breakpoints) });
   if (done.outcome !== UrlImportOutcome.Ok) {
-    return json({ error: done.outcome }, { status: URL_IMPORT_STATUS[done.outcome] });
+    return json({ error: done.outcome, ...(done.error ? { detail: done.error } : {}) }, { status: URL_IMPORT_STATUS[done.outcome] });
   }
 
   const node = await findNode(scope.db, { orgId: scope.orgId, nodeId: done.frameId });

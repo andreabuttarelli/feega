@@ -6,6 +6,7 @@ import { OVERLAY_SELECTOR, type Overlay } from './overlays';
 import { SnapMode, TREE_LIMITS, treeScript, type PageSnap, type PageTree } from '$lib/server/url-import/page-tree';
 import { drawnInView, everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed, type Walk } from '$lib/server/url-import/page-reveal';
 import { snapped, type Shoot } from '$lib/server/url-import/page-snaps';
+import { BrowserBusy, type SessionSlots } from './browser-slots';
 import { componentMarksOf, MARK_LIMITS, type ComponentUse } from '$lib/server/code-import/component-marks';
 
 export type Target = { selector?: string; text?: string };
@@ -61,6 +62,7 @@ export type BrowserlessPorts = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   meter?: (use: BrowserlessUse) => void;
+  slots?: SessionSlots;
 };
 
 export const BROWSERLESS_DEFAULT_BASE = 'https://production-sfo.browserless.io';
@@ -489,8 +491,27 @@ export function localBrowser(newPage: () => Promise<Page>): OpenAppBrowser {
   };
 }
 
+export function errorText(e: unknown): string {
+  if (typeof e === 'string') {
+    return e;
+  }
+  if (e instanceof Error) {
+    return e.message;
+  }
+  if (typeof e !== 'object' || e === null) {
+    return String(e);
+  }
+
+  const fields = e as { message?: unknown; error?: unknown; status?: unknown; statusCode?: unknown; code?: unknown };
+  const inner = fields.error instanceof Error ? fields.error.message : '';
+  const message = typeof fields.message === 'string' && fields.message ? fields.message : inner;
+  const status = String(fields.status ?? fields.statusCode ?? fields.code ?? '');
+  const parts = [message.includes(status) ? '' : status, message].filter(Boolean);
+  return parts.length ? parts.join(' ') : JSON.stringify(e);
+}
+
 function hidden(e: unknown, key: string): Error {
-  return new Error((e instanceof Error ? e.message : String(e)).split(key).join(REDACTED));
+  return new Error(errorText(e).split(key).join(REDACTED));
 }
 
 async function connected(config: BrowserlessConfig, ports: BrowserlessPorts): Promise<Browser> {
@@ -500,8 +521,11 @@ async function connected(config: BrowserlessConfig, ports: BrowserlessPorts): Pr
       return await ports.connect(browserlessEndpoint(config));
     } catch (e) {
       const error = hidden(e, config.key);
-      if (attempt >= RETRY_DELAYS_MS.length || !RETRYABLE.test(error.message)) {
+      if (!RETRYABLE.test(error.message)) {
         throw error;
+      }
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        throw new BrowserBusy();
       }
       await sleep(RETRY_DELAYS_MS[attempt]);
     }
@@ -511,10 +535,15 @@ async function connected(config: BrowserlessConfig, ports: BrowserlessPorts): Pr
 export function browserless(config: BrowserlessConfig, ports: BrowserlessPorts): OpenAppBrowser {
   const now = ports.now ?? Date.now;
   return async () => {
+    const release = ports.slots ? await ports.slots.take() : () => undefined;
     const started = now();
-    const browser = await connected(config, ports);
+    const browser = await connected(config, ports).catch((e) => {
+      release();
+      throw e;
+    });
     const close = async () => {
       await browser.close().catch(() => undefined);
+      release();
       const ms = now() - started;
       const units = unitsOf(ms);
       const usd = units * BROWSERLESS_UNIT_USD;
