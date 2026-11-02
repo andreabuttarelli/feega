@@ -284,7 +284,7 @@ describe('core usage from CLI and MCP', async () => {
   const { CANVAS_TEMPLATES } = await import('$lib/canvas/templates');
   const canvases = [{ id: CANVAS, org_id: ORG, project_id: PROJECT }];
 
-  async function events(run: () => Promise<unknown>) {
+  async function events(run: () => unknown) {
     const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
     useCoreSink((b) => sent.push(b));
     await run();

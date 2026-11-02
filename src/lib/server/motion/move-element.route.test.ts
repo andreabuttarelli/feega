@@ -504,7 +504,7 @@ describe('core usage: frame drawn or pasted on the canvas', async () => {
   const { useCoreSink } = await import('$lib/server/core-usage');
   const FIGMA = readFileSync(new URL('../../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
 
-  async function events(run: () => Promise<unknown>) {
+  async function events(run: () => unknown) {
     const sent: { event: string; properties: Record<string, unknown> }[] = [];
     useCoreSink((b) => sent.push(b));
     await run();
