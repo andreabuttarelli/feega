@@ -5,6 +5,7 @@ import { DEFAULT_LAYOUT_ITEM, type AutoLayout, type LayoutItem, type Padding } f
 import { Horizontal, Vertical, type Constraints } from '../constraints/model';
 import type { Rule } from './ir';
 import type { TokenBook } from './tokens';
+import { BOUNDS, LIMIT_AXES, LimitUnit, limitOf } from '../layout/limits';
 
 const DIGITS = 100;
 const FLUID_FROM = 320;
@@ -21,8 +22,6 @@ const AXES: readonly Axis[] = ['width', 'height'];
 
 const MAIN_AXIS: Record<Direction, Axis | null> = { [Direction.Horizontal]: 'width', [Direction.Vertical]: 'height', [Direction.Grid]: null };
 
-const MIN_KEY: Record<Axis, keyof LayoutItem> = { width: 'minWidth', height: 'minHeight' };
-const MAX_KEY: Record<Axis, keyof LayoutItem> = { width: 'maxWidth', height: 'maxHeight' };
 
 const JUSTIFY_CSS: Record<Justify, string | null> = {
   [Justify.Start]: null,
@@ -107,12 +106,15 @@ function gridItem(placed: Placed, item: LayoutItem): Rule[] {
   return [...gridCell(item), ...height];
 }
 
+const LIMIT_CSS: Record<LimitUnit, (value: number) => string> = { [LimitUnit.Px]: px, [LimitUnit.Percent]: (value) => `${round(value)}%` };
+
 function limits(item: LayoutItem): Rule[] {
-  return AXES.flatMap((axis) => {
-    const min = item[MIN_KEY[axis]] as number | undefined;
-    const max = item[MAX_KEY[axis]] as number | undefined;
-    return [...(min !== undefined ? [[`min-${axis}`, px(min)] as Rule] : []), ...(max !== undefined ? [[`max-${axis}`, px(max)] as Rule] : [])];
-  });
+  return LIMIT_AXES.flatMap((axis) =>
+    BOUNDS.flatMap((bound) => {
+      const limit = limitOf(item, axis, bound);
+      return limit ? [[`${bound}-${axis}`, LIMIT_CSS[limit.unit](limit.value)] as Rule] : [];
+    })
+  );
 }
 
 export function flowItemRules(placed: Placed, flow: AutoLayout): Rule[] {

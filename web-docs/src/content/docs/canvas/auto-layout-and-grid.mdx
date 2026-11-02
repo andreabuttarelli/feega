@@ -32,14 +32,12 @@ Select a Stack (its row in **Layers**, a click on it on the canvas, or `Esc` fro
 1. The header: the name, then **Create component** and the **…** menu.
 2. **Alignment**: left, centre, right; top, middle, bottom.
 3. **Layout**: X / Y, rotation, rotate 90° and flip.
-4. **Stack**:
-   - **Direction**: horizontal, vertical, wrap, or grid, and the unwrap button.
-   - **W / H**: the size the Stack resolves to, with **Fixed** or **Hug** beside it (a child can also **Fill** or take a **%**). Typing a number makes it fixed; a typed size keeps the Stack's left and top edges where they are.
-   - A 3×3 grid sets the main and cross alignment at once.
-   - **Gap**, with **Auto** to spread the children apart (space between). On the canvas, drag the small handle in the middle of a gap or padding to change it.
-   - **Padding**: horizontal and vertical; the per-side button splits it into top, right, bottom, left.
+4. **Stack**, all chips with the label or an icon inside, no form rows:
+   - **Direction**: vertical, horizontal, wrap, or grid, and the unwrap button. The sliders button in the section header opens the rarely used settings: **Canvas stacking** (first on top or last on top), **Strokes included**, stretch children, align text baselines (rows), space around or evenly, how wrapped lines spread, grid track sizes and fill order.
+   - **W / H**: the size the Stack resolves to, with its mode in the same chip: **Fixed**, **Hug**, and for a child **Fill** or **%**. Typing a number makes it fixed; a typed size keeps the Stack's left and top edges where they are. The mode menu also takes **Min** and **Max**: type `200`, `200px` or `50%` (a share of the parent Stack, inside its padding). A set min or max shows as a chip under W / H, with **×** to clear it.
+   - A 3×3 grid sets the main and cross alignment at once, beside the **Gap** chip. Its menu switches the gap to **Auto**, which spreads the children apart (space between). On the canvas, drag the small handle in the middle of a gap or padding to change it.
+   - **Padding**: a horizontal and a vertical chip. The per-side button opens four chips, left, top, right, bottom, each with its side's icon; pressing it again goes back to two, keeping the left and top values when the sides differ.
    - **Clip content**.
-   - The settings button opens the rest: stretch children, align text baselines (rows), space around or evenly, **First on top**, **Strokes included**, min / max width and height.
 5. **Appearance**: opacity with the show / hide eye, corner radius (one value or per corner), blend.
 6. **Fill**, **Stroke**, **Effects**: each with **+**.
 7. **Selection colours**: every colour used inside the Stack; change one to change it everywhere in the Stack.
@@ -49,12 +47,8 @@ Select a Stack (its row in **Layers**, a click on it on the canvas, or `Esc` fro
 
 The Stack places its children, like flexbox. Select a child and the right bar drops **X / Y**, frame alignment and constraints, and shows instead:
 
-- **Width / Height**: a value with a unit, from the dropdown or typed:
-  - `120` or `120px`: fixed pixels;
-  - `50%`: a share of the Stack;
-  - `Fill`, `fill 2`, `2fr`: shares the space left by weight, so `1fr` and `2fr` split it 1:2;
-  - `hug`: fits its content.
-- **Min / max** width and height.
+- **W / H** chips: the size in pixels, or the share when the mode is **%**; the mode menu picks **Fixed**, **Hug**, **Fill** (shares the space left; an agent can weight it, `widthGrow` 2 takes twice the space of 1) or **%** (a share of the Stack).
+- **Min / max** width and height, in the same menu, in `px` or `%`.
 - **Align self**: overrides the Stack's align for this child (start, center, end, stretch).
 - **Absolute position**: takes the child out of the flow (Figma's *ignore auto layout*). X and Y come back, measured from the Stack's top-left corner.
 - **Move earlier / later** and **Take out of the stack**.

@@ -441,3 +441,15 @@ describe('a flex item', () => {
   });
 });
 
+describe('min and max in percent of the stack', () => {
+  it('caps a fill child at a share of the room inside the padding', () => {
+    const out = layoutTree(box('c', 440, 100, [leaf('a', 10, 20, { sizing: { width: Sizing.Fill, height: Sizing.Fixed }, maxPercent: { width: 50 } })], { padding: { top: 0, right: 20, bottom: 0, left: 20 } }));
+    expect(out.get('a')?.width).toBe(200);
+  });
+
+  it('holds a fixed child at least a share of the room in a grid too', () => {
+    const out = layoutTree(box('c', 400, 100, [leaf('a', 10, 20, { minPercent: { width: 25 } })], { direction: Direction.Grid, columns: 1 }));
+    expect(out.get('a')?.width).toBe(100);
+  });
+});
+
