@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ResizeMode, customSize, fitElementToNode, fitToNode } from './custom-size';
+import { ResizeMode, customSize, fitElementToNode, fitToNode, handResized } from './custom-size';
 import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setCanvas } from '@feega/motion-core/motion/timeline';
@@ -94,6 +94,27 @@ describe('resizing a free element', () => {
     const sized = fitToNode(doc, { width: 240, height: 320 }, ResizeMode.Element);
 
     expect(sized.ok && sized.doc.tracks[0].clips[0].props).toMatchObject({ x: 0.5, y: 0.5, width: 1, height: 1, size: 0.25 });
+  });
+});
+
+describe('resizing a free text by hand', () => {
+  const base = newMotionDoc(MotionFormat.Landscape);
+  const autoWidth = (() => {
+    const text = { id: 't', from: 0, durationInFrames: 150, component: 'Text', props: { text: 'Hi', x: 0.5, y: 0.5, width: 1, height: 1, size: 0.75, sizing: 'auto' }, transform: {}, keyframes: {} };
+    return { ...base, still: true, width: 240, height: 80, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [text] }] } as unknown as MotionDoc;
+  })();
+
+  it('dragging its width stops it hugging the width, so the new width sticks', () => {
+    const sized = handResized(autoWidth, { width: 240, height: 80 }, { width: 400, height: 80 });
+
+    expect(sized.ok && sized.doc.tracks[0].clips[0].props).toMatchObject({ sizing: 'auto-height', width: 1 });
+    expect(sized.ok && sized.doc.width).toBe(400);
+  });
+
+  it('dragging its height fixes both sides', () => {
+    const sized = handResized(autoWidth, { width: 240, height: 80 }, { width: 240, height: 160 });
+
+    expect(sized.ok && sized.doc.tracks[0].clips[0].props.sizing).toBe('fixed');
   });
 });
 
