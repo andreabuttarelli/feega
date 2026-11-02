@@ -4,7 +4,7 @@ import { TrackKind, type ComponentId } from '../components';
 import { animProp, sampleColor, Source, TRANSFORM, ValueKind, type TransformKey } from '../keyframes';
 import { sampleTrack } from '../sample-track';
 import { IDENTITY, ParentOpacity, ancestorsOf, localAt, mul2d, transformAt, worldAt, type Affine } from '../parent';
-import { depthOf, turnedInDepth } from './depth';
+import { depthOf, stageLenses, turnedInDepth } from './depth';
 import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
@@ -531,6 +531,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   const items: Item[] = [];
   const unsupported: Gap[] = [];
 
+  const lenses = stageLenses(doc, frame);
+
   const parentsAt = (clip: MotionClip) => ancestorsOf(doc, clip.id).reduce<Affine>((m, id) => (byId.get(id) ? mul2d(m, localAt(byId.get(id)!, frame, size)) : m), IDENTITY);
 
   function clipItems(clip: MotionClip): Item[] | Unsupported {
@@ -550,8 +552,10 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     unsupported.push(...gaps.map((detail) => ({ clip: clip.id, component: clip.component, reason: Unsupported.Dom, detail })));
     const edge = effectiveEdge(clip);
     const edged = posed(edge, size.width, size.height);
-    const depth = turnedInDepth(clip) ? depthOf(clip, frame, size, mul2d(edged, parentsAt(clip)), box) : null;
-    if (turnedInDepth(clip) && !depth) {
+    const lens = lenses.get(clip.id);
+    const deep = turnedInDepth(clip) || lens !== undefined;
+    const depth = deep ? depthOf(clip, frame, size, mul2d(edged, parentsAt(clip)), box, lens) : null;
+    if (deep && !depth) {
       return Unsupported.Space3d;
     }
     const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));

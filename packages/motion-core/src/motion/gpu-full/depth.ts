@@ -1,7 +1,8 @@
 import { apply2d } from '../affine';
 import { invert2d, pivotOf, transformAt, mul2d, type Affine } from '../parent';
-import type { MotionClip } from '../doc';
-import { TRANSFORM, type TransformKey } from '../keyframes';
+import type { MotionClip, MotionDoc } from '../doc';
+import { TRANSFORM, sampleTrack, type TransformKey } from '../keyframes';
+import { LayerKind, cameraMath, stageSpec } from '../camera';
 import { flattened, mul4, projectBy, translate4, viewOf, type Matrix4 } from './dom/css';
 
 const DEG = Math.PI / 180;
@@ -37,6 +38,10 @@ const scale = (x: number, y: number): Matrix4 => [x, 0, 0, 0, 0, y, 0, 0, 0, 0, 
 
 const translate3 = (x: number, y: number, z: number): Matrix4 => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 
+const LENSLESS: Matrix4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+const CAMERA = cameraMath(sampleTrack);
+
 const about = ([ox, oy]: [number, number], m: Matrix4) => mul4(mul4(translate4(ox, oy), m), translate4(-ox, -oy));
 
 export const turnedInDepth = (clip: MotionClip) => DEPTH_KEYS.some((k) => (clip.transform[k] ?? TRANSFORM[k].fallback) !== TRANSFORM[k].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
@@ -50,8 +55,20 @@ function ownChain(clip: MotionClip, frame: number, size: Size): Matrix4 {
   return depth > 0 ? mul4(viewOf({ depth, origin }), own) : own;
 }
 
-export function depthOf(clip: MotionClip, frame: number, size: Size, outer: Affine, box: Box): Depth | null {
-  const chain = mul4(lift(outer), ownChain(clip, frame, size));
+export function stageLenses(doc: MotionDoc, frame: number): Map<string, Matrix4> {
+  if (!doc.camera) {
+    return new Map();
+  }
+  const spec = stageSpec(doc);
+  const at = CAMERA.valuesAt(spec, frame);
+  const centre: [number, number] = [spec.width / 2, spec.height / 2];
+  const lens = mul4(viewOf({ depth: CAMERA.perspectiveOf(at.fov, spec.height), origin: centre }), about(centre, CAMERA.worldMatrix(at, spec)));
+  const placed = (depth: number) => mul4(translate3(0, 0, -depth), scale(CAMERA.compensation(spec, depth), CAMERA.compensation(spec, depth)));
+  return new Map(spec.layers.filter((l) => l.kind === LayerKind.Flat).map((l) => [l.id, mul4(lens, about(centre, placed(l.depth)))]));
+}
+
+export function depthOf(clip: MotionClip, frame: number, size: Size, outer: Affine, box: Box, lens: Matrix4 = LENSLESS): Depth | null {
+  const chain = mul4(lens, mul4(lift(outer), ownChain(clip, frame, size)));
   const fitted = flattened(mul4(chain, translate4(box.left, box.top)), { w: box.width, h: box.height });
   if (!fitted) {
     return null;
