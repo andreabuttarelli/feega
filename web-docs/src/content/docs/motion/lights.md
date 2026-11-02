@@ -15,7 +15,7 @@ Lights shade the flat layers of a video that has a camera. Add one in the frame 
 4. Select the light clip. Move it with X, Y and depth, aim a spot or parallel light with Rotate X / Rotate Y, and set colour, intensity, falloff, cone angle and cone feather.
 5. To animate, turn on Animate mode (`E`), move the playhead and change a value: each change is keyed. A spot light that sweeps across turned cards is two keys on Rotate Y.
 
-Lights show in exports and in the editor preview of a frame with a camera. The infinite canvas draws frames on the GPU and does not draw the camera stage yet, so a light does not appear there: check the result in an export or still.
+Lights show in exports and in the editor preview of a frame with a camera. The infinite canvas draws the camera moves but not the lights yet: check lights in an export or still.
 
 | Kind | Does |
 |---|---|

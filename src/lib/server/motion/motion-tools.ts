@@ -1528,7 +1528,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_camera: tool({
-      description: `Turn on the virtual camera of the video, change its base values, or turn it off (enabled false). With a camera, clips sit in a 3D world at their depth (set_clip_depth) and camera moves give parallax. Values: ${CAMERA_UNITS}. dof turns depth of field on.`,
+      description: `Turn on the virtual camera of the video, change its base values, or turn it off (enabled false). One camera drives the whole scene: every visual clip (text, shapes, images, video, custom components, 3D) sits in one 3D world at its depth (set_clip_depth) and camera moves (apply_camera_preset, set_camera_keyframes) give real parallax. For a push-in, orbit, pan or focus pull move the camera, never each layer's own rotateX/rotateY/scale. Values: ${CAMERA_UNITS}. dof turns depth of field on.`,
       inputSchema: z.object({
         enabled: z.boolean().optional(),
         values: z.object(Object.fromEntries(CAMERA_KEYS.map((k) => [k, z.number().optional()]))).partial().optional(),
@@ -1796,7 +1796,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_clip_depth: tool({
-      description: 'Place a clip in the camera world: depth in pixels behind the focus plane 0 (negative comes forward; a far background 1500–4000, a foreground card -200..0). It keeps its size at rest and shows parallax when the camera moves. space "screen" keeps a caption or overlay flat on top, ignoring the camera.',
+      description: 'Place a clip in the camera world: depth in pixels behind the focus plane 0 (negative comes forward; a far background 1500–4000, a foreground card -200..0). It keeps its size at rest and shows parallax when the camera moves. space "screen" keeps a caption or overlay flat on top, ignoring the camera. Works for every visual clip: text, shapes, images, video and custom components.',
       inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional(), accepts_lights: z.boolean().optional() }),
       execute: async (input) => {
         const placed = setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space });
