@@ -128,6 +128,24 @@ describe('component tools', () => {
     expect(listed.library.some((c) => c.id === 'Title')).toBe(true);
   });
 
+  it('read_component reads one file by numbered lines or by a search, so a large component is not dumped whole', async () => {
+    const { run } = setup();
+    await run(WRITE_COMPONENT, CHAT);
+
+    expect(await run(READ_COMPONENT, { name: 'ChatPanel', file: 'css' })).toMatchObject({ ok: true, file: 'css', total_lines: 1, text: `1\t${CHAT.css}`, version: 1 });
+    expect(await run(READ_COMPONENT, { name: 'ChatPanel', pattern: 'querySelector' })).toMatchObject({ ok: true, matches: [{ file: 'js', line: 1 }] });
+  });
+
+  it('update_components edits numbered lines and reruns the check', async () => {
+    const { session, run, deps } = setup();
+    await run(WRITE_COMPONENT, { ...CHAT, css: '.panel{position:absolute;inset:10%}\n.line{color:#fff}' });
+    const out = await run('update_components', { component: 'ChatPanel', edits: [{ file: 'css', lines: [2, 2], text: '.line{color:#eee}' }, { file: 'css', after_line: 0, text: ':scope{opacity:1}' }] });
+
+    expect(out).toMatchObject({ ok: true, version: 2, diff: [{ file: 'css', replaced: 1 }, { file: 'css', replaced: 0 }] });
+    expect(session.doc.components.ChatPanel.source.css).toBe(':scope{opacity:1}\n.panel{position:absolute;inset:10%}\n.line{color:#eee}');
+    expect(deps.check).toHaveBeenCalledTimes(2);
+  });
+
   it('a custom clip is added with add_clip and its props come from the component schema', async () => {
     const { session, run } = setup();
     await run(WRITE_COMPONENT, CHAT);

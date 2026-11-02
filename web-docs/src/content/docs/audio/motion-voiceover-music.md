@@ -24,4 +24,4 @@ Cost is the same as the canvas operations: [Text to speech](/audio/text-to-speec
 The motion agent has the same abilities:
 
 - `generate_voiceover`: `text`, `start` in seconds, optional `voice_id`.
-- `add_music`: a `mood` and optional `bpm`. It spans the whole video and its beats are marked for cutting to the beat. When the server has no ElevenLabs key, it picks a CC0 track from the built-in library instead.
+- `add_music`: a `mood` and optional `bpm`. It spans the whole video and its beats are marked for cutting to the beat. When the server has no ElevenLabs key, it picks a CC0 track from the built-in library instead. It works from the editor chat, the canvas chat and MCP alike, and needs a paid plan there.

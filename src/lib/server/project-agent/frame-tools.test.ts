@@ -64,6 +64,15 @@ describe('the canvas chat edits a frame with the same tools as the frame editor'
     expect(JSON.stringify((await head()).markers)).toContain('beat 1');
   });
 
+  it('through MCP a component is read by numbered lines and edited by line range', async () => {
+    const t = tools()[FRAME_TOOL];
+    await call(t, { tool: 'write_component', input: { name: 'Card', html: '<div class="c"></div>', css: '.c{inset:0}\n.c{opacity:1}', js: 'tl.from(root,{opacity:0,duration:0.5});', props_schema: { type: 'object', properties: {} } } });
+
+    expect(await call(t, { tool: 'read_component', input: { name: 'Card', file: 'css', offset: 2 } })).toMatchObject({ output: { text: '2\t.c{opacity:1}' } });
+    expect(await call(t, { tool: 'update_components', input: { component: 'Card', edits: [{ file: 'css', lines: [2, 2] }] } })).toMatchObject({ output: { ok: true } });
+    expect((await head()).components.Card.source.css).toBe('.c{inset:0}');
+  });
+
   it('node_id addresses a frame that is not open', async () => {
     const out = await call(tools({ open: null })[FRAME_TOOL], { node_id: NODE, tool: 'get_motion_doc', input: {} });
 
