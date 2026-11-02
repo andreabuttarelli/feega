@@ -16,6 +16,16 @@ vi.mock('$lib/server/canvas-catalogue', () => {
   return { canvasModelCatalogue: async () => ({ text: none, image: none, video: none, audio: none, model3d: none }) };
 });
 vi.mock('$lib/server/ai-models-sync', () => ({ modalitiesOf: async () => [] }));
+vi.mock('$lib/server/motion/selection-export-ports', async () => {
+  const { MotionFormat, newMotionDoc } = await import('@feega/motion-core/motion/doc');
+  return {
+    selectionPorts: () => ({
+      read: async () => ({ name: 'Frame', doc: newMotionDoc(MotionFormat.Square) }),
+      draw: async () => ({ bytes: Buffer.from('x'), skipped: [] }),
+      store: async () => ({ asset_id: 'asset', url: 'https://x/y' })
+    })
+  };
+});
 
 import { POST } from './+server';
 
@@ -325,5 +335,21 @@ describe('core usage from CLI and MCP', async () => {
     vi.unstubAllGlobals();
 
     expect(sent.find((b) => b.event === 'export_completed')?.properties).toMatchObject({ format: 'code', target: 'svelte' });
+  });
+});
+
+describe('image export from CLI and MCP', async () => {
+  const { useCoreSink } = await import('$lib/server/core-usage');
+
+  it('export_selection is export_completed as image, once per format exported', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db);
+    const sent: { event: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+
+    const { res } = await call({ project_id: PROJECT, op: 'export_selection', input: { frameIds: [NODE], rows: [{ format: 'svg', by: 'scale', value: 1 }, { format: 'svg', by: 'scale', value: 2, suffix: '@2x' }] } });
+    useCoreSink(null);
+
+    expect(res.status).toBe(200);
+    expect(sent.filter((b) => b.event === 'export_completed').map((b) => b.properties)).toEqual([{ format: 'image', target: 'svg', $process_person_profile: false, $geoip_disable: true, $ip: null }]);
   });
 });

@@ -2,6 +2,9 @@ import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
 import { isLocalMode } from '$lib/local-user';
+import { createServiceRoleDb } from '$lib/server/db/client';
+import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
+import { isInternalEmail } from '$lib/server/internal-users';
 import { LOCAL_MODE_EVENTS, ONCE_PER_FRAME, type CoreEvent, type CoreProps } from '$lib/core-usage';
 
 const CAPTURE_URL = 'https://eu.i.posthog.com/capture/';
@@ -50,11 +53,37 @@ export function postHogSink(e: Env = { ...env, ...publicEnv }, build: Build = de
   return (body) => post({ ...body, api_key: key });
 }
 
+export type InternalCheck = (userId: string) => Promise<boolean>;
+
+const PROFILE_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/core-usage.ts'));
+const internalById = new Map<string, Promise<boolean>>();
+
+async function profileIsInternal(userId: string): Promise<boolean> {
+  if (!PROFILE_USE) {
+    return true;
+  }
+
+  const { data } = await createServiceRoleDb(PROFILE_USE).from('profiles').select('email').eq('id', userId).maybeSingle();
+  return isInternalEmail((data as { email?: string } | null)?.email);
+}
+
+const internalUser: InternalCheck = (userId) => {
+  if (internalById.size >= SEEN_CAP) {
+    internalById.clear();
+  }
+
+  const known = internalById.get(userId) ?? profileIsInternal(userId).catch(() => true);
+  internalById.set(userId, known);
+  return known;
+};
+
 let sink: CoreSink | null | undefined;
+let internal: InternalCheck | null = null;
 const seen = new Set<string>();
 
-export function useCoreSink(next: CoreSink | null) {
+export function useCoreSink(next: CoreSink | null, check: InternalCheck | null = null) {
   sink = next;
+  internal = check;
   seen.clear();
 }
 
@@ -83,13 +112,19 @@ export function coreEvent<E extends CoreEvent>(userId: string | null | undefined
 
   if (sink === undefined) {
     sink = postHogSink();
+    internal = sink ? internalUser : null;
   }
 
   if (!sink || !firstTime(event, userId, props)) {
     return;
   }
 
-  try {
-    sink({ event, distinct_id: userId, properties: { ...props, ...personless } });
-  } catch {}
+  const send = sink;
+  const body = { event, distinct_id: userId, properties: { ...props, ...personless } };
+  if (!internal) {
+    send(body);
+    return;
+  }
+
+  void internal(userId).then((team) => !team && send(body)).catch(() => {});
 }

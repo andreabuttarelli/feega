@@ -94,6 +94,16 @@ describe('postHogSink', () => {
     expect(postHogSink({ PUBLIC_POSTHOG_KEY: 'phc_x', VERCEL_ENV: 'production' }, Build.Release)).not.toBeNull();
   });
 
+  it("l'azione di un utente interno non manda niente, come il track() del browser", async () => {
+    useCoreSink((b) => sent.push(b), async (userId) => userId === 'team-1');
+
+    coreEvent('team-1', CoreEvent.CanvasOpened, { canvas_id: 'c' });
+    coreEvent('u1', CoreEvent.CanvasOpened, { canvas_id: 'c' });
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(sent.map((b) => b.distinct_id)).toEqual(['u1']);
+  });
+
   it('senza utente non parte niente', () => {
     coreEvent(null, CoreEvent.CanvasOpened, { canvas_id: 'c' });
     expect(sent).toEqual([]);

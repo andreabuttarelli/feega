@@ -10,8 +10,9 @@ saved), so a failed or conflicting write is never counted.
 - `frame_edited` / `motion_edited`: once per user+frame(+kind) per server instance.
 - Local mode (`npx feega`): the launcher passes the anonymous install id to the app server, which
   sends only `frame_created` and `export_completed`; `FEEGA_TELEMETRY=0` / `DO_NOT_TRACK=1` stop it.
+- Team accounts (`isInternalEmail` on `profiles.email`, cached per user) send nothing, as in the browser.
 - Active user = `export_completed` in the week.
 
 Not covered yet: loop/workflow generations (`completeRun` in loop.ts/workflow.ts), browser-only
-exports, the internal-viewer opt-out (server events skip it), cookie consent (server events are
+exports, cookie consent (server events are
 personless product telemetry, not browser trackers).
