@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion, sendResultOf, inFlightWrites } from './node-save';
+import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion, sendResultOf, inFlightWrites, quietGone, NodePresence } from './node-save';
 import { SendResult } from './save-scheduler';
 
 describe('actAtVersion: an action on a node waits for my own writes and never conflicts with them', () => {
@@ -357,5 +357,19 @@ describe('sendResultOf: a queued edit is never dropped by a transient failure', 
 
   it.each([SaveFailure.Invalid, SaveFailure.Gone, SaveFailure.Credits, SaveFailure.Auth])('%s drops it', (reason) => {
     expect(sendResultOf(reason)).toBe(SendResult.Dropped);
+  });
+});
+
+describe('quietGone: a write racing a node this tab already removed stays silent', () => {
+  it('is quiet when the node is gone here too, like an image just moved into a frame', () => {
+    expect(quietGone(SaveFailure.Gone, NodePresence.Removed)).toBe(true);
+  });
+
+  it('still speaks when the node is on screen but the server lost it', () => {
+    expect(quietGone(SaveFailure.Gone, NodePresence.Shown)).toBe(false);
+  });
+
+  it('never hides another failure', () => {
+    expect(quietGone(SaveFailure.Server, NodePresence.Removed)).toBe(false);
   });
 });

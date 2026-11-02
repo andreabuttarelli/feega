@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameHolding, groupHolding } from './frame-holding';
+import { fileHolding, frameHolding, groupHolding } from './frame-holding';
 import { FrameKind, newMotionData } from './motion-node';
 
 const tile = (id: string, kind: FrameKind, x: number, y: number, w: number, h: number) => ({ id, type: 'motion', data: { ...newMotionData(), kind }, x, y, w, h });
@@ -38,5 +38,21 @@ describe('groupHolding', () => {
 
   it('an svg pasted on bare canvas has no frame', () => {
     expect(groupHolding([tile('f', FrameKind.Frame, 500, 500, 400, 300)], PATHS)).toBeNull();
+  });
+});
+
+describe('fileHolding', () => {
+  const FRAME = tile('f', FrameKind.Frame, 0, 0, 400, 200);
+
+  it('an image file dropped on a frame lands in it, where it was dropped', () => {
+    expect(fileHolding([FRAME], 'image/jpeg', { x: 100, y: 50 })).toEqual({ nodeId: 'f', at: { x: 0.25, y: 0.25 } });
+  });
+
+  it('an image file dropped on bare canvas has no frame', () => {
+    expect(fileHolding([FRAME], 'image/png', { x: 900, y: 900 })).toBeNull();
+  });
+
+  it('a file that is not a picture stays on the canvas', () => {
+    expect(fileHolding([FRAME], 'application/pdf', { x: 100, y: 50 })).toBeNull();
   });
 });

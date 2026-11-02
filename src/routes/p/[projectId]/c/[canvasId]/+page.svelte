@@ -57,7 +57,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { syncOf } from '$lib/canvas/sync-status';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, quietGone, NodePresence, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { Way, createUndoStack } from '$lib/canvas/undo-stack';
   import { exportFailure } from '$lib/canvas/export-failure';
   import { joinGestures, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
@@ -134,7 +134,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { CommentAction, commentOp, restoreThreads, runnable } from '$lib/canvas/comment-ops';
   import { OptimisticAction, Refresh, optimisticOp, refreshOf, requestOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
   import { replaySent, sentLog, type SentLog } from '$lib/canvas/sent-ops';
-  import { frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
+  import { fileHolding, frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, CopyShown, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
   import { feedImageSize, type FeedImageDrag } from '$lib/canvas/feed-image';
   import { feedImageHover } from '$lib/canvas/feed-image-hover.svelte';
@@ -2087,8 +2087,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     failed = saveMessage(reason, (detail ?? {}) as { message?: string });
   }
 
-  function report(action: string, result: ActionAnswer) {
-    if (saveBanner(action, result) === null) {
+  const presenceOf = (id: unknown): NodePresence =>
+    typeof id === 'string' && !nodes.some((node) => node.id === id) ? NodePresence.Removed : NodePresence.Shown;
+
+  function report(action: string, result: ActionAnswer, subject?: unknown) {
+    if (saveBanner(action, result) === null || quietGone(failureOf(result), presenceOf(subject))) {
       console.warn(`canvas read ${action} failed: ${failureOf(result)}`, result.data ?? result);
       return;
     }
@@ -2098,7 +2101,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   type Fields = Record<string, string | number | File | string[]>;
 
   function post(action: string, fields: Fields): Promise<Record<string, unknown> | null> {
-    return answered(action, () => send(action, fields));
+    return answered(action, () => send(action, fields), fields.node_id);
   }
 
   function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
@@ -2109,16 +2112,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       send: (version) => send(action, { ...fields, node_id: id, version }),
       reread: refresh
     });
-    return answered(action, () => asked).finally(() => release());
+    return answered(action, () => asked, id).finally(() => release());
   }
 
-  async function answered(action: string, ask: () => Promise<ActionAnswer>): Promise<Record<string, unknown> | null> {
+  async function answered(action: string, ask: () => Promise<ActionAnswer>, subject?: unknown): Promise<Record<string, unknown> | null> {
     const mutating = actionKind(action) === ActionKind.Write;
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
       const result = await ask();
       if (result.type !== 'success') {
-        report(action, result);
+        report(action, result, subject);
         return null;
       }
 
@@ -3106,7 +3109,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       failedIsCreditsExhausted = false;
       return out;
     }
-    announce('write', out.reason, out.detail);
+    if (!quietGone(out.reason, presenceOf(id))) {
+      announce('write', out.reason, out.detail);
+    }
     return out;
   }
 
@@ -4453,7 +4458,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onTileDrop={tileDrop}
     onElementOut={elementOut}
     onFlow={(fn) => (toFlow = fn)}
-    onUpload={upload}
+    onUpload={(file, at = { x: 0, y: 0 }) => upload(file, at, fileHolding(nodes, file.type, at))}
     onDuplicate={duplicate}
     onCopy={copy}
     onPaste={paste}

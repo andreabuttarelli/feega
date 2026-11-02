@@ -137,6 +137,7 @@
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { missingAssets } from '$lib/canvas/live-assets';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
   import { instanceOf } from '$lib/motion/main-component';
@@ -1430,12 +1431,16 @@
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(doc, statePreview.picksOf(nodeId)) }),
         recorded: () => {
           settle.edited(nodeId);
+          queueMicrotask(() => adoptAssets(nodeId));
           leaveHost(nodeId, session.history.present);
           queueMicrotask(() => settleHost(nodeId));
           autosize(nodeId);
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
-        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) }),
+        saved: () => {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) });
+          adoptAssets(nodeId);
+        },
         landed: (from, to) => {
           const step = stepOf(nodeId, from, to);
           if (step) {
@@ -1460,6 +1465,14 @@
     }
     savers.set(nodeId, session);
     return session;
+  }
+
+  function adoptAssets(nodeId: string) {
+    const live = liveOf(nodeId);
+    const added = live ? missingAssets(live.doc, live.assets, assetUrl) : null;
+    if (live && added) {
+      liveDocs.set(nodeId, { ...live, assets: { ...live.assets, ...added } });
+    }
   }
 
   const extras = new Map<string, FrameExtras>();
@@ -1779,19 +1792,21 @@
     if (!live) {
       const like = liveOf(held.like);
       holdLive(held.nodeId, { doc: held.doc, tokens: like?.tokens ?? heldTokens() ?? FEEGA_TOKENS, assets: like?.assets ?? {} }, saved);
+      adoptAssets(held.nodeId);
       return;
     }
     const session = saverOf(held.nodeId);
     const before = frameDocOf(held.nodeId) ?? live.doc;
-    session?.settleHeld(held.doc);
+    session?.adoptSaved(held.doc);
     session?.holdSave(saved);
-    liveDocs.set(held.nodeId, { ...live, doc: held.doc });
+    liveDocs.set(held.nodeId, { ...live, doc: held.doc, assets: { ...liveOf(held.like)?.assets, ...live.assets } });
+    adoptAssets(held.nodeId);
     void saved.then((landed) => {
       const now = liveOf(held.nodeId);
       if (landed || !now) {
         return;
       }
-      session?.settleHeld(before);
+      session?.adoptSaved(before);
       liveDocs.set(held.nodeId, { ...now, doc: before });
     });
   }
