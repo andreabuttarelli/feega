@@ -35,6 +35,8 @@ export function installId(home) {
   return id;
 }
 
+export const telemetryEnv = (home, env) => (isOptedOut(env) ? {} : { FEEGA_TELEMETRY_ID: installId(home), FEEGA_TELEMETRY_KEY: PUBLIC_KEY });
+
 export function buildEvent(event, id, info) {
   return {
     api_key: PUBLIC_KEY,

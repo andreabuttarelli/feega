@@ -1,4 +1,6 @@
 import type { Db } from '$lib/server/db/client';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, ExportKind } from '$lib/core-usage';
 import { findNode } from '$lib/server/repos/canvas';
 import { frameOf } from '$lib/canvas-node-data';
 import { exportFiles, npmVersion, type ExportResult } from './code-export';
@@ -13,7 +15,7 @@ const folderOf = (name: string | null | undefined) => (name ?? '').toLowerCase()
 
 export type NodeExport = (ExportResult & { ok: true; folder: string; framework: string; mode: ExportMode }) | { ok: false; error: string };
 
-export async function exportCodeNode(db: Db, input: { orgId: string; nodeId: string; mode: ExportMode }): Promise<NodeExport> {
+export async function exportCodeNode(db: Db, input: { orgId: string; userId: string; nodeId: string; mode: ExportMode }): Promise<NodeExport> {
   const row = await findNode(db, input);
   const frame = row ? frameOf(row) : null;
   const sourceRow = frame?.source === 'view' ? await findNode(db, { orgId: input.orgId, nodeId: frame.sourceNodeId }) : row;
@@ -23,5 +25,8 @@ export async function exportCodeNode(db: Db, input: { orgId: string; nodeId: str
   }
 
   const out = await exportFiles({ framework: code.framework, files: code.files, vars: code.vars }, input.mode, npmVersion);
+  if (out.ok) {
+    coreEvent(input.userId, CoreEvent.ExportCompleted, { format: ExportKind.Code, target: code.framework });
+  }
   return out.ok ? { ...out, folder: folderOf(sourceRow?.displayName), framework: code.framework, mode: input.mode } : out;
 }

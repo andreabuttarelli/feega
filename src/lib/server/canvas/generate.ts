@@ -8,7 +8,9 @@ import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 import { promptRequired, snapResolution, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { nearestVideoDuration, upscaleLimitsOf } from '$lib/video-models';
-import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
+import { findAsset, insertAsset, type Asset, type AssetType } from '$lib/server/repos/assets';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, GeneratedMedium } from '$lib/core-usage';
 import {
   AUDIO_JOB_PREFIX,
   claimRun,
@@ -138,6 +140,24 @@ async function depositImage(db: Db, input: StartRun, media: { storage_path?: str
   });
 }
 
+const MEDIUM_OF_ASSET: Partial<Record<AssetType, GeneratedMedium>> = {
+  image: GeneratedMedium.Image,
+  video: GeneratedMedium.Video,
+  audio: GeneratedMedium.Audio,
+  model3d: GeneratedMedium.Model3d,
+  text: GeneratedMedium.Text,
+  document: GeneratedMedium.Text
+};
+
+async function landRun(db: Db, run: NodeRun, asset: Asset, costUsd: number | null | undefined): Promise<void> {
+  await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: asset.id, costUsd });
+
+  const medium = MEDIUM_OF_ASSET[asset.type];
+  if (medium) {
+    coreEvent(run.actorId, CoreEvent.NodeGenerated, { medium });
+  }
+}
+
 async function depositVideo(
   db: Db,
   scope: { orgId: string; projectId: string; nodeId: string },
@@ -171,7 +191,7 @@ async function land(
   costUsd?: number | null,
   shownWith: Record<string, unknown> = {}
 ): Promise<RunOutcome> {
-  await completeRun(db, { orgId: input.orgId, runId: run.id, assetId: asset.id, costUsd });
+  await landRun(db, run, asset, costUsd);
 
   const shown = await showRunState(db, input, {
     running: false,
@@ -994,7 +1014,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
           { orgId: run.orgId, projectId: node.projectId, nodeId: run.nodeId },
           { url: settled.url, durationSeconds: settled.durationSeconds }
         );
-        await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: asset.id, costUsd: null });
+        await landRun(db, run, asset, null);
         await showRunState(db, startRunShape, { running: false, runId: run.id, refId: asset.id, error: null, outputUncensored: false });
         done += 1;
         continue;
@@ -1062,7 +1082,7 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
         { orgId: run.orgId, projectId: node.projectId, nodeId: run.nodeId },
         { url: outcome.url, durationSeconds: outcome.durationSeconds, aiMarked: outcome.aiMarked }
       );
-      await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: asset.id, costUsd });
+      await landRun(db, run, asset, costUsd);
       await showRunState(db, startRunShape, { running: false, runId: run.id, refId: asset.id, error: null, outputUncensored: false });
       done += 1;
     } catch (error) {
@@ -1129,7 +1149,7 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
         continue;
       }
 
-      await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
+      await landRun(db, run, progress.asset, progress.costUsd);
       await showRunState(db, shape, {
         running: false,
         runId: run.id,
@@ -1239,7 +1259,7 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
         continue;
       }
 
-      await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: progress.asset.id, costUsd: progress.costUsd });
+      await landRun(db, run, progress.asset, progress.costUsd);
       const poster = progress.poster ? { posterRefId: progress.poster.id } : {};
       const layerRefIds = progress.layers.length ? progress.layers.map((layer) => layer.id) : null;
       await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, layerRefIds, ...poster });

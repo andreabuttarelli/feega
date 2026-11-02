@@ -499,3 +499,33 @@ describe('importLottie action', () => {
     expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });
+
+describe('core usage: frame drawn or pasted on the canvas', async () => {
+  const { useCoreSink } = await import('$lib/server/core-usage');
+  const FIGMA = readFileSync(new URL('../../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
+
+  async function events(run: () => Promise<unknown>) {
+    const sent: { event: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+    await run();
+    useCoreSink(null);
+    return sent;
+  }
+
+  it('drawing a frame is frame_created once its first revision lands', async () => {
+    const sent = await events(() => actions.drawFrame(event({ box: JSON.stringify({ left: 0, top: 0, width: 400, height: 300 }) }) as never));
+
+    expect(sent.map((b) => b.event)).toEqual(['frame_created']);
+  });
+
+  it('a Figma paste is figma_pasted from the clipboard, plus the frame it made', async () => {
+    const sent = await events(() => actions.pasteFigma(event({ html: FIGMA, at: JSON.stringify({ x: 0, y: 0 }) }) as never));
+
+    expect(sent.map((b) => b.event)).toEqual(['frame_created', 'figma_pasted']);
+    expect(sent[1].properties.source).toBe('paste');
+  });
+
+  it('a paste with no Figma layers counts nothing', async () => {
+    expect(await events(() => actions.pasteFigma(event({ html: '<p>hi</p>', at: JSON.stringify({ x: 0, y: 0 }) }) as never))).toEqual([]);
+  });
+});

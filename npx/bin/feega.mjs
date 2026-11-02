@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import { sendTelemetry } from '../telemetry.mjs';
+import { sendTelemetry, telemetryEnv } from '../telemetry.mjs';
 import { MCP_ENTRY, USAGE, appDir, bundleSource, boundUrl, cachedVersions, freePort, isCached, latestAppVersion, markCached, mcpEnv, parseArgs, pickVersion } from '../launcher.mjs';
 
 const MIN_NODE_MAJOR = 22;
@@ -148,7 +148,7 @@ async function main() {
   console.log(`feega: open ${url}`);
 
   const nodeOptions = nodeMajor >= WEBSTORAGE_NODE_MAJOR ? '--no-experimental-webstorage' : '';
-  const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS, nodeOptions].filter(Boolean).join(' ') };
+  const env = { ...process.env, ...telemetryEnv(homedir(), process.env), NODE_OPTIONS: [process.env.NODE_OPTIONS, nodeOptions].filter(Boolean).join(' ') };
   const server = spawn(process.execPath, [realpathSync(join(dir, 'scripts/local.mjs')), file, `--port=${port}`], { stdio: 'inherit', env });
   forward(server);
 

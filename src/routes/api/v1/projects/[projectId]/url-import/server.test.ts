@@ -133,3 +133,19 @@ describe('POST /api/v1/projects/:id/url-import', () => {
     expect(body.error).toBe('busy');
   });
 });
+
+describe('url_imported', () => {
+  it("parte solo quando la pagina è atterrata sulla tela, per l'utente che l'ha importata", async () => {
+    const { useCoreSink } = await import('$lib/server/core-usage');
+    const sent: { event: string; distinct_id: string }[] = [];
+    useCoreSink((b) => sent.push(b));
+
+    importPageAt.mockResolvedValueOnce({ outcome: 'not_public' });
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-event-refused');
+    importPageAt.mockResolvedValueOnce({ outcome: 'ok', frameId: 'f1', name: 'Acme', undo: [], skipped: [], truncated: false });
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-event');
+    useCoreSink(null);
+
+    expect(sent).toMatchObject([{ event: 'url_imported', distinct_id: 'u-event', properties: { canvas_id: 'c1' } }]);
+  });
+});

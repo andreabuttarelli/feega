@@ -1,4 +1,6 @@
 import type { Db } from '$lib/server/db/client';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, FigmaSource } from '$lib/core-usage';
 import { importCanvasLink } from '$lib/server/canvas/upload';
 import { UPLOAD_MAX_BYTES } from '$lib/canvas/upload-kind';
 import { frameStore } from '$lib/server/motion/move-element';
@@ -44,7 +46,7 @@ export async function importFigmaInto(scope: FigmaScope, canvasId: string, ask: 
 
   const importUrl = async (url: string) => (await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.projectId, url, maxBytes: UPLOAD_MAX_BYTES.image })).asset.id;
 
-  return importFigmaFrames({
+  const imported = await importFigmaFrames({
     ...ask,
     store: frameStore(scope.db, { orgId: scope.orgId, actor: scope.actor, projectId: scope.projectId }),
     place: { projectId: scope.projectId, canvasId },
@@ -53,4 +55,8 @@ export async function importFigmaInto(scope: FigmaScope, canvasId: string, ask: 
     importUrl,
     newId: () => crypto.randomUUID().slice(0, 8)
   });
+  if (imported.outcome === FigmaOutcome.Ok) {
+    coreEvent(scope.userId, CoreEvent.FigmaPasted, { source: FigmaSource.Link });
+  }
+  return imported;
 }

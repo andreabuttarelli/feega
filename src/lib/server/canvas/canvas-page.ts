@@ -1,4 +1,6 @@
 import { componentsPage, homeComponents } from '$lib/server/canvas/components-page';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, FigmaSource, TemplateKind } from '$lib/core-usage';
 import { exportCodeNode, isExportMode } from '$lib/server/canvas/code-export-node';
 import { musicEnabled } from '$lib/server/elevenlabs-music';
 import { ExportMode } from '$lib/canvas/code-frame';
@@ -108,7 +110,7 @@ import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
-import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { ExportOutcome, exportSelection, noteImageExport } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { importLottieAt } from '$lib/server/motion/lottie-at';
@@ -270,6 +272,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
+  coreEvent(userId, CoreEvent.CanvasOpened, { canvas_id: canvasId });
   return {
     handoff,
     canvas,
@@ -953,7 +956,7 @@ export const actions: Actions<CanvasParams> = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
     const mode = fd.get('mode');
-    const out = await exportCodeNode(scope.db, { orgId: scope.orgId, nodeId: String(fd.get('node_id') ?? ''), mode: isExportMode(mode) ? mode : ExportMode.Inline });
+    const out = await exportCodeNode(scope.db, { orgId: scope.orgId, userId: scope.userId, nodeId: String(fd.get('node_id') ?? ''), mode: isExportMode(mode) ? mode : ExportMode.Inline });
     return out.ok ? { folder: out.folder, files: out.files } : fail(400, { error: out.error });
   },
 
@@ -1284,7 +1287,12 @@ export const actions: Actions<CanvasParams> = {
     if (out instanceof Error) {
       return fail(502, { error: `the images could not be drawn: ${out.message}` });
     }
-    return out.outcome === ExportOutcome.Done ? out : fail(404, { error: out.outcome });
+    if (out.outcome !== ExportOutcome.Done) {
+      return fail(404, { error: out.outcome });
+    }
+
+    noteImageExport(scope.userId, rows.data);
+    return out;
   },
 
   imageTool: async ({ request, params, locals }) => {
@@ -1556,6 +1564,8 @@ export const actions: Actions<CanvasParams> = {
     if (!pasted) {
       return fail(400, { error: 'no Figma layers in this paste' });
     }
+
+    coreEvent(scope.userId, CoreEvent.FigmaPasted, { source: FigmaSource.Paste });
     const nodes = await Promise.all(pasted.frameIds.map((nodeId) => findNode(scope.db, { orgId: scope.orgId, nodeId })));
     return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped, fills: pasted.fills, fileKey: pasted.fileKey };
   },
@@ -1884,6 +1894,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'unknown template' });
     }
 
+    coreEvent(scope.userId, CoreEvent.TemplateInserted, { kind: TemplateKind.Canvas, template_id: String(fd.get('template_id')) });
     return out;
   },
 

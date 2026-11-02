@@ -1,4 +1,6 @@
 import { componentsPage, homeComponents } from '$lib/server/canvas/components-page';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, TemplateKind } from '$lib/core-usage';
 import { exportCodeNode } from '$lib/server/canvas/code-export-node';
 import { listProjectComponents } from './project-components';
 import { ExportMode } from '$lib/canvas/code-frame';
@@ -58,7 +60,7 @@ import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { addComment, deleteComment, editComment, listComments, resolveThread, teammates } from '$lib/server/canvas/canvas-comments';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
-import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { ExportOutcome, exportSelection, noteImageExport } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
@@ -620,7 +622,7 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: exportCodeFrameInput,
     run: async (ctx, input) => {
-      const out = await exportCodeNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId, mode: input.mode ?? ExportMode.Inline });
+      const out = await exportCodeNode(ctx.db, { orgId: ctx.orgId, userId: ctx.userId, nodeId: input.nodeId, mode: input.mode ?? ExportMode.Inline });
       return out.ok ? { framework: out.framework, mode: out.mode, folder: out.folder, files: out.files } : { outcome: 'invalid', message: out.error };
     }
   }),
@@ -929,7 +931,12 @@ export const CANVAS_OPS = {
       }
       const targets = [...input.frameIds.map((nodeId) => ({ nodeId })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))];
       const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
-      return out.outcome === ExportOutcome.Done ? out : { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
+      if (out.outcome !== ExportOutcome.Done) {
+        return { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
+      }
+
+      noteImageExport(ctx.userId, input.rows);
+      return out;
     }
   }),
 
@@ -1575,7 +1582,12 @@ export const CANVAS_OPS = {
     input: insertTemplateInput,
     run: async (ctx, input) => {
       const out = await insertTemplate(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, templateId: input.templateId, at: { x: input.x, y: input.y }, actor: ctx.actor });
-      return out ?? { error: 'unknown_template' };
+      if (!out) {
+        return { error: 'unknown_template' };
+      }
+
+      coreEvent(ctx.userId, CoreEvent.TemplateInserted, { kind: TemplateKind.Canvas, template_id: input.templateId });
+      return out;
     }
   }),
 

@@ -9,6 +9,9 @@ import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
 import { callerMotionScope } from '$lib/server/motion/editor-scope';
 import { EDITOR_OPS, EditorAccess, runEditorOp, type EditorAnswer, type EditorOpName } from '$lib/server/frame-editor/editor-ops';
 import { MAX_BATCH_OPS, SPENDING_TOOLS, ToolRun, refusalOf, runMotionBatch, runMotionTool } from '$lib/server/motion/tool-run';
+import { activeTool } from '$lib/server/ai-log';
+import { coreEvent } from '$lib/server/core-usage';
+import { AgentVia, CoreEvent, landed } from '$lib/core-usage';
 
 export type Answer = { status: number; body: unknown };
 
@@ -20,6 +23,13 @@ const HTTP_CONFLICT = 409;
 const HTTP_UNPROCESSABLE = 422;
 
 export const BATCH = 'batch';
+
+function noted<A extends Answer>(caller: OrgCaller, op: string, answer: A): A {
+  if (answer.status === HTTP_OK && landed(answer.body)) {
+    coreEvent(caller.userId, CoreEvent.AgentAction, { via: activeTool() ? AgentVia.Mcp : AgentVia.Cli, op });
+  }
+  return answer;
+}
 
 const READ_ONLY_KEY: Answer = { status: HTTP_FORBIDDEN, body: { error: 'api_key_read_only' } };
 
@@ -57,7 +67,7 @@ export async function runCanvasOp(caller: OrgCaller, ask: CanvasAsk): Promise<An
   }
 
   const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId, agentKey: MCP_AGENT_KEY, sessionId: caller.sessionId });
-  return { status: HTTP_OK, body: await op.run(ctx, input.data as never) };
+  return noted(caller, ask.op, { status: HTTP_OK, body: await op.run(ctx, input.data as never) });
 }
 
 const STATUS_OF: Record<Exclude<ToolRun, ToolRun.Done>, number> = {
@@ -96,7 +106,7 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
     if (ran.outcome !== ToolRun.Done) {
       return { status: STATUS_OF[ran.outcome], body: { error: ran.outcome, ...ran, outcome: undefined } };
     }
-    return { status: HTTP_OK, body: { tool: BATCH, version: ran.version, saved: ran.saved, output: ran.output } };
+    return noted(caller, BATCH, { status: HTTP_OK, body: { tool: BATCH, version: ran.version, saved: ran.saved, output: ran.output } });
   }
 
   const denied = await gated([ask.tool]);
@@ -112,7 +122,7 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
   if (refused) {
     return { status: STATUS_OF[ToolRun.Refused], body: { error: ToolRun.Refused, detail: refused, output: run.output } };
   }
-  return { status: HTTP_OK, body: { tool: ask.tool, version: run.version, saved: run.saved, output: run.output } };
+  return noted(caller, ask.tool, { status: HTTP_OK, body: { tool: ask.tool, version: run.version, saved: run.saved, output: run.output } });
 }
 
 export type EditorAsk = { nodeId: string; op: EditorOpName; input: unknown };
@@ -132,5 +142,5 @@ export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promis
   }
 
   const gate = async (): Promise<EditorAnswer | null> => (await denial(caller)) as EditorAnswer | null;
-  return runEditorOp(ask.op, { ...scope, actor: agentActor(caller.userId, MCP_AGENT_KEY, caller.sessionId), gate }, input.data as never);
+  return noted(caller, ask.op, await runEditorOp(ask.op, { ...scope, actor: agentActor(caller.userId, MCP_AGENT_KEY, caller.sessionId), gate }, input.data as never));
 }

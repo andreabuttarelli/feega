@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { EVENT, NOTICE, buildEvent, installId, isOptedOut, sendTelemetry } from './telemetry.mjs';
+import { EVENT, NOTICE, buildEvent, installId, isOptedOut, sendTelemetry, telemetryEnv } from './telemetry.mjs';
 
 const info = { version: '1.2.3', platform: 'darwin', arch: 'arm64', node: '22.1.0' };
 const home = () => mkdtempSync(join(tmpdir(), 'feega-tel-'));
@@ -95,5 +95,19 @@ describe('avviso', () => {
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify).toHaveBeenCalledWith(NOTICE);
     expect(NOTICE).toContain('FEEGA_TELEMETRY=0');
+  });
+});
+
+describe('telemetryEnv', () => {
+  it("passa all'app l'id anonimo e la chiave, così export e frame arrivano da locale", () => {
+    const dir = home();
+    const passed = telemetryEnv(dir, {});
+    expect(passed.FEEGA_TELEMETRY_ID).toBe(installId(dir));
+    expect(passed.FEEGA_TELEMETRY_KEY).toMatch(/^phc_/);
+  });
+
+  it('con FEEGA_TELEMETRY=0 o DO_NOT_TRACK=1 non passa niente', () => {
+    expect(telemetryEnv(home(), { FEEGA_TELEMETRY: '0' })).toEqual({});
+    expect(telemetryEnv(home(), { DO_NOT_TRACK: '1' })).toEqual({});
   });
 });
