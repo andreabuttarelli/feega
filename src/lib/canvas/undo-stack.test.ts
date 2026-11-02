@@ -100,3 +100,30 @@ describe('createUndoStack: uno stack per scheda, undo e redo', async () => {
     expect(stack.canRedo()).toBe(false);
   });
 });
+
+describe('un gesto che scrive in più passi lascia una voce sola', () => {
+  it('quello che si spinge mentre lo stack tace non entra', async () => {
+    const stack = createUndoStack<string>();
+    stack.push('before');
+
+    await stack.muted(async () => {
+      stack.push('inner');
+      stack.pushPending(Promise.resolve('pending'));
+    });
+    stack.push('gesture');
+
+    expect(await stack.popUndo()).toBe('gesture');
+    expect(await stack.popUndo()).toBe('before');
+  });
+
+  it('torna a registrare anche quando il gesto fallisce', async () => {
+    const stack = createUndoStack<string>();
+
+    await stack.muted(async () => {
+      throw new Error('boom');
+    }).catch(() => undefined);
+    stack.push('after');
+
+    expect(await stack.popUndo()).toBe('after');
+  });
+});

@@ -25,6 +25,7 @@
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
   import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
+  import { tileFaded } from '$lib/canvas/tile-opacity';
   import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
@@ -839,15 +840,13 @@
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
   function hitAt(w: Point): Hit {
+    const unit = resizable ? resizeHandleAt(selectedBoxes[0], w, view.zoom) : null;
+    if (unit) {
+      return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
+    }
     const port = connectable ? portAt(ports, w, view.zoom) : null;
     if (port) {
       return { kind: HitKind.Port, nodeId: port.nodeId, handle: port.handle };
-    }
-    if (resizable) {
-      const unit = resizeHandleAt(selectedBoxes[0], w, view.zoom);
-      if (unit) {
-        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
-      }
     }
     const turnUnit = rotatable ? rotateZoneAt(rotatable, rotatable.rotation ?? 0, w, view.zoom) : null;
     if (rotatable && turnUnit) {
@@ -2726,11 +2725,8 @@
         props.onLive?.([]);
         snapGuides = [];
         const box = overrides.get(a.id);
-        if (box && (box.x !== a.box.x || box.y !== a.box.y)) {
-          props.onMove?.(a.id, box.x, box.y);
-        }
         if (box) {
-          props.onResize?.(a.id, box.w, box.h);
+          props.onResizeEnd?.(a.id, a.box, { x: box.x, y: box.y, w: box.w, h: box.h });
         }
         settleOverrides();
       },
@@ -3066,7 +3062,7 @@
   }
 
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
-    add: (c) => c.id === 'add' && addAtCentre(c.what),
+    opacity: (c) => c.id === 'opacity' && fadeTiles(selected, c.opacity),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
@@ -3122,6 +3118,15 @@
       untrack(() => runPaletteCommand(asked.command));
     }
   });
+
+  function fadeTiles(ids: readonly string[], opacity: number) {
+    for (const id of ids) {
+      const session = saverOf(id);
+      if (session) {
+        commit(id, tileFaded(session.history.present, opacity), `Opacity ${Math.round(opacity * 100)}%`);
+      }
+    }
+  }
 
   function runPaletteCommand(command: Command) {
     if (inside?.level.clip && picks.length && canRunInFrame(command)) {
