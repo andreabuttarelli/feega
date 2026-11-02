@@ -45,29 +45,33 @@
   </header>
   {#each guides as guide, i (i)}
     <div class="guide" data-testid="layout-guide">
-      <select aria-label="Grid kind" value={guide.kind} onchange={(e) => patch(i, { kind: e.currentTarget.value as GuideKind })}>
-        {#each KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
-      </select>
-      {#if guide.kind === GuideKind.Grid}
-        <input type="number" min="1" aria-label="Cell size" title="Cell size in px" value={guide.size} onchange={(e) => number(i, 'size', e.currentTarget.value)} />
-      {:else}
-        <input type="text" inputmode="numeric" aria-label="Count" title="Count, or auto" value={guide.count} onchange={(e) => count(i, e.currentTarget.value)} />
-        <input type="number" min="0" aria-label="Gutter" title="Gutter in px" value={guide.gutter} onchange={(e) => number(i, 'gutter', e.currentTarget.value)} />
-        <select aria-label="Alignment" value={guide.align} onchange={(e) => patch(i, { align: e.currentTarget.value as GuideAlign })}>
-          {#each ALIGNS as align (align)}<option value={align}>{align}</option>{/each}
+      <label class="field"><span>Type</span>
+        <select aria-label="Grid kind" value={guide.kind} onchange={(e) => patch(i, { kind: e.currentTarget.value as GuideKind })}>
+          {#each KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
         </select>
+      </label>
+      {#if guide.kind === GuideKind.Grid}
+        <label class="field"><span>Size</span><input type="number" min="1" aria-label="Cell size" title="Cell size in px" value={guide.size} onchange={(e) => number(i, 'size', e.currentTarget.value)} /></label>
+      {:else}
+        <label class="field"><span>Count</span><input type="text" inputmode="numeric" aria-label="Count" title="Count, or auto" value={guide.count} onchange={(e) => count(i, e.currentTarget.value)} /></label>
+        <label class="field"><span>Gutter</span><input type="number" min="0" aria-label="Gutter" title="Gutter in px" value={guide.gutter} onchange={(e) => number(i, 'gutter', e.currentTarget.value)} /></label>
+        <label class="field"><span>Align</span>
+          <select aria-label="Alignment" value={guide.align} onchange={(e) => patch(i, { align: e.currentTarget.value as GuideAlign })}>
+            {#each ALIGNS as align (align)}<option value={align}>{align}</option>{/each}
+          </select>
+        </label>
         {#if guide.align === GuideAlign.Stretch}
-          <input type="number" min="0" aria-label="Margin" title="Margin in px" value={guide.margin} onchange={(e) => number(i, 'margin', e.currentTarget.value)} />
+          <label class="field"><span>Margin</span><input type="number" min="0" aria-label="Margin" title="Margin in px" value={guide.margin} onchange={(e) => number(i, 'margin', e.currentTarget.value)} /></label>
         {:else}
-          <input type="number" min="1" aria-label="Section size" title="Section size in px" value={guide.size} onchange={(e) => number(i, 'size', e.currentTarget.value)} />
+          <label class="field"><span>Size</span><input type="number" min="1" aria-label="Section size" title="Section size in px" value={guide.size} onchange={(e) => number(i, 'size', e.currentTarget.value)} /></label>
           {#if guide.align !== GuideAlign.Center}
-            <input type="number" min="0" aria-label="Offset" title="Offset in px" value={guide.offset} onchange={(e) => number(i, 'offset', e.currentTarget.value)} />
+            <label class="field"><span>Offset</span><input type="number" min="0" aria-label="Offset" title="Offset in px" value={guide.offset} onchange={(e) => number(i, 'offset', e.currentTarget.value)} /></label>
           {/if}
         {/if}
       {/if}
-      <ColorField name="Guide colour" display={ColourDisplay.Chip} value={guide.color} onchange={(v) => patch(i, { color: v })} />
-      <input type="number" min="0" max="100" step="5" aria-label="Guide opacity" title="Opacity %" value={Math.round(guide.opacity * 100)} onchange={(e) => patch(i, { opacity: Math.min(1, Math.max(0, Number(e.currentTarget.value) / 100)) })} />
-      <label class="toggle" title="Show this grid"><input type="checkbox" checked={!guide.hidden} onchange={(e) => patch(i, { hidden: !e.currentTarget.checked })} /></label>
+      <div class="field"><span>Colour</span><ColorField name="Guide colour" display={ColourDisplay.Chip} value={guide.color} onchange={(v) => patch(i, { color: v })} /></div>
+      <label class="field"><span>Opacity</span><input type="number" min="0" max="100" step="5" aria-label="Guide opacity" title="Opacity %" value={Math.round(guide.opacity * 100)} onchange={(e) => patch(i, { opacity: Math.min(1, Math.max(0, Number(e.currentTarget.value) / 100)) })} /></label>
+      <label class="field toggle" title="Show this grid"><span>Show</span><input type="checkbox" checked={!guide.hidden} onchange={(e) => patch(i, { hidden: !e.currentTarget.checked })} /></label>
       <button type="button" class="remove" aria-label="Remove grid" onclick={() => write(guides.filter((_, j) => j !== i), 'Removed a layout grid')}>Remove</button>
     </div>
   {/each}
@@ -91,8 +95,19 @@
   .guide {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-    align-items: center;
+    gap: 6px 4px;
+    align-items: end;
+  }
+
+  .field {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .field > span {
+    font-size: 10px;
+    color: var(--ui-text-3);
   }
 
   select,
@@ -129,6 +144,8 @@
 
 
   .toggle input {
+    height: 28px;
     margin: 0;
+    justify-self: start;
   }
 </style>
