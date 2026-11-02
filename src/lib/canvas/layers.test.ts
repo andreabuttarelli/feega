@@ -129,6 +129,21 @@ describe('layer rows', () => {
     ]);
   });
 
+  it('a free stack highlights only its text while the text is picked', () => {
+    const doc = stackedText();
+    const rows = layerRows([{ id: 'e1', type: 'motion', name: 'Stack', element: true, glyph: LayoutKind.Stack }], { nodeId: 'e1', doc }, { e1: frameRows(doc, 'e1') });
+
+    expect(rows.filter((r) => rowPicked(r, { canvas: ['e1'], video: { nodeId: 'e1', selection: ['t'], part: null } })).map((r) => r.id)).toEqual(['t']);
+  });
+
+  it('a free stack highlights only its own row while the stack is picked', () => {
+    const doc = stackedText();
+    const rows = layerRows([{ id: 'e1', type: 'motion', name: 'Stack', element: true, glyph: LayoutKind.Stack }], { nodeId: 'e1', doc }, { e1: frameRows(doc, 'e1') });
+
+    expect(rows.filter((r) => rowPicked(r, { canvas: ['e1'], video: { nodeId: 'e1', selection: ['st'], part: null } })).map((r) => r.id)).toEqual(['e1']);
+    expect(rows[0].own).toBe('st');
+  });
+
   it('picks the one element row while its shape is selected inside it', () => {
     const doc = video();
     const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], { nodeId: 'e1', doc });

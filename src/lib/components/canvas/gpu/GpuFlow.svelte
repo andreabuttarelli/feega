@@ -82,7 +82,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Press, Reach, childBelow, pressOn, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Press, Reach, Root, childBelow, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
@@ -1250,7 +1250,7 @@
 
   function groupOfPick(nodeId: string): string | null {
     const live = liveOf(nodeId);
-    return live ? parentPick(live.doc, picks[0]) : null;
+    return live ? parentPick(live.doc, picks[0], frameChrome(kindOfNode(nodeId)).root) : null;
   }
 
   function pickElement(e: PointerEvent, w: Point): boolean {
@@ -1274,7 +1274,7 @@
     if (!nodeId || !live || !picks.length) {
       return;
     }
-    if (frameChrome(kindOfNode(nodeId)).selectsOwnClip && stacksWholeElement(id, live.doc, picks)) {
+    if (frameChrome(kindOfNode(nodeId)).root === Root.Own && stacksWholeElement(id, live.doc, picks)) {
       props.onWrapStack?.([nodeId]);
       return;
     }
@@ -1333,6 +1333,11 @@
 
   let ownPicked: string | null = null;
 
+  function ownOf(nodeId: string): string | null {
+    const doc = liveOf(nodeId)?.doc;
+    return doc && frameChrome(kindOfNode(nodeId)).root === Root.Own ? ownClipOf(doc) : null;
+  }
+
   $effect(() => {
     const only = selected.length === 1 ? selected[0] : null;
     if (only && coreFrames.some((f) => f.id === only)) {
@@ -1340,7 +1345,7 @@
         inside = { nodeId: only, level: frameLevel() };
         picks = [];
       }
-      const own = ownClipToPick(ownPicked, only, frameChrome(kindOfNode(only)).selectsOwnClip ? liveOf(only)?.doc.tracks[0]?.clips[0]?.id : null);
+      const own = ownClipToPick(ownPicked, only, ownOf(only));
       if (own) {
         ownPicked = only;
         untrack(() => goInside(only, Gesture.Click, own));
@@ -1555,7 +1560,7 @@
   }
 
   $effect(() => {
-    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
+    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).root === Root.Own ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
     layersSource.setDocs(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   });
 
@@ -3124,7 +3129,7 @@
     return Boolean(spec.chrome && !frameDialog && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
   }
 
-  const framePicks = (): string[] => (inside && picks.length && !frameChrome(kindOfNode(inside.nodeId)).selectsOwnClip ? picks : []);
+  const framePicks = (): string[] => (inside && picks.length && frameChrome(kindOfNode(inside.nodeId)).root !== Root.Own ? picks : []);
 
   function clipOfSelection(): ClipboardPayload | null {
     const tools = inside && framePicks().length ? toolsOf(inside.nodeId) : null;
@@ -3337,7 +3342,7 @@
     reframe: (ids) => props.onReframe?.(ids[0]),
     'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
     'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
-    export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
+    export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && frameChrome(kindOfNode(ids[0])).root !== Root.Own ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     'frame-history': (ids) => historyPanel.show(ids[0]),
     delete: (ids) => props.onDelete?.(ids)
   };
