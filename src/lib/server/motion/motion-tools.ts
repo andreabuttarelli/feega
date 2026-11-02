@@ -1202,7 +1202,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     duplicate_clip: tool({
-      description: 'Duplicate clips, like the editor Duplicate: each copy starts where its original ends, on the same track. Returns the copy ids.',
+      description: 'Duplicate clips, like the editor Duplicate: each copy starts where its original ends, on the same track; a copy of a stack child instead stays at the same time, right after it in the stack. Returns the copy ids.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
       execute: async (input) => {
         const done = runClipOp(ClipOp.Duplicate, { doc: session.doc, selection: input.clip_ids, frame: 0, parent: null, newId: deps.newId });

@@ -1,6 +1,7 @@
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { setParent } from './parent-ops';
-import { duplicateClip, removeClips, splitClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { duplicateLayer } from './layout/ops';
+import { removeClips, splitClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum ClipOp {
   Split = 'split',
@@ -36,7 +37,7 @@ function duplicate(ctx: ClipCtx): ClipDone {
   const copies: string[] = [];
   const result = eachSelected(ctx, (doc, id) => {
     const copy = ctx.newId();
-    const made = duplicateClip(doc, id, copy);
+    const made = duplicateLayer(doc, id, copy);
     if (made.ok) {
       copies.push(copy);
     }

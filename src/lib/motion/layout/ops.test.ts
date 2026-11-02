@@ -6,6 +6,7 @@ import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core
 import { laidClip, setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
+import { ClipOp, runClipOp } from '../clip-ops';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -360,5 +361,26 @@ describe('a stack child as a flex item', () => {
     const later = must(stepInStack(stacked, 'a', 1));
     expect(clip(later, 'box').autoLayout?.order).toEqual(['b', 'a']);
     expect(stepInStack(later, 'a', 1).ok).toBe(false);
+  });
+});
+
+describe('duplicating a stack child', () => {
+  const stacked = must(wrapInStack(row, ['a', 'b'], 'box', 'lane'));
+  const duplicated = runClipOp(ClipOp.Duplicate, { doc: stacked, selection: ['a'], frame: 0, parent: null, newId: () => 'a2' });
+  const doc = duplicated.ok ? duplicated.doc : stacked;
+  const laid = withAutoLayout(doc);
+
+  it('shows the copy at the same time, right after the original in the stack', () => {
+    expect(clip(doc, 'a2').from).toBe(clip(doc, 'a').from);
+    expect(clip(doc, 'box').autoLayout?.order).toEqual(['a', 'a2', 'b']);
+  });
+
+  it('lays the copy out and grows the hugging stack', () => {
+    expect(clip(laid, 'a2').props.x).not.toBe(clip(laid, 'a').props.x);
+    expect(Number(clip(laid, 'box').props.width)).toBeGreaterThan(Number(clip(withAutoLayout(stacked), 'box').props.width));
+  });
+
+  it('keeps the video length', () => {
+    expect(doc.durationInFrames).toBe(stacked.durationInFrames);
   });
 });

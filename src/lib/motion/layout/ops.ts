@@ -1,9 +1,9 @@
 import { TrackKind } from '@feega/motion-core/motion/components';
-import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { cloneDoc, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { pivotBox } from '@feega/motion-core/motion/parent';
 import { KeepWorld, setParent } from '../parent-ops';
 import { layerOrder } from '../siblings';
-import { addClip, moveClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, duplicateClip, moveClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import type { SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
 import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
@@ -147,6 +147,19 @@ export function reorderChild(doc: MotionDoc, containerId: string, childId: strin
   const rest = ids.filter((id) => id !== childId);
   const at = Math.min(Math.max(0, index), rest.length);
   return setAutoLayout(doc, containerId, { order: [...rest.slice(0, at), childId, ...rest.slice(at)] });
+}
+
+export function duplicateLayer(doc: MotionDoc, clipId: string, newId: string): OpResult {
+  const found = findClip(doc, clipId);
+  const parent = found ? layoutParent(doc, found.clip) : null;
+  if (!found || !parent) {
+    return duplicateClip(doc, clipId, newId);
+  }
+
+  const copy = { ...cloneDoc(found.clip), id: newId };
+  const added = { ...doc, tracks: doc.tracks.map((t) => (t.id === found.track.id ? { ...t, clips: [...t.clips, copy] } : t)) };
+  const ids = childrenInOrder(added.tracks.flatMap((t) => t.clips as MotionClip[]), parent).map((c) => c.id);
+  return reorderChild(added, parent.id, newId, ids.indexOf(clipId) + 1);
 }
 
 export function leaveStack(doc: MotionDoc, clipId: string): OpResult {
