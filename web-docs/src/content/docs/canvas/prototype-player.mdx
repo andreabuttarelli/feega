@@ -31,6 +31,9 @@ Clicking an empty spot flashes the linked areas. **Restart** (or `R`) goes back 
 | Navigate to, Scroll to | the target frame replaces the current one |
 | Open overlay | the target frame opens centred over the current one; click outside it to close |
 | Back | closes the top overlay, otherwise returns to the previous frame, with the transition reversed |
+| Change to | the instance around the layer switches to that variant, in place; the rest of the frame reflows around it. While hovering switches back when the pointer leaves |
+
+Element states play too: a layer with a Hover or Pressed state, inside a group or a component instance, changes while the pointer is over it or presses it.
 
 Dissolve, Slide in and Push use the easing and duration set on the link.
 
@@ -60,7 +63,8 @@ feega motion play <nodeId>
 
 ## Limits
 
-- Hovering opens the target on pointer enter; moving off the layer does not undo it, use a Back link.
+- Hovering opens the target on pointer enter; moving off the layer does not undo it, use a Back link (a Change to link does switch back).
+- A frame taller or wider than 8192 px plays with the HTML renderer.
 - Scroll to behaves like Navigate to: it moves to the target frame, it does not scroll inside a frame.
 - Frames are played at their first frame with the animation looping; layers are located where they sit at the start.
 - A public link shows only frames that are published; uncensored projects cannot be shared.

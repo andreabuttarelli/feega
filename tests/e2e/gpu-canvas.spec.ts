@@ -11,7 +11,7 @@ type Box = { x: number; y: number; w: number; h: number };
 
 async function open(page: Page, s: E2eSession) {
   await gotoHydrated(page, `/p/${s.projectId}/c/${s.canvasId}?renderer=${RENDERER}`);
-  await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('core-canvas')).toBeVisible({ timeout: 30_000 });
   await expect.poll(async () => (await page.locator('[data-canvas-surface]').getAttribute('data-renderer')) !== 'pending').toBe(true);
 }
 

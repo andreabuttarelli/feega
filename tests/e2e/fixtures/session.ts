@@ -310,11 +310,18 @@ export async function skipTour(page: Page): Promise<void> {
   }, TOUR_SEEN_KEY);
 }
 
+const COOKIE_BANNER_WAIT_MS = 1_500;
+
+export async function dismissCookieBanner(page: Page): Promise<void> {
+  await page.getByTestId('cookie-reject').click({ timeout: COOKIE_BANNER_WAIT_MS }).catch(() => undefined);
+}
+
 export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 'password'>, tour: E2eTour = E2eTour.Seen): Promise<void> {
   if (tour === E2eTour.Seen) {
     await skipTour(page);
   }
   await gotoHydrated(page, '/login');
+  await dismissCookieBanner(page);
   await page.getByPlaceholder('you@yourbrand.com').fill(session.email);
   await page.locator('input[type="password"]').fill(session.password);
 

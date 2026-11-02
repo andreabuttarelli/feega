@@ -2,6 +2,7 @@ import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type Mo
 import type { CanvasSize, OpResult } from '@feega/motion-core/motion/timeline';
 import { Horizontal, Vertical, resizeFrame } from './constraints/constraints';
 import { keepTextSize } from './text-fit';
+import { heldPixels } from '@feega/motion-core/motion/breakpoints/model';
 
 const evenSide = (n: number) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(n / 2) * 2));
 
@@ -37,8 +38,13 @@ const fittedWith = (doc: MotionDoc, node: CanvasSize, pinning: MotionClip['const
   return sized.ok ? { ok: true, doc: withConstraintsOf(sized.doc, (c) => own.get(c.id)) } : sized;
 };
 
+const constrainedFit = (doc: MotionDoc, node: CanvasSize): OpResult => {
+  const sized = resizeFrame(doc, customSize(node, doc));
+  return sized.ok && doc.still ? { ok: true, doc: heldPixels(sized.doc, doc) } : sized;
+};
+
 const FIT_BY_MODE: Record<ResizeMode, (doc: MotionDoc, node: CanvasSize) => OpResult> = {
-  [ResizeMode.Constrained]: (doc, node) => resizeFrame(doc, customSize(node, doc)),
+  [ResizeMode.Constrained]: constrainedFit,
   [ResizeMode.Ignored]: (doc, node) => fittedWith(doc, node, STAYS_PUT),
   [ResizeMode.Element]: (doc, node) => fitElementToNode(keepTextSize(doc, doc, customSize(node, doc)), node)
 };

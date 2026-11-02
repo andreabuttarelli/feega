@@ -68,6 +68,23 @@ function outlinePoints(base: KitFont, id: number, processor: Processor | null): 
   );
 }
 
+function advanceShift(base: KitFont, id: number, processor: Processor): number {
+  const raw = base.getGlyph(id)._decode();
+  const own = !raw ? [] : raw.numberOfContours > 0 ? (raw.points ?? []) : (raw.components ?? []).map((c) => point(c.dx, c.dy, true, true));
+  const all = [...own.map((p) => p.copy()), ...Array.from({ length: PHANTOMS }, () => point(0, 0, false, true))];
+  processor.transformPoints(id, all);
+  const [left, right] = all.slice(-PHANTOMS);
+  return right.x - left.x;
+}
+
+function advanceShifts(base: KitFont, processor: Processor | null): (id: number) => number {
+  if (!processor || !base.directory.tables.glyf || base.directory.tables.HVAR) {
+    return () => 0;
+  }
+  const known = new Map<number, number>();
+  return (id) => known.get(id) ?? known.set(id, advanceShift(base, id, processor)).get(id)!;
+}
+
 function metricsOf(font: KitFont): { ascent: number; descent: number; lineGap: number } {
   const os2 = font['OS/2'];
   return os2?.fsSelection.useTypoMetrics ? { ascent: os2.typoAscender, descent: -os2.typoDescender, lineGap: os2.typoLineGap } : { ascent: font.ascent, descent: -font.descent, lineGap: font.lineGap };
@@ -90,12 +107,13 @@ function instance(base: KitFont, axes: Axes, coords: Record<string, number>): Ki
 function faceOf(base: KitFont, inst: KitFont): Face {
   const glyf = Boolean(base.directory.tables.glyf);
   const processor = Object.keys(axesOf(base)).length ? inst._variationProcessor : null;
+  const shift = advanceShifts(base, processor);
   return {
     unitsPerEm: base.unitsPerEm,
     ...metricsOf(base),
     shape: memoShape((text, ligatures, features = {}): Shaped[] => {
       const run = inst.layout(text, { ...FEATURES[ligatures], ...features });
-      return run.glyphs.map((g, i) => ({ glyph: g.id, advance: run.positions[i].xAdvance, dx: run.positions[i].xOffset, dy: run.positions[i].yOffset, chars: Math.max(1, g.codePoints.length) }));
+      return run.glyphs.map((g, i) => ({ glyph: g.id, advance: run.positions[i].xAdvance + shift(g.id), dx: run.positions[i].xOffset, dy: run.positions[i].yOffset, chars: Math.max(1, g.codePoints.length) }));
     }),
     outline: memoOutline((glyph): Command[] => (glyf ? quadraticPath(outlinePoints(base, glyph, processor)) : inst.getGlyph(glyph).path.commands.map((c) => ({ op: KIT_OP[c.command], at: c.args }))))
   };

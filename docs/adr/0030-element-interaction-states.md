@@ -55,3 +55,24 @@ framer.com/learn/component-variants; framer.com/motion/transition and /gestures.
 - Figma's variant-per-state: a hover on a single button would copy the whole component.
 - Spring transitions: the house eases cover the cases; a spring is a new row in the ease table
   when needed.
+
+## Amendment 2026-11-01: change to variant
+
+Imported pages bring accordions, tabs, switches and menus, which change structure, not just a
+colour: a row of overrides cannot open an FAQ answer. They need Figma's interactive components.
+
+- `ActionKind.ChangeTo` (`change_to`) carries `variant` (`{ property: value }`) and no target.
+  It changes the nearest component instance around the layer whose set has that variant
+  (`changeTo` in `src/lib/motion/prototype/variant-change.ts`); inner layers keep their own
+  links, so each variant of a main says where its triggers lead, as in Figma.
+- The player keeps the swap as view state, never saved, and finds each spot by the precomp path
+  down to the layer (`pathRect`), so two instances of one main are two spots. A While hovering
+  link swaps back on leave.
+- URL import builds one set per part with a variant per state (default = the state the page was
+  in); the part's triggers carry the links.
+- Element states now also play inside groups and instances: an instance whose main has its own
+  Hover row shows that main drawn hovered (`withStatedComps`), a set with `State=Hover` swaps.
+  A `fill` row on a text writes its `color`, as the export already did.
+- Discarded: a toggle action (one link that flips between two variants), which cannot say which
+  of N tabs to show and which Figma does not have; a page-level link naming a variant comp id,
+  which breaks when the set is edited.

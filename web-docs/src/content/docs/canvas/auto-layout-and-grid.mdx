@@ -7,11 +7,13 @@ sidebar:
 
 import DemoVideo from '../../../components/DemoVideo.astro';
 
+<DemoVideo name="wrap-with-stack" caption="Select a title, a text and a pill button, wrap them with ⇧A, turn the stack into a row, set gap, width and alignment, give the text Fill ×2 and the button Fill ×1, then drag the button to the front." />
+
 A **Stack** is an element that lays its children out in a row or a column, like a flexbox `div`. It works inside a frame and free on the canvas. A Stack is the container clip with auto layout, read as a kind; every auto layout made before is a Stack ([ADR 0027](/architecture/adr/0027-stack-is-the-auto-layout-container/), [ADR 0008](/architecture/adr/0008-auto-layout-is-resolved-at-render/)).
 
 ## Wrap with stack
 
-1. Select one or more elements: a text, a shape, an image, inside a frame or free on the canvas.
+1. Select one or more elements: a text, a shape, an image, a component instance, inside a frame or free on the canvas.
 2. Press `Shift+A`, or pick **Wrap with stack** from any of these:
    - right-click on the element on the canvas;
    - right-click on its row in **Layers**;
@@ -30,9 +32,9 @@ Select a Stack and the right bar shows **Stack** under **Layout**, above the sha
 - **Direction**: horizontal, vertical, wrap, or grid.
 - **Align**: a 3×3 grid sets the main and cross alignment at once.
 - **Distribute**: stretch children across the cross axis, align text baselines (rows), space between, around or evenly.
-- **Gap**, and the gap between lines when the Stack wraps.
+- **Gap**, and the gap between lines when the Stack wraps. On the canvas, drag the small handle in the middle of a gap or padding to change it; a click elsewhere in the gap does nothing.
 - **Padding**: one value, or CSS shorthand `8`, `8 16`, `8 16 24`, `8 16 24 32`, or per side.
-- **Width / Height**: fixed or fit (hug); a child can also fill.
+- **Width / Height**: fixed or fit (hug); a child can also fill. A typed width or height keeps the Stack's left and top edges where they are. The **Layout** fields show the size the Stack resolves to, not the one it had before Hug or Fill.
 - **First on top** and **Strokes included**.
 
 ## Stack children are flex items
@@ -49,7 +51,7 @@ The Stack places its children, like flexbox. Select a child and the right bar dr
 - **Absolute position**: takes the child out of the flow (Figma's *ignore auto layout*). X and Y come back, measured from the Stack's top-left corner.
 - **Move earlier / later** and **Take out of the stack**.
 
-On the canvas, dragging a child reorders it: a line shows where it lands between its siblings. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it.
+On the canvas, dragging a child reorders it: a line shows where it lands between its siblings. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it. In **Layers**, dragging a child above or below another reorders it in that Stack, or moves it into the Stack of the row it lands on.
 
 Fills, per-side strokes, corner radius, opacity, blend, shadows, blur and clip content are the usual sections.
 

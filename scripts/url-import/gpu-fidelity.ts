@@ -6,10 +6,14 @@ import { build } from 'vite';
 import sharp from 'sharp';
 import { chromium } from 'playwright';
 import base from '../vite-node.config';
+import { resolveView } from '@feega/motion-core/motion/breakpoints/view';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { imagesFilled } from '$lib/canvas/figma/images';
 import type { PageTree } from '$lib/server/url-import/page-tree';
+import { PAGE_VIEWS, type PageView, type ViewRead } from '$lib/server/url-import/page-views';
 import { capturedIn, scoredIn } from '$lib/server/url-import/fidelity-pages';
-import { band, FOLD, plannedPage, scores, sideBySide } from '$lib/server/url-import/fidelity-score';
+import { band, FOLD, harnessShape, plannedPage, scores, sideBySide } from '$lib/server/url-import/fidelity-score';
+import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { GpuBackend, type WorldInput, type WorldResult } from './gpu-world';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -28,6 +32,7 @@ const captured = capturedIn(process.env.URL_IMPORT_CAPTURED ?? label);
 const only = process.env.URL_IMPORT_ONLY?.split(',');
 const backend = (process.env.URL_IMPORT_GPU_BACKEND ?? GpuBackend.WebGpu) as GpuBackend;
 const headed = process.env.URL_IMPORT_GPU_HEADED === '1';
+const smoothing = (process.env.URL_IMPORT_GPU_SMOOTHING ?? Smoothing.Plain) as Smoothing;
 
 if (!label || !existsSync(captured)) {
   throw new Error(`no capture at ${captured}: set URL_IMPORT_GPU=<label> (and URL_IMPORT_CAPTURED=<capture label>)`);
@@ -85,11 +90,23 @@ function serve(script: string): Promise<{ url: string; origin: string; close: ()
   );
 }
 
-async function stitched(result: WorldResult, height: number): Promise<Buffer> {
+async function stitched(result: WorldResult, width: number, height: number): Promise<Buffer> {
   const parts = result.bands.map((b64, i) => ({ input: Buffer.from(b64, 'base64'), top: i * FOLD.height, left: 0 }));
-  const whole = await sharp({ create: { width: FOLD.width, height: parts.length * FOLD.height, channels: 3, background: WHITE } }).composite(parts).png().toBuffer();
-  return sharp(whole).extract({ left: 0, top: 0, width: FOLD.width, height }).png().toBuffer();
+  const whole = await sharp({ create: { width, height: parts.length * FOLD.height, channels: 3, background: WHITE } }).composite(parts).png().toBuffer();
+  return sharp(whole).extract({ left: 0, top: 0, width, height }).png().toBuffer();
 }
+
+const viewsOf = (name: string): ViewRead[] => PAGE_VIEWS.flatMap((view) => (existsSync(join(captured, `${name}@${view.width}.json`)) ? [{ view, tree: JSON.parse(readFileSync(join(captured, `${name}@${view.width}.json`), 'utf8')) as PageTree }] : []));
+
+const placedItems = (docs: { doc: MotionDoc; width: number; height: number }[]) => {
+  let top = 0;
+  const items = docs.map((d) => {
+    const placed = { doc: d.doc as unknown, top, width: d.width, height: d.height };
+    top += d.height;
+    return placed;
+  });
+  return { items, height: top };
+};
 
 const htmlScore = (out: string, name: string): { fold?: number; full?: number } => {
   const file = join(out, `${name}-score.json`);
@@ -122,30 +139,42 @@ await page.goto(server.url);
 
 const out = scoredIn(label);
 mkdirSync(out, { recursive: true });
-const names = readdirSync(captured).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, '')).filter((n) => !only || only.includes(n));
+const names = readdirSync(captured).filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, '')).filter((n) => !n.includes('@') && (!only || only.includes(n)));
 const rows: string[] = [];
-for (const name of names) {
-  const tree = JSON.parse(readFileSync(join(captured, `${name}.json`), 'utf8')) as PageTree;
-  const { made, assetOf, assets } = await plannedPage(tree);
-  const local = Object.fromEntries(await Promise.all(Object.entries(assets).map(async ([id, url]) => [id, await served(url, tree.url)] as const)).then((all) => all.map(([id, url]) => [id, url.startsWith('/') ? `${server.origin}${url}` : url])));
-  let top = 0;
-  const items = made.plan.items.map((item) => {
-    const placed = { doc: imagesFilled(item.doc, item.images, assetOf), top, ...item.size };
-    top += item.size.height;
-    return placed;
-  });
-  const input: WorldInput = { items, assets: local, width: FOLD.width, band: FOLD.height, height: top, backend };
-  const result = await worldShots(input);
-  const drawn = await stitched(result, top);
+
+async function gpuScored(name: string, docs: { doc: MotionDoc; width: number; height: number }[], assets: Record<string, string>, width: number) {
+  const { items, height } = placedItems(docs);
+  const result = await worldShots({ items, assets, width, band: FOLD.height, height, backend, smoothing });
+  const drawn = await stitched(result, width, height);
+  const fold = { width, height: FOLD.height };
+  const scored = await scores(readFileSync(join(captured, `${name}-source.png`)), drawn, fold);
   writeFileSync(join(out, `${name}-gpu-imported.png`), drawn);
-  const scored = await scores(readFileSync(join(captured, `${name}-source.png`)), drawn);
-  writeFileSync(join(out, `${name}-gpu-fold.png`), await sideBySide(await band(scored.a, 0), await band(scored.b, 0), FOLD.height));
-  writeFileSync(join(out, `${name}-gpu-full.png`), await sideBySide(scored.a, scored.b, scored.height));
-  writeFileSync(join(out, `${name}-gpu-score.json`), JSON.stringify({ fold: scored.fold, full: scored.full, bands: scored.bands, frames: items.length, height: top, backend: result.backend, unsettled: result.unsettled, skipped: result.skipped }, null, 2));
+  writeFileSync(join(out, `${name}-gpu-fold.png`), await sideBySide(await band(scored.a, 0, fold), await band(scored.b, 0, fold), FOLD.height, width));
+  writeFileSync(join(out, `${name}-gpu-full.png`), await sideBySide(scored.a, scored.b, scored.height, width));
+  writeFileSync(join(out, `${name}-gpu-score.json`), JSON.stringify({ fold: scored.fold, full: scored.full, bands: scored.bands, frames: items.length, height, backend: result.backend, unsettled: result.unsettled, skipped: result.skipped }, null, 2));
   const html = htmlScore(out, name);
-  const row = `| ${name} | ${items.length} | ${top} | ${fmt(html.fold)} | ${fmt(scored.fold)} | ${fmt(html.full)} | ${fmt(scored.full)} | ${result.unsettled} | ${result.skipped.length} |`;
+  const row = `| ${name} | ${items.length} | ${height} | ${fmt(html.fold)} | ${fmt(scored.fold)} | ${fmt(html.full)} | ${fmt(scored.full)} | ${result.unsettled} | ${result.skipped.length} |`;
   rows.push(row);
   console.log(row);
+}
+
+const viewDocs = (docs: { doc: MotionDoc; width: number }[], view: PageView) =>
+  docs.map(({ doc, width }) => {
+    const seen = resolveView(doc, view.id);
+    const pxPerUnit = width / doc.width;
+    return { doc: seen, width: Math.min(view.width, Math.round(seen.width * pxPerUnit)), height: Math.round(seen.height * pxPerUnit) };
+  });
+
+for (const name of names) {
+  const tree = JSON.parse(readFileSync(join(captured, `${name}.json`), 'utf8')) as PageTree;
+  const views = viewsOf(name);
+  const { made, assetOf, assets } = await plannedPage(tree, views, harnessShape());
+  const local = Object.fromEntries(await Promise.all(Object.entries(assets).map(async ([id, url]) => [id, await served(url, tree.url)] as const)).then((all) => all.map(([id, url]) => [id, url.startsWith('/') ? `${server.origin}${url}` : url])));
+  const docs = made.plan.items.map((item) => ({ doc: imagesFilled(item.doc, item.images, assetOf), ...item.size }));
+  await gpuScored(name, docs, local, FOLD.width);
+  for (const { view } of views) {
+    await gpuScored(`${name}@${view.width}`, viewDocs(docs, view), local, view.width);
+  }
 }
 const table = ['| page | frames | height | HTML fold | GPU fold | HTML full | GPU full | unsettled bands | skipped |', '|---|---|---|---|---|---|---|---|---|', ...rows].join('\n');
 writeFileSync(join(out, `gpu-${backend}.md`), `${table}\n`);

@@ -197,6 +197,12 @@ worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallis
 un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
 Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright. Vale anche per una misura di
 performance: numeri identici prima e dopo un fix vogliono dire codice vecchio servito, non un fix inutile.
+Vale anche al contrario: un bug già corretto su `dev` torna vivo. Un dev server acceso alle 8:34 ha
+servito fino alle 14 il `GpuFlow.svelte` delle 10:29, prima del fix del loop di sync degli stili:
+~9000 `updated at` (`set docs`, `commit`, `liveDocs.set`) e tab in crash dopo un import da URL,
+sul codice di `dev` zero. Segnale: le righe dello stack non tornano col sorgente. Mossa:
+`curl localhost:<porta>/src/<file>.svelte | grep <riga del fix>`; se manca, riavvia prima di
+diagnosticare.
 
 ### Il canvas core diventa vuoto o nero dopo un clic, senza errori
 Segnale: nessun `pageerror`, nessun `liveDocs.set`, `data-painted` aumenta di un `full` e poi il
@@ -3567,13 +3573,57 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** an imported card at opacity 0.64 is visibly darker than the page; the same card without auto layout is right. **Move:** `laidOut` (`figma-doc.ts`) parented the children to the container and then faded container and children; parent opacity is inherited, so children got it twice. Fade only the container. Measure with mean brightness of the same region in source and import before blaming text rendering.
 
+## A breakpoint round trip writes overrides nobody made
+
+**Signal:** after making breakpoint code walk compositions, `liftViewEdit` of an untouched view adds overrides to a top-level clip (the landing fixture's `cta`). **Move:** clip ids are unique per composition, not per doc; a `Map` by id over top-level and composition clips mixes two clips with the same id. Keep id lookups scoped (top-level, or one composition), and only walk every composition for per-clip work that needs no lookup.
+
+## Layers copied from another read collide by node id
+
+**Signal:** an imported phone view places a desktop hero at an FAQ answer's box; node count and distinct ids of the planned tree differ. **Move:** each page read numbers its nodes from 1, so a layer copied from the phone read into the desktop tree reuses a desktop id, and any map by id picks the wrong one. Give copied layers a namespaced id (`<view>:<id>`) and count `new Set(ids).size` against the node count before trusting an id map.
+
+## A size page-stacks measured is not the size the layer gets
+
+**Signal:** a value computed in `page-stacks.ts` from a node box (a max width, a span) shifts a layer by a few px on desktop; dumping clip boxes with and without the change shows the layer narrower than its doc width. **Move:** `page-flatten` runs after stacks and can hand a node a wrapper box; take sizes the layout depends on from the built clip in `figma-doc.ts` (or guard with it), not from the box stacks saw. Diff clip boxes (`withAutoLayout`, every clip including comps) before scoring SSIM.
+
 ## An imported component in a row lands shifted by what it draws outside its box
 
 **Signal:** a code import scores below the plain URL import of the same capture; a whole grid of cards or a boundary box sits tens or hundreds of px off. **Move:** layout places a precomp in a flow by the bounds of its comp's root clips; any child drawn outside the frame (overhanging badge, SVG paths captured off-box) widens them. Print the parent chain of one text with `worldAt` in both plans and find the first precomp whose world origin differs; its comp's `compBounds` names the overflowing clip.
 
 ## A URL import on Browserless takes four minutes and then succeeds
 
-**Signal:** `ai_calls` shows two `browserless` sessions per import, the first ~128 s, the second ~120 s. **Move:** the session cap is 120 s (`BROWSERLESS_SESSION_MS`): a slow capture is killed, `tab.tree` comes back empty, and `importPageAt` retries with `Sight.Native` in a new session. Profile with timers around each `AppTab` method over Browserless, not locally: stripe takes 15 s in local Chrome, but remotely `goto` hits its 20 s cap, `reveal` takes 55 s under `seeAll` and the 27 snapshots in `tree` take 70 s.
+**Signal:** `ai_calls` shows two `browserless` sessions per import, the first ~128 s, the second ~120 s. **Move:** the session cap is 120 s (`BROWSERLESS_SESSION_MS`); a read that runs out answers `too_slow` now instead of starting over. Profile with timers around each `AppTab` method (a `Proxy` over the tab) over Browserless, not locally: stripe takes 15 s in local Chrome. Most of it reproduces for free: connect puppeteer to local Chrome through a WebSocket proxy that delays each message by half the round trip (~180 ms to `production-sfo`) and count CDP methods there; per-call cost is round trips, so batch work into one evaluate. What does not reproduce is software WebGL: a CPU profile (`Profiler.start` on a CDP session) full of `(program)` and a main thread that answers an evaluate after 30-40 s means the page's WebGL scenes are drawing; rerun with `getContext('webgl')` returning null to confirm. `goto` with `networkidle2` never fires there (a worker and iframes puppeteer never sees end): wait for `load`, then a quiet network.
+
+## A fidelity reference screenshot loses images after a speed-up of the snapshots
+
+**Signal:** `url-fidelity` drops on apple (0.974 to 0.93-0.96) in bands that move between runs; the side by side shows the import with its pictures and the reference (`-source.png`) without them, while the DOM reports every image loaded and visible. **Move:** a `Page.captureScreenshot` sent on a CDP session other than the page's own leaves Chrome painting later `captureBeyondViewport` shots without some images (`Page.enable` on that session does not help). Take screenshots with `page.screenshot`; a second session is fine for `Emulation` overrides.
+
+## A probe script outside the worktree runs old package code
+
+**Signal:** a fix to `packages/motion-core` passes its unit test, but a `vite-node` script you keep in the scratchpad still prints the old numbers, and a debug log you add never shows. **Move:** imports such as `@feega/motion-core/...` resolve from the nearest `node_modules` up the script's path, which may be a stray install, not your worktree. Keep probe scripts inside the worktree (an ignored folder) so they resolve the code you are editing.
+
+## A canvas freezes for minutes right after it opens
+
+**Signal:** after reload the frame stays blank, Ctrl+scroll does nothing, a `longtask` of tens of seconds or more; the CPU profile is all `found` (style or variable library) → `syncStyle` → `commit`, with Svelte's `infinite_loop_guard`. **Move:** a library sync effect compares a doc value with the project copy and re-commits on mismatch; anything that is not key-order free (`JSON.stringify` against jsonb, which reorders keys) never settles. Compare with `sameValue`. Probe with `tests/e2e/url-import-reopen.spec.ts` (`REOPEN_SEED=<file>` reuses one real import).
+
+## A whole nav comes in as one picture
+
+**Signal:** an imported block with links and buttons is a single image layer. **Move:** ask why the walker took the snapshot (`shape` in `page-tree.ts`: filter, mask, clip path, blend with children, `turned`). On supabase.com it was Tailwind's `transform` utility: it computes to `matrix3d(... 0, 0, 999, 1)` (a `translateZ`), which `matrixOf` did not parse, so `turned` read it as a rotation. Blocks holding text never snapshot now (`holdsContent`); a new snapshot reason must still keep them as layers.
+
+## Imported text cannot be typed, double-click climbs to a "Precomp"
+
+**Signal:** on an imported page Cmd-click selects a label, Enter does nothing, double-click selects a wrapper (often 0×0, named Precomp or Group). **Move:** the label sits inside a Precomp (a group or an instance), so its id is scoped (`host__0__label`) and every top-level lookup (`findClip`, `isLayer`, `textCaretAt`) misses it. Resolve scene ids through `textScope`/`scoped` before editing; for URL imports, plain groups come in as frames (`Grouping.Frame`), never as Precomps.
+
+## A captured page state is the default state again
+
+**Signal:** an imported Tabs (or Disclosure) set whose variants all show the first panel; in the capture JSON `tree.patterns[].variants[].root` has the default's texts. **Move:** the import's `seeAll` scripts can stop a framework from answering a synthetic `click` (feega.app's Framer tabs: they switch with plain puppeteer, never after `seeAll`). Probe the same click with and without `tab.seeAll()` before blaming the walker; a row in `page-patterns.ts` says how to read that a state took (`shows`), and a state that did not is skipped.
+
+## The prototype player shows a black frame
+
+**Signal:** play mode on a long imported page is black; the console says `Texture size ... exceeded maximum texture size ... 8192`. **Move:** a WebGPU surface holds 8192 px per side by default; `drawableOn` sends taller or wider frames to the HTML engine. For screenshots in Playwright, open the player with Fill width and scroll the stage, and take the shot from headless Chromium with GPU flags (`--enable-unsafe-webgpu --use-angle=metal`).
+
+## A release regression that the fixture does not reproduce
+
+**Signal:** two release builds measure the same on the seeded fixture, while production freezes; the crash telemetry (`[canvas] webcontent-crash-suspected` in Vercel runtime logs, one day of retention) shows the real device and texture bytes. **Move:** seed what the real canvas carries that the fixture lacks (styles, variables, components, images) and measure the reopen, not only the first open; `tests/e2e/canvas-landing-session.spec.ts` against two `build:node` builds served with `node --env-file=.env build` is the comparison.
 
 ## "A valid external Instance reference no longer exists" on a canvas page
 
@@ -3583,6 +3633,47 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** a change under `packages/motion-core` is in the file, `curl /node_modules/@feega/motion-core/...` shows it, but the browser still runs the old code and a debug log never prints. **Move:** the app imports it as `/packages/motion-core/...`, a second URL whose transform Vite cached before the edit. `curl` that exact URL (take it from the importing module's served source); if it is stale, restart with `vite dev --force`.
 
-## A canvas freezes for minutes right after it opens
+## Go to main does nothing, and nothing errors
 
-**Signal:** after reload the frame stays blank, Ctrl+scroll does nothing, a `longtask` of tens of seconds or more; the CPU profile is all `found` (style or variable library) → `syncStyle` → `commit`, with Svelte's `infinite_loop_guard`. **Move:** a library sync effect compares a doc value with the project copy and re-commits on mismatch; anything that is not key-order free (`JSON.stringify` against jsonb, which reorders keys) never settles. Compare with `sameValue`. Probe with `tests/e2e/url-import-reopen.spec.ts` (`REOPEN_SEED=<file>` reuses one real import).
+**Signal:** an instance's `component.home` is set and the node exists, but clicking Go to main changes neither URL nor view. **Move:** check that `/api/v1/projects/<id>/components` lists a component whose `frameId` is that home: `mainLocation` only knows frames the list holds. Import sets are `element` nodes on the Components page; a list built from `motion` nodes alone misses them.
+
+## Media emulation alone does not make a page light
+
+**Signal:** the same light site imports dark in some runs over Browserless, never locally; `emulateMediaFeatures` is set. **Move:** the stealth fingerprint answers scripts that call `matchMedia`; pin light from a script registered with `evaluateOnNewDocument` after the browser's own, plus `color-scheme` and the `Sec-CH-Prefers-Color-Scheme` hint. Check with five reads over Browserless (about $0.01): locally it never reproduces.
+
+## A dev server started inside an agent worktree never reloads
+
+**Signal:** `vite dev` runs from `.claude/worktrees/<agent>`, a source edit is on disk, yet the served module (`curl` its URL) still lacks it and debug logs never print. **Move:** `vite.config.ts` ignores `**/.claude/worktrees/**` in the watcher, which matches every file of that checkout. Restart the server after each edit, or start it with a scratch config that spreads the repo config and replaces `server.watch.ignored`.
+
+## "GPU renderer unavailable: unreachable" after a zoom
+
+**Signal:** the canvas goes blank with that banner; the console shows `[core] gpu lost` first. **Move:** the loss came first, the trap second: a reattach on the same `<canvas>` whose GL context is lost makes the core panic (`gl.create_texture().expect`). Headless Chromium has no WebGPU and renders GL in software; it reproduces only at `deviceScaleFactor: 2` on a tall imported page zoomed to 4×. `CoreFrames` now reattaches on a fresh canvas and reloads a trapped core (`afterAttachFailure` in `gpu-loss.ts`).
+
+
+## A breakpoint view scores low and looks fine, its bottom half drifting
+
+**Signal:** `url-fidelity` view bands fall steadily down the page (stripe phone: 25 px off at 20 000 px); the side by side looks right at the top. **Move:** a view keeps the frame's units per pixel, and a frame's units rarely divide 390 or 768 evenly. Size a drawn view by the base frame's pixels per unit (`item.size.width / item.doc.width`), as `breakpoint-views.ts` does on the canvas, never by stretching it to the view width. Lowering the units so widths divide evenly blurred the desktop instead (stripe full 0.981 → 0.962).
+
+## One capture scores old and new code badly on the same page
+
+**Signal:** a fresh capture drops a page for both the old and the new code (stripe desktop full 0.98 → 0.69, apple phone fold 0.98 → 0.59); the source screenshot shows another accordion item open, or a search panel. **Move:** the capture reads the tree and screenshots a moment later; a page that moves on its own in between (rotating accordion, a narrow-width panel) makes the two disagree. Compare code on one capture, and keep the capture whose screenshot matches its tree as the reference.
+
+## `replaceState` in an `$effect` at mount: `Cannot read properties of undefined (reading '$set')`
+
+**Signal:** a page that cleans its URL on mount shows nothing it should, and a production build logs that `$set` error (in dev: `Cannot call replaceState(...) before router is initialized`). **Move:** SvelteKit's `replaceState`/`pushState` write to the root component, which does not exist while the first page is still mounting. Call them from `afterNavigate`, never from an `$effect` or `onMount` of the first page.
+
+## An imported frame lands empty, the import answers 200
+
+**Signal:** a URL import returns 200 and a frame named after the page, but the frame is 16:9 with no layers and its head revision is the default doc. **Move:** the plan doc failed `parseMotionDoc` and `frameStore.create` ignores the `Invalid` write. Run the plan on a capture (`urlPlan` + `parseMotionDoc` over `fidelity2/captures/<label>`) and read the refusal: a font only one breakpoint read uses was the cause once.
+
+## URL import answers 500 with `Error: [object Object]` from `connected`
+
+**Signal:** the preview log shows `unhandled server error` on `/url-import` with `Error: [object Object]` at `hidden` → `connected`; imports with breakpoints fail about half the time, a breakpoint view goes missing the rest. **Move:** the Browserless plan admits two sessions; a third connect gets `429`, which the server bundle receives as an `ErrorEvent` (stringified to `[object Object]`). Count the sessions one import opens at once (`importPageAt` reads views in turn beside the desktop read) and probe the limit with parallel `puppeteer.connect` calls before blaming the page.
+
+## Two imports at once: `busy`, or 429 behind `[object Object]`
+
+**Signal:** concurrent imports answer 503 `busy` or the dialog shows "Browsers are busy, retrying…"; a log line shows `BrowserBusy`. **Move:** one import opens two Browserless sessions, the plan admits two. `sessionSlots` queues connects per server process (`BROWSERLESS_MAX_SESSIONS`, wait 10 s); it does not span deployments, so two instances can still meet a 429, which now retries with backoff and then reads as `BrowserBusy`. A refusal that is not an `Error` goes through `errorText`, never `String(e)`.
+
+## test:gate red while the product is fine: selectors of a UI that was replaced
+
+**Signal:** most gate specs time out waiting for `motion-editor`, `editor-stage` or `input.hex`; the same flows work by hand. **Move:** probe the live DOM once (list `data-testid`s after the action) before editing specs; the inspector is `motion-inspector`, the fill hex is `Fill colour hex`, a text node mounts its prompt on click, `gpu-canvas` is `core-canvas`. A selector that matches a Vite dev module URL (`/frame-outlines`) is a test bug, match the API path.

@@ -17,6 +17,10 @@ describe('inspector edits of an interaction', () => {
     expect(retargeted(base, ActionKind.OpenOverlay, 'c').action).toEqual({ kind: ActionKind.OpenOverlay, target: 'c' });
   });
 
+  it('switching to change to drops the target and takes the picked variant', () => {
+    expect(retargeted(base, ActionKind.ChangeTo, 'b', { State: 'Open' }).action).toEqual({ kind: ActionKind.ChangeTo, variant: { State: 'Open' } });
+  });
+
   it('switching the transition to slide fills direction, easing and duration; to instant strips them', () => {
     const slid = retimed(base, { kind: TransitionKind.Slide });
 

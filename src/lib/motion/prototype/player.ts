@@ -60,7 +60,8 @@ export function act(state: PlayerState, action: Action, transition: Transition, 
     [ActionKind.Navigate]: () => enter(state, 'target' in action ? action.target : '', transition, known),
     [ActionKind.ScrollTo]: () => enter(state, 'target' in action ? action.target : '', transition, known),
     [ActionKind.OpenOverlay]: () => open(state, 'target' in action ? action.target : '', transition, known),
-    [ActionKind.Back]: () => back(state, transition)
+    [ActionKind.Back]: () => back(state, transition),
+    [ActionKind.ChangeTo]: () => stay(state)
   };
   return runs[action.kind]();
 }

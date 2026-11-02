@@ -12,7 +12,8 @@ export enum ActionKind {
   Navigate = 'navigate',
   OpenOverlay = 'open_overlay',
   Back = 'back',
-  ScrollTo = 'scroll_to'
+  ScrollTo = 'scroll_to',
+  ChangeTo = 'change_to'
 }
 
 export enum TransitionKind {
@@ -43,6 +44,11 @@ export const DEFAULT_DURATION_MS = 300;
 
 const target = z.string().min(1);
 
+export const MAX_VARIANT_PART = 80;
+
+const variantPart = z.string().min(1).max(MAX_VARIANT_PART);
+const variant = z.record(variantPart, variantPart).refine((picked) => Object.keys(picked).length > 0, 'pick at least one variant property');
+
 export const triggerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(TriggerKind.Click) }),
   z.object({ kind: z.literal(TriggerKind.Hover) }),
@@ -54,7 +60,8 @@ export const actionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(ActionKind.Navigate), target }),
   z.object({ kind: z.literal(ActionKind.OpenOverlay), target }),
   z.object({ kind: z.literal(ActionKind.Back) }),
-  z.object({ kind: z.literal(ActionKind.ScrollTo), target })
+  z.object({ kind: z.literal(ActionKind.ScrollTo), target }),
+  z.object({ kind: z.literal(ActionKind.ChangeTo), variant })
 ]);
 
 const timing = { easing: z.enum(EASE_IDS).default(Ease.Standard), durationMs: z.number().int().min(1).max(MAX_DURATION_MS).default(DEFAULT_DURATION_MS) };
@@ -86,7 +93,8 @@ const TARGETED: Record<ActionKind, boolean> = {
   [ActionKind.Navigate]: true,
   [ActionKind.OpenOverlay]: true,
   [ActionKind.Back]: false,
-  [ActionKind.ScrollTo]: true
+  [ActionKind.ScrollTo]: true,
+  [ActionKind.ChangeTo]: false
 };
 
 export const needsTarget = (kind: ActionKind): boolean => TARGETED[kind];
@@ -102,7 +110,8 @@ export const ACTION_LABEL: Record<ActionKind, string> = {
   [ActionKind.Navigate]: 'Navigate to',
   [ActionKind.OpenOverlay]: 'Open overlay',
   [ActionKind.Back]: 'Back',
-  [ActionKind.ScrollTo]: 'Scroll to'
+  [ActionKind.ScrollTo]: 'Scroll to',
+  [ActionKind.ChangeTo]: 'Change to'
 };
 
 export const TRANSITION_LABEL: Record<TransitionKind, string> = {

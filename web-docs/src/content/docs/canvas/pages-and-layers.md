@@ -11,7 +11,7 @@ The left panel opens from the rail or with `Alt+1`. It has two parts.
 
 Every canvas of the project is a page.
 
-- **Switch** by clicking a page.
+- **Switch** by clicking a page. It opens on its own content, where you last left it or fitted to it.
 - **New page** with **+**.
 - **Rename** with a double click on the current page, or from its **…** menu.
 - **Versions** and **Comments** of the current page are in its **…** menu (shown on hover).
@@ -25,6 +25,8 @@ On a phone, tap the title in the top bar: the sheet lists the pages first, then 
 ## Layers
 
 The layers of the current page, below Pages. The search icon next to Layers opens a filter. Hovering a row shows its **hide** and **lock** buttons.
+
+The chevron of a frame, stack, group or instance folds its row. A fold is kept in this browser, open frame or not, and still holds after a reload.
 
 The top-left of the canvas keeps only the main menu and the project switcher.
 

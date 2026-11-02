@@ -37,7 +37,7 @@ test.describe('layers of closed frames @real', () => {
     await expect(layers.locator('[data-kind="track"]'), 'tracks are not elements').toHaveCount(0);
     await expect(layers.locator('[data-layer="deep"]'), 'a scene played twice lists its insides under both').toHaveCount(2);
     await expect(layers.locator('[data-layer="t"]')).toHaveCount(2);
-    await expect(layers.locator(`[data-layer="${TITLE_LINE}"]`), 'a closed poster lists its parts').toHaveCount(1);
+    await expect(layers.locator(`[data-layer="${TITLE_LINE}"]`), 'a closed poster lists its element, its parts only once the frame is open').toHaveCount(0);
     if (SHOTS) {
       await page.screenshot({ path: `${SHOTS}/layers-closed-frames.png` });
     }

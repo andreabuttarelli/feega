@@ -419,10 +419,8 @@ function animatorsAt(clip: MotionClip, frame: number, colour: (v: string) => str
 
 const GROUP_COMPONENT = 'Precomp';
 
-function contentCut(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, size: Size): MaskLayer | null {
-  const chain = ancestorsOf(doc, clip.id).flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
-  const inside = chain.slice(chain.findLastIndex((c) => c.component === GROUP_COMPONENT) + 1);
-  const boxes = inside.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, size));
+function cutOf(level: MotionClip[], size: Size, matrix: Affine): MaskLayer | null {
+  const boxes = level.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, size));
   if (!boxes.length || boxes.some((b) => !b)) {
     return null;
   }
@@ -430,7 +428,18 @@ function contentCut(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionCl
   const top = Math.max(...boxes.map((b) => b!.top));
   const right = Math.min(...boxes.map((b) => b!.left + b!.width));
   const bottom = Math.min(...boxes.map((b) => b!.top + b!.height));
-  return { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[left, top, right, top, right, bottom, left, bottom]], matrix: IDENTITY } };
+  return { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[left, top, right, top, right, bottom, left, bottom]], matrix } };
+}
+
+function contentCuts(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, size: Size, frame: number): MaskLayer[] {
+  const chain = ancestorsOf(doc, clip.id).flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  const hosts = chain.flatMap((c, at) => (c.component === GROUP_COMPONENT ? [at] : []));
+  const starts = [-1, ...hosts];
+  return starts.flatMap((host, i) => {
+    const level = chain.slice(host + 1, starts[i + 1] ?? chain.length);
+    const cut = cutOf(level, size, host < 0 ? IDENTITY : worldAt(doc, chain[host].id, frame, size));
+    return cut ? [cut] : [];
+  });
 }
 
 function enclosingGroups(doc: MotionDoc): Map<string, string[]> {
@@ -511,12 +520,12 @@ function stageAt({ doc, tokens, moves }: Prepared, frame: number) {
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
   const drawable = bottomFirst.flatMap((t) => t.clips as MotionClip[]).filter((clip) => shown(clip) && !sources.has(clip.id) && !onScreen(clip));
   const alphaOf = (clip: MotionClip, opacity: number, edge: Pose) => inheritedOpacity(doc, clip, byId, frame) * opacity * edge.opacity;
-  return { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf };
+  return { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf, enclosing };
 }
 
 export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
   const { doc, tokens, assets, typeset } = prepared;
-  const { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf } = stageAt(prepared, frame);
+  const { css, size, byId, pairs, shown, effectiveEdge, drawable, alphaOf, enclosing } = stageAt(prepared, frame);
   const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
   const colour = (v: string) => rgbaOf(css(v)) ?? [0, 0, 0, 1];
   const items: Item[] = [];
@@ -547,8 +556,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     }
     const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));
     const own = maskLayers(clip, frame, size, world, asset);
-    const cut = contentCut(doc, clip, byId, size);
-    const masks = own && cut ? [...own, cut] : own;
+    const cuts = contentCuts(doc, clip, byId, size, frame);
+    const masks = own && cuts.length ? [...own, ...cuts] : own;
     const found = filtersOf(clip, frame, doc.fps, size, css);
     if (typeof found === 'string') {
       return found;
@@ -586,14 +595,47 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     return projected([{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }]);
   }
 
+  type Drawn = { chain: string[]; items: Item[] };
+
+  const maskedChain = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).filter((id) => byId.get(id)?.mask);
+
+  function nested(drawn: Drawn[], depth: number): Item[] {
+    const out: Item[] = [];
+    let at = 0;
+    while (at < drawn.length) {
+      const id = drawn[at].chain[depth];
+      if (!id) {
+        out.push(...drawn[at].items);
+        at++;
+        continue;
+      }
+      let end = at;
+      while (end < drawn.length && drawn[end].chain[depth] === id) {
+        end++;
+      }
+      const inner = nested(drawn.slice(at, end), depth + 1);
+      const masks = maskLayers(byId.get(id)!, frame, size, worldAt(doc, id, frame, size), asset);
+      if (masks) {
+        out.push({ kind: ItemKind.Group, clip: id, items: inner, opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal, masks });
+      } else {
+        unsupported.push({ clip: id, component: GROUP_COMPONENT, reason: Unsupported.Mask });
+        out.push(...inner);
+      }
+      at = end;
+    }
+    return out;
+  }
+
+  const drawn: Drawn[] = [];
   for (const clip of drawable) {
-    const drawn = clipItems(clip);
-    if (Array.isArray(drawn)) {
-      items.push(...drawn);
+    const own = clipItems(clip);
+    if (Array.isArray(own)) {
+      drawn.push({ chain: maskedChain(clip), items: own });
       continue;
     }
-    unsupported.push({ clip: clip.id, component: clip.component, reason: drawn });
+    unsupported.push({ clip: clip.id, component: clip.component, reason: own });
   }
+  items.push(...nested(drawn, 0));
   const background = doc.surface ? CLEAR : doc.background === Background.Transparent ? null : colour('brand.background');
   const cut = frameCut(doc);
   const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;

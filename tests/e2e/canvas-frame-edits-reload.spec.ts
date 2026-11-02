@@ -19,7 +19,7 @@ async function greenShare(page: Page, clip: Box): Promise<number> {
   return green / (info.width * info.height);
 }
 
-const fillHex = (page: Page) => page.getByTestId('fill-editor').locator('input.hex').first();
+const fillHex = (page: Page) => page.getByLabel('Fill colour hex');
 
 async function recolour(page: Page, colour: string) {
   if (!(await fillHex(page).isVisible())) {

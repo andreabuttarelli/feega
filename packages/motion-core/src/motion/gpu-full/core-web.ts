@@ -51,6 +51,7 @@ export function wantedPictures(items: Item[]): PictureItem[] {
 const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement) || (typeof HTMLCanvasElement !== 'undefined' && picture.source instanceof HTMLCanvasElement);
 
 let loading: Promise<CoreModule> | null = null;
+let instance = 0;
 let wasmMemory: WebAssembly.Memory | null = null;
 
 const kept = (exports: unknown) => {
@@ -71,9 +72,18 @@ async function loadCore(): Promise<CoreModule> {
   if (inline) {
     return loadInlineCore(inline);
   }
-  const core = (await import(/* @vite-ignore */ new URL(CORE_URL, import.meta.url).href)) as CoreModule;
+  const url = new URL(CORE_URL, import.meta.url);
+  if (instance) {
+    url.searchParams.set('instance', String(instance));
+  }
+  const core = (await import(/* @vite-ignore */ url.href)) as CoreModule;
   kept(await core.default());
   return core;
+}
+
+export function dropCore(): void {
+  loading = null;
+  instance++;
 }
 
 export function warmCore(): Promise<CoreModule> {

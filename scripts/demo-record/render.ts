@@ -35,6 +35,11 @@ function frameAt(frames: Recording['frames'], t: number, from: number): number {
 
 type Size = { width: number; height: number };
 
+async function sized(file: string, meta: Size): Promise<string | Buffer> {
+  const own = await sharp(file).metadata();
+  return own.width === meta.width && own.height === meta.height ? file : sharp(file).resize(meta.width, meta.height, { fit: 'fill' }).toBuffer();
+}
+
 async function cropFrame(file: string, cam: Rect, scale: number, meta: Size, size: Size): Promise<Buffer> {
   const out = size.width / cam.width;
   const left = Math.max(0, Math.floor(cam.x * scale));
@@ -45,7 +50,7 @@ async function cropFrame(file: string, cam: Rect, scale: number, meta: Size, siz
   const height = Math.max(size.height, Math.round(((bottom - top) / scale) * out));
   const ox = Math.min(width - size.width, Math.round(((cam.x * scale - left) / scale) * out));
   const oy = Math.min(height - size.height, Math.round(((cam.y * scale - top) / scale) * out));
-  return sharp(file)
+  return sharp(await sized(file, meta))
     .extract({ left, top, width: right - left, height: bottom - top })
     .resize(width, height, { fit: 'fill', kernel: 'lanczos3' })
     .extract({ left: ox, top: oy, width: size.width, height: size.height })

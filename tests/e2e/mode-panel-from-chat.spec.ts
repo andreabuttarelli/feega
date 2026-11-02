@@ -33,7 +33,7 @@ test.describe('a mode picked while the Chat tab is open @real', () => {
 
       await page.getByTestId('side-tab-chat').filter({ visible: true }).click();
       await expect(page.getByTestId('side-tab-chat').filter({ visible: true })).toHaveAttribute('aria-selected', 'true');
-      await page.locator(`[data-testid="editor-mode-switch"] [data-mode="${mode}"]`).click();
+      await page.locator(`[data-testid="editor-mode-switch"] [data-value="${mode}"]`).click();
 
       await expect(page.getByTestId(panel)).toBeVisible();
     });

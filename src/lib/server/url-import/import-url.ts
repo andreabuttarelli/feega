@@ -1,14 +1,18 @@
 import { z } from 'zod';
 import { imagesFilled, type ImageAssets } from '$lib/canvas/figma/images';
-import { placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
+import { DocRejected, placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { homedAt } from '$lib/motion/canvas-components';
 import type { AppTab, OpenAppBrowser } from '$lib/server/web/browser';
+import { BrowserBusy } from '$lib/server/web/browser-slots';
 import { dismissOverlays } from '$lib/server/web/overlays';
 import { SnapMode, TREE_LIMITS, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
 import type { PageOutline } from './page-outline';
+import { PatternKind } from './page-patterns';
 import { sheetFonts, type FetchText } from './sheet-fonts';
+import type { PageView, ViewRead } from './page-views';
+import type { Homes } from './component-sheet';
 import { FULL_SHAPE, fontsWanted, urlPlan, type FontAssets, type PageShape, type UrlPlan } from './url-doc';
 
 export enum UrlImportOutcome {
@@ -18,7 +22,10 @@ export enum UrlImportOutcome {
   NoBrowser = 'no_browser',
   Failed = 'failed',
   Unreadable = 'unreadable',
-  RateLimited = 'rate_limited'
+  TooSlow = 'too_slow',
+  RateLimited = 'rate_limited',
+  Busy = 'busy',
+  Rejected = 'rejected'
 }
 
 export enum PageExtent {
@@ -39,14 +46,17 @@ export const URL_IMPORT_STATUS: Record<Exclude<UrlImportOutcome, UrlImportOutcom
   [UrlImportOutcome.NoBrowser]: 503,
   [UrlImportOutcome.Failed]: 502,
   [UrlImportOutcome.Unreadable]: 422,
-  [UrlImportOutcome.RateLimited]: 429
+  [UrlImportOutcome.TooSlow]: 504,
+  [UrlImportOutcome.RateLimited]: 429,
+  [UrlImportOutcome.Busy]: 503,
+  [UrlImportOutcome.Rejected]: 422
 };
 
 export type UrlImported = { outcome: UrlImportOutcome.Ok; frameId: string; name: string; undo: UndoItem[]; skipped: string[]; truncated: boolean } | { outcome: Exclude<UrlImportOutcome, UrlImportOutcome.Ok>; error?: string };
 
-export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, shape: PageShape) => UrlPlan | null };
+export type Planner = { prepare: (tab: AppTab) => Promise<void>; plan: (tree: PageTree, newId: () => string, fonts: FontAssets, shape: PageShape, views: ViewRead[]) => UrlPlan | null };
 
-export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts, shape) => urlPlan(tree, newId, undefined, fonts, shape) };
+export const PLAIN_PLANNER: Planner = { prepare: async () => undefined, plan: (tree, newId, fonts, shape, views) => urlPlan(tree, newId, undefined, fonts, shape, views) };
 
 export type PageAsk = {
   url: string;
@@ -56,7 +66,7 @@ export type PageAsk = {
   open: OpenAppBrowser | null;
   guard: (url: URL) => Promise<void>;
   importImage: (url: string) => Promise<string | null>;
-  importFont?: (url: string) => Promise<string | null>;
+  importFont?: (url: string, page: string) => Promise<string | null>;
   fetchText?: FetchText;
   newId: () => string;
   settleMs?: number;
@@ -64,6 +74,7 @@ export type PageAsk = {
   maxHeight?: number;
   shape?: PageShape;
   components?: () => Promise<ComponentsPage>;
+  views?: PageView[];
 };
 
 export type ComponentsPage = { place: Place; at: { x: number; y: number } };
@@ -83,6 +94,10 @@ const FONT_SHAPE = z.object({ family: z.string(), weight: z.string(), style: z.s
 
 const SNAP_SHAPE = z.object({ ref: z.string(), box: BOX_SHAPE, mode: z.nativeEnum(SnapMode) });
 
+const NODE_SHAPE = z.object({ id: z.string(), type: z.string() }).passthrough();
+
+const PATTERN_SHAPE = z.object({ ix: z.number().int(), kind: z.nativeEnum(PatternKind), prop: z.string().min(1), initial: z.string().min(1), states: z.array(z.string().min(1)), variants: z.array(z.object({ state: z.string().min(1), root: NODE_SHAPE })) });
+
 const TREE_SHAPE = z
   .object({
     title: z.string(),
@@ -94,7 +109,8 @@ const TREE_SHAPE = z
     fonts: z.array(FONT_SHAPE).optional(),
     sheets: z.array(z.string()).optional(),
     snaps: z.array(SNAP_SHAPE).optional(),
-    outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional()
+    outline: z.custom<PageOutline>((v) => typeof v === 'object' && v !== null).optional(),
+    patterns: z.array(PATTERN_SHAPE).optional()
   })
   .strict();
 
@@ -131,13 +147,8 @@ export async function pagePrepared(tab: AppTab, url: URL, settleMs: number, plan
   }
   await tab.settle(NETWORK_IDLE_MS);
   const { height } = await tab.reveal(RevealMode.Loading).catch(() => ({ height: TREE_LIMITS.height }));
-  await tab.sample().catch(() => 0);
   const steps = Math.ceil(Math.min(height, maxHeight) / SCROLL_STEP_PX);
-  for (let i = 0; i < steps; i++) {
-    await tab.scroll({ px: SCROLL_STEP_PX }).catch(() => undefined);
-    await pause(settleMs / SCROLL_PAUSES);
-    await tab.sample().catch(() => 0);
-  }
+  await tab.sample({ steps, stepPx: SCROLL_STEP_PX, pauseMs: settleMs / SCROLL_PAUSES }).catch(() => 0);
   await tab.settle(NETWORK_IDLE_MS);
   await tab.scroll({ to: 'top' }).catch(() => undefined);
   await pause(settleMs);
@@ -181,7 +192,7 @@ export async function fontsFor(ask: LandAsk, tree: PageTree): Promise<FontAssets
   if (!importFont) {
     return {};
   }
-  const entries = await Promise.all(fontsWanted(tree).map(async (face) => [face.url, await importFont(face.url).catch(() => null)] as const));
+  const entries = await Promise.all(fontsWanted(tree).map(async (face) => [face.url, await importFont(face.url, tree.url).catch(() => null)] as const));
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
@@ -194,7 +205,7 @@ async function placedSets(ask: LandAsk, sets: UrlPlan['sets']): Promise<{ frameI
   return { frameIds: placed.frameIds, undo: placed.undo };
 }
 
-async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: UrlPlan['homes']): Promise<void> {
+async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: Homes): Promise<void> {
   for (const [page, comps] of Object.entries(homes)) {
     const pageId = frameIds[Number(page)];
     const frame = pageId ? await store.read(pageId) : null;
@@ -215,7 +226,7 @@ async function filled(ask: LandAsk, frameIds: string[], items: UrlPlan['sets'], 
   }
 }
 
-export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
+async function readAndLand(ask: PageAsk): Promise<UrlImported> {
   const url = await publicUrl(ask.url, ask.guard);
   if (!url) {
     return refused(UrlImportOutcome.NotPublic);
@@ -226,18 +237,51 @@ export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
 
   const open = ask.open;
   const planner = ask.planner ?? PLAIN_PLANNER;
+  const unreadable = (read: PageTree | UrlImported) => 'outcome' in read && read.outcome === UrlImportOutcome.Unreadable;
   const readWith = async (sight: Sight) => {
     const tab = await open();
-    return pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+    const read = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight, sight).finally(() => tab.close());
+    return unreadable(read) && tab.left() <= 0 ? refused(UrlImportOutcome.TooSlow) : read;
   };
-  const first = await readWith(Sight.Everything);
-  const read = 'outcome' in first && first.outcome === UrlImportOutcome.Unreadable ? await readWith(Sight.Native) : first;
+  const readPage = async () => {
+    const first = await readWith(Sight.Everything);
+    return unreadable(first) ? readWith(Sight.Native) : first;
+  };
+  const readView = async (view: PageView): Promise<ViewRead[]> => {
+    const tab = await open();
+    await tab.viewport(view.width).catch(() => undefined);
+    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+    return 'outcome' in narrow ? [] : [{ view, tree: narrow }];
+  };
+  const readViewsInTurn = async () => {
+    const reads: ViewRead[][] = [];
+    for (const view of ask.views ?? []) {
+      reads.push(await readView(view).catch(() => []));
+    }
+    return reads;
+  };
+  const [read, narrow] = await Promise.all([readPage(), readViewsInTurn()]);
   if ('outcome' in read) {
     return read;
   }
   const tree = await withSheetFonts(ask, read);
+  const views = narrow.flat();
 
-  return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE), tree.truncated);
+  return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
+}
+
+export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
+  try {
+    return await readAndLand(ask);
+  } catch (e) {
+    if (e instanceof BrowserBusy) {
+      return refused(UrlImportOutcome.Busy);
+    }
+    if (e instanceof DocRejected) {
+      return refused(UrlImportOutcome.Rejected, e.message);
+    }
+    throw e;
+  }
 }
 
 export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: boolean): Promise<UrlImported> {
@@ -248,6 +292,7 @@ export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: bo
   const placed = await placeFigmaPlan(ask.store, ask.place, made.plan, ask.at);
   const sets = await placedSets(ask, made.sets);
   await homedOnSets(ask.store, placed.frameIds, sets.frameIds, made.homes);
+  await homedOnSets(ask.store, sets.frameIds, sets.frameIds, made.setHomes);
   const assets = await imported(ask, made.images);
   await filled(ask, placed.frameIds, made.plan.items, assets);
   await filled(ask, sets.frameIds, made.sets, assets);

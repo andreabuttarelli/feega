@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { restoreViewport } from './restore-viewport';
+import { FitPurpose, FIT_MAX_ZOOM, fitView, restoreViewport } from './restore-viewport';
 
 const screen = { width: 1000, height: 800 };
 const content = { x: 5000, y: 5000, width: 400, height: 300 };
@@ -50,5 +50,26 @@ describe('restoreViewport', () => {
   it('ignores a saved view that only touches the content edge', () => {
     const saved = { x: -5400, y: 0, zoom: 1 };
     expect(restoreViewport(saved, content, screen)).not.toEqual(saved);
+  });
+});
+
+describe('fitView', () => {
+  const small = { x: 0, y: 0, width: 40, height: 30 };
+
+  it('zooms past 100% on a small frame when asked to fit (⇧1, ⇧2)', () => {
+    expect(fitView(small, screen, FitPurpose.Command)?.zoom).toBe(FIT_MAX_ZOOM);
+  });
+
+  it('opens a page at no more than 100%', () => {
+    expect(fitView(small, screen, FitPurpose.Open)?.zoom).toBe(1);
+  });
+
+  it('centres a 0×0 element at the fit cap', () => {
+    expect(fitView({ x: 100, y: 50, width: 0, height: 0 }, screen, FitPurpose.Command)).toEqual({ x: 500 - 100 * FIT_MAX_ZOOM, y: 400 - 50 * FIT_MAX_ZOOM, zoom: FIT_MAX_ZOOM });
+  });
+
+  it('refuses bounds that are not numbers instead of handing the renderer a NaN view', () => {
+    expect(fitView({ x: NaN, y: 0, width: 10, height: 10 }, screen, FitPurpose.Command)).toBeNull();
+    expect(fitView({ x: 0, y: 0, width: Infinity, height: 10 }, screen, FitPurpose.Command)).toBeNull();
   });
 });

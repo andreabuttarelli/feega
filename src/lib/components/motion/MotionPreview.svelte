@@ -17,7 +17,7 @@
   import { InputKey, type InputValues } from '@feega/motion-core/motion/expression/inputs';
   import { INPUT_MESSAGE } from '@feega/motion-core/motion/interactive/runtime';
   import type { VarValues } from '@feega/motion-core/motion/interactive/var-model';
-  import { RenderEngine } from '$lib/motion/gpu/engine-flag';
+  import { RenderEngine, drawableOn } from '$lib/motion/gpu/engine-flag';
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '@feega/motion-core/motion/hyperframes/text-edit';
   import GpuFullLayer from './GpuFullLayer.svelte';
   import { FullBackend } from '@feega/motion-core/motion/gpu-full/backends';
@@ -60,7 +60,7 @@
 
   const FULL_BACKEND: Partial<Record<RenderEngine, FullBackend>> = { [RenderEngine.GpuFull]: FullBackend.WebGl2, [RenderEngine.GpuCore]: FullBackend.Core, [RenderEngine.GpuCoreGl]: FullBackend.CoreGl };
   const FULL_ENGINES: ReadonlySet<RenderEngine> = new Set(Object.keys(FULL_BACKEND) as RenderEngine[]);
-  const drawnOn = $derived(fullDoc && FULL_ENGINES.has(engine) ? engine : RenderEngine.Html);
+  const drawnOn = $derived(fullDoc && FULL_ENGINES.has(engine) ? drawableOn(engine, fullDoc.doc) : RenderEngine.Html);
   const drawnOver = $derived(drawnOn !== RenderEngine.Html);
 
   let pointer = $state<InputValues>({});

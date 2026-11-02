@@ -10,7 +10,9 @@ export const FIDELITY_PAGES: Record<string, string> = {
   webflow: 'https://webflow.com/',
   tailwind: 'https://tailwindcss.com/docs/installation/using-vite',
   blog: 'https://overreacted.io/a-chain-reaction/',
-  feega: 'https://feega.app/'
+  feega: 'https://feega.app/',
+  supabase: 'https://supabase.com/',
+  astro: 'https://docs.astro.build/en/install-and-setup/'
 };
 
 export const FIDELITY_DIR = process.env.URL_IMPORT_FIDELITY_DIR ?? join(homedir(), 'Documents/feega-videos/url-import/fidelity2');

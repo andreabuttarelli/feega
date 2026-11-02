@@ -3,7 +3,6 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { createMedia } from '@feega/motion-core/motion/gpu-full/media';
 import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
-import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { createCore, createCoreGl, type CoreRaster, type Use } from '@feega/motion-core/motion/gpu-full/core-web';
 import { BUDGET, Device } from '$lib/canvas/gpu/memory-budget';
 import { stillFrame } from '$lib/canvas/core/frame-source';
@@ -25,7 +24,6 @@ type World = { raster: CoreRaster; media: ReturnType<typeof createMedia>; canvas
 let world: World | null = null;
 
 async function worldOpen(input: WorldInput): Promise<void> {
-  const smoothing = smoothingOf(navigator.userAgent);
   const media = createMedia();
   const canvas = document.createElement('canvas');
   canvas.style.cssText = `display:block;position:fixed;left:0;top:0;width:${input.width}px;height:${input.band}px`;
@@ -37,7 +35,7 @@ async function worldOpen(input: WorldInput): Promise<void> {
   for (const [i, item] of input.items.entries()) {
     const doc = item.doc as MotionDoc;
     const fonts = await loadFonts(doc, input.assets, FEEGA_TOKENS);
-    const prepared = prepare(doc, FEEGA_TOKENS, input.assets, { fonts, smoothing });
+    const prepared = prepare(doc, FEEGA_TOKENS, input.assets, { fonts, smoothing: input.smoothing });
     const list = drawFrame(prepared, stillFrame(doc));
     await media.ready(list);
     const group = `frame-${i}`;

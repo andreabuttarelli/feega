@@ -4,7 +4,9 @@ import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { MaskKind, MaskMode, Matte, maskSchema } from '@feega/motion-core/motion/mask';
-import { CoverKind, displayListAt, ItemKind, Unsupported, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { CoverKind, displayListAt, ItemKind, Unsupported, type Item, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import type { MaskLayer } from '@feega/motion-core/motion/gpu-full/mask-layers';
+import { groupClips } from '../group';
 import { apply2d } from '@feega/motion-core/motion/affine';
 
 function must(r: OpResult): MotionDoc {
@@ -74,6 +76,35 @@ describe('track mattes', () => {
   });
 });
 
+describe('masks on a group', () => {
+  it('cuts what the group holds with the group mask, as the HTML render does', () => {
+    let n = 0;
+    const grouped = must(groupClips(withCard, ['card'], () => (n++ === 0 ? 'inner' : 'group')));
+    const doc = patch(grouped, 'group', { mask: mask({ kind: MaskKind.Rect, x: 0.25, y: 0.5, width: 0.5, height: 1 }) });
+    const drawn = displayListAt(doc, 0, FEEGA_TOKENS);
+    const masksOn = (items: Item[]): MaskLayer[] => items.flatMap((i) => [...(i.masks ?? []), ...(i.kind === ItemKind.Group ? masksOn(i.items) : [])]);
+
+    expect(drawn.unsupported).toEqual([]);
+    const [layer] = masksOn(drawn.items);
+    const cover = layer.cover as Extract<CoverOf, { kind: CoverKind.Path }>;
+    const xs = cover.contours.flatMap((c) => c.filter((_, i) => i % 2 === 0).map((x, i) => apply2d(cover.matrix, [x, c[i * 2 + 1]])[0]));
+
+    expect(masksOn(drawn.items).map((m) => m.mode)).toEqual([MaskMode.Add]);
+    expect([Math.min(...xs), Math.max(...xs)]).toEqual([0, 960]);
+  });
+
+  it('masks everything a group holds as one layer, not one per clip', () => {
+    const two = must(addClip(withCard, { component: 'Shape', from: 0, durationInFrames: 90, props: square }, 'second'));
+    let n = 0;
+    const grouped = must(groupClips(two, ['card', 'second'], () => (n++ === 0 ? 'inner' : 'group')));
+    const doc = patch(grouped, 'group', { mask: mask({ kind: MaskKind.Rect, x: 0.25, y: 0.5, width: 0.5, height: 1 }) });
+    const groups = displayListAt(doc, 0, FEEGA_TOKENS).items.filter((i) => i.kind === ItemKind.Group && i.masks?.length);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].kind === ItemKind.Group && groups[0].items).toHaveLength(2);
+  });
+});
+
 describe('content clipped by a parent', () => {
   const frameBox = { shape: 'rect', x: 0.5, y: 0.5, width: 0.5, height: 0.5, fill: '#00ff00' };
   const framed = must(addClip(withCard, { component: 'Shape', from: 0, durationInFrames: 90, props: frameBox }, 'frame'));
@@ -94,5 +125,22 @@ describe('content clipped by a parent', () => {
 
   it('leaves a child alone when its parent does not clip', () => {
     expect(card(patch(wide, 'frame', { clipContent: false }))?.masks).toBeUndefined();
+  });
+
+  it('cuts a group by the parent that clips it, as the HTML render cuts the group layer', () => {
+    let n = 0;
+    const grouped = patch(must(groupClips(wide, ['card'], () => (n++ === 0 ? 'inner' : 'group'))), 'group', { parent: 'frame' });
+    const drawn = displayListAt(grouped, 0, FEEGA_TOKENS).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip.endsWith('card'));
+
+    expect(drawn?.masks?.map((m) => extentOf(m.cover))).toEqual([[480, 270, 1440, 810]]);
+  });
+
+  it('moves the cut with the group it is in, as an instance placed elsewhere on the page', () => {
+    let n = 0;
+    const grouped = must(groupClips(wide, ['frame', 'card'], () => (n++ === 0 ? 'inner' : 'group')));
+    const moved = patch(grouped, 'group', { transform: { x: 0.25 } });
+    const drawn = displayListAt(moved, 0, FEEGA_TOKENS).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip.endsWith('card'));
+
+    expect(extentOf(drawn!.masks![0].cover)).toEqual([960, 270, 1920, 810]);
   });
 });

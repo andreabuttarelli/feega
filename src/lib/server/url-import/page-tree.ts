@@ -1,7 +1,9 @@
 import { DESIGN_MAX_SIDE } from '@feega/motion-core/motion/doc';
-import type { RestNode, RestPaint } from '$lib/server/figma/rest-message';
+import type { RestColor, RestNode, RestPaint } from '$lib/server/figma/rest-message';
 import { pageKit, type KitMatrix, type KitRect, type PageKit } from './page-kit';
 import { OUTLINE_LIMITS, pageOutlineOf, type PageOutline } from './page-outline';
+import { PATTERN_LIMITS, pagePatterns, type PagePattern, type PatternKit } from './page-patterns';
+import { HOVER_LIMITS, pageHovers, type HoverKit } from './page-hovers';
 
 export enum SnapMode {
   Isolated = 'isolated',
@@ -9,11 +11,13 @@ export enum SnapMode {
   Backdrop = 'backdrop'
 }
 
-export type TreeLimits = { nodes: number; height: number; text: number; snaps: number; useAttr: string; snapAttr: string; hostAttr: string; hideAttr: string };
+export type TreeLimits = { nodes: number; height: number; text: number; snaps: number; useAttr: string; snapAttr: string; hostAttr: string; hideAttr: string; hints: string[]; patternAttr: string; goAttr: string; standAttr: string };
 
 const PAGE_SLICES = 4;
 
-export const TREE_LIMITS: TreeLimits = { nodes: 10_000, height: DESIGN_MAX_SIDE * PAGE_SLICES, text: 4_000, snaps: 48, useAttr: 'data-feega-use', snapAttr: 'data-feega-snap', hostAttr: 'data-feega-host', hideAttr: 'data-feega-hide' };
+export const HINT_WORDS = ['avatar', 'badge', 'pill', 'chip', 'tag', 'pricing', 'tier', 'plan', 'testimonial', 'quote', 'review', 'accordion', 'faq', 'tab', 'tooltip', 'toast', 'alert', 'banner', 'input', 'field', 'search', 'button', 'btn', 'cta', 'logo', 'icon', 'card', 'tile', 'feature', 'nav', 'menu', 'link', 'item'];
+
+export const TREE_LIMITS: TreeLimits = { nodes: 10_000, height: DESIGN_MAX_SIDE * PAGE_SLICES, text: 4_000, snaps: 48, useAttr: 'data-feega-use', snapAttr: 'data-feega-snap', hostAttr: 'data-feega-host', hideAttr: 'data-feega-hide', hints: HINT_WORDS, patternAttr: 'data-feega-pattern', goAttr: 'data-feega-go', standAttr: 'data-feega-stand' };
 
 export const SNAP_REF = 'snap:';
 
@@ -21,12 +25,12 @@ export type PageBox = { x: number; y: number; width: number; height: number };
 export type PageFont = { family: string; weight: string; style: string; url: string };
 export type PageSnap = { ref: string; box: PageBox; mode: SnapMode };
 
-export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; snaps?: PageSnap[]; outline?: PageOutline };
+export type PageTree = { title: string; url: string; width: number; height: number; root: RestNode; truncated: boolean; fonts?: PageFont[]; sheets?: string[]; snaps?: PageSnap[]; outline?: PageOutline; patterns?: PagePattern[] };
 
 export const treeScript = (limits: TreeLimits) =>
-  `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})()).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
+  `var __name = (f) => f; (${pageTreeOf.toString()})(${JSON.stringify(limits)}, (${pageKit.toString()})(), (${pagePatterns.toString()})(${JSON.stringify(PATTERN_LIMITS)}), (${pageHovers.toString()})(${JSON.stringify(HOVER_LIMITS)})).then((tree) => ({ ...tree, outline: (${pageOutlineOf.toString()})(${JSON.stringify(OUTLINE_LIMITS)}, tree.height) }))`;
 
-export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<PageTree> {
+export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: PatternKit, hovers: HoverKit): Promise<PageTree> {
   const SKIPPED = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|HEAD|META|LINK|TITLE|BR|WBR|DIALOG)$/;
   const RASTER = /^(VIDEO|CANVAS|IFRAME|EMBED|OBJECT)$/;
   const REPLACED = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|EMBED|OBJECT|INPUT|SELECT|TEXTAREA|BUTTON|PICTURE)$/;
@@ -43,6 +47,19 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   const MOSTLY_SEEN = 0.5;
   const LIFTED = 1.5;
   const DRAWN_ALL = 0.99;
+  const HOLDERS = /^(grid|list|wrapper|wrap|container|group|row|rows|section|carousel|track|slider|marquee|items|cards|buttons|tabs|links)$/;
+  const LANDMARKS: [string, string][] = [
+    ['footer', 'footer, [role=contentinfo]'],
+    ['nav', 'nav, [role=navigation]'],
+    ['header', 'header, [role=banner]']
+  ];
+  const PRESSES: [string, string][] = [
+    ['tab', '[role=tab]'],
+    ['menuitem', '[role=menuitem]'],
+    ['button', 'button, [role=button], input[type=submit], input[type=button]'],
+    ['link', 'a[href], [role=link]']
+  ];
+  const PRESSABLE = PRESSES.map(([, selector]) => selector).join(', ');
 
   const width = document.documentElement.clientWidth;
   const full = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0, window.innerHeight);
@@ -147,13 +164,18 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     return { id: id(), type: 'RECTANGLE', name, absoluteBoundingBox: box(seen), fills: [{ type: 'IMAGE', imageRef: `snap:${ref}`, scaleMode: 'STRETCH' }] };
   };
 
+  const FLAT_3D = [2, 3, 6, 7, 8, 9, 11];
+  const FLAT_3D_ONE = 10;
   const matrixOf = (transform: string): KitMatrix | null => {
-    const m = transform.match(/^matrix\(([^)]+)\)$/);
-    if (!m) {
-      return null;
+    const flat = transform.match(/^matrix\(([^)]+)\)$/);
+    if (flat) {
+      const v = flat[1].split(',').map(Number);
+      return [v[0], v[1], v[2], v[3], v[4], v[5]];
     }
-    const v = m[1].split(',').map(Number);
-    return [v[0], v[1], v[2], v[3], v[4], v[5]];
+    const deep = transform.match(/^matrix3d\(([^)]+)\)$/);
+    const v = deep ? deep[1].split(',').map(Number) : [];
+    const flatInZ = deep && FLAT_3D.every((i) => Math.abs(v[i]) < 1e-6) && Math.abs(v[FLAT_3D_ONE] - 1) < 1e-6 && Math.abs(v[15] - 1) < 1e-6;
+    return flatInZ ? [v[0], v[1], v[4], v[5], v[12], v[13]] : null;
   };
   const turned = (css: CSSStyleDeclaration) => {
     if (css.transform === 'none') {
@@ -181,6 +203,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   const sorted = (kids: RestNode[]) => kids.map((k, i) => ({ k, i, z: zOf.get(k) ?? 0 })).sort((a, b) => a.z - b.z || a.i - b.i).map((e) => e.k);
 
   const SIMPLE_FILTER = /^blur\(([\d.]+)px\)$/;
+  const SHADOW_FILTER = /^drop-shadow\((.+)\)$/;
   const effectsOf = (css: CSSStyleDeclaration): RestNode['effects'] => {
     const effects: NonNullable<RestNode['effects']> = [];
     if (css.boxShadow && css.boxShadow !== 'none') {
@@ -192,6 +215,12 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         }
         effects.push({ type: /\binset\b/.test(part) ? 'INNER_SHADOW' : 'DROP_SHADOW', visible: true, color, offset: { x: lengths[0], y: lengths[1] }, radius: lengths[2] ?? 0, spread: lengths[3] ?? 0 });
       }
+    }
+    const shadow = css.filter.match(SHADOW_FILTER);
+    const shadowColor = shadow ? colourOf(shadow[1].match(/(?:[a-z-]+\([^()]*\)|#[\da-f]+)/i)?.[0] ?? '') : null;
+    const shadowLengths = shadow ? (shadow[1].replace(/[a-z-]+\([^()]*\)/gi, '').match(/-?[\d.]+px/g)?.map(px) ?? []) : [];
+    if (shadowColor && shadowLengths.length >= 2) {
+      effects.push({ type: 'DROP_SHADOW', visible: true, color: shadowColor, offset: { x: shadowLengths[0], y: shadowLengths[1] }, radius: shadowLengths[2] ?? 0, spread: 0 });
     }
     const blur = css.filter.match(SIMPLE_FILTER);
     if (blur) {
@@ -359,7 +388,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     return text;
   };
 
-  type Seg = { node: Text | null; css: CSSStyleDeclaration; fills: RestPaint[] | null; br: boolean; lead?: number; trail?: number };
+  type Seg = { node: Text | null; css: CSSStyleDeclaration; fills: RestPaint[] | null; br: boolean; lead?: number; trail?: number; host?: Element };
   type Char = { c: string; seg: number; node: Text | null; at: number; extra?: number };
 
   const styleOf = (seg: Seg, scale: number) => ({
@@ -422,9 +451,11 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   };
 
   const SPACE_EM = 0.2;
+  const overlapOf = (l: KitRect, r: KitRect) => Math.min(l.bottom, r.bottom) - Math.max(l.top, r.top);
+  const mostOn = (rect: KitRect, lines: KitRect[]) => lines.reduce((best, l, i) => (overlapOf(l, rect) > 0 && (best < 0 || overlapOf(l, rect) > overlapOf(lines[best], rect)) ? i : best), -1);
   const lineAt = (ch: Char, lines: KitRect[]) => {
     const rect = ch.node ? rectsOf(ch.node, ch.at, ch.at + 1)[0] : null;
-    return rect ? lines.findIndex((l) => Math.min(l.bottom, rect.bottom) - Math.max(l.top, rect.top) > 0) : -1;
+    return rect ? mostOn(rect, lines) : -1;
   };
   const firstOn = (chars: Char[], lines: KitRect[], line: number) => {
     let [lo, hi] = [0, chars.length];
@@ -530,18 +561,34 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     return node;
   };
 
-  const runNodes = (segs: Seg[], ctx: Ctx, block: CSSStyleDeclaration): RestNode[] => {
+  const paths = new Map<Element, string>();
+  const pathOf = (el: Element): string => {
+    const known = paths.get(el);
+    if (known) {
+      return known;
+    }
+    const parent = el.parentElement ?? (el.parentNode instanceof ShadowRoot ? el.parentNode.host : null);
+    const siblings = el.parentNode ? [...el.parentNode.children] : [];
+    const step = `${el.tagName.toLowerCase()}${siblings.indexOf(el)}`;
+    const path = parent ? `${pathOf(parent)}/${el.parentNode instanceof ShadowRoot ? '#' : ''}${step}` : step;
+    paths.set(el, path);
+    return path;
+  };
+
+  const runNodes = (segs: Seg[], ctx: Ctx, block: CSSStyleDeclaration, key: string): RestNode[] => {
     const chars = charsOf(segs);
     if (!chars.some((c) => c.c.trim())) {
       return [];
     }
     const texts = segs.filter((s) => s.node);
-    const all = texts.flatMap((s) => rectsOf(s.node!));
+    const hosts = [...new Set(segs.flatMap((s) => (s.host ? [s.host] : [])))];
+    const boxes = hosts.flatMap((h) => [...h.getClientRects()].map((r) => ({ left: r.left + window.scrollX, top: r.top + window.scrollY, right: r.right + window.scrollX, bottom: r.bottom + window.scrollY })));
+    const all = [...texts.flatMap((s) => rectsOf(s.node!)), ...boxes];
     const lines = kit.linesOf(all);
     const seen = (l: KitRect) => {
       const r = { x: l.left, y: l.top, width: l.right - l.left, height: l.bottom - l.top };
       const v = meet(r, ctx.clip);
-      return (v.width * v.height) / Math.max(1, r.width * r.height);
+      return v.width > 0 ? v.height / Math.max(1, r.height) : 0;
     };
     const kept = lines.filter((l) => seen(l) >= MOSTLY_SEEN && l.top < height);
     if (!kept.length) {
@@ -552,13 +599,13 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const clean = kept.length === lines.length && (lines.length === 1 || lines.every((l) => Math.abs(edge(l) - edge(lines[0])) <= LINE_SLACK || (align === 'JUSTIFIED' && Math.abs(l.left - lines[0].left) <= LINE_SLACK)));
     if (clean) {
       const made = textNode(chars, segs, lines, ctx, align);
-      return made ? [made] : [];
+      return made ? [{ ...made, key }] : [];
     }
     const perLine = kept.map(() => [] as Char[]);
     let last = 0;
     for (const ch of chars) {
       const rect = ch.node ? rectsOf(ch.node, ch.at, ch.at + 1)[0] : null;
-      const index = rect ? kept.findIndex((l) => Math.min(l.bottom, rect.bottom) - Math.max(l.top, rect.top) > 0) : -1;
+      const index = rect ? mostOn(rect, kept) : -1;
       if (index >= 0) {
         last = index;
       } else if (rect && ch.c.trim()) {
@@ -575,7 +622,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         trimmed.pop();
       }
       const made = trimmed.length ? textNode(trimmed, segs, [kept[i]], ctx, 'LEFT') : null;
-      return made ? [made] : [];
+      return made ? [{ ...made, key: `${key}.${i}` }] : [];
     });
   };
 
@@ -939,7 +986,36 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     };
   };
 
+  const hintOf = (el: Element): string | undefined => {
+    const words = (el.getAttribute('class') ?? '').split(/\s+/).flatMap((token) => {
+      const parts = token.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/);
+      return parts.some((w) => HOLDERS.test(w)) ? [] : parts;
+    });
+    return limits.hints.find((hint) => words.includes(hint));
+  };
+  const pressOf = (el: Element): string | undefined => {
+    const control = el.closest(PRESSABLE);
+    const labelled = control && (control.textContent ?? '').trim() === (el.textContent ?? '').trim();
+    return labelled ? PRESSES.find(([, selector]) => control.matches(selector))?.[0] : undefined;
+  };
+  const domOf = (el: Element): NonNullable<RestNode['dom']> => {
+    const role = el.getAttribute('role') ?? undefined;
+    const hint = hintOf(el);
+    const landmark = LANDMARKS.find(([, selector]) => el.closest(selector))?.[0];
+    const press = pressOf(el);
+    return { tag: el.tagName.toLowerCase(), ...(role ? { role } : {}), ...(hint ? { hint } : {}), ...(landmark ? { landmark } : {}), ...(press ? { press } : {}) };
+  };
+  const described = (el: Element, made: RestNode[]): RestNode[] => {
+    const bare = made.filter((n) => !n.dom);
+    if (bare.length) {
+      const dom = domOf(el);
+      bare.forEach((n) => (n.dom = dom));
+    }
+    return made;
+  };
+
   const marked = (el: Element, made: RestNode[]): RestNode[] => {
+    described(el, made);
     const use = el.getAttribute(limits.useAttr);
     if (use === null || !made.length) {
       return made;
@@ -964,14 +1040,41 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const paint = kit.gradientOf(layers[0], r.width, r.height, rgbaOf) as RestPaint | null;
     return paint?.type === 'GRADIENT_LINEAR' ? paint : null;
   };
+  const OPAQUE = 0.99;
+  const backdropOf = (el: Element): RestColor | null => {
+    for (let at = el.parentElement; at; at = at.parentElement) {
+      const colour = rgbaOf(getComputedStyle(at).backgroundColor);
+      if (colour && colour.a >= OPAQUE) {
+        return colour;
+      }
+    }
+    return null;
+  };
+  const veilsOf = (el: Element, css: CSSStyleDeclaration, r: Rect): RestNode[] => {
+    const mask = maskOf(css);
+    const layers = mask ? kit.splitTop(mask, ',').map((l) => l.trim()) : [];
+    const backdrop = backdropOf(el);
+    if (!backdrop || layers.length < 2 || !layers.every((l) => /^linear-gradient\(/.test(l))) {
+      return [];
+    }
+    const paints = layers.map((l) => kit.gradientOf(l, r.width, r.height, rgbaOf) as RestPaint | null);
+    return paints.flatMap((paint) =>
+      paint?.type === 'GRADIENT_LINEAR'
+        ? [{ id: id(), type: 'RECTANGLE', name: 'fade', absoluteBoundingBox: box(r), layoutPositioning: 'ABSOLUTE', fills: [{ ...paint, gradientStops: paint.gradientStops!.map((stop) => ({ ...stop, color: { ...backdrop, a: 1 - (stop.color.a ?? 1) } })) }] } as RestNode]
+        : []
+    );
+  };
+  const holdsContent = (el: Element) => el instanceof HTMLElement && (Boolean(el.innerText.trim()) || Boolean(el.querySelector('a, button, input, select, textarea')));
+  const OWN_PAINT_EFFECTS = (css: CSSStyleDeclaration) => (css.filter !== 'none' && !SIMPLE_FILTER.test(css.filter) && !SHADOW_FILTER.test(css.filter)) || Boolean(maskOf(css)) || !(css.clipPath === 'none' || /^inset\(/.test(css.clipPath));
   const SIMPLE_EFFECTS = (el: Element, css: CSSStyleDeclaration) => (css.filter === 'none' || SIMPLE_FILTER.test(css.filter)) && (css.mixBlendMode === 'normal' || blendsAlone(el, css)) && (!maskOf(css) || Boolean(gradientMaskOf(el, css))) && (css.clipPath === 'none' || /^inset\(/.test(css.clipPath));
 
   const childrenOf = (el: Element, css: CSSStyleDeclaration, ctx: Ctx): RestNode[] => {
     const out: RestNode[] = [];
     let run: Seg[] = [];
+    let runs = 0;
     const flush = () => {
       if (run.length) {
-        out.push(...runNodes(run, ctx, css));
+        out.push(...runNodes(run, ctx, css, `${pathOf(el)}~${runs++}`));
       }
       run = [];
     };
@@ -998,12 +1101,15 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         if (SKIPPED.test(element.tagName.toUpperCase()) && element.tagName !== 'BR') {
           continue;
         }
+        const ccss = getComputedStyle(element);
+        if (ccss.display === 'none') {
+          continue;
+        }
         if (element.tagName === 'BR') {
           run.push({ node: null, css: own, fills, br: true });
           continue;
         }
-        const ccss = getComputedStyle(element);
-        if (ccss.display === 'none' || Number(ccss.opacity) === 0) {
+        if (Number(ccss.opacity) === 0) {
           continue;
         }
         if (plainInline(element, ccss)) {
@@ -1014,6 +1120,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
           const inside = run === was ? run.slice(from).filter((seg) => seg.node) : [];
           if (inside.length) {
             inside[0].lead = (inside[0].lead ?? 0) + lead;
+            inside[0].host = lead || trail ? element : inside[0].host;
             inside[inside.length - 1].trail = (inside[inside.length - 1].trail ?? 0) + trail;
           }
           continue;
@@ -1024,7 +1131,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     };
     inline(el, css, ctx.textFills);
     flush();
-    return out;
+    return described(el, out);
   };
 
   const textPaintOf = (css: CSSStyleDeclaration, el: Element): RestPaint[] | null => {
@@ -1042,6 +1149,31 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         return visit(e, ctx);
       });
 
+  const LETTER_CHARS = 2;
+  const NEAR_EM = 0.6;
+  const LINE_PX = 1;
+  const lettersJoined = (kids: RestNode[]): RestNode[] => {
+    const letter = (k: RestNode) => k.type === 'TEXT' && (k.characters ?? '').length <= LETTER_CHARS && !k.children?.length;
+    if (kids.length < 2 || !kids.every(letter)) {
+      return kids;
+    }
+    const look = (k: RestNode) => JSON.stringify([k.style, k.fills]);
+    const row = [...kids].sort((a, b) => a.absoluteBoundingBox!.x - b.absoluteBoundingBox!.x);
+    const em = row[0].style?.fontSize ?? 16;
+    const fits = row.every((k, i) => {
+      const [b, prev] = [k.absoluteBoundingBox!, row[i - 1]?.absoluteBoundingBox];
+      return look(k) === look(row[0]) && Math.abs(b.y - row[0].absoluteBoundingBox!.y) <= LINE_PX && (!prev || (b.x - (prev.x + prev.width) <= em * NEAR_EM && b.x - (prev.x + prev.width) >= -LINE_PX));
+    });
+    if (!fits) {
+      return kids;
+    }
+    const characters = row.map((k, i) => (i && k.absoluteBoundingBox!.x - (row[i - 1].absoluteBoundingBox!.x + row[i - 1].absoluteBoundingBox!.width) > em * SPACE_EM ? ' ' : '') + k.characters).join('');
+    const first = row[0].absoluteBoundingBox!;
+    const last = row[row.length - 1].absoluteBoundingBox!;
+    return [{ ...row[0], name: characters.slice(0, 40), characters, absoluteBoundingBox: { ...first, width: last.x + last.width - first.x } }];
+  };
+  const leavesOf = (nodes: RestNode[]): RestNode[] => nodes.flatMap((n) => (n.children?.length ? leavesOf(n.children) : [n]));
+
   const visit = (el: Element, within: Ctx): RestNode[] => {
     const tag = el.tagName.toUpperCase();
     if (SKIPPED.test(tag)) {
@@ -1054,17 +1186,47 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     }
     const ctx = fixed ? { ...within, clip: PAGE } : within;
     const made = shape(el, css, ctx);
+    if (made[0] && !made[0].key) {
+      made[0].key = pathOf(el);
+    }
     const fade = maskOf(css) ? gradientMaskOf(el, css) : null;
     if (fade && made[0]?.type === 'FRAME') {
       made[0].maskGradient = fade;
     }
-    if (blendsAlone(el, css)) {
-      made.forEach((n) => (n.blendMode = css.mixBlendMode.toUpperCase().replace(/-/g, '_')));
+    if (blendsAlone(el, css) || (css.mixBlendMode !== 'normal' && holdsContent(el))) {
+      leavesOf(made).forEach((n) => (n.blendMode = css.mixBlendMode.toUpperCase().replace(/-/g, '_')));
     }
     if (fixed) {
       made.forEach((n) => fixedNodes.add(n));
     }
-    return made;
+    return stamped(el, made);
+  };
+
+  const sameBox = (n: RestNode, r: Rect) => {
+    const b = n.absoluteBoundingBox;
+    return Boolean(b) && Math.abs(b!.x - r.x) <= EXACT && Math.abs(b!.y - r.y) <= EXACT && Math.abs(b!.width - r.width) <= EXACT && Math.abs(b!.height - r.height) <= EXACT;
+  };
+
+  const stamped = (el: Element, made: RestNode[]): RestNode[] => {
+    const hover = hovered.get(el);
+    if (hover && made.length === 1) {
+      made[0].hover = hover;
+    }
+    const pattern = el.getAttribute(limits.patternAttr);
+    const go = el.getAttribute(limits.goAttr);
+    if ((pattern === null && go === null) || !made.length) {
+      return made;
+    }
+    const r = pageRect(el.getBoundingClientRect());
+    const own = made.length === 1 && made[0].type === 'FRAME' && sameBox(made[0], r);
+    const one = own ? made[0] : keyed({ id: id(), type: 'FRAME', name: el.tagName.toLowerCase(), absoluteBoundingBox: box(r), fills: [], clipsContent: false, children: made }, Math.max(...made.map((m) => zOf.get(m) ?? 0)));
+    if (pattern !== null) {
+      one.pattern = Number(pattern);
+    }
+    if (go !== null) {
+      one.go = go;
+    }
+    return [one];
   };
 
   const shape = (el: Element, css: CSSStyleDeclaration, ctx: Ctx): RestNode[] => {
@@ -1085,7 +1247,9 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const name = el.id || el.getAttribute('aria-label') || tag.toLowerCase();
     const control = (el instanceof HTMLInputElement && !FIELDS.test(el.type) && css.appearance !== 'none') || /^(PROGRESS|METER)$/.test(tag);
     const rasterOnly = RASTER.test(tag);
-    if (!SIMPLE_EFFECTS(el, css) || (turned(css) && !(el instanceof SVGSVGElement)) || control || rasterOnly) {
+    const plain = SIMPLE_EFFECTS(el, css) && !(turned(css) && !(el instanceof SVGSVGElement));
+    const holding = !plain && !control && !rasterOnly && holdsContent(el);
+    if ((!plain && !holding) || control || rasterOnly) {
       if (!visible) {
         return [];
       }
@@ -1115,8 +1279,10 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     const field = (el instanceof HTMLInputElement && FIELDS.test(el.type)) || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ? fieldText(el as HTMLInputElement, css, r, ctx) : null;
     const every = sorted([...(field ? [field] : []), ...childrenOf(el, css, inner)]);
     const lifted = every.filter((k) => fixedNodes.has(k) || (!stacks(el, css) && !clipsSelf && ((zOf.get(k) ?? 0) < 0 || (zOf.get(k) ?? 0) >= LIFTED)));
-    const kids = every.filter((k) => !lifted.includes(k));
-    const own = visible && !textFills ? backgroundOf(css, r, ctx) : { fills: [], under: [], own: false };
+    const kids = lettersJoined(every.filter((k) => !lifted.includes(k)));
+    const painted = visible && !textFills ? backgroundOf(css, r, ctx) : { fills: [], under: [], own: false };
+    const effectPaint = holding && OWN_PAINT_EFFECTS(css) && (painted.own || painted.fills.length > 0);
+    const own = effectPaint ? { ...painted, fills: [], own: true } : painted;
     const ownSnap = own.own && visible ? snapOf(el, r, 'own', ctx, 'background') : null;
     const borders = visible ? bordersOf(css, r) : { sides: [] };
     const effects = visible ? effectsOf(css) : undefined;
@@ -1155,7 +1321,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
       }
       return k.type === 'TEXT' ? { id: id(), type: 'FRAME', name: k.name, absoluteBoundingBox: k.absoluteBoundingBox, fills: [], clipsContent: false, children: [k] } : k;
     };
-    const children = [...extras, ...(flow.layoutMode ? kids.map(boxed) : kids), ...borders.sides, ...outline];
+    const veils = holding ? veilsOf(el, css, r) : [];
+    const children = [...extras, ...(flow.layoutMode ? kids.map(boxed) : kids), ...borders.sides, ...outline, ...veils];
     return marked(el, [
       keyed(
         {
@@ -1179,7 +1346,13 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     ]);
   };
 
-  pseudoElements();
+  const hovered = hovers.read();
+  const found = patterns.found();
+  found.forEach((p, i) => p.root.setAttribute(limits.patternAttr, String(i)));
+  found.forEach((p) => aimed(p, p.initial));
+  if (document.body) {
+    pseudoElements(document.body);
+  }
   const { fonts, sheets } = fontsOf();
   fonts.forEach((f) => declaredFamilies.add(f.family.toLowerCase()));
   await svgImages();
@@ -1189,6 +1362,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
   const ground = pageCss && solid(pageCss.backgroundColor).length ? solid(pageCss.backgroundColor) : solid(getComputedStyle(document.documentElement).backgroundColor);
   const top: Ctx = { clip: PAGE, scale: 1, textFills: null, visible: true };
   const children = body ? sorted(childrenOf(body, pageCss!, top)).flatMap((n) => (n.type === 'GROUP' && n.name === 'body' ? (n.children ?? []) : [n])) : [];
+  const captured = await variantsOf(found, top);
+  unstamped(children, new Set(captured.map((p) => p.ix)));
   hosts.forEach((h) => h.remove());
 
   return {
@@ -1200,15 +1375,98 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
     fonts,
     sheets,
     snaps: snaps.map((s) => ({ ...s, mode: s.mode as SnapMode })),
+    ...(captured.length ? { patterns: captured } : {}),
     root: { id: id(), type: 'FRAME', name: document.title.trim() || location.hostname, absoluteBoundingBox: { x: 0, y: 0, width, height }, fills: ground.length ? ground : [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], clipsContent: true, children }
   };
 
-  function pseudoElements() {
+  function aimed(p: (typeof found)[number], state: string) {
+    p.root.querySelectorAll(`[${limits.goAttr}]`).forEach((el) => el.removeAttribute(limits.goAttr));
+    p.triggers(state).forEach(([el, target]) => el.setAttribute(limits.goAttr, target));
+  }
+
+  function stayed(event: Event) {
+    if (event.target instanceof Element && event.target.closest('a[href], [type=submit]')) {
+      event.preventDefault();
+    }
+  }
+
+  function unfocused() {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement || active instanceof SVGElement) {
+      active.blur();
+    }
+  }
+
+  function unstamped(nodes: RestNode[], kept: ReadonlySet<number>, within = false) {
+    for (const n of nodes) {
+      const inside = n.pattern === undefined ? within : kept.has(n.pattern);
+      if (!inside) {
+        delete n.pattern;
+        delete n.go;
+      }
+      unstamped(n.children ?? [], kept, inside);
+    }
+  }
+
+  function freshPseudos(scope: Element) {
+    scope.querySelectorAll(`[${limits.standAttr}]`).forEach((el) => el.remove());
+    for (const el of [scope, ...scope.querySelectorAll('[data-feega-before], [data-feega-after]')]) {
+      el.removeAttribute('data-feega-before');
+      el.removeAttribute('data-feega-after');
+    }
+    pseudoElements(scope);
+  }
+
+  async function shifted(p: (typeof found)[number], state: string) {
+    const held = window as unknown as { __feegaStill?: boolean; requestAnimationFrame: typeof requestAnimationFrame };
+    const frozen = held.requestAnimationFrame;
+    const FRAME_MS = 16;
+    held.__feegaStill = false;
+    held.requestAnimationFrame = (callback) => window.setTimeout(() => callback(performance.now()), FRAME_MS);
+    window.addEventListener('click', stayed, true);
+    p.enter(state);
+    window.removeEventListener('click', stayed, true);
+    await new Promise((done) => setTimeout(done, p.settleMs));
+    unfocused();
+    held.requestAnimationFrame = frozen;
+    held.__feegaStill = true;
+    freshPseudos(p.root);
+  }
+
+  async function variantsOf(list: typeof found, ctx: Ctx): Promise<PagePattern[]> {
+    const instant = new CSSStyleSheet();
+    instant.replaceSync('*,*::before,*::after{transition:none!important}');
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, instant];
+    const out: PagePattern[] = [];
+    for (const [ix, p] of list.entries()) {
+      const variants: PagePattern['variants'] = [];
+      for (const state of p.states.filter((s) => s !== p.initial)) {
+        await shifted(p, state);
+        if (!p.shows(state)) {
+          continue;
+        }
+        aimed(p, state);
+        const made = visit(p.root, ctx).find((n) => n.pattern === ix);
+        if (made) {
+          variants.push({ state, root: made });
+        }
+      }
+      await shifted(p, p.initial);
+      aimed(p, p.initial);
+      if (variants.length) {
+        out.push({ ix, kind: p.kind, prop: p.prop, initial: p.initial, states: [p.initial, ...variants.map((v) => v.state)], variants });
+      }
+    }
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== instant);
+    return out;
+  }
+
+  function pseudoElements(scope: Element) {
     const SKIP_PROPS = /^(animation|transition|content$|counter-|quotes$|will-change)/;
     const sheet = new CSSStyleSheet();
     const rules: string[] = [];
     let made = 0;
-    for (const el of document.body ? [...document.body.querySelectorAll('*')] : []) {
+    for (const el of [...(scope === document.body ? [] : [scope]), ...scope.querySelectorAll('*')]) {
       if (REPLACED.test(el.tagName.toUpperCase()) || el instanceof SVGElement || made >= limits.nodes) {
         continue;
       }
@@ -1221,6 +1479,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit): Promise<Page
         const text = [...content.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1].replace(/\\(.)/g, '$1')).join('');
         const picture = content.match(/url\(["']?([^"')]+)["']?\)/)?.[1];
         const stand = document.createElement(picture ? 'img' : 'feega-pseudo');
+        stand.setAttribute(limits.standAttr, '');
         for (let i = 0; i < pc.length; i++) {
           const prop = pc[i];
           if (!SKIP_PROPS.test(prop)) {

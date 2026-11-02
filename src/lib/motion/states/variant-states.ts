@@ -12,4 +12,6 @@ export function inVariantState(doc: MotionDoc, clipId: string, state: ElementSta
 
 export const hasVariantStates = (doc: MotionDoc, clipId: string): boolean => inVariantState(doc, clipId, ElementState.Hover) !== null;
 
+export const statePick = (state: ElementState): Record<string, string> => ({ [STATE_PROPERTY]: STATE_LABEL[state] });
+
 export const pastHalfway = (amount: number): boolean => amount >= HALFWAY;

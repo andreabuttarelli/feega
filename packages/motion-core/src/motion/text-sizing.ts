@@ -7,6 +7,8 @@ export enum TextSizing {
 export const NEW_TEXT_SIZING = TextSizing.AutoWidth;
 export const DRAGGED_TEXT_SIZING = TextSizing.AutoHeight;
 
+export const TEXT_WRAPS = ['wrap', 'balance', 'pretty', 'none'] as const;
+
 export const TEXT_SIZINGS = [TextSizing.AutoWidth, TextSizing.AutoHeight, TextSizing.Fixed] as const;
 
 type Placement = { x: number; y: number; width: number; height: number };

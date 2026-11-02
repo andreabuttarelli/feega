@@ -3,6 +3,7 @@ import type { NewId } from './main-component';
 import { reframed } from './comp-frame';
 import { setMembers, type Variant } from './variants';
 import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 
 export type FrameDoc = { id: string; doc: MotionDoc };
 export type ComponentVariant = { compId: string; variant: Variant };
@@ -65,23 +66,28 @@ export function homedAt(source: MotionDoc, homes: Readonly<Record<string, string
 
 export const mainHome = (doc: MotionDoc, compId: string, frameId: string): string => doc.comps[compId]?.component?.home ?? frameId;
 
-const holdsMain = (doc: MotionDoc, clip: MotionClip, compId: string, seen: Set<string>): boolean => {
-  const comp = clip.props.comp;
-  if (comp === compId) {
-    return true;
-  }
-  if (typeof comp !== 'string' || seen.has(comp)) {
-    return false;
-  }
-  seen.add(comp);
-  return (doc.comps[comp]?.tracks ?? []).flatMap((t) => t.clips as MotionClip[]).some((inner) => holdsMain(doc, inner, compId, seen));
-};
+const FIRST_LOOP = 0;
 
-export const mainClipOf = (doc: MotionDoc, compId: string): string | null => {
-  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
-  const shown = clips.find((c) => c.props.comp === compId) ?? clips.find((c) => holdsMain(doc, c, compId, new Set()));
-  return shown?.id ?? null;
-};
+function mainPath(doc: MotionDoc, clips: readonly MotionClip[], compId: string, seen: Set<string>): string | null {
+  const own = clips.find((c) => c.props.comp === compId);
+  if (own) {
+    return own.id;
+  }
+  for (const host of clips) {
+    const comp = host.props.comp;
+    if (typeof comp !== 'string' || seen.has(comp)) {
+      continue;
+    }
+    seen.add(comp);
+    const inner = mainPath(doc, (doc.comps[comp]?.tracks ?? []).flatMap((t) => t.clips as MotionClip[]), compId, seen);
+    if (inner) {
+      return `${host.id}${SEPARATOR}${FIRST_LOOP}${SEPARATOR}${inner}`;
+    }
+  }
+  return null;
+}
+
+export const mainClipOf = (doc: MotionDoc, compId: string): string | null => mainPath(doc, doc.tracks.flatMap((t) => t.clips as MotionClip[]), compId, new Set());
 
 export function placeInstance(target: MotionDoc, source: MotionDoc, compId: string, newId: NewId, at?: Offset): OpResult {
   const main = source.comps[compId];

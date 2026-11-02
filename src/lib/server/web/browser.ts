@@ -1,11 +1,12 @@
-import type { Browser, HTTPRequest, Page } from 'puppeteer-core';
+import type { Browser, CDPSession, HTTPRequest, Page } from 'puppeteer-core';
 import { RequestVerdict, requestVerdict } from './screenshot';
 import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
 import { OVERLAY_SELECTOR, type Overlay } from './overlays';
 import { SnapMode, TREE_LIMITS, treeScript, type PageSnap, type PageTree } from '$lib/server/url-import/page-tree';
-import { everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed } from '$lib/server/url-import/page-reveal';
-import { snapped } from '$lib/server/url-import/page-snaps';
+import { drawnInView, everythingInView, heldStill, inViewSampled, revealPage, type RevealMode, type Revealed, type Walk } from '$lib/server/url-import/page-reveal';
+import { snapped, type Shoot } from '$lib/server/url-import/page-snaps';
+import { BrowserBusy, type SessionSlots } from './browser-slots';
 import { componentMarksOf, MARK_LIMITS, type ComponentUse } from '$lib/server/code-import/component-marks';
 
 export type Target = { selector?: string; text?: string };
@@ -39,9 +40,11 @@ export type AppTab = Tab & {
   ui: () => Promise<UiDigest>;
   vector: () => Promise<unknown>;
   tree: (maxHeight?: number) => Promise<unknown>;
+  left: () => number;
   reveal: (mode: RevealMode) => Promise<Revealed>;
   seeAll: () => Promise<void>;
-  sample: () => Promise<number>;
+  sample: (walk?: Walk) => Promise<number>;
+  viewport: (width: number) => Promise<void>;
   settle: (ms: number) => Promise<void>;
   marks: (names: string[]) => Promise<ComponentUse[]>;
   overlay: () => Promise<Overlay | null>;
@@ -59,6 +62,7 @@ export type BrowserlessPorts = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   meter?: (use: BrowserlessUse) => void;
+  slots?: SessionSlots;
 };
 
 export const BROWSERLESS_DEFAULT_BASE = 'https://production-sfo.browserless.io';
@@ -103,8 +107,43 @@ async function gate(request: HTTPRequest): Promise<void> {
   await request.continue(headers ? { headers } : undefined).catch(() => undefined);
 }
 
+const LIGHT_SCHEME = [{ name: 'prefers-color-scheme', value: 'light' }];
+const LIGHT_HINT = { 'sec-ch-prefers-color-scheme': 'light' };
+
+function lightOnly(): void {
+  const SCHEME = /prefers-color-scheme/;
+  const answered = window.matchMedia.bind(window);
+  const fixed = (query: string): MediaQueryList => ({
+    matches: /light/.test(query) && !/dark/.test(query),
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false
+  });
+  window.matchMedia = (query: string) => (SCHEME.test(query) ? fixed(query) : answered(query));
+  const style = document.createElement('style');
+  style.textContent = ':root{color-scheme:light!important}';
+  const pin = () => document.documentElement?.appendChild(style);
+  if (document.documentElement) {
+    pin();
+    return;
+  }
+  new MutationObserver((_, watch) => {
+    if (document.documentElement) {
+      pin();
+      watch.disconnect();
+    }
+  }).observe(document, { childList: true });
+}
+
 async function fenced(page: Page): Promise<void> {
   await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 });
+  await page.emulateMediaFeatures(LIGHT_SCHEME);
+  await page.evaluateOnNewDocument(lightOnly);
+  await page.setExtraHTTPHeaders(LIGHT_HINT);
   await page.setBypassCSP(true);
   await page.setRequestInterception(true);
   page.on('request', (request) => void gate(request));
@@ -206,6 +245,35 @@ function labelOf(el: Element): string {
 }
 
 const IDLE_MS = 500;
+const LONG_LIVED_MS = 4_000;
+const QUIET_POLL_MS = 100;
+const FONTS_MS = 3_000;
+
+function quietOf(page: Page): (ms: number) => Promise<void> {
+  const inflight = new Map<HTTPRequest, number>();
+  let changed = Date.now();
+  page.on('request', (request) => {
+    inflight.set(request, Date.now());
+    changed = Date.now();
+  });
+  for (const ended of ['requestfinished', 'requestfailed'] as const) {
+    page.on(ended, (request) => {
+      inflight.delete(request);
+      changed = Date.now();
+    });
+  }
+
+  const quiet = () => {
+    const now = Date.now();
+    return now - changed >= IDLE_MS && [...inflight.values()].every((at) => now - at >= LONG_LIVED_MS);
+  };
+  return async (ms) => {
+    const until = Date.now() + ms;
+    while (!quiet() && Date.now() < until) {
+      await pause(QUIET_POLL_MS);
+    }
+  };
+}
 
 const HIDE = `[${TREE_LIMITS.hideAttr}]`;
 const hiddenWithin = (scope: string) => `${scope}${HIDE},${scope}${HIDE} *{visibility:hidden!important}`;
@@ -219,59 +287,129 @@ const SNAP_CSS: Record<SnapMode, (target: string) => string> = {
   [SnapMode.Backdrop]: (target) => `${hiddenWithin('')}${shown(target)}${hiddenWithin(`${target} `)}`
 };
 
-async function shotInView(page: Page, snap: PageSnap): Promise<Buffer> {
-  const { height } = page.viewport() ?? VIEWPORT;
-  const pieces: { input: Buffer; top: number; left: number }[] = [];
-  for (let top = snap.box.y; top < snap.box.y + snap.box.height; top += height) {
-    const piece = { x: snap.box.x, y: top, width: snap.box.width, height: Math.min(height, snap.box.y + snap.box.height - top) };
-    await page.evaluate((y) => window.scrollTo(0, y), top + piece.height <= height ? 0 : top);
-    pieces.push({ input: Buffer.from(await page.screenshot({ type: 'png', clip: piece, captureBeyondViewport: false, omitBackground: snap.mode !== SnapMode.Backdrop })), top: Math.round(top - snap.box.y), left: 0 });
-  }
-  await page.evaluate(() => window.scrollTo(0, 0));
-  if (pieces.length === 1) {
-    return pieces[0].input;
-  }
-  const { default: sharp } = await import('sharp');
-  const size = { width: Math.round(snap.box.width), height: Math.round(snap.box.height) };
-  return sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(pieces).png().toBuffer();
-}
+type SnapBox = PageSnap['box'];
+type Held = { target: string; picture: string; box: SnapBox };
+type SnapStage = { held: Held | null; style?: string | null; y: number; shot: { target: string; box: SnapBox } | null };
+type SnapView = { live: boolean; scrolled: number };
+type Piece = { data: Buffer; top: number };
 
-function heldOn(target: string, picture: string, box: PageSnap['box']): void {
+const SEE_THROUGH = { color: { r: 0, g: 0, b: 0, a: 0 } };
+
+function snapStaged(stage: SnapStage): SnapView {
   const LIVE = /^(CANVAS|VIDEO|IFRAME|EMBED|OBJECT)$/;
   const SAME_PX = 1;
-  const el = document.querySelector<HTMLElement>(target);
-  if (!el || !LIVE.test(el.tagName)) {
-    return;
+  const STYLE_ID = 'feega-snap-style';
+  const liveAt = (target: string, box: SnapBox) => {
+    const el = document.querySelector<HTMLElement>(target);
+    if (!el || !LIVE.test(el.tagName)) {
+      return null;
+    }
+    const r = el.getBoundingClientRect();
+    return Math.abs(r.width - box.width) <= SAME_PX && Math.abs(r.height - box.height) <= SAME_PX ? { el, r } : null;
+  };
+
+  const held = stage.held ? liveAt(stage.held.target, stage.held.box) : null;
+  if (held && stage.held) {
+    const still = document.createElement('img');
+    still.src = stage.held.picture;
+    still.className = held.el.className;
+    still.style.cssText = `${held.el.style.cssText};width:${held.r.width}px;height:${held.r.height}px;object-fit:fill`;
+    held.el.replaceWith(still);
   }
-  const r = el.getBoundingClientRect();
-  const whole = Math.abs(r.width - box.width) <= SAME_PX && Math.abs(r.height - box.height) <= SAME_PX;
-  if (!whole) {
-    return;
+
+  if (stage.style !== undefined) {
+    document.getElementById(STYLE_ID)?.remove();
   }
-  const still = document.createElement('img');
-  still.src = picture;
-  still.className = el.className;
-  still.style.cssText = `${el.style.cssText};width:${r.width}px;height:${r.height}px;object-fit:fill`;
-  el.replaceWith(still);
+  if (stage.style) {
+    const sheet = document.createElement('style');
+    sheet.id = STYLE_ID;
+    sheet.textContent = stage.style;
+    (document.head ?? document.documentElement).append(sheet);
+  }
+
+  window.scrollTo({ top: stage.y, behavior: 'instant' });
+  return { live: stage.shot ? liveAt(stage.shot.target, stage.shot.box) !== null : false, scrolled: window.scrollY };
 }
 
-async function shoot(page: Page, snap: PageSnap): Promise<string | null> {
-  const target = `[${TREE_LIMITS.snapAttr}="${snap.ref}"]`;
-  const css = SNAP_CSS[snap.mode](target);
-  const style = css ? await page.addStyleTag({ content: css }) : null;
-  try {
-    const picture = `data:image/png;base64,${(await shotInView(page, snap)).toString('base64')}`;
-    await page.evaluate(heldOn, target, picture, snap.box).catch(() => undefined);
+async function cropped(viewport: Uint8Array, piece: SnapBox, scrolled: number): Promise<Buffer> {
+  const { default: sharp } = await import('sharp');
+  const shot = sharp(viewport);
+  const { width = 0, height = 0 } = await shot.metadata();
+  const left = Math.max(0, Math.round(piece.x));
+  const top = Math.max(0, Math.round(piece.y - scrolled));
+  const right = Math.min(width, Math.round(piece.x + piece.width));
+  const bottom = Math.min(height, Math.round(piece.y - scrolled + piece.height));
+  return shot.extract({ left, top, width: right - left, height: bottom - top }).png().toBuffer();
+}
+
+async function stitched(pieces: Piece[], box: SnapBox): Promise<string> {
+  if (pieces.length === 1) {
+    return pieces[0].data.toString('base64');
+  }
+  const { default: sharp } = await import('sharp');
+  const size = { width: Math.round(box.width), height: Math.round(box.height) };
+  const layers = pieces.map((piece) => ({ input: piece.data, top: piece.top, left: 0 }));
+  return (await sharp({ create: { ...size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(layers).png().toBuffer()).toString('base64');
+}
+
+function camera(page: Page): { shoot: Shoot; done: () => Promise<void> } {
+  let session: Promise<CDPSession> | null = null;
+  let held: Held | null = null;
+  let seeThrough = false;
+  const cdp = () => (session ??= page.createCDPSession());
+
+  const shoot: Shoot = async (snap) => {
+    const target = `[${TREE_LIMITS.snapAttr}="${snap.ref}"]`;
+    const transparent = snap.mode !== SnapMode.Backdrop;
+    if (transparent !== seeThrough) {
+      await (await cdp()).send('Emulation.setDefaultBackgroundColorOverride', transparent ? SEE_THROUGH : {});
+      seeThrough = transparent;
+    }
+
+    const { height } = page.viewport() ?? VIEWPORT;
+    const pieces: Piece[] = [];
+    let live = false;
+    for (let top = snap.box.y; top < snap.box.y + snap.box.height; top += height) {
+      const piece = { x: snap.box.x, y: top, width: snap.box.width, height: Math.min(height, snap.box.y + snap.box.height - top) };
+      const first = pieces.length === 0;
+      const stage: SnapStage = first ? { held, style: SNAP_CSS[snap.mode](target), y: top + piece.height <= height ? 0 : top, shot: { target, box: snap.box } } : { held: null, y: top, shot: null };
+      const view = await page.evaluate(snapStaged, stage);
+      live ||= view.live;
+      held = null;
+      const data = await cropped(await page.screenshot({ type: 'png', optimizeForSpeed: true }), piece, view.scrolled);
+      pieces.push({ data, top: Math.round(top - snap.box.y) });
+    }
+
+    const picture = `data:image/png;base64,${await stitched(pieces, snap.box)}`;
+    held = live ? { target, picture, box: snap.box } : null;
     return picture;
-  } finally {
-    await style?.evaluate((el) => el.remove()).catch(() => undefined);
-    await style?.dispose();
-  }
+  };
+
+  const done = async () => {
+    await page.evaluate(snapStaged, { held, style: null, y: 0, shot: null }).catch(() => undefined);
+    held = null;
+    if (!session) {
+      return;
+    }
+    const opened = await session;
+    if (seeThrough) {
+      await opened.send('Emulation.setDefaultBackgroundColorOverride', {}).catch(() => undefined);
+    }
+    await opened.detach().catch(() => undefined);
+  };
+
+  return { shoot, done };
 }
 
-function tabOf(page: Page, close: () => Promise<number>): AppTab {
+function tabOf(page: Page, close: () => Promise<number>, left: () => number): AppTab {
+  const quiet = quietOf(page);
   return {
-    goto: async (url) => (await page.goto(url, { waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS }))?.status() ?? null,
+    goto: async (url) => {
+      const until = Date.now() + NAV_TIMEOUT_MS;
+      const response = await page.goto(url, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
+      await quiet(until - Date.now());
+      return response?.status() ?? null;
+    },
     url: () => page.url(),
     html: () => page.content(),
     look: () => page.evaluate(lookOf),
@@ -309,16 +447,23 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     },
     ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
     vector: () => vectorOfPage(page),
-    tree: async (maxHeight = TREE_LIMITS.height) => snapped((await page.evaluate(treeScript({ ...TREE_LIMITS, height: maxHeight }))) as PageTree, (snap) => shoot(page, snap)),
+    tree: async (maxHeight = TREE_LIMITS.height) => {
+      const read = (await page.evaluate(treeScript({ ...TREE_LIMITS, height: maxHeight }))) as PageTree;
+      const lens = camera(page);
+      return snapped(read, lens.shoot, left).finally(lens.done);
+    },
+    left,
     reveal: (mode) => page.evaluate(revealPage, mode),
     seeAll: async () => {
+      await page.evaluateOnNewDocument(drawnInView);
       await page.evaluateOnNewDocument(everythingInView);
       await page.evaluateOnNewDocument(heldStill);
     },
-    sample: () => page.evaluate(inViewSampled),
+    sample: (walk) => page.evaluate(inViewSampled, walk),
+    viewport: (width) => page.setViewport({ ...VIEWPORT, width, deviceScaleFactor: 1 }),
     settle: async (ms) => {
-      await page.waitForNetworkIdle({ idleTime: IDLE_MS, timeout: ms }).catch(() => undefined);
-      await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, 3_000))])).catch(() => undefined);
+      await quiet(ms);
+      await page.evaluate((fontsMs) => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, fontsMs))]), FONTS_MS).catch(() => undefined);
     },
     marks: (names) => page.evaluate(componentMarksOf, { names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr }),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
@@ -335,15 +480,38 @@ export function localBrowser(newPage: () => Promise<Page>): OpenAppBrowser {
   return async () => {
     const page = await newPage();
     await fenced(page);
-    return tabOf(page, async () => {
-      await page.close().catch(() => undefined);
-      return 0;
-    });
+    return tabOf(
+      page,
+      async () => {
+        await page.close().catch(() => undefined);
+        return 0;
+      },
+      () => Infinity
+    );
   };
 }
 
+export function errorText(e: unknown): string {
+  if (typeof e === 'string') {
+    return e;
+  }
+  if (e instanceof Error) {
+    return e.message;
+  }
+  if (typeof e !== 'object' || e === null) {
+    return String(e);
+  }
+
+  const fields = e as { message?: unknown; error?: unknown; status?: unknown; statusCode?: unknown; code?: unknown };
+  const inner = fields.error instanceof Error ? fields.error.message : '';
+  const message = typeof fields.message === 'string' && fields.message ? fields.message : inner;
+  const status = String(fields.status ?? fields.statusCode ?? fields.code ?? '');
+  const parts = [message.includes(status) ? '' : status, message].filter(Boolean);
+  return parts.length ? parts.join(' ') : JSON.stringify(e);
+}
+
 function hidden(e: unknown, key: string): Error {
-  return new Error((e instanceof Error ? e.message : String(e)).split(key).join(REDACTED));
+  return new Error(errorText(e).split(key).join(REDACTED));
 }
 
 async function connected(config: BrowserlessConfig, ports: BrowserlessPorts): Promise<Browser> {
@@ -353,8 +521,11 @@ async function connected(config: BrowserlessConfig, ports: BrowserlessPorts): Pr
       return await ports.connect(browserlessEndpoint(config));
     } catch (e) {
       const error = hidden(e, config.key);
-      if (attempt >= RETRY_DELAYS_MS.length || !RETRYABLE.test(error.message)) {
+      if (!RETRYABLE.test(error.message)) {
         throw error;
+      }
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        throw new BrowserBusy();
       }
       await sleep(RETRY_DELAYS_MS[attempt]);
     }
@@ -364,10 +535,15 @@ async function connected(config: BrowserlessConfig, ports: BrowserlessPorts): Pr
 export function browserless(config: BrowserlessConfig, ports: BrowserlessPorts): OpenAppBrowser {
   const now = ports.now ?? Date.now;
   return async () => {
+    const release = ports.slots ? await ports.slots.take() : () => undefined;
     const started = now();
-    const browser = await connected(config, ports);
+    const browser = await connected(config, ports).catch((e) => {
+      release();
+      throw e;
+    });
     const close = async () => {
       await browser.close().catch(() => undefined);
+      release();
       const ms = now() - started;
       const units = unitsOf(ms);
       const usd = units * BROWSERLESS_UNIT_USD;
@@ -377,7 +553,7 @@ export function browserless(config: BrowserlessConfig, ports: BrowserlessPorts):
     try {
       const page = await browser.newPage();
       await fenced(page);
-      return tabOf(page, close);
+      return tabOf(page, close, () => started + BROWSERLESS_SESSION_MS - now());
     } catch (e) {
       await close();
       throw hidden(e, config.key);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { importPage, type ImportExtent, type UrlLanded } from '$lib/canvas/url-import-client';
+  import { importPageWaiting, type ImportExtent, type UrlLanded } from '$lib/canvas/url-import-client';
   import { startHost } from '$lib/start-url';
 
   let {
@@ -18,8 +18,12 @@
     no_browser: 'Page import is not available right now.',
     failed: 'The page could not be opened.',
     unreadable: 'Nothing on that page could be read.',
-    rate_limited: 'Too many imports. Try again in a minute.'
+    too_slow: 'That page took too long to read.',
+    rate_limited: 'Too many imports. Try again in a minute.',
+    busy: 'Every browser is busy right now. Try again in a minute.',
+    rejected: 'The imported page could not be saved.'
   };
+  const BUSY_NOTE = 'Browsers are busy, retrying…';
   const FALLBACK_REFUSAL = 'Could not import that page.';
 
   const FIRST_SCREENS: ImportExtent = 'top';
@@ -27,19 +31,23 @@
   let url = $state('');
   let busy = $state(false);
   let message = $state<string | null>(null);
+  let waiting = $state<string | null>(null);
   let site = $state<string | null>(null);
   let sections = $state(true);
   let tokens = $state(true);
+  let breakpoints = $state(true);
 
   const title = $derived(site ? (busy ? `Importing ${site}…` : `Couldn't import ${site}`) : 'Import from URL');
 
   async function bring(typed: string, extent?: ImportExtent) {
     busy = true;
     message = null;
-    const got = await importPage({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent, sections, tokens });
+    const got = await importPageWaiting({ projectId, canvasId, url: /^https?:\/\//i.test(typed) ? typed : `https://${typed}`, at, extent, sections, tokens, breakpoints }, { onBusy: () => (waiting = BUSY_NOTE) });
     busy = false;
+    waiting = null;
     if (!got.ok) {
-      message = REFUSALS[got.error] ?? FALLBACK_REFUSAL;
+      const refusal = REFUSALS[got.error] ?? FALLBACK_REFUSAL;
+      message = got.detail ? `${refusal} ${got.detail}` : refusal;
       return;
     }
     onimported(got.landed);
@@ -72,8 +80,12 @@
       <input class="rounded-sm" type="text" inputmode="url" placeholder="https://example.com" aria-label="Page address" bind:value={url} data-testid="url-import-url" />
       <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !url.trim()} data-testid="url-import-run">{busy ? 'Importing…' : site ? 'Try another URL' : 'Import'}</button>
     </form>
-    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={sections} data-testid="url-import-sections" /> Split into sections (Nav, Hero, Footer…)</label>
+    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={sections} disabled={breakpoints} data-testid="url-import-sections" /> Split into sections (Nav, Hero, Footer…)</label>
     <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={tokens} data-testid="url-import-tokens" /> Extract styles and variables (colours, type, effects)</label>
+    <label class="ui-check"><input class="rounded-xs" type="checkbox" bind:checked={breakpoints} data-testid="url-import-breakpoints" /> Add tablet and phone layouts as breakpoints</label>
+    {/if}
+    {#if waiting}
+      <p class="ui-note" role="status" data-testid="url-import-busy">{waiting}</p>
     {/if}
     {#if message}
       <p class="ui-note" role="alert" data-testid="url-import-message">{message}</p>

@@ -841,6 +841,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   let nodes = $state<Tile[]>((data.nodes as CanvasNodeRecord[]).map((n) => toTile(n)));
+  let heldCanvas = $state(untrack(() => data.canvas.id));
   const nodeById = $derived(byId(nodes));
 
   /**
@@ -1933,6 +1934,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     snapshotVersion += 1;
     runsOverride = null;
     nodes = keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty);
+    heldCanvas = data.canvas.id;
     edges = (data.connections as Connection[]).map(toEdge);
     seenRevision = data.revision;
     const carried = takeNotice();
@@ -3148,8 +3150,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       get nodes() {
         return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), ...frameLook(n) }));
       },
-      outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
-      previewUrl: (nodeId) => motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId }),
       get selected() {
         return selectedIds;
       },
@@ -3761,9 +3761,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     urlImportAt = { x: 0, y: 0 };
   }
 
-  $effect(() => {
-    untrack(takeStartUrl);
-  });
+  afterNavigate(takeStartUrl);
 
   function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
     landImported(landed);
@@ -4285,6 +4283,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   <Flow
     mode={canvasMode}
     viewerId={me}
+    canvasId={heldCanvas}
     postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
     {edges}

@@ -4,6 +4,7 @@ import { createRawSnippet } from 'svelte';
 import Square from '@lucide/svelte/icons/square';
 import IconButton from './IconButton.svelte';
 import SegmentedControl from './SegmentedControl.svelte';
+import { SegmentedShape } from './segmented-shape';
 import Row from './Row.svelte';
 import Section from './Section.svelte';
 import Field from './Field.svelte';
@@ -51,6 +52,23 @@ describe('the shell primitives', () => {
     expect(html).toContain('role="radiogroup"');
     expect(html.match(/aria-checked="true"/g)).toHaveLength(1);
     expect(html).toContain('aria-label="Grid"');
+  });
+
+  it('the active segment is a thumb that slides to the checked index', () => {
+    const html = render(SegmentedControl, { props: { label: 'Mode', value: 'c', onchange: noop, options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }] } }).body;
+    expect(html).toContain('data-slot="segmented-thumb"');
+    expect(html).toContain('translateX(200%)');
+  });
+
+  it('the pill shape rounds track and thumb fully, the default keeps the scale radii', () => {
+    const options = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }];
+    const pill = render(SegmentedControl, { props: { label: 'Mode', value: 'a', onchange: noop, options, shape: SegmentedShape.Pill } }).body;
+    const plain = render(SegmentedControl, { props: { label: 'Mode', value: 'a', onchange: noop, options } }).body;
+    expect(pill).toContain('data-shape="pill"');
+    expect(pill).toContain('rounded-full');
+    expect(pill).not.toContain('rounded-md');
+    expect(plain).toContain('rounded-md');
+    expect(plain).not.toContain('rounded-full');
   });
 
   it('a row indents by depth and states its selection', () => {

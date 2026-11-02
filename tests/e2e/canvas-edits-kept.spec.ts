@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { pickBarTool } from './fixtures/canvas-bar';
-import { hoverTile } from './fixtures/canvas-tile';
+import { tileOf } from './fixtures/canvas-tile';
 import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
@@ -30,16 +30,16 @@ async function drawBox(page: Page, tool = 'rectangle') {
 }
 
 async function markEditor(page: Page) {
-  await page.getByTestId('motion-editor').evaluate((el) => {
+  await page.getByTestId('motion-inspector').evaluate((el) => {
     (el as HTMLElement & { __kept?: boolean }).__kept = true;
   });
 }
 
 async function editorKept(page: Page): Promise<boolean> {
-  return page.getByTestId('motion-editor').evaluate((el) => !!(el as HTMLElement & { __kept?: boolean }).__kept);
+  return page.getByTestId('motion-inspector').evaluate((el) => !!(el as HTMLElement & { __kept?: boolean }).__kept);
 }
 
-const fillHex = (page: Page) => page.getByTestId('fill-editor').locator('input.hex').first();
+const fillHex = (page: Page) => page.getByLabel('Fill colour hex');
 
 async function openFill(page: Page) {
   if (await fillHex(page).isVisible()) {
@@ -81,7 +81,10 @@ async function reddest(tile: Locator): Promise<number> {
 const WATCH_SAMPLES = 12;
 const WATCH_EVERY_MS = 500;
 
+const PAINT_WAIT_MS = 20_000;
+
 async function stillRed(page: Page, tile: Locator) {
+  await expect.poll(() => reddest(tile), { timeout: PAINT_WAIT_MS, message: 'the tile paints red' }).toBeGreaterThan(RED_SHARE);
   for (let i = 0; i < WATCH_SAMPLES; i++) {
     expect(await reddest(tile), `the tile went back to another colour after ${i * WATCH_EVERY_MS} ms`).toBeGreaterThan(RED_SHARE);
     await page.waitForTimeout(WATCH_EVERY_MS);
@@ -115,7 +118,7 @@ test.describe('edits are never lost @real', () => {
     const element = page.locator('[data-kind="element"][data-motion-node]');
     await expect(element).toHaveCount(1, { timeout: 15_000 });
     const nodeId = (await element.getAttribute('data-motion-node'))!;
-    await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
     await openFill(page);
     await expect(fillHex(page)).toBeVisible({ timeout: 15_000 });
     await markEditor(page);
@@ -151,7 +154,7 @@ test.describe('edits are never lost @real', () => {
     const element = page.locator('[data-kind="element"][data-motion-node]');
     await expect(element).toHaveCount(1, { timeout: 15_000 });
     const nodeId = (await element.getAttribute('data-motion-node'))!;
-    await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
 
     for (const colour of COLOURS.slice(0, 3)) {
       await openFill(page);
@@ -160,9 +163,9 @@ test.describe('edits are never lost @real', () => {
       await expect.poll(async () => boxColour(await headDoc(admin, nodeId))?.toLowerCase(), { timeout: 10_000 }).toBe(colour);
       const empty = (await emptyCanvasPoint(page))!;
       await page.mouse.click(empty.x, empty.y);
-      await expect(page.getByTestId('motion-editor')).toHaveCount(0);
+      await expect(page.getByTestId('motion-inspector')).toHaveCount(0);
       await page.locator(`[data-motion-node="${nodeId}"]`).click();
-      await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
       await openFill(page);
       await expect(fillHex(page), 'the reopened editor shows the last colour').toHaveValue(new RegExp(colour.slice(1), 'i'));
       await expect.poll(async () => boxColour(await headDoc(admin, nodeId))?.toLowerCase(), { timeout: 10_000 }).toBe(colour);
@@ -191,7 +194,8 @@ test.describe('edits are never lost @real', () => {
     await expect(prompt).toHaveValue(expected);
     await expect.poll(async () => (await admin.from('nodes').select('data').eq('id', typed.id).single()).data?.data?.prompt, { timeout: 10_000 }).toBe(expected);
     await page.reload();
-    await expect((await hoverTile(page, typed.id)).getByPlaceholder(PROMPT_PLACEHOLDER)).toHaveValue(expected, { timeout: 15_000 });
+    await tileOf(page, typed.id).click({ timeout: 15_000 });
+    await expect(tileOf(page, typed.id).getByPlaceholder(PROMPT_PLACEHOLDER)).toHaveValue(expected, { timeout: 15_000 });
   });
 
   test('two tabs: tab A edits reach tab B without reverting what B is typing', async ({ page, session, seedNode }) => {
@@ -214,11 +218,13 @@ test.describe('edits are never lost @real', () => {
     const sentence = WORD.repeat(6);
     await Promise.all([promptIn(page, mine.id).pressSequentially(sentence, { delay: KEY_DELAY_MS }), promptIn(other, theirs.id).pressSequentially(sentence, { delay: KEY_DELAY_MS })]);
 
-    await hoverTile(other, mine.id);
+    await tileOf(other, mine.id).click();
     await expect(promptIn(other, mine.id)).toHaveValue(sentence, { timeout: 15_000 });
-    await hoverTile(page, theirs.id);
+    await tileOf(page, theirs.id).click();
     await expect(promptIn(page, theirs.id)).toHaveValue(sentence, { timeout: 15_000 });
+    await tileOf(other, theirs.id).click();
     await expect(promptIn(other, theirs.id)).toHaveValue(sentence);
+    await tileOf(page, mine.id).click();
     await expect(promptIn(page, mine.id)).toHaveValue(sentence);
   });
 
@@ -231,7 +237,7 @@ test.describe('edits are never lost @real', () => {
       const element = page.locator('[data-kind="element"][data-motion-node]');
       await expect(element).toHaveCount(1, { timeout: 15_000 });
       const nodeId = (await element.getAttribute('data-motion-node'))!;
-      await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('motion-inspector')).toBeVisible({ timeout: 15_000 });
       await openFill(page);
       await fillHex(page).fill(RED);
       await fillHex(page).press('Enter');
@@ -239,7 +245,7 @@ test.describe('edits are never lost @real', () => {
 
       const empty = (await emptyCanvasPoint(page))!;
       await page.mouse.click(empty.x, empty.y);
-      await expect(page.getByTestId('motion-editor')).toHaveCount(0);
+      await expect(page.getByTestId('motion-inspector')).toHaveCount(0);
       const tile = page.locator(`[data-motion-node="${nodeId}"]`);
       await expect(tile.getByText('Frame', { exact: true }), 'an element has no frame chrome').toHaveCount(0);
       await expect(tile.locator('[data-drawn="true"], [data-testid=motion-node-poster]:visible').first()).toBeAttached({ timeout: 15_000 });

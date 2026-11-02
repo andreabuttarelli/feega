@@ -203,6 +203,22 @@ describe('every frame lists its children, open or not', () => {
     expect(rows.some((r) => r.nodeId === 'm2' && r.depth > 0)).toBe(true);
   });
 
+  it('a group folded in a closed frame hides its insides, as after a reload', () => {
+    const doc = video();
+    const inner = { id: 'in', kind: TrackKind.Visual, name: 'Inner', clips: [{ ...doc.tracks[0].clips[0], id: 'deep' }] };
+    const grouped: MotionDoc = {
+      ...doc,
+      comps: { g1: { name: 'Nav', durationInFrames: 30, tracks: [inner] } as never },
+      tracks: doc.tracks.map((t, i) => (i === 0 ? { ...t, clips: [{ ...t.clips[0], id: 'g', component: 'Precomp', props: { comp: 'g1' } }] } : t))
+    };
+    const outline = { m2: frameRows(grouped, 'm2') };
+    const nav = layerRows(NODES, null, outline).find((r) => r.nodeId === 'm2' && r.id === 'g')!;
+    const rows = layerRows(NODES, null, outline, new Set([nav.key]));
+
+    expect(rows.some((r) => r.nodeId === 'm2' && r.id === 'g')).toBe(true);
+    expect(rows.some((r) => r.nodeId === 'm2' && r.id === 'deep')).toBe(false);
+  });
+
   it('the open frame reads its live doc, never the stored outline', () => {
     const doc = video();
     const rows = layerRows(NODES, { nodeId: 'm1', doc }, { m1: [] });
@@ -653,5 +669,29 @@ describe('dropTool: a tile dragged from the add menu into the layers', () => {
 
   it('refuses a tool that draws no box', () => {
     expect(dropTool(video(), DrawTool.Pen, 't1', Place.Above, 'new1', DROP_BOX).ok).toBe(false);
+  });
+});
+
+describe('dropping a layer onto a stack child', () => {
+  const stacked = (() => {
+    let doc = newMotionDoc(MotionFormat.Square);
+    for (const [id, x] of [['a', 0.2], ['b', 0.5], ['c', 0.8]] as const) {
+      doc = ok(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } }, id));
+    }
+    doc = ok(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.9, width: 0.1, height: 0.1 } }, 'loose'));
+    return ok(wrapInStack(doc, ['a', 'b', 'c'], 'box', 'lane'));
+  })();
+  const orderOf = (doc: MotionDoc) => findClip(doc, 'box')!.clip.autoLayout!.order;
+
+  it('reorders it in the stack', () => {
+    expect(orderOf(ok(dropLayers(stacked, ['c'], 'a', Place.Above, ['a', 'b', 'c'])))).toEqual(['c', 'a', 'b']);
+    expect(orderOf(ok(dropLayers(stacked, ['a'], 'b', Place.Below, ['a', 'b', 'c'])))).toEqual(['b', 'a', 'c']);
+  });
+
+  it('moves a layer from outside into the stack', () => {
+    const doc = ok(dropLayers(stacked, ['loose'], 'b', Place.Below, ['a', 'b', 'c', 'loose']));
+
+    expect(findClip(doc, 'loose')!.clip.parent).toBe('box');
+    expect(orderOf(doc)).toEqual(['a', 'b', 'loose', 'c']);
   });
 });

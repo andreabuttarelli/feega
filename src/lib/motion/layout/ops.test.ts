@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
-import { setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
+import { laidClip, setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
 
@@ -82,6 +82,17 @@ describe('wrapInStack', () => {
     doc = must(addClip(doc, { component: 'Shape', from: 0, props: { x: 0.5, y: 0.2, width: 0.3, height: 0.1 } }, 'p'));
     doc = must(addClip(doc, { component: 'Shape', from: 0, props: { x: 0.5, y: 0.6, width: 0.3, height: 0.1 } }, 'q'));
     expect(clip(must(wrapInStack(doc, ['q', 'p'], 'box', 'lane')), 'box').autoLayout).toMatchObject({ direction: Direction.Vertical, order: ['p', 'q'] });
+  });
+
+  it('wraps a component instance, boxed by its content like an imported one', () => {
+    const button = { id: 'pill', from: 0, durationInFrames: 60, component: 'Shape', props: { shape: 'rect', x: 0.7, y: 0.5, width: 0.1, height: 0.1 } };
+    const withMain: MotionDoc = { ...row, comps: { btn: { name: 'Nav Button', component: true, durationInFrames: 60, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [button] }] } as never } };
+    const doc = must(addClip(withMain, { component: 'Precomp', from: 0, durationInFrames: 60, props: { comp: 'btn' } }, 'inst'));
+    const wrapped = must(wrapInStack(doc, ['a', 'inst'], 'box', 'lane'));
+
+    expect(clip(wrapped, 'inst').parent).toBe('box');
+    expect(clip(wrapped, 'box').autoLayout?.order).toEqual(['a', 'inst']);
+    expect(clip(wrapped, 'box').props.width).toBeCloseTo(0.6, 5);
   });
 
   it('refuses an audio clip or an empty selection', () => {
@@ -319,6 +330,30 @@ describe('a stack child as a flex item', () => {
     const done = clip(must(setChildSize(stacked, 'a', 'width', { sizing: Sizing.Fixed, value: 270 })), 'a');
     expect(done.layoutItem?.width).toBe(Sizing.Fixed);
     expect(done.props.width).toBeCloseTo(270 / stacked.width);
+  });
+
+  it('a typed width keeps the stack where it is, its left and top edges anchored', () => {
+    const shown = (doc: MotionDoc) => findClip(withAutoLayout(doc), 'box')!.clip.props;
+    const before = shown(stacked);
+    const wider = shown(must(setChildSize(stacked, 'box', 'width', { sizing: Sizing.Fixed, value: 900 })));
+    const taller = shown(must(setChildSize(stacked, 'box', 'height', { sizing: Sizing.Fixed, value: 600 })));
+    const left = (p: typeof before) => (Number(p.x) - Number(p.width) / 2) * stacked.width;
+    const top = (p: typeof before) => (Number(p.y) - Number(p.height) / 2) * stacked.height;
+
+    expect(left(wider)).toBeCloseTo(left(before), 5);
+    expect(Number(wider.width) * stacked.width).toBeCloseTo(900, 5);
+    expect(top(taller)).toBeCloseTo(top(before), 5);
+  });
+
+  it('the inspector reads the size the stack resolves, not the stored one', () => {
+    const filled = must(setChildSize(stacked, 'a', 'width', { sizing: Sizing.Fill, value: 1 }));
+    const fixedBox = must(setChildSize(filled, 'box', 'width', { sizing: Sizing.Fixed, value: 800 }));
+    const huggedTall = must(setChildSize(stacked, 'box', 'height', { sizing: Sizing.Fixed, value: 600 }));
+    const hugAgain = must(setChildSize(huggedTall, 'box', 'height', { sizing: Sizing.Hug }));
+
+    expect(Number(laidClip(fixedBox, 'a')!.props.width) * stacked.width).toBeGreaterThan(Number(clip(fixedBox, 'a').props.width) * stacked.width + 1);
+    expect(Number(laidClip(hugAgain, 'box')!.props.height) * stacked.height).toBeCloseTo(0.1 * stacked.height, 5);
+    expect(Number(clip(hugAgain, 'box').props.height) * stacked.height).toBeCloseTo(600, 5);
   });
 
   it('steps earlier and later among its siblings, never past the ends', () => {

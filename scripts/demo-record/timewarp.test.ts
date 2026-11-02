@@ -19,4 +19,10 @@ describe('demo time warp', () => {
   it('shifts time after the drag', () => {
     expect(recordedAt(4, warps)).toBeCloseTo(6);
   });
+
+  it('cuts a wait out of the played time', () => {
+    const cut = [{ t: 2, end: 30, play: 0 }];
+    expect(playedDuration(40, cut)).toBe(12);
+    expect(recordedAt(2.5, cut)).toBeCloseTo(30.5);
+  });
 });

@@ -79,10 +79,12 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
     press: vi.fn(async () => undefined),
     paint: vi.fn(async () => Buffer.from('png')),
     tree: vi.fn(async () => null),
+    left: () => Infinity,
     reveal: vi.fn(async () => ({ height: 800, hidden: 0 })),
     settle: vi.fn(async () => undefined),
     seeAll: vi.fn(async () => undefined),
     sample: vi.fn(async () => 0),
+    viewport: vi.fn(async () => {}),
     marks: vi.fn(async () => [])
   };
   return tab;

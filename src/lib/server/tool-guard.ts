@@ -343,7 +343,7 @@ export type SafeFetchBytesResult = { url: string; status: number; ok: boolean; m
  */
 export async function safeFetchBytes(
   input: string,
-  opts: { maxBytes: number; timeoutMs?: number; maxRedirects?: number; scheme?: UrlScheme; userAgent?: string }
+  opts: { maxBytes: number; timeoutMs?: number; maxRedirects?: number; scheme?: UrlScheme; userAgent?: string; headers?: Record<string, string> }
 ): Promise<SafeFetchBytesResult> {
   const { url, res } = await fetchFollowingGatedRedirects(input, opts);
 

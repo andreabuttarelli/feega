@@ -1,4 +1,4 @@
-import type { CodeComponent, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
+import type { ClipBehaviour, CodeComponent, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
 
 export type RestColor = { r: number; g: number; b: number; a?: number };
 
@@ -36,6 +36,7 @@ export type RestNode = {
   type: string;
   visible?: boolean;
   collapsed?: boolean;
+  key?: string;
   opacity?: number;
   size?: Vec;
   absoluteBoundingBox?: { x: number; y: number; width: number; height: number };
@@ -65,6 +66,7 @@ export type RestNode = {
   counterAxisSizingMode?: string;
   layoutGrow?: number;
   layoutAlign?: string;
+  maxWidth?: number;
   layoutPositioning?: string;
   fillGeometry?: { path: string; windingRule?: string }[];
   strokeGeometry?: { path: string; windingRule?: string }[];
@@ -75,7 +77,12 @@ export type RestNode = {
   styleOverrideTable?: Record<string, RestStyle>;
   componentId?: string;
   use?: number;
+  pattern?: number;
+  go?: string;
+  hover?: { fill?: string; color?: string; stroke?: string; opacity?: number; scale?: number; durationMs: number; easing: string };
+  dom?: { tag: string; role?: string; hint?: string; landmark?: string; press?: string };
   codeComponent?: CodeComponent;
+  behaviour?: ClipBehaviour;
   children?: RestNode[];
 };
 
@@ -245,6 +252,7 @@ function layoutOf(n: RestNode): Partial<FigmaRawNode> {
     stackCounterSizing: sizing(n.counterAxisSizingMode),
     stackChildPrimaryGrow: n.layoutGrow,
     stackChildAlignSelf: n.layoutAlign,
+    maxWidth: n.maxWidth,
     stackPositioning: n.layoutPositioning
   };
 }
@@ -290,6 +298,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     name: n.name,
     visible: n.visible,
     collapsed: n.collapsed,
+    ref: n.id,
     opacity: n.opacity,
     size: sizeOf(n),
     transform: transformOf(n, parent.rest),
@@ -309,7 +318,8 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     ...layoutOf(n),
     ...(n.type === 'TEXT' ? textOf(n) : {}),
     ...(symbolID ? { symbolData: { symbolID } } : {}),
-    ...(n.codeComponent ? { codeComponent: n.codeComponent } : {})
+    ...(n.codeComponent ? { codeComponent: n.codeComponent } : {}),
+    ...(n.behaviour ? { behaviour: n.behaviour } : {})
   });
   (n.children ?? []).forEach((child, i) => add(child, { rest: n, guid }, i, build));
 }

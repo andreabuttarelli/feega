@@ -104,4 +104,32 @@ describe('POST /api/v1/projects/:id/url-import', () => {
 
     expect(importPageAt.mock.lastCall?.[0].maxHeight).toBeUndefined();
   });
+
+  it('reads the tablet and phone widths by default, and only the desktop with breakpoints false', async () => {
+    importPageAt.mockReset();
+    importPageAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'Acme', undo: [], skipped: [], truncated: false });
+
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-views-on');
+    await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0, breakpoints: false }, 'u-views-off');
+
+    expect(importPageAt.mock.calls.map((c) => c[0].views.map((v: { width: number }) => v.width))).toEqual([[768, 390], []]);
+  });
+
+  it('a doc the schema rejects answers 422 with the reason, so the dialog can show it', async () => {
+    importPageAt.mockResolvedValue({ outcome: 'rejected', error: 'tracks.0: expected array' });
+
+    const { res, body } = await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-rejected');
+
+    expect(res.status).toBe(422);
+    expect(body).toEqual({ error: 'rejected', detail: 'tracks.0: expected array' });
+  });
+
+  it('browsers all in use answer 503 busy', async () => {
+    importPageAt.mockResolvedValue({ outcome: 'busy' });
+
+    const { res, body } = await call({ canvasId: 'c1', url: 'https://acme.test', x: 0, y: 0 }, 'u-busy');
+
+    expect(res.status).toBe(503);
+    expect(body.error).toBe('busy');
+  });
 });
