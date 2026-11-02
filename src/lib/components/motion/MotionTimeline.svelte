@@ -359,7 +359,7 @@
     if (!edge || !areaDraft) {
       return;
     }
-    const at = Math.min(Math.max(0, frameOfPointer(e)), doc.durationInFrames);
+    const at = Math.min(Math.max(0, snapTo(doc, frameOfPointer(e), [])), doc.durationInFrames);
     areaDraft = edge === WorkEdge.In ? { ...areaDraft, from: Math.min(at, areaDraft.to - 1) } : { ...areaDraft, to: Math.max(at, areaDraft.from + 1) };
   }
 

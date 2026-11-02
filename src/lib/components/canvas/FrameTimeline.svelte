@@ -100,7 +100,14 @@
     raf = requestAnimationFrame(tick);
   }
 
+  const NOTICE_MS = 4000;
+  let notice = $state('');
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
   function edit(result: OpResult, summary: string) {
+    clearTimeout(noticeTimer);
+    notice = result.ok ? summary : `Not done: ${result.error}`;
+    noticeTimer = setTimeout(() => (notice = ''), NOTICE_MS);
     if (result.ok) {
       onchange(result.doc, summary);
     }
@@ -134,7 +141,10 @@
     }
   }
 
-  $effect(() => () => cancelAnimationFrame(raf));
+  $effect(() => () => {
+    cancelAnimationFrame(raf);
+    clearTimeout(noticeTimer);
+  });
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -148,6 +158,7 @@
     <IconButton action={Command.RamPreview} size={14} data-testid="frame-timeline-ram" onclick={onram} />
     <span class="time" data-testid="frame-timeline-time">{(frame / doc.fps).toFixed(2)}s</span>
     {#each grouping as id (id)}<IconButton action={id} size={14} data-testid={`frame-timeline-${id}`} onclick={() => onaction(id)} />{/each}
+    {#if notice}<span class="notice" role="status" data-testid="frame-timeline-notice">{notice}</span>{/if}
     {#if onpin}<button type="button" class="pin-here" data-testid="frame-timeline-pin" onclick={onpin}>Comment here</button>{/if}
     <span class="spacer"></span>
     <button type="button" class="pin-here" data-testid="frame-timeline-proxies" aria-pressed={proxySetting.on} title="Play and scrub a light copy of large videos. Export always uses the original." onclick={() => proxySetting.toggle()}>Use proxies</button>
@@ -227,6 +238,11 @@
   .time {
     font-variant-numeric: tabular-nums;
     font-size: 12px;
+  }
+
+  .notice {
+    font-size: 12px;
+    color: var(--ui-text-2);
   }
 
   .pin-here {

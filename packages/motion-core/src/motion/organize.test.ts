@@ -199,6 +199,14 @@ describe('closing the loop', () => {
     expect(keys(must(closeLoop(doc))).opacity.at(-1)!.frame).toBe(doc.durationInFrames - 10);
   });
 
+  it('closes on the content end when the work area runs a frame past every clip, and pulls the out point back so no empty frame plays', () => {
+    const doc = withClip({ ...clip(0, { opacity: [{ frame: 0, value: 0, ease: 'standard' }, { frame: 30, value: 1, ease: 'standard' }] }), durationInFrames: 180 }, { from: 0, to: 181 });
+    const closed = must(closeLoop(doc));
+
+    expect(keys(closed).opacity.at(-1)).toMatchObject({ frame: 180, value: 0 });
+    expect(closed.workArea).toEqual({ from: 0, to: 180 });
+  });
+
   it('says so when nothing is animated', () => {
     expect(closeLoop(withClip(clip(0, {}))).ok).toBe(false);
   });
