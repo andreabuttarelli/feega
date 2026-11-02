@@ -376,6 +376,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'send-back': GuideGroup.Edit,
   'toggle-hidden': GuideGroup.Edit,
   'toggle-locked': GuideGroup.Edit,
+  export: GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
   'wrap-stack': GuideGroup.Edit,
