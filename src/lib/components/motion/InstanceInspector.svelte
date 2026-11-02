@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fieldKeys } from '$lib/motion/field-keys';
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import Diamond from '@lucide/svelte/icons/diamond';
@@ -101,7 +102,7 @@
             </optgroup>
           </select>
         {:else}
-          <input type="text" value={String(p.value)} data-testid="instance-property-text" onchange={(e) => setProp(p.key, e.currentTarget.value)} />
+          <input {@attach fieldKeys} type="text" value={String(p.value)} data-testid="instance-property-text" onchange={(e) => setProp(p.key, e.currentTarget.value)} />
         {/if}
         {#if p.overridden}<button type="button" class="reset" data-testid="instance-property-reset" onclick={() => resetProp(p.key)}>Reset</button>{:else}<button type="button" class="reset" data-testid="instance-property-remove" onclick={() => dropProp(p.key)}>Remove</button>{/if}
       </label>
@@ -120,7 +121,7 @@
     {#each texts as t (t.innerId)}
       <label class="field">
         <span class:overridden={t.overridden}>{t.main}</span>
-        <input type="text" value={t.value} data-testid="instance-text" onchange={(e) => retext(t.innerId, e.currentTarget.value)} />
+        <input {@attach fieldKeys} type="text" value={t.value} data-testid="instance-text" onchange={(e) => retext(t.innerId, e.currentTarget.value)} />
         {#if t.overridden}<button type="button" class="reset" data-testid="instance-reset-text" onclick={() => reset(t.innerId, 'text')}>Reset</button>{/if}
       </label>
     {/each}

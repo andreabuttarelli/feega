@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fieldKeys } from '$lib/motion/field-keys';
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import FontPicker from './FontPicker.svelte';
@@ -108,7 +109,7 @@
     {#each NUMBERS as field (field.key)}
       <label class="row">
         <span>{field.label}</span>
-        <input type="number" step={field.step * field.scale} data-testid={`range-${field.key}`} placeholder={values[field.key] === MIXED ? MIXED_LABEL : ''} value={shown(values[field.key], field.scale)} onchange={(e) => setNumber(field, e.currentTarget.value)} />
+        <input {@attach fieldKeys} type="number" step={field.step * field.scale} data-testid={`range-${field.key}`} placeholder={values[field.key] === MIXED ? MIXED_LABEL : ''} value={shown(values[field.key], field.scale)} onchange={(e) => setNumber(field, e.currentTarget.value)} />
       </label>
     {/each}
     <label class="row">
@@ -129,13 +130,13 @@
       {#if gradient.type === FillType.Linear || gradient.type === FillType.Angular}
         <label class="row">
           <span>Angle</span>
-          <input type="number" step="5" data-testid="range-gradient-angle" value={Math.round(gradient.angle)} onchange={(e) => patchGradient({ angle: Number(e.currentTarget.value) })} />
+          <input {@attach fieldKeys} type="number" step="5" data-testid="range-gradient-angle" value={Math.round(gradient.angle)} onchange={(e) => patchGradient({ angle: Number(e.currentTarget.value) })} />
         </label>
       {/if}
       {#each gradient.stops as stop, i (i)}
         <div class="row stop" data-testid="range-gradient-stop">
           <ColorField name={`Stop ${i + 1} colour`} display={ColourDisplay.Chip} value={colourOf(stop.color)} onchange={(v) => patchStop(i, { color: v })} />
-          <input type="number" min="0" max="100" step="1" value={Math.round(stop.pos * PERCENT)} onchange={(e) => setStopPos(i, e.currentTarget.value)} />
+          <input {@attach fieldKeys} type="number" min="0" max="100" step="1" value={Math.round(stop.pos * PERCENT)} onchange={(e) => setStopPos(i, e.currentTarget.value)} />
           <button type="button" title="Remove stop" disabled={gradient.stops.length <= 2} onclick={() => patchGradient({ stops: removeStop(gradient.stops, i) })}>×</button>
         </div>
       {/each}

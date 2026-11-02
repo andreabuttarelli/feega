@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fieldKeys } from '$lib/motion/field-keys';
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import Layers from '@lucide/svelte/icons/layers';
@@ -196,7 +197,7 @@
           {:else}
             <label class="line" data-prop={f.key}>
               <span>{f.label}</span>
-              <input type="text" aria-label={f.label} placeholder={value === MIXED ? "Mixed" : ""} value={textShown(value)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
+              <input {@attach fieldKeys} type="text" aria-label={f.label} placeholder={value === MIXED ? "Mixed" : ""} value={textShown(value)} onchange={(e) => setStyle(f.key, e.currentTarget.value)} />
             </label>
           {/if}
         {/each}

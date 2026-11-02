@@ -1,5 +1,6 @@
 <script lang="ts">
   import { localStore } from '$lib/browser-storage';
+  import { fieldKeys } from '$lib/motion/field-keys';
   import { setMotionPath } from '$lib/motion/path-ops';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
@@ -544,7 +545,7 @@
 <div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
-    <input class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} onchange={(e) => e.currentTarget.value.trim() && commit(renameClip(doc, clip.id, e.currentTarget.value.trim()), 'Renamed the layer')} />
+    <input {@attach fieldKeys} class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onchange={(e) => e.currentTarget.value.trim() && commit(renameClip(doc, clip.id, e.currentTarget.value.trim()), 'Renamed the layer')} />
     {#if headKind !== headTitle}<span class="kind">{headKind}</span>{/if}
     {@render actions?.()}
   </header>
@@ -688,7 +689,7 @@
         {#if clip.bind?.[field.key]}
           <BindChip {doc} {clip} target={field.key} {commit} />
         {:else if field.control === Control.Text}
-          <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
+          <input {@attach fieldKeys} id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
         {:else if field.control === Control.Select}
           <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
             {#each field.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
@@ -723,7 +724,7 @@
           {#if split}
             <div class="corners" data-testid="corners">
               {#each CORNER_NAMES as name, i (name)}
-                <input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} />
+                <input {@attach fieldKeys} type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} />
               {/each}
             </div>
           {/if}
@@ -751,7 +752,7 @@
   {#if cornersField && split}
     <div class="corners" data-testid="corners">
       {#each CORNER_NAMES as name, i (name)}
-        <label class="corner" title={name}><span>{CORNER_SHORT[i]}</span><input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(cornersField, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} /></label>
+        <label class="corner" title={name}><span>{CORNER_SHORT[i]}</span><input {@attach fieldKeys} type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(cornersField, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} /></label>
       {/each}
     </div>
   {/if}
@@ -935,8 +936,8 @@
 
 {#snippet timingBody()}
   <div class="grid2">
-    <label class="clock"><span>In</span><input type="text" aria-label="Start" value={clockText(clip.from, doc.fps)} onchange={(e) => setClock('from', e.currentTarget.value)} /></label>
-    <label class="clock"><span>Dur</span><input type="text" aria-label="Length" value={clockText(clip.durationInFrames, doc.fps)} onchange={(e) => setClock('durationInFrames', e.currentTarget.value)} /></label>
+    <label class="clock"><span>In</span><input {@attach fieldKeys} type="text" aria-label="Start" value={clockText(clip.from, doc.fps)} onchange={(e) => setClock('from', e.currentTarget.value)} /></label>
+    <label class="clock"><span>Dur</span><input {@attach fieldKeys} type="text" aria-label="Length" value={clockText(clip.durationInFrames, doc.fps)} onchange={(e) => setClock('durationInFrames', e.currentTarget.value)} /></label>
   </div>
   {#if shows(Part.Transitions, family)}
     {#each [Side.In, Side.Out] as side (side)}
@@ -948,7 +949,7 @@
             {#each TRANSITION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
           </select>
         </label>
-        <label class="clock"><span>Dur</span><input type="text" aria-label={`Transition ${side} duration`} value={clockText(edge.durationInFrames, doc.fps)} onchange={(e) => setEdgeClock(side, e.currentTarget.value)} /></label>
+        <label class="clock"><span>Dur</span><input {@attach fieldKeys} type="text" aria-label={`Transition ${side} duration`} value={clockText(edge.durationInFrames, doc.fps)} onchange={(e) => setEdgeClock(side, e.currentTarget.value)} /></label>
       </div>
     {/each}
   {/if}
@@ -1222,7 +1223,7 @@
         {@const mask = clip.mask}
         <label class="check"><input type="checkbox" checked={mask.invert} onchange={(e) => editMask(mask, { invert: e.currentTarget.checked })} />Invert</label>
         {#if MASK_KINDS[mask.kind].needs === Needs.Text}
-          <div class="line"><label class="label" for="mask-text">Text</label><input id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
+          <div class="line"><label class="label" for="mask-text">Text</label><input {@attach fieldKeys} id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
         {:else if MASK_KINDS[mask.kind].needs === Needs.Asset}
           <div class="assets">
             {#each pictures as asset (asset.id)}
@@ -1557,6 +1558,7 @@
     background-color: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
+    letter-spacing: normal;
     font-size: var(--ui-text-sm);
     transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
@@ -1844,6 +1846,7 @@
     background: none;
     color: var(--ui-ink);
     font: inherit;
+    letter-spacing: normal;
   }
   .split {
     border: 0;
