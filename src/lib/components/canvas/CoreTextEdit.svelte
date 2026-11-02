@@ -86,6 +86,12 @@
   });
 
   $effect(() => {
+    const fonts = document.fonts;
+    fonts?.addEventListener('loadingdone', fit);
+    return () => fonts?.removeEventListener('loadingdone', fit);
+  });
+
+  $effect(() => {
     void value;
     void textRange.runs;
     void textRange.lists;
