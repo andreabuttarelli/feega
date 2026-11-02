@@ -28,10 +28,11 @@
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
   import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, TextTier, textTier, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
-  import { PropertiesView, fieldShownFor, sectionsFor } from '$lib/motion/properties-view';
+  import { PropertiesView, ShapePart, fieldShown as fieldVisible, fieldShownFor, sectionsFor, shapePartShown, sizeShown, transformShown } from '$lib/motion/properties-view';
   import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
+  import CheckRow from './CheckRow.svelte';
   import type { NodeTurn } from '$lib/motion/element-turn';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
@@ -219,6 +220,7 @@
 
   const transformKeys = $derived(new Set(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform).map((p) => p.key)));
   const typed = $derived(clipFieldGroups(doc, clip).some((g) => g.fields.some((f) => f.control === Control.Font)) ? Typed.Yes : Typed.No);
+  const fieldContext = $derived({ mode, shape: clip.component === 'Shape' ? (clip.props.shape as ShapeKind) : null, morphTargets: Array.isArray(clip.props.morphs) ? clip.props.morphs.length : 0 });
   const fields = $derived(
     clipFieldGroups(doc, clip)
       .flatMap((g) => g.fields)
@@ -226,6 +228,7 @@
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
       .filter((f) => !emptyManaged(f.control, (clip.props as Record<string, unknown>)[f.key]))
+      .filter((f) => fieldVisible(f.key, fieldContext))
       .map((f) => ({ ...f, label: fieldLabel(f.key, f.label) }))
   );
   const sharedFields = $derived(
@@ -236,7 +239,7 @@
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
-  const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
+  const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && transformShown(p.key)));
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
   const positioned = $derived(transformProps.length > 0);
   const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
@@ -512,7 +515,7 @@
     [Section.Stroke]: fieldsIn(Section.Stroke).length > 0,
     [Section.Text]: fieldsIn(Section.Text).length > 0,
     [Section.Timing]: true,
-    [Section.Shape]: clip.component === 'Shape',
+    [Section.Shape]: clip.component === 'Shape' && !clip.autoLayout && !hasChildren,
     [Section.Animate]: visual || TEXT_COMPONENTS.has(clip.component) || pulseShown || (voices.length > 0 && shows(Part.Ducking, family)) || fieldsIn(Section.Animate).length > 0 || !!(clip.keyframes.x?.length && clip.keyframes.y?.length),
     [Section.Effects]: visual && clip.component !== 'Null',
     [Section.Colours]: layerExtras && hasChildren && colours.length > 0,
@@ -863,7 +866,7 @@
 
 {#snippet layoutBody()}
   {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
-  {@const sizeFields = clip.autoLayout ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
+  {@const sizeFields = clip.autoLayout || !sizeShown(placement) ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
   {@const sizing = textField('sizing')}
   {@const modes = sizing ? axisModes(value(sizing) as TextSizing) : null}
   {#if sizing}
@@ -913,10 +916,7 @@
   {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
     {#if clipsOwnContent}
-      <div class="line" data-prop="clipContent">
-        <span class="label">Clip content</span>
-        <SegmentedField name="Clip content" options={YES_NO} value={answerOf(clip.clipContent)} onchange={(v) => commit(setClipFlags(doc, clip.id, { clipContent: v === Answer.Yes }), 'Changed clip content')} />
-      </div>
+      <div data-prop="clipContent"><CheckRow label="Clip content" checked={!!clip.clipContent} testid="clip-content" onchange={(on) => commit(setClipFlags(doc, clip.id, { clipContent: on }), 'Changed clip content')} /></div>
     {/if}
     {#if doc.motionBlur.enabled}
       <div class="line" data-testid="clip-blur-section">
@@ -966,6 +966,7 @@
         <span class="managed">Edit points on the preview with the pen tool.</span>
       {/if}
     </div>
+    {#if shapePartShown(ShapePart.Morph, mode)}
     {#each shapeMorphs as _target, i (i)}
       <div class="line">
         <span class="label">Morph {i + 1}</span>
@@ -982,10 +983,13 @@
         {#each morphSources as other (other.id)}<option value={other.id}>{clipName(other.id)}</option>{/each}
       </select>
     {/if}
+    {/if}
+    {#if shapePartShown(ShapePart.Liquid, mode)}
     <select class="add" aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
       <option value="">Liquid preset…</option>
       {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
     </select>
+    {/if}
     {#each shapeModifiers as modifier, i (modifier.id)}
       <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
         <div class="effect-head">

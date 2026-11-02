@@ -54,7 +54,7 @@ The Stack places its children, like flexbox. Select a child and the right bar dr
 - **W / H** chips: the size in pixels, or the share when the mode is **%**; the mode menu picks **Fixed**, **Hug**, **Fill** (shares the space left; an agent can weight it, `widthGrow` 2 takes twice the space of 1) or **%** (a share of the Stack).
 - **Min / max** width and height, in the same menu, in `px` or `%`.
 - **Align self**: overrides the Stack's align for this child (start, center, end, stretch).
-- **Absolute position**: takes the child out of the flow (Figma's *ignore auto layout*). X and Y come back, measured from the Stack's top-left corner.
+- **Ignore auto layout**: a checkbox that takes the child out of the flow (absolute position). X and Y come back, measured from the Stack's top-left corner.
 - **Move earlier / later** and **Take out of the stack**.
 
 On the canvas, dragging a child reorders it: the child follows the cursor and a line shows where it lands between its siblings. Dragging any other element of the frame onto a Stack inserts it at the line the same way. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it. In **Layers**, dragging a child above or below another reorders it in that Stack, or moves it into the Stack of the row it lands on. Dropping on the middle of a Stack row puts the layer inside it, at the end.

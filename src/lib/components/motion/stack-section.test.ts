@@ -82,8 +82,9 @@ describe('the stack section', () => {
     expect(uneven).not.toContain('data-testid="auto-layout-padding-x"');
   });
 
-  it('absolute is a Yes / No', () => {
-    expect(html(row, 'a')).toMatch(/data-segmented="Absolute position"[\s\S]*?>Yes<[\s\S]*?>No</);
+  it('absolute is a labelled toggle: Ignore auto layout', () => {
+    expect(html(row, 'a')).toMatch(/type="checkbox"[^>]*data-testid="auto-layout-absolute"[\s\S]*?Ignore auto layout/);
+    expect(html(row, 'a')).not.toContain('data-segmented="Absolute position"');
   });
 
   it('a plain rectangle shows nothing: Wrap with stack makes a stack', () => {
