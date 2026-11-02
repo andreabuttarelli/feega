@@ -1,6 +1,6 @@
 <script lang="ts">
   import { LocalOff, isOff } from '$lib/local-user';
-  import { followDocks } from '$lib/canvas/dock-lift';
+  import { LiftMove, followDocks, liftMove } from '$lib/canvas/dock-lift';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
   import Cloud from '@lucide/svelte/icons/cloud';
@@ -88,6 +88,7 @@
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);
+  let lifting = $state(LiftMove.Glide);
   $effect(() => {
     const timeline = frameBar.timeline;
     const host = barEl?.parentElement;
@@ -98,6 +99,7 @@
     const bottomDocks = () => [...(timeline ? [timeline] : []), ...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')].filter((el) => el !== barEl);
     return followDocks(host, bottomDocks, (px) => {
       if (px !== timelinePx) {
+        lifting = liftMove(timelinePx, px);
         timelinePx = px;
       }
     });
@@ -403,7 +405,7 @@
 
 <svelte:window onresize={fitMenu} />
 
-<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
+<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" data-lift={lifting} style:--lift={`${timelinePx}px`}>
   <div class="group" data-testid={`bar-${context}`}>
     {#each slots as s, i (s)}
       <div class="slot" in:slotTransition={{ phase: SlotPhase.Enter, index: i }} out:slotTransition={{ phase: SlotPhase.Leave, index: i }}>{@render SLOT[s]()}</div>
@@ -522,6 +524,11 @@
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
   }
+
+  .add-bar[data-lift='jump'] {
+    transition: left var(--chrome-move) var(--ease-expo), opacity var(--chrome-move) var(--ease-expo), translate var(--chrome-move) var(--ease-expo);
+  }
+
 
   .slot {
     display: flex;

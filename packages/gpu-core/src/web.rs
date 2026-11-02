@@ -14,7 +14,7 @@ use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
-use crate::reproject::{Draw, Reprojector};
+use crate::reproject::{Draw, Output, Reprojector};
 use crate::retained::{Camera, Lookup, Quality};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
@@ -25,6 +25,8 @@ const RASTERS_PER_DRAW: usize = 1;
 const ITEMS_PER_RASTER: usize = 48;
 const FRAMES_IN_FLIGHT: u32 = 1;
 const GESTURE_RASTER_EVERY_MS: f64 = 80.0;
+
+const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
@@ -49,7 +51,6 @@ pub struct WebCore {
     surface: wgpu::Surface<'static>,
     format: wgpu::TextureFormat,
     engine: Engine,
-    blitter: wgpu::util::TextureBlitter,
     target: wgpu::Texture,
     pictures: Pictures,
     textures: HashMap<String, wgpu::Texture>,
@@ -146,7 +147,7 @@ impl Painter for GpuPainter<'_> {
                 let scale = list.width as f64 / into.width();
                 let look = Lookup { scale, x: -into.x0 * scale, y: -into.y0 * scale };
                 let target = self.retained.create_view(&wgpu::TextureViewDescriptor::default());
-                self.reprojector.draw(self.device, &mut encoder, Draw { source: &scratch, target: &target, format: wgpu::TextureFormat::Rgba8Unorm, look, within: Some(into) });
+                self.reprojector.draw(self.device, &mut encoder, Draw { source: &scratch, target: &target, format: wgpu::TextureFormat::Rgba8Unorm, look, within: Some(into), output: Output::Straight });
             }
         }
         self.queue.submit([encoder.finish()]);
@@ -160,7 +161,7 @@ impl Painter for GpuPainter<'_> {
         };
         let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.reprojector.draw(self.device, &mut encoder, Draw { source: self.retained, target: &out, format: self.format, look, within: None });
+        self.reprojector.draw(self.device, &mut encoder, Draw { source: self.retained, target: &out, format: self.format, look, within: None, output: Output::Premultiplied });
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(())
@@ -230,7 +231,6 @@ impl WebCore {
         let engine = Engine::new(&device).map_err(failed)?;
         let mut library = Library::new();
         library.compose_encodings();
-        let blitter = wgpu::util::TextureBlitter::new(&device, format);
         let target = storage(&device, width, height);
         let limits = Limits { side: CACHE_SIDE.min(device.limits().max_texture_dimension_2d), rasters: RASTERS_PER_DRAW, items: ITEMS_PER_RASTER };
         let compositor = Compositor::new(width, height);
@@ -238,7 +238,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -388,7 +388,7 @@ impl WebCore {
         };
         let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.blitter.copy(&self.device, &mut encoder, &view, &out);
+        self.reprojector.draw(&self.device, &mut encoder, Draw { source: &self.target, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Premultiplied });
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(report(&[skipped, missing].concat()))

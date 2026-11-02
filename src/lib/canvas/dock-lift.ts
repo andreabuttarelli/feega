@@ -7,6 +7,13 @@ export function dockLift(bottom: number, docks: readonly Rect[]): number {
   return Math.max(0, Math.round(Math.max(0, ...tops)));
 }
 
+export enum LiftMove {
+  Jump = 'jump',
+  Glide = 'glide'
+}
+
+export const liftMove = (from: number, to: number): LiftMove => (to > from ? LiftMove.Jump : LiftMove.Glide);
+
 export const resizeWatch: Watch = (targets, onchange) => {
   const observer = new ResizeObserver(onchange);
   for (const target of targets) {
