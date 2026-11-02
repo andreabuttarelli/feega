@@ -81,7 +81,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Press, Reach, Root, childBelow, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Extend, Press, Reach, Root, childBelow, extendOf, framePage, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { holdsLock, ownLocked } from '$lib/canvas/locks';
   import { altCopies } from '$lib/canvas/alt-copy';
   import { clickPick, pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
@@ -1243,19 +1243,34 @@
   }
 
   function extendPick(e: PointerEvent, w: Point): boolean {
-    const deep = (e.metaKey || e.ctrlKey) && !e.shiftKey;
-    const hit = (e.shiftKey || deep) && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
-    if (!hit || inside?.nodeId !== hit.nodeId) {
+    const keys = { shift: e.shiftKey, mod: e.metaKey || e.ctrlKey };
+    const hit = e.button === 0 && e.pointerType === 'mouse' && mode !== CanvasMode.View && !space ? framePickAt(w) : null;
+    const doc = hit ? liveOf(hit.nodeId)?.doc : null;
+    if (!hit || !doc || frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
       return false;
     }
-    if (hit.clip && deep) {
+    const entered = inside?.nodeId === hit.nodeId;
+    const { box } = hit.frame;
+    const onBody = w.x >= box.x && w.y >= box.y && w.x <= box.x + box.w && w.y <= box.y + box.h;
+    const page = framePage(doc, frameChrome(kindOfNode(hit.nodeId)).root);
+    const clips = doc.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.id !== page && (c.parent ?? null) === page).map((c) => c.id));
+    const bandable = kindOfNode(hit.nodeId) === FrameKind.Frame && clips.length > 0;
+    const plan = extendOf(keys, { onClip: !!hit.clip, onBody, held: selected.includes(hit.nodeId), entered, selectedElsewhere: selected.some((id) => id !== hit.nodeId), picks: entered ? picks.length : 0, bandable });
+    if (plan.extend === Extend.None) {
       return false;
     }
-    if (hit.clip) {
-      pickMany(hit.nodeId, toggleId(picks, elementAt(w, Reach.Top)?.clip ?? hit.clip));
+    if (!entered) {
+      select([hit.nodeId]);
+      pickMany(hit.nodeId, []);
+    }
+    if (plan.extend === Extend.Toggle) {
+      const clip = elementAt(w, plan.reach)?.clip ?? hit.clip;
+      if (clip) {
+        pickMany(hit.nodeId, toggleId(picks, clip));
+      }
       return true;
     }
-    const clips = liveOf(hit.nodeId)?.doc.tracks.flatMap((t) => t.clips.map((c) => c.id)) ?? [];
+    const deep = plan.reach === Reach.Deep;
     const from = w;
     const move = (ev: PointerEvent) => {
       bandDrag = { nodeId: hit.nodeId, from, to: toWorld(view, local(ev)) };
@@ -2401,7 +2416,7 @@
       rotateHost(nodeId, e);
       return;
     }
-    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
+    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && (extendPick(e, toWorld(view, local(e))) || pickElement(e, toWorld(view, local(e))))) {
       e.stopPropagation();
       return;
     }

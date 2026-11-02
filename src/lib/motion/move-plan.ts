@@ -1,12 +1,13 @@
 import { Background, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { shownBox } from '@feega/motion-core/motion/layout/resolve';
+import { shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { dropInStack } from './layout/stack-drag';
 import { docMode, type DocMode } from '@feega/motion-core/motion/still';
 import { FrameKind, elementNodeOf, frameNodeOf, leftEmpty, type DocNodeType } from '$lib/canvas/motion-node';
 import { blankElement, canvasReady } from './draw-create';
 import { elementName } from './element-name';
 import { homed, placeInstance } from './canvas-components';
 import { reframed } from './comp-frame';
-import { DropOn, clipCentre, elementBox, frameOf, liftElement, placeElement, type Box, type Drop, type Element, type NewId, type Point } from './move-element';
+import { DropOn, clipCentre, elementBox, frameOf, guessedBoxes, liftElement, placeElement, type Box, type Drop, type Element, type NewId, type Point } from './move-element';
 
 export enum MoveOutcome {
   Done = 'done',
@@ -77,7 +78,12 @@ export function landIn(target: FrameSnap, element: Element, drop: FrameDrop, new
   if (!placed.ok) {
     return refusal(MoveOutcome.Invalid, placed.error);
   }
-  return { ok: true, landing: { on: DropOn.Frame, nodeId: target.nodeId, doc: placed.doc, clipId: placed.clipId } };
+  return { ok: true, landing: { on: DropOn.Frame, nodeId: target.nodeId, doc: stackedAt(placed.doc, placed.clipId, drop.at), clipId: placed.clipId } };
+}
+
+function stackedAt(doc: MotionDoc, clipId: string, at: Point): MotionDoc {
+  const joined = dropInStack(doc, clipId, guessedBoxes(withAutoLayout(doc)), [at.x * doc.width, at.y * doc.height]);
+  return joined?.result.ok ? joined.result.doc : doc;
 }
 
 export function landOnCanvas(element: Element, drop: CanvasDrop, mode: DocMode, box: Box | null, newId: NewId): OnCanvas {
@@ -171,6 +177,7 @@ export function planFree(source: FrameSnap, target: FrameSnap, drop: FrameDrop, 
   const spread = (axis: 'x' | 'y', size: 'width' | 'height', centre: number) => drop.at[axis] + ((centre - 0.5) * (source.stage?.[size] ?? 0)) / (target.stage?.[size] ?? 1);
   let doc = target.doc;
   let clipId = '';
+  let roots: string[] = [];
   for (const clip of source.doc.tracks.flatMap((t) => t.clips)) {
     const lifted = liftElement(source.doc, clip.id);
     if (!lifted.ok) {
@@ -183,6 +190,8 @@ export function planFree(source: FrameSnap, target: FrameSnap, drop: FrameDrop, 
     }
     doc = placed.doc;
     clipId = placed.clipId;
+    roots = clip.parent ? roots : [...roots, placed.clipId];
   }
-  return { ok: true, landing: { on: DropOn.Frame, nodeId: target.nodeId, doc, clipId } };
+  const [only] = roots;
+  return { ok: true, landing: { on: DropOn.Frame, nodeId: target.nodeId, doc: roots.length === 1 ? stackedAt(doc, only, drop.at) : doc, clipId } };
 }

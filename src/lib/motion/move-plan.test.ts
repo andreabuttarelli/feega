@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { newMotionDoc, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { findClip, newMotionDoc, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
-import { shownBox } from '@feega/motion-core/motion/layout/resolve';
+import { shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { wrapInStack } from './layout/ops';
 import { createComponent } from './main-component';
-import { DropOn } from './move-element';
-import { planComponent } from './move-plan';
+import { DropOn, guessedBoxes, liftElement } from './move-element';
+import { landIn, planComponent, planFree } from './move-plan';
 
 function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!result.ok) {
@@ -38,5 +39,53 @@ describe('placing a component on the canvas', () => {
     expect(at).toEqual({ x: 500 - shape.width / 2, y: 300 - shape.height / 2 });
     const box = shownBox(placed, clipId)!;
     expect([box.left, box.top, box.width / placed.width, box.height / placed.height].map((v) => Math.round(v * 100) / 100)).toEqual([0, 0, 1, 1]);
+  });
+});
+
+describe('landing an element on a stack in another frame', () => {
+  const shape = (x: number) => ({ component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.3, width: 0.1, height: 0.1 } }) as const;
+  const target = (() => {
+    let d = newMotionDoc(MotionFormat.Square);
+    d = must(addClip(d, shape(0.1), 'a'));
+    d = must(addClip(d, shape(0.25), 'b'));
+    return must(wrapInStack(d, ['a', 'b'], 'row', 'lane-row'));
+  })();
+  const element = (() => {
+    const lifted = liftElement(must(addClip(newMotionDoc(MotionFormat.Square), shape(0.8), 'moved')), 'moved');
+    if (!lifted.ok) {
+      throw new Error(lifted.error);
+    }
+    return lifted.element;
+  })();
+  const rowBox = guessedBoxes(withAutoLayout(target)).row;
+  const landed = (at: { x: number; y: number }) => {
+    const plan = landIn({ nodeId: 'to', doc: target }, element, { on: DropOn.Frame, nodeId: 'to', at }, newId);
+    if (!plan.ok || plan.landing.on !== DropOn.Frame) {
+      throw new Error('not landed');
+    }
+    return findClip(plan.landing.doc, plan.landing.clipId)?.clip;
+  };
+
+  it('joins the stack under the drop point', () => {
+    const at = { x: (rowBox.left + rowBox.width - 1) / target.width, y: (rowBox.top + rowBox.height / 2) / target.height };
+
+    expect(landed(at)?.parent).toBe('row');
+  });
+
+  it('stays free away from any stack', () => {
+    expect(landed({ x: 0.8, y: 0.8 })?.parent ?? null).toBeNull();
+  });
+
+  it('joins it when the element was free on the canvas', () => {
+    const free = must(addClip(newMotionDoc(MotionFormat.Square), { ...shape(0.5), props: { ...shape(0.5).props, y: 0.5 } }, 'own'));
+    const stage = { width: 100, height: 100 };
+    const at = { x: (rowBox.left + rowBox.width - 1) / target.width, y: (rowBox.top + rowBox.height / 2) / target.height };
+
+    const plan = planFree({ nodeId: 'free', doc: free, stage }, { nodeId: 'to', doc: target, stage: { width: 1080, height: 1080 } }, { on: DropOn.Frame, nodeId: 'to', at }, newId);
+
+    if (!plan.ok || plan.landing.on !== DropOn.Frame) {
+      throw new Error('not landed');
+    }
+    expect(findClip(plan.landing.doc, plan.landing.clipId)?.clip.parent).toBe('row');
   });
 });
