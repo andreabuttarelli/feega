@@ -281,7 +281,10 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   fov: { short: 'FOV', unit: DEGREES },
   focusX: { short: 'Crop X', unit: PERCENT_SIGN },
   focusY: { short: 'Crop Y', unit: PERCENT_SIGN },
-  zoom: { short: 'Zoom', unit: PERCENT_SIGN }
+  zoom: { short: 'Zoom', unit: PERCENT_SIGN },
+  arcStart: { short: 'Start', unit: DEGREES },
+  arcSweep: { short: 'Sweep', unit: PERCENT_SIGN },
+  arcRatio: { short: 'Ratio', unit: PERCENT_SIGN }
 };
 
 const SOURCE_LOOKS: Partial<Record<Source, Record<string, Partial<FieldLook>>>> = {

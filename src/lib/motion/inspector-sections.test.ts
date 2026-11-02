@@ -90,6 +90,12 @@ describe('inspector sections', () => {
     expect(fieldLook('x').short).toBe('X');
   });
 
+  it('an ellipse arc reads start in degrees, sweep and ratio in percent', () => {
+    expect(fieldLook('arcStart')).toMatchObject({ short: 'Start', unit: '°' });
+    expect(fieldLook('arcSweep')).toMatchObject({ short: 'Sweep', unit: '%' });
+    expect(fieldLook('arcRatio')).toMatchObject({ short: 'Ratio', unit: '%' });
+  });
+
   it('files every field under the section a designer looks for it in', () => {
     const field = (key: string, control: Control, group: Group) => ({ key, control, group });
 

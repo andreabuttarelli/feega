@@ -36,6 +36,7 @@ The right panel follows the selection, whatever is selected:
 - **A generated image or video:** its model and settings (the same pickers as the selection toolbar), View output, and the tools: Remove background, Upscale, Inpaint, Outpaint, Reframe, Split into layers, Layers to frame.
 - **Several free elements or nodes:** Align (left, centre, right, top, middle, bottom) and Distribute horizontally or vertically, plus Duplicate, Group, Tidy up.
 - **Several layers inside a frame:** the same Align and Distribute bar, and **Use as mask**: the bottom-most selected layer cuts the layers above it. **Remove mask** undoes it. Both are in the right-click menu too.
+- **One layer, in Design:** alignment, layout, constraints, appearance, fill, stroke and effects. Timing, Transform, 3D, Parent & mask and Animation appear only in Motion; so do Morph and the liquid presets, and Morph only on a shape that has morph targets. A 3D model keeps its 3D section in both.
 - **A frame with nothing inside picked:** Export, Components, Templates, Version history, Branches, Interactive, Chat history, Save as template, Publish, Copy id, Report — the same entries as the frame's "…" menu.
 
 On a phone or tablet, press and hold a node or a layer to open the same menu a right click opens.
