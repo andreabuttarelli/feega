@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fieldKeys } from '$lib/motion/field-keys';
   import Pipette from '@lucide/svelte/icons/pipette';
   import { COMPONENTS } from '@feega/motion-core/motion/components';
   import { clipsOf, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -200,7 +201,7 @@
             {#each CAMERA_PRESETS as id (id)}<option value={id}>{PRESETS[id].label}</option>{/each}
           </select>
         </label>
-        <label>Length (s)<input type="text" inputmode="decimal" bind:value={seconds} /></label>
+        <label>Length (s)<input {@attach fieldKeys} type="text" inputmode="decimal" bind:value={seconds} /></label>
       </div>
       {#if preset === CameraPreset.RackFocus}
         <div class="row two">
@@ -208,7 +209,7 @@
           <label>To<select bind:value={rackTo}><option value="">…</option>{#each worldClips as clip (clip.id)}<option value={clip.id}>{label(clip.id)}</option>{/each}</select></label>
         </div>
       {:else}
-        <div class="row"><label for="camera-amount">Amount</label><input id="camera-amount" type="text" inputmode="decimal" bind:value={amount} /></div>
+        <div class="row"><label for="camera-amount">Amount</label><input {@attach fieldKeys} id="camera-amount" type="text" inputmode="decimal" bind:value={amount} /></div>
       {/if}
       <p class="hint">{PRESETS[preset].about}. Starts at the playhead.</p>
       <button type="button" class="primary" data-testid="camera-apply" onclick={applyMove}>Add move</button>
