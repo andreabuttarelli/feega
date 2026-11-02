@@ -10,6 +10,8 @@
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
+  import { PAINT_GRIP, PAINT_INLINE_INPUT, PAINT_META, PAINT_NAME, PAINT_ROW, PAINT_SWATCH, PAINT_TEXT } from './paint-row';
+  import MinusGlyph from './MinusGlyph.svelte';
 
   let { strokes, tokens, sided = false, short, title = '', adder = Adder.Own, gesture = null, palette = () => [], onchange }: { palette?: () => readonly string[]; gesture?: LiveGesture | null; strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; adder?: Adder; onchange: (strokes: Stroke[], summary: string) => void } = $props();
 
@@ -98,7 +100,7 @@
   {#each topFirst as { stroke, index } (index)}
     <div
       bind:this={rowEls[index]}
-      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_56px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !stroke.visible && '[&>.dim]:opacity-40')}
+      class={cn(PAINT_ROW, open === index && 'bg-ui-selected', !stroke.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
@@ -114,10 +116,14 @@
         drop(index);
       }}
     >
-      <span class="cursor-grab text-ui-text-3 select-none" aria-hidden="true">⋮</span>
-      <span class="dim size-[18px] rounded-xs border border-ui-divider" data-testid="stroke-swatch" style={`background:${swatch(stroke.paint)}`}></span>
-      <span class={cn(LABEL, 'dim truncate')} data-testid="stroke-label">{rowLabel(stroke.paint)}</span>
-      <input class={cn(FIELD_INPUT, 'dim')} type="number" min="0" step="0.5" data-testid="stroke-width" aria-label="Stroke width px" title="Width px" value={toPx(stroke.width)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { width: fromPx(e) }, 'Stroke width')} />
+      <span class={PAINT_GRIP} aria-hidden="true">⋮</span>
+      <span class={PAINT_SWATCH} data-testid="stroke-swatch" style={`background:${swatch(stroke.paint)}`}></span>
+      <span class={PAINT_TEXT}>
+        <span class={PAINT_NAME} data-testid="stroke-label">{rowLabel(stroke.paint)}</span>
+        <span class={PAINT_META} data-testid="stroke-meta">
+          <input class={PAINT_INLINE_INPUT} type="number" min="0" step="0.5" data-testid="stroke-width" aria-label="Stroke width px" title="Width px" value={toPx(stroke.width)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { width: fromPx(e) }, 'Stroke width')} />px · {ALIGN_LABEL[stroke.align]}
+        </span>
+      </span>
       <button
         type="button"
         class={ICON}
@@ -136,7 +142,7 @@
         onclick={(e) => {
           e.stopPropagation();
           remove(index);
-        }}>−</button
+        }}><MinusGlyph /></button
       >
     </div>
 

@@ -74,7 +74,12 @@ describe('the stroke stack in Properties', () => {
   it('a collapsed row shows swatch, hex or paint, width, eye and remove', () => {
     show(TWO);
     expect(inRow(0, 'stroke-label').textContent).toBe('222222');
-    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['stroke-swatch', 'stroke-label', 'stroke-width', 'stroke-eye', 'stroke-remove']);
+    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['stroke-swatch', 'stroke-label', 'stroke-meta', 'stroke-width', 'stroke-eye', 'stroke-remove']);
+  });
+
+  it('a row reads its hex over a muted line with the width and the position', () => {
+    show(TWO);
+    expect(inRow(0, 'stroke-meta').textContent?.replace(/\s+/g, ' ').trim()).toMatch(/^px · (Inside|Centre|Center|Outside)$/);
   });
 
   it('+ adds a stroke on top', () => {

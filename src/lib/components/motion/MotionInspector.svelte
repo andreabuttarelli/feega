@@ -39,6 +39,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Settings2 from '@lucide/svelte/icons/settings-2';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
+  import Droplet from '@lucide/svelte/icons/droplet';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import { IconButton as ShellIconButton, Menu, MenuContent, MenuItem, MenuTrigger } from '$lib/components/ui/shell';
@@ -780,6 +781,10 @@
   {/if}
 {/snippet}
 
+{#snippet advancedToggle()}
+  <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={15} /></button>
+{/snippet}
+
 {#snippet contentBody()}
   {@render groupFields(Section.Content)}
 {/snippet}
@@ -800,10 +805,10 @@
   {@const casing = textField('textCase')}
   {@const advanced = textFields.filter((f) => textTier(f.key, decorationNow) === TextTier.Advanced)}
   <div class="text-primary">
-    {#if font}{@render fieldRow(font)}{/if}
+    {#if font}<div class="font-row">{@render fieldRow(font)}</div>{/if}
     <div class="grid2">{@render pair(['weight', 'fontWeight', 'size'])}</div>
     <div class="grid2">{@render pair(['leading', 'tracking'])}</div>
-    {#if aligns.length}<div class="grid2">{#each aligns as field (field.key)}{@render alignCell(field)}{/each}</div>{/if}
+    {#if aligns.length}<div class="align-row" data-testid="text-aligns"><div class="grid2">{#each aligns as field (field.key)}{@render alignCell(field)}{/each}</div>{@render advancedToggle()}</div>{/if}
     <div class="tgl-row" data-testid="text-styles" bind:this={advancedRow}>
       {#if italic}<button type="button" class="tgl" class:on={value(italic) === true} data-testid="text-italic" aria-label="Italic" title="Italic" aria-pressed={value(italic) === true} onclick={() => setProp(italic, value(italic) !== true)}><i>I</i></button>{/if}
       {@render lineToggle('Underline', 'U', 'underline')}
@@ -813,7 +818,7 @@
           {#each casing.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
         </select>
       {/if}
-      <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={14} /></button>
+      {#if !aligns.length}{@render advancedToggle()}{/if}
     </div>
   </div>
   {#if advancedOpen && advancedRow && advanced.length}
@@ -842,17 +847,22 @@
 {/snippet}
 
 {#snippet layerBody()}
+  {#if visual && !focus && opacityProp}
+    <div class="appear" data-prop="opacity" data-testid="opacity-field">
+      <div class="appear-main">{@render animField(opacityProp)}</div>
+      <IconButton action={clip.hidden ? Action.ShowLayer : Action.HideLayer} size={16} data-testid="layer-visibility" onclick={() => commit(setClipFlags(doc, clip.id, { hidden: !clip.hidden }), clip.hidden ? 'Showed the layer' : 'Hid the layer')} />
+    </div>
+  {/if}
+  {#if roundnessField}{@render radiusControl(roundnessField)}{/if}
   {#if visual && !focus}
-    <div class="line" data-testid="layer-look">
-      <label for="blend-mode">Blend</label>
-      <select id="blend-mode" class="wide-select" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
+    <label class="blend" data-testid="layer-look">
+      <span class="blend-icon" aria-hidden="true"><Droplet size={15} /></span>
+      <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
         {#each BLEND_MODES as mode (mode)}<option value={mode}>{blendLabel(mode)}</option>{/each}
       </select>
-    </div>
-    {#if opacityProp}<div class="stack" data-prop="opacity" data-testid="opacity-field">{@render animField(opacityProp, true)}</div>{/if}
+    </label>
   {/if}
   {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{#each layerProps as prop (prop.key)}<div class="stack" data-prop={prop.key}>{@render animField(prop, true)}</div>{/each}</div>{/if}
-  {#if roundnessField}{@render radiusControl(roundnessField)}{/if}
   {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
     {#if hasChildren || view === PropertiesView.Frame}
@@ -1190,7 +1200,7 @@
     gap: 8px;
     height: var(--ui-header-h);
     flex-shrink: 0;
-    padding: 0 12px;
+    padding: 0 var(--ui-space-2) 0 var(--ui-space-4);
     border-bottom: 1px solid var(--ui-divider);
   }
 
@@ -1216,7 +1226,7 @@
   .name {
     flex: 1;
     min-width: 0;
-    height: 28px;
+    height: var(--ui-row);
     padding: 0 6px;
     margin-left: -6px;
     border: 0;
@@ -1228,7 +1238,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: var(--ui-weight-semibold);
-    font-size: var(--ui-type-title);
+    font-size: var(--ui-text-lg);
     letter-spacing: var(--ui-tracking-title);
   }
 
@@ -1269,34 +1279,62 @@
   .adv {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .tgl-row {
     display: flex;
-    gap: 4px;
+    gap: var(--ui-space-2);
     align-items: center;
   }
 
   .tgl {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--ui-radius-sm);
-    border: 1px solid var(--ui-line);
-    background: transparent;
-    color: var(--ui-ink-2);
-    font-size: 12px;
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: var(--ui-row);
+    height: var(--ui-row);
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
     cursor: pointer;
   }
 
-  .tgl.on {
-    background: var(--ui-surface-3, var(--ui-line));
+  .tgl:hover {
+    background: var(--ui-input-hover);
     color: var(--ui-text);
+  }
+
+  .tgl.on {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent-text, var(--ui-accent));
   }
 
   .case {
     flex: 1;
     min-width: 0;
+  }
+
+  .align-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .align-row > .grid2 {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .font-row :global(.line > label) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .adv {
@@ -1315,13 +1353,13 @@
   .grid2 {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .bindable {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .bindable > :global(:first-child) {
@@ -1332,7 +1370,7 @@
   .stackable {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .dials {
@@ -1357,15 +1395,16 @@
   .line {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 28px;
+    gap: var(--ui-space-2);
+    min-height: var(--ui-row);
   }
 
   .line > label,
   .line > .label {
     flex-shrink: 0;
     width: 88px;
-    color: var(--ui-ink-2);
+    font-size: var(--ui-text-sm);
+    color: var(--ui-text-2);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1382,7 +1421,7 @@
     display: flex;
     align-items: center;
     height: var(--ui-row);
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
     border: 1px solid transparent;
   }
@@ -1423,13 +1462,56 @@
   select {
     box-sizing: border-box;
     width: 100%;
-    height: 28px;
-    padding: 0 8px;
+    height: var(--ui-row);
+    padding: 0 10px;
     border: 1px solid transparent;
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
+    font-size: var(--ui-text-sm);
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
+  }
+
+  input[type='text']:hover,
+  textarea:hover,
+  select:hover {
+    background: var(--ui-input-hover);
+  }
+
+  .appear {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .appear-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .blend {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .blend-icon {
+    position: absolute;
+    left: 10px;
+    display: inline-flex;
+    color: var(--ui-text-2);
+    pointer-events: none;
+  }
+
+  .blend select {
+    padding-left: 32px;
+    border-color: var(--ui-divider-strong);
+    background: transparent;
+  }
+
+  .blend select:hover {
+    background: var(--ui-wash);
   }
 
   textarea {
@@ -1618,7 +1700,7 @@
   .radius {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
     min-width: 0;
   }
   .radius-main {
@@ -1628,14 +1710,19 @@
   .radius-split {
     display: grid;
     place-items: center;
-    flex: 0 0 28px;
-    height: 28px;
+    flex: 0 0 var(--ui-row);
+    height: var(--ui-row);
     padding: 0;
     border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
-    color: var(--ui-ink-2);
+    border-radius: var(--ui-radius-md);
+    background: none;
+    color: var(--ui-text-2);
     cursor: pointer;
+  }
+
+  .radius-split:hover {
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
   .radius-split.on {
     background: var(--ui-selected, var(--ui-accent-wash));
@@ -1646,11 +1733,11 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
-    height: 28px;
-    padding: 0 6px;
-    border-radius: var(--ui-radius-sm);
+    height: var(--ui-row);
+    padding: 0 8px;
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
-    font-size: var(--ui-text-xs);
+    font-size: var(--ui-text-sm);
     color: var(--ui-ink-2);
   }
   .corner input {

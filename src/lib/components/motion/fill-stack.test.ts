@@ -164,7 +164,14 @@ describe('the fill stack in Properties', () => {
     expect(inRow(1, 'fill-label').textContent).toBe('11AA33');
     expect(inRow(0, 'fill-label').textContent).toBe('Linear');
     expect(rows()[0].querySelector('select')).toBeNull();
-    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-opacity', 'fill-eye', 'fill-remove']);
+    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-meta', 'fill-opacity', 'fill-eye', 'fill-remove']);
+  });
+
+  it('a row reads its hex over a muted line with the layer opacity and the type', () => {
+    show(stack([{ type: 'solid', color: '#ff2a69', opacity: 0.4 }]));
+    expect(inRow(0, 'fill-label').textContent).toBe('FF2A69');
+    expect(inRow(0, 'fill-meta').textContent?.replace(/\s+/g, ' ').trim()).toBe('% · Solid');
+    expect(inRow<HTMLInputElement>(0, 'fill-opacity').value).toBe('40');
   });
 
   it('a layer shows only its own type fields', () => {

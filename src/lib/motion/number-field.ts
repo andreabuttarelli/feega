@@ -57,6 +57,8 @@ export const formatValue = (value: number, step: number): string => value.toFixe
 
 export const fillShare = (value: number, range: Range): number => Math.min(1, Math.max(0, (value - range.min) / (range.max - range.min)));
 
+export const valueAtShare = (share: number, range: Range): number => settle(range.min + share * (range.max - range.min), range, range.step);
+
 const pad = (n: number) => String(n).padStart(2, '0');
 
 export const clockText = (frames: number, fps: number): string => `${pad(Math.floor(frames / fps))}:${pad(frames % fps)}`;

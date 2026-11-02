@@ -18,9 +18,14 @@ describe('number field', () => {
     expect(body).toContain('>%</span>');
   });
 
-  it('fills a known range inside the field instead of a separate slider', () => {
-    expect(html({ fill: FieldFill.Range })).toContain('--fill: 50%');
+  it('draws a known range as a slider track inside the same chip, beside the value', () => {
+    const ranged = html({ fill: FieldFill.Range });
+
+    expect(ranged).toContain('--fill: 50%');
+    expect(ranged).toMatch(/class="field[^"]*\branged\b/);
+    expect(ranged).toMatch(/<span class="track[^"]*"[^>]*data-slider/);
     expect(html()).not.toContain('--fill');
+    expect(html()).not.toContain('data-slider');
     expect(html()).not.toContain('type="range"');
   });
 

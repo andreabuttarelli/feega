@@ -157,9 +157,8 @@
   .position {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
     min-width: 0;
-    padding: var(--ui-space-1, 4px) 0;
     font-size: var(--ui-text-xs);
     color: var(--ui-ink-2);
   }
@@ -167,7 +166,7 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .row > * {
@@ -175,38 +174,58 @@
     min-width: 0;
   }
 
+  .row > :global(.ib) {
+    flex: 0 0 var(--ui-row);
+    height: var(--ui-row);
+  }
+
   .segments {
     display: flex;
-    background: var(--ui-input);
-    border-radius: var(--ui-radius-sm);
+    gap: 1px;
+    border-radius: var(--ui-radius-md);
+    overflow: hidden;
   }
 
   .segments button {
     display: grid;
     place-items: center;
     flex: 1;
-    height: 28px;
+    height: var(--ui-row);
     padding: 0;
     border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: none;
+    border-radius: 0;
+    background: var(--ui-input);
     color: var(--ui-ink);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
   .segments button:hover {
-    background: var(--ui-hover);
+    background: var(--ui-input-hover);
   }
 
   .field,
   .select {
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 8px;
-    border-radius: var(--ui-radius-sm);
+    gap: 8px;
+    height: var(--ui-row);
+    padding: 0 10px;
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
+  }
+
+  .field:hover,
+  .select:hover {
+    background: var(--ui-input-hover);
+  }
+
+  .field:focus-within,
+  .select:focus-within {
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
   }
 
   .field input,
@@ -219,24 +238,34 @@
     background: none;
     color: var(--ui-ink);
     font: inherit;
+    outline: none;
+    appearance: textfield;
+  }
+
+  .field input::-webkit-inner-spin-button,
+  .field input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
   }
 
   .constraints {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .selects {
     display: grid;
-    gap: 6px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ui-space-2);
     align-content: start;
+    min-width: 0;
   }
 
   .widget {
     position: relative;
-    min-height: 62px;
-    border-radius: var(--ui-radius-sm);
+    min-height: 72px;
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
   }
 
@@ -303,7 +332,7 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .rotation .field {
@@ -315,9 +344,9 @@
     display: grid;
     grid-template-columns: repeat(3, 6px);
     gap: 3px;
-    padding: 4px;
+    padding: 7px;
     background: var(--ui-input);
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
   }
 
   .pivot button {

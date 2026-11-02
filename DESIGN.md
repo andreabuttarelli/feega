@@ -62,13 +62,16 @@ These rules apply to every panel, including the Properties inspector:
 - **Generous targets:** rows 32px (`--ui-row`), inputs 32px, panel header 48px; 44px on touch.
 - **Panel tabs:** a `SegmentedControl` at the top of a panel switches its views (right panel:
   Chat / Properties). No underlined tabs.
-- **Sections:** bold sentence-case title (13px semibold, `Section`), a `+` `IconButton` at the
-  right when the section can add something (Layout, Effects, Fill…). No caps headers inside
-  the inspector; caps stay for menu group labels.
-- **Rows:** label left (secondary, 12–13px), control right (`Field`). Values in filled
-  inputs with `md` radius (`FIELD_INPUT`), mono tabular numbers.
-- **Controls:** inline dropdowns for modes (Fixed / Fit), segmented Yes / No for booleans, number
-  + slider for opacity, a swatch + value row for Fill / Border / Shadows with an `Add…` empty state.
+- **Sections:** bold sentence-case title (13px semibold, `Section`), full-width hairline below,
+  icon actions (`+`) at the right and the collapse chevron last. A closed section's title is
+  muted. No caps headers inside the inspector; caps stay for menu group labels.
+- **Rows:** short numbers are filled 32px chips with `md` radius and the label inside (`X 326`),
+  two per row; icon groups (align, flip) are segmented chips with 1px seams. Longer fields keep
+  label left (secondary, 12px), control right. Values in the UI sans.
+- **Paint rows:** Fill / Stroke show a 32px `md` swatch, the hex in medium and a muted line
+  under it (`100% · Solid`, `1px · Inside`), eye and `−` at the right.
+- **Controls:** inline dropdowns for modes (Fixed / Fit), segmented Yes / No for booleans, one
+  chip with value + slider for opacity and radius (the eye beside opacity), a swatch + value row for Fill / Border / Shadows with an `Add…` empty state.
 - **Action rows:** a row of icon actions (align, distribute) sits at the top of Properties, each
   an `IconButton` with a tooltip and shortcut.
 - **Tree selection:** the selected row is a solid accent row with white text; the rows inside it
@@ -136,8 +139,9 @@ sections in one fixed order — Layout, Layer, Fill, Stroke, Effects, Text, Anim
 only). Which sections a selection gets is one table (`src/lib/motion/properties-view.ts`); which
 section a field lands in is another (`src/lib/motion/inspector-sections.ts`).
 
-- Rows are 28px, labels in English on the left (88px), never a glyph alone; numbers carry their
-  unit and scrub when the label is dragged. Short numbers pair up in two columns.
+- Rows are 32px, labels in English (inside the chip for short numbers, 88px on the left
+  otherwise), never a glyph alone; numbers carry their unit and scrub when the label is dragged.
+  Short numbers pair up in two columns.
 - A colour is one field: swatch, hex, and a popover with the picker (saturation square, hue and opacity sliders, eyedropper, Hex / RGB / HSL / HSB) and document, brand and recent swatches. Fill popovers embed the picker inline.
 - Two to three exclusive options are a segmented toggle (align, fit), not a dropdown.
 - Several layers show their shared value, or an empty field reading `Mixed`.
