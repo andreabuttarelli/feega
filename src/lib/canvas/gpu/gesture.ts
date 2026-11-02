@@ -41,6 +41,8 @@ export type Press = { pointer: Pointer; button: number; shift: boolean; space: b
 
 const PAN_BUTTONS = new Set([1, 2]);
 
+export const glidesAfterPan = (pointer: Pointer): boolean => pointer === Pointer.Touch;
+
 const ON_HIT: Record<HitKind, (p: Press) => GestureKind> = {
   [HitKind.Port]: () => GestureKind.Connect,
   [HitKind.Corner]: () => GestureKind.Resize,

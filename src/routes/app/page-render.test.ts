@@ -7,12 +7,19 @@ const canvas = { id: 'c1', name: 'Spring teaser', projectName: 'Launch', updated
 const project = { id: 'p1', name: 'Launch', href: '/p/p1', updatedAt: '2026-10-03', canvases: [], thumbs: [], videoCount: 1, posters: ['https://signed/poster.jpg'] };
 const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
 
-function page(canvases: (typeof canvas)[] = [canvas]) {
-  const data = { dashboard: { canvases, projects: [project], batches: [], motions: [], moreVideos: null }, templates: [{ id: 't', name: 'A poster series', brief: 'A poster series' }], tools: [], attachProjectId: 'p1' };
+function page(canvases: (typeof canvas)[] = [canvas], projects: { id: string; name: string }[] = []) {
+  const data = { projects, dashboard: { canvases, projects: [project], batches: [], motions: [], moreVideos: null }, templates: [{ id: 't', name: 'A poster series', brief: 'A poster series' }], tools: [], attachProjectId: 'p1' };
   return render(Page, { props: { data, form: null } as never }).body;
 }
 
 describe('the /app home: the recents, one prompt', () => {
+  it('a new canvas can be started in one of the existing projects', () => {
+    const body = page([canvas], [{ id: 'p1', name: 'Launch' }]);
+
+    expect(body).toContain('data-testid="new-canvas-project"');
+    expect(body).toContain('name="projectId"');
+  });
+
   it('reads create actions, recents, then the prompt', () => {
     const body = page();
     const at = (needle: string) => body.indexOf(needle);

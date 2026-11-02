@@ -33,7 +33,7 @@
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
-  import { frameViews, zoomRequest } from '$lib/canvas/view-menu.svelte';
+  import { frameViews, zoomLevel, zoomRequest } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
@@ -224,7 +224,7 @@
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -2882,7 +2882,7 @@
         if (a.kind === GestureKind.Pan && !a.moved && e.button === 0) {
           clearSelection();
         }
-        if (a.kind === GestureKind.Pan && a.moved) {
+        if (a.kind === GestureKind.Pan && a.moved && glidesAfterPan(pointerOf(e))) {
           startGlide();
         }
       },
@@ -3315,6 +3315,10 @@
       }
     }
   };
+
+  $effect(() => {
+    zoomLevel.show(view.zoom);
+  });
 
   $effect(() => {
     const asked = zoomRequest.current;

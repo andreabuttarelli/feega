@@ -95,13 +95,21 @@ export const actions: Actions = {
   },
 
   project: async (event) => {
+    const form = await event.request.formData();
+    const chosen = String(form.get('projectId') ?? '');
+    if (chosen) {
+      const scope = await toolScope(event, chosen);
+      const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: scope.projectId, name: DEFAULT_CANVAS_NAME });
+      throw redirect(HTTP_SEE_OTHER, canvasPath(scope.projectId, canvas.id));
+    }
+
     const { db, user } = await signedInDb(event);
     const membership = chooseOrg(await listMemberships(db, user.id), event.cookies.get(ORG_COOKIE) ?? null);
     if (!membership) {
       return fail(HTTP_NOT_FOUND, { error: 'No workspace' });
     }
 
-    const name = String((await event.request.formData()).get('name') ?? '').trim() || DEFAULT_PROJECT_NAME;
+    const name = String(form.get('name') ?? '').trim() || DEFAULT_PROJECT_NAME;
     const project = await createProject(db, { orgId: membership.org.id, name, slug: projectSlug() });
     const canvas = await createCanvas(db, { orgId: membership.org.id, projectId: project.id, name: DEFAULT_CANVAS_NAME });
     throw redirect(HTTP_SEE_OTHER, canvasPath(project.id, canvas.id));

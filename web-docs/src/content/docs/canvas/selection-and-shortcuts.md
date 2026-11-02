@@ -80,9 +80,14 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Arrows | Move the selection |
 | Arrows + Shift | Move by a longer step |
 | Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
+| Shift+0 | Zoom to 100% |
+| F | Frame tool |
+| Space + drag | Pan; the canvas follows the pointer exactly and stops when you let go |
 | + / = | Zoom in |
 | - | Zoom out |
 | 1 to 9, 0 | Opacity of the selection: 10 to 90%, 0 for 100% |
+
+The View menu (eye icon, top right) shows the current zoom and lists the same three zoom commands with their keys.
 
 None fire while typing in a text field, except Esc, which always closes an open menu or overlay. Deleting asks no confirmation.
 

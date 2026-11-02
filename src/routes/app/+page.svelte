@@ -6,6 +6,7 @@
   import { preloadCode } from '$app/navigation';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
+  import NewCanvasButton from '$lib/components/app/NewCanvasButton.svelte';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
   import { ComposerKey, composerKey, rotateTemplates } from '$lib/motion/brief-composer';
   import { composerHeight } from '$lib/components/brand-agent/composer-height';
@@ -139,9 +140,7 @@
       <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
     {/if}
     <Button variant="secondary" data-testid="home-import-feega" onclick={() => feegaFile?.pick()}>import .feega</Button>
-    <form method="POST" action="?/project" use:apiEnhance>
-      <Button type="submit" data-testid="new-canvas">new canvas</Button>
-    </form>
+    <NewCanvasButton projects={data.projects} action="?/project" />
     <FeegaFile bind:this={feegaFile} page={PAGE_PATH[DashboardPage.Home]} />
   </div>
 

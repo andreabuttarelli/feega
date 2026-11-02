@@ -4,7 +4,7 @@
   import { DRAGGED_TEXT_SIZING, NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
-  import { DRAW_SUMMARY, LINE_PAINT, drawClip, lineOutline, penClip, penPaint, type LineTool } from '$lib/motion/draw-create';
+  import { DRAW_SUMMARY, LINE_PAINT, drawClip, lineOutline, penClip, penInk, penPaint, type LineTool } from '$lib/motion/draw-create';
   import { mapOutline, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
   import { smoothStroke, straightStroke } from '$lib/motion/shape/pencil';
   import { Handle, Mirror, addPoint, dragHandle, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
@@ -161,7 +161,7 @@
     }
   }
 
-  function finish(done: Outline, paint: Record<string, unknown> = {}) {
+  function finish(done: Outline, paint: Record<string, unknown> = penInk(doc)) {
     outline = [];
     grab = null;
     const id = newId();

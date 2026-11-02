@@ -207,6 +207,10 @@ export function penPaint({ fill, stroke, gradient, fillRule }: PenPaint): Record
   };
 }
 
+const HAIRLINE_PX = 1;
+
+export const penInk = (doc: Pick<MotionDoc, 'width' | 'height'>): Record<string, unknown> => ({ ...penPaint(LINE_PAINT[DrawTool.Line](DEFAULT_COLOUR.ink)), strokeWidth: HAIRLINE_PX / Math.min(doc.width, doc.height) });
+
 export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
 
 const ELEMENT_PX_PER_CANVAS_PX = 1;
