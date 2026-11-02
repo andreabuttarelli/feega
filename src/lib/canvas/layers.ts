@@ -52,7 +52,7 @@ export enum NodeIcon {
   Element = 'shape'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean; glyph?: string };
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean; glyph?: string; hidden?: boolean; locked?: boolean };
 export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]>; mode?: EditMode };
 
 const FRAME_TYPE = 'motion';
@@ -244,7 +244,7 @@ function elementRows(row: LayerRow, rows: readonly LayerRow[]): LayerRow[] {
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? (node.glyph ?? NodeIcon.Element) : nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? (node.glyph ?? NodeIcon.Element) : nodeIcon(node), nodeId: node.id, hidden: node.hidden ?? false, locked: node.locked ?? false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
     if (folded.has(node.id)) {
       return [row];
     }

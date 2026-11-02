@@ -5,8 +5,8 @@ import { layersSource } from '$lib/canvas/layers-source.svelte';
 
 const POSTER = '/p/x/c/y/assets/a1';
 
-const canvasWith = (nodes: { id: string; type: string; name: string | null; poster?: string | null; still?: boolean; head?: number }[]) =>
-  layersSource.publishCanvas({ nodes, selected: [], select: () => {}, open: () => {}, rename: () => {} });
+const canvasWith = (nodes: { id: string; type: string; name: string | null; poster?: string | null; still?: boolean; head?: number; hidden?: boolean; locked?: boolean }[]) =>
+  layersSource.publishCanvas({ nodes, selected: [], select: () => {}, open: () => {}, rename: () => {}, flag: () => {} });
 
 let unpublish = () => {};
 
@@ -35,5 +35,16 @@ describe('a long Layers list', () => {
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.length).toBeLessThan(100);
+  });
+});
+
+describe('a node row in Layers', () => {
+  it('has an eye and a lock, and a hidden node is dimmed', () => {
+    unpublish = canvasWith([{ id: 'i1', type: 'image', name: 'Shot', hidden: true, locked: true }]);
+    const body = render(LayersPanel).body;
+
+    expect(body).toContain('aria-label="Show"');
+    expect(body).toContain('aria-label="Unlock"');
+    expect(body).toMatch(/class="row[^"]*muted/);
   });
 });

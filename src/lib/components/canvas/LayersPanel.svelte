@@ -36,6 +36,7 @@
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import { Density, ROW_STEP_PX } from '$lib/canvas/layer-density';
   import { layerMenuActions } from '$lib/canvas/frame-inspector';
+  import { NodeFlag } from '$lib/canvas/node-flags';
   import type { ActionId } from '$lib/motion/actions';
   import Pencil from '@lucide/svelte/icons/pencil';
   import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
@@ -154,7 +155,8 @@
   const visible = $derived(shown.slice(span.start, span.end));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
   const flagTarget = (row: LayerRow): string | null => (editable(row) ? row.id : row.own && video?.nodeId === row.id ? row.own : null);
-  const renamable = (row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
+  const nodeFlagged = (row: LayerRow) => row.kind === LayerKind.Node && !row.nested && !!canvas && !(row.own && video?.nodeId === row.id);
+  const renamable =(row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
   function enterRow(row: LayerRow, e: KeyboardEvent) {
     if (isPicked(row) && renamable(row)) {
@@ -342,7 +344,16 @@
         <IconButton size={IconSize.Sm} label="Bring forward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Up, SUMMARY[LayerAction.Up]))}><ChevronUp /></IconButton>
         <IconButton size={IconSize.Sm} label="Send backward" onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Down, SUMMARY[LayerAction.Down]))}><ChevronDown /></IconButton>
       {/if}
-      {#if flagTarget(row)}
+      {#if nodeFlagged(row)}
+        <span class="toggles" class:held={row.hidden || row.locked}>
+        <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), canvas?.flag([row.id], NodeFlag.Hidden))}>
+          {#if row.hidden}<EyeOff />{:else}<Eye />{/if}
+        </IconButton>
+        <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} onclick={(e) => (e.stopPropagation(), canvas?.flag([row.id], NodeFlag.Locked))}>
+          {#if row.locked}<Lock />{:else}<LockOpen />{/if}
+        </IconButton>
+        </span>
+      {:else if flagTarget(row)}
         <span class="toggles" class:held={row.hidden || row.locked}>
         <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([flagTarget(row)!], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
           {#if row.hidden}<EyeOff />{:else}<Eye />{/if}

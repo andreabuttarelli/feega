@@ -29,6 +29,7 @@ import type { GraphScope } from '$lib/canvas/run-graph';
 import type { ImageTool } from '$lib/image-tools';
 import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
 import type { Stack } from '$lib/canvas/stacking';
+import type { NodeFlag } from '$lib/canvas/node-flags';
 import type { DeleteMode } from '$lib/canvas/section';
 import type { SceneDrop } from '$lib/canvas/scene-drop';
 
@@ -56,6 +57,7 @@ export type Tile = {
   select?: boolean;
   settings?: boolean;
   poster?: Poster;
+  locked?: boolean;
 };
 
 export type FlowProps = {
@@ -129,6 +131,7 @@ export type FlowProps = {
   onNodeSize?: (id: string, w: number, h: number) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;
+  onToggleFlag?: (ids: string[], flag: NodeFlag) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   onConnectNew?: (ids: string[], medium: GenMedium, prompt?: string) => void;
