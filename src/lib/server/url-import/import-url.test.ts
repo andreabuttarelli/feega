@@ -143,7 +143,7 @@ describe('importPageAt', () => {
     expect(doc.breakpoints?.map((b) => b.name)).toEqual(['Tablet', 'Phone']);
   });
 
-  it('reads the tablet and phone widths alongside the desktop one, each in its own tab, not one after the other (Browserless: three sessions in a row)', async () => {
+  it('reads the breakpoints one at a time alongside the desktop read, two sessions at most (Browserless: a third session at once is refused with 429, and a refused desktop read failed the import)', async () => {
     const tabs = [tabOf(TREE), tabOf(TREE), tabOf(TREE)];
     let release = () => undefined as void;
     const held = new Promise<void>((done) => (release = done));
@@ -155,10 +155,13 @@ describe('importPageAt', () => {
     const { ask } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
 
     const done = importPageAt(ask);
-    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(open).toHaveBeenCalledTimes(2);
     release();
 
     expect((await done).outcome).toBe(UrlImportOutcome.Ok);
+    expect(open).toHaveBeenCalledTimes(3);
   });
 
   it('a breakpoint whose browser cannot be opened is left out, the page still comes in', async () => {
