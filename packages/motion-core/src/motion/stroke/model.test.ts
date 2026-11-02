@@ -3,6 +3,8 @@ import { FillType } from '../fill/model';
 import { ShapeKind } from '../shape/schema';
 import { MAX_STROKES, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, sidesShown, strokeSchema, strokesOf, strokesSchema } from './model';
 
+const SHORT_SIDE = 100;
+
 describe('stroke stack model', () => {
   it('a fresh stroke is a centred solid line with butt caps and miter joins', () => {
     expect(strokeSchema.parse({ paint: { type: 'solid', color: '#000000' } })).toMatchObject({ width: 0.01, align: StrokeAlign.Center, dash: 0, gap: 0, cap: 'butt', join: 'miter', visible: true });
@@ -44,18 +46,22 @@ describe('stroke stack model', () => {
     expect(strokesOf({ strokeKind: 'solid', stroke: '#111111', strokes: [] })).toEqual([]);
   });
 
+  it('a stroke added to a shape of a given short side is 1 px', () => {
+    expect(addStroke([], 400)[0].width).toBeCloseTo(1 / 400);
+  });
+
   it('add, set, move and remove keep the stack valid and capped', () => {
-    let s = addStroke([]);
-    s = addStroke(s);
+    let s = addStroke([], SHORT_SIDE);
+    s = addStroke(s, SHORT_SIDE);
     expect(s).toHaveLength(2);
     s = setStroke(s, 0, { align: StrokeAlign.Outside, width: 0.05 });
     expect(s[0]).toMatchObject({ align: 'outside', width: 0.05 });
     expect(moveStroke(s, 0, 1)[1].align).toBe('outside');
     expect(removeStroke(s, 0)).toHaveLength(1);
     expect(() => setStroke(s, 0, { width: 5 })).toThrow();
-    let many = addStroke([]);
+    let many = addStroke([], SHORT_SIDE);
     for (let i = 0; i < MAX_STROKES + 2; i++) {
-      many = addStroke(many);
+      many = addStroke(many, SHORT_SIDE);
     }
     expect(many).toHaveLength(MAX_STROKES);
   });

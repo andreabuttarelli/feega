@@ -346,7 +346,7 @@ describe('shape tools', () => {
     expect(clip?.props).toMatchObject({ shape: 'path', fillKind: 'none', strokeKind: 'solid', stroke: '#111111' });
   });
 
-  it('a flat line on the canvas gets room around it and a stroke two canvas units wide', () => {
+  it('a flat line on the canvas gets room around it and a 1 px stroke, like a pen path', () => {
     const made = drawnElement({ tool: DrawTool.Pen, outline: lineOutline({ x: 0, y: 10 }, { x: 200, y: 10 }, DrawTool.Line), fill: null, stroke: '#111111' }, 'l2');
     expect(made.ok).toBe(true);
     if (!made.ok) {
@@ -354,7 +354,7 @@ describe('shape tools', () => {
     }
     expect(made.box.height).toBeGreaterThanOrEqual(24);
     const clip = findClip(made.doc, 'l2')!.clip;
-    expect((clip.props.strokeWidth as number) * Math.min(made.box.width, made.box.height)).toBeCloseTo(2, 5);
+    expect((clip.props.strokeWidth as number) * Math.min(made.box.width, made.box.height)).toBeCloseTo(1, 5);
   });
 });
 

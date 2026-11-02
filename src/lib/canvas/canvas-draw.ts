@@ -3,6 +3,7 @@ import { NEW_TEXT_SIZING, TEXT_SIZINGS } from '@feega/motion-core/motion/text-si
 import { CANVAS_INK, CanvasTheme, LINE_PAINT, drawClip, drawnElement, drawnOf, penClip, penPaint, type CanvasBox, type DrawnWire, type PenPaint } from '$lib/motion/draw-create';
 import { mapOutline, parsePath, pathData } from '@feega/motion-core/motion/shape/geometry';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 
 type Point = { x: number; y: number };
@@ -20,14 +21,21 @@ const TOOL_OF_CLIP: Record<string, DrawTool> = {
 
 const toolOf = (clip: DrawnClip): DrawTool | undefined => (clip.autoLayout ? DrawTool.Stack : (TOOL_OF_CLIP[clip.component] ?? TOOL_OF_CLIP[`${clip.component}:${String(clip.props.shape)}`]));
 
+export const TEXT_CLICK_PX = { size: 16, width: 160 };
+
+const TEXT_LEADING = Number(COMPONENTS.Text.schema.parse({}).leading);
+
+export function canvasTextClick(toFlow: ToFlow): { width: number; height: number } {
+  const zoom = 1 / (toFlow({ x: 1, y: 0 }).x - toFlow({ x: 0, y: 0 }).x);
+  return { width: TEXT_CLICK_PX.width * zoom, height: TEXT_CLICK_PX.size * TEXT_LEADING * zoom };
+}
+
 const SOLID = 'solid';
 const NO_FILL = 'none';
 
 function strokedPaint(props: Record<string, unknown>, theme: CanvasTheme): PenPaint {
-  if (props.strokeKind !== SOLID) {
-    return {};
-  }
-  return { fill: props.fillKind === NO_FILL ? null : CANVAS_INK[theme], stroke: CANVAS_INK[theme] };
+  const filled = props.strokeKind === SOLID && props.fillKind !== NO_FILL;
+  return { fill: filled ? CANVAS_INK[theme] : null, stroke: CANVAS_INK[theme] };
 }
 
 const num = (value: unknown) => (typeof value === 'number' ? value : 0);

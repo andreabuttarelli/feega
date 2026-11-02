@@ -33,7 +33,7 @@ export enum EffectKind {
 
 export const EFFECT_KINDS = Object.values(EffectKind) as [EffectKind, ...EffectKind[]];
 
-export type EffectParam = { key: string; label: string; kind: ValueKind; min: number; max: number; step: number; fallback: number | string };
+export type EffectParam = { key: string; label: string; kind: ValueKind; min: number; max: number; step: number; fallback: number | string; flag?: boolean };
 
 export type Values = Record<string, number | string>;
 
@@ -46,6 +46,7 @@ export type Rendered = { filter: string; nodes: SvgNode[]; backdrop?: string };
 type Spec = { label: string; about: string; params: EffectParam[]; behind?: true; varies?: (v: Values) => boolean; reach?: (v: Values) => number; boxed?: (v: Values, filterId: string) => Rendered; render: (v: Values, frame: EffectFrame, filterId: string, lut: CompiledLut | null) => Rendered };
 
 const num = (key: string, label: string, min: number, max: number, step: number, fallback: number): EffectParam => ({ key, label, kind: ValueKind.Number, min, max, step, fallback });
+const flag = (key: string, label: string, fallback: boolean): EffectParam => ({ ...num(key, label, 0, 1, 1, Number(fallback)), flag: true });
 const colour = (key: string, label: string, fallback: string): EffectParam => ({ key, label, kind: ValueKind.Color, min: 0, max: 0, step: 0, fallback });
 
 const n = (v: Values, key: string) => Number(v[key]);
@@ -315,11 +316,11 @@ export const EFFECTS: Record<EffectKind, Spec> = {
       num('angle', 'Angle', -180, 180, 1, 135),
       num('x', 'X', -300, 300, 1, 0),
       num('y', 'Y', -300, 300, 1, 0),
-      num('blur', 'Softness', 0, 200, 0.5, 24),
+      num('blur', 'Blur', 0, 200, 0.5, 24),
       num('spread', 'Spread', -100, 100, 1, 0),
       colour('color', 'Colour', '#000000'),
       num('opacity', 'Opacity', 0, 1, 0.01, 0.5),
-      num('behind', 'Show behind', 0, 1, 1, 1)
+      flag('behind', 'Show behind', true)
     ],
     reach: (v) => n(v, 'distance') + Math.hypot(n(v, 'x'), n(v, 'y')) + Math.max(0, n(v, 'spread')) + (n(v, 'blur') / 2) * GAUSS_TAIL,
     boxed: (v, id) => (plainShadow(v) ? svg(id, [shadowNode(...shadowOffset(v), n(v, 'blur'), String(v.color), n(v, 'opacity'))]) : svg(id, shapedShadow(v))),
@@ -334,7 +335,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.InnerShadow]: {
     label: 'Inner shadow',
     about: 'shadow inside the layer edge at distance px and angle degrees, blur px, colour and opacity',
-    params: [num('distance', 'Distance', 0, 300, 1, 4), num('angle', 'Angle', -180, 180, 1, 90), num('blur', 'Softness', 0, 200, 0.5, 8), colour('color', 'Colour', '#000000'), num('opacity', 'Opacity', 0, 1, 0.01, 0.25)],
+    params: [num('distance', 'Distance', 0, 300, 1, 4), num('angle', 'Angle', -180, 180, 1, 90), num('blur', 'Blur', 0, 200, 0.5, 8), colour('color', 'Colour', '#000000'), num('opacity', 'Opacity', 0, 1, 0.01, 0.25)],
     render: (v, _f, id) => {
       const a = rad(n(v, 'angle'));
       return svg(id, [
@@ -541,7 +542,22 @@ export const EFFECT_ALPHA: Partial<Record<EffectKind, { color: string; alpha: st
   [EffectKind.Glow]: { color: 'color', alpha: 'intensity' }
 };
 
-export const editedParams = (kind: EffectKind): EffectParam[] => EFFECTS[kind].params.filter((p) => p.key !== EFFECT_ALPHA[kind]?.alpha);
+const offsetByDistance = (v: Values) => n(v, 'distance') !== 0;
+
+const SHOWN_WHEN: Partial<Record<EffectKind, Record<string, (v: Values) => boolean>>> = {
+  [EffectKind.DropShadow]: { distance: offsetByDistance, angle: offsetByDistance }
+};
+
+export const EFFECT_SEED: Partial<Record<EffectKind, Values>> = {
+  [EffectKind.DropShadow]: { distance: 0, x: 0, y: 4, blur: 4, spread: 0, opacity: 0.25 }
+};
+
+export function editedParams(kind: EffectKind, values: Values): EffectParam[] {
+  const current = { ...defaultValues(kind), ...values };
+  return EFFECTS[kind].params.filter((p) => p.key !== EFFECT_ALPHA[kind]?.alpha && (SHOWN_WHEN[kind]?.[p.key]?.(current) ?? true));
+}
+
+export const isFlag = (kind: EffectKind, key: string): boolean => EFFECTS[kind].params.some((p) => p.key === key && p.flag === true);
 
 export function defaultValues(kind: EffectKind): Values {
   return Object.fromEntries(EFFECTS[kind].params.map((p) => [p.key, p.fallback]));

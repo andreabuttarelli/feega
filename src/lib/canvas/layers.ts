@@ -6,12 +6,12 @@ import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feeg
 import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
 import { soleFrame } from '$lib/motion/main-component';
-import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
+import { CUSTOM_CLIP, PART_SEP, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { joinMask, leaveMask, maskMembers, maskOf } from '$lib/motion/mask-group';
 import { NODE_KIND_LABEL } from './node-label';
-import { elementName } from '$lib/motion/element-name';
+import { layerLabel } from '$lib/motion/element-name';
 import { LayoutKind, layoutKind } from '@feega/motion-core/motion/layout/stack';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import type { NodeType } from './node-data';
@@ -90,7 +90,9 @@ type Clip = Track['clips'][number];
 const NODE_DEPTH = 0;
 const TRACK_DEPTH = 1;
 
-const clipLabel = (clip: Clip) => clip.name || (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : elementName(clip));
+
+const NO_COMPS = {};
+const clipLabel = (clip: Clip) => layerLabel(clip, NO_COMPS);
 
 const KEY_SEP = '/';
 
@@ -168,7 +170,7 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     key,
     kind: kindOf(walk, clip, template),
     depth,
-    label: doc.comps[comp]?.name ?? clipLabel(clip),
+    label: layerLabel(clip, doc.comps),
     type: layoutKind(clip) ?? clip.component,
     nodeId,
     hidden: !!clip.hidden,

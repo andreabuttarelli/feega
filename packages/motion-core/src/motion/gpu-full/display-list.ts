@@ -1,6 +1,7 @@
 import { resolveColor, type BrandTokens } from '../brand';
 import { Background, type MotionClip, type MotionDoc } from '../doc';
 import { TrackKind, type ComponentId } from '../components';
+import { imageRectangle } from '../image-dress';
 import { animProp, sampleColor, Source, TRANSFORM, ValueKind, type TransformKey } from '../keyframes';
 import { sampleTrack } from '../sample-track';
 import { IDENTITY, ParentOpacity, ancestorsOf, localAt, mul2d, transformAt, worldAt, type Affine } from '../parent';
@@ -238,7 +239,14 @@ const picture = (src: string, size: Size, look: Partial<Omit<ImageItem, 'kind' |
 const imagePainter = (env: Env): Painted => {
   const { props, size, asset } = env;
   const src = asset(props.assetId);
-  return src ? [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })] : customPainter(env);
+  if (!src) {
+    return customPainter(env);
+  }
+  const rectangle = imageRectangle(props);
+  if (rectangle) {
+    return shapePainter({ ...env, clip: { ...env.clip, props: rectangle }, props: rectangle });
+  }
+  return [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })];
 };
 
 const videoPainter = (env: Env): Painted => {

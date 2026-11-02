@@ -28,10 +28,14 @@
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
   import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, TextTier, textTier, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
-  import { PropertiesView, fieldShownFor, sectionsFor } from '$lib/motion/properties-view';
-  import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
+  import { PropertiesView, ShapePart, fieldShown as fieldVisible, fieldShownFor, sectionsFor, shapePartShown, sizeShown, transformShown } from '$lib/motion/properties-view';
+  import { renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
+  import CheckRow from './CheckRow.svelte';
+  import BoxFields from './BoxFields.svelte';
+  import { layerKind, layerLabel } from '$lib/motion/element-name';
+  import { ComponentRole, componentOf, roleOf } from '$lib/motion/main-component';
   import type { NodeTurn } from '$lib/motion/element-turn';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
@@ -56,7 +60,6 @@
   import FamilyIcon from './FamilyIcon.svelte';
   import { CLIP_FAMILIES, clipFamily } from '$lib/motion/track-style';
   import { placeLayer } from '$lib/motion/light-group';
-  import { elementKind } from '$lib/motion/element-name';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
@@ -64,14 +67,13 @@
   import FillStack from './FillStack.svelte';
   import { cropRequest } from '$lib/canvas/crop-request.svelte';
   import { FILLED, elementFills } from '@feega/motion-core/motion/fill/elements';
-  import { FILL_LABEL, FILL_TYPES, addFill, type Fill } from '@feega/motion-core/motion/fill/model';
+  import { FILL_LABEL, FILL_TYPES, FillHolder, addFill, type Fill } from '@feega/motion-core/motion/fill/model';
   import { applyFillKeys, fillOfKey, splitFillEdit } from '@feega/motion-core/motion/fill/keys';
   import { Adder } from './stack-adder';
   import StrokeStack from './StrokeStack.svelte';
   import { STROKED, elementStrokes } from '@feega/motion-core/motion/stroke/elements';
   import { addStroke, sidesShown } from '@feega/motion-core/motion/stroke/model';
   import { MarkedField, markedField } from '@feega/motion-core/motion/poster-lines';
-  import { componentLabel } from '@feega/motion-core/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
@@ -95,10 +97,10 @@
   import { withParams } from '@feega/motion-core/motion/custom/params';
   import type { CustomSource } from '@feega/motion-core/motion/custom/component';
   import { expressionToKeys, setExpression } from '@feega/motion-core/motion/expression/ops';
-  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, editedParams, type EffectKind } from '@feega/motion-core/motion/effects/registry';
+  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, EFFECT_SEED, editedParams, isFlag, type EffectKind } from '@feega/motion-core/motion/effects/registry';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
-  import { effectKey } from '@feega/motion-core/motion/effects/model';
+  import { effectKey, effectOfKey } from '@feega/motion-core/motion/effects/model';
   import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
   import { addModifier, morphHere, morphToClip, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
   import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
@@ -146,6 +148,9 @@
     mode = EditMode.Motion,
     as = null,
     turn = null,
+    title = null,
+    here = null,
+    onrename = null,
     onalign
   }: {
     doc: MotionDoc;
@@ -171,6 +176,9 @@
     mode?: EditMode;
     as?: PropertiesView | null;
     turn?: NodeTurn | null;
+    title?: string | null;
+    here?: string | null;
+    onrename?: ((name: string) => void) | null;
     onalign?: (edge: AlignEdge) => void;
   } = $props();
 
@@ -219,6 +227,7 @@
 
   const transformKeys = $derived(new Set(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform).map((p) => p.key)));
   const typed = $derived(clipFieldGroups(doc, clip).some((g) => g.fields.some((f) => f.control === Control.Font)) ? Typed.Yes : Typed.No);
+  const fieldContext = $derived({ mode, shape: clip.component === 'Shape' ? (clip.props.shape as ShapeKind) : null, morphTargets: Array.isArray(clip.props.morphs) ? clip.props.morphs.length : 0, instance: componentOf(doc, clip) !== null });
   const fields = $derived(
     clipFieldGroups(doc, clip)
       .flatMap((g) => g.fields)
@@ -226,6 +235,7 @@
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
       .filter((f) => !emptyManaged(f.control, (clip.props as Record<string, unknown>)[f.key]))
+      .filter((f) => fieldVisible(f.key, fieldContext))
       .map((f) => ({ ...f, label: fieldLabel(f.key, f.label) }))
   );
   const sharedFields = $derived(
@@ -236,10 +246,11 @@
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
-  const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
+  const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && transformShown(p.key)));
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
   const positioned = $derived(transformProps.length > 0);
-  const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
+  const ownBox = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number');
+  const pinnable = $derived(positioned && ownBox && !clip.parent);
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));
   const SIZE_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
@@ -251,8 +262,7 @@
   const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
-  const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
-  const headKind = $derived(customName ? 'Component' : elementKind(clip));
+  const headTitle = $derived(title ?? layerLabel(clip, doc.comps));
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
@@ -267,6 +277,17 @@
   const pictures = $derived(assets.filter((a) => a.kind === 'image'));
   const resolve = (v: string) => resolveColor(v, tokens);
   const managedSummary = (v: unknown) => `${Array.isArray(v) ? v.length : Object.keys(v ?? {}).length} set`;
+
+  function rename(name: string) {
+    if (!name) {
+      return;
+    }
+    if (onrename) {
+      onrename(name);
+      return;
+    }
+    commit(renameClip(doc, clip.id, name), 'Renamed the layer');
+  }
 
   function commit(result: OpResult, summary: string) {
     if (!result.ok) {
@@ -377,8 +398,8 @@
   let draggedEffect = $state<string | null>(null);
   const effectParams = (effectId: string) => animated.params.filter((p) => p.source === Source.Effect && p.key.startsWith(`${effectKey(effectId, '')}`));
   const alphaKeyOf = (effect: { id: string; kind: EffectKind }) => (EFFECT_ALPHA[effect.kind] ? effectKey(effect.id, EFFECT_ALPHA[effect.kind]!.alpha) : null);
-  const effectRows = (effect: { id: string; kind: EffectKind }) => {
-    const edited = new Set(editedParams(effect.kind).map((p) => effectKey(effect.id, p.key)));
+  const effectRows = (effect: { id: string; kind: EffectKind; params: Record<string, number | string> }) => {
+    const edited = new Set(editedParams(effect.kind, effect.params).map((p) => effectKey(effect.id, p.key)));
     return effectParams(effect.id).filter((p) => edited.has(p.key));
   };
   let openEffect = $state<string | null>(null);
@@ -387,7 +408,7 @@
 
   const animatorRows = (id: string) => animated.params.filter((p) => p.source === Source.Animator && p.key.startsWith(animatorKey(id, '')));
 
-  const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
+  const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8), EFFECT_SEED[kind]), `Added ${EFFECTS[kind].label.toLowerCase()}`);
 
   const shapeModifiers = $derived(clip.component === 'Shape' ? ((clip.props.modifiers as Modifier[]) ?? []) : []);
   const shapeMorphs = $derived(clip.component === 'Shape' ? ((clip.props.morphs as string[]) ?? []) : []);
@@ -498,6 +519,8 @@
   const visual = $derived(spec.track === TrackKind.Visual);
 
   const view = $derived(as ?? (focus ? PropertiesView.Part : PropertiesView.Clip));
+  const FRAME_KIND = 'Frame';
+  const headKind = $derived(view === PropertiesView.Frame ? FRAME_KIND : layerKind(clip, doc.comps, roleOf(doc, clip.id, here) ?? ComponentRole.Instance));
   const clipsOwnContent = $derived(!clip.autoLayout && fieldShownFor(family, 'clipContent') && (hasChildren || view === PropertiesView.Frame));
   const layerExtras = $derived(visual && view !== PropertiesView.Frame);
   const has: Record<Section, boolean> = $derived({
@@ -512,7 +535,7 @@
     [Section.Stroke]: fieldsIn(Section.Stroke).length > 0,
     [Section.Text]: fieldsIn(Section.Text).length > 0,
     [Section.Timing]: true,
-    [Section.Shape]: clip.component === 'Shape',
+    [Section.Shape]: clip.component === 'Shape' && !clip.autoLayout && !hasChildren,
     [Section.Animate]: visual || TEXT_COMPONENTS.has(clip.component) || pulseShown || (voices.length > 0 && shows(Part.Ducking, family)) || fieldsIn(Section.Animate).length > 0 || !!(clip.keyframes.x?.length && clip.keyframes.y?.length),
     [Section.Effects]: visual && clip.component !== 'Null',
     [Section.Colours]: layerExtras && hasChildren && colours.length > 0,
@@ -546,7 +569,7 @@
 <div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
-    <input {@attach fieldKeys} class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onchange={(e) => e.currentTarget.value.trim() && commit(renameClip(doc, clip.id, e.currentTarget.value.trim()), 'Renamed the layer')} />
+    <input {@attach fieldKeys} class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onchange={(e) => rename(e.currentTarget.value.trim())} />
     {#if headKind !== headTitle}<span class="kind">{headKind}</span>{/if}
     {@render actions?.()}
   </header>
@@ -863,7 +886,8 @@
 
 {#snippet layoutBody()}
   {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
-  {@const sizeFields = clip.autoLayout ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
+  {#if positioned && !ownBox}<BoxFields {doc} ids={[clip.id]} {frame} {mode} {gesture} {onchange} />{/if}
+  {@const sizeFields = clip.autoLayout || !sizeShown(placement) ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
   {@const sizing = textField('sizing')}
   {@const modes = sizing ? axisModes(value(sizing) as TextSizing) : null}
   {#if sizing}
@@ -913,10 +937,7 @@
   {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
     {#if clipsOwnContent}
-      <div class="line" data-prop="clipContent">
-        <span class="label">Clip content</span>
-        <SegmentedField name="Clip content" options={YES_NO} value={answerOf(clip.clipContent)} onchange={(v) => commit(setClipFlags(doc, clip.id, { clipContent: v === Answer.Yes }), 'Changed clip content')} />
-      </div>
+      <div data-prop="clipContent"><CheckRow label="Clip content" checked={!!clip.clipContent} testid="clip-content" onchange={(on) => commit(setClipFlags(doc, clip.id, { clipContent: on }), 'Changed clip content')} /></div>
     {/if}
     {#if doc.motionBlur.enabled}
       <div class="line" data-testid="clip-blur-section">
@@ -966,6 +987,7 @@
         <span class="managed">Edit points on the preview with the pen tool.</span>
       {/if}
     </div>
+    {#if shapePartShown(ShapePart.Morph, mode)}
     {#each shapeMorphs as _target, i (i)}
       <div class="line">
         <span class="label">Morph {i + 1}</span>
@@ -982,10 +1004,13 @@
         {#each morphSources as other (other.id)}<option value={other.id}>{clipName(other.id)}</option>{/each}
       </select>
     {/if}
+    {/if}
+    {#if shapePartShown(ShapePart.Liquid, mode)}
     <select class="add" aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
       <option value="">Liquid preset…</option>
       {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
     </select>
+    {/if}
     {#each shapeModifiers as modifier, i (modifier.id)}
       <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
         <div class="effect-head">
@@ -1094,7 +1119,7 @@
       {/snippet}
     </MenuTrigger>
     <MenuContent align="end">
-      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type) }), 'Add fill')} />{/each}
+      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type, clip.autoLayout || hasChildren ? FillHolder.Container : FillHolder.Layer) }), 'Add fill')} />{/each}
     </MenuContent>
   </Menu>
 {/snippet}
@@ -1109,7 +1134,7 @@
 
 
 {#snippet addStrokeButton()}
-  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props)) }), 'Add stroke')}><Plus /></ShellIconButton>
+  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props), Math.min(doc.width, doc.height)) }), 'Add stroke')}><Plus /></ShellIconButton>
 {/snippet}
 
 {#snippet addEffectMenu()}
@@ -1147,6 +1172,8 @@
                     <div class="control"><ColorField {gesture} {palette} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
                   </div>
+                {:else if isFlag(effect.kind, effectOfKey(prop.key)?.param ?? '')}
+                  <div data-prop={prop.key}><CheckRow label={afterDot(prop)} checked={Number(shown(prop.key)) === 1} testid="effect-flag" onchange={(on) => animate(prop.key, on ? 1 : 0)} /></div>
                 {:else}
                   {@render animList([prop], afterDot)}
                 {/if}

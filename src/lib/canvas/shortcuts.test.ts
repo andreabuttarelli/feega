@@ -5,14 +5,12 @@ import {
   NUDGE_STEP,
   preventable,
   NUDGE_STEP_BIG,
-  addableOf,
   matchCanvasShortcut,
   climbsUp,
   canvasToolKeys,
   nudgeOf,
   type CanvasCommand
 } from './shortcuts';
-import { CANVAS_ADD_BAR } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Command } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
@@ -187,20 +185,21 @@ describe('quello che i tasti fanno sulla tela', () => {
     expect(matchCanvasShortcut(ev('A', { ctrlKey: true }))?.id).toBe('select-all');
   });
 
-  it('i numeri aggiungono, nello stesso ordine della barra', () => {
-    CANVAS_ADD_BAR.forEach((what, i) => {
-      const m = matchCanvasShortcut(ev(String(i + 1)));
-      expect(m?.id).toBe('add');
-      expect(addableOf(m as CanvasCommand)).toBe(what);
-    });
+  it('le cifre danno l’opacità come in Figma: 1 = 10%, 9 = 90%, 0 = 100%', () => {
+    for (let digit = 1; digit <= 9; digit++) {
+      expect(matchCanvasShortcut(ev(String(digit)))).toEqual({ id: 'opacity', opacity: digit / 10 });
+    }
+    expect(matchCanvasShortcut(ev('0'))).toEqual({ id: 'opacity', opacity: 1 });
   });
 
-  it('un numero oltre l’elenco non aggiunge niente', () => {
-    expect(matchCanvasShortcut(ev(String(CANVAS_ADD_BAR.length + 1)))).toBeNull();
+  it('una cifra non inserisce mai un nodo', () => {
+    for (let digit = 0; digit <= 9; digit++) {
+      expect(matchCanvasShortcut(ev(String(digit)))?.id).not.toBe('add');
+    }
   });
 
-  it('la vista: 0 inquadra tutto, + e - la scala', () => {
-    expect(matchCanvasShortcut(ev('0'))?.id).toBe('fit');
+  it('la vista: ⇧1 inquadra tutto, + e - la scala', () => {
+    expect(matchCanvasShortcut(ev('!', { shiftKey: true, code: 'Digit1' }))?.id).toBe('fit');
     expect(matchCanvasShortcut(ev('+'))?.id).toBe('zoom-in');
     expect(matchCanvasShortcut(ev('='))?.id).toBe('zoom-in');
     expect(matchCanvasShortcut(ev('-'))?.id).toBe('zoom-out');
@@ -309,7 +308,7 @@ describe('la scheda che le elenca', () => {
     // divergere è sempre quella che l'utente legge.
     const listed = new Set(CANVAS_SHORTCUTS.map((s) => s.id));
     for (const id of [
-      'delete', 'deselect', 'select-all', 'add', 'fit', 'zoom-in', 'zoom-out', 'nudge',
+      'delete', 'deselect', 'select-all', 'opacity', 'fit', 'zoom-in', 'zoom-out', 'nudge',
       'duplicate', 'copy', 'paste', 'undo', 'redo'
     ]) {
       expect(listed).toContain(id);

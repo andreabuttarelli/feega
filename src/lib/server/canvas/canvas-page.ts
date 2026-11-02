@@ -115,7 +115,7 @@ import { ExportOutcome, exportSelection, noteImageExport } from '$lib/server/mot
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { importLottieAt } from '$lib/server/motion/lottie-at';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, componentAskSchema, copyElement, placeComponent, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, componentAskSchema, copyElement, placeComponent, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeFreeMedia, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
 import { DropOn, OutputKind } from '$lib/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -564,17 +564,21 @@ export const actions: Actions<CanvasParams> = {
     try {
       const drop = fd.has('drop') ? dropSchema.safeParse(jsonField(fd, 'drop')) : null;
       if (drop) {
-        if (!drop.success || drop.data.on !== DropOn.Frame) {
+        if (!drop.success) {
           return fail(400, { error: 'invalid drop' });
         }
         const { asset, kind } = await registerUploadedAsset(scope.db, {
           orgId: scope.orgId, projectId: scope.canvas.projectId, path, fileName, mimeType, bytes
         });
         if (kind !== OutputKind.Image) {
-          return fail(400, { error: 'only pictures land inside a frame' });
+          return fail(400, { error: 'only pictures land as image elements' });
         }
-        const size = { width: coord(fd.get('width')), height: coord(fd.get('height')) };
-        return movedAnswer(await placeMedia(canvasFrames(scope), { kind: OutputKind.Image, assetId: asset.id, name: fileName, width: size.width, height: size.height }, drop.data));
+        const picture = { kind: OutputKind.Image, assetId: asset.id, name: fileName, width: coord(fd.get('width')), height: coord(fd.get('height')) } as const;
+        const frames = canvasFrames(scope);
+        const placed = drop.data.on === DropOn.Frame
+          ? await placeMedia(frames, picture, drop.data)
+          : await placeFreeMedia(frames, { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id: chosenNode(fd) }, picture, drop.data);
+        return movedAnswer(placed);
       }
 
       if (fd.get('into') === 'library') {
@@ -1046,13 +1050,6 @@ export const actions: Actions<CanvasParams> = {
     return { moved: true };
   },
 
-  /**
-   * RIDIMENSIONARE: STESSA DOTTRINA DI `move` — last-write-wins, nessun `canvas_events` (il
-   * commento in cima a `canvas.ts` lo dice esplicitamente), una scrittura sola a fine gesto, non
-   * per fotogramma. Il minimo non è un numero a caso qui: è quello del TIPO del nodo
-   * (`nodeSize`), lo stesso che decide la misura di un nodo appena creato — un nodo non può
-   * restringersi sotto la taglia in cui nasce.
-   */
   resize: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();

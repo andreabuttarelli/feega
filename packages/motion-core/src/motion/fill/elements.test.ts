@@ -4,8 +4,8 @@ import { FILLED, elementFills, fillReplaces } from './elements';
 import { fillsSchema } from './model';
 
 describe('which elements take a fill stack', () => {
-  it('boxes, ellipses, paths and text do', () => {
-    expect(Object.keys(FILLED).sort()).toEqual(['Caption', 'Kicker', 'Shape', 'Text', 'Title']);
+  it('boxes, ellipses, paths, images and text do', () => {
+    expect(Object.keys(FILLED).sort()).toEqual(['Caption', 'Image', 'Kicker', 'Shape', 'Text', 'Title']);
   });
 
   it('every filled component stores fills in its schema', () => {

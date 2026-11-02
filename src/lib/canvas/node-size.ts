@@ -10,7 +10,7 @@ import { selectNodeSize } from './select-node';
 import { effectsNodeSize } from './effects-node';
 import { compositionNodeSize } from './composition-node';
 import { calendarNodeSize } from './calendar-node';
-import { DocNodeType, frameDefaultSize } from './motion-node';
+import { DocNodeType, frameDefaultSize, frameMinSize } from './motion-node';
 import { studioBatchNodeSize } from './studio-batch-node';
 
 type Size = { w: number; h: number };
@@ -46,4 +46,14 @@ const NODE_SIZE: Record<NodeType, (data: Record<string, unknown>) => Size> = {
 
 export function nodeSize(type: string, data: Record<string, unknown> = {}): Size {
   return isNodeType(type) ? NODE_SIZE[type](data) : FALLBACK_SIZE;
+}
+
+const MIN_SIZE: Partial<Record<NodeType, () => Size>> = {
+  motion: frameMinSize,
+  element: frameMinSize
+};
+
+export function minNodeSize(type: string, data: Record<string, unknown> = {}): Size {
+  const min = isNodeType(type) ? MIN_SIZE[type] : undefined;
+  return min ? min() : nodeSize(type, data);
 }

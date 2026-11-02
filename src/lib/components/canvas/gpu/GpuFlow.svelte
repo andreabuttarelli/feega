@@ -25,6 +25,7 @@
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
   import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
+  import { tileFaded } from '$lib/canvas/tile-opacity';
   import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
@@ -67,7 +68,7 @@
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
-  import { frameProperties, UNNAMED_FRAME } from '../frame-properties.svelte';
+  import { frameProperties, UNNAMED_FRAME, type NodePlace } from '../frame-properties.svelte';
   import { selectionProperties } from '../selection-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
@@ -170,8 +171,6 @@
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
-  import { isSvgFile } from '$lib/canvas/system-clipboard';
-  import { isLottieFile } from '$lib/canvas/lottie-file';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
@@ -842,15 +841,13 @@
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
   function hitAt(w: Point): Hit {
+    const unit = resizable ? resizeHandleAt(selectedBoxes[0], w, view.zoom) : null;
+    if (unit) {
+      return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
+    }
     const port = connectable ? portAt(ports, w, view.zoom) : null;
     if (port) {
       return { kind: HitKind.Port, nodeId: port.nodeId, handle: port.handle };
-    }
-    if (resizable) {
-      const unit = resizeHandleAt(selectedBoxes[0], w, view.zoom);
-      if (unit) {
-        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
-      }
     }
     const turnUnit = rotatable ? rotateZoneAt(rotatable, rotatable.rotation ?? 0, w, view.zoom) : null;
     if (rotatable && turnUnit) {
@@ -1589,6 +1586,8 @@
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     frameProperties.runAction = runSelectionAction;
     frameProperties.turn = nodeTurnOf(panelNodeId);
+    frameProperties.place = nodePlaceOf(panelNodeId);
+    frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
     return () => frameProperties.clear();
   });
 
@@ -2124,6 +2123,11 @@
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
     return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+  }
+
+  function nodePlaceOf(nodeId: string): NodePlace | null {
+    const tile = byId.get(nodeId);
+    return tile ? { x: tile.x, y: tile.y, set: (x, y) => props.onMove?.(nodeId, x, y) } : null;
   }
 
   function nodeTurnOf(nodeId: string): NodeTurn | null {
@@ -2732,11 +2736,8 @@
         props.onLive?.([]);
         snapGuides = [];
         const box = overrides.get(a.id);
-        if (box && (box.x !== a.box.x || box.y !== a.box.y)) {
-          props.onMove?.(a.id, box.x, box.y);
-        }
         if (box) {
-          props.onResize?.(a.id, box.w, box.h);
+          props.onResizeEnd?.(a.id, a.box, { x: box.x, y: box.y, w: box.w, h: box.h });
         }
         settleOverrides();
       },
@@ -3072,7 +3073,7 @@
   }
 
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
-    add: (c) => c.id === 'add' && addAtCentre(c.what),
+    opacity: (c) => c.id === 'opacity' && fadeTiles(selected, c.opacity),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
@@ -3130,6 +3131,15 @@
       untrack(() => runPaletteCommand(asked.command));
     }
   });
+
+  function fadeTiles(ids: readonly string[], opacity: number) {
+    for (const id of ids) {
+      const session = saverOf(id);
+      if (session) {
+        commit(id, tileFaded(session.history.present, opacity), `Opacity ${Math.round(opacity * 100)}%`);
+      }
+    }
+  }
 
   function runPaletteCommand(command: Command) {
     if (inside?.level.clip && picks.length && canRunInFrame(command)) {
@@ -3541,7 +3551,7 @@
     const files = [...(e.dataTransfer?.files ?? [])];
     if (files.length && props.onUpload) {
       e.preventDefault();
-      files.forEach((file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? toFlow(at) : undefined));
+      files.forEach((file) => props.onUpload?.(file, toFlow(at)));
       return;
     }
     const feedImage = parseFeedImageDrag(e.dataTransfer?.getData(CANVAS_DRAG_FEED_IMAGE) ?? '');
@@ -3843,7 +3853,7 @@
       onpick={addAtCentre}
       models={hotTiles((medium) => props.modelChoicesFor?.(medium) ?? [])}
       onmodel={(model) => props.onCreateFilled?.(hotDrag(model), viewCentre())}
-      onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? viewCentre() : undefined) : undefined}
+      onupload={props.onUpload ? (file) => props.onUpload?.(file, viewCentre()) : undefined}
       oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       techniques={props.techniques}

@@ -26,6 +26,7 @@
   import ScenesSection from '$lib/components/motion/ScenesSection.svelte';
   import FrameColoursSection from '$lib/components/motion/FrameColoursSection.svelte';
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
+  import FramePlaceSection from './FramePlaceSection.svelte';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -107,6 +108,11 @@
 
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
 
+{#snippet frameLead()}
+  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} turn={frameProperties.turn} />{/if}
+  {#if doc}<FramePresetSection {doc} onchange={editGuides} />{/if}
+{/snippet}
+
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
 {#if editorMode.spec.inspector === ModeInspector.Play && session && doc}
@@ -125,10 +131,9 @@
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     {#if editorMode.spec.sounds === SoundEntries.Shown && frameProperties.runAction}<SoundSection onrun={frameProperties.runAction} />{/if}
-    <FramePresetSection {doc} onchange={editGuides} />
     {#if surfaced && surface}
       <div class="frame-look" data-testid="frame-look">
-        <MotionInspector as={PropertiesView.Frame} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} onchange={edit} />
+        <MotionInspector as={PropertiesView.Frame} lead={frameLead} title={frameProperties.name} onrename={frameProperties.rename} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} onchange={edit} />
       </div>
     {/if}
     <LayoutGuidesSection {doc} onchange={editGuides} />
@@ -164,9 +169,9 @@
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
-      <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
+      <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} turn={frameProperties.turn?.clipId === shown.clip.id ? frameProperties.turn : null} onchange={editShown} onalign={alignPicks} />
+      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} turn={frameProperties.turn?.clipId === shown.clip.id ? frameProperties.turn : null} onchange={editShown} onalign={alignPicks} />
       {#if frameProperties.exportPicks}<ExportSection onexport={frameProperties.exportPicks} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}

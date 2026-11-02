@@ -3,51 +3,43 @@
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import Layers from '@lucide/svelte/icons/layers';
-  import type { Bounds } from '$lib/motion/scene-select';
   import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { EditMode, editIn } from '$lib/motion/edit-mode';
   import { valueAt } from '$lib/motion/inspector';
   import { withParams } from '@feega/motion-core/motion/custom/params';
   import { TRANSFORM, isAnimatable } from '@feega/motion-core/motion/keyframes';
   import { sliderOf, toShown, toStored } from '$lib/motion/units';
-  import { fieldLook } from '$lib/motion/inspector-sections';
+  import { fieldLook, optionLabel } from '$lib/motion/inspector-sections';
   import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { MIXED, shared, type Shared } from '$lib/motion/mixed';
   import { FieldKind } from '$lib/motion/number-field';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { aabb, quadOf, type Boxes } from '$lib/motion/scene-select';
-  import { unionBounds } from '$lib/motion/multi-select';
   import { HORIZONTALS, VERTICALS } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
-  import { placeBox, setPropAcross, sharedConstraint, sharedFields, type BoxPatch } from '$lib/motion/selection-props';
+  import { setPropAcross, sharedConstraint, sharedFields } from '$lib/motion/selection-props';
   import { documentColours, recolour, selectionColours } from '$lib/motion/selection-colours';
   import { Control } from '@feega/motion-core/motion/components';
   import { Axis, distributeSpace, gapOf, propBoxes } from '$lib/motion/space';
   import ColourRow from './ColourRow.svelte';
   import NumberField from './NumberField.svelte';
+  import BoxFields from './BoxFields.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
 
-  let { doc, ids, frame, mode = EditMode.Motion, boxes = {}, gesture = null, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; boxes?: Boxes; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, ids, frame, mode = EditMode.Motion, gesture = null, onchange }: { doc: MotionDoc; ids: readonly string[]; frame: number; mode?: EditMode; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
-  const BOX_FIELDS = [
-    { key: 'x', label: 'X', of: (b: Bounds) => b.left },
-    { key: 'y', label: 'Y', of: (b: Bounds) => b.top },
-    { key: 'width', label: 'W', of: (b: Bounds) => b.right - b.left },
-    { key: 'height', label: 'H', of: (b: Bounds) => b.bottom - b.top }
-  ] as const;
-  const BOX_RANGE = { min: -100000, max: 100000, step: 1 };
+  const HUNDREDTHS = 100;
   const PROP_RANGE = { min: 0, max: 100000, step: 1 };
   const HEX = /^#[0-9a-f]{6}$/i;
   const FALLBACK_COLOUR = '#000000';
 
-  const SHARED_KEYS = ['x', 'y', 'rotateZ', 'scale', 'opacity', 'anchorX', 'anchorY'] as const;
+  const SHARED_KEYS = ['rotateZ', 'opacity'] as const;
   type SharedKey = (typeof SHARED_KEYS)[number];
   const MIXED_OPTION = '';
 
   const clips = $derived(ids.map((id) => findClip(doc, id)?.clip).filter((c): c is MotionClip => !!c));
   const first = $derived(clips[0]);
-  const bounds = $derived(ids.length && ids.every((id) => boxes[id] && findClip(doc, id)) ? unionBounds(ids.map((id) => aabb(quadOf(doc, id, frame, boxes[id])))) : null);
+  const boxes = $derived(propBoxes(doc));
   const styleFields = $derived(sharedFields(clips));
   const sameColour = (c: string) => c;
 
@@ -72,23 +64,20 @@
   }
 
   const setNumber = (key: SharedKey, shown: number) => across((d, clip) => (isAnimatable(clip.component, key) ? editIn(mode, d, clip, key, toStored(clip.component, key, shown, d), frame) : { ok: true, doc: d }), `Edited ${TRANSFORM[key].label.toLowerCase()} on ${ids.length} clips`);
-  function setBox(patch: BoxPatch) {
-    const result = bounds ? placeBox(doc, [...ids], frame, bounds, patch, mode) : null;
-    if (result?.ok) {
-      onchange(result.doc, `Placed ${ids.length} layers`);
-    }
-  }
 
   const GAP_RANGE = { min: -100000, max: 100000, step: 1 };
   const GAP_FIELDS = [
     { axis: Axis.X, label: 'H', name: 'Horizontal gap' },
     { axis: Axis.Y, label: 'V', name: 'Vertical gap' }
   ] as const;
-  const gaps = $derived(Object.fromEntries(GAP_FIELDS.map((f) => [f.axis, gapOf(doc, [...ids], frame, propBoxes(doc), f.axis)])) as Record<Axis, number | null>);
-  const gapShown = (axis: Axis): Shared<number> => (gaps[axis] === null ? MIXED : Math.round(gaps[axis]! * 100) / 100);
+  const gaps = $derived(Object.fromEntries(GAP_FIELDS.map((f) => [f.axis, gapOf(doc, [...ids], frame, boxes, f.axis)])) as Record<Axis, number | null>);
+  const gapShown = (axis: Axis): Shared<number> => {
+    const gap = gaps[axis];
+    return gap === null || gap < 0 ? MIXED : Math.round(gap * HUNDREDTHS) / HUNDREDTHS;
+  };
 
   function setGap(axis: Axis, px: number) {
-    const result = distributeSpace(doc, [...ids], frame, propBoxes(doc), axis, EditMode.Design, px);
+    const result = distributeSpace(doc, [...ids], frame, boxes, axis, EditMode.Design, px);
     if (result.ok) {
       onchange(result.doc, `Spaced ${ids.length} layers`);
     }
@@ -133,18 +122,10 @@
     <span class="kind">Mixed selection</span>
   </header>
   {#if first}
-    {#if bounds}
-      <section class="section ui-section" data-section="box">
-        <h3>Selection</h3>
-        <div class="grid2">
-          {#each BOX_FIELDS as f (f.key)}
-            <div data-prop={f.key}>
-              <NumberField {gesture} label={f.label} kind={FieldKind.Glyph} name={`Selection ${f.key}`} value={Math.round(f.of(bounds) * 100) / 100} range={BOX_RANGE} unit="px" onchange={(v) => setBox({ [f.key]: v })} />
-            </div>
-          {/each}
-        </div>
-      </section>
-    {/if}
+    <section class="section ui-section" data-section="box">
+      <h3>Selection</h3>
+      <BoxFields {doc} {ids} {frame} {mode} {gesture} {onchange} />
+    </section>
     <section class="section ui-section" data-section="spacing">
       <h3>Spacing</h3>
       <div class="grid2">
@@ -186,7 +167,7 @@
               <span>{f.label}</span>
               <select aria-label={f.label} value={value === MIXED ? MIXED_OPTION : String(value)} onchange={(e) => e.currentTarget.value !== MIXED_OPTION && setStyle(f.key, e.currentTarget.value)}>
                 {#if value === MIXED}<option value={MIXED_OPTION}>Mixed</option>{/if}
-                {#each f.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
+                {#each f.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
               </select>
             </label>
           {:else if f.control === Control.Toggle}
@@ -218,7 +199,7 @@
           <span>{c.label}</span>
           <select aria-label={`${c.label} constraint`} data-testid={`multi-${c.axis}`} value={c.value === MIXED ? MIXED_OPTION : c.value} onchange={(e) => setPin(c.axis as 'horizontal' | 'vertical', e.currentTarget.value)}>
             {#if c.value === MIXED}<option value={MIXED_OPTION}>Mixed</option>{/if}
-            {#each c.options as o (o)}<option value={o}>{o}</option>{/each}
+            {#each c.options as o (o)}<option value={o}>{optionLabel(o)}</option>{/each}
           </select>
         </label>
       {/each}

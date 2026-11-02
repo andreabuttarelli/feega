@@ -1,5 +1,6 @@
 import { isInteractive } from '@feega/motion-core/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
+import { uploadName } from '$lib/motion/asset-name';
 import { findAssets, listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { findBrandLook, findFirstBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -64,12 +65,15 @@ export async function motionTokens(db: Db, input: { orgId: string; brandId: stri
   return { ...brandTokens({ name: brand.name, palette: paletteFrom(brand.content), logoUrl: brand.logoUrl }), fonts: fontsFrom(brand.content, GOOGLE_FONTS) };
 }
 
+const GENERATED = 'generated';
+
 function assetLabel(asset: Asset, kind: AssetKind): string {
   if (kind === AssetKind.Font) {
     const font = fontFileOf(asset);
     return `${font.family} ${font.weight}${font.italic ? ' italic' : ''}`;
   }
-  return `${kind} · ${asset.createdAt.slice(0, 10)} · ${asset.id.slice(0, 6)}`;
+  const named = asset.source === GENERATED ? '' : uploadName(asset.url);
+  return named || `${kind} · ${asset.createdAt.slice(0, 10)} · ${asset.id.slice(0, 6)}`;
 }
 
 export type AssetSigner = (paths: { generated: string[]; uploaded: string[] }, ttlSeconds?: number) => Promise<Map<string, string>>;

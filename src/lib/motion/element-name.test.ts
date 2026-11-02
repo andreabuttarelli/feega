@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
-import { elementKind, elementName } from './element-name';
+import { elementKind, elementName, layerKind, layerLabel } from './element-name';
+import { ComponentRole } from './main-component';
 
 describe('what a graphic element is called', () => {
   it('names shapes by what they draw, and the rest by their component', () => {
@@ -27,5 +28,37 @@ describe('what a group is called', () => {
   it('keeps the component as the kind of anything else', () => {
     expect(elementKind({ component: 'Shape', props: { shape: 'rect' } })).toBe('Shape');
     expect(elementKind({ component: 'Shape', props: { shape: 'rect' }, autoLayout: { ...DEFAULT_AUTO_LAYOUT, direction: Direction.Vertical } })).toBe('Stack');
+  });
+});
+
+describe('one name for a layer, in Layers and in Properties', () => {
+  const comps = { main: { name: 'Button', component: { id: 'main' } }, plain: { name: 'Intro' } };
+
+  it('a name the user typed wins', () => {
+    expect(layerLabel({ component: 'Shape', name: 'Card', props: { shape: 'rect' } }, comps)).toBe('Card');
+  });
+
+  it('a text layer is named by its first line', () => {
+    expect(layerLabel({ component: 'Text', props: { text: 'Ship faster\nsecond line' } }, comps)).toBe('Ship faster');
+  });
+
+  it('a shape by what it draws, never the component name', () => {
+    expect(layerLabel({ component: 'Shape', props: { shape: 'rect' } }, comps)).toBe('Box');
+  });
+
+  it('a group is called a Group, in Layers and in its header', () => {
+    expect(layerLabel({ component: 'Shape', group: true, props: { shape: 'rect' } }, comps)).toBe('Group');
+    expect(layerKind({ component: 'Shape', group: true, props: { shape: 'rect' } }, comps)).toBe('Group');
+  });
+
+  it('an instance by its main component', () => {
+    expect(layerLabel({ component: 'Precomp', props: { comp: 'main' } }, comps)).toBe('Button');
+  });
+
+  it('the kind under the name says what an instance is an instance of', () => {
+    expect(layerKind({ component: 'Precomp', props: { comp: 'main' } }, comps)).toBe('Instance of Button');
+    expect(layerKind({ component: 'Precomp', props: { comp: 'plain' } }, comps)).toBe('Precomp');
+    expect(layerKind({ component: 'Precomp', props: { comp: 'main' } }, comps, ComponentRole.Main)).toBe('Main component');
+    expect(layerKind({ component: 'Shape', props: { shape: 'rect' } }, comps)).toBe('Shape');
   });
 });

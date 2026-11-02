@@ -25,6 +25,7 @@ import { elementStrokes } from '../stroke/elements';
 import { textStroke } from '../stroke/render';
 import { textBody } from './text-body';
 import { CUSTOM_ROOT_PREFIX } from '../gpu-full/dom/tree';
+import { imageRectangle } from '../image-dress';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -227,6 +228,10 @@ const Image: Template<'Image'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
+    const rectangle = url ? imageRectangle(ctx.p as unknown as Record<string, unknown>) : null;
+    if (rectangle) {
+      return Shape.html({ ...ctx, p: rectangle } as unknown as TemplateCtx<'Shape'>);
+    }
     return placed(ctx, ctx.p, url ? zoomed(url, ctx.p) : missing('Pick an image', ctx.id), true);
   }
 };

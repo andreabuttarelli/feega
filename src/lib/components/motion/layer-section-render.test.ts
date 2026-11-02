@@ -60,12 +60,13 @@ describe('the Layer section', () => {
     expect(layer(inspect('Shape', { shape: 'rect', corners: [0.1, 0, 0, 0] }))).toContain('data-testid="corners"');
   });
 
-  it('a layer with children can clip them, as a Yes / No', () => {
+  it('a layer with children can clip them, with the same checkbox a stack uses', () => {
     let doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, props: { shape: 'rect' } }, 'c1'));
     doc = must(addClip(doc, { component: 'Title', from: 0 }, 'kid'));
     doc = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'kid' ? { ...c, parent: 'c1' } : c)) })) };
-    expect(layer(inspect('Shape', {}, doc))).toMatch(/data-segmented="Clip content"[\s\S]*?>Yes<[\s\S]*?>No</);
-    expect(layer(inspect('Shape', { shape: 'rect' }))).not.toContain('data-segmented="Clip content"');
+    expect(layer(inspect('Shape', {}, doc))).toMatch(/type="checkbox"[^>]*data-testid="clip-content"[\s\S]*?Clip content/);
+    expect(layer(inspect('Shape', {}, doc))).not.toContain('data-segmented="Clip content"');
+    expect(layer(inspect('Shape', { shape: 'rect' }))).not.toContain('data-testid="clip-content"');
   });
 });
 

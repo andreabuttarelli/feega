@@ -64,6 +64,8 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
+  import { inverseResize, resizeStale, type ResizeGesture } from '$lib/canvas/resize-gesture';
+  import type { TileBox } from '$lib/components/canvas/flow-types';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { landTiles } from '$lib/canvas/land-tiles';
   import { canvasLink } from '$lib/realtime/canvas-link';
@@ -218,7 +220,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
-  import { nodeSize } from '$lib/canvas/node-size';
+  import { minNodeSize, nodeSize } from '$lib/canvas/node-size';
   import { grownTextNodeHeight } from '$lib/canvas/text-node-grow';
   import { scrollGuard } from '$lib/canvas/scroll-guard';
   import { reloadTechniques, techniquesOf } from '$lib/canvas/techniques.svelte';
@@ -1400,8 +1402,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       select: n.select,
       settings: hasInspector(n.type),
       poster: tilePoster(n) ?? undefined,
-      minW: nodeSize(n.type, n.data).w,
-      minH: nodeSize(n.type, n.data).h,
+      minW: minNodeSize(n.type, n.data).w,
+      minH: minNodeSize(n.type, n.data).h,
       node: n.type === 'effects'
         ? { id: n.id, kind: 'effects' as const, mediaKind: n.data.mediaKind === 'video' ? 'video' as const : 'image' as const }
         : tileNode({
@@ -1664,7 +1666,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'resize'; gesture: ResizeGesture } | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -2160,10 +2162,18 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name}`;
-    if (!hold) {
-      await uploadOnCanvas(file, path, at);
+    if (hold) {
+      await uploadPicture(file, path, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at });
       return;
     }
+    if (kindOfFile(file.type) === MediaKind.Image) {
+      await uploadPicture(file, path, { on: DropOn.Canvas, x: at.x, y: at.y });
+      return;
+    }
+    await uploadOnCanvas(file, path, at);
+  }
+
+  async function uploadPicture(file: File, path: string, drop: Drop) {
     const up = await supabase.storage
       .from('canvas-assets')
       .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
@@ -2175,7 +2185,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const size = await pictureSize(file);
     await landed(post('upload', {
       path, file_name: file.name, mime_type: file.type, bytes: file.size, ...(size ?? {}),
-      drop: JSON.stringify({ on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at })
+      drop: JSON.stringify(drop)
     }));
   }
 
@@ -2184,17 +2194,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function uploadOnCanvas(file: File, path: string, at: { x: number; y: number }) {
     const id = crypto.randomUUID();
-    const local = URL.createObjectURL(file);
-    if (kindOfFile(file.type) === MediaKind.Image) {
-      catalogPosters.set(id, local);
-    }
     uploadProgress.set(id, 0);
     const fields = { path, file_name: file.name, mime_type: file.type, bytes: String(file.size), x: String(at.x), y: String(at.y), node_id: id };
     const stored = storeFile(supabase, path, file, (fraction) => uploadProgress.set(id, fraction));
     await runUpload(optimisticOp(OptimisticAction.Upload, { record: pendingPicture(id, { x: at.x + UPLOAD_TILE.w / 2, y: at.y + UPLOAD_TILE.h / 2 }, UPLOAD_TILE), fields }, { nodes, edges }, { toTile: (record) => toTile(record), toEdge }, async (name, sent) => ((await stored) ? null : post(name, sent))));
     uploadProgress.delete(id);
-    catalogPosters.delete(id);
-    URL.revokeObjectURL(local);
   }
 
   const RENDER_VIEW_GAP = 24;
@@ -2844,13 +2848,6 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await placed;
   }
 
-  /**
-   * RIDIMENSIONARE: STESSA FORMA DI `move` — ottimista, last-write-wins, nessuna voce nello stack
-   * di undo (lo spostamento non ne ha una propria sulla taglia, e `MoveGesture` porta solo
-   * `x`/`y`). Scrive `userHeight`: da qui in poi `tileHeight` prende QUESTA misura, non più
-   * quella calcolata da `grownTextNodeHeight` — un ridimensionamento a mano vince sulla crescita
-   * automatica, la stessa regola già scritta in `text-node-grow.ts`.
-   */
   const FIT_SLACK_PX = 1;
 
   const PICTURE_OF_KIND: Record<FrameKind, (motion: { format: MotionFormat }, row: { w: number; h: number }) => { width: number; height: number }> = {
@@ -2926,6 +2923,28 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const sized = plan?.picture ? sizeFrameDoc(id, plan.picture, was) : null;
     await storeSize(id, plan?.w ?? width, plan?.h ?? height);
     await sized;
+  }
+
+  async function placeBox(id: string, before: TileBox, after: TileBox) {
+    const moved = after.x !== before.x || after.y !== before.y;
+    const placed = moved ? move(id, after.x, after.y) : null;
+    await resize(id, after.w, after.h);
+    await placed;
+  }
+
+  async function resizeTile(id: string, before: TileBox, after: TileBox) {
+    await undoStack.muted(() => placeBox(id, before, after));
+    undoStack.push({ source: 'resize', gesture: { nodeId: id, before, after } });
+  }
+
+  async function applyResizeUndo(gesture: ResizeGesture, onAccepted: (redo: ResizeGesture) => void) {
+    const node = nodes.find((n) => n.id === gesture.nodeId);
+    if (resizeStale(gesture, node ? { x: node.x, y: node.y } : null)) {
+      failed = 'Undo skipped: someone else already changed this node';
+      return;
+    }
+    await undoStack.muted(() => placeBox(gesture.nodeId, gesture.after, gesture.before));
+    onAccepted(inverseResize(gesture));
   }
 
   let liveAsk: { id: string; w: number; h: number } | null = null;
@@ -4106,6 +4125,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'move', gesture: redo }));
       return;
     }
+    if (entry.source === 'resize') {
+      await applyResizeUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'resize', gesture: redo }));
+      return;
+    }
     await applyUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'server', gesture: redo }));
   }
 
@@ -4124,6 +4147,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'move', gesture: redo }));
+      return;
+    }
+    if (entry.source === 'resize') {
+      await applyResizeUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'resize', gesture: redo }));
       return;
     }
     await applyUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'server', gesture: redo }));
@@ -4309,6 +4336,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onMove={move}
     onMoveEnd={moveEnd}
     onResize={resize}
+    onResizeEnd={resizeTile}
     onPlace={storeSize}
     onRename={renameNode}
     onNodeDoubled={openOutput}

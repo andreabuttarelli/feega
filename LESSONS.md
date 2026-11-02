@@ -210,6 +210,12 @@ canvas è vuoto; succede solo su frame grandi. Causa vista: l'overlay passato a 
 migliaia di item (un item per trattino dell'anello). Mossa: logga `overlay.length` in `paint()`
 di `CoreFrames.svelte`; un elemento di chrome è un solo item, i pezzi sono contorni.
 
+### La tela si svuota subito dopo il caricamento, i nodi appaiono solo al clic
+Segnale: console `[core] gpu lost, attaching again Error("invalid type: null, expected f64", column: N)`
+in loop, `data-painted` sale e la tela resta vuota. Causa vista: un numero `NaN` in una display
+list (JSON lo scrive `null`). Mossa: avvolgi `JSON.stringify` dalla console, cerca `[null` nelle
+stringhe lunghe, risali dal colore/forma all'elemento del doc; poi cerca la divisione per zero.
+
 ### `backdrop-filter` che non sfoca niente
 Un antenato con `will-change: opacity` (o `filter`, `opacity < 1`, `mask`, `clip-path`,
 `mix-blend-mode`) è una Backdrop Root: il blur vede solo ciò che sta dentro di lui, cioè niente.

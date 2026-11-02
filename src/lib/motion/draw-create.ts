@@ -252,7 +252,7 @@ export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.C
 }
 
 const MIN_PEN_ELEMENT_SIDE = 24;
-const PEN_STROKE_CANVAS_UNITS = 2;
+const PEN_STROKE_CANVAS_UNITS = 1;
 const MAX_STROKE_WIDTH = 0.2;
 
 function canvasBoxOf(outline: Outline): CanvasBox {

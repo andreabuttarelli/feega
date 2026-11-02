@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { parsePath, pathData, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
-import { drawnInFrame, drawnOnCanvas } from './canvas-draw';
+import { TEXT_CLICK_PX, canvasTextClick, drawnInFrame, drawnOnCanvas } from './canvas-draw';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -37,10 +38,10 @@ describe('a shape drawn over the canvas lands in canvas units', () => {
     expect(drawnOnCanvas(clip, HOST, ZOOM_TWO, CanvasTheme.Dark)).toMatchObject({ tool: DrawTool.Text, theme: CanvasTheme.Dark });
   });
 
-  it('a pen path is written in canvas units', () => {
+  it('a pen path is written in canvas units, stroked in ink with no fill like any pen', () => {
     const clip = { component: 'Shape', props: { shape: 'path', path: 'M 0 0 L 1 1', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } };
 
-    expect(drawnOnCanvas(clip, HOST, ZOOM_TWO)).toEqual({ tool: DrawTool.Pen, path: pathData(parsePath('M 200 112.5 L 300 137.5') as Outline) });
+    expect(drawnOnCanvas(clip, HOST, ZOOM_TWO)).toEqual({ tool: DrawTool.Pen, path: pathData(parsePath('M 200 112.5 L 300 137.5') as Outline), fill: null, stroke: CANVAS_INK[CanvasTheme.Light] });
   });
 
   it('a polygon and a star keep their tool', () => {
@@ -88,5 +89,17 @@ describe('a shape drawn over a frame lands inside it, on the gesture', () => {
     const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Pen, path: 'M 200 100 L 700 500', fill: null, stroke: CANVAS_INK[CanvasTheme.Light] }, 0, 'p2');
 
     expect(made.ok && clipOf(made.doc, 'p2')?.props).toMatchObject({ fillKind: 'none', stroke: 'brand.text' });
+  });
+});
+
+describe('a click with the text tool on the canvas', () => {
+  const leading = COMPONENTS.Text.schema.parse({}).leading as number;
+
+  it('makes a box for 16 px type, whatever the zoom', () => {
+    expect(TEXT_CLICK_PX.size).toBe(16);
+    const atTwo = canvasTextClick((p) => ({ x: p.x / 2, y: p.y / 2 }));
+    expect(atTwo.height).toBeCloseTo(16 * leading * 2);
+    const atOne = canvasTextClick((p) => p);
+    expect(atOne.height).toBeCloseTo(16 * leading);
   });
 });

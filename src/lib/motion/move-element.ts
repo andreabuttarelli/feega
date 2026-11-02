@@ -4,7 +4,8 @@ import { FPS, maxFrames } from '@feega/motion-core/motion/design';
 import { fieldsOf } from './inspector';
 import { retimer } from './frame-rate';
 import { DocMode } from '@feega/motion-core/motion/still';
-import { removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { TOP_LEFT_START, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { CLIP_NAME_MAX } from '@feega/motion-core/motion/organize';
 import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
 
 export type Point = { x: number; y: number };
@@ -56,16 +57,16 @@ const SIZE_PROPS: Record<string, Scale> = {
 
 const POSITION_KEYS: Record<keyof Point, keyof Point> = { x: 'x', y: 'y' };
 
-type Media = { component: ComponentId; prop: string; value: (output: Output) => unknown; asset: (output: Output) => AssetRef | null; size: (output: Output) => Size; frames: (output: Output, fps: number) => number | null };
+type Media = { component: ComponentId; prop: string; name: (output: Output) => string | undefined; value: (output: Output) => unknown; asset: (output: Output) => AssetRef | null; size: (output: Output) => Size; frames: (output: Output, fps: number) => number | null };
 
 const pictureSize = (output: Output): Size => ('width' in output && output.width && output.height ? { width: output.width, height: output.height } : PICTURE_FALLBACK);
 
 const mediaAsset = (output: Output): AssetRef | null => ('assetId' in output ? { id: output.assetId, kind: output.kind as 'image' | 'video', name: output.name } : null);
 
 const MEDIA: Record<OutputKind, Media> = {
-  [OutputKind.Image]: { component: 'Image', prop: 'assetId', value: (o) => ('assetId' in o ? o.assetId : null), asset: mediaAsset, size: pictureSize, frames: () => null },
-  [OutputKind.Video]: { component: 'Video', prop: 'assetId', value: (o) => ('assetId' in o ? o.assetId : null), asset: mediaAsset, size: pictureSize, frames: (o, fps) => ('seconds' in o && o.seconds ? Math.max(1, Math.round(o.seconds * fps)) : null) },
-  [OutputKind.Text]: { component: 'Text', prop: 'text', value: (o) => ('text' in o ? o.text : null), asset: () => null, size: () => TEXT_CANVAS, frames: () => null }
+  [OutputKind.Image]: { component: 'Image', prop: 'assetId', name: (o) => o.name.slice(0, CLIP_NAME_MAX), value: (o) => ('assetId' in o ? o.assetId : null), asset: mediaAsset, size: pictureSize, frames: () => null },
+  [OutputKind.Video]: { component: 'Video', prop: 'assetId', name: (o) => o.name.slice(0, CLIP_NAME_MAX), value: (o) => ('assetId' in o ? o.assetId : null), asset: mediaAsset, size: pictureSize, frames: (o, fps) => ('seconds' in o && o.seconds ? Math.max(1, Math.round(o.seconds * fps)) : null) },
+  [OutputKind.Text]: { component: 'Text', prop: 'text', name: () => undefined, value: (o) => ('text' in o ? o.text : null), asset: () => null, size: () => TEXT_CANVAS, frames: () => null }
 };
 
 const MEDIA_FIT = { [OutputKind.Image]: { fit: 'contain', width: 1, height: 1 }, [OutputKind.Video]: { fit: 'contain', width: 1, height: 1 }, [OutputKind.Text]: {} } satisfies Record<OutputKind, Record<string, unknown>>;
@@ -377,7 +378,7 @@ export function frameOf(element: Element, mode: DocMode, box: Box | null, newId:
 export function mediaElement(output: Output, fps: number = FPS): Element {
   const media = MEDIA[output.kind];
   const durationInFrames = media.frames(output, fps) ?? Math.round((COMPONENTS[media.component].durationInFrames * fps) / FPS);
-  const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, props: { ...defaultProps(media.component), ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
+  const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, name: media.name(output), constraints: TOP_LEFT_START.constraints, props: { ...defaultProps(media.component), ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
   const asset = media.asset(output);
   return { clip, fps, size: media.size(output), stillAt: 0, fillsFrame: output.kind === OutputKind.Image, carried: { assets: asset ? [asset] : [], fonts: [], components: {}, comps: {} } };
 }

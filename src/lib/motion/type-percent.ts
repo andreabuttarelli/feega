@@ -3,7 +3,7 @@ import type { Slider } from './units';
 const HUNDRED = 100;
 const PRECISION = 100;
 
-const IN_PERCENT: ReadonlySet<string> = new Set(['leading', 'tracking']);
+const IN_PERCENT: ReadonlySet<string> = new Set(['leading', 'tracking', 'focusX', 'focusY', 'zoom', 'arcSweep', 'arcRatio']);
 
 const factor = (key: string) => (IN_PERCENT.has(key) ? HUNDRED : 1);
 
