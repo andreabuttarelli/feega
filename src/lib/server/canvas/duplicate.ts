@@ -36,7 +36,7 @@ export async function duplicateNodes(
 
   const plan = copyPlan({
     ids: chosenIds,
-    nodes: existingNodes.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.position.x, y: n.position.y, width: n.size.width, height: n.size.height })),
+    nodes: existingNodes.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.position.x, y: n.position.y, width: n.size.width, height: n.size.height, displayName: n.displayName })),
     edges: existingEdges.map((e) => ({
       id: e.id,
       source: e.sourceNodeId,
@@ -72,6 +72,7 @@ export async function writePlan(
       data: planned.data,
       width: planned.width,
       height: planned.height,
+      displayName: planned.displayName,
       actor: input.actor
     });
     nodes.push(node);

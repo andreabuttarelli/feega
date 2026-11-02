@@ -30,6 +30,15 @@ describe('pasteNodes', () => {
     expect(out.connections[0]!.sourceNodeId).toBe(out.nodes[0]!.id);
   });
 
+  it('a pasted node keeps the name of its source', async () => {
+    const out = await pasteNodes(emptyDb(), { ...SCOPE, nodes: [{ type: 'text', data: { prompt: 'a' }, x: 0, y: 0, displayName: 'beach.jpg' }], edges: [] });
+
+    if ('refused' in out) {
+      throw new Error(out.refused);
+    }
+    expect(out.nodes[0]!.displayName).toBe('beach.jpg');
+  });
+
   it('refuses a node whose data does not fit its type', async () => {
     const out = await pasteNodes(emptyDb(), { ...SCOPE, nodes: [{ type: 'nope', data: {}, x: 0, y: 0 }], edges: [] });
 

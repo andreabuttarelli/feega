@@ -24,7 +24,7 @@ const MAX_RADIUS = 4;
 
 const clampUnit = (v: number) => Math.min(1, Math.max(0, v));
 const lerp = (a: Pt, b: Pt, t: number): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-const degreesOf = (from: Pt, to: Pt) => Math.atan2(to[1] - from[1], to[0] - from[0]) / DEG;
+const degreesOf = (from: Pt, to: Pt) => Math.round(Math.atan2(to[1] - from[1], to[0] - from[0]) / DEG);
 const centreOf = (size: Size): Pt => [size.width * HALF, size.height * HALF];
 const along = (start: Pt, end: Pt, p: Pt) => {
   const [dx, dy] = [end[0] - start[0], end[1] - start[1]];

@@ -159,6 +159,6 @@ export type Duplication = { copies: { from: string; to: string }[]; saved: Promi
 export const copiedNodes = (plan: DuplicatePlan): CanvasNodeRecord[] =>
   plan.nodes.flatMap((p) =>
     p.id
-      ? [{ id: p.id, canvasId: '', projectId: '', type: p.type, displayName: null, position: { x: p.x, y: p.y, z: 0 }, size: { width: p.width ?? null, height: p.height ?? null }, data: p.data, version: 0 }]
+      ? [{ id: p.id, canvasId: '', projectId: '', type: p.type, displayName: p.displayName ?? null, position: { x: p.x, y: p.y, z: 0 }, size: { width: p.width ?? null, height: p.height ?? null }, data: p.data, version: 0 }]
       : []
   );

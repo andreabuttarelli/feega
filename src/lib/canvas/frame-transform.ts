@@ -12,7 +12,8 @@ import { arrowStep, stackPlaced, stepInStack } from '$lib/motion/layout/ops';
 export enum SelectionKind {
   Element = 'element',
   Member = 'member',
-  Group = 'group'
+  Group = 'group',
+  Many = 'many'
 }
 
 export const GRIP_SUMMARY: Record<Grip, string> = {

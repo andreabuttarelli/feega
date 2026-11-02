@@ -59,6 +59,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['realtime.messages']
   },
   {
+    path: 'src/lib/server/canvas/agent-cursor.ts — broadcast (cursori degli agenti)',
+    why: "Un agente MCP con chiave API non ha un JWT con cui scrivere nel canale privato `canvas:<id>`, e un turno di chat non porta il JWT fino al livello degli strumenti. Il canvas_id e la posizione si LEGGONO con il client del chiamante (RLS accesa) dai nodi che l'agente ha appena toccato; la chiave serve solo a mandare un broadcast `canvas-peer` via REST su quel canale. Non legge né scrive tabelle.",
+    tables: ['realtime.messages']
+  },
+  {
     path: 'le callback dei provider, src/routes/api/v1/webhooks/** (non ancora scritte: fase 3 e 5)',
     why: 'Zernio e i provider di generazione chiamano senza una sessione utente. La riga da aggiornare si trova dal loro id esterno, che è già legato a una org; la firma della richiesta è ciò che autentica, non un JWT. Programmazione e stato di pubblicazione si leggono da Zernio, non da una tabella nostra (scheduled_posts è stata rimossa, 2026-09-22): un eventuale webhook scriverebbe solo posts.zernio_post_ids.',
     tables: ['posts', 'node_runs', 'ai_calls']

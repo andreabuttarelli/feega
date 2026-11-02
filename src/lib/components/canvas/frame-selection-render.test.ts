@@ -82,6 +82,15 @@ describe('the selection drawn over a core frame', () => {
     expect(body).toContain('data-testid="frame-group-selection"');
     expect(body.match(/data-testid="frame-selection-handle"/g)).toHaveLength(8);
   });
+
+  it('draws one solid box around several nodes, its body letting presses reach them', () => {
+    const body = render(FrameSelection, { props: { clip: '', quad: QUAD, kind: SelectionKind.Many, ongrab: () => {} } }).body;
+
+    expect(body).toMatch(/class="selection[^"]*passes/);
+    expect(body).not.toMatch(/class="selection[^"]*group/);
+    expect(body.match(/data-testid="frame-selection-handle"/g)).toHaveLength(8);
+    expect(body.match(/data-testid="frame-selection-rotate"/g)).toHaveLength(4);
+  });
 });
 
 describe('guides drawn over a core frame', () => {

@@ -60,8 +60,9 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { Way, createUndoStack } from '$lib/canvas/undo-stack';
   import { exportFailure } from '$lib/canvas/export-failure';
-  import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
+  import { joinGestures, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
+  import { planPlaceMany, reverseEach, type PlacedChange } from '$lib/canvas/place-many';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { inverseResize, resizeStale, sameBox, type ResizeGesture } from '$lib/canvas/resize-gesture';
   import type { TileBox } from '$lib/components/canvas/flow-types';
@@ -75,6 +76,8 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, presentControlsShown, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import { LocalOff, isOff } from '$lib/local-user';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import AgentAvatars from '$lib/components/canvas/AgentAvatars.svelte';
+  import { agentsOf } from '$lib/realtime/agent-presence';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
@@ -617,7 +620,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const turn = box.rotation - (layoutOf(node.data).rotation ?? 0);
     if (turn) {
-      turnGroup({ id, degrees: turn });
+      void turnGroup({ id, degrees: turn });
     }
     if (box.x !== node.x || box.y !== node.y) {
       void move(id, box.x, box.y);
@@ -633,10 +636,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
-  function turnGroup({ id, degrees }: Turn): boolean {
+  function turnGroup({ id, degrees }: Turn): Promise<unknown> | null {
     const group = nodes.find((n) => n.id === id);
     if (!group) {
-      return false;
+      return null;
     }
     const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
     const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
@@ -644,8 +647,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       const t = turned.get(n.id);
       return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
     });
-    void post('rotateGroup', { id, degrees: String(degrees) });
-    return true;
+    return post('rotateGroup', { id, degrees: String(degrees) });
   }
 
   function groupElements(ids: string[], after?: (groupId: string) => Promise<void>) {
@@ -1551,6 +1553,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
   const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow, (box) => tiles.some((t) => t.id === box.id && landedAt(t, box))));
   const drawnPeers = $derived(peerFrame ? peerPaths.smooth(canvasPeers, peerFrame) : canvasPeers);
+  const canvasAgents = $derived(agentsOf(canvasPeers));
   let following = $state<string | null>(null);
   let presenting = $state(false);
   const followView = $derived(following ? followed(canvasPeers, following) : null);
@@ -1684,7 +1687,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
   type ResizeEntry = { source: 'resize'; gesture: ResizeGesture; inner: StackEntry[] };
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'batch'; entries: StackEntry[] };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -2943,7 +2946,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     await sized;
   }
 
-  async function resizeTile(id: string, before: TileBox, after: TileBox) {
+  async function resizedEntry(id: string, before: TileBox, after: TileBox): Promise<ResizeEntry | null> {
     const moved = after.x !== before.x || after.y !== before.y;
     const inner = await undoStack.collect(async () => {
       const placed = moved ? move(id, after.x, after.y) : null;
@@ -2953,9 +2956,43 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const node = nodes.find((n) => n.id === id);
     const landed = node ? { x: node.x, y: node.y, w: node.w, h: node.h } : after;
     if (sameBox(landed, before) && !inner.length) {
-      return;
+      return null;
     }
-    undoStack.push({ source: 'resize', gesture: { nodeId: id, before, after: landed }, inner });
+    return { source: 'resize', gesture: { nodeId: id, before, after: landed }, inner };
+  }
+
+  async function resizeTile(id: string, before: TileBox, after: TileBox) {
+    const entry = await resizedEntry(id, before, after);
+    if (entry) {
+      undoStack.push(entry);
+    }
+  }
+
+  async function placeMany(changes: PlacedChange[]) {
+    const plan = planPlaceMany(changes);
+    const landing = plan.turns.map((turn) => ({ turn, landed: turnGroup(turn) }));
+    await Promise.all(landing.map((t) => t.landed));
+    const turned: StackEntry[] = landing.filter((t) => t.landed).map(({ turn }) => ({ source: 'turn', turn }));
+    const gesture = buildMoveGesture(
+      plan.moves.map((m) => ({ nodeId: m.id, after: { x: m.x, y: m.y } })),
+      (nodeId) => {
+        const node = nodes.find((n) => n.id === nodeId);
+        return node ? { x: node.x, y: node.y } : null;
+      }
+    );
+    const placed = Promise.all(plan.moves.map((m) => move(m.id, m.x, m.y)));
+    const sized: ResizeEntry[] = [];
+    for (const r of plan.resizes) {
+      const entry = await resizedEntry(r.id, r.before, r.after);
+      if (entry) {
+        sized.push(entry);
+      }
+    }
+    await placed;
+    const steps = [...turned, ...(gesture ? [{ source: 'move', gesture } as const] : []), ...sized];
+    if (steps.length) {
+      undoStack.push({ source: 'many', steps });
+    }
   }
 
   async function putBox(id: string, box: TileBox) {
@@ -3226,10 +3263,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     })
   );
 
-  function toggleFlag(ids: string[], flag: NodeFlag) {
-    for (const { id, patch } of toggledFlags(nodes, ids, flag)) {
-      void write(id, patch, SaveTiming.Now);
-    }
+  async function toggleFlag(ids: string[], flag: NodeFlag) {
+    const caught = await undoStack.collect(() => Promise.all(toggledFlags(nodes, ids, flag).map(({ id, patch }) => write(id, patch, SaveTiming.Now))));
+    const joined = joinGestures(caught.flatMap((entry) => (entry.source === 'server' ? [entry.gesture] : [])));
+    if (joined) { pushGesture(joined); }
   }
 
   function rectOf(id: string): Rect | null {
@@ -3729,7 +3766,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const copyIds = Object.fromEntries(sources.map((n) => [n.id, crypto.randomUUID()]));
     const copies = sources.map((n) => ({ from: n.id, to: copyIds[n.id] }));
-    const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
+    const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h, displayName: n.displayName })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
     lastDuplicate = offset ? { ids: copies.map((c) => c.to), offset } : null;
     const outcome = optimistic(OptimisticAction.Duplicate, { ids: sources.map((n) => n.id), copies: shown === CopyShown.Now ? copiedNodes(plan) : [], copyIds, offset });
     return { copies, saved: outcome.then((o) => o === OpOutcome.Landed) };
@@ -3756,7 +3793,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     clipboard = {
       freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
-      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy, source: n.id, width: n.w, height: n.h })),
+      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy, source: n.id, width: n.w, height: n.h, displayName: n.displayName })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
         .map((e) => ({
@@ -3976,7 +4013,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const result = await post('paste', {
-      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy, source: n.source, width: n.width, height: n.height }))),
+      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy, source: n.source, width: n.width, height: n.height, displayName: n.displayName }))),
       edges: JSON.stringify(clipboard.edges)
     });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
@@ -4148,37 +4185,28 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     [Way.Forward]: (step) => step.forward()
   };
 
-  async function reverseAll(entries: readonly StackEntry[], way: Way): Promise<StackEntry> {
-    const order = way === Way.Back ? [...entries].reverse() : entries;
-    const done: StackEntry[] = [];
-    for (const entry of order) {
-      const again = await reverse(entry, way);
-      if (again) {
-        done.push(again);
-      }
-    }
-    return { source: 'batch', entries: way === Way.Back ? done.reverse() : done };
-  }
-
   function batch(run: () => void) {
-    void undoStack.collect(async () => run()).then((entries) => entries.length && undoStack.push({ source: 'batch', entries }));
+    void undoStack.collect(async () => run()).then((entries) => entries.length && undoStack.push({ source: 'many', steps: entries }));
   }
 
   async function reverse(entry: StackEntry, way: Way): Promise<StackEntry | null> {
     let out: StackEntry | null = null;
-    if (entry.source === 'batch') {
-      return reverseAll(entry.entries, way);
-    }
     if (entry.source === 'frame') {
       STEP[way](entry.step);
       return entry;
     }
     if (entry.source === 'turn') {
       const back = undoTurn(entry.turn);
-      return turnGroup(back) ? { source: 'turn', turn: back } : null;
+      const landed = turnGroup(back);
+      await landed;
+      return landed ? { source: 'turn', turn: back } : null;
     }
     if (entry.source === 'resize') {
       return reverseResize(entry, way);
+    }
+    if (entry.source === 'many') {
+      const steps = await reverseEach(entry.steps, (step) => reverse(step, way));
+      return steps.length ? { source: 'many', steps } : null;
     }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => (out = { source: 'move', gesture: redo }));
@@ -4255,9 +4283,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if peers.length || canvasPeers.length || presenting}
     {@const onspotlight = isOff(LocalOff.Present) || !presentControlsShown({ others: peers.length, presenting }) ? undefined : spotlight}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></Portal>
+      <Portal to={topPeers}><div class="crowd"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /><AgentAvatars agents={canvasAgents} /></div></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></div>
+      <div class="peers crowd"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /><AgentAvatars agents={canvasAgents} /></div>
     {/if}
   {/if}
   {#if presenting}
@@ -4381,6 +4409,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onMoveEnd={moveEnd}
     onResize={resize}
     onResizeEnd={resizeTile}
+    onPlaceMany={placeMany}
     onPlace={storeSize}
     onSettle={settleHost}
     onRename={renameNode}
@@ -4986,6 +5015,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   .presenting { position: absolute; z-index: 10; left: 50%; top: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 12px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 9999px; font-size: 13px; }
   .presenting button { border: 0; background: var(--ui-accent, #0090ff); color: white; border-radius: 9999px; padding: 2px 10px; cursor: pointer; }
   .peers { position: absolute; z-index: 10; right: 16px; top: 16px; }
+  .crowd { display: flex; align-items: center; }
 
   .save-status {
     position: absolute;
