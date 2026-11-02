@@ -7,13 +7,18 @@ export type UndoStack<T> = {
   pushUndo: (entry: T) => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
+  muted: <R>(run: () => Promise<R>) => Promise<R>;
 };
 
 export function createUndoStack<T>(): UndoStack<T> {
   const undo: Promise<T | null>[] = [];
   const redo: T[] = [];
+  let silent = 0;
 
   function pushPending(landing: Promise<T | null>) {
+    if (silent) {
+      return;
+    }
     undo.push(landing.catch(() => null));
     redo.length = 0;
   }
@@ -36,6 +41,14 @@ export function createUndoStack<T>(): UndoStack<T> {
     pushRedo: (entry: T) => redo.push(entry),
     pushUndo: (entry: T) => undo.push(Promise.resolve(entry)),
     canUndo: () => undo.length > 0,
-    canRedo: () => redo.length > 0
+    canRedo: () => redo.length > 0,
+    muted: async (run) => {
+      silent += 1;
+      try {
+        return await run();
+      } finally {
+        silent -= 1;
+      }
+    }
   };
 }

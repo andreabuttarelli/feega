@@ -285,6 +285,8 @@ export function frameDefaultSize(data: Record<string, unknown>, type: DocNodeTyp
   return DEFAULT_SIZE[node.kind](node);
 }
 
+export const frameMinSize = (): { w: number; h: number } => ELEMENT_MIN_SIZE;
+
 const OPENING_SELECTION: Record<FrameKind, (clipIds: string[]) => string[]> = {
   [FrameKind.Frame]: () => [],
   [FrameKind.Element]: (clipIds) => clipIds,

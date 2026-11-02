@@ -4,7 +4,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { deleteConnection, deleteNode, findNode, listConnections, listNodes, renameNode, resizeNode, writeNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { runsOf } from '$lib/server/canvas/generate';
-import { nodeSize } from '$lib/canvas/node-size';
+import { minNodeSize } from '$lib/canvas/node-size';
 import { cleanNodeName } from '$lib/canvas/node-name';
 import { docData } from '$lib/canvas-node-data';
 import { mintShareToken } from '$lib/canvas/doc-node';
@@ -36,7 +36,7 @@ export async function resizeOnCanvas(db: Db, input: CanvasScope & { nodeId: stri
     return false;
   }
 
-  const min = nodeSize(existing.type, existing.data);
+  const min = minNodeSize(existing.type, existing.data);
   await resizeNode(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,

@@ -1050,13 +1050,6 @@ export const actions: Actions<CanvasParams> = {
     return { moved: true };
   },
 
-  /**
-   * RIDIMENSIONARE: STESSA DOTTRINA DI `move` — last-write-wins, nessun `canvas_events` (il
-   * commento in cima a `canvas.ts` lo dice esplicitamente), una scrittura sola a fine gesto, non
-   * per fotogramma. Il minimo non è un numero a caso qui: è quello del TIPO del nodo
-   * (`nodeSize`), lo stesso che decide la misura di un nodo appena creato — un nodo non può
-   * restringersi sotto la taglia in cui nasce.
-   */
   resize: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();

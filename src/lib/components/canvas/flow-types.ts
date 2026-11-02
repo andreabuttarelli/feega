@@ -32,6 +32,8 @@ import type { Stack } from '$lib/canvas/stacking';
 import type { DeleteMode } from '$lib/canvas/section';
 import type { SceneDrop } from '$lib/canvas/scene-drop';
 
+export type TileBox = { x: number; y: number; w: number; h: number };
+
 export type Tile = {
   id: string;
   x: number;
@@ -174,6 +176,7 @@ export type FlowProps = {
     },
   ) => void;
   onResize?: (id: string, w: number, h: number) => void;
+  onResizeEnd?: (id: string, before: TileBox, after: TileBox) => void;
   onPlace?: (id: string, w: number, h: number) => void;
   peers?: CanvasPeer[];
   onPointer?: (at: { x: number; y: number } | null) => void;

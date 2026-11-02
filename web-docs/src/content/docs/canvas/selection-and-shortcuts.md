@@ -73,15 +73,14 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
 | Cmd/Ctrl+C | Copy |
 | Cmd/Ctrl+V | Paste at the centre of the view |
-| Cmd/Ctrl+Z | Undo |
+| Cmd/Ctrl+Z | Undo, resizing included |
 | Shift+Cmd/Ctrl+Z | Redo |
 | Arrows | Move the selection |
 | Arrows + Shift | Move by a longer step |
-| 0 | Fit the whole canvas |
 | Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
 | + / = | Zoom in |
 | - | Zoom out |
-| 1, 2, 3... | Add the node type at that position of the bar |
+| 1 to 9, 0 | Opacity of the selection: 10 to 90%, 0 for 100% |
 
 None fire while typing in a text field, except Esc, which always closes an open menu or overlay. Deleting asks no confirmation.
 

@@ -1,7 +1,6 @@
 import { isTypingTarget } from '$lib/shortcuts';
-import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { Command, SHORTCUTS, commandFor } from '$lib/motion/shortcuts';
+import { Command, OPACITY_KEYS, SHORTCUTS, commandFor } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 import { EditMode } from '$lib/motion/edit-mode';
@@ -13,7 +12,7 @@ export type CanvasCommandId =
   | 'delete'
   | 'deselect'
   | 'select-all'
-  | 'add'
+  | 'opacity'
   | 'fit'
   | 'zoom-actual'
   | 'zoom-selection'
@@ -46,12 +45,12 @@ export type CanvasCommandId =
   | 'view';
 
 export type CanvasCommand =
-  | { id: 'add'; what: Addable }
+  | { id: 'opacity'; opacity: number }
   | { id: 'nudge'; dx: number; dy: number }
   | { id: 'tool'; tool: DrawTool }
   | { id: 'align'; edge: Edge }
   | { id: 'view'; view: FrameView }
-  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align' | 'view'> };
+  | { id: Exclude<CanvasCommandId, 'opacity' | 'nudge' | 'tool' | 'align' | 'view'> };
 
 const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolSelect]: DrawTool.Select,
@@ -168,10 +167,6 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
 
 const PASTE_MOD_KEYS:Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
 
-export function addableOf(c: CanvasCommand): Addable | null {
-  return c.id === 'add' ? c.what : null;
-}
-
 export function nudgeOf(c: CanvasCommand): { dx: number; dy: number } | null {
   return c.id === 'nudge' ? { dx: c.dx, dy: c.dy } : null;
 }
@@ -184,6 +179,8 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 };
 
 const ZOOM_IN_KEYS = ['+', '='];
+
+const OPACITY_OF_KEY = new Map<string, number>(OPACITY_KEYS.map((o) => [o.key, o.opacity]));
 
 const HELP_KEY = '?';
 const COMMENT_KEY = 'c';
@@ -268,14 +265,11 @@ export function matchCanvasShortcut(e: KeyboardEvent, mode: EditMode = EditMode.
 
   const shiftZoom = e.shiftKey ? SHIFT_DIGIT_ZOOM[e.code] : undefined;
   if (shiftZoom) return { id: shiftZoom };
-  if (key === '0') return { id: 'fit' };
   if (ZOOM_IN_KEYS.includes(key)) return { id: 'zoom-in' };
   if (key === '-') return { id: 'zoom-out' };
 
-  const slot = Number(key);
-  if (Number.isInteger(slot) && slot >= 1 && slot <= CANVAS_ADD_BAR.length) {
-    return { id: 'add', what: CANVAS_ADD_BAR[slot - 1] };
-  }
+  const opacity = e.shiftKey ? undefined : OPACITY_OF_KEY.get(key);
+  if (opacity !== undefined) return { id: 'opacity', opacity };
 
   return null;
 }
@@ -291,11 +285,7 @@ export function preventable(c: CanvasCommand): boolean {
 export type CanvasShortcutRow = { id: CanvasCommandId; keys: string[]; label: string };
 
 export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
-  ...CANVAS_ADD_BAR.map((what, i) => ({
-    id: 'add' as const,
-    keys: [String(i + 1)],
-    label: `Add: ${ADDABLE_LABEL[what]}`
-  })),
+  { id: 'opacity', keys: ['1…9', '0'], label: 'Opacity: 1 to 9 = 10 to 90%, 0 = 100%' },
   { id: 'delete', keys: ['⌫'], label: 'Delete selection' },
   { id: 'select-all', keys: ['mod', 'A'], label: 'Select all' },
   { id: 'deselect', keys: ['Esc'], label: 'Deselect' },
@@ -322,7 +312,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'delete-keep', keys: ['mod', '⌫'], label: 'Delete a section, keep what is in it' },
   { id: 'view', keys: ["⇧'", '⇧G', 'mod Y'], label: 'Pixel grid, layout guides, outline view' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
-  { id: 'fit', keys: ['0', '⇧1'], label: 'Zoom to fit' },
+  { id: 'fit', keys: ['⇧1'], label: 'Zoom to fit' },
   { id: 'zoom-actual', keys: ['⇧0'], label: 'Zoom to 100%' },
   { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
   { id: 'zoom-in', keys: ['+'], label: 'Zoom in' },
@@ -334,14 +324,13 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
 export type CanvasGuideRow = { id: string; name: string; keys: string; gesture: string };
 
 enum GuideGroup {
-  Add = 'Add',
   Select = 'Select',
   Edit = 'Edit',
   View = 'View'
 }
 
 const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
-  add: GuideGroup.Add,
+  opacity: GuideGroup.Edit,
   delete: GuideGroup.Edit,
   'select-all': GuideGroup.Select,
   deselect: GuideGroup.Select,
