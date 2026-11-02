@@ -88,6 +88,23 @@ describe('the stroke stack in Properties', () => {
     expect(sent(onchange)).toHaveLength(3);
   });
 
+  it('a new stroke is 1 px wide, whatever the frame size', () => {
+    const onchange = show(TWO);
+    click(byId('stroke-add'));
+    expect(sent(onchange)[2].width * SHORT).toBeCloseTo(1);
+  });
+
+  it('the editor carries the width and labels dash and gap in px', () => {
+    const onchange = show(TWO);
+    click(rows()[1]);
+    const editor = byId('stroke-editor');
+    expect(editor.textContent).toContain('Width');
+    expect(editor.textContent).toContain('Dash length');
+    expect(editor.textContent).toContain('Dash gap');
+    change(byId<HTMLInputElement>('stroke-editor-width'), '3');
+    expect(sent(onchange)[0].width).toBe(0.003);
+  });
+
   it('− removes it, the eye hides it', () => {
     const onchange = show(TWO);
     click(inRow(0, 'stroke-remove'));

@@ -37,10 +37,10 @@ describe('a shape drawn over the canvas lands in canvas units', () => {
     expect(drawnOnCanvas(clip, HOST, ZOOM_TWO, CanvasTheme.Dark)).toMatchObject({ tool: DrawTool.Text, theme: CanvasTheme.Dark });
   });
 
-  it('a pen path is written in canvas units', () => {
+  it('a pen path is written in canvas units, stroked in ink with no fill like any pen', () => {
     const clip = { component: 'Shape', props: { shape: 'path', path: 'M 0 0 L 1 1', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } };
 
-    expect(drawnOnCanvas(clip, HOST, ZOOM_TWO)).toEqual({ tool: DrawTool.Pen, path: pathData(parsePath('M 200 112.5 L 300 137.5') as Outline) });
+    expect(drawnOnCanvas(clip, HOST, ZOOM_TWO)).toEqual({ tool: DrawTool.Pen, path: pathData(parsePath('M 200 112.5 L 300 137.5') as Outline), fill: null, stroke: CANVAS_INK[CanvasTheme.Light] });
   });
 
   it('a polygon and a star keep their tool', () => {

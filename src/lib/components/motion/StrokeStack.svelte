@@ -54,7 +54,7 @@
   const toggle = (i: number) => (open = open === i ? null : i);
 
   function add() {
-    onchange(addStroke(strokes), 'Add stroke');
+    onchange(addStroke(strokes, short), 'Add stroke');
     open = strokes.length;
   }
 
@@ -166,6 +166,7 @@
             <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="stroke-angle" value={stroke.paint.angle} onchange={(e) => repaint(index, { angle: Number(e.currentTarget.value) }, 'Stroke gradient angle')} /></label>
           {/if}
         {/if}
+        <label class={FIELD_ROW}><span class={LABEL}>Width</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="0.5" data-testid="stroke-editor-width" aria-label="Width px" value={toPx(stroke.width)} onchange={(e) => patch(index, { width: fromPx(e) }, 'Stroke width')} /></label>
         <label class={FIELD_ROW}
           ><span class={LABEL}>Position</span>
           <select class={cn(FIELD_INPUT, 'w-28')} data-testid="stroke-align" value={stroke.align} onchange={(e) => patch(index, { align: e.currentTarget.value }, 'Stroke position')}>
@@ -173,8 +174,8 @@
           </select>
         </label>
         <label class={FIELD_ROW}><span class={LABEL}>Dashes</span><input class={cn(FIELD_INPUT, 'w-28')} type="text" placeholder="10, 5, 2, 5" data-testid="stroke-pattern" value={(stroke.pattern ?? []).map(toPx).join(', ')} onchange={(e) => patch(index, { pattern: patternPx(e.currentTarget.value).map((n) => n / short) }, 'Stroke dash pattern')} /></label>
-        <label class={FIELD_ROW}><span class={LABEL}>Dash</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-dash" value={toPx(stroke.dash)} onchange={(e) => patch(index, { dash: fromPx(e) }, 'Stroke dash')} /></label>
-        <label class={FIELD_ROW}><span class={LABEL}>Gap</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-gap" value={toPx(stroke.gap)} onchange={(e) => patch(index, { gap: fromPx(e) }, 'Stroke gap')} /></label>
+        <label class={FIELD_ROW}><span class={LABEL}>Dash length</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-dash" value={toPx(stroke.dash)} onchange={(e) => patch(index, { dash: fromPx(e) }, 'Stroke dash')} /></label>
+        <label class={FIELD_ROW}><span class={LABEL}>Dash gap</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-gap" value={toPx(stroke.gap)} onchange={(e) => patch(index, { gap: fromPx(e) }, 'Stroke gap')} /></label>
         <label class={FIELD_ROW}
           ><span class={LABEL}>Cap</span>
           <select class={cn(FIELD_INPUT, 'w-28')} data-testid="stroke-cap" value={stroke.cap} onchange={(e) => patch(index, { cap: e.currentTarget.value }, 'Stroke cap')}>

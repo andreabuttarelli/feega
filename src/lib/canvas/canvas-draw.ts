@@ -24,10 +24,8 @@ const SOLID = 'solid';
 const NO_FILL = 'none';
 
 function strokedPaint(props: Record<string, unknown>, theme: CanvasTheme): PenPaint {
-  if (props.strokeKind !== SOLID) {
-    return {};
-  }
-  return { fill: props.fillKind === NO_FILL ? null : CANVAS_INK[theme], stroke: CANVAS_INK[theme] };
+  const filled = props.strokeKind === SOLID && props.fillKind !== NO_FILL;
+  return { fill: filled ? CANVAS_INK[theme] : null, stroke: CANVAS_INK[theme] };
 }
 
 const num = (value: unknown) => (typeof value === 'number' ? value : 0);
