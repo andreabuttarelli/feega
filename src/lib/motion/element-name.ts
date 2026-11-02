@@ -3,6 +3,7 @@ import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { LAYOUT_KIND_LABEL, layoutKind } from '@feega/motion-core/motion/layout/stack';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import { CUSTOM_CLIP, componentLabel } from '@feega/motion-core/motion/poster-parts';
+import { ComponentRole } from './main-component';
 
 const SHAPE_NAME: Partial<Record<string, string>> = {
   [ShapeKind.Rect]: 'Box',
@@ -49,13 +50,18 @@ export function layerLabel(clip: Layer, comps: Comps): string {
   return compNamed(clip, comps)?.name ?? (clip.name || own);
 }
 
-export function layerKind(clip: Named, comps: Comps): string {
+const ROLE_KIND: Record<ComponentRole, (main: string) => string> = {
+  [ComponentRole.Main]: () => 'Main component',
+  [ComponentRole.Instance]: (main) => `Instance of ${main}`
+};
+
+export function layerKind(clip: Named, comps: Comps, role = ComponentRole.Instance): string {
   if (clip.component === CUSTOM_CLIP) {
     return CUSTOM_KIND;
   }
   const comp = compNamed(clip, comps);
   if (comp?.component) {
-    return `Instance of ${comp.name}`;
+    return ROLE_KIND[role](comp.name);
   }
   return elementKind(clip);
 }

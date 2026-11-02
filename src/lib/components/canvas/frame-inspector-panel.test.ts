@@ -38,6 +38,31 @@ describe('the rotation of a free element', () => {
 
 const html = (selection: string[], part: string | null = null) => render(FrameInspectorPanel, { props: { session: sessionOf(selection), tokens: FEEGA_TOKENS, part } }).body;
 
+describe('the frame itself', () => {
+  it('places the frame with X and Y and heads the panel with its name', () => {
+    frameProperties.place = { x: 120, y: 40, set: () => undefined };
+    frameProperties.name = 'Hero';
+    const body = html([]);
+    frameProperties.clear();
+
+    expect(body).toMatch(/aria-label="Frame X"[^>]*value="120"|value="120"[^>]*aria-label="Frame X"/);
+    expect(body).toContain('aria-label="Frame Y"');
+    expect(body).not.toContain('aria-label="Frame rotation"');
+    expect(body).toMatch(/data-testid="layer-name"[^>]*value="Hero"|value="Hero"[^>]*data-testid="layer-name"/);
+  });
+});
+
+describe('a free group or image', () => {
+  it('turns from the panel with the node rotation', () => {
+    frameProperties.place = { x: 0, y: 0, set: () => undefined };
+    frameProperties.turn = { clipId: 'a', degrees: 30, set: () => undefined };
+    const body = html([]);
+    frameProperties.clear();
+
+    expect(body).toMatch(/aria-label="Frame rotation"[^>]*value="30"|value="30"[^>]*aria-label="Frame rotation"/);
+  });
+});
+
 describe('frame inspector panel', () => {
   it('lists the frame "…" entries in the right bar', () => {
     frameProperties.runAction = () => undefined;

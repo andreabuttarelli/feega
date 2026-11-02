@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { elementKind, elementName, layerKind, layerLabel } from './element-name';
+import { ComponentRole } from './main-component';
 
 describe('what a graphic element is called', () => {
   it('names shapes by what they draw, and the rest by their component', () => {
@@ -45,6 +46,11 @@ describe('one name for a layer, in Layers and in Properties', () => {
     expect(layerLabel({ component: 'Shape', props: { shape: 'rect' } }, comps)).toBe('Box');
   });
 
+  it('a group is called a Group, in Layers and in its header', () => {
+    expect(layerLabel({ component: 'Shape', group: true, props: { shape: 'rect' } }, comps)).toBe('Group');
+    expect(layerKind({ component: 'Shape', group: true, props: { shape: 'rect' } }, comps)).toBe('Group');
+  });
+
   it('an instance by its main component', () => {
     expect(layerLabel({ component: 'Precomp', props: { comp: 'main' } }, comps)).toBe('Button');
   });
@@ -52,6 +58,7 @@ describe('one name for a layer, in Layers and in Properties', () => {
   it('the kind under the name says what an instance is an instance of', () => {
     expect(layerKind({ component: 'Precomp', props: { comp: 'main' } }, comps)).toBe('Instance of Button');
     expect(layerKind({ component: 'Precomp', props: { comp: 'plain' } }, comps)).toBe('Precomp');
+    expect(layerKind({ component: 'Precomp', props: { comp: 'main' } }, comps, ComponentRole.Main)).toBe('Main component');
     expect(layerKind({ component: 'Shape', props: { shape: 'rect' } }, comps)).toBe('Shape');
   });
 });

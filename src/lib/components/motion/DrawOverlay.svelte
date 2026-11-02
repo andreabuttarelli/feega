@@ -14,12 +14,14 @@
     doc,
     frame,
     tool,
+    textClick = null,
     onchange,
     oncreated
   }: {
     doc: MotionDoc;
     frame: number;
     tool: DrawTool;
+    textClick?: { width: number; height: number } | null;
     onchange: (result: OpResult, summary: string) => void;
     oncreated: (id: string) => void;
   } = $props();
@@ -128,7 +130,7 @@
       return;
     }
     const dragged = live && !clickLike(live) ? live : null;
-    const box = dragged ?? (tool === DrawTool.Text ? clickBox(drag.from, { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
+    const box = dragged ?? (tool === DrawTool.Text ? clickBox(drag.from, textClick ? { width: docPx(textClick.width), height: docPx(textClick.height) } : { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
     drag = null;
     if (!box) {
       return;

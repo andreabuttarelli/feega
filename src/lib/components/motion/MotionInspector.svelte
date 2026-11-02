@@ -35,7 +35,7 @@
   import CheckRow from './CheckRow.svelte';
   import BoxFields from './BoxFields.svelte';
   import { layerKind, layerLabel } from '$lib/motion/element-name';
-  import { componentOf } from '$lib/motion/main-component';
+  import { ComponentRole, componentOf, roleOf } from '$lib/motion/main-component';
   import type { NodeTurn } from '$lib/motion/element-turn';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
@@ -148,6 +148,9 @@
     mode = EditMode.Motion,
     as = null,
     turn = null,
+    title = null,
+    here = null,
+    onrename = null,
     onalign
   }: {
     doc: MotionDoc;
@@ -173,6 +176,9 @@
     mode?: EditMode;
     as?: PropertiesView | null;
     turn?: NodeTurn | null;
+    title?: string | null;
+    here?: string | null;
+    onrename?: ((name: string) => void) | null;
     onalign?: (edge: AlignEdge) => void;
   } = $props();
 
@@ -256,8 +262,7 @@
   const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
-  const headTitle = $derived(layerLabel(clip, doc.comps));
-  const headKind = $derived(layerKind(clip, doc.comps));
+  const headTitle = $derived(title ?? layerLabel(clip, doc.comps));
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
@@ -272,6 +277,17 @@
   const pictures = $derived(assets.filter((a) => a.kind === 'image'));
   const resolve = (v: string) => resolveColor(v, tokens);
   const managedSummary = (v: unknown) => `${Array.isArray(v) ? v.length : Object.keys(v ?? {}).length} set`;
+
+  function rename(name: string) {
+    if (!name) {
+      return;
+    }
+    if (onrename) {
+      onrename(name);
+      return;
+    }
+    commit(renameClip(doc, clip.id, name), 'Renamed the layer');
+  }
 
   function commit(result: OpResult, summary: string) {
     if (!result.ok) {
@@ -503,6 +519,8 @@
   const visual = $derived(spec.track === TrackKind.Visual);
 
   const view = $derived(as ?? (focus ? PropertiesView.Part : PropertiesView.Clip));
+  const FRAME_KIND = 'Frame';
+  const headKind = $derived(view === PropertiesView.Frame ? FRAME_KIND : layerKind(clip, doc.comps, roleOf(doc, clip.id, here) ?? ComponentRole.Instance));
   const clipsOwnContent = $derived(!clip.autoLayout && fieldShownFor(family, 'clipContent') && (hasChildren || view === PropertiesView.Frame));
   const layerExtras = $derived(visual && view !== PropertiesView.Frame);
   const has: Record<Section, boolean> = $derived({
@@ -551,7 +569,7 @@
 <div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
-    <input {@attach fieldKeys} class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onchange={(e) => e.currentTarget.value.trim() && commit(renameClip(doc, clip.id, e.currentTarget.value.trim()), 'Renamed the layer')} />
+    <input {@attach fieldKeys} class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onchange={(e) => rename(e.currentTarget.value.trim())} />
     {#if headKind !== headTitle}<span class="kind">{headKind}</span>{/if}
     {@render actions?.()}
   </header>

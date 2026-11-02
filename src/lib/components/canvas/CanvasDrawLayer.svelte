@@ -4,7 +4,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CanvasTheme, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { drawnOnCanvas } from '$lib/canvas/canvas-draw';
+  import { canvasTextClick, drawnOnCanvas } from '$lib/canvas/canvas-draw';
 
   type Point = { x: number; y: number };
   type FrameAt = { box: CanvasBox } | { at: Point };
@@ -47,7 +47,7 @@
 </script>
 
 <div class="canvas-draw" data-testid="canvas-draw" bind:this={host} bind:clientWidth={size.width} bind:clientHeight={size.height} onpointerup={released} role="presentation">
-  <DrawOverlay doc={sheet} frame={0} tool={overlayTool} onchange={(result) => (made = result)} oncreated={created} />
+  <DrawOverlay doc={sheet} frame={0} tool={overlayTool} textClick={canvasTextClick(toFlow)} onchange={(result) => (made = result)} oncreated={created} />
 </div>
 
 <style>

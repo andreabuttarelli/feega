@@ -9,6 +9,8 @@ const BAR_SELECTOR = '[data-testid="right-bar"]';
 export const UNNAMED_FRAME = 'Frame';
 const TEXT_FIELDS = new Set(['TEXTAREA', 'INPUT']);
 
+export type NodePlace = { x: number; y: number; set: (x: number, y: number) => void };
+
 export type OpenFrame = { nodeId: string; selection: string[]; playhead: number; mode: DocMode };
 
 export class FrameProperties {
@@ -21,6 +23,8 @@ export class FrameProperties {
   exportPicks: (() => void) | null = null;
   runAction = $state.raw<((id: SelectionActionId) => void) | null>(null);
   turn = $state.raw<NodeTurn | null>(null);
+  place = $state.raw<NodePlace | null>(null);
+  rename = $state.raw<((name: string) => void) | null>(null);
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
     this.nodeId = nodeId;
@@ -54,6 +58,8 @@ export class FrameProperties {
     this.exportPicks = null;
     this.runAction = null;
     this.turn = null;
+    this.place = null;
+    this.rename = null;
   }
 }
 
