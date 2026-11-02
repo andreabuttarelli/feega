@@ -222,9 +222,13 @@ type Sides = { long: number; short: number };
 const VIDEO_SIDES: Sides = { long: MAX_SIDE, short: MAX_SHORT_SIDE };
 const STILL_SIDES: Sides = { long: DESIGN_MAX_SIDE, short: DESIGN_MAX_SIDE };
 
+const FLOAT_NOISE = 1e6;
+
+const settled = (n: number) => Math.round(n * FLOAT_NOISE) / FLOAT_NOISE;
+
 function elementPixels(box: CanvasBox, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
-  const long = Math.max(box.width, box.height);
-  const short = Math.min(box.width, box.height);
+  const long = settled(Math.max(box.width, box.height));
+  const short = settled(Math.min(box.width, box.height));
   const scale = Math.min(PIXELS_PER_CANVAS_PX, sides.long / long, sides.short / short);
   const shortSide = evenFloor(short * scale);
   const longSide = Math.min(evenSide((long * shortSide) / short), evenSide(long * scale));

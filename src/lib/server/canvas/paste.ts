@@ -5,7 +5,7 @@ import { validateNodeData } from '$lib/canvas/node-data';
 import { docNodeCopy, holdsDoc } from '$lib/canvas/motion-node';
 import { copyHead } from '$lib/server/repos/motion-revisions';
 
-export type PastedNode = { type: string; data: Record<string, unknown>; x: number; y: number; source?: string; width?: number; height?: number };
+export type PastedNode = { type: string; data: Record<string, unknown>; x: number; y: number; source?: string; width?: number; height?: number; displayName?: string | null };
 
 const landed = (p: PastedNode): PastedNode => (holdsDoc(p.type) ? docNodeCopy(p) : { ...p, width: undefined, height: undefined });
 
@@ -37,6 +37,7 @@ export async function pasteNodes(
         data: verdict.data,
         width: p.width,
         height: p.height,
+        displayName: p.displayName,
         actor: input.actor
       })
     );

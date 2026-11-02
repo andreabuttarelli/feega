@@ -20,6 +20,20 @@ describe('duplicare una selezione', () => {
     expect(insert?.payload).toMatchObject({ type: 'text', data: { prompt: 'ciao' } });
   });
 
+  it('a copy keeps the name of its source', async () => {
+    const fake = fakeDb({
+      nodes: [
+        { id: 'a', canvas_id: 'canvas', project_id: 'project', type: 'image', display_name: 'beach.jpg', x: 10, y: 20, z: 0, width: 300, height: 200, data: {}, version: 1 }
+      ],
+      nodes_connections: []
+    });
+
+    await duplicateNodes(fake.db, { ...scope, nodeIds: ['a'], actor: { kind: 'user', id: 'user' } });
+
+    const insert = fake.calls.find((c) => c.table === 'nodes' && c.op === 'insert');
+    expect(insert?.payload).toMatchObject({ display_name: 'beach.jpg' });
+  });
+
   it('sposta ogni copia del passo dato, non la lascia sopra l’originale', async () => {
     const fake = fakeDb({
       nodes: [

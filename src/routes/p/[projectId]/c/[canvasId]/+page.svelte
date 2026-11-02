@@ -3703,7 +3703,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const copyIds = Object.fromEntries(sources.map((n) => [n.id, crypto.randomUUID()]));
     const copies = sources.map((n) => ({ from: n.id, to: copyIds[n.id] }));
-    const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
+    const plan = copyPlan({ ids: sources.map((n) => n.id), nodes: sources.map((n) => ({ id: n.id, type: n.type, data: n.data, x: n.x, y: n.y, width: n.w, height: n.userHeight ?? n.h, displayName: n.displayName })), edges: [], offset: offset ?? DUPLICATE_OFFSET, copyIds });
     lastDuplicate = offset ? { ids: copies.map((c) => c.to), offset } : null;
     const outcome = optimistic(OptimisticAction.Duplicate, { ids: sources.map((n) => n.id), copies: shown === CopyShown.Now ? copiedNodes(plan) : [], copyIds, offset });
     return { copies, saved: outcome.then((o) => o === OpOutcome.Landed) };
@@ -3730,7 +3730,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
     clipboard = {
       freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
-      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy, source: n.id, width: n.w, height: n.h })),
+      nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy, source: n.id, width: n.w, height: n.h, displayName: n.displayName })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
         .map((e) => ({
@@ -3950,7 +3950,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
 
     const result = await post('paste', {
-      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy, source: n.source, width: n.width, height: n.height }))),
+      nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy, source: n.source, width: n.width, height: n.height, displayName: n.displayName }))),
       edges: JSON.stringify(clipboard.edges)
     });
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
