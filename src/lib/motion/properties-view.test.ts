@@ -149,7 +149,7 @@ describe('Design mode keeps time and motion out of Properties', () => {
 });
 
 describe('which fields a layer shows', () => {
-  const leaf = { mode: EditMode.Motion, shape: ShapeKind.Rect, morphTargets: 1 };
+  const leaf = { mode: EditMode.Motion, shape: ShapeKind.Rect, morphTargets: 1, instance: false };
 
   it('morph only in Motion and only when the shape has targets to morph into', () => {
     expect(fieldShown('morph', leaf)).toBe(true);
@@ -161,6 +161,11 @@ describe('which fields a layer shows', () => {
   it('fill rule only on a free path', () => {
     expect(fieldShown('fillRule', { ...leaf, shape: ShapeKind.Rect })).toBe(false);
     expect(fieldShown('fillRule', { ...leaf, shape: ShapeKind.Path })).toBe(true);
+  });
+
+  it('an instance swaps its main component in the instance panel, not in a Composition select', () => {
+    expect(fieldShown('comp', { ...leaf, shape: null, instance: true })).toBe(false);
+    expect(fieldShown('comp', { ...leaf, shape: null })).toBe(true);
   });
 
   it('any other field is always shown', () => {

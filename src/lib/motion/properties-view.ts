@@ -77,14 +77,15 @@ export const positionShown = (placement: Placement): boolean => PLACEMENT[placem
 
 export const sizeShown = (placement: Placement): boolean => PLACEMENT[placement].size;
 
-export type FieldContext = { mode: EditMode; shape: ShapeKind | null; morphTargets: number };
+export type FieldContext = { mode: EditMode; shape: ShapeKind | null; morphTargets: number; instance: boolean };
 
 const morphing = (c: FieldContext) => c.mode === EditMode.Motion && c.morphTargets > 0;
 
 const FIELD_SHOWN: Record<string, (c: FieldContext) => boolean> = {
   morph: morphing,
   morphStart: morphing,
-  fillRule: (c) => c.shape === ShapeKind.Path
+  fillRule: (c) => c.shape === ShapeKind.Path,
+  comp: (c) => !c.instance
 };
 
 export const fieldShown = (key: string, context: FieldContext): boolean => FIELD_SHOWN[key]?.(context) ?? true;

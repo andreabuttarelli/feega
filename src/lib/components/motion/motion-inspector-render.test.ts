@@ -192,6 +192,16 @@ describe('Properties for one clip', () => {
   });
 });
 
+describe('a layer placed by its transform', () => {
+  it('gets X, Y, W and H from its box when it has no own position, like an instance', () => {
+    expect(inspect('Adjustment', EditMode.Design)).toContain('data-testid="box-fields"');
+  });
+
+  it('a layer with its own position keeps the usual Layout fields', () => {
+    expect(inspect('Shape', EditMode.Design)).not.toContain('data-testid="box-fields"');
+  });
+});
+
 describe('Properties for several clips', () => {
   it('shows a shared value as it is and a differing one as Mixed', () => {
     let doc = withClip('Shape', 'b', withClip('Title', 'a'));
@@ -203,5 +213,41 @@ describe('Properties for several clips', () => {
     expect(html).toContain('2 layers');
     expect(html).toMatch(/aria-label="Opacity"[^>]*placeholder="Mixed"/);
     expect(html).toMatch(/aria-label="Rotate Z"[^>]*value="0"/);
+  });
+
+  const several = () => {
+    let doc = withClip('Shape', 'b', withClip('Shape', 'a'));
+    const moved = addClip(doc, { component: 'Shape', from: 0, props: { x: 0.8, y: 0.2, width: 0.1, height: 0.1 } }, 'c');
+    doc = moved.ok ? moved.doc : doc;
+    return doc;
+  };
+
+  it('places the selection with X, Y, W and H, Mixed where the layers differ', () => {
+    const html = render(MultiInspector, { props: { doc: several(), ids: ['a', 'c'], frame: 0, onchange: () => {} } }).body;
+
+    for (const name of ['X', 'Y', 'Width', 'Height']) {
+      expect(html).toMatch(new RegExp(`aria-label="${name}"[^>]*placeholder="Mixed"`));
+    }
+  });
+
+  it('never shows offsets, scale or pivot: those are motion, not placement', () => {
+    const html = render(MultiInspector, { props: { doc: several(), ids: ['a', 'b'], frame: 0, onchange: () => {} } }).body;
+
+    for (const name of ['Offset X', 'Offset Y', 'Scale', 'Anchor X', 'Anchor Y']) {
+      expect(html).not.toContain(`aria-label="${name}"`);
+    }
+  });
+
+  it('leaves spacing blank where the layers overlap instead of a negative gap', () => {
+    const html = render(MultiInspector, { props: { doc: several(), ids: ['a', 'b'], frame: 0, onchange: () => {} } }).body;
+
+    expect(html).toMatch(/aria-label="Vertical gap"[^>]*placeholder="Mixed"/);
+  });
+
+  it('reads constraint options as words, not raw values', () => {
+    const html = render(MultiInspector, { props: { doc: several(), ids: ['a', 'b'], frame: 0, onchange: () => {} } }).body;
+
+    expect(html).toContain('>Left</option>');
+    expect(html).not.toContain('>left</option>');
   });
 });

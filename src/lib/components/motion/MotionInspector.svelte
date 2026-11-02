@@ -29,10 +29,13 @@
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
   import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, TextTier, textTier, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, ShapePart, fieldShown as fieldVisible, fieldShownFor, sectionsFor, shapePartShown, sizeShown, transformShown } from '$lib/motion/properties-view';
-  import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
+  import { renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
   import CheckRow from './CheckRow.svelte';
+  import BoxFields from './BoxFields.svelte';
+  import { layerKind, layerLabel } from '$lib/motion/element-name';
+  import { componentOf } from '$lib/motion/main-component';
   import type { NodeTurn } from '$lib/motion/element-turn';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
@@ -57,7 +60,6 @@
   import FamilyIcon from './FamilyIcon.svelte';
   import { CLIP_FAMILIES, clipFamily } from '$lib/motion/track-style';
   import { placeLayer } from '$lib/motion/light-group';
-  import { elementKind } from '$lib/motion/element-name';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
@@ -72,7 +74,6 @@
   import { STROKED, elementStrokes } from '@feega/motion-core/motion/stroke/elements';
   import { addStroke, sidesShown } from '@feega/motion-core/motion/stroke/model';
   import { MarkedField, markedField } from '@feega/motion-core/motion/poster-lines';
-  import { componentLabel } from '@feega/motion-core/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
@@ -220,7 +221,7 @@
 
   const transformKeys = $derived(new Set(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform).map((p) => p.key)));
   const typed = $derived(clipFieldGroups(doc, clip).some((g) => g.fields.some((f) => f.control === Control.Font)) ? Typed.Yes : Typed.No);
-  const fieldContext = $derived({ mode, shape: clip.component === 'Shape' ? (clip.props.shape as ShapeKind) : null, morphTargets: Array.isArray(clip.props.morphs) ? clip.props.morphs.length : 0 });
+  const fieldContext = $derived({ mode, shape: clip.component === 'Shape' ? (clip.props.shape as ShapeKind) : null, morphTargets: Array.isArray(clip.props.morphs) ? clip.props.morphs.length : 0, instance: componentOf(doc, clip) !== null });
   const fields = $derived(
     clipFieldGroups(doc, clip)
       .flatMap((g) => g.fields)
@@ -242,7 +243,8 @@
   const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && transformShown(p.key)));
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
   const positioned = $derived(transformProps.length > 0);
-  const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
+  const ownBox = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number');
+  const pinnable = $derived(positioned && ownBox && !clip.parent);
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));
   const SIZE_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
@@ -254,8 +256,8 @@
   const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
-  const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
-  const headKind = $derived(customName ? 'Component' : elementKind(clip));
+  const headTitle = $derived(layerLabel(clip, doc.comps));
+  const headKind = $derived(layerKind(clip, doc.comps));
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
@@ -866,6 +868,7 @@
 
 {#snippet layoutBody()}
   {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned && !ownBox}<BoxFields {doc} ids={[clip.id]} {frame} {mode} {gesture} {onchange} />{/if}
   {@const sizeFields = clip.autoLayout || !sizeShown(placement) ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
   {@const sizing = textField('sizing')}
   {@const modes = sizing ? axisModes(value(sizing) as TextSizing) : null}

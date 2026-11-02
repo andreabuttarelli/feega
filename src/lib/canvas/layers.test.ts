@@ -70,7 +70,7 @@ describe('layer rows', () => {
       ['m2', LayerKind.Node, 'Frame']
     ]);
     expect(rows.filter((r) => r.nodeId === 'm1' && r.depth > 0).map((r) => [r.id, r.kind])).toEqual([['t1', LayerKind.Clip]]);
-    expect(rows.find((r) => r.id === 't1')).toMatchObject({ depth: 1, label: 'Title' });
+    expect(rows.find((r) => r.id === 't1')).toMatchObject({ depth: 1, label: 'Better marketing' });
     expect(rows.some((r) => r.nodeId === 'm2' && r.depth > 0)).toBe(false);
   });
 
@@ -123,7 +123,7 @@ describe('layer rows', () => {
 
     expect(rows.map((r) => [r.id, r.label, r.type, r.depth])).toEqual([
       ['st', 'Stack', LayoutKind.Stack, 1],
-      ['t', 'Text', 'Text', 2]
+      ['t', 'Hi', 'Text', 2]
     ]);
   });
 
@@ -133,7 +133,7 @@ describe('layer rows', () => {
 
     expect(rows.map((r) => [r.id, r.label, r.type, r.depth])).toEqual([
       ['e1', 'Stack', LayoutKind.Stack, 0],
-      ['t', 'Text', 'Text', 1]
+      ['t', 'Hi', 'Text', 1]
     ]);
   });
 
@@ -321,7 +321,7 @@ describe('layer edits go through the doc operations the editor and the agent alr
     expect(layerRows(NODES, { nodeId: 'm1', doc: named }).find((r) => r.id === 't1')!.label).toBe('Headline');
 
     const cleared = ok(layerEdit(named, 't1', LayerAction.Rename, ' '));
-    expect(layerRows(NODES, { nodeId: 'm1', doc: cleared }).find((r) => r.id === 't1')!.label).toBe('Title');
+    expect(layerRows(NODES, { nodeId: 'm1', doc: cleared }).find((r) => r.id === 't1')!.label).toBe('Better marketing');
   });
 
   it('refuses what the model has no place for', () => {
@@ -433,7 +433,7 @@ describe('a frame lists elements, not timeline tracks', () => {
       ['b', LayerKind.Clip, 2],
       ['c', LayerKind.Clip, 1]
     ]);
-    expect(rows.find((r) => r.id === 'v2')!.label).toBe('Title');
+    expect(rows.find((r) => r.id === 'v2')!.label).toBe('Better marketing');
   });
 
   it('a group keeps a name its owner gave the track, and falls back to its place when unnamed', () => {
