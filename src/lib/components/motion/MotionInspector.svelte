@@ -67,7 +67,7 @@
   import FillStack from './FillStack.svelte';
   import { cropRequest } from '$lib/canvas/crop-request.svelte';
   import { FILLED, elementFills } from '@feega/motion-core/motion/fill/elements';
-  import { FILL_LABEL, FILL_TYPES, addFill, type Fill } from '@feega/motion-core/motion/fill/model';
+  import { FILL_LABEL, FILL_TYPES, FillHolder, addFill, type Fill } from '@feega/motion-core/motion/fill/model';
   import { applyFillKeys, fillOfKey, splitFillEdit } from '@feega/motion-core/motion/fill/keys';
   import { Adder } from './stack-adder';
   import StrokeStack from './StrokeStack.svelte';
@@ -97,10 +97,10 @@
   import { withParams } from '@feega/motion-core/motion/custom/params';
   import type { CustomSource } from '@feega/motion-core/motion/custom/component';
   import { expressionToKeys, setExpression } from '@feega/motion-core/motion/expression/ops';
-  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, editedParams, type EffectKind } from '@feega/motion-core/motion/effects/registry';
+  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, EFFECT_SEED, editedParams, isFlag, type EffectKind } from '@feega/motion-core/motion/effects/registry';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
-  import { effectKey } from '@feega/motion-core/motion/effects/model';
+  import { effectKey, effectOfKey } from '@feega/motion-core/motion/effects/model';
   import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
   import { addModifier, morphHere, morphToClip, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
   import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
@@ -382,8 +382,8 @@
   let draggedEffect = $state<string | null>(null);
   const effectParams = (effectId: string) => animated.params.filter((p) => p.source === Source.Effect && p.key.startsWith(`${effectKey(effectId, '')}`));
   const alphaKeyOf = (effect: { id: string; kind: EffectKind }) => (EFFECT_ALPHA[effect.kind] ? effectKey(effect.id, EFFECT_ALPHA[effect.kind]!.alpha) : null);
-  const effectRows = (effect: { id: string; kind: EffectKind }) => {
-    const edited = new Set(editedParams(effect.kind).map((p) => effectKey(effect.id, p.key)));
+  const effectRows = (effect: { id: string; kind: EffectKind; params: Record<string, number | string> }) => {
+    const edited = new Set(editedParams(effect.kind, effect.params).map((p) => effectKey(effect.id, p.key)));
     return effectParams(effect.id).filter((p) => edited.has(p.key));
   };
   let openEffect = $state<string | null>(null);
@@ -392,7 +392,7 @@
 
   const animatorRows = (id: string) => animated.params.filter((p) => p.source === Source.Animator && p.key.startsWith(animatorKey(id, '')));
 
-  const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
+  const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8), EFFECT_SEED[kind]), `Added ${EFFECTS[kind].label.toLowerCase()}`);
 
   const shapeModifiers = $derived(clip.component === 'Shape' ? ((clip.props.modifiers as Modifier[]) ?? []) : []);
   const shapeMorphs = $derived(clip.component === 'Shape' ? ((clip.props.morphs as string[]) ?? []) : []);
@@ -1101,7 +1101,7 @@
       {/snippet}
     </MenuTrigger>
     <MenuContent align="end">
-      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type) }), 'Add fill')} />{/each}
+      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type, clip.autoLayout || hasChildren ? FillHolder.Container : FillHolder.Layer) }), 'Add fill')} />{/each}
     </MenuContent>
   </Menu>
 {/snippet}
@@ -1116,7 +1116,7 @@
 
 
 {#snippet addStrokeButton()}
-  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props)) }), 'Add stroke')}><Plus /></ShellIconButton>
+  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props), Math.min(doc.width, doc.height)) }), 'Add stroke')}><Plus /></ShellIconButton>
 {/snippet}
 
 {#snippet addEffectMenu()}
@@ -1154,6 +1154,8 @@
                     <div class="control"><ColorField {gesture} {palette} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
                   </div>
+                {:else if isFlag(effect.kind, effectOfKey(prop.key)?.param ?? '')}
+                  <div data-prop={prop.key}><CheckRow label={afterDot(prop)} checked={Number(shown(prop.key)) === 1} testid="effect-flag" onchange={(on) => animate(prop.key, on ? 1 : 0)} /></div>
                 {:else}
                   {@render animList([prop], afterDot)}
                 {/if}

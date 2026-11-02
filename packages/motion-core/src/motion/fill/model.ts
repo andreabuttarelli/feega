@@ -243,7 +243,14 @@ const FRESH: Record<FillType, (color: string) => unknown> = {
 
 export const newFill = (type: FillType, color = DEFAULT_COLOR): Fill => fillSchema.parse(FRESH[type](color));
 
-export const addFill = (fills: readonly Fill[], type: FillType): Fill[] => [...fills, newFill(type)].slice(0, MAX_FILLS);
+export enum FillHolder {
+  Layer = 'layer',
+  Container = 'container'
+}
+
+const NEW_FILL_COLOUR: Record<FillHolder, string> = { [FillHolder.Layer]: DEFAULT_COLOR, [FillHolder.Container]: '#ffffff' };
+
+export const addFill = (fills: readonly Fill[], type: FillType, holder = FillHolder.Layer): Fill[] => [...fills, newFill(type, NEW_FILL_COLOUR[holder])].slice(0, MAX_FILLS);
 
 export const removeFill = (fills: readonly Fill[], i: number): Fill[] => fills.filter((_, at) => at !== i);
 
