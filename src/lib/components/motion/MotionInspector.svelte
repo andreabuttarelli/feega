@@ -31,6 +31,7 @@
   import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
+  import type { NodeTurn } from '$lib/motion/element-turn';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
@@ -141,6 +142,7 @@
     actions,
     mode = EditMode.Motion,
     as = null,
+    turn = null,
     onalign
   }: {
     doc: MotionDoc;
@@ -165,6 +167,7 @@
     actions?: Snippet;
     mode?: EditMode;
     as?: PropertiesView | null;
+    turn?: NodeTurn | null;
     onalign?: (edge: AlignEdge) => void;
   } = $props();
 
@@ -873,7 +876,7 @@
     </div>
   {/if}
   {@render groupFields(Section.Layout, positioned || clip.autoLayout ? PLACED_SIZE_KEYS : SIZE_KEYS)}
-  {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned}<PositionSection {doc} {clip} {turn} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
 {/snippet}
 
 {#snippet alignBody()}

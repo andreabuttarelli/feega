@@ -63,7 +63,7 @@
   import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
-  import { elementTurn } from '$lib/motion/element-turn';
+  import { elementTurn, type NodeTurn } from '$lib/motion/element-turn';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
@@ -1585,6 +1585,7 @@
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     frameProperties.runAction = runSelectionAction;
+    frameProperties.turn = nodeTurnOf(panelNodeId);
     return () => frameProperties.clear();
   });
 
@@ -2120,6 +2121,12 @@
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
     return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+  }
+
+  function nodeTurnOf(nodeId: string): NodeTurn | null {
+    const clipId = ownOf(nodeId);
+    const degrees = byId.get(nodeId)?.rotation ?? 0;
+    return clipId ? { clipId, degrees, set: (next) => props.onRotate?.(nodeId, next - degrees) } : null;
   }
 
   function turnHost(nodeId: string) {

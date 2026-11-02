@@ -26,6 +26,16 @@ function sessionOf(selection: string[]) {
   );
 }
 
+describe('the rotation of a free element', () => {
+  it('reads the node rotation, not the upright root inside its doc', () => {
+    frameProperties.turn = { clipId: 'a', degrees: 90, set: () => undefined };
+    const body = html(['a']);
+    frameProperties.clear();
+
+    expect(body).toMatch(/value="90"[^>]*data-testid="rotation-field"/);
+  });
+});
+
 const html = (selection: string[], part: string | null = null) => render(FrameInspectorPanel, { props: { session: sessionOf(selection), tokens: FEEGA_TOKENS, part } }).body;
 
 describe('frame inspector panel', () => {

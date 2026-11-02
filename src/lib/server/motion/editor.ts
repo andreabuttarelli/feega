@@ -6,7 +6,9 @@ import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord }
 import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
-import { docNodeSize, motionOf, type MotionNode } from '$lib/canvas/motion-node';
+import { docNodeSize, frameChrome, motionOf, type MotionNode } from '$lib/canvas/motion-node';
+import { Root } from '$lib/canvas/frame-select';
+import { elementTurn, type ElementTurn } from '$lib/motion/element-turn';
 import { formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -137,7 +139,11 @@ export async function saveMotionDoc(
   db: Db,
   input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; known?: CanvasNodeRecord; checkpoint?: Checkpoint }
 ): Promise<RevisionWrite> {
-  const write = await appendRevision(db, input);
+  const doc = input.doc as Partial<MotionDoc>;
+  const rooted = Array.isArray(doc.tracks) ? elementTurn(doc as MotionDoc) : null;
+  const known = rooted ? ((input.known ?? (await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }))) ?? undefined) : input.known;
+  const turn = rooted && known ? nodeTurnOf(known, rooted) : null;
+  const write = await appendRevision(db, { ...input, doc: turn?.doc ?? input.doc });
   if (write.outcome !== RevisionOutcome.Written) {
     return write;
   }
@@ -145,16 +151,25 @@ export async function saveMotionDoc(
   const patched = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    patch: headPatch(write.head.doc as MotionDoc, write.head.version, input.nodeId),
+    patch: { ...headPatch(write.head.doc as MotionDoc, write.head.version, input.nodeId), ...(turn && { rotation: turn.rotation }) },
     check: DataCheck.Schema,
     actor: input.actor,
-    known: input.known
+    known
   });
   if (patched.outcome === 'written') {
     await followDoc(db, input.orgId, patched.node, write.head.doc as MotionDoc);
   }
   await nudgeInstances(db, { orgId: input.orgId, nodeId: input.nodeId, doc: write.head.doc as MotionDoc, actor: input.actor });
   return write;
+}
+
+function nodeTurnOf(record: CanvasNodeRecord, turn: ElementTurn): { doc: MotionDoc; rotation: number } | null {
+  const node = motionOf(record);
+  if (!node || frameChrome(node.kind).root !== Root.Own) {
+    return null;
+  }
+  const rotation = typeof record.data.rotation === 'number' ? record.data.rotation : 0;
+  return { doc: turn.doc, rotation: rotation + turn.degrees };
 }
 
 async function followDoc(db: Db, orgId: string, record: CanvasNodeRecord, doc: MotionDoc): Promise<void> {
