@@ -9,7 +9,7 @@
   import { ListKind, type ListItem } from '@feega/motion-core/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
 
-  let { layout, look, text, body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
+  let { layout, look, text, typed = '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; typed?: string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
   type Box = { left: number; top: number; width: number; height: number };
   type Snapshot = { text: string; runs: TextRun[]; lists: ListItem[]; sel: Span };
@@ -348,13 +348,13 @@
   }
 
   onMount(() => {
-    value = text;
-    textRange.open({ clipId: styled ? clipId : '', text, runs: initialRuns, lists: initialLists, base });
+    value = typed || text;
+    textRange.open({ clipId: styled ? clipId : '', text: value, runs: typed ? [] : initialRuns, lists: typed ? [] : initialLists, base });
     window.addEventListener('pointerdown', outside, true);
     const follow = () => focused() && !composing && selected();
     document.addEventListener('selectionchange', follow);
     void tick().then(() => {
-      sel = { start: 0, end: value.length };
+      sel = { start: typed ? value.length : 0, end: value.length };
       field?.focus();
       paint();
       syncRange();

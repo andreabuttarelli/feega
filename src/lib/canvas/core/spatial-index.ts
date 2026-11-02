@@ -30,6 +30,12 @@ export class SpatialIndex {
     return null;
   }
 
+  allAt(p: Point): string[] {
+    const bucket = this.#cells.get(keyOf(cellOf(p.x), cellOf(p.y))) ?? [];
+    const under = bucket.map((order) => this.#items[order]).filter((r) => contains(r, p));
+    return [...new Set(under.reverse().map((r) => r.id))];
+  }
+
   within(area: Area): string[] {
     const found = new Set<number>();
     for (let cx = cellOf(area.x); cx <= cellOf(area.x + area.w); cx++) {
