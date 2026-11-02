@@ -3687,3 +3687,8 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## An undo entry vanishes when two edits record at once
 
 **Signal:** after a gesture that writes several nodes, Cmd+Z undoes the step before it (a create), not the gesture. **Move:** `undoStack.collect` is not reentrant: two collects awaited in parallel restore the wrong outer bucket, and every later push lands in a finished collection. Run collecting writes one after another (`for … await`), never in `Promise.all`.
+
+## Agent worktrees
+
+### The Vite dev server in a worktree serves stale code after an edit
+**Signal:** a browser check after an edit shows the old behaviour, client or server side, as if the change was never made; the test for it is green. **Move:** stop the dev server and start it again after every change, before each browser check; never trust HMR or a server-side reload in an agent worktree.

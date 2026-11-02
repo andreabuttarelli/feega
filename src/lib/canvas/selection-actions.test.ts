@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FRAME_DIALOG_ACTIONS } from './frame-dialogs';
-import { ALIGN_EDGE, CANVAS_MENU, SELECTION_ACTIONS, actionsIn, canvasMenuIds, enabledFor, menuFor, shownFor } from './selection-actions';
+import { ALIGN_EDGE, CANVAS_MENU, SELECTION_ACTIONS, actionsIn, canvasMenuIds, enabledFor, isCanvasAction, menuFor, shownFor } from './selection-actions';
 
 describe('the context menu is the one home for selection actions', () => {
   const soundPanel = new Set(['frame-voice', 'frame-music', 'run-workflow']);
@@ -284,5 +284,12 @@ describe('Run flow on a selection of drawings', () => {
 
   it('is offered when a generating node is selected', () => {
     expect(shownFor('run-workflow', [shape, { type: 'image', data: {} }])).toBe(true);
+  });
+});
+
+describe('hide and lock on canvas nodes', () => {
+  it('the right-click menu of a node offers them and runs them on the node', () => {
+    expect([...canvasMenuIds()]).toEqual(expect.arrayContaining(['hide', 'lock']));
+    expect(isCanvasAction('hide') && isCanvasAction('lock')).toBe(true);
   });
 });

@@ -143,7 +143,8 @@
   import { appendVariant } from '$lib/motion/variants';
   import VariantPlus from '../VariantPlus.svelte';
   import ComponentSetOutline from '../ComponentSetOutline.svelte';
-  import { addSetVariant, setMainOf } from '$lib/motion/component-set';
+  import { addSetVariant, resizeSetMain, setMainOf } from '$lib/motion/component-set';
+  import { compBox } from '$lib/motion/comp-frame';
   import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
@@ -838,7 +839,7 @@
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
-    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number }; main?: string }
     | { kind: GestureKind.Rotate; id: string; centre: Point; start: Point; base: number; degrees: number }
     | { kind: GestureKind.ResizeMany; unit: [number, number]; start: Point; box: Box; items: Placed[] }
     | { kind: GestureKind.TurnMany; centre: Point; start: Point; box: Box; items: Placed[] }
@@ -1723,6 +1724,29 @@
     }
   }
 
+  function setMainPicked(nodeId: string, clip: string | null): string | undefined {
+    const doc = clip && isComponentSet(nodeId) ? saverOf(nodeId)?.history.present : null;
+    const main = doc ? doc.tracks.flatMap((t) => t.clips).find((c) => c.id === clip) : null;
+    return main?.component === 'Precomp' ? main.id : undefined;
+  }
+
+  function resizeSetMainBy(nodeId: string, clip: string, by: { w: number; h: number }, was: Box) {
+    const saver = saverOf(nodeId);
+    const before = saver?.history.present;
+    const main = before?.tracks.flatMap((t) => t.clips).find((c) => c.id === clip);
+    const box = before && main ? compBox(before.comps[String(main.props.comp)], before) : null;
+    if (!before || !box) {
+      return;
+    }
+    const perPx = { x: before.width / was.w, y: before.height / was.h };
+    const size = { width: box.right - box.left + by.w * perPx.x, height: box.bottom - box.top + by.h * perPx.y };
+    const resized = resizeSetMain(before, clip, size);
+    commit(nodeId, resized, 'Resized the main component');
+    if (resized.ok) {
+      props.onNodeSize?.(nodeId, resized.doc.width / perPx.x, resized.doc.height / perPx.y);
+    }
+  }
+
   function editFrameDoc(nodeId: string, change: FrameDocEdit, summary: string): boolean {
     const live = liveOf(nodeId);
     if (!live || !saverOf(nodeId)) {
@@ -2253,9 +2277,9 @@
     [0, 1]
   ];
 
-  function resizeOf(nodeId: string, unit: [number, number], start: Point): Active {
+  function resizeOf(nodeId: string, unit: [number, number], start: Point, main?: string): Active {
     const t = byId.get(nodeId)!;
-    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 }, main };
   }
 
   function rotateOf(nodeId: string, start: Point): Active {
@@ -2315,13 +2339,13 @@
     settleOverrides();
   }
 
-  function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
+  function resizeHost(nodeId: string, handle: number, e: PointerEvent, main?: string) {
     e.preventDefault();
     e.stopPropagation();
     downAt = local(e);
     captureId = e.pointerId;
     holdSelection(true);
-    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)));
+    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)), main);
     gesturing = true;
   }
 
@@ -2339,7 +2363,7 @@
 
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
     if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
-      resizeHost(nodeId, handle, e);
+      resizeHost(nodeId, handle, e, setMainPicked(nodeId, clip));
       return;
     }
     if (grip === Grip.Rotate && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.get(nodeId)?.rotatable) {
@@ -2864,7 +2888,9 @@
         props.onLive?.([]);
         snapGuides = [];
         const box = overrides.get(a.id);
-        if (box) {
+        if (box && a.main) {
+          resizeSetMainBy(a.id, a.main, { w: box.w - a.box.w, h: box.h - a.box.h }, a.box);
+        } else if (box) {
           props.onResizeEnd?.(a.id, a.box, { x: box.x, y: box.y, w: box.w, h: box.h });
         }
         settleOverrides();
@@ -3561,6 +3587,8 @@
     paste: () => menuAt && void pasteSystem(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
+    hide: (ids) => props.onToggleFlag?.(ids, NodeFlag.Hidden),
+    lock: (ids) => props.onToggleFlag?.(ids, NodeFlag.Locked),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     'combine-video': (ids) => props.onCombineScenes?.(ids),
     'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
