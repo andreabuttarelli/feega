@@ -12,6 +12,7 @@ import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
 import type { BarContext } from '$lib/canvas/bottom-bar';
 import type { NameTag } from '$lib/canvas/node-label';
 import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
+import type { HostBox } from '$lib/motion/element-host';
 import type { CopyShown, Drawing, Duplication } from '$lib/canvas/optimistic-insert';
 import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
 import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -181,6 +182,7 @@ export type FlowProps = {
   onResize?: (id: string, w: number, h: number) => void;
   onResizeEnd?: (id: string, before: TileBox, after: TileBox) => void;
   onPlace?: (id: string, w: number, h: number) => void;
+  onSettle?: (id: string, box: HostBox) => void;
   peers?: CanvasPeer[];
   onPointer?: (at: { x: number; y: number } | null) => void;
   onLive?: (boxes: LiveBox[]) => void;

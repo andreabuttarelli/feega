@@ -16,7 +16,6 @@
   import { marksFor } from '$lib/canvas/comment-marks';
   import { hasUnseenMention, latestActivity, mentionedIds, type Teammate } from '$lib/canvas/comment-mentions';
   import { readSeen, writeSeen } from '$lib/canvas/comments-seen';
-  import { keepTextSize } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
   import TechniqueRowsDialog from '$lib/components/canvas/TechniqueRowsDialog.svelte';
@@ -154,8 +153,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { NodeFlag, flagHeld, flagsOf, toggledFlags } from '$lib/canvas/node-flags';
+  import type { HostBox } from '$lib/motion/element-host';
   import { FORMATS, MotionFormat, formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
-  import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
+  import { ResizeMode, fitToNode, handResized } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -608,6 +608,23 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     await carryElement(OptimisticAction.MoveElement, { source, clip: out.clipId, drop, box: out.box });
+  }
+
+  function settleHost(id: string, box: HostBox) {
+    const node = nodes.find((n) => n.id === id);
+    if (!node) {
+      return;
+    }
+    const turn = box.rotation - (layoutOf(node.data).rotation ?? 0);
+    if (turn) {
+      turnGroup({ id, degrees: turn });
+    }
+    if (box.x !== node.x || box.y !== node.y) {
+      void move(id, box.x, box.y);
+    }
+    if (box.w !== node.w || box.h !== node.h) {
+      void storeSize(id, box.w, box.h);
+    }
   }
 
   function rotateGroupBy(id: string, degrees: number) {
@@ -2894,7 +2911,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return row && motionOf(row)?.kind === FrameKind.Element ? { width: row.w, height: row.h } : null;
   }
 
-  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Picture | null, mode: ResizeMode) => (was ? fitElementToNode(keepTextSize(doc, was, picture), picture, was) : fitToNode(doc, picture, mode));
+  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Picture | null, mode: ResizeMode) => (was ? handResized(doc, was, picture) : fitToNode(doc, picture, mode));
 
   async function sizeFrameDoc(id: string, picture: Picture, was: Picture | null = null) {
     const mode = resizeMode;
@@ -4346,6 +4363,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onResize={resize}
     onResizeEnd={resizeTile}
     onPlace={storeSize}
+    onSettle={settleHost}
     onRename={renameNode}
     onNodeDoubled={openOutput}
     onConnect={connect}

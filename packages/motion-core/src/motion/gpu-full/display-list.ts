@@ -9,7 +9,7 @@ import { depthOf, stageLenses, turnedInDepth } from './depth';
 import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
-import { placedBox } from '../effects/paint-area';
+import { paintBleed, placedBox } from '../effects/paint-area';
 import type { AudioAnalysis } from '../audio-analysis';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
 import { shapedText } from './text/measure';
@@ -116,7 +116,7 @@ export type Gap = { clip: string; component: ComponentId; reason: Unsupported; d
 
 export type DomReads = ReadonlyMap<string, DomRead>;
 
-export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[]; faces?: readonly FaceRule[] };
+export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[]; faces?: readonly FaceRule[]; bleed?: number };
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset; moves: JunctionMove[] };
 
@@ -651,7 +651,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   const background = doc.surface ? CLEAR : doc.background === Background.Transparent ? null : colour('brand.background');
   const cut = frameCut(doc);
   const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;
-  return { ...size, background, items: faded(doc, framed, frameFadeAt(doc, frame)), unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+  const bleed = paintBleed(doc);
+  return { ...size, background, items: faded(doc, framed, frameFadeAt(doc, frame)), unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}), ...(bleed ? { bleed } : {}) };
 }
 
 const CLEAR: Rgba = [0, 0, 0, 0];

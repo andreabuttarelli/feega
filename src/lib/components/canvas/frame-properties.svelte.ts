@@ -3,7 +3,7 @@ import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { FrameExtras } from '$lib/canvas/frame-extras.svelte';
 import { docMode, type DocMode } from '@feega/motion-core/motion/doc';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
-import type { NodeTurn } from '$lib/motion/element-turn';
+import type { ElementHost } from '$lib/motion/element-host';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
 export const UNNAMED_FRAME = 'Frame';
@@ -22,9 +22,9 @@ export class FrameProperties {
   part = $state<string | null>(null);
   exportPicks: (() => void) | null = null;
   runAction = $state.raw<((id: SelectionActionId) => void) | null>(null);
-  turn = $state.raw<NodeTurn | null>(null);
   place = $state.raw<NodePlace | null>(null);
   rename = $state.raw<((name: string) => void) | null>(null);
+  host = $state.raw<ElementHost | null>(null);
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
     this.nodeId = nodeId;
@@ -57,9 +57,9 @@ export class FrameProperties {
     this.part = null;
     this.exportPicks = null;
     this.runAction = null;
-    this.turn = null;
     this.place = null;
     this.rename = null;
+    this.host = null;
   }
 }
 

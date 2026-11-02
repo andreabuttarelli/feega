@@ -300,7 +300,20 @@ export const canRunInFrame = runs;
 
 const rootIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips.filter((c) => !c.parent).map((c) => c.id));
 
-export const stacksWholeElement = (id: ActionId, doc: MotionDoc, picks: readonly string[]): boolean => id === Action.WrapStack && rootIds(doc).every((root) => picks.includes(root));
+export enum ElementAction {
+  WrapStack = 'wrap-stack',
+  Duplicate = 'duplicate'
+}
+
+const WHOLE_ELEMENT: Partial<Record<ActionId, ElementAction>> = {
+  [Action.WrapStack]: ElementAction.WrapStack,
+  [Action.Duplicate]: ElementAction.Duplicate
+};
+
+export function wholeElementAction(id: ActionId, doc: MotionDoc, picks: readonly string[]): ElementAction | null {
+  const action = WHOLE_ELEMENT[id];
+  return action && rootIds(doc).every((root) => picks.includes(root)) ? action : null;
+}
 
 export const frameMenuAction = (id: SelectionActionId): ActionId | null => {
   const run = frameMenuRun(id);

@@ -1,6 +1,10 @@
 import type { ComponentId } from '../components';
 import { boxOf, type Box } from '../layout';
 import type { Extent } from '../shape/render';
+import type { MotionClip, MotionDoc } from '../doc';
+import { strokesOf } from '../stroke/model';
+import { EFFECTS } from './registry';
+import { paramValues } from './model';
 
 type Placement = Parameters<typeof boxOf>[0] & { scale?: number; rotation?: number };
 type Frame = { width: number; height: number };
@@ -44,4 +48,14 @@ export function placedBox(p: Partial<Placement>, frame: Frame): Box | null {
 
 export function paintArea(component: ComponentId, p: Placement, frame: Frame, extent: Extent | null): Box | null {
   return AREA[component]?.(p, frame, extent) ?? null;
+}
+
+const strokeReach = (clip: MotionClip, unit: number) => Math.max(0, ...strokesOf(clip.props).map((s) => s.width * unit));
+
+const effectsReach = (clip: MotionClip) => (clip.effects ?? []).filter((e) => e.enabled).reduce((sum, e) => sum + (EFFECTS[e.kind].reach?.(paramValues(e)) ?? 0), 0);
+
+export function paintBleed(doc: MotionDoc): number {
+  const unit = Math.min(doc.width, doc.height);
+  const reaches = doc.tracks.flatMap((t) => (t.clips as MotionClip[]).map((c) => effectsReach(c) + strokeReach(c, unit)));
+  return Math.ceil(Math.max(0, ...reaches));
 }

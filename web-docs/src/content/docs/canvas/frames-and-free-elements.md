@@ -9,6 +9,18 @@ A **frame** is a node with its own size, content and timeline: a video, a poster
 
 A **free element** is a shape, text, image or SVG placed directly on the canvas. It is saved as an element, never as a frame, so duplicating or copy-pasting it keeps its drawing and size. Technically a free element is a chromeless frame ([ADR 0011](/architecture/adr/0011-a-free-canvas-element-is-a-chromeless-frame/)).
 
+## A free element is one object
+
+A free element behaves like a single object, as in Figma ([ADR 0032](/architecture/adr/0032-a-free-element-is-its-node/)):
+
+- **X**, **Y**, **W**, **H** and rotation in the right bar are its place and size on the canvas, in canvas pixels. Typing them, scrubbing their label or nudging with the arrow keys (`⇧` for 10 px) moves, resizes or turns the element itself; one `⌘Z` undoes each.
+- Every other pixel value (type size, corner radius, stroke, blur, shadow, gap and padding) is in canvas pixels too.
+- Changing the type size, weight or spacing of an auto-width text grows its box. Dragging a text's handle stops it hugging that side.
+- Rotate 90°, flip horizontal and flip vertical turn and mirror it in place, around its centre.
+- `⌘D` duplicates it as a new element on the canvas.
+- Shadows, glows and outer strokes show past its edge. There are no constraints: a free element has no frame to pin to.
+- An agent moving, resizing or turning the element's layer moves, resizes or turns the element.
+
 ## Moving things
 
 - Drag an element out of a frame into another frame or onto the canvas. Both frames, and the new element, change at once; saving continues in the background, and a move that cannot be saved is put back with a notice.

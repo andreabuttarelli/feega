@@ -9,7 +9,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
 import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
 import { precompose } from '@feega/motion-core/motion/precomp';
-import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor, stacksWholeElement } from './frame-inspector';
+import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor, ElementAction, wholeElementAction } from './frame-inspector';
 import { findClip } from '@feega/motion-core/motion/doc';
 import { barActions, headerActions } from '$lib/motion/clip-bar';
 import { copyElements } from '$lib/motion/move-element';
@@ -380,13 +380,21 @@ describe('use as mask inside a canvas frame', () => {
   });
 });
 
-describe('wrap with stack on a free element', () => {
+describe('acting on a whole free element', () => {
   it('wraps the whole element as a new canvas stack, never turning its own clip into one', () => {
     const doc = fixture();
 
-    expect(stacksWholeElement(Action.WrapStack, doc, ['a', 'b'])).toBe(true);
-    expect(stacksWholeElement(Action.WrapStack, doc, ['a'])).toBe(false);
-    expect(stacksWholeElement(Action.Group, doc, ['a', 'b'])).toBe(false);
+    expect(wholeElementAction(Action.WrapStack, doc, ['a', 'b'])).toBe(ElementAction.WrapStack);
+    expect(wholeElementAction(Action.WrapStack, doc, ['a'])).toBeNull();
+    expect(wholeElementAction(Action.Group, doc, ['a', 'b'])).toBeNull();
+  });
+
+  it('duplicates the whole element as a new canvas layer, not a second clip inside it', () => {
+    const doc = fixture();
+
+    expect(wholeElementAction(Command.Duplicate, doc, ['a', 'b'])).toBe(ElementAction.Duplicate);
+    expect(wholeElementAction(Action.Duplicate, doc, ['a', 'b'])).toBe(ElementAction.Duplicate);
+    expect(wholeElementAction(Command.Duplicate, doc, ['a'])).toBeNull();
   });
 });
 

@@ -1,7 +1,7 @@
 import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { CanvasSize, OpResult } from '@feega/motion-core/motion/timeline';
 import { Horizontal, Vertical, resizeFrame } from './constraints/constraints';
-import { keepTextSize } from './text-fit';
+import { keepTextSize, resizedFreeText } from './text-fit';
 import { stackElementResized } from './layout/stack-fit';
 import { heldPixels } from '@feega/motion-core/motion/breakpoints/model';
 
@@ -54,6 +54,11 @@ const FIT_BY_MODE: Record<ResizeMode, (doc: MotionDoc, node: CanvasSize, was?: C
 };
 
 export const fitToNode = (doc: MotionDoc, node: CanvasSize, mode: ResizeMode = ResizeMode.Constrained, was?: CanvasSize): OpResult => FIT_BY_MODE[mode](doc, node, was);
+
+export function handResized(doc: MotionDoc, was: CanvasSize, node: CanvasSize): OpResult {
+  const sized = resizedFreeText(doc, { width: was.width !== node.width, height: was.height !== node.height }) ?? doc;
+  return fitElementToNode(keepTextSize(sized, was, node), node, was);
+}
 
 export function fitElementToNode(doc: MotionDoc, node: CanvasSize, was?: CanvasSize): OpResult {
   const stack = stackElementResized(doc, elementStage(doc, node, was));

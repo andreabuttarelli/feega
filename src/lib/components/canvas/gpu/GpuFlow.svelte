@@ -25,7 +25,7 @@
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
   import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
   import { tileFaded } from '$lib/canvas/tile-opacity';
-  import { canRunInFrame, barAction, barActionLater, elementMenuIds, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
+  import { canRunInFrame, barAction, barActionLater, elementMenuIds, frameKeyAction, frameMenuAction, picksFor, wholeElementAction, ElementAction } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
@@ -61,7 +61,7 @@
   import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
-  import { elementTurn, type NodeTurn } from '$lib/motion/element-turn';
+  import { HostLedger, settleElement, type ElementHost, type HostBox } from '$lib/motion/element-host';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
@@ -1284,14 +1284,20 @@
 
   const elementName = (nodeId: string): string | undefined => (frameChrome(kindOfNode(nodeId)).root === Root.Own ? (byId.get(nodeId)?.displayName ?? undefined) : undefined);
 
+  const WHOLE_ELEMENT_RUN: Record<ElementAction, (nodeId: string) => void> = {
+    [ElementAction.WrapStack]: (nodeId) => props.onWrapStack?.([nodeId]),
+    [ElementAction.Duplicate]: (nodeId) => duplicateTiles([nodeId])
+  };
+
   async function runFrameAction(id: ActionId) {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
     if (!nodeId || !live || !picks.length) {
       return;
     }
-    if (frameChrome(kindOfNode(nodeId)).root === Root.Own && stacksWholeElement(id, live.doc, picks)) {
-      props.onWrapStack?.([nodeId]);
+    const whole = frameChrome(kindOfNode(nodeId)).root === Root.Own ? wholeElementAction(id, live.doc, picks) : null;
+    if (whole) {
+      WHOLE_ELEMENT_RUN[whole](nodeId);
       return;
     }
     const at = scoped(live.doc, picks, frameOfLive(live));
@@ -1399,7 +1405,8 @@
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(doc, statePreview.picksOf(nodeId)) }),
         recorded: () => {
           settle.edited(nodeId);
-          queueMicrotask(() => turnHost(nodeId));
+          leaveHost(nodeId, session.history.present);
+          queueMicrotask(() => settleHost(nodeId));
           autosize(nodeId);
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
@@ -1594,9 +1601,9 @@
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
     frameProperties.runAction = runSelectionAction;
-    frameProperties.turn = nodeTurnOf(panelNodeId);
     frameProperties.place = nodePlaceOf(panelNodeId);
     frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
+    frameProperties.host = hostOf(panelNodeId);
     return () => frameProperties.clear();
   });
 
@@ -1624,11 +1631,13 @@
     if (!session) {
       return;
     }
+    leaveHost(nodeId, session.history.present);
     if (step === Step.Back) {
       session.undo();
     } else {
       session.redo();
     }
+    arriveHost(nodeId, session.history.present);
     liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
     if (inside?.nodeId === nodeId) {
       picks = picks.filter((id) => scopeOf(session.history.present, id));
@@ -2160,22 +2169,48 @@
     return tile ? { x: tile.x, y: tile.y, set: (x, y) => props.onMove?.(nodeId, x, y) } : null;
   }
 
-  function nodeTurnOf(nodeId: string): NodeTurn | null {
-    const clipId = ownOf(nodeId);
-    const degrees = byId.get(nodeId)?.rotation ?? 0;
-    return clipId ? { clipId, degrees, set: (next) => props.onRotate?.(nodeId, next - degrees) } : null;
+  const hostLedger = new HostLedger();
+
+  function hostBoxOf(nodeId: string): HostBox | null {
+    const t = byId.get(nodeId);
+    return t && frameChrome(kindOfNode(nodeId)).root === Root.Own ? { x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 } : null;
   }
 
-  function turnHost(nodeId: string) {
+  function hostOf(nodeId: string): ElementHost | null {
+    const clipId = ownOf(nodeId);
+    const box = hostBoxOf(nodeId);
+    if (!clipId || !box) {
+      return null;
+    }
+    return { clipId, box, move: (x, y) => placeTiles([{ id: nodeId, x, y }]), resize: (w, h) => props.onResize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - box.rotation) };
+  }
+
+  function leaveHost(nodeId: string, doc: MotionDoc) {
+    const box = hostBoxOf(nodeId);
+    if (box) {
+      hostLedger.leave(doc, box);
+    }
+  }
+
+  function arriveHost(nodeId: string, doc: MotionDoc) {
+    const box = hostBoxOf(nodeId);
+    const back = box ? hostLedger.arrive(doc, box) : null;
+    if (back) {
+      props.onSettle?.(nodeId, back);
+    }
+  }
+
+  function settleHost(nodeId: string) {
     const saver = savers.get(nodeId);
     const live = liveOf(nodeId);
-    const turn = saver && live && frameChrome(kindOfNode(nodeId)).root === Root.Own ? elementTurn(saver.history.present) : null;
-    if (!saver || !live || !turn) {
+    const box = hostBoxOf(nodeId);
+    const settled = saver && live && box ? settleElement(saver.history.present, box) : null;
+    if (!saver || !live || !settled) {
       return;
     }
-    saver.amendRoot(turn.doc, 'Rotated the element');
-    liveDocs.set(nodeId, { ...live, doc: previewDoc(turn.doc, statePreview.picksOf(nodeId)) });
-    props.onRotate?.(nodeId, turn.degrees);
+    saver.amendRoot(settled.doc, 'Placed the element');
+    liveDocs.set(nodeId, { ...live, doc: previewDoc(settled.doc, statePreview.picksOf(nodeId)) });
+    props.onSettle?.(nodeId, settled.box);
   }
 
   const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
@@ -3058,7 +3093,18 @@
     scaleBy: (factor) => zoomStep(factor)
   };
 
+  function pickedHost(): HostBox & { id: string } | null {
+    const nodeId = inside?.nodeId;
+    const box = nodeId && picks.length === 1 && picks[0] === ownOf(nodeId) ? hostBoxOf(nodeId) : null;
+    return box && nodeId ? { ...box, id: nodeId } : null;
+  }
+
   function nudgePicks(dx: number, dy: number): boolean {
+    const host = pickedHost();
+    if (host) {
+      placeTiles([{ id: host.id, x: host.x + dx, y: host.y + dy }]);
+      return true;
+    }
     const nodeId = inside?.nodeId;
     const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
     if (!nodeId || !tools) {

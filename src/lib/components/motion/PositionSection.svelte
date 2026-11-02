@@ -25,9 +25,13 @@
   import { Placement } from '@feega/motion-core/motion/layout/stack';
   import { positionShown } from '$lib/motion/properties-view';
   import { placeLayer } from '$lib/motion/light-group';
-  import type { NodeTurn } from '$lib/motion/element-turn';
+  import type { ElementHost } from '$lib/motion/element-host';
+  import type { Frame } from '$lib/motion/units';
+  import { liveEdits } from '$lib/motion/live-edit';
+  import { FieldKind } from '$lib/motion/number-field';
+  import NumberField from './NumberField.svelte';
 
-  let { doc, clip, part, placement = Placement.Free, within = null, turn = null, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; turn?: NodeTurn | null; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
+  let { doc, clip, part, placement = Placement.Free, within = null, host = null, space = doc, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; host?: ElementHost | null; space?: Frame; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
 
   const ICON = 15;
   const PIVOT_STOPS = [0, 0.5, 1] as const;
@@ -65,12 +69,22 @@
   const down = $derived(pinnedVertically(vertical));
   const pivotX = $derived(clip.transform.anchorX ?? TRANSFORM.anchorX.fallback);
   const pivotY = $derived(clip.transform.anchorY ?? TRANSFORM.anchorY.fallback);
-  const rotation = $derived(turn ? turn.degrees : (clip.transform.rotateZ ?? 0));
+  const PLACE_RANGE = { min: -1_000_000, max: 1_000_000, step: 1 };
+  const TURN_RANGE = { min: -360, max: 360, step: 1 };
 
-  const numberOf = (e: Event) => Number((e.currentTarget as HTMLInputElement).value);
-  const rotate = (degrees: number) => (turn ? turn.set(degrees) : onchange(setTransform(doc, clip.id, { rotateZ: degrees }), 'Rotated the layer'));
-  const moveX = (e: Event) => onchange(placeLayer(doc, clip.id, { x: (numberOf(e) + origin.left + box.width / 2) / doc.width }), 'Moved horizontally');
-  const moveY = (e: Event) => onchange(placeLayer(doc, clip.id, { y: (numberOf(e) + origin.top + box.height / 2) / doc.height }), 'Moved vertically');
+  const own = $derived(clip.transform.rotateZ ?? 0);
+  const rotation = $derived((host?.box.rotation ?? 0) + own);
+  const scale = $derived({ x: space.width / doc.width, y: space.height / doc.height });
+  const seat = $derived(host ? { x: host.box.x, y: host.box.y } : { x: 0, y: 0 });
+  const offset = $derived({ x: (clip.transform.x ?? 0) * doc.width, y: (clip.transform.y ?? 0) * doc.height });
+  const shownX = $derived(Math.round(seat.x + (box.left + offset.x - origin.left) * scale.x));
+  const shownY = $derived(Math.round(seat.y + (box.top + offset.y - origin.top) * scale.y));
+  const hostEdit = liveEdits<() => void>({ show: () => {}, record: (run) => run() });
+  const gesture = $derived(host ? hostEdit : null);
+
+  const rotate = (degrees: number) => (host ? hostEdit.edit(() => host.turn(degrees - own), 'Rotated the element') : onchange(setTransform(doc, clip.id, { rotateZ: degrees }), 'Rotated the layer'));
+  const moveX = (x: number) => (host ? hostEdit.edit(() => host.move(host.box.x + x - shownX, host.box.y), 'Moved horizontally') : onchange(placeLayer(doc, clip.id, { x: ((x - seat.x) / scale.x + origin.left - offset.x + box.width / 2) / doc.width }), 'Moved horizontally'));
+  const moveY = (y: number) => (host ? hostEdit.edit(() => host.move(host.box.x, host.box.y + y - shownY), 'Moved vertically') : onchange(placeLayer(doc, clip.id, { y: ((y - seat.y) / scale.y + origin.top - offset.y + box.height / 2) / doc.height }), 'Moved vertically'));
   const pinH = (h: Horizontal) => onchange(setConstraints(doc, [clip.id], { horizontal: h }), 'Changed the horizontal constraint');
   const pinV = (v: Vertical) => onchange(setConstraints(doc, [clip.id], { vertical: v }), 'Changed the vertical constraint');
   const tickH = (side: Side, e: MouseEvent) => pinH(toggleHorizontal(horizontal, side, e.shiftKey ? Toggle.Both : Toggle.One));
@@ -96,8 +110,8 @@
 
   {#if part === PositionPart.Position && placed}
     <div class="row xy">
-      <label class="field"><span>X</span><input type="number" step="1" value={Math.round(box.left - origin.left)} data-testid="position-x" onchange={moveX} /></label>
-      <label class="field"><span>Y</span><input type="number" step="1" value={Math.round(box.top - origin.top)} data-testid="position-y" onchange={moveY} /></label>
+      <div class="slot"><NumberField label="X" name="X" testid="position-x" kind={FieldKind.Glyph} value={shownX} range={PLACE_RANGE} unit="px" {gesture} onchange={moveX} /></div>
+      <div class="slot"><NumberField label="Y" name="Y" testid="position-y" kind={FieldKind.Glyph} value={shownY} range={PLACE_RANGE} unit="px" {gesture} onchange={moveY} /></div>
     </div>
   {/if}
 
@@ -130,7 +144,7 @@
   {#if part === PositionPart.Rotation}
     <div class="row turn">
       <div class="rotation">
-        <label class="field"><Triangle size={ICON} /><input type="number" step="1" value={rotation} aria-label="Rotation" data-testid="rotation-field" onchange={(e) => rotate(numberOf(e))} /><span>°</span></label>
+        <div class="slot"><NumberField label="" icon={Triangle} name="Rotation" testid="rotation-field" kind={FieldKind.Glyph} value={rotation} range={TURN_RANGE} unit="°" {gesture} onchange={rotate} /></div>
         <div class="pivot" role="group" aria-label="Pivot">
           {#each PIVOT_STOPS as py (py)}
             {#each PIVOT_STOPS as px (px)}
@@ -199,7 +213,6 @@
     background: var(--ui-input-hover);
   }
 
-  .field,
   .select {
     display: flex;
     align-items: center;
@@ -213,17 +226,14 @@
     transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
-  .field:hover,
   .select:hover {
     background: var(--ui-input-hover);
   }
 
-  .field:focus-within,
   .select:focus-within {
     box-shadow: inset 0 0 0 1px var(--ui-accent);
   }
 
-  .field input,
   .select select {
     flex: 1;
     min-width: 0;
@@ -241,12 +251,6 @@
     padding-right: 18px;
     appearance: none;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4l2.5 2.5L7.5 4'/%3E%3C/svg%3E") no-repeat right 0 center / 10px 10px;
-  }
-
-  .field input::-webkit-inner-spin-button,
-  .field input::-webkit-outer-spin-button {
-    appearance: none;
-    margin: 0;
   }
 
   .constraints {
@@ -336,7 +340,7 @@
     gap: var(--ui-space-2);
   }
 
-  .rotation .field {
+  .rotation .slot {
     flex: 1;
     min-width: 0;
   }

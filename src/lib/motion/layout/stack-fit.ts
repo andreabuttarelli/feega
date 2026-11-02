@@ -31,7 +31,7 @@ function rescaled(clip: MotionClip, from: Size, to: Size): MotionClip {
   return { ...clip, props };
 }
 
-function holdPixels(doc: MotionDoc, to: Size): MotionDoc {
+export function holdPixels(doc: MotionDoc, to: Size): MotionDoc {
   const from = { width: doc.width, height: doc.height };
   const tracks = doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => rescaled(c as MotionClip, from, to)) }));
   return keepTextSize({ ...doc, ...to, tracks } as MotionDoc, from, to);

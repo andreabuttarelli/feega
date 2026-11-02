@@ -19,7 +19,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, toFetch, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -241,7 +241,7 @@
     frames.flatMap((f): HeldFrame[] => {
       const group = shownOf(f);
       const list = group ? lists.get(group) : undefined;
-      return group && list && drawsAny(list) ? [{ id: f.id, group, box: f.box, size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
+      return group && list && drawsAny(list) ? [{ id: f.id, group, box: stagedBox(f.box, list), size: { width: list.width, height: list.height }, bytes: pictureBytes(list.items), ...(f.turn ? { turn: f.turn } : {}) }] : [];
     })
   );
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
@@ -293,6 +293,10 @@
     }
     return keep;
   };
+  const bledBox = (box: FrameAt['box'], group: string) => {
+    const list = listIfKnown(group);
+    return list ? stagedBox(box, list) : box;
+  };
   const chains = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
     const holding = new Set([...rebuilding, ...retained(Date.now()), ...real.filter((f) => !pictured.has(f.group)).map((f) => f.id)]);
@@ -302,7 +306,7 @@
     return [...placeholders.values()].map((p) => {
       const before = holding.has(p.id) ? drawnLast.get(p.id) : undefined;
       const turned = p.turn ? { turn: p.turn } : {};
-      const layers = [ready.get(p.id), before && before.group !== ready.get(p.id)?.group && { ...before, box: p.box, ...turned }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned }];
+      const layers = [ready.get(p.id), before && before.group !== ready.get(p.id)?.group && { ...before, box: bledBox(p.box, before.group), ...turned }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned }];
       return layers.filter((l): l is HeldFrame => l != null);
     });
   });
