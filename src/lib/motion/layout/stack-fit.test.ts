@@ -3,8 +3,10 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/mot
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { pivotBox } from '@feega/motion-core/motion/parent';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-import { setAutoLayout, wrapInStack } from './ops';
+import { duplicateLayer, setAutoLayout, wrapInStack } from './ops';
 import { freeStackFit } from './stack-fit';
+import { ResizeMode, fitToNode } from '../custom-size';
+import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -67,5 +69,41 @@ describe('a free stack hugs the text it measures', () => {
 
     expect(fit.doc.width).toBe(shaped.width);
     expect(fit.doc.height).toBe(shaped.height);
+  });
+});
+
+describe('resizing a free stack element on the canvas', () => {
+  const hugging = freeStackFit(element)?.doc ?? element;
+  const itemOf = (doc: MotionDoc) => findClip(doc, 'stack')!.clip.layoutItem!;
+
+  it('a taller drag turns the hugged height Fixed at the dragged size, and the node box stays the stack box', () => {
+    const sized = must(fitToNode(hugging, { width: hugging.width, height: hugging.height * 3 }, ResizeMode.Element));
+    const stack = pxBox(sized, 'stack');
+
+    expect(itemOf(sized).height).toBe(Sizing.Fixed);
+    expect(itemOf(sized).width).toBe(Sizing.Hug);
+    expect(stack.height).toBeCloseTo(sized.height, 0);
+    expect(stack.width).toBeCloseTo(sized.width, 0);
+    expect(pxBox(sized, 'sq').height).toBeCloseTo(pxBox(hugging, 'sq').height, 0);
+    expect(freeStackFit(sized)).toBeNull();
+  });
+
+  it('a wider drag turns the hugged width Fixed and leaves the height hugging', () => {
+    const sized = must(fitToNode(hugging, { width: hugging.width * 2, height: hugging.height }, ResizeMode.Element));
+
+    expect(itemOf(sized).width).toBe(Sizing.Fixed);
+    expect(itemOf(sized).height).toBe(Sizing.Hug);
+    expect(pxBox(sized, 'stack').width).toBeCloseTo(sized.width, 0);
+    expect(freeStackFit(sized)).toBeNull();
+  });
+
+  it('a child added to a hugging stack grows the node to the stack box', () => {
+    const grown = must(duplicateLayer(hugging, 'sq', 'more'));
+    const fit = freeStackFit(grown)!;
+    const stack = pxBox(fit.doc, 'stack');
+
+    expect(fit.share.width).toBeGreaterThan(1);
+    expect(stack.width).toBeCloseTo(fit.doc.width, 0);
+    expect(stack.height).toBeCloseTo(fit.doc.height, 0);
   });
 });
