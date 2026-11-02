@@ -307,8 +307,7 @@ export enum ElementAction {
 
 const WHOLE_ELEMENT: Partial<Record<ActionId, ElementAction>> = {
   [Action.WrapStack]: ElementAction.WrapStack,
-  [Action.Duplicate]: ElementAction.Duplicate,
-  [Command.Duplicate]: ElementAction.Duplicate
+  [Action.Duplicate]: ElementAction.Duplicate
 };
 
 export function wholeElementAction(id: ActionId, doc: MotionDoc, picks: readonly string[]): ElementAction | null {

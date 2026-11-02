@@ -172,7 +172,7 @@ export async function saveMotionDoc(
 
 function hostBoxOf(record: CanvasNodeRecord): HostBox | null {
   const node = motionOf(record);
-  const { width, height } = record.size;
+  const { width, height } = record.size ?? {};
   if (!node || frameChrome(node.kind).root !== Root.Own || !width || !height) {
     return null;
   }

@@ -209,7 +209,8 @@ export function penPaint({ fill, stroke, gradient, fillRule }: PenPaint): Record
 
 export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
 
-const PIXELS_PER_CANVAS_PX = 1;
+const ELEMENT_PX_PER_CANVAS_PX = 1;
+const FRAME_PX_PER_CANVAS_PX = 2;
 const MIN_DOC_SIDE = 16;
 const FULL_BOX: DrawBox = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
@@ -222,23 +223,23 @@ type Sides = { long: number; short: number };
 const VIDEO_SIDES: Sides = { long: MAX_SIDE, short: MAX_SHORT_SIDE };
 const STILL_SIDES: Sides = { long: DESIGN_MAX_SIDE, short: DESIGN_MAX_SIDE };
 
-function elementPixels(box: CanvasBox, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
+function docPixels(box: CanvasBox, density: number, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
   const long = Math.max(box.width, box.height);
   const short = Math.min(box.width, box.height);
-  const scale = Math.min(PIXELS_PER_CANVAS_PX, sides.long / long, sides.short / short);
+  const scale = Math.min(density, sides.long / long, sides.short / short);
   const shortSide = evenFloor(short * scale);
   const longSide = Math.min(evenSide((long * shortSide) / short), evenSide(long * scale));
   return box.width >= box.height ? { width: longSide, height: shortSide } : { width: shortSide, height: longSide };
 }
 
 export function blankElement(box: CanvasBox): OpResult {
-  return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
+  return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...docPixels(box, ELEMENT_PX_PER_CANVAS_PX), background: Background.Transparent }, 0);
 }
 
 const SURFACE_ID = 'surface';
 
 function sizedFrame(box: CanvasBox, format: MotionFormat, sides: Sides): MotionDoc {
-  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box, sides) } : newMotionDoc(format);
+  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...docPixels(box, FRAME_PX_PER_CANVAS_PX, sides) } : newMotionDoc(format);
   return withSurface(doc, SURFACE_ID);
 }
 

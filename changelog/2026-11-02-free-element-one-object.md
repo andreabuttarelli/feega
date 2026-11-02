@@ -18,7 +18,7 @@ holding a doc, and the inspector, the keyboard and the doc ops acted on the root
   by `GpuFlow.hostOf`) moves, resizes (same path as a handle drag) and turns the node; a scrub is
   one `liveEdits` gesture, one undo step. X/Y/rotation are `NumberField`s (scrub, units).
   Constraints hidden on the root of a free element (`pinnable`).
-- **Drawn at 1×.** `PIXELS_PER_CANVAS_PX` 2 → 1: a hand resize already re-staged docs at 1×, so
+- **Drawn at 1×.** Elements are drawn at `ELEMENT_PX_PER_CANVAS_PX` 1 (frames keep 2 for export); a hand resize already re-staged element docs at 1×, so
   docs were mixed anyway. Legacy 2× docs still read right through `spaceOf`; they were not
   rewritten (rejected: a table of every px quantity just to rescale old docs).
 - **Keyboard.** Arrows on the whole element move the node by 1/10 px with an undo step; `⌘D`
