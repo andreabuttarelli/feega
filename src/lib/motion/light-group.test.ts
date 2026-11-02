@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { groupLight, settleGroups, ungroupLight } from './light-group';
+import { groupLight, placeLayer, settleGroups, ungroupLight } from './light-group';
+import { wrapInStack } from './layout/ops';
+import { shownBox } from '@feega/motion-core/motion/layout/resolve';
 import { pivotBox } from '@feega/motion-core/motion/parent';
 import { addClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 
@@ -66,5 +68,59 @@ describe('a light group', () => {
     expect(findClip(doc, 'g')).toBeNull();
     expect(['a', 'b'].map((id) => findClip(doc, id)!.clip.parent ?? null)).toEqual([null, null]);
     expect(boxOf(doc, 'a')).toEqual(boxOf(two(), 'a'));
+  });
+});
+
+const three = () => must(addClip(two(), square('c', 0.4, 0.8), 'c'));
+const stacked = () => must(wrapInStack(three(), ['a', 'b', 'c'], 's', 'stack-lane'));
+const orderOf = (doc: MotionDoc, id: string) => findClip(doc, id)!.clip.autoLayout!.order;
+const shown = (doc: MotionDoc, id: string) => shownBox(doc, id)!;
+
+describe('a light group inside a stack', () => {
+  it('stays a stack child where its members were', () => {
+    const doc = must(groupLight(stacked(), ['b', 'c'], 'g', 'lane'));
+
+    expect(findClip(doc, 'g')!.clip.parent).toBe('s');
+    expect(orderOf(doc, 's')).toEqual(['a', 'g']);
+  });
+
+  it('keeps its members where the stack showed them', () => {
+    const before = stacked();
+    const doc = settleGroups(must(groupLight(before, ['b', 'c'], 'g', 'lane')));
+
+    expect(shown(doc, 'b').left).toBeCloseTo(shown(before, 'b').left, 3);
+    expect(shown(doc, 'c').left).toBeCloseTo(shown(before, 'c').left, 3);
+  });
+
+  it('ungroups back into the stack at its own place', () => {
+    const doc = must(ungroupLight(must(groupLight(stacked(), ['a', 'b'], 'g', 'lane')), 'g'));
+
+    expect(['a', 'b'].map((id) => findClip(doc, id)!.clip.parent)).toEqual(['s', 's']);
+    expect(orderOf(doc, 's')).toEqual(['a', 'b', 'c']);
+  });
+});
+
+const groupX = () => findClip(grouped(), 'g')!.clip.props.x as number;
+
+describe('placing a light group', () => {
+  it('moves its members with X and Y', () => {
+    const doc = settleGroups(must(placeLayer(grouped(), 'g', { x: groupX() + 0.1 })));
+
+    expect(boxOf(doc, 'a').left).toBeCloseTo(boxOf(two(), 'a').left + 108, 3);
+    expect(boxOf(doc, 'g').left).toBeCloseTo(boxOf(grouped(), 'g').left + 108, 3);
+  });
+
+  it('scales its members with W and H', () => {
+    const doc = settleGroups(must(placeLayer(grouped(), 'g', { width: 1 })));
+
+    expect(boxOf(doc, 'g').width).toBeCloseTo(1080, 3);
+    expect(boxOf(doc, 'a').width).toBeCloseTo(0.2 * 1080, 3);
+    expect(boxOf(doc, 'g').left).toBeCloseTo(boxOf(grouped(), 'g').left, 3);
+  });
+
+  it('sets the props of anything else', () => {
+    const doc = must(placeLayer(two(), 'a', { x: 0.7 }));
+
+    expect(findClip(doc, 'a')!.clip.props.x).toBe(0.7);
   });
 });

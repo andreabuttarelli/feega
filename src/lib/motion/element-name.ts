@@ -10,13 +10,26 @@ const SHAPE_NAME: Partial<Record<string, string>> = {
   [ShapeKind.Vector]: 'Vector'
 };
 
-type Named = { component: string; props: Record<string, unknown>; autoLayout?: Pick<AutoLayout, 'direction'> | null };
+type Named = { component: string; props: Record<string, unknown>; autoLayout?: Pick<AutoLayout, 'direction'> | null; group?: boolean };
+
+const GROUP_NAME = 'Group';
 
 export function elementName(clip: Named): string {
   const kind = layoutKind(clip);
   if (kind) {
     return LAYOUT_KIND_LABEL[kind];
   }
+  if (clip.group) {
+    return GROUP_NAME;
+  }
   const shape = clip.component === 'Shape' ? SHAPE_NAME[String(clip.props.shape)] : undefined;
   return shape ?? COMPONENTS[clip.component as ComponentId]?.label ?? clip.component;
+}
+
+export function elementKind(clip: Named): string {
+  const kind = layoutKind(clip);
+  if (kind) {
+    return LAYOUT_KIND_LABEL[kind];
+  }
+  return clip.group ? GROUP_NAME : (COMPONENTS[clip.component as ComponentId]?.label ?? clip.component);
 }

@@ -12,7 +12,8 @@ export enum ClipFamily {
   Camera = 'camera',
   Mask = 'mask',
   Precomp = 'precomp',
-  Adjustment = 'adjustment'
+  Adjustment = 'adjustment',
+  Group = 'group'
 }
 
 export enum Preview {
@@ -37,7 +38,8 @@ export const CLIP_FAMILIES: Record<ClipFamily, FamilyStyle> = {
   [ClipFamily.Camera]: { label: 'Camera', hue: '#2bb3c0', preview: Preview.Icon },
   [ClipFamily.Mask]: { label: 'Mask', hue: '#978365', preview: Preview.Icon },
   [ClipFamily.Precomp]: { label: 'Precomp', hue: '#3e63dd', preview: Preview.Icon },
-  [ClipFamily.Adjustment]: { label: 'Adjustment', hue: '#6e56cf', preview: Preview.Icon }
+  [ClipFamily.Adjustment]: { label: 'Adjustment', hue: '#6e56cf', preview: Preview.Icon },
+  [ClipFamily.Group]: { label: 'Group', hue: '#a18072', preview: Preview.Icon }
 };
 
 const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
@@ -74,6 +76,8 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
 export function familyOf(component: ComponentId): ClipFamily {
   return COMPONENT_FAMILY[component];
 }
+
+export const clipFamily = (clip: { component: ComponentId; group?: boolean }): ClipFamily => (clip.group ? ClipFamily.Group : familyOf(clip.component));
 
 export type TileQuery = { samples: number; sourceSeconds: number; trimSeconds: number; clipSeconds: number; tiles: number };
 

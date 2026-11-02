@@ -28,7 +28,7 @@
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
   import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, TextTier, textTier, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
-  import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
+  import { PropertiesView, fieldShownFor, sectionsFor } from '$lib/motion/properties-view';
   import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
@@ -54,7 +54,9 @@
   import { percentShown, percentSlider, percentStored } from '$lib/motion/type-percent';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import FamilyIcon from './FamilyIcon.svelte';
-  import { CLIP_FAMILIES, familyOf } from '$lib/motion/track-style';
+  import { CLIP_FAMILIES, clipFamily } from '$lib/motion/track-style';
+  import { placeLayer } from '$lib/motion/light-group';
+  import { elementKind } from '$lib/motion/element-name';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
@@ -80,7 +82,7 @@
   import StackSection from './StackSection.svelte';
   import StackSettings from './StackSettings.svelte';
   import { laidClip, layoutParent } from '$lib/motion/layout/ops';
-  import { LAYOUT_KIND_LABEL, layoutKind, placementOf } from '@feega/motion-core/motion/layout/stack';
+  import { placementOf } from '@feega/motion-core/motion/layout/stack';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
   import BindChip from './BindChip.svelte';
@@ -185,7 +187,7 @@
   const EDGE_GLYPH: Record<Side, string> = { [Side.In]: '↗', [Side.Out]: '↘' };
   const DEFAULT_EDGE_FRAMES = 12;
 
-  const family = $derived(familyOf(clip.component));
+  const family = $derived(clipFamily(clip));
   let sections = $state<SectionState>({});
 
   onMount(() => {
@@ -220,7 +222,7 @@
   const fields = $derived(
     clipFieldGroups(doc, clip)
       .flatMap((g) => g.fields)
-      .filter((f) => !uiHidden(f.key))
+      .filter((f) => !uiHidden(f.key) && fieldShownFor(family, f.key))
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
       .filter((f) => !emptyManaged(f.control, (clip.props as Record<string, unknown>)[f.key]))
@@ -250,8 +252,7 @@
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
-  const stackKind = $derived(layoutKind(clip));
-  const headKind = $derived(customName ? 'Component' : stackKind ? LAYOUT_KIND_LABEL[stackKind] : spec.label);
+  const headKind = $derived(customName ? 'Component' : elementKind(clip));
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
@@ -281,7 +282,7 @@
       animate(field.key, value as KeyValue);
       return;
     }
-    commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
+    commit(placeLayer(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
   }
 
   let replacing = $state(false);
@@ -497,7 +498,7 @@
   const visual = $derived(spec.track === TrackKind.Visual);
 
   const view = $derived(as ?? (focus ? PropertiesView.Part : PropertiesView.Clip));
-  const clipsOwnContent = $derived(!clip.autoLayout && (hasChildren || view === PropertiesView.Frame));
+  const clipsOwnContent = $derived(!clip.autoLayout && fieldShownFor(family, 'clipContent') && (hasChildren || view === PropertiesView.Frame));
   const layerExtras = $derived(visual && view !== PropertiesView.Frame);
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,

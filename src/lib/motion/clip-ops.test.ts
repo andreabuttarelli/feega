@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { ClipOp, runClipOp } from './clip-ops';
+import { wrapInStack } from './layout/ops';
+import { setParent } from './parent-ops';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -55,5 +57,30 @@ describe('clip ops', () => {
 
   it('a failing op reports its error instead of a doc', () => {
     expect(runClipOp(ClipOp.Split, ctx(['a'], 200)).ok).toBe(false);
+  });
+});
+
+describe('deleting a container', () => {
+  const nested = () => {
+    let d = newMotionDoc(MotionFormat.Square);
+    const box = (x: number) => ({ component: 'Shape' as const, from: 0, durationInFrames: 30, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } });
+    d = must(addClip(d, box(0.2), 'a'));
+    d = must(addClip(d, box(0.5), 'b'));
+    d = must(wrapInStack(d, ['a', 'b'], 's', 'lane'));
+    return must(addClip(d, { component: 'Null', from: 0, durationInFrames: 30, props: { x: 0.5, y: 0.5 } }, 'n'));
+  };
+  const deleting = (doc: MotionDoc, selection: string[]) => runClipOp(ClipOp.Delete, { doc, selection, frame: 0, parent: null, newId: () => 'x' });
+
+  it('deletes the stack with its children, like the canvas does', () => {
+    const done = deleting(nested(), ['s']);
+
+    expect(done.ok && ids(done.doc).sort()).toEqual(['n']);
+  });
+
+  it('lets a null object go of what it rigs', () => {
+    const done = deleting(must(setParent(nested(), 's', 'n')), ['n']);
+
+    expect(done.ok && ids(done.doc).sort()).toEqual(['a', 'b', 's']);
+    expect(done.ok && (findClip(done.doc, 's')!.clip.parent ?? null)).toBeNull();
   });
 });
