@@ -289,7 +289,7 @@ describe('Run flow on a selection of drawings', () => {
 
 describe('hide and lock on canvas nodes', () => {
   it('the right-click menu of a node offers them and runs them on the node', () => {
-    expect([...canvasMenuIds(1)]).toEqual(expect.arrayContaining(['hide', 'lock']));
+    expect([...canvasMenuIds()]).toEqual(expect.arrayContaining(['hide', 'lock']));
     expect(isCanvasAction('hide') && isCanvasAction('lock')).toBe(true);
   });
 });
