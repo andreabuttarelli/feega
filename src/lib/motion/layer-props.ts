@@ -1,5 +1,5 @@
-import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setKeyframes, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 
 export enum Flip {
   Horizontal = 'horizontal',
@@ -18,6 +18,25 @@ export function flipPatch(scales: Scales, flip: Flip): Scales {
   return { [key]: -(scales[key] ?? 1) };
 }
 
+const SPAN: Record<Flip, { anchor: 'anchorX' | 'anchorY'; at: 'x' | 'y'; size: 'width' | 'height' }> = {
+  [Flip.Horizontal]: { anchor: 'anchorX', at: 'x', size: 'width' },
+  [Flip.Vertical]: { anchor: 'anchorY', at: 'y', size: 'height' }
+};
+
+const MIDDLE = 0.5;
+
+function centredPivot(doc: MotionDoc, clip: MotionClip, flip: Flip): OpResult {
+  const { anchor, at, size } = SPAN[flip];
+  const [place, length] = [clip.props[at], clip.props[size]];
+  if (typeof place !== 'number' || typeof length !== 'number' || clip.transform.rotateZ) {
+    return { ok: true, doc };
+  }
+  const pivot = clip.transform[anchor] ?? MIDDLE;
+  const scale = clip.transform[AXIS[flip]] ?? 1;
+  const moved = setProps(doc, clip.id, { [at]: place + (scale - 1) * (MIDDLE - pivot) * length });
+  return moved.ok ? setTransform(moved.doc, clip.id, { [anchor]: MIDDLE }) : moved;
+}
+
 function flipOne(doc: MotionDoc, clipId: string, flip: Flip): OpResult {
   const clip = findClip(doc, clipId)?.clip;
   if (!clip) {
@@ -28,7 +47,8 @@ function flipOne(doc: MotionDoc, clipId: string, flip: Flip): OpResult {
   if (track?.length) {
     return setKeyframes(doc, clipId, key, track.map((k) => ({ ...k, value: -Number(k.value) })));
   }
-  return setTransform(doc, clipId, flipPatch(clip.transform, flip));
+  const centred = centredPivot(doc, clip, flip);
+  return centred.ok ? setTransform(centred.doc, clipId, flipPatch(clip.transform, flip)) : centred;
 }
 
 export const QUARTER_TURN = 90;

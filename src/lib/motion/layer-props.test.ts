@@ -84,6 +84,21 @@ describe('⇧H / ⇧V flip every selected layer', () => {
     expect(findClip(flipped, 'a')!.clip.keyframes.scaleY!.map((k) => k.value)).toEqual([-1, -2]);
   });
 
+  it('a layer drawn with its pivot at the top-left flips in place, not over its left edge', () => {
+    const drawn = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.2 }, transform: { anchorX: 0, anchorY: 0 } }, 'c'));
+    const span = (d: MotionDoc) => {
+      const c = findClip(d, 'c')!.clip;
+      const [x, w] = [Number(c.props.x), Number(c.props.width)];
+      const pivot = x - w / 2 + (c.transform.anchorX ?? 0.5) * w;
+      const s = c.transform.scaleX ?? 1;
+      return [pivot + s * (x - w / 2 - pivot), pivot + s * (x + w / 2 - pivot)].sort((a, b) => a - b).map((v) => Math.round(v * 1e6) / 1e6);
+    };
+    const once = must(flipClips(drawn, ['c'], Flip.Horizontal));
+
+    expect(span(once)).toEqual(span(drawn));
+    expect(span(must(flipClips(once, ['c'], Flip.Horizontal)))).toEqual(span(drawn));
+  });
+
   it('flipping twice is the original', () => {
     const twice = must(flipClips(must(flipClips(doc, ['a'], Flip.Horizontal)), ['a'], Flip.Horizontal));
     expect(findClip(twice, 'a')!.clip.transform.scaleX).toBe(1);
