@@ -20,3 +20,11 @@ Basics audit #19, and a drop shadow defect seen on the canvas.
   item's spread within the frame grown by the filter reach. Test: `tests/shadow_region.rs`.
 - Discarded: damaging a group's spill instead of its box. The element group already includes the
   bleed, so damage was not the cause.
+- **Set main resize (follow-up to #1748).** The drag preview scaled the whole set node, then the
+  drop resized only the main. `mainDragged` (`motion/component-set.ts`) turns the drag into the
+  main size and the node size; `GpuFlow` shows it live through `liveDocs` and the node override,
+  and puts the doc back on cancel or refusal. Agents: `component` action `resize-set-main`
+  (`clip_id`, `width`, `height` in frame px), same op.
+- **Open:** after ⌘G a group can keep a 1 px canvas-coloured column inside its outer edges until a
+  full repaint (zoom or reload). Reproduced, not fixed: it is a partial-repaint defect distinct
+  from the shadow one (a native compositor probe paints the right items for the damaged rect).

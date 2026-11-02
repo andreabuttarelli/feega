@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@fe
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { createComponent } from './main-component';
 import { compBox } from './comp-frame';
-import { SET_GAP_PX, addSetVariant, resizeSetMain, setMainOf } from './component-set';
+import { SET_GAP_PX, addSetVariant, mainDragged, resizeSetMain, setMainOf } from './component-set';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -59,6 +59,22 @@ describe('resizing the main of a set', () => {
     expect(Math.round(second.right - second.left)).toBe(200);
     expect(resized.width).toBe(doc.width + 40);
     expect(resized.height).toBe(doc.height + 20);
+  });
+
+  it('turns a handle drag in canvas px into the main size, growing the node by the set it hugs', () => {
+    const doc = must(addSetVariant(setFrame(), newId));
+    const [main] = precomps(doc);
+    const was = { w: doc.width / 2, h: doc.height / 2 };
+
+    const dragged = mainDragged(doc, main.id, { w: 20, h: 10 }, was)!;
+    const resized = must(dragged.result);
+    const [first, second] = precomps(resized).map((c) => compBox(resized.comps[String(c.props.comp)], resized)!);
+
+    expect(Math.round(first.right - first.left)).toBe(240);
+    expect(Math.round(first.bottom - first.top)).toBe(64);
+    expect(Math.round(second.right - second.left)).toBe(200);
+    expect(dragged.node).toEqual({ w: resized.width / 2, h: resized.height / 2 });
+    expect(mainDragged(doc, 'nope', { w: 1, h: 1 }, was)).toBeNull();
   });
 
   it('refuses a clip that is not a main of the set', () => {

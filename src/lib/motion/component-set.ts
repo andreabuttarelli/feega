@@ -98,3 +98,18 @@ export function resizeSetMain(doc: MotionDoc, clipId: string, size: Size): OpRes
   const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, placedComp(id, comp)]));
   return { ok: true, doc: { ...doc, ...next, comps } };
 }
+
+type NodeSize = { w: number; h: number };
+
+export function mainDragged(doc: MotionDoc, clipId: string, by: NodeSize, was: NodeSize): { result: OpResult; node: NodeSize } | null {
+  const main = topClips(doc).find((c) => c.id === clipId && ownMain(doc, c));
+  const box = main ? compBox(doc.comps[String(main.props.comp)], doc) : null;
+  if (!box) {
+    return null;
+  }
+  const perPx = { x: doc.width / was.w, y: doc.height / was.h };
+  const size = { width: box.right - box.left + by.w * perPx.x, height: box.bottom - box.top + by.h * perPx.y };
+  const result = resizeSetMain(doc, clipId, size);
+  const node = result.ok ? { w: result.doc.width / perPx.x, h: result.doc.height / perPx.y } : was;
+  return { result, node };
+}
