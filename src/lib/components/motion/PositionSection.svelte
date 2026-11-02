@@ -234,6 +234,12 @@
     appearance: textfield;
   }
 
+  .select select {
+    padding-right: 18px;
+    appearance: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4l2.5 2.5L7.5 4'/%3E%3C/svg%3E") no-repeat right 0 center / 10px 10px;
+  }
+
   .field input::-webkit-inner-spin-button,
   .field input::-webkit-outer-spin-button {
     appearance: none;

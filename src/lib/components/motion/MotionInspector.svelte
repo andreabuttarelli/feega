@@ -1479,9 +1479,10 @@
     flex: 1;
     min-width: 0;
     height: 100%;
-    padding: 0 2px;
+    padding: 0 16px 0 2px;
     border: 0;
-    background: transparent;
+    background-color: transparent;
+    background-position: right 2px center;
     font: inherit;
     font-variant-numeric: tabular-nums;
   }
@@ -1498,6 +1499,13 @@
     width: 100%;
     height: var(--ui-row);
     padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius-md);
+    background-color: var(--ui-input);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
   select {
@@ -1507,19 +1515,12 @@
     background-repeat: no-repeat;
     background-position: right 8px center;
     background-size: 10px 10px;
-    border: 1px solid transparent;
-    border-radius: var(--ui-radius-md);
-    background: var(--ui-input);
-    color: var(--ui-ink);
-    font: inherit;
-    font-size: var(--ui-text-sm);
-    transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
   input[type='text']:hover,
   textarea:hover,
   select:hover {
-    background: var(--ui-input-hover);
+    background-color: var(--ui-input-hover);
   }
 
   .appear {
@@ -1550,11 +1551,11 @@
   .blend select {
     padding-left: 32px;
     border-color: var(--ui-divider-strong);
-    background: transparent;
+    background-color: transparent;
   }
 
   .blend select:hover {
-    background: var(--ui-wash);
+    background-color: var(--ui-wash);
   }
 
   textarea {
