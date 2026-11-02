@@ -133,6 +133,13 @@ describe('the stroke stack in Properties', () => {
     expect(sent(onchange)[0].join).toBe('bevel');
   });
 
+  it('a stroke colour opens the same picker as a fill, already open in its editor', () => {
+    show(TWO);
+    click(rows()[1]);
+
+    expect(byId('stroke-editor').querySelector('[data-testid="colour-picker"]')).not.toBeNull();
+  });
+
   it('a stroke colour carries its own alpha', () => {
     const onchange = show(TWO);
     click(rows()[1]);

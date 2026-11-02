@@ -31,6 +31,8 @@ export function syncedDoc(doc: MotionDoc, name: string, style: Style): MotionDoc
   return defined.ok ? defined.doc : null;
 }
 
+export const colourStyles = (library: Library): { name: string; color: string }[] => Object.entries(library).flatMap(([name, style]) => (style.kind === StyleKind.Colour ? [{ name, color: style.color }] : []));
+
 export const offeredStyles = (doc: MotionDoc, component: ComponentId, library: Library) => stylesFor({ ...doc, styles: { ...library, ...doc.styles } }, component).map((s) => ({ name: s.name, style: s.style, shared: !doc.styles?.[s.name] }));
 
 const LABEL: { [K in StyleKind]: (style: Extract<Style, { kind: K }>) => string } = {
