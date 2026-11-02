@@ -71,7 +71,7 @@ function coordsFor(source: Source, weight: number, request: Request): Record<str
 
 export const resolvedRequest = <R extends Omit<Request, 'size'>>(request: R, registry: readonly FontFace[]): R => ({ ...request, family: familyName(request.family, registry), weight: loadedWeight(request.family, request.weight, registry) });
 
-export const SYMBOL_FALLBACKS = ['Noto Sans Symbols 2', 'Noto Sans Math'];
+export const SYMBOL_FALLBACKS = ['Noto Sans', 'Noto Sans Mono', 'Noto Sans Symbols 2', 'Noto Sans Math', 'Noto Sans Symbols'];
 
 export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string, Source>, registry: readonly FontFace[]): FaceBook {
   const keyed = new Map<string, Face>();

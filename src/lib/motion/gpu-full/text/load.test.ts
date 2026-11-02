@@ -100,5 +100,12 @@ describe('loadFonts', () => {
     await fontLoader(read)(ticked, {}, FEEGA_TOKENS);
     expect(asked.find((url) => url.includes('Symbols'))).toContain(`text=${encodeURIComponent('✓')}`);
   });
-});
 
+  it('asks the fallback fonts for the letters a font lacks past Latin, Greek in a mono title', async () => {
+    const asked: string[] = [];
+    const greek = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'αβ', font: 'mono' } }, 'greek'));
+    await fontLoader({ text: async (url: string) => (asked.push(url), CSS), bytes: async () => new Uint8Array() })(greek, {}, FEEGA_TOKENS);
+
+    expect(asked.find((url) => url.includes('family=Noto+Sans&'))).toContain(`text=${encodeURIComponent('αβ')}`);
+  });
+});
