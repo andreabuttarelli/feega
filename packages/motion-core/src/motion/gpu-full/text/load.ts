@@ -22,10 +22,10 @@ export const webReader: Reader = {
 };
 
 const SPACE = 0x20;
-const FIRST_SYMBOL = 0x2000;
+const PAST_LATIN = 0x250;
 
 function symbolsUrl(points: readonly number[]): string | null {
-  const symbols = String.fromCodePoint(...points.filter((cp) => cp >= FIRST_SYMBOL));
+  const symbols = String.fromCodePoint(...points.filter((cp) => cp >= PAST_LATIN));
   const families = SYMBOL_FALLBACKS.map((f) => `family=${f.replaceAll(' ', '+')}`).join('&');
   return symbols ? `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(symbols)}&display=block` : null;
 }
