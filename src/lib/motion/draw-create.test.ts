@@ -143,6 +143,18 @@ describe('drawing an element on the canvas, outside any frame', () => {
     expect(drawn.box).toEqual({ left: 100, top: 50, width: 300, height: 100 });
   });
 
+  it('an element doc has a pixel for each canvas pixel, so its numbers read as the canvas', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Rectangle, box: { left: 100, top: 50, width: 300, height: 100 } }, 'r1'));
+
+    expect([drawn.doc.width, drawn.doc.height]).toEqual([300, 100]);
+  });
+
+  it('a drawn frame keeps two pixels for each canvas pixel, for a sharp export', () => {
+    const frame = drawnFrame({ left: 0, top: 0, width: 300, height: 100 });
+
+    expect([frame.width, frame.height]).toEqual([600, 200]);
+  });
+
   it('a pen path takes the box of its points', () => {
     const outline = parsePath('M 10 20 L 110 20 L 110 70') as Outline;
     const drawn = made(drawnElement({ tool: DrawTool.Pen, outline }, 'p1'));

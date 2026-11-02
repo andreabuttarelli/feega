@@ -107,7 +107,7 @@
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
 
 {#snippet frameLead()}
-  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} turn={frameProperties.turn} />{/if}
+  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} host={frameProperties.host} />{/if}
   {#if doc}<FramePresetSection {doc} onchange={editGuides} />{/if}
 {/snippet}
 
@@ -160,7 +160,7 @@
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} turn={frameProperties.turn?.clipId === shown.clip.id ? frameProperties.turn : null} onchange={editShown} onalign={alignPicks} />
+      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} onchange={editShown} onalign={alignPicks} />
       {#if frameProperties.exportPicks}<ExportSection onexport={frameProperties.exportPicks} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}

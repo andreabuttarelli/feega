@@ -13,7 +13,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 const lookupFound = () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null });
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => lookupFound(), openCanvasForUser: async () => ({ memberships: [], found: lookupFound() }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
-vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })) }));
+vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })), findNode: vi.fn(async () => null) }));
 vi.mock('$lib/server/motion/editor', async (original) => ({
   ...(await original<object>()),
   findMotionNode: async () => ({ record: { id: 'n1' }, node: { format: 'landscape' } })

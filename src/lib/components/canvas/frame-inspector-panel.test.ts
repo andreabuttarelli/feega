@@ -26,13 +26,65 @@ function sessionOf(selection: string[]) {
   );
 }
 
-describe('the rotation of a free element', () => {
-  it('reads the node rotation, not the upright root inside its doc', () => {
-    frameProperties.turn = { clipId: 'a', degrees: 90, set: () => undefined };
-    const body = html(['a']);
-    frameProperties.clear();
+const valueOf = (body: string, attr: string) => new RegExp(`<input[^>]*${attr}[^>]*>`).exec(body)?.[0].match(/value="([^"]*)"/)?.[1] ?? null;
 
-    expect(body).toMatch(/value="90"[^>]*data-testid="rotation-field"/);
+const element = (() => {
+  const doc = { ...newMotionDoc(MotionFormat.Landscape), still: { frame: 0 }, width: 400, height: 240 } as MotionDoc;
+  return must(addClip(doc, { component: 'Shape', from: 0, props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1, roundness: 0.25 } }, 'a'));
+})();
+
+function elementSession() {
+  return new FrameEditSession(
+    { head: { version: 1, doc: element }, selection: ['a'] },
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+  );
+}
+
+const hosted = (box = { x: 30, y: 40, w: 200, h: 120, rotation: 90 }) => {
+  frameProperties.host = { clipId: 'a', box, move: () => undefined, resize: () => undefined, turn: () => undefined };
+  const body = render(FrameInspectorPanel, { props: { session: elementSession(), tokens: FEEGA_TOKENS } }).body;
+  frameProperties.clear();
+  return body;
+};
+
+describe('a layer aligned in its frame', () => {
+  it('reads X where align put it, offset included', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 }, transform: { x: 0.1 } }, 'a'));
+    const session = new FrameEditSession(
+      { head: { version: 1, doc }, selection: ['a'] },
+      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    );
+    const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
+
+    expect(valueOf(body, 'data-testid="position-x"')).toBe(String(Math.round(0.4 * doc.width + 0.1 * doc.width)));
+  });
+});
+
+describe('a free element reads as one object on the canvas', () => {
+  it('its rotation is the node rotation, not the upright root inside its doc', () => {
+    expect(valueOf(hosted(), 'data-testid="rotation-field"')).toBe('90');
+  });
+
+  it('its X and Y are where the node sits on the canvas', () => {
+    const body = hosted();
+
+    expect(valueOf(body, 'data-testid="position-x"')).toBe('30');
+    expect(valueOf(body, 'data-testid="position-y"')).toBe('40');
+  });
+
+  it('its W and H are canvas px, though its doc holds two px for each', () => {
+    const body = hosted();
+
+    expect(valueOf(body, 'aria-label="Width"')).toBe('200');
+    expect(valueOf(body, 'aria-label="Height"')).toBe('120');
+  });
+
+  it('its radius is canvas px too', () => {
+    expect(valueOf(hosted(), 'aria-label="Roundness"')).toBe('30');
+  });
+
+  it('it has no frame to pin to, so no constraints', () => {
+    expect(hosted()).not.toContain('data-testid="constraints-section"');
   });
 });
 
@@ -55,7 +107,7 @@ describe('the frame itself', () => {
 describe('a free group or image', () => {
   it('turns from the panel with the node rotation', () => {
     frameProperties.place = { x: 0, y: 0, set: () => undefined };
-    frameProperties.turn = { clipId: 'a', degrees: 30, set: () => undefined };
+    frameProperties.host = { clipId: 'a', box: { x: 0, y: 0, w: 10, h: 10, rotation: 30 }, move: () => undefined, resize: () => undefined, turn: () => undefined };
     const body = html([]);
     frameProperties.clear();
 
