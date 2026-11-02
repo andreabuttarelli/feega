@@ -61,7 +61,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, inFlightWrites, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { Way, createUndoStack } from '$lib/canvas/undo-stack';
   import { exportFailure } from '$lib/canvas/export-failure';
-  import { type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
+  import { joinGestures, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { DUPLICATE_OFFSET, copyPlan, repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { inverseResize, resizeStale, sameBox, type ResizeGesture } from '$lib/canvas/resize-gesture';
@@ -3209,10 +3209,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     })
   );
 
-  function toggleFlag(ids: string[], flag: NodeFlag) {
-    for (const { id, patch } of toggledFlags(nodes, ids, flag)) {
-      void write(id, patch, SaveTiming.Now);
-    }
+  async function toggleFlag(ids: string[], flag: NodeFlag) {
+    const caught = await undoStack.collect(() => Promise.all(toggledFlags(nodes, ids, flag).map(({ id, patch }) => write(id, patch, SaveTiming.Now))));
+    const joined = joinGestures(caught.flatMap((entry) => (entry.source === 'server' ? [entry.gesture] : [])));
+    if (joined) { pushGesture(joined); }
   }
 
   function rectOf(id: string): Rect | null {

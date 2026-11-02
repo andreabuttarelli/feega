@@ -49,6 +49,11 @@ export type UndoItem =
  */
 export type Gesture = { items: UndoItem[] };
 
+export const joinGestures = (gestures: readonly Gesture[]): Gesture | null => {
+  const items = gestures.flatMap((g) => g.items);
+  return items.length ? { items } : null;
+};
+
 export const writesFrameAt = (gesture: Gesture, nodeId: string, version: number): boolean =>
   gesture.items.some((item) => item.kind === 'doc.revision' && item.nodeId === nodeId && item.after === version);
 

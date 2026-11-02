@@ -37,7 +37,7 @@ Scenes, camera, breakpoints, prototype flow, styles and variables sit in the fol
 
 - Right-click on stacked layers lists them so you can pick the one underneath.
 - Right-click a layer to hide (`⇧⌘H`), lock (`⇧⌘L`), copy properties (`⌥⌘C`) or paste them (`⌥⌘V`). A locked layer, and everything inside it, stays put when dragged.
-- The same keys work on whole nodes on the canvas: frames, images and groups. A hidden node is not drawn and cannot be clicked; its row in Layers is dimmed. A locked node cannot be moved, resized or rotated, but you can still select it from Layers. Each node row in Layers has its own eye and lock, and `Cmd+Z` undoes either.
+- The same keys work on whole nodes on the canvas: frames, images and groups. A hidden node is not drawn and cannot be clicked; its row in Layers is dimmed. A locked node cannot be moved, resized or rotated, but you can still select it from Layers. Each node row in Layers has its own eye and lock, the right-click menu has Hide / show and Lock / unlock, and one `Cmd+Z` undoes the toggle for the whole selection.
 - Hold `Alt` while dragging an element inside a frame to drag a copy; the original stays where it was.
 - Hold `Cmd`/`Ctrl` and drag across a frame to select elements inside groups, not the groups.
 - `Cmd+F` finds any node by name, text or prompt.

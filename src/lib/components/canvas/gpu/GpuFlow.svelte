@@ -3464,6 +3464,8 @@
     paste: () => menuAt && void pasteSystem(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
+    hide: (ids) => props.onToggleFlag?.(ids, NodeFlag.Hidden),
+    lock: (ids) => props.onToggleFlag?.(ids, NodeFlag.Locked),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     'combine-video': (ids) => props.onCombineScenes?.(ids),
     'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
