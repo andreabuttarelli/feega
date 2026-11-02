@@ -100,6 +100,7 @@ test.describe('effect and paint styles shared across frames @real', () => {
     }
 
     await page.keyboard.press('Escape');
+    await page.locator('[data-testid="style-library-row"][data-style="Sunset"]').click();
     const name = page.getByTestId('style-library-name-Sunset');
     await name.fill(RENAMED);
     await name.press('Enter');

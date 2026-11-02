@@ -56,6 +56,7 @@ test.describe('styles shared by the frames of a canvas @real', () => {
     const boxA = (await hostA.boundingBox())!;
     await page.mouse.click(boxA.x + 4, boxA.y + 4);
     await expect(page.getByTestId('style-library')).toBeVisible({ timeout: 15_000 });
+    await page.locator('[data-testid="style-library-row"][data-style="Brand"]').click();
     await setColour(page, page.getByTestId('style-library-colour-Brand'), GREEN);
     await page.waitForTimeout(SETTLE_MS * 2);
     await page.screenshot({ path: `${SHOTS}/figD-styles-1-shared.png` });
@@ -93,10 +94,13 @@ test.describe('styles shared by the frames of a canvas @real', () => {
     await page.getByText('Properties', { exact: true }).first().click();
     await expect(page.getByTestId('style-library')).toBeVisible({ timeout: 15_000 });
 
-    await page.getByTestId('style-library-size-Headline').fill('0.2');
-    await page.getByTestId('style-library-size-Headline').press('Enter');
+    const headlineRow = page.locator('[data-testid="style-library-row"][data-style="Headline"]');
+    await headlineRow.click();
+    await page.getByTestId('style-library-size-Headline').locator('input').fill('216');
+    await page.getByTestId('style-library-size-Headline').locator('input').press('Enter');
     await page.waitForTimeout(SETTLE_MS);
     await page.screenshot({ path: `${SHOTS}/w2a-5-style-edited.png` });
+    await headlineRow.click();
     await page.getByTestId('style-library-name-Headline').fill('Display');
     await page.getByTestId('style-library-name-Headline').press('Enter');
     await page.waitForTimeout(SETTLE_MS * 2);

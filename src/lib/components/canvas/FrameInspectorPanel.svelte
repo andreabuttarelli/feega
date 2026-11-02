@@ -140,7 +140,7 @@
       <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
       <BreakpointsSection doc={source!} active={session.breakpoint} onchange={editSource} onpick={pickView} />
       <FlowSection {doc} onchange={editGuides} />
-      <StyleLibrarySection {tokens} />
+      <StyleLibrarySection {tokens} unit={Math.min(doc.width, doc.height)} />
       <VariablesLibrarySection {doc} onchange={editGuides} />
     </details>
     {#if frameProperties.runAction}

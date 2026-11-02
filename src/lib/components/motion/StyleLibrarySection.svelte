@@ -1,26 +1,61 @@
 <script lang="ts">
+  import Plus from '@lucide/svelte/icons/plus';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import * as Popover from '$lib/components/ui/popover/index.js';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import ColorField from './ColorField.svelte';
+  import NumberField from './NumberField.svelte';
+  import FontPicker from './FontPicker.svelte';
+  import { fontPreviewHref } from '$lib/design/font-preview';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
-  import { STYLE_NAME, StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
+  import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
+  import { TYPE, TYPE_SIZE } from '@feega/motion-core/motion/components';
   import { styleLabel } from '$lib/motion/style-library';
   import { swatchOf } from '$lib/motion/fill/swatch';
+  import { fractionOf, pxOf, textFace, textMetrics } from '$lib/motion/type-px';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
 
-  let { tokens }: { tokens: BrandTokens } = $props();
+  const DEFAULT_UNIT = 1080;
+  const PERCENT = 100;
 
-  type TextKey = 'size' | 'weight' | 'tracking' | 'leading';
-  const TEXT_FIELDS: { key: TextKey; label: string; step: number }[] = [
-    { key: 'size', label: 'Size', step: 0.005 },
-    { key: 'weight', label: 'Weight', step: 100 },
-    { key: 'tracking', label: 'Tracking', step: 0.01 },
-    { key: 'leading', label: 'Leading', step: 0.05 }
+  let { tokens, unit = DEFAULT_UNIT }: { tokens: BrandTokens; unit?: number } = $props();
+
+  type Group = { title: string; kinds: StyleKind[]; create?: { prefix: string; style: Style } };
+  const GROUPS: Group[] = [
+    { title: 'Text', kinds: [StyleKind.Text], create: { prefix: 'Text style', style: { kind: StyleKind.Text, size: 0.08, weight: 600 } } },
+    { title: 'Colour', kinds: [StyleKind.Colour, StyleKind.Paint], create: { prefix: 'Colour', style: { kind: StyleKind.Colour, color: '#111111' } } },
+    { title: 'Effect', kinds: [StyleKind.Effect] }
   ];
 
   const entries = $derived(Object.entries(styleLibrary.styles));
+  const inGroup = (group: Group) => entries.filter(([, style]) => group.kinds.includes(style.kind));
   const color = (value: string) => resolveColor(value, tokens);
-  const colourOf = (style: Style) => ('color' in style && style.color ? color(style.color) : '#000000');
-  const swatch = (style: Style) => (style.kind === StyleKind.Paint ? swatchOf(style.fills[0], { color, picture: (f) => f.src }) : null);
+  const swatch = (style: Style) => {
+    if (style.kind === StyleKind.Paint) {
+      return swatchOf(style.fills[0], { color, picture: (f) => f.src });
+    }
+    return 'color' in style && style.color ? color(style.color) : null;
+  };
+  const meta = (style: Style) => {
+    if (style.kind === StyleKind.Text) {
+      return { face: textFace(style), metrics: textMetrics(style, unit) };
+    }
+    return { face: '', metrics: style.kind === StyleKind.Colour ? color(style.color) : styleLabel(style) };
+  };
+
+  const SAMPLE = 'Aa';
+  const previews = $derived.by(() => {
+    const weights = new Map<string, Set<number>>();
+    for (const [, style] of entries) {
+      if (style.kind === StyleKind.Text && style.font) {
+        weights.set(style.font, (weights.get(style.font) ?? new Set()).add(style.weight ?? 400));
+      }
+    }
+    return [...weights].map(([font, w]) => fontPreviewHref([font], { text: SAMPLE, weights: [...w].sort((a, b) => a - b) }));
+  });
+
+  let open = $state<string | null>(null);
 
   function edit(name: string, style: Style, patch: Record<string, unknown>) {
     const next = styleSchema.safeParse({ ...style, ...patch });
@@ -29,64 +64,110 @@
     }
   }
 
-  const NEW_STYLES: { kind: StyleKind; label: string; style: Style }[] = [
-    { kind: StyleKind.Text, label: 'Text', style: { kind: StyleKind.Text, size: 0.08, weight: 600 } },
-    { kind: StyleKind.Colour, label: 'Colour', style: { kind: StyleKind.Colour, color: '#111111' } }
-  ];
+  function create({ prefix, style }: NonNullable<Group['create']>) {
+    let n = 1;
+    while (styleLibrary.styles[`${prefix} ${n}`]) {
+      n++;
+    }
+    const name = `${prefix} ${n}`;
+    void styleLibrary.push(name, style);
+    open = name;
+  }
 
-  let draft = $state('');
+  function rename(from: string, raw: string) {
+    const to = raw.trim();
+    void styleLibrary.rename(from, to);
+    if (open === from && styleLibrary.styles[to]) {
+      open = to;
+    }
+  }
 
-  function create(style: Style) {
-    const name = draft.trim();
-    if (!STYLE_NAME.test(name) || styleLibrary.styles[name]) {
+  function remove(name: string) {
+    open = null;
+    void styleLibrary.remove(name);
+  }
+
+  function closeOnEnter(e: KeyboardEvent) {
+    e.stopPropagation();
+    if (e.key !== 'Enter') {
       return;
     }
-    void styleLibrary.push(name, style);
-    draft = '';
+    (e.target as HTMLElement).blur?.();
+    open = null;
   }
 
-  function numeric(name: string, style: Style, key: TextKey, raw: string) {
-    edit(name, style, { [key]: raw === '' ? undefined : Number(raw) });
-  }
+  const toggle = (name: string, next: boolean) => {
+    if (next) {
+      open = name;
+      return;
+    }
+    if (open === name) {
+      open = null;
+    }
+  };
 </script>
 
+<svelte:head>
+  {#each previews as href (href)}<link rel="stylesheet" {href} />{/each}
+</svelte:head>
+
 <section class="library" data-testid="style-library">
-    <header>Styles · project</header>
-    <div class="create">
-      <input type="text" placeholder="New style name" bind:value={draft} aria-label="New style name" data-testid="style-library-new-name" onkeydown={(e) => e.stopPropagation()} />
-      {#each NEW_STYLES as n (n.kind)}
-        <button type="button" data-testid={`style-library-new-${n.kind}`} onclick={() => create(n.style)}>+ {n.label}</button>
-      {/each}
-    </div>
-    {#if styleLibrary.failed}<p class="kind" data-testid="style-library-failed">A style change could not be saved and was undone.</p>{/if}
-    {#each entries as [name, style] (name)}
-      <div class="style" data-testid="style-library-row" data-kind={style.kind}>
-        <div class="row">
-          {#if style.kind === StyleKind.Text || style.kind === StyleKind.Colour}
-            <span data-testid={`style-library-colour-${name}`}><ColorField {name} display={ColourDisplay.Chip} value={colourOf(style)} {tokens} onchange={(v) => edit(name, style, { color: v })} /></span>
-          {:else}
-            <span class="swatch" data-testid={`style-library-swatch-${name}`} style={`background:${swatch(style) ?? 'var(--ui-input)'}`}></span>
+  {#if styleLibrary.failed}<p class="muted" data-testid="style-library-failed">A style change could not be saved and was undone.</p>{/if}
+  {#each GROUPS as group (group.title)}
+    {@const rows = inGroup(group)}
+    {#if group.create || rows.length}
+      <div class="group">
+        <header>
+          <span>{group.title}</span>
+          {#if group.create}
+            {@const make = group.create}
+            <button type="button" class="icon" aria-label={`New ${group.title.toLowerCase()} style`} data-testid={`style-library-new-${make.style.kind}`} onclick={() => create(make)}><Plus size={14} /></button>
           {/if}
-          <input class="name" type="text" value={name} aria-label="Style name" data-testid={`style-library-name-${name}`} onchange={(e) => void styleLibrary.rename(name, e.currentTarget.value.trim())} />
-          <button type="button" class="remove" aria-label={`Delete ${name}`} data-testid={`style-library-remove-${name}`} onclick={() => void styleLibrary.remove(name)}>×</button>
-        </div>
-        <span class="kind">{styleLabel(style)}</span>
-        {#if style.kind === StyleKind.Text}
-          <div class="fields">
-            <label class="field">
-              <span>Font</span>
-              <input type="text" value={style.font ?? ''} data-testid={`style-library-font-${name}`} onchange={(e) => edit(name, style, { font: e.currentTarget.value.trim() || undefined })} />
-            </label>
-            {#each TEXT_FIELDS as f (f.key)}
-              <label class="field">
-                <span>{f.label}</span>
-                <input type="number" step={f.step} value={style[f.key] ?? ''} data-testid={`style-library-${f.key}-${name}`} onchange={(e) => numeric(name, style, f.key, e.currentTarget.value)} />
-              </label>
-            {/each}
-          </div>
-        {/if}
+        </header>
+        {#each rows as [name, style] (name)}
+          {@const chip = swatch(style)}
+          <Popover.Root open={open === name} onOpenChange={(next) => toggle(name, next)}>
+            <Popover.Trigger class="row" data-testid="style-library-row" data-kind={style.kind} data-style={name}>
+              {#if style.kind === StyleKind.Text}
+                <span class="aa" style:font-family={style.font ? `'${style.font}', sans-serif` : null} style:font-weight={style.weight}>{SAMPLE}</span>
+              {:else}
+                <span class="swatch" data-testid={`style-library-swatch-${name}`} style:background={chip ?? 'var(--ui-input)'}></span>
+              {/if}
+              {@const m = meta(style)}
+              <span class="name">{name}</span>
+              <span class="muted meta"><span class="face">{m.face}</span>{#if m.face && m.metrics}<span>&nbsp;·&nbsp;</span>{/if}<span class="metrics">{m.metrics}</span></span>
+              <span class="trail">{#if style.kind === StyleKind.Text && chip}<span class="dot" style:background={chip}></span>{/if}</span>
+            </Popover.Trigger>
+            <Popover.Content side="left" class="style-editor w-64 gap-2 p-3" onkeydown={closeOnEnter}>
+              <div class="head">
+                <input class="text" type="text" value={name} aria-label="Style name" data-testid={`style-library-name-${name}`} onchange={(e) => rename(name, e.currentTarget.value)} />
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger class="icon" aria-label={`More for ${name}`} data-testid={`style-library-more-${name}`}><Ellipsis size={14} /></DropdownMenu.Trigger>
+                  <DropdownMenu.Content align="end">
+                    <DropdownMenu.Item onSelect={() => remove(name)} data-testid={`style-library-remove-${name}`}>Delete style</DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+              </div>
+              {#if style.kind === StyleKind.Text}
+                <span data-testid={`style-library-font-${name}`}><FontPicker value={style.font ?? ''} fonts={[]} brand={tokens.fonts ?? []} onpick={(family) => edit(name, style, { font: family })} /></span>
+                <div class="grid">
+                  <span data-testid={`style-library-size-${name}`}><NumberField label="Size" name="Size" unit="px" value={pxOf(style.size ?? 0, unit)} range={{ min: Math.ceil(TYPE_SIZE.min * unit), max: TYPE_SIZE.max * unit, step: 1 }} onchange={(px) => edit(name, style, { size: fractionOf(px, unit) })} /></span>
+                  <span data-testid={`style-library-weight-${name}`}><NumberField label="W" name="Weight" value={style.weight ?? 400} range={{ min: TYPE.weight.min, max: TYPE.weight.max, step: 100 }} onchange={(v) => edit(name, style, { weight: Math.round(v) })} /></span>
+                  <span data-testid={`style-library-tracking-${name}`}><NumberField label="Tr" name="Tracking" unit="%" value={(style.tracking ?? 0) * PERCENT} range={{ min: TYPE.tracking.min * PERCENT, max: TYPE.tracking.max * PERCENT, step: 0.5 }} onchange={(v) => edit(name, style, { tracking: v / PERCENT })} /></span>
+                  <span data-testid={`style-library-leading-${name}`}><NumberField label="Ld" name="Leading" value={style.leading ?? 1.2} range={TYPE.leading} onchange={(v) => edit(name, style, { leading: v })} /></span>
+                </div>
+              {/if}
+              {#if (style.kind === StyleKind.Text && style.color) || style.kind === StyleKind.Colour}
+                <span data-testid={`style-library-colour-${name}`}><ColorField {name} display={ColourDisplay.Field} value={chip} {tokens} onchange={(v) => edit(name, style, { color: v })} /></span>
+              {/if}
+            </Popover.Content>
+          </Popover.Root>
+        {:else}
+          <p class="muted empty">No {group.title.toLowerCase()} styles yet.</p>
+        {/each}
       </div>
-    {/each}
+    {/if}
+  {/each}
 </section>
 
 <style>
@@ -99,34 +180,128 @@
     font-size: var(--ui-type-caption);
   }
 
+  .group {
+    display: flex;
+    flex-direction: column;
+  }
+
   header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: var(--ui-space-1);
     font-weight: 600;
     color: var(--ui-text);
   }
 
-  .style {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-2);
-  }
-
-  .row {
+  .library :global(.row) {
     display: grid;
-    grid-template-columns: 24px 1fr 20px;
+    grid-template-columns: 24px minmax(0, auto) minmax(0, 1fr) 8px;
     align-items: center;
     gap: var(--ui-space-2);
+    width: 100%;
+    padding: 4px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text);
+    font: inherit;
+    text-align: left;
   }
 
+  .library :global(.row:hover),
+  .library :global(.row[data-state='open']) {
+    background: var(--ui-hover);
+  }
+
+  .aa {
+    width: 24px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1;
+  }
 
   .swatch {
-    width: 24px;
-    height: 24px;
+    width: 16px;
+    height: 16px;
+    margin: 0 4px;
     border: 1px solid var(--ui-line);
     border-radius: var(--ui-radius-xs);
   }
 
-  input[type='text'],
-  input[type='number'] {
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--ui-radius-full);
+  }
+
+  .name {
+    white-space: nowrap;
+  }
+
+  .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .meta {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .face {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .metrics {
+    flex: none;
+  }
+
+  .trail {
+    display: grid;
+    place-items: center;
+  }
+
+  .muted {
+    color: var(--ui-text-tertiary);
+  }
+
+  .empty {
+    margin: 0;
+    padding: 4px;
+  }
+
+  .library :global(.icon),
+  :global(.style-editor .icon) {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-tertiary);
+  }
+
+  :global(.style-editor) .head {
+    display: grid;
+    grid-template-columns: 1fr 20px;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  :global(.style-editor) .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ui-space-2);
+  }
+
+  :global(.style-editor) .text {
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
@@ -136,44 +311,6 @@
     background: var(--ui-surface);
     color: var(--ui-text);
     font: inherit;
-  }
-
-  .create {
-    display: flex;
-    gap: var(--ui-space-2);
-  }
-
-  button {
-    padding: 4px 6px;
-    border: 1px solid var(--ui-line);
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-surface);
-    color: var(--ui-text);
-    font: inherit;
-    white-space: nowrap;
-  }
-
-  .remove {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--ui-text-tertiary);
-  }
-
-  .kind {
-    color: var(--ui-text-tertiary);
-  }
-
-  .fields {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--ui-space-2);
-  }
-
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-caption);
   }
 </style>
