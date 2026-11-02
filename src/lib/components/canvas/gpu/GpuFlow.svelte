@@ -818,14 +818,19 @@
         return;
       }
     }
-    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null, focusPlacement(mode)))));
     return () => cancelAnimationFrame(frame);
   });
 
-  function focusOn(ids: readonly string[], free: Insets | null) {
+  function focusOn(ids: readonly string[], free: Insets | null, placement: Placement) {
     const boxes = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
     const b = boundsOf(boxes);
     if (!b) {
+      return;
+    }
+    if (placement === Placement.Slide) {
+      const s = screenSize();
+      animateTo(revealIn(b, view, { width: s.width, height: s.height }, free ?? undefined));
       return;
     }
     if (free) {

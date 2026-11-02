@@ -127,6 +127,11 @@ describe('what each focus request does to the selection and the view', () => {
     expect(focusPlacement(FocusMode.Select)).toBe(Placement.Fit);
   });
 
+  it('a shape just drawn is selected and never zooms the view out', () => {
+    expect(focusSelects(FocusMode.Drawn)).toBe(true);
+    expect(focusPlacement(FocusMode.Drawn)).toBe(Placement.Slide);
+  });
+
   it('a reveal slides the view without selecting', () => {
     expect(focusSelects(FocusMode.Reveal)).toBe(false);
     expect(focusPlacement(FocusMode.Reveal)).toBe(Placement.Slide);

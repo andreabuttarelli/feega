@@ -685,12 +685,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const ghost = drawnTile(id, drawn);
     if (!ghost) {
       const saved = saveDrawn(id, drawn);
-      void saved.then(() => focusOn([id], undefined, FocusMode.Select));
+      void saved.then(() => focusOn([id], undefined, FocusMode.Drawn));
       return { id, doc: null, saved };
     }
     catalogPosters.set(id, ghost.look);
     nodes = [...nodes, toTile(ghost.node)];
-    focusOn([id], undefined, FocusMode.Select);
+    focusOn([id], undefined, FocusMode.Drawn);
     return { id, doc: ghost.doc, saved: saveDrawn(id, drawn) };
   }
 
@@ -721,7 +721,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
-    focusOn([id], undefined, FocusMode.Select);
+    focusOn([id], undefined, FocusMode.Drawn);
     return true;
   }
 
@@ -746,7 +746,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function intoFrame(id: string, hold: FrameHold) {
     if (!(await moveFreeInto(id, hold))) {
-      focusOn([id], undefined, FocusMode.Select);
+      focusOn([id], undefined, FocusMode.Drawn);
     }
   }
 
