@@ -38,12 +38,15 @@ describe('agent_action from frame tools and the editor', () => {
     expect(sent).toEqual([]);
   });
 
-  it('an editor op that lands counts via cli, a conflict does not', async () => {
+  it('an editor write that lands counts via cli; a conflict or a read does not', async () => {
     runEditorOp.mockResolvedValueOnce({ status: 409, body: { error: 'conflict' } });
-    await runEditorAction(caller, { nodeId: 'n1', op: 'read_head', input: {} });
+    await runEditorAction(caller, { nodeId: 'n1', op: 'apply_ops', input: { version: 1, ops: [] } });
     runEditorOp.mockResolvedValueOnce({ status: 200, body: { version: 3 } });
     await runEditorAction(caller, { nodeId: 'n1', op: 'read_head', input: {} });
+    runEditorOp.mockResolvedValueOnce({ status: 200, body: { version: 3 } });
+    await runEditorAction(caller, { nodeId: 'n1', op: 'apply_ops', input: { version: 1, ops: [] } });
 
-    expect(sent).toMatchObject([{ event: 'agent_action', properties: { via: 'cli', op: 'read_head' } }]);
+    expect(sent).toMatchObject([{ event: 'agent_action', properties: { via: 'cli', op: 'apply_ops' } }]);
+    expect(sent).toHaveLength(1);
   });
 });

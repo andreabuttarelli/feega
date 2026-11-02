@@ -98,8 +98,8 @@ const GENERIC_DESCRIPTION = [
 const shown = (name: CanvasOpName, input: unknown, result: unknown) =>
   CANVAS_OPS[name].access === Access.Write ? compactWrite(result, { surface: Surface.ChatCanvas, touched: touchedOf(input) }) : result;
 
-function chatRan(ctx: CanvasCtx, op: string, result: unknown): unknown {
-  if (landed(result)) {
+function chatRan(ctx: CanvasCtx, op: CanvasOpName, result: unknown): unknown {
+  if (CANVAS_OPS[op].access !== Access.Read && landed(result)) {
     coreEvent(ctx.userId, CoreEvent.AgentAction, { via: AgentVia.Chat, op });
   }
   return result;
@@ -108,7 +108,7 @@ function chatRan(ctx: CanvasCtx, op: string, result: unknown): unknown {
 function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
   const own = Object.entries(CHAT_TOOL_OPS).map(([name, description]) => {
     const op = CANVAS_OPS[name as CanvasOpName];
-    return [name, tool({ description, inputSchema: op.input, execute: async (input: unknown) => shown(name as CanvasOpName, input, chatRan(ctx, name, await op.run(ctx, input as never))) })];
+    return [name, tool({ description, inputSchema: op.input, execute: async (input: unknown) => shown(name as CanvasOpName, input, chatRan(ctx, name as CanvasOpName, await op.run(ctx, input as never))) })];
   });
 
   const generic = tool({

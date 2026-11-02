@@ -459,6 +459,7 @@ describe('agent_action via chat', () => {
     useCoreSink((b) => sent.push(b));
 
     await run(tools.update_node, { nodeId: NODE, data: { prompt: 42 } });
+    await run(tools.list_nodes, { canvasId: CANVAS });
     await run(tools.update_node, { nodeId: NODE, data: { prompt: 'x' } });
     useCoreSink(null);
 

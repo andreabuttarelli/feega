@@ -311,6 +311,12 @@ describe('core usage from CLI and MCP', async () => {
     expect(sent.find((b) => b.event === 'agent_action')?.properties.via).toBe('mcp');
   });
 
+  it('a read op is no agent_action', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db);
+
+    expect(await events(() => call({ project_id: PROJECT, op: 'list_nodes', input: { canvasId: CANVAS } }))).toEqual([]);
+  });
+
   it('a refused write is no agent_action', async () => {
     caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db, false);
 

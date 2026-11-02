@@ -24,8 +24,13 @@ const HTTP_UNPROCESSABLE = 422;
 
 export const BATCH = 'batch';
 
-function noted<A extends Answer>(caller: OrgCaller, op: string, answer: A): A {
-  if (answer.status === HTTP_OK && landed(answer.body)) {
+enum Writes {
+  Yes = 'yes',
+  No = 'no'
+}
+
+function noted<A extends Answer>(caller: OrgCaller, op: string, answer: A, writes: Writes = Writes.Yes): A {
+  if (writes === Writes.Yes && answer.status === HTTP_OK && landed(answer.body)) {
     coreEvent(caller.userId, CoreEvent.AgentAction, { via: activeTool() ? AgentVia.Mcp : AgentVia.Cli, op });
   }
   return answer;
@@ -67,7 +72,7 @@ export async function runCanvasOp(caller: OrgCaller, ask: CanvasAsk): Promise<An
   }
 
   const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId, agentKey: MCP_AGENT_KEY, sessionId: caller.sessionId });
-  return noted(caller, ask.op, { status: HTTP_OK, body: await op.run(ctx, input.data as never) });
+  return noted(caller, ask.op, { status: HTTP_OK, body: await op.run(ctx, input.data as never) }, op.access === Access.Read ? Writes.No : Writes.Yes);
 }
 
 const STATUS_OF: Record<Exclude<ToolRun, ToolRun.Done>, number> = {
@@ -142,5 +147,5 @@ export async function runEditorAction(caller: OrgCaller, ask: EditorAsk): Promis
   }
 
   const gate = async (): Promise<EditorAnswer | null> => (await denial(caller)) as EditorAnswer | null;
-  return noted(caller, ask.op, await runEditorOp(ask.op, { ...scope, actor: agentActor(caller.userId, MCP_AGENT_KEY, caller.sessionId), gate }, input.data as never));
+  return noted(caller, ask.op, await runEditorOp(ask.op, { ...scope, actor: agentActor(caller.userId, MCP_AGENT_KEY, caller.sessionId), gate }, input.data as never), EDITOR_OPS[ask.op].access === EditorAccess.Write ? Writes.Yes : Writes.No);
 }
