@@ -254,11 +254,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
     },
-    renderLink: async (quality: Quality) => {
+    renderLink: async (quality: Quality, range?: { from: number; to: number }) => {
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the link renders the saved video, so finish the turn and run render_video in the next one' };
       }
-      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, quality, actor });
+      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, quality, actor, range });
       return { ok: true, render_url: renderPagePath(link.token), expires_at: link.expiresAt, credits: BROWSER_RENDER_CREDITS };
     },
     embed: (action) => embedAction(db, { nodeId: motion.record.id, doc: session.doc, tokens, assetUrls: assetUrls(assets), title: motion.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: project.mode }, action),

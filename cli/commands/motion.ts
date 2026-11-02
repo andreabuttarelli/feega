@@ -67,11 +67,18 @@ function printRun(run: MotionRun) {
   }
 }
 
-type RenderOpts = { org?: string; server?: boolean; resolution?: string; format?: string; quality?: string; fps?: string; gifLoop?: string; gifFps?: string; gifWidth?: string };
+type RenderOpts = { org?: string; server?: boolean; resolution?: string; format?: string; quality?: string; fps?: string; gifLoop?: string; gifFps?: string; gifWidth?: string; from?: string; to?: string };
 
 function gifOf(opts: RenderOpts) {
   const gif = { loop: opts.gifLoop, fps: opts.gifFps ? Number(opts.gifFps) : undefined, width: opts.gifWidth ? Number(opts.gifWidth) : undefined };
   return Object.values(gif).some((v) => v !== undefined) ? gif : undefined;
+}
+
+function rangeOf(opts: RenderOpts) {
+  if (opts.from === undefined && opts.to === undefined) {
+    return undefined;
+  }
+  return { from: Number(opts.from ?? 0), to: opts.to === undefined ? Number.MAX_SAFE_INTEGER : Number(opts.to) };
 }
 
 export async function cmdMotionRender(nodeId: string, opts: RenderOpts) {
@@ -79,7 +86,7 @@ export async function cmdMotionRender(nodeId: string, opts: RenderOpts) {
 }
 
 export async function renderAndReport(bearer: string, nodeId: string, opts: RenderOpts) {
-  const started = await motionApi.render(bearer, nodeId, { mode: opts.server ? 'server' : 'browser', resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps ? Number(opts.fps) : undefined, gif: gifOf(opts) }, opts.org);
+  const started = await motionApi.render(bearer, nodeId, { mode: opts.server ? 'server' : 'browser', resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps ? Number(opts.fps) : undefined, gif: gifOf(opts), range: rangeOf(opts) }, opts.org);
   printRender(started);
 }
 

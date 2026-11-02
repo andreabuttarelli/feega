@@ -14,6 +14,8 @@ The formats come from the exporter code: see the generated table in [Export form
 - Video frames go up to 3840 × 2160 (2160p export).
 - 120 fps renders on servers.
 - "Render in this browser" draws every frame with the same GPU engine as the canvas, then encodes. Videos with line or vector shapes, motion blur or 3D devices are drawn by the previous HTML engine instead; the file has the same size, frame rate and sound either way.
+- A browser render keeps its full speed in a background tab; only the screen wake lock is let go.
+- To check a frame or a few seconds before the whole video, render a stretch: `feega motion render <nodeId> --from 3 --to 3.5`, or MCP `render_video` with `from`/`to` (seconds, `to` exclusive; one frame is `to = from + 1/fps`). It goes through the same pipeline as the full export, so the pixels match; it has no sound and renders in the browser only.
 
 ## Lottie
 

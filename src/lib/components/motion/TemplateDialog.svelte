@@ -159,7 +159,7 @@
       local[i] = { ...local[i], status: 'rendering' };
       const size = exportSize(filled.doc, settings.resolution);
       try {
-        const blob = await renderInBrowser({ doc: filled.doc, assetUrls, size, quality: settings.quality, withAudio: Boolean(caps?.aac), frames: framesFor(filled.doc), signal: controller.signal, onStage: () => {}, onFrame: () => {}, onPause: () => {} });
+        const blob = await renderInBrowser({ doc: filled.doc, assetUrls, size, quality: settings.quality, withAudio: Boolean(caps?.aac), frames: framesFor(filled.doc), signal: controller.signal, onStage: () => {}, onFrame: () => {} });
         await saveExport(blob, { scope, editorUrl, size, seconds: filled.doc.durationInFrames / filled.doc.fps });
         local[i] = { ...local[i], status: 'done', url: URL.createObjectURL(blob) };
       } catch (e) {

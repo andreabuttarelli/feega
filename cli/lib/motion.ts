@@ -28,7 +28,7 @@ export type RenderMode = 'browser' | 'server';
 export type RenderStart = { mode: RenderMode; run_id: string; render_url?: string; expires_at?: string; revision?: number; credits: number };
 export type RenderState = { run_id: string; mode: RenderMode; status: MotionRun['status']; asset_id: string | null; file_url: string | null; error: string | null; credits: number | null };
 export type GifOptions = { loop?: string; fps?: number; width?: number };
-export type RenderOptions = { mode?: RenderMode; resolution?: string; format?: string; quality?: string; fps?: number; gif?: GifOptions };
+export type RenderOptions = { mode?: RenderMode; resolution?: string; format?: string; quality?: string; fps?: number; gif?: GifOptions; range?: { from: number; to: number } };
 export type MotionVideo = { node_id: string; name: string | null; project_id: string; canvas_id: string; format: string; version: number; poster_url: string | null; last_render_url: string | null; editor_url: string };
 export type MotionFrames = { revision: number; frames: { time: number; mime: string; data: string }[]; quality: string[]; blocking: string[] };
 
@@ -47,7 +47,8 @@ export type EmbedState = { published: boolean; url?: string; snippet?: string; r
 
 function renderBody(opts: RenderOptions): Record<string, unknown> {
   const settings = Object.fromEntries(Object.entries({ resolution: opts.resolution, format: opts.format, quality: opts.quality, fps: opts.fps, gif: opts.gif }).filter(([, v]) => v !== undefined));
-  return Object.keys(settings).length ? { mode: opts.mode ?? 'browser', settings } : { mode: opts.mode ?? 'browser' };
+  const range = opts.range ? { range: opts.range } : {};
+  return Object.keys(settings).length ? { mode: opts.mode ?? 'browser', settings, ...range } : { mode: opts.mode ?? 'browser', ...range };
 }
 
 const SETTLED = new Set<MotionRun['status']>(['done', 'failed', 'expired']);

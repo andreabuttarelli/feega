@@ -30,4 +30,12 @@ describe('linkPayload', () => {
 
     expect(payload?.assetUrls).toEqual({ 'img-1': expect.stringContaining('org-1/project-1/a.png') });
   });
+
+  it('a link for a stretch of the video carries that stretch, a whole render carries none', async () => {
+    const { db } = fakeDb({});
+    const of = (params: Record<string, unknown>) => linkPayload(db, { id: 'run-1', orgId: 'org-1', nodeId: 'node-1', params: { revision: 2, ...params } } as unknown as NodeRun);
+
+    expect((await of({ range: { from: 1, to: 1.5 } }))?.range).toEqual({ from: 1, to: 1.5 });
+    expect((await of({}))?.range).toBeNull();
+  });
 });

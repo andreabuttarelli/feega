@@ -5,9 +5,11 @@ import { frameTimes, samplesPerFrame, type Size } from '../export-plan';
 import { encodeMp4, mixAudio } from './encode';
 import { docCuts, joltMeter, type JoltAt } from '../smoothness';
 import { orFallback } from './fallback';
-import { keepAwake, visibleGate, type Page, type WakeLockHost } from './stay-awake';
+import { keepAwake, type Page, type WakeLockHost } from './stay-awake';
 
 export type FrameSource = (times: number[], size: Size, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
+
+export type SecondsRange = { from: number; to: number };
 
 export enum BrowserStage {
   Mixing = 'mixing',
@@ -20,13 +22,13 @@ export type BrowserJob = {
   size: Size;
   quality: Quality;
   withAudio: boolean;
+  range?: SecondsRange | null;
   frames: FrameSource;
   fallback?: FrameSource | null;
   onFallback?: (error: unknown) => void;
   signal: AbortSignal;
   onStage: (stage: BrowserStage) => void;
   onFrame: (done: number) => void;
-  onPause: (paused: boolean) => void;
   onJolts?: (jolts: JoltAt[]) => void;
   host?: { nav: WakeLockHost; page: Page };
 };
@@ -36,21 +38,22 @@ export async function renderInBrowser(job: BrowserJob): Promise<Blob> {
   const release = await keepAwake(host.nav, host.page);
   try {
     job.onStage(BrowserStage.Mixing);
-    const sounds = job.withAudio ? audioPlan(job.doc, job.assetUrls) : [];
+    const span = framesOf(job.doc, job.range);
+    const sounds = job.withAudio && !job.range ? audioPlan(job.doc, job.assetUrls) : [];
     const audio = sounds.length ? await mixAudio(sounds, job.doc.durationInFrames / job.doc.fps) : null;
 
     job.onStage(BrowserStage.Rendering);
-    const times = frameTimes(job.doc);
+    const samples = samplesPerFrame(job.doc);
+    const times = frameTimes(job.doc).slice(span.from * samples, span.to * samples);
     const meter = job.onJolts ? joltMeter() : undefined;
     const encode = (frames: FrameSource) => () => encodeMp4({
       size: job.size,
       fps: job.doc.fps,
       quality: job.quality,
-      frames: job.doc.durationInFrames,
-      samples: samplesPerFrame(job.doc),
+      frames: span.to - span.from,
+      samples,
       audio,
       signal: job.signal,
-      gate: visibleGate(host.page, job.onPause),
       render: (onFrame) => frames(times, job.size, onFrame, job.signal),
       onFrame: job.onFrame,
       meter
@@ -61,4 +64,12 @@ export async function renderInBrowser(job: BrowserJob): Promise<Blob> {
   } finally {
     release();
   }
+}
+
+export function framesOf(doc: Pick<MotionDoc, 'fps' | 'durationInFrames'>, range?: SecondsRange | null): { from: number; to: number } {
+  if (!range) {
+    return { from: 0, to: doc.durationInFrames };
+  }
+  const from = Math.min(Math.max(0, Math.round(range.from * doc.fps)), doc.durationInFrames - 1);
+  return { from, to: Math.min(doc.durationInFrames, Math.max(from + 1, Math.round(range.to * doc.fps))) };
 }

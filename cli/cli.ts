@@ -133,6 +133,8 @@ motion
   .option('--gif-loop <mode>', 'GIF: forever (default), once or boomerang')
   .option('--gif-fps <n>', 'GIF frame rate, 8 to 30 (default 15)')
   .option('--gif-width <px>', 'GIF width, 64 to 1920 (default 640)')
+  .option('--from <s>', 'Render only from this second (browser, silent): check a frame before the whole video')
+  .option('--to <s>', 'Render only up to this second, exclusive')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (nodeId: string, opts) => {
     const { cmdMotionRender } = await import('./commands/motion.ts');
