@@ -121,6 +121,8 @@ export type VerticalAlign = (typeof VERTICAL_ALIGNS)[number];
 export { TEXT_SIZINGS, TextSizing } from './text-sizing';
 export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
+export const TEXT_ENTRANCES = ['none', 'fade-up'] as const;
+export type TextEntrance = (typeof TEXT_ENTRANCES)[number];
 export type Move = (typeof MOVES)[number];
 
 export const MIN_BOX = { width: 0.0005, height: 0.0001 };
@@ -324,11 +326,11 @@ export const COMPONENTS = {
   },
   Text: {
     label: 'Text',
-    description: 'Body copy that fades up.',
+    description: 'Body copy, shown as drawn. entrance fade-up fades it up as the clip starts.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, DEFAULT_COLOUR.ink, { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, DEFAULT_COLOUR.ink, { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), entrance: choice(TEXT_ENTRANCES, 'none', 'Entrance', Group.Motion), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {
