@@ -1,6 +1,6 @@
 import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { setProps, type OpResult } from '@feega/motion-core/motion/timeline';
-import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, variantsOf, type CatalogueFont, type FontFace, type FontVariant } from '@feega/motion-core/motion/fonts/model';
+import { FONT_WEIGHTS, FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, variantsOf, type Axis, type CatalogueFont, type FontFace, type FontVariant } from '@feega/motion-core/motion/fonts/model';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -55,6 +55,10 @@ export function registerFont(doc: MotionDoc, family: string, catalogue: readonly
   return typeof verdict === 'string' ? fail(verdict) : { ok: true, doc: verdict.doc };
 }
 
+const weightsOf = (v: FontVariant): number[] => (v.maxWeight ? FONT_WEIGHTS.filter((w) => w >= v.weight && w <= v.maxWeight!) : [v.weight]);
+
+const weightAxis = (v: FontVariant): Axis[] => (v.maxWeight ? [['wght', v.weight, v.maxWeight]] : []);
+
 export function registerUpload(doc: MotionDoc, family: { family: string; variants: FontVariant[] }): OpResult {
   const known = doc.fonts.find((f) => f.family === family.family);
   if (isBuiltin(family.family) || (known && known.source !== FontSource.Upload)) {
@@ -63,8 +67,8 @@ export function registerUpload(doc: MotionDoc, family: { family: string; variant
   if (!family.variants.length) {
     return fail(`${family.family} has no files`);
   }
-  const weights = [...new Set(family.variants.map((v) => v.weight))].sort((a, b) => a - b);
-  const face: FontFace = { family: family.family, source: FontSource.Upload, category: FontCategory.Sans, weights, italic: family.variants.some((v) => v.italic), axes: [], assetId: family.variants[0].assetId, variants: family.variants };
+  const weights = [...new Set(family.variants.flatMap(weightsOf))].sort((a, b) => a - b);
+  const face: FontFace = { family: family.family, source: FontSource.Upload, category: FontCategory.Sans, weights, italic: family.variants.some((v) => v.italic), axes: family.variants.flatMap(weightAxis).slice(0, 1), assetId: family.variants[0].assetId, variants: family.variants };
   const listed = new Set(doc.assets.map((a) => a.id));
   const added = family.variants.filter((v) => !listed.has(v.assetId)).map((v) => ({ id: v.assetId, kind: 'font' as const, name: family.family }));
   const fonts = known ? doc.fonts.map((f) => (f === known ? face : f)) : [...doc.fonts, face];

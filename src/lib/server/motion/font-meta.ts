@@ -1,6 +1,6 @@
 import { brotliDecompressSync, inflateSync } from 'node:zlib';
 
-export type FontMeta = { family: string; weight: number; italic: boolean };
+export type FontMeta = { family: string; weight: number; maxWeight?: number; italic: boolean };
 
 type Tables = Map<string, Uint8Array>;
 
@@ -23,7 +23,12 @@ const WOFF2_HEADER = 48;
 const WOFF2_CUSTOM_TAG = 0x3f;
 const WOFF2_GLYF = 10;
 const WOFF2_LOCA = 11;
-const WOFF2_TAGS: Record<number, string> = { 1: 'head', 5: 'name', 6: 'OS/2' };
+const WOFF2_TAGS: Record<number, string> = { 1: 'head', 5: 'name', 6: 'OS/2', 47: 'fvar' };
+const FVAR_AXES_AT = 4;
+const FVAR_COUNT_AT = 8;
+const FVAR_SIZE_AT = 10;
+const FIXED = 0x10000;
+const WEIGHT_AXIS = 'wght';
 
 const tagAt = (view: DataView, at: number) => String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3));
 
@@ -138,7 +143,23 @@ function metaOf(tables: Tables): FontMeta | null {
     return { family, weight: REGULAR, italic: false };
   }
   const view = viewOf(os2);
-  return { family, weight: view.getUint16(OS2_WEIGHT_AT) || REGULAR, italic: (view.getUint16(OS2_SELECTION_AT) & ITALIC_BIT) === ITALIC_BIT };
+  const italic = (view.getUint16(OS2_SELECTION_AT) & ITALIC_BIT) === ITALIC_BIT;
+  const range = weightRange(tables.get('fvar'));
+  return range ? { family, weight: range[0], maxWeight: range[1], italic } : { family, weight: view.getUint16(OS2_WEIGHT_AT) || REGULAR, italic };
+}
+
+function weightRange(fvar: Uint8Array | undefined): [number, number] | null {
+  if (!fvar) {
+    return null;
+  }
+  const view = viewOf(fvar);
+  const size = view.getUint16(FVAR_SIZE_AT);
+  for (let i = 0, at = view.getUint16(FVAR_AXES_AT); i < view.getUint16(FVAR_COUNT_AT); i++, at += size) {
+    if (tagAt(view, at) === WEIGHT_AXIS) {
+      return [Math.round(view.getInt32(at + 4) / FIXED), Math.round(view.getInt32(at + 12) / FIXED)];
+    }
+  }
+  return null;
 }
 
 export function readFontMeta(bytes: Uint8Array): FontMeta | null {

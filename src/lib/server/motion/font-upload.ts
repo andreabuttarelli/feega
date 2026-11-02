@@ -1,9 +1,9 @@
 import type { Db } from '$lib/server/db/client';
-import { deleteAsset, insertAsset, setAssetContent } from '$lib/server/repos/assets';
+import { deleteAsset, findAssets, insertAsset, setAssetContent } from '$lib/server/repos/assets';
 import { FontStyle, deleteOrgFont, insertOrgFont, listOrgFonts, renameOrgFont, type OrgFont } from '$lib/server/repos/org-fonts';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { FONT_NAME } from '@feega/motion-core/motion/fonts/model';
-import { familyFromFileName, fontFamilies, type FontFamily, type FontFile } from '$lib/motion/fonts/library';
+import { familyFromFileName, fontFamilies, fontFileOf, type FontFamily, type FontFile } from '$lib/motion/fonts/library';
 import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
 import type { OrgFontFace } from '$lib/fonts/org-fonts';
 import { readFontMeta } from './font-meta';
@@ -69,10 +69,16 @@ async function registerFont(db: Db, input: { orgId: string; userId: string | nul
   return { ok: true, assetId: asset.id, format, font: { assetId: asset.id, ...meta } };
 }
 
-const fileOf = (font: OrgFont): FontFile => ({ assetId: font.id, family: font.family, weight: font.weight, italic: font.style === FontStyle.Italic });
+const fileOf = (font: OrgFont, maxWeight?: number): FontFile => ({ assetId: font.id, family: font.family, weight: font.weight, ...(maxWeight ? { maxWeight } : {}), italic: font.style === FontStyle.Italic });
 
 async function orgFontFiles(db: Db, orgId: string) {
-  return (await listOrgFonts(db, orgId)).map((font) => ({ font, file: fileOf(font) }));
+  const fonts = await listOrgFonts(db, orgId);
+  const assets = await findAssets(db, { orgId, assetIds: fonts.map((f) => f.id) });
+  const rangeOf = (id: string) => {
+    const asset = assets.get(id);
+    return asset ? fontFileOf(asset).maxWeight : undefined;
+  };
+  return fonts.map((font) => ({ font, file: fileOf(font, rangeOf(font.id)) }));
 }
 
 export async function orgFontFamilies(db: Db, orgId: string): Promise<FontFamily[]> {
@@ -94,7 +100,7 @@ export async function renameFontFamily(db: Db, input: { orgId: string; family: s
   }
   for (const { file } of own) {
     await renameOrgFont(db, { orgId: input.orgId, id: file.assetId, family: to });
-    await setAssetContent(db, { orgId: input.orgId, assetId: file.assetId, content: JSON.stringify({ family: to, weight: file.weight, italic: file.italic }) });
+    await setAssetContent(db, { orgId: input.orgId, assetId: file.assetId, content: JSON.stringify({ ...file, assetId: undefined, family: to }) });
   }
   return { ok: true };
 }
@@ -138,7 +144,7 @@ export async function storeFontBytes(db: Db, input: { orgId: string; userId: str
 }
 
 export async function orgFontFaces(db: Db, orgId: string, sign: (paths: string[]) => Promise<Map<string, string>>): Promise<OrgFontFace[]> {
-  const fonts = await listOrgFonts(db, orgId);
-  const urls = await sign(fonts.map((f) => f.path));
-  return fonts.map((font) => ({ ...fileOf(font), url: urls.get(font.path) ?? null }));
+  const files = await orgFontFiles(db, orgId);
+  const urls = await sign(files.map((f) => f.font.path));
+  return files.map(({ font, file }) => ({ ...file, url: urls.get(font.path) ?? null }));
 }

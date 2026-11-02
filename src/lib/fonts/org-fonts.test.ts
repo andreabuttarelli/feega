@@ -21,4 +21,10 @@ describe('orgFontCss', () => {
     expect(css).toContain(`font-family:"O'Hara"`);
     expect(css).not.toContain('Gone');
   });
+
+  it('declares a variable file over its whole weight range', () => {
+    const css = orgFontCss([{ assetId: 'v', family: 'Inter', weight: 100, maxWeight: 900, italic: false, url: 'https://s/v.woff2' }]);
+
+    expect(css).toContain('font-weight:100 900;font-style:normal');
+  });
 });

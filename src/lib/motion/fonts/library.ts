@@ -5,7 +5,7 @@ const MIN_WEIGHT = 1;
 const MAX_WEIGHT = 1000;
 const REGULAR = 400;
 
-export const fontMetaSchema = z.object({ family: z.string().regex(FONT_NAME), weight: z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT), italic: z.boolean() });
+export const fontMetaSchema = z.object({ family: z.string().regex(FONT_NAME), weight: z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT), maxWeight: z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT).optional(), italic: z.boolean() });
 
 export type FontMeta = z.infer<typeof fontMetaSchema>;
 
