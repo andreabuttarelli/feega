@@ -181,3 +181,5 @@ export function axisTicks([from, to]: readonly [number, number], count: number):
   const last = Math.floor(to / step);
   return Array.from({ length: last - first + 1 }, (_, i) => Number(((first + i) * step).toPrecision(TICK_PRECISION)));
 }
+
+export const trimmedTogether = (selection: readonly string[], grabbed: string): string[] => (selection.includes(grabbed) ? [...selection] : [grabbed]);

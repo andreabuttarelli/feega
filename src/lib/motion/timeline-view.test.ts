@@ -5,7 +5,7 @@ import { Source } from '@feega/motion-core/motion/keyframes';
 import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
 import { feegaTrailerV2 } from './trailer-v2';
 import { withParams } from '@feega/motion-core/motion/custom/params';
-import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode, headerPx, fitZoom, ZOOM_MIN, axisTicks } from './timeline-view';
+import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode, headerPx, fitZoom, ZOOM_MIN, axisTicks, trimmedTogether } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -173,5 +173,15 @@ describe('graph editor axes', () => {
   it('gives a flat range one tick, and never an endless list', () => {
     expect(axisTicks([0.5, 0.5], 5)).toEqual([0.5]);
     expect(axisTicks([0, 1e9], 5).length).toBeLessThanOrEqual(11);
+  });
+});
+
+describe('trimming selected clips', () => {
+  it('trims every selected clip with the one whose edge is dragged', () => {
+    expect(trimmedTogether(['a', 'b', 'c'], 'b')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('trims only the dragged clip when it is not part of the selection', () => {
+    expect(trimmedTogether(['a', 'b'], 'z')).toEqual(['z']);
   });
 });

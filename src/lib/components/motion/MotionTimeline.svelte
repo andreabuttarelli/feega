@@ -12,9 +12,9 @@
   import { filmstrip, type Strip } from '$lib/motion/filmstrip';
   import { COMPONENTS, THREE_D_COMPONENTS, TrackKind } from '@feega/motion-core/motion/components';
   import { compOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-  import { ClipEdge, duplicateKeyframes, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, setLaneMuted, trimClip, type KeyRef, type OpResult } from '@feega/motion-core/motion/timeline';
+  import { ClipEdge, duplicateKeyframes, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, setLaneMuted, type KeyRef, type OpResult } from '@feega/motion-core/motion/timeline';
   import { withParams } from '@feega/motion-core/motion/custom/params';
-  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped, WorkEdge } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped, trimmedTogether, WorkEdge } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
   import { layerLabel } from '$lib/motion/element-name';
   import { KeyGlyph, KeyMark, RowKind, keyGlyph, keyMark, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
@@ -32,7 +32,7 @@
   import EasePicker from './EasePicker.svelte';
   import { marqueeHits, relatedSelection } from '$lib/motion/timeline-select';
   import { isTypingTarget } from '$lib/shortcuts';
-  import { allMarkers, isLocked, loopRange, setClipFlags, setTrackFlags, setWorkArea, shownTracks } from '@feega/motion-core/motion/organize';
+  import { allMarkers, isLocked, loopRange, setClipFlags, setTrackFlags, setWorkArea, shownTracks, trimClipsAt } from '@feega/motion-core/motion/organize';
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
@@ -543,7 +543,7 @@
   }
 
   function trimTo(g: Gesture, at: number): number {
-    const edge = snapTo(g.base, at, [g.clipId]);
+    const edge = snapTo(g.base, at, trimmedTogether(selection, g.clipId));
     markSnap(edge !== at ? edge : null);
     return edge;
   }
@@ -560,8 +560,8 @@
       const sameKind = g.base.tracks.find((t) => t.id === over)?.kind === g.base.tracks.find((t) => t.id === g.trackId)?.kind;
       return moveClip(g.base, g.clipId, { from: target, trackId: over && sameKind ? over : undefined });
     },
-    [Drag.TrimStart]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.Start, trimTo(g, at)),
-    [Drag.TrimEnd]: (g, at) => trimClip(g.base, g.clipId, ClipEdge.End, trimTo(g, at)),
+    [Drag.TrimStart]: (g, at) => trimClipsAt(g.base, trimmedTogether(selection, g.clipId), ClipEdge.Start, trimTo(g, at)),
+    [Drag.TrimEnd]: (g, at) => trimClipsAt(g.base, trimmedTogether(selection, g.clipId), ClipEdge.End, trimTo(g, at)),
     [Drag.FadeIn]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.In, at),
     [Drag.FadeOut]: (g, at) => dragFade(g.base, g.clipId, FadeEdge.Out, at),
     [Drag.Keys]: (g, at) => {
