@@ -21,6 +21,11 @@ describe('on-canvas gradient handles', () => {
     expect(f.type === FillType.Linear && f.angle).toBeCloseTo(90);
   });
 
+  it('dragging the end to any point lands on a whole degree, like the angle field steps', () => {
+    const f = draggedFill(linear(0), box, { grip: GradientGrip.End }, [180, 90]);
+    expect(f.type === FillType.Linear && f.angle).toBe(27);
+  });
+
   it('dragging a stop moves its position along the line', () => {
     const f = draggedFill(linear(0), box, { grip: GradientGrip.Stop, stop: 1 }, [150, 10]);
     expect(f.type === FillType.Linear && f.stops[1].pos).toBeCloseTo(0.75);
