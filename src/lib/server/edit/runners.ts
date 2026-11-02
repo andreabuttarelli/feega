@@ -3,7 +3,7 @@ import type { OrgCaller } from '$lib/server/org-data/auth';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findProjectById } from '$lib/server/repos/projects';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
-import { Access, CANVAS_OPS, canvasCtx, type CanvasOpName } from '$lib/server/canvas/canvas-ops';
+import { Access, CANVAS_OPS, canvasCtx, runOp, type CanvasOpName } from '$lib/server/canvas/canvas-ops';
 import { agentActor } from '$lib/server/repos/actor';
 import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
 import { callerMotionScope } from '$lib/server/motion/editor-scope';
@@ -72,7 +72,7 @@ export async function runCanvasOp(caller: OrgCaller, ask: CanvasAsk): Promise<An
   }
 
   const ctx = canvasCtx({ db: caller.db, orgId: caller.orgId, projectId: project.id, userId: caller.userId, brandId: project.brandId, agentKey: MCP_AGENT_KEY, sessionId: caller.sessionId });
-  return noted(caller, ask.op, { status: HTTP_OK, body: await op.run(ctx, input.data as never) }, op.access === Access.Read ? Writes.No : Writes.Yes);
+  return noted(caller, ask.op, { status: HTTP_OK, body: await runOp(ctx, ask.op, input.data) }, op.access === Access.Read ? Writes.No : Writes.Yes);
 }
 
 const STATUS_OF: Record<Exclude<ToolRun, ToolRun.Done>, number> = {

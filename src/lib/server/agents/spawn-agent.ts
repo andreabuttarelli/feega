@@ -1,12 +1,14 @@
 import { stepCountIs, streamText, tool, type Tool } from 'ai';
 import { llmLanguageModel } from '$lib/server/llm';
 import { PromptCache } from '$lib/server/prompt-cache';
+import { inLane } from './agent-lane';
 import { billingScope, extractSdkUsage, type SdkUsage } from '$lib/server/ai-log';
 import { gatewayModels, gatewayRate } from '$lib/server/openrouter-models';
 import { spentUsd } from '$lib/server/motion/model-route';
 import { SPAWN_GUIDE, SPAWNED_KEY, SpawnDepth, spawnInput, spawnPlan, spawnRunner, type ModelOffer, type SpawnInput, type SpawnResult } from './spawn';
 
 const SPAWN_STEPS = 30;
+const SUBAGENT_LANE = 'subagent';
 const CHILD_SYSTEM = 'You are a sub-agent with one job. Do the job with the tools you have, then answer plainly with what you found or changed. You cannot ask the user anything.';
 
 export type SpawnHost = {
@@ -28,6 +30,7 @@ export const spawnOffers = (): ModelOffer[] =>
     .map((m) => ({ id: m.id, inputUsdPerM: m.rate.input, outputUsdPerM: m.rate.output, vision: m.usable }));
 
 export function spawnAgents(host: SpawnHost, offers: readonly ModelOffer[]) {
+  let spawned = 0;
   const runner = spawnRunner(
     {
       run: async (plan) => {
@@ -35,7 +38,8 @@ export function spawnAgents(host: SpawnHost, offers: readonly ModelOffer[]) {
         const billing = billingScope(host.orgId);
         let estimate = 0;
         const all = host.tools();
-        const ran = billing.run(() =>
+        spawned += 1;
+        const ran = inLane(`${SUBAGENT_LANE} ${spawned}`, () => billing.run(() =>
           streamText({
             model: llmLanguageModel(plan.model, PromptCache.On),
             system: CHILD_SYSTEM,
@@ -47,7 +51,7 @@ export function spawnAgents(host: SpawnHost, offers: readonly ModelOffer[]) {
               estimate += spentUsd([extractSdkUsage(step.usage)], [plan.model], gatewayRate);
             }
           })
-        );
+        ));
         const text = await ran.text;
         const usage = extractSdkUsage(await ran.totalUsage);
         const usd = Math.max(estimate, billing.gatewayUsd());

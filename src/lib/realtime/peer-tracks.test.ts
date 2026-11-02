@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { peerTracks } from './peer-tracks';
+import { GLIDE_MS, peerTracks } from './peer-tracks';
 import type { CanvasPeer } from './canvas-presence';
 
 const peer = (over: Partial<CanvasPeer> = {}): CanvasPeer => ({
@@ -26,6 +26,20 @@ describe('peerTracks: peers drawn on smooth paths', () => {
     expect(drawn.live[0].x).toBeGreaterThan(0);
     expect(drawn.live[0].x).toBeLessThan(100);
     expect(drawn.live[0].w).toBe(10);
+  });
+
+  it('an agent cursor glides to its new spot instead of jumping', () => {
+    const tracks = peerTracks();
+    const agent = { agent: { doing: 'set text' } };
+    tracks.heard(peer({ ...agent, cursor: { x: 0, y: 0 } }), 0, 1000);
+    tracks.heard(peer({ ...agent, cursor: { x: 1000, y: 0 } }), 3000, 4000);
+
+    const [mid] = tracks.smooth([peer({ ...agent, cursor: { x: 1000, y: 0 } })], 4000 + GLIDE_MS / 2);
+    expect(mid.cursor!.x).toBeGreaterThan(0);
+    expect(mid.cursor!.x).toBeLessThan(1000);
+
+    const [end] = tracks.smooth([peer({ ...agent, cursor: { x: 1000, y: 0 } })], 4000 + GLIDE_MS);
+    expect(end.cursor!.x).toBe(1000);
   });
 
   it('says when nothing has moved lately, so the frame loop can stop', () => {

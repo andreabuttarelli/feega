@@ -1,0 +1,29 @@
+---
+title: Agents on the canvas
+description: See the chat agent, its sub-agents and MCP agents work live, with their own cursor, selection and avatar.
+sidebar:
+  order: 13
+---
+
+import DemoVideo from '../../../components/DemoVideo.astro';
+
+<DemoVideo name="agent-cursors" caption="Three agents edit three frames in parallel, each with its own cursor and avatar." />
+
+Agents show up on the canvas the way teammates do.
+
+- **Cursor.** When an agent reads or edits an element, its cursor glides to it, labelled with its name: `Claude` for the chat, `Claude · subagent 2` for a sub-agent it started, `MCP agent` for an agent connected over MCP.
+- **Selection.** The elements it is working on get an outline in its colour.
+- **Avatar.** Each agent session gets its own shape, colour and initial, shown at the top right next to the people on the canvas, with a sparkle badge. Hover it to see what the agent is doing.
+- **Parallel work.** Several agents at once means several cursors at once.
+- **Idle.** A few seconds after an agent stops, its cursor, outline and avatar disappear.
+
+Every collaborator on the canvas sees them, not only the person who started the agent.
+
+## With an MCP agent
+
+Nothing to turn on. Every `edit` call that reads or changes a node moves the agent's cursor there. Send the same `x-feega-session` header (a UUID) on every call to keep one cursor per agent session; a different session gets a different cursor and avatar.
+
+```
+edit { "op": "set_props", "target": "<frameId>", "input": { "clip_id": "title", "props": { "text": "Slow mornings, made by hand." } } }
+edit { "op": "move_node", "input": { "nodeId": "<frameId>", "x": 760, "y": 480 } }
+```

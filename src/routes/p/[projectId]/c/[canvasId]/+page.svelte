@@ -75,6 +75,8 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, presentControlsShown, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import { LocalOff, isOff } from '$lib/local-user';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import AgentAvatars from '$lib/components/canvas/AgentAvatars.svelte';
+  import { agentsOf } from '$lib/realtime/agent-presence';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
@@ -1551,6 +1553,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
   const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow, (box) => tiles.some((t) => t.id === box.id && landedAt(t, box))));
   const drawnPeers = $derived(peerFrame ? peerPaths.smooth(canvasPeers, peerFrame) : canvasPeers);
+  const canvasAgents = $derived(agentsOf(canvasPeers));
   let following = $state<string | null>(null);
   let presenting = $state(false);
   const followView = $derived(following ? followed(canvasPeers, following) : null);
@@ -4236,9 +4239,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   {#if peers.length || canvasPeers.length || presenting}
     {@const onspotlight = isOff(LocalOff.Present) || !presentControlsShown({ others: peers.length, presenting }) ? undefined : spotlight}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></Portal>
+      <Portal to={topPeers}><div class="crowd"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /><AgentAvatars agents={canvasAgents} /></div></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /></div>
+      <div class="peers crowd"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} {onspotlight} /><AgentAvatars agents={canvasAgents} /></div>
     {/if}
   {/if}
   {#if presenting}
@@ -4966,6 +4969,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   .presenting { position: absolute; z-index: 10; left: 50%; top: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 12px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 9999px; font-size: 13px; }
   .presenting button { border: 0; background: var(--ui-accent, #0090ff); color: white; border-radius: 9999px; padding: 2px 10px; cursor: pointer; }
   .peers { position: absolute; z-index: 10; right: 16px; top: 16px; }
+  .crowd { display: flex; align-items: center; }
 
   .save-status {
     position: absolute;

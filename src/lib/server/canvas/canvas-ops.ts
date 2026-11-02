@@ -70,6 +70,7 @@ import { Side } from '$lib/motion/branch-merge';
 import { ResolveOutcome, resolveConflict } from '$lib/server/canvas/conflicts';
 import { Resolution } from '$lib/server/repos/canvas-conflicts';
 import { canvasPath } from '$lib/server/tenancy/entry';
+import { showAgentAt, touchedNodes } from './agent-cursor';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
@@ -1917,4 +1918,10 @@ export function isCanvasOp(name: string): name is CanvasOpName {
 
 export function chatSendsOp(name: CanvasOpName): boolean {
   return (CANVAS_OPS[name].audience ?? Audience.Everyone) === Audience.Everyone;
+}
+
+export async function runOp(ctx: CanvasCtx, name: CanvasOpName, input: unknown): Promise<unknown> {
+  const result = await CANVAS_OPS[name].run(ctx, input as never);
+  showAgentAt(ctx, touchedNodes(input, result), name);
+  return result;
 }
