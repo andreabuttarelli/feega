@@ -79,6 +79,7 @@ export type LayerRow = {
   thumb?: string | null;
   foldable?: boolean;
   element?: boolean;
+  own?: string;
   instance?: boolean;
 };
 
@@ -232,12 +233,12 @@ function unfolded(rows: readonly LayerRow[], folded: ReadonlySet<string>): Layer
   });
 }
 
-function elementRows(rows: readonly LayerRow[]): LayerRow[] {
+function elementRows(row: LayerRow, rows: readonly LayerRow[]): LayerRow[] {
   const roots = rows.filter((r) => r.depth === TRACK_DEPTH);
   if (roots.length !== 1) {
-    return [];
+    return [row];
   }
-  return rows.filter((r) => r.depth > TRACK_DEPTH).map((r) => ({ ...r, depth: r.depth - 1 }));
+  return [{ ...row, own: roots[0].id }, ...rows.filter((r) => r.depth > TRACK_DEPTH).map((r) => ({ ...r, depth: r.depth - 1 }))];
 }
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
@@ -247,7 +248,7 @@ export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null,
       return [row];
     }
     const inside = childRows(node.id, open, outlines, folded);
-    return [row, ...(node.element ? elementRows(inside) : inside)];
+    return node.element ? elementRows(row, inside) : [row, ...inside];
   });
 }
 
@@ -455,7 +456,9 @@ export function selectedLayers({ canvas, video }: LayerSelection): readonly stri
   return video?.selection.length ? video.selection : canvas;
 }
 
-const elementPicked = (row: LayerRow, selection: LayerSelection): boolean => selection.video?.nodeId === row.id || selection.canvas.includes(row.id);
+const wholePicked = (row: LayerRow, video: LayerSelection['video']): boolean => !row.own || video?.nodeId !== row.id || !video.selection.length || video.selection.includes(row.own);
+
+const elementPicked = (row: LayerRow, selection: LayerSelection): boolean => (selection.video?.nodeId === row.id || selection.canvas.includes(row.id)) && wholePicked(row, selection.video);
 
 export const rowPicked = (row: LayerRow, selection: LayerSelection): boolean =>
   row.element ? elementPicked(row, selection) : selectedLayers(selection).includes(row.id) && (row.kind === LayerKind.Node || row.nodeId === selection.video?.nodeId);

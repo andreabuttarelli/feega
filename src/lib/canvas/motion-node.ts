@@ -6,6 +6,7 @@ import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 import { FramePress } from '$lib/motion/drill';
+import { Root } from './frame-select';
 import { grantedPath } from './asset-url';
 
 export enum FrameKind {
@@ -14,12 +15,12 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; selectsOwnClip: boolean };
+type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; root: Root };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, selectsOwnClip: false },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, selectsOwnClip: true },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, selectsOwnClip: false }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, root: Root.Page },
+  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, root: Root.Own },
+  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, root: Root.Page }
 };
 
 export enum TileBody {

@@ -73,12 +73,28 @@ const SPAN_TOLERANCE = 1e-3;
 
 const spansFrame = (clip: MotionClip): boolean => Object.entries(FULL_FRAME).every(([key, full]) => Math.abs(Number(clip.props[key]) - full) <= SPAN_TOLERANCE);
 
-export function framePage(doc: MotionDoc): string | null {
-  const clips = doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips as MotionClip[]);
+export enum Root {
+  Page = 'page',
+  Own = 'own'
+}
+
+const visualClips = (doc: MotionDoc) => doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips as MotionClip[]);
+
+export const ownClipOf = (doc: MotionDoc): string | null => visualClips(doc).find((c) => !c.parent)?.id ?? null;
+
+function pageClip(doc: MotionDoc): string | null {
+  const clips = visualClips(doc);
   const roots = clips.filter((c) => !c.parent && isLayer(doc, c.id));
   const [only] = roots;
   return roots.length === 1 && spansFrame(only) && clips.some((c) => c.parent === only.id) ? only.id : null;
 }
+
+const PAGE_OF: Record<Root, (doc: MotionDoc) => string | null> = {
+  [Root.Page]: pageClip,
+  [Root.Own]: () => null
+};
+
+export const framePage = (doc: MotionDoc, root: Root = Root.Page): string | null => PAGE_OF[root](doc);
 
 function samePlaceOrTop(doc: MotionDoc, hit: string, picks: readonly string[]): string | null {
   const page = framePage(doc);

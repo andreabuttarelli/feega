@@ -178,6 +178,10 @@
       video?.selectPart(row.id.slice(0, at), row.id.slice(at + 1));
       return;
     }
+    if (row.own && video?.nodeId === row.id && pickOf(e) === Pick.One) {
+      video.select([row.own]);
+      return;
+    }
     if (row.kind === LayerKind.Node) {
       canvas?.select(pickLayers(canvas.selected, row.id, pickOf(e), rangeRows(row)));
       return;
