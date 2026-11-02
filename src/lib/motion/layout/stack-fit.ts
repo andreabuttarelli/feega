@@ -80,3 +80,15 @@ export function freeStackFit(doc: MotionDoc, measure: TextMeasure = estimatedTex
   }
   return { doc: holdPixels(doc, size), share: { width: size.width / stage.width, height: size.height / stage.height } };
 }
+
+const LAID_KEYS = ['x', 'y', 'width', 'height'] as const;
+
+export function laidOutAsShown(doc: MotionDoc, measure: TextMeasure = estimatedText): MotionDoc {
+  const laid = new Map(withAutoLayout(doc, measure).tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c.props]));
+  const settle = (clip: MotionClip): MotionClip => {
+    const props = laid.get(clip.id);
+    const moved = props ? LAID_KEYS.filter((k) => typeof props[k] === 'number' && props[k] !== clip.props[k]) : [];
+    return moved.length ? { ...clip, props: { ...clip.props, ...Object.fromEntries(moved.map((k) => [k, props![k]])) } } : clip;
+  };
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => settle(c as MotionClip)) })) } as MotionDoc;
+}

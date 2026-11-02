@@ -96,7 +96,7 @@ const STACK_LAYOUT = { direction: Direction.Vertical, gap: 8, padding: { top: 16
 
 function finishStack(doc: MotionDoc, id: string): OpResult {
   const laid = setAutoLayout(doc, id, STACK_LAYOUT);
-  return laid.ok ? setLayoutItem(laid.doc, id, { width: Sizing.Hug, height: Sizing.Hug }) : laid;
+  return laid.ok ? setLayoutItem(laid.doc, id, { width: Sizing.Fixed, height: Sizing.Fixed }) : laid;
 }
 
 const FINISH: Partial<Record<BoxTool, (doc: MotionDoc, id: string) => OpResult>> = {

@@ -30,7 +30,7 @@ export async function sizeFrame(store: FrameStore, ask: SizeAsk): Promise<Sized>
   if (!frame) {
     return { outcome: SizeOutcome.NotFound };
   }
-  const sized = fitToNode(frame.doc, ask, ask.mode);
+  const sized = fitToNode(frame.doc, ask, ask.mode, frame.stage);
   if (!sized.ok) {
     return { outcome: SizeOutcome.Invalid, detail: sized.error };
   }

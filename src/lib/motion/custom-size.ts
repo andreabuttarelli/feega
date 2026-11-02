@@ -44,15 +44,18 @@ const constrainedFit = (doc: MotionDoc, node: CanvasSize): OpResult => {
   return sized.ok && doc.still ? { ok: true, doc: heldPixels(sized.doc, doc) } : sized;
 };
 
-const FIT_BY_MODE: Record<ResizeMode, (doc: MotionDoc, node: CanvasSize) => OpResult> = {
+const elementStage = (doc: MotionDoc, node: CanvasSize, was?: CanvasSize): CanvasSize =>
+  customSize(was ? { width: (doc.width * node.width) / was.width, height: (doc.height * node.height) / was.height } : node, doc);
+
+const FIT_BY_MODE: Record<ResizeMode, (doc: MotionDoc, node: CanvasSize, was?: CanvasSize) => OpResult> = {
   [ResizeMode.Constrained]: constrainedFit,
   [ResizeMode.Ignored]: (doc, node) => fittedWith(doc, node, STAYS_PUT),
-  [ResizeMode.Element]: (doc, node) => fitElementToNode(keepTextSize(doc, doc, customSize(node, doc)), node)
+  [ResizeMode.Element]: (doc, node, was) => fitElementToNode(keepTextSize(doc, doc, elementStage(doc, node, was)), node, was)
 };
 
-export const fitToNode = (doc: MotionDoc, node: CanvasSize, mode: ResizeMode = ResizeMode.Constrained): OpResult => FIT_BY_MODE[mode](doc, node);
+export const fitToNode = (doc: MotionDoc, node: CanvasSize, mode: ResizeMode = ResizeMode.Constrained, was?: CanvasSize): OpResult => FIT_BY_MODE[mode](doc, node, was);
 
-export function fitElementToNode(doc: MotionDoc, node: CanvasSize): OpResult {
-  const stack = stackElementResized(doc, customSize(node, doc));
+export function fitElementToNode(doc: MotionDoc, node: CanvasSize, was?: CanvasSize): OpResult {
+  const stack = stackElementResized(doc, elementStage(doc, node, was));
   return stack ? { ok: true, doc: stack } : fittedWith(doc, node, SCALES_WITH_NODE);
 }

@@ -21,9 +21,13 @@ A **Stack** is an element that lays its children out in a row or a column, like 
    - the **…** menu in the header of the right bar.
 3. A new Stack holds the selection. Its direction and gap are guessed from where the elements were; text hugs its words and the Stack hugs its children.
 
-Wrapping elements that already sit in a Stack nests the new Stack in their place. Wrapping free elements merges them into one free Stack element on the canvas, which grows and shrinks with its content.
+Wrapping elements that already sit in a Stack nests the new Stack in their place. Wrapping free elements merges them into one free Stack element on the canvas, which grows and shrinks with its content. Free Stacks wrapped together keep their own children, so a column of two rows stays a column of two rows. The new Stack is selected, and nothing moves: a row stays a row, a column becomes a vertical Stack, and the gap is the space that was already between the elements.
 
-**Remove stack** (`Alt+Shift+A`, same four menus, or the unwrap button next to the direction in the Stack section) unwraps: the children stay where the layout put them and the Stack goes.
+Drag a side or a corner of a Stack to resize it: the dragged side turns from Hug to Fixed at the size you drag, and the children keep their size. The padding handles sit just inside the edges, so a side drag always resizes.
+
+**Remove stack** (`Alt+Shift+A`, same four menus, or the unwrap button next to the direction in the Stack section) unwraps: the children stay where the layout put them and the Stack goes. `Delete` removes the Stack together with everything inside it.
+
+The **Stack** tool (in the **+** menu of the bottom bar) draws an empty Stack at the size you drag, ready to take elements.
 
 ## The Stack section
 

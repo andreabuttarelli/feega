@@ -104,8 +104,8 @@ async function applyWrite(db: Db, orgId: string, write: Exclude<InverseWrite, Do
         orgId,
         nodeId: write.nodeId,
         position: data.position ?? { x: 0, y: 0, z: 0 },
-        size: data.size ?? { width: null, height: null },
-        data: data.data ?? {},
+        size: data.size,
+        data: data.data,
         actor
       });
       return;

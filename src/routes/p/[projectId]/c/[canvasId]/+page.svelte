@@ -2894,7 +2894,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return row && motionOf(row)?.kind === FrameKind.Element ? { width: row.w, height: row.h } : null;
   }
 
-  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Picture | null, mode: ResizeMode) => (was ? fitElementToNode(keepTextSize(doc, was, picture), picture) : fitToNode(doc, picture, mode));
+  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Picture | null, mode: ResizeMode) => (was ? fitElementToNode(keepTextSize(doc, was, picture), picture, was) : fitToNode(doc, picture, mode));
 
   async function sizeFrameDoc(id: string, picture: Picture, was: Picture | null = null) {
     const mode = resizeMode;

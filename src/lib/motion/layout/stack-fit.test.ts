@@ -7,6 +7,7 @@ import { duplicateLayer, setAutoLayout, wrapInStack } from './ops';
 import { freeStackFit } from './stack-fit';
 import { ResizeMode, fitToNode } from '../custom-size';
 import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { setStill } from '@feega/motion-core/motion/still';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -95,6 +96,20 @@ describe('resizing a free stack element on the canvas', () => {
     expect(itemOf(sized).height).toBe(Sizing.Hug);
     expect(pxBox(sized, 'stack').width).toBeCloseTo(sized.width, 0);
     expect(freeStackFit(sized)).toBeNull();
+  });
+
+  it('a stack drawn at two pixels per canvas unit keeps its children their size on the canvas', () => {
+    const still = must(setStill(hugging, 0));
+    const dense = { ...still, width: still.width * 2, height: still.height * 2 };
+    const node = { width: hugging.width, height: hugging.height };
+    const onCanvas = (doc: MotionDoc, size: { width: number }, id: string) => (pxBox(doc, id).width * size.width) / doc.width;
+
+    const wider = { width: node.width + 100, height: node.height };
+    const sized = must(fitToNode(dense, wider, ResizeMode.Element, node));
+
+    expect(onCanvas(sized, wider, 'sq')).toBeCloseTo(onCanvas(dense, node, 'sq'), 0);
+    expect(itemOf(sized).height).toBe(Sizing.Hug);
+    expect(sized.width / sized.height).toBeCloseTo(wider.width / wider.height, 1);
   });
 
   it('a child added to a hugging stack grows the node to the stack box', () => {

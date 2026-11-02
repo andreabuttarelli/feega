@@ -182,6 +182,8 @@ function positioned(clip: MotionClip, at: Point): MotionClip {
   return next;
 }
 
+export const rehomedClip = (clip: MotionClip, from: Size, to: Size, at: Point): MotionClip => positioned(sized(clip, from, to), at);
+
 function timed(clip: MotionClip, target: MotionDoc, element: Element, frame?: number): MotionClip {
   const retime = retimer(element.fps, target.fps);
   const moved = retime.clip(clip);

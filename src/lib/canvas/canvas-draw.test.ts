@@ -24,6 +24,13 @@ describe('a shape drawn over the canvas lands in canvas units', () => {
     expect(drawnOnCanvas({ component: 'Text', props: { text: 'Text', ...box } }, HOST, ZOOM_TWO)?.tool).toBe(DrawTool.Text);
   });
 
+  it('a stack drawn with the Stack tool stays a stack, not a rectangle', () => {
+    const box = { x: 0.5, y: 0.5, width: 0.2, height: 0.1 };
+    const stack = { component: 'Shape', props: { shape: 'rect', fill: 'transparent', ...box }, autoLayout: { direction: 'vertical' } };
+
+    expect(drawnOnCanvas(stack, HOST, ZOOM_TWO)?.tool).toBe(DrawTool.Stack);
+  });
+
   it('a text carries the theme of the canvas it was drawn on', () => {
     const clip = { component: 'Text', props: { text: 'Text', x: 0.5, y: 0.5, width: 0.2, height: 0.1 } };
 

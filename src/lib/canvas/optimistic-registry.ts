@@ -6,7 +6,7 @@ import { SECTION_DEFAULT_FILL } from './node-data';
 import { layoutOf, scaleGroup } from './node-layout';
 import { shownOutput } from './gen-history';
 import { cleanNodeName } from './node-name';
-import { groupedLocally, ungroupedLocally } from './optimistic-group';
+import { groupedLocally, wrappedLocally, ungroupedLocally } from './optimistic-group';
 import { restoreRows, type OptimisticOp, type Touched } from './optimistic-ops';
 import { SECTION_TYPE, sectionBoxAround } from './section';
 import { stackedLocally, type Stack } from './stacking';
@@ -188,7 +188,7 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   },
   [OptimisticAction.Stack]: {
     fields: idsField,
-    apply: (rows, i, ctx) => ({ ...rows, nodes: groupedLocally(rows.nodes, i.ids, i.id, ctx.toTile) }),
+    apply: (rows, i, ctx) => ({ ...rows, nodes: wrappedLocally(rows.nodes, i.ids, i.id, ctx.toTile) }),
     touched: (i) => nodesOnly([...i.ids, i.id]),
     landing: Landing.Moved,
     undo: serverUndo,
