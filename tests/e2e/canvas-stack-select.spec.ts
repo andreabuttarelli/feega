@@ -78,7 +78,7 @@ test.describe('a Stack wrapping one text is selected on its own @real', () => {
     }
 
     for (const axis of ['x', 'y']) {
-      const padding = page.getByTestId(`auto-layout-padding-${axis}`);
+      const padding = page.getByTestId(`auto-layout-padding-${axis}`).locator('input');
       await padding.fill('16');
       await padding.dispatchEvent('change');
       await expect(padding).toHaveValue('16');
@@ -102,6 +102,18 @@ test.describe('a Stack wrapping one text is selected on its own @real', () => {
       return { clip: !!root.clipContent, effects: root.effects?.length ?? 0, fills: Array.isArray(root.props.fills) && root.props.fills.length > 0, padding: root.autoLayout?.padding.top, rounded: Number(root.props.roundness ?? 0) > 0 };
     }, { timeout: 15_000 }).toEqual({ clip: true, effects: 1, fills: true, padding: 16, rounded: true });
 
+    const stackSection = inspector.locator('[data-section="stack"]');
+    await stackSection.scrollIntoViewIfNeeded();
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      await page.waitForTimeout(300);
+      await page.getByTestId('frame-inspector').screenshot({ path: join(SHOTS, `stack-inspector-${theme}.png`) });
+    }
+    await page.getByTestId('auto-layout-advanced').click();
+    await expect(page.getByTestId('auto-layout-advanced-panel')).toBeVisible();
+    await page.screenshot({ path: join(SHOTS, 'stack-inspector-settings-dark.png') });
+    await page.getByTestId('auto-layout-advanced').click();
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
     await inspector.locator('[data-section="layer"]').scrollIntoViewIfNeeded();
     await shot(page, 'appearance');
     await page.locator('.svelte-flow__pane').hover({ position: { x: 10, y: 10 } });

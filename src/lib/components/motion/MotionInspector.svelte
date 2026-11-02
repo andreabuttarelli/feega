@@ -73,6 +73,7 @@
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import StackSection from './StackSection.svelte';
+  import StackSettings from './StackSettings.svelte';
   import { laidClip, layoutParent } from '$lib/motion/layout/ops';
   import { LAYOUT_KIND_LABEL, layoutKind, placementOf } from '@feega/motion-core/motion/layout/stack';
   import StyleSection from './StyleSection.svelte';
@@ -508,7 +509,7 @@
     [Section.Parent]: visual || maskProps.length > 0
   });
 
-  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
+  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(clip.autoLayout ? { [Section.Stack]: stackSettings } : {}), ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
 
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
@@ -1055,6 +1056,10 @@
       {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type) }), 'Add fill')} />{/each}
     </MenuContent>
   </Menu>
+{/snippet}
+
+{#snippet stackSettings()}
+  {#if clip.autoLayout}<StackSettings {doc} clip={{ ...clip, autoLayout: clip.autoLayout }} {commit} />{/if}
 {/snippet}
 
 {#snippet stackBody()}

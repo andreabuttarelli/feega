@@ -107,19 +107,57 @@ test.describe('stack and padding @real', () => {
     await page.mouse.click(at.x, at.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(at.x, at.y);
-    const horizontal = page.getByTestId('auto-layout-padding-x');
-    await expect(horizontal).toBeVisible({ timeout: 15_000 });
-    await horizontal.fill('16');
-    await horizontal.dispatchEvent('change');
-    const vertical = page.getByTestId('auto-layout-padding-y');
-    await vertical.fill('8');
-    await vertical.dispatchEvent('change');
+    const chip = (id: string) => page.getByTestId(id).locator('input');
+    const type = async (id: string, value: string) => {
+      await chip(id).fill(value);
+      await chip(id).press('Enter');
+    };
+    await expect(chip('auto-layout-padding-x')).toBeVisible({ timeout: 15_000 });
+    await type('auto-layout-padding-x', '16');
+    await type('auto-layout-padding-y', '8');
     await page.getByTestId('auto-layout-padding-sides').click();
 
-    await expect(page.getByTestId('auto-layout-padding-top')).toHaveValue('8');
-    await expect(page.getByTestId('auto-layout-padding-right')).toHaveValue('16');
-    await expect(page.getByTestId('auto-layout-padding-bottom')).toHaveValue('8');
-    await expect(page.getByTestId('auto-layout-padding-left')).toHaveValue('16');
+    await expect(chip('auto-layout-padding-top')).toHaveValue('8');
+    await expect(chip('auto-layout-padding-right')).toHaveValue('16');
+    await expect(chip('auto-layout-padding-bottom')).toHaveValue('8');
+    await expect(chip('auto-layout-padding-left')).toHaveValue('16');
+
+    await type('auto-layout-padding-left', '24');
+    await page.getByTestId('auto-layout-padding-sides').click();
+    await expect(page.getByTestId('auto-layout-padding')).toHaveAttribute('data-view', 'axes');
+    await expect(chip('auto-layout-padding-x')).toHaveValue('24');
+    await expect(chip('auto-layout-padding-y')).toHaveValue('8');
     await shot(page, 'padding-axes');
+  });
+
+  test('min and max take px or % from the W mode menu and show as chips', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const node = await seedNode({ type: 'motion', x: 200, y: 150, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: paddedDoc, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const r = (await page.locator(`[data-frame="${node.id}"]`).boundingBox())!;
+    const at = { x: r.x + r.width * 0.5, y: r.y + r.height * 0.5 };
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.click(at.x, at.y);
+    await page.waitForTimeout(SETTLE_MS);
+    await page.mouse.click(at.x, at.y);
+
+    await page.getByTestId('stack-unit-width').click({ timeout: 15_000 });
+    const min = page.getByTestId('stack-limit-input-min-width');
+    await min.fill('200px');
+    await min.press('Enter');
+    const max = page.getByTestId('stack-limit-input-max-width');
+    await max.fill('50%');
+    await max.press('Enter');
+    await page.getByTestId('stack-unit-width').click();
+
+    await expect(page.getByTestId('stack-limit-min-width')).toContainText('200px', { timeout: 15_000 });
+    await expect(page.getByTestId('stack-limit-max-width')).toContainText('50%');
+    await page.getByTestId('stack-limit-clear-min-width').click();
+    await expect(page.getByTestId('stack-limit-min-width')).toHaveCount(0);
+    await shot(page, 'limits');
   });
 });

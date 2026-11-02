@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Component, Snippet } from 'svelte';
   import { parseDecimal } from '$lib/motion/inspector';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import { FieldFill, FieldKind, Gesture, Nudge, fillShare, gestureOf, formatValue, nudged, precisionOf, scrubbed, valueAtShare, type Range } from '$lib/motion/number-field';
@@ -16,6 +17,9 @@
     mark = null,
     expression = false,
     disabled = false,
+    icon = null,
+    blank = null,
+    trailing,
     gesture = null,
     onchange,
     onkey,
@@ -31,6 +35,9 @@
     mark?: KeyMark | null;
     expression?: boolean;
     disabled?: boolean;
+    icon?: Component | null;
+    blank?: string | null;
+    trailing?: Snippet;
     gesture?: LiveGesture | null;
     onchange: (value: number) => void;
     onkey?: () => void;
@@ -41,7 +48,8 @@
   let scrubbing = $state<number | null>(null);
   const shown = $derived(scrubbing ?? value);
   const known = $derived(shown === MIXED ? Math.min(range.max, Math.max(range.min, 0)) : shown);
-  const text = $derived(shown === MIXED ? '' : formatValue(shown, range.step));
+  const text = $derived(shown === MIXED || blank !== null ? '' : formatValue(shown, range.step));
+  const hint = $derived(value === MIXED ? MIXED_TEXT : (blank ?? undefined));
 
   const NUDGE_KEYS: Record<string, Nudge> = { ArrowUp: Nudge.Up, ArrowDown: Nudge.Down };
   const LONG_PRESS_MS = 550;
@@ -219,9 +227,10 @@
 </script>
 
 <div class="field {kind}" class:ranged={fill === FieldFill.Range} class:disabled class:expression data-field={name} class:mixed={shown === MIXED} style={fill === FieldFill.Range && shown !== MIXED ? `--fill: ${fillShare(shown, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
-  <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={leaveScrub} onlostpointercapture={leaveScrub} aria-hidden="true">{label}</span>
-  <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={value === MIXED ? MIXED_TEXT : undefined} onpointerdown={pressValue} onpointermove={dragValue} onpointerup={releaseValue} onpointercancel={releaseValue} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
+  <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={leaveScrub} onlostpointercapture={leaveScrub} aria-hidden="true">{#if icon}{@const Icon = icon}<Icon size={14} />{/if}{icon ? '' : label}</span>
+  <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={hint} onpointerdown={pressValue} onpointermove={dragValue} onpointerup={releaseValue} onpointercancel={releaseValue} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
   {#if unit}<span class="unit" aria-hidden="true">{unit}</span>{/if}
+  {@render trailing?.()}
   {#if fill === FieldFill.Range}
     <span class="track" data-slider aria-hidden="true" onpointerdown={startSlide} onpointermove={moveSlide} onpointerup={endSlide} onlostpointercapture={endSlide}><span class="rail"><span class="thumb"></span></span></span>
   {/if}
@@ -312,6 +321,10 @@
 
   .named .label + .num {
     padding-left: 10px;
+  }
+
+  .label :global(svg) {
+    display: block;
   }
 
   .label:hover {

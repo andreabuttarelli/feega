@@ -65,7 +65,8 @@ describe('a Stack in Properties', () => {
     const clip = findClip(hugged.doc, 'stack')!.clip;
     const html = render(MotionInspector, { props: { doc: hugged.doc, clip, tokens: FEEGA_TOKENS, assets: [], frame: 0, mode: EditMode.Design, onchange: () => {} } }).body;
     const stack = html.slice(html.indexOf('data-section="stack"'));
-    const height = stack.match(/<input[^>]*data-testid="stack-size-height"[^>]*>/)?.[0] ?? '';
+    const chip = stack.slice(stack.indexOf('data-testid="stack-size-height"'));
+    const height = chip.match(/<input[^>]*>/)?.[0] ?? '';
 
     expect(height).toMatch(/value="108"/);
     expect(html).not.toMatch(/value="640"/);
