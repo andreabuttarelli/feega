@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stillFrame, toFetch, untilFound } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stagedBox, stillFrame, toFetch, untilFound } from './frame-source';
+import { ItemKind, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import { BlendMode } from '@feega/motion-core/motion/blend';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -119,6 +122,32 @@ describe('a transparent doc on the canvas', () => {
   it('elements and groups stay see-through, and an opaque doc keeps its own colour', () => {
     expect(onStage(list(null), FrameKind.Element).background).toBeNull();
     expect(onStage(list([1, 0, 0, 1]), FrameKind.Frame).background).toEqual([1, 0, 0, 1]);
+  });
+});
+
+describe('a free element paints past its own box', () => {
+  const shadowed = { width: 200, height: 100, background: null, items: [{ kind: ItemKind.Path, clip: 'r', contours: [[0, 0, 200, 0, 200, 100, 0, 100]], rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: [0, 0, 0, 1] }, opacity: 1, matrix: [1, 0, 0, 1, 0, 0], blur: 0, blend: BlendMode.Normal, scissor: [0, 0, 200, 100] }], unsupported: [], bleed: 40 } as DisplayList;
+
+  it('an element grows its picture by the bleed on every side, with the content moved in by it', () => {
+    const staged = onStage(shadowed, FrameKind.Element);
+    const [item] = staged.items as PathItem[];
+
+    expect([staged.width, staged.height]).toEqual([280, 180]);
+    expect(item.matrix).toEqual([1, 0, 0, 1, 40, 40]);
+    expect(item.scissor).toEqual([40, 40, 240, 140]);
+  });
+
+  it('and the box it is drawn into grows by the same share, so the shape stays where the node is', () => {
+    const staged = onStage(shadowed, FrameKind.Element);
+
+    expect(stagedBox({ x: 10, y: 20, w: 100, h: 50 }, staged)).toEqual({ x: -10, y: 0, w: 140, h: 90 });
+  });
+
+  it('a frame still clips what it holds to its own edge', () => {
+    const staged = onStage(shadowed, FrameKind.Frame);
+
+    expect([staged.width, staged.height]).toEqual([200, 100]);
+    expect(stagedBox({ x: 10, y: 20, w: 100, h: 50 }, staged)).toEqual({ x: 10, y: 20, w: 100, h: 50 });
   });
 });
 

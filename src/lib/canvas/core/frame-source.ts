@@ -2,7 +2,8 @@ import { FrameKind, MOTION_NODE_BAR_H, docKindOf, frameChrome, holdsDoc } from '
 import { restFrameOf } from '$lib/motion/poster-time';
 import { stillFrame as docStill } from '@feega/motion-core/motion/still';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
-import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import { ItemKind, type DisplayList, type Item, type Scissor } from '@feega/motion-core/motion/gpu-full/display-list';
+import { mul2d, type Affine } from '@feega/motion-core/motion/affine';
 import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 
@@ -57,13 +58,49 @@ export function logGaps(id: string, list: DisplayList) {
   console.warn('[canvas] core left out of frame', id, list.unsupported.map((g) => `${g.clip} (${g.component}): ${g.detail ?? g.reason}`).join('; '));
 }
 
-const STAGE: Record<FrameKind, Rgba | null> = {
-  [FrameKind.Frame]: [0, 0, 0, 1],
-  [FrameKind.Element]: null,
-  [FrameKind.Group]: null
+enum Edge {
+  Clips = 'clips',
+  Bleeds = 'bleeds'
+}
+
+const STAGE: Record<FrameKind, { background: Rgba | null; edge: Edge }> = {
+  [FrameKind.Frame]: { background: [0, 0, 0, 1], edge: Edge.Clips },
+  [FrameKind.Element]: { background: null, edge: Edge.Bleeds },
+  [FrameKind.Group]: { background: null, edge: Edge.Bleeds }
 };
 
-export const onStage = (list: DisplayList, kind: FrameKind): DisplayList => ({ ...list, background: list.background ?? STAGE[kind] });
+function moved(item: Item, by: number): Item {
+  const m: Affine = [1, 0, 0, 1, by, by];
+  const masks = item.masks?.map((l) => ({ ...l, cover: { ...l.cover, matrix: mul2d(m, l.cover.matrix) } }));
+  const matte = item.matte && { ...item.matte, items: item.matte.items.map((i) => moved(i, by)) };
+  return {
+    ...item,
+    matrix: mul2d(m, item.matrix),
+    ...(item.scissor ? { scissor: item.scissor.map((v) => v + by) as Scissor } : {}),
+    ...(masks ? { masks } : {}),
+    ...(matte ? { matte } : {}),
+    ...(item.kind === ItemKind.Group ? { items: item.items.map((i) => moved(i, by)) } : {}),
+    ...(item.origin ? { origin: [item.origin[0] + by, item.origin[1] + by] } : {})
+  } as Item;
+}
+
+function bled(list: DisplayList, bleed: number): DisplayList {
+  return { ...list, width: list.width + 2 * bleed, height: list.height + 2 * bleed, items: list.items.map((i) => moved(i, bleed)), bleed };
+}
+
+export function onStage(list: DisplayList, kind: FrameKind): DisplayList {
+  const stage = STAGE[kind];
+  const { bleed = 0, ...flat } = list;
+  const shown = { ...flat, background: list.background ?? stage.background };
+  return stage.edge === Edge.Bleeds && bleed > 0 ? bled(shown, bleed) : shown;
+}
+
+export function stagedBox(box: Box, list: DisplayList): Box {
+  const bleed = list.bleed ?? 0;
+  const sx = box.w / (list.width - 2 * bleed);
+  const sy = box.h / (list.height - 2 * bleed);
+  return bleed ? { x: box.x - bleed * sx, y: box.y - bleed * sy, w: box.w + 2 * bleed * sx, h: box.h + 2 * bleed * sy } : box;
+}
 
 export type Patience = { tries: number; waitMs: number };
 
