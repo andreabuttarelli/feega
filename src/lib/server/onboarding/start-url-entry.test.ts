@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { START_URL_COOKIE } from './start-url-cookie';
-import { startUrlRedirect } from './start-url-entry';
+import { carriesStartUrl, startUrlRedirect } from './start-url-entry';
 
 function cookies() {
   const store = new Map<string, string>();
@@ -42,5 +42,26 @@ describe('the website entry routes the visitor before anything else', () => {
 
   it('a refused url changes nothing', async () => {
     expect(await startUrlRedirect({ url: new URL('https://oh.feega.app/?start_url=javascript:alert(1)'), cookies: cookies(), land: null })).toBeNull();
+  });
+});
+
+describe('the start_from alias used by shared links', () => {
+  it('is renamed to start_url on the same path, so every entry handles it', async () => {
+    const to = await startUrlRedirect({ url: new URL('https://oh.feega.app/app?start_from=stripe.com&ref=x'), cookies: cookies(), land: vi.fn() });
+
+    expect(to).toBe('/app?ref=x&start_url=stripe.com');
+  });
+
+  it('a signed-out visitor following the renamed link lands on sign in with the url', async () => {
+    const jar = cookies();
+    const to = await startUrlRedirect({ url: new URL('https://oh.feega.app/app?start_url=stripe.com'), cookies: jar, land: null });
+
+    expect(to).toBe(`/login?start_url=${encodeURIComponent('https://stripe.com/')}`);
+    expect(jar.store.get(START_URL_COOKIE)).toBe('https://stripe.com/');
+  });
+
+  it('is announced as a start url to the hook', () => {
+    expect(carriesStartUrl(new URL('https://oh.feega.app/app?start_from=stripe.com'))).toBe(true);
+    expect(carriesStartUrl(new URL('https://oh.feega.app/app'))).toBe(false);
   });
 });

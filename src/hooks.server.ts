@@ -26,8 +26,7 @@ import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { landingPath } from '$lib/server/tenancy/landing';
-import { startUrlRedirect } from '$lib/server/onboarding/start-url-entry';
-import { START_URL_PARAM } from '$lib/start-url';
+import { carriesStartUrl, startUrlRedirect } from '$lib/server/onboarding/start-url-entry';
 import type { RequestEvent } from '@sveltejs/kit';
 import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_S, THEME_METADATA_KEY, ThemePref, htmlThemeAttrs, parseThemePref } from '$lib/theme';
 
@@ -78,7 +77,7 @@ async function startLanding(event: RequestEvent): Promise<(() => Promise<string>
 }
 
 async function routeStartUrl(event: RequestEvent): Promise<void> {
-  if (!event.url.searchParams.has(START_URL_PARAM)) {
+  if (!carriesStartUrl(event.url)) {
     return;
   }
   const target = await startUrlRedirect({ url: event.url, cookies: event.cookies, land: await startLanding(event) });
