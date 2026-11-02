@@ -190,6 +190,7 @@
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
+  import { NodeFlag } from '$lib/canvas/node-flags';
   import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
@@ -621,8 +622,8 @@
   );
 
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
-  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && editable ? selectedBoxes[0] : null);
-  const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && editable);
+  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && !selectedBoxes[0].locked && editable ? selectedBoxes[0] : null);
+  const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && !selectedBoxes[0].locked && editable);
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
@@ -2518,8 +2519,11 @@
   }
 
   function nodeHeld(nodeId: string): boolean {
+    if (byId.get(nodeId)?.locked) {
+      return true;
+    }
     const live = liveOf(nodeId);
-    return !!live && frameChrome(kindOfNode(nodeId)).root === Root.Own && ownLocked(live.doc);
+    return !!live &&frameChrome(kindOfNode(nodeId)).root === Root.Own && ownLocked(live.doc);
   }
 
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
@@ -3081,7 +3085,7 @@
     }
     for (const id of selected) {
       const t = byId.get(id);
-      if (t) {
+      if (t && !t.locked) {
         props.onMove?.(id, t.x + dx, t.y + dy);
       }
     }
@@ -3130,6 +3134,8 @@
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
     'send-back': () => props.onRestack?.(selected, Stack.Back),
+    'toggle-hidden': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Hidden),
+    'toggle-locked': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Locked),
     help: () => (shortcutHelp.open = true),
     view: (c) => {
       if (c.id === 'view') {

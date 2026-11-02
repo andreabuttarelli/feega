@@ -168,6 +168,15 @@ describe('checkGesture: il cambio di modello che sgancia connessioni si annulla 
     expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'patch_node_data', nodeId: NODE, patch: { seed: 1 } }] });
   });
 
+  it('undo leaves a null key it did not change, so the node keeps a field its schema requires', () => {
+    const gesture: Gesture = { items: [{ kind: 'node.update', nodeId: NODE, before: { data: { locked: false, posterAssetId: null } }, after: { data: { locked: true, posterAssetId: null } }, expectedVersion: 3 }] };
+    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ version: 4, data: { locked: true, posterAssetId: null } }) };
+
+    const result = checkGesture(gesture, (item) => ({ node: states[(item as { nodeId: string }).nodeId] }));
+
+    expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'patch_node_data', nodeId: NODE, patch: { locked: false } }] });
+  });
+
   it('a key that did not exist before my edit goes away again', () => {
     const gesture: Gesture = { items: [{ kind: 'node.update', nodeId: NODE, before: { data: {} }, after: { data: { refId: 'x' } }, expectedVersion: 3 }] };
     const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ data: { refId: 'x' } }) };

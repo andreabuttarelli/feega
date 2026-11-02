@@ -755,3 +755,10 @@ describe('dropping a layer on a container row', () => {
     expect(findClip(ok(dropLayer(framed, 'loose', 'card', Place.Into)), 'loose')!.clip.parent).toBe('card');
   });
 });
+
+describe('node rows carry hide and lock', () => {
+  it('a hidden or locked node shows so in Layers', () => {
+    const rows = layerRows([{ id: 'n', type: 'image', name: 'Shot', hidden: true, locked: true }], null);
+    expect(rows[0]).toMatchObject({ hidden: true, locked: true });
+  });
+});

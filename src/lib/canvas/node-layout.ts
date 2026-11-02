@@ -5,10 +5,12 @@ export const nodeLayoutSchema = z.object({
   rotation: z.number().finite().min(-180).max(180).optional(),
   groupId: z.string().min(1).nullable().optional(),
   colorTag: z.enum(COLOUR_TAGS).nullable().optional(),
-  sectionExcluded: z.array(z.string().min(1)).optional()
+  sectionExcluded: z.array(z.string().min(1)).optional(),
+  hidden: z.boolean().optional(),
+  locked: z.boolean().optional()
 });
 
-export const LAYOUT_KEYS = ['rotation', 'groupId', 'colorTag', 'sectionExcluded'] as const;
+export const LAYOUT_KEYS = ['rotation', 'groupId', 'colorTag', 'sectionExcluded', 'hidden', 'locked'] as const;
 
 export type Layout = { rotation: number; groupId: string | null };
 

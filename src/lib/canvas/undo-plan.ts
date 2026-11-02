@@ -173,7 +173,7 @@ const dataOf = (side: Record<string, unknown>) => (side.data ?? {}) as Record<st
 function ownKeysBack(item: Extract<UndoItem, { kind: 'node.update' }>, current: Record<string, unknown>): Record<string, unknown> {
   const before = dataOf(item.before);
   const after = dataOf(item.after);
-  const mine = Object.keys(after).filter((key) => sameValue(current[key], after[key]));
+  const mine = Object.keys(after).filter((key) => !sameValue(before[key], after[key]) && sameValue(current[key], after[key]));
   const gone = Object.keys(before).filter((key) => !(key in after) && current[key] === undefined);
   return Object.fromEntries([...mine, ...gone].map((key) => [key, before[key] ?? null]));
 }

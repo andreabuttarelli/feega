@@ -153,6 +153,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
+  import { NodeFlag, flagHeld, flagsOf, toggledFlags } from '$lib/canvas/node-flags';
   import { FORMATS, MotionFormat, formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { ResizeMode, fitElementToNode, fitToNode } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
@@ -1379,8 +1380,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   const tiles = $derived(
-    nodes.map((n) => ({ n, chrome: tileChromeOf(n), ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, chrome, ports, outputs }) => ({
+    nodes.filter((n) => !flagHeld(nodes, n.id, NodeFlag.Hidden)).map((n) => ({ n, chrome: tileChromeOf(n), ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, chrome, ports, outputs }) => ({
       id: n.id,
+      locked: flagHeld(nodes, n.id, NodeFlag.Locked),
       x: n.x,
       y: n.y,
       w: n.w,
@@ -3195,16 +3197,23 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   $effect(() =>
     layersSource.publishCanvas({
       get nodes() {
-        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), ...frameLook(n) }));
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), ...flagsOf(n.data), ...frameLook(n) }));
       },
       get selected() {
         return selectedIds;
       },
       select: (ids) => focusOn(ids, undefined, FocusMode.Select),
       open: (id) => focusOn([id], undefined, FocusMode.Select),
-      rename: renameNode
+      rename: renameNode,
+      flag: toggleFlag
     })
   );
+
+  function toggleFlag(ids: string[], flag: NodeFlag) {
+    for (const { id, patch } of toggledFlags(nodes, ids, flag)) {
+      void write(id, patch, SaveTiming.Now);
+    }
+  }
 
   function rectOf(id: string): Rect | null {
     const tile = tiles.find((t) => t.id === id);
@@ -4377,6 +4386,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onNodeSize={(id, w, h) => void storeSize(id, w, h)}
     onUngroup={ungroupElements}
     onRestack={restack}
+    onToggleFlag={toggleFlag}
     onTileDragOver={tileDragOver}
     onTileDrop={tileDrop}
     onElementOut={elementOut}

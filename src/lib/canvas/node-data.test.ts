@@ -645,3 +645,10 @@ describe('un media trascinato sulla tela nasce con il suo file', () => {
     }
   });
 });
+
+describe('hidden and locked live in node data', () => {
+  it('keeps them on any node type', () => {
+    const out = validateNodeData('image', { prompt: 'x', ...GEN_STATE, hidden: true, locked: false });
+    expect(out.ok && out.data).toMatchObject({ hidden: true, locked: false });
+  });
+});

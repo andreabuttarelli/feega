@@ -42,6 +42,8 @@ export type CanvasCommandId =
   | 'bring-front'
   | 'send-back'
   | 'help'
+  | 'toggle-hidden'
+  | 'toggle-locked'
   | 'view';
 
 export type CanvasCommand =
@@ -124,6 +126,8 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.SelectPrevious]: { id: 'select-previous' },
   [Command.BringToFront]: { id: 'bring-front' },
   [Command.SendToBack]: { id: 'send-back' },
+  [Command.ToggleHidden]: { id: 'toggle-hidden' },
+  [Command.ToggleLocked]: { id: 'toggle-locked' },
   [Command.PreviewZoomIn]: { id: 'zoom-in' },
   [Command.PreviewZoomOut]: { id: 'zoom-out' },
   [Command.PreviewFit]: { id: 'fit' },
@@ -166,6 +170,8 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
 };
 
 const PASTE_MOD_KEYS:Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
+
+const SHIFT_MOD_KEYS: Record<string, CanvasCommand> = { h: { id: 'toggle-hidden' }, l: { id: 'toggle-locked' } };
 
 export function nudgeOf(c: CanvasCommand): { dx: number; dy: number } | null {
   return c.id === 'nudge' ? { dx: c.dx, dy: c.dy } : null;
@@ -234,7 +240,7 @@ export function matchCanvasShortcut(e: KeyboardEvent, mode: EditMode = EditMode.
     if (key.toLowerCase() === 'z') return { id: e.shiftKey ? 'redo' : 'undo' };
     if (key.toLowerCase() === 'g') return { id: e.shiftKey ? 'ungroup' : 'group' };
     if (key === 'Backspace' || key === 'Delete') return { id: 'delete-keep' };
-    if (e.shiftKey) return null;
+    if (e.shiftKey) return SHIFT_MOD_KEYS[key.toLowerCase()] ?? null;
     if (key.toLowerCase() === 'a') return { id: 'select-all' };
     if (key.toLowerCase() === 'j') return { id: 'timeline' };
     const command = PASTE_MOD_KEYS[key.toLowerCase()];
@@ -300,6 +306,8 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
   { id: 'send-back', keys: ['mod', '['], label: 'Send to back' },
+  { id: 'toggle-hidden', keys: ['⇧', 'mod', 'H'], label: 'Hide / show the selection' },
+  { id: 'toggle-locked', keys: ['⇧', 'mod', 'L'], label: 'Lock / unlock the selection' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
   { id: 'paste', keys: ['mod', 'V'], label: 'Paste' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
@@ -348,6 +356,8 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   ungroup: GuideGroup.Edit,
   'bring-front': GuideGroup.Edit,
   'send-back': GuideGroup.Edit,
+  'toggle-hidden': GuideGroup.Edit,
+  'toggle-locked': GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
   'wrap-stack': GuideGroup.Edit,
