@@ -33,7 +33,7 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: `${SHOT_PREFIX.replace(/shot$/, 'r7')}-${name}.png` });
 }
 
-test.describe('stack and padding shorthand @real', () => {
+test.describe('stack and padding @real', () => {
   test.skip(!REAL_STACK, 'needs E2E_REAL_STACK=1');
 
   test('Shift+A wraps three free elements in one free Stack', async ({ page, session, admin, seedNode }) => {
@@ -73,7 +73,7 @@ test.describe('stack and padding shorthand @real', () => {
     await page.waitForTimeout(SETTLE_MS);
     const tile = (await page.locator(`[data-frame="${node.id}"]`).boundingBox())!;
     await page.mouse.click(tile.x + tile.width / 2, tile.y + tile.height / 2);
-    await page.getByRole('button', { name: 'More actions', exact: true }).click();
+    await page.getByTestId('more-actions').click();
     await page.locator('[data-action="wrap-stack"]').click();
 
     await expect.poll(async () => (await live()).map((n) => n.display_name), { timeout: 10_000 }).toEqual(['Stack']);
@@ -92,7 +92,7 @@ test.describe('stack and padding shorthand @real', () => {
     await shot(page, 'stack-one-text');
   });
 
-  test('padding takes CSS shorthand', async ({ page, session, admin, seedNode }) => {
+  test('padding sets horizontal and vertical, then splits per side', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(150_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     const node = await seedNode({ type: 'motion', x: 200, y: 150, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
@@ -107,15 +107,19 @@ test.describe('stack and padding shorthand @real', () => {
     await page.mouse.click(at.x, at.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(at.x, at.y);
-    const padding = page.getByTestId('auto-layout-padding');
-    await expect(padding).toBeVisible({ timeout: 15_000 });
-    await padding.fill('8, 16');
-    await padding.dispatchEvent('change');
+    const horizontal = page.getByTestId('auto-layout-padding-x');
+    await expect(horizontal).toBeVisible({ timeout: 15_000 });
+    await horizontal.fill('16');
+    await horizontal.dispatchEvent('change');
+    const vertical = page.getByTestId('auto-layout-padding-y');
+    await vertical.fill('8');
+    await vertical.dispatchEvent('change');
+    await page.getByTestId('auto-layout-padding-sides').click();
 
     await expect(page.getByTestId('auto-layout-padding-top')).toHaveValue('8');
     await expect(page.getByTestId('auto-layout-padding-right')).toHaveValue('16');
     await expect(page.getByTestId('auto-layout-padding-bottom')).toHaveValue('8');
     await expect(page.getByTestId('auto-layout-padding-left')).toHaveValue('16');
-    await shot(page, 'padding-shorthand');
+    await shot(page, 'padding-axes');
   });
 });

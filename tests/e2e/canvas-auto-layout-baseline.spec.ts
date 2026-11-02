@@ -55,7 +55,8 @@ test.describe('baseline alignment on the canvas @real', () => {
     await page.mouse.click(edge.x, edge.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(edge.x, edge.y);
-    await expect(page.getByTestId('auto-layout-baseline')).toHaveAttribute('aria-pressed', 'true', { timeout: 15_000 });
+    await page.getByTestId('auto-layout-advanced').click({ timeout: 15_000 });
+    await expect(page.getByTestId('auto-layout-baseline')).toHaveAttribute('aria-pressed', 'true');
     await shot(page, 'selected');
   });
 });

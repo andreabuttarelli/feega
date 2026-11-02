@@ -77,10 +77,12 @@ test.describe('a Stack wrapping one text is selected on its own @real', () => {
       await expect(inspector.locator(`[data-section="${section}"]`)).toBeVisible();
     }
 
-    const padding = page.getByTestId('auto-layout-padding');
-    await padding.fill('16');
-    await padding.dispatchEvent('change');
-    await expect(padding).toHaveValue('16');
+    for (const axis of ['x', 'y']) {
+      const padding = page.getByTestId(`auto-layout-padding-${axis}`);
+      await padding.fill('16');
+      await padding.dispatchEvent('change');
+      await expect(padding).toHaveValue('16');
+    }
 
     await page.getByTestId('fill-add').click();
     await page.getByRole('menuitem', { name: 'Solid', exact: true }).click();
@@ -89,7 +91,7 @@ test.describe('a Stack wrapping one text is selected on its own @real', () => {
     await radius.fill('12');
     await radius.press('Enter');
 
-    await inspector.locator('[data-prop="clipContent"]').getByRole('radio', { name: 'Yes' }).click();
+    await page.getByTestId('stack-clip-content').check();
 
     await page.getByTestId('add-effect').click();
     await page.getByRole('menuitem', { name: 'Drop shadow', exact: true }).click();
@@ -100,6 +102,8 @@ test.describe('a Stack wrapping one text is selected on its own @real', () => {
       return { clip: !!root.clipContent, effects: root.effects?.length ?? 0, fills: Array.isArray(root.props.fills) && root.props.fills.length > 0, padding: root.autoLayout?.padding.top, rounded: Number(root.props.roundness ?? 0) > 0 };
     }, { timeout: 15_000 }).toEqual({ clip: true, effects: 1, fills: true, padding: 16, rounded: true });
 
+    await inspector.locator('[data-section="layer"]').scrollIntoViewIfNeeded();
+    await shot(page, 'appearance');
     await page.locator('.svelte-flow__pane').hover({ position: { x: 10, y: 10 } });
     await page.keyboard.press('Shift+Digit2');
     await page.waitForTimeout(SETTLE_MS);

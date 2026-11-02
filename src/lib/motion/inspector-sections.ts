@@ -22,6 +22,7 @@ export enum Section {
   Text = 'text',
   Shape = 'shape',
   Effects = 'effects',
+  Colours = 'colours',
   Timing = 'timing',
   Animate = 'animate',
   ThreeD = '3d',
@@ -29,9 +30,9 @@ export enum Section {
 }
 
 export const SECTION_ORDER: readonly Section[] = [
+  Section.Align,
   Section.Layout,
   Section.Stack,
-  Section.Align,
   Section.Constraints,
   Section.Content,
   Section.Layer,
@@ -39,6 +40,7 @@ export const SECTION_ORDER: readonly Section[] = [
   Section.Stroke,
   Section.Shape,
   Section.Effects,
+  Section.Colours,
   Section.Text,
   Section.Transform,
   Section.Timing,
@@ -60,13 +62,14 @@ export const SECTION_TITLE: Record<Section, string> = {
   [Section.Text]: 'Text',
   [Section.Shape]: 'Path',
   [Section.Effects]: 'Effects',
+  [Section.Colours]: 'Selection colours',
   [Section.Timing]: 'Timing',
   [Section.Animate]: 'Animation',
   [Section.ThreeD]: '3D',
   [Section.Parent]: 'Parent & mask'
 };
 
-const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text]);
+const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Colours, Section.Text]);
 
 const DEFAULT_OPEN = Object.fromEntries(SECTION_ORDER.map((s) => [s, OPEN_FIRST.has(s)])) as Record<Section, boolean>;
 
@@ -322,6 +325,7 @@ const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
   [Section.Text]: () => '',
   [Section.Animate]: (clip) => countOf(animated(clip), 'animated'),
   [Section.Effects]: (clip) => countOf(clip.effects.length, 'effects'),
+  [Section.Colours]: () => '',
   [Section.ThreeD]: () => '',
   [Section.Parent]: (clip) => [clip.parent ? 'Parented' : '', clip.mask ? 'Masked' : ''].filter(Boolean).join(SEP)
 };

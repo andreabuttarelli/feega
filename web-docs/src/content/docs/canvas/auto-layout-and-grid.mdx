@@ -23,19 +23,27 @@ A **Stack** is an element that lays its children out in a row or a column, like 
 
 Wrapping elements that already sit in a Stack nests the new Stack in their place. Wrapping free elements merges them into one free Stack element on the canvas, which grows and shrinks with its content.
 
-**Remove stack** (`Alt+Shift+A`, same four menus, or the **−** in the Stack section) unwraps: the children stay where the layout put them and the Stack goes.
+**Remove stack** (`Alt+Shift+A`, same four menus, or the unwrap button next to the direction in the Stack section) unwraps: the children stay where the layout put them and the Stack goes.
 
 ## The Stack section
 
-Select a Stack and the right bar shows **Stack** under **Layout**, above the shared **Fill**, **Stroke**, **Appearance** and **Effects**:
+Select a Stack (its row in **Layers**, a click on it on the canvas, or `Esc` from one of its children) and the right bar reads top to bottom like Figma's auto layout panel:
 
-- **Direction**: horizontal, vertical, wrap, or grid.
-- **Align**: a 3×3 grid sets the main and cross alignment at once.
-- **Distribute**: stretch children across the cross axis, align text baselines (rows), space between, around or evenly.
-- **Gap**, and the gap between lines when the Stack wraps. On the canvas, drag the small handle in the middle of a gap or padding to change it; a click elsewhere in the gap does nothing.
-- **Padding**: one value, or CSS shorthand `8`, `8 16`, `8 16 24`, `8 16 24 32`, or per side.
-- **Width / Height**: fixed or fit (hug); a child can also fill. A typed width or height keeps the Stack's left and top edges where they are. The **Layout** fields show the size the Stack resolves to, not the one it had before Hug or Fill.
-- **First on top** and **Strokes included**.
+1. The header: the name, then **Create component** and the **…** menu.
+2. **Alignment**: left, centre, right; top, middle, bottom.
+3. **Layout**: X / Y, rotation, rotate 90° and flip.
+4. **Stack**:
+   - **Direction**: horizontal, vertical, wrap, or grid, and the unwrap button.
+   - **W / H**: the size the Stack resolves to, with **Fixed** or **Hug** beside it (a child can also **Fill** or take a **%**). Typing a number makes it fixed; a typed size keeps the Stack's left and top edges where they are.
+   - A 3×3 grid sets the main and cross alignment at once.
+   - **Gap**, with **Auto** to spread the children apart (space between). On the canvas, drag the small handle in the middle of a gap or padding to change it.
+   - **Padding**: horizontal and vertical; the per-side button splits it into top, right, bottom, left.
+   - **Clip content**.
+   - The settings button opens the rest: stretch children, align text baselines (rows), space around or evenly, **First on top**, **Strokes included**, min / max width and height.
+5. **Appearance**: opacity with the show / hide eye, corner radius (one value or per corner), blend.
+6. **Fill**, **Stroke**, **Effects**: each with **+**.
+7. **Selection colours**: every colour used inside the Stack; change one to change it everywhere in the Stack.
+8. **Export**: **+** exports the selection.
 
 ## Stack children are flex items
 

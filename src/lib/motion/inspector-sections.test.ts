@@ -11,10 +11,10 @@ function memory() {
 }
 
 describe('inspector sections', () => {
-  it('orders by importance: layout, alignment, constraints, content, appearance, effects, text, then transform', () => {
-    const order = [Section.Layout, Section.Align, Section.Constraints, Section.Content, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text, Section.Transform, Section.Animate];
+  it('orders by importance: alignment, layout, constraints, content, appearance, effects, text, then transform', () => {
+    const order = [Section.Align, Section.Layout, Section.Constraints, Section.Content, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text, Section.Transform, Section.Animate];
     expect(SECTION_ORDER.filter((s) => order.includes(s))).toEqual(order);
-    expect(SECTION_ORDER[0]).toBe(Section.Layout);
+    expect(SECTION_ORDER[0]).toBe(Section.Align);
     expect(SECTION_ORDER.indexOf(Section.Animate)).toBeGreaterThan(SECTION_ORDER.indexOf(Section.Effects));
     expect(SECTION_ORDER.indexOf(Section.ThreeD)).toBeGreaterThan(SECTION_ORDER.indexOf(Section.Effects));
   });
