@@ -345,6 +345,8 @@ const shownOnlyAt = (clip: MotionClip, view: string): MotionClip => ({ ...clip, 
 
 type State = { doc: MotionDoc; images: FigmaImage[]; keys: Map<string, string>; page: string | null };
 
+const fontsJoined = (base: MotionDoc['fonts'], read: MotionDoc['fonts']): MotionDoc['fonts'] => [...base, ...read.filter((face) => !base.some((f) => f.family === face.family))];
+
 function viewed(state: State, plan: ViewPlan): State {
   const { view, item } = plan;
   const added = addBreakpoint(state.doc, { name: view.name, width: item.doc.width, height: item.doc.height }, view.id);
@@ -359,7 +361,7 @@ function viewed(state: State, plan: ViewPlan): State {
   const wanted = { ...resolved, tracks: placedTracks(resolved, settled(base, read, pairs), copies.slots), comps: { ...resolved.comps, ...copies.comps } } as MotionDoc;
   const lifted = liftEdit(added.doc, view.id, wanted);
   const copied = new Set(copies.clips.map((c) => c.id));
-  const doc = { ...lifted, tracks: lifted.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (copied.has(c.id) ? shownOnlyAt(c, view.id) : c)) })) } as MotionDoc;
+  const doc = { ...lifted, fonts: fontsJoined(lifted.fonts, item.doc.fonts), tracks: lifted.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (copied.has(c.id) ? shownOnlyAt(c, view.id) : c)) })) } as MotionDoc;
   return { doc, images: [...state.images, ...copies.images], keys: new Map([...state.keys, ...copies.keys]), page: state.page };
 }
 
