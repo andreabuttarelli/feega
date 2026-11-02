@@ -14,12 +14,10 @@
   import { onionSetting } from '$lib/canvas/onion-skin.svelte';
   import OutlineOverlay from '$lib/components/motion/OutlineOverlay.svelte';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
-  import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { EditMode } from '$lib/motion/edit-mode';
   import { drawStart } from '$lib/motion/draw-create';
-  import { Axis, Edge, alignSpace, distributeSpace, propBoxes } from '$lib/motion/space';
   import { editsPoints, enterPointEdit, landsOn, pointDraft } from '$lib/motion/shape/vector-edit';
   import type { Pt } from '@feega/motion-core/motion/shape/geometry';
   import { isTyping } from '$lib/motion/shortcuts';
@@ -29,7 +27,7 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { GridToggle } from '$lib/motion/pixel-grid';
   import { FRAME_VIEW_DEFAULT, FrameView, shows, type FrameViews } from '$lib/canvas/frame-view';
-  import { activeAt, shownOverlays, AlignSide, FrameOverlay } from '$lib/canvas/frame-tools';
+  import { activeAt, shownOverlays, FrameOverlay } from '$lib/canvas/frame-tools';
 
   type Size = { width: number; height: number };
 
@@ -40,7 +38,6 @@
     size,
     picks,
     tool,
-    side,
     views = FRAME_VIEW_DEFAULT,
     boxes = {},
     apply,
@@ -53,7 +50,6 @@
     size: Size;
     picks: string[];
     tool: DrawTool;
-    side: AlignSide;
     views?: FrameViews;
     boxes?: Boxes;
     apply: (result: OpResult, summary: string) => void;
@@ -78,8 +74,6 @@
   });
 
   const edit = (next: MotionDoc, summary: string) => apply({ ok: true, doc: next }, summary);
-  const alignTo = (edge: Edge) => apply(alignSpace(doc, picks, frame, propBoxes(doc), edge, EditMode.Design), `Aligned ${edge}`);
-  const distribute = (axis: Axis, spacing?: number) => apply(distributeSpace(doc, picks, frame, propBoxes(doc), axis, EditMode.Design, spacing), `Distributed along ${axis}`);
 
   function created(id: string) {
     const made = findClip(doc, id)?.clip;
@@ -141,12 +135,6 @@
   {/if}
 </div>
 
-{#if shown.has(FrameOverlay.Align)}
-  <div class="align" data-side={side} data-testid="frame-align" role="presentation" onpointerdown={(e) => e.stopPropagation()}>
-    <AlignBar count={picks.length} onalign={alignTo} ondistribute={distribute} />
-  </div>
-{/if}
-
 <style>
   .beneath {
     position: absolute;
@@ -164,28 +152,5 @@
     position: absolute;
     inset: 0;
     pointer-events: auto;
-  }
-
-  .align {
-    position: absolute;
-    left: 0;
-    top: 100%;
-    margin-top: 8px;
-    pointer-events: auto;
-    background: var(--ui-bg);
-  }
-
-  .align[data-side='right'] {
-    left: 100%;
-    top: 0;
-    margin-top: 0;
-    margin-left: 8px;
-  }
-
-  .align[data-side='above'] {
-    top: auto;
-    bottom: 100%;
-    margin-top: 0;
-    margin-bottom: 8px;
   }
 </style>

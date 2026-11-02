@@ -151,10 +151,11 @@ test.describe('draw, mask and align inside a core frame @real', () => {
       const bodies = await page.getByTestId('frame-selection-body').evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })));
       const near = (u: number, v: number) => Math.abs(u - v) < HOVER_TOLERANCE_PX;
       expect(bodies.some((r) => near(r.x, ghost.x) && near(r.y, ghost.y) && near(r.width, ghost.width) && near(r.height, ghost.height)), JSON.stringify({ ghost, bodies })).toBe(true);
-      await expect(page.getByTestId('frame-align')).toHaveCount(1, { timeout: 15_000 });
+      await expect(page.getByTestId('frame-align')).toHaveCount(0);
+      const inspectorAlign = page.getByTestId('frame-inspector').getByTestId('align-bar');
+      await expect(inspectorAlign).toHaveCount(1, { timeout: 15_000 });
       await shot(page, `${rotation}-align-bar`);
-      await page.waitForTimeout(500);
-      await page.getByTestId('frame-align').locator('[data-align="left"]').click();
+      await inspectorAlign.locator('[data-align="left"]').click();
       const sharesLeft = async () => {
         const all = await clips();
         const [ax, bx] = ['a', 'b'].map((id) => {

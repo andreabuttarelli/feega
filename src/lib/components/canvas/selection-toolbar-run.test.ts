@@ -30,3 +30,12 @@ describe('the run button', () => {
     expect(run).not.toMatch(/\sdisabled(=|\s|>)/);
   });
 });
+
+describe('the selection bar', () => {
+  it('leaves edits like duplicate and upscale to the context menu', () => {
+    const body = toolbar({ refId: 'r' }, quote());
+
+    expect(body).not.toContain('aria-label="Duplicate"');
+    expect(body).not.toContain('aria-label="Upscale 2×"');
+  });
+});

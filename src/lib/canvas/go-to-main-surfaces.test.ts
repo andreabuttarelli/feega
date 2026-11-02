@@ -5,7 +5,7 @@ import { Action } from '$lib/motion/actions';
 import { barActions, headerActions } from '$lib/motion/clip-bar';
 import { createComponent } from '$lib/motion/main-component';
 import { frameSummaries } from '$lib/motion/frame-menu';
-import { elementMenuIds, elementToolbarActions, frameBarActions, layerMenuActions } from './frame-inspector';
+import { elementMenuIds, frameBarActions, layerMenuActions } from './frame-inspector';
 import { menuFor } from './selection-actions';
 
 const must = (r: OpResult): MotionDoc => {
@@ -31,10 +31,6 @@ describe('Go to main component is on every surface for an instance', () => {
     expect(contextMenu(made, [instanceId])).toContain('go-to-main');
   });
 
-  it('the floating selection toolbar', () => {
-    expect(elementToolbarActions(made, [instanceId])).toContain('go-to-main');
-  });
-
   it('the More actions menu in the right bar header', () => {
     expect(header(made, [instanceId])).toContain(Action.GoToMain);
   });
@@ -44,7 +40,6 @@ describe('Go to main component hides for what is not an instance', () => {
   it('on every surface', () => {
     expect(layerMenuActions(plain, ['t'])).not.toContain(Action.GoToMain);
     expect(contextMenu(plain, ['t'])).not.toContain('go-to-main');
-    expect(elementToolbarActions(plain, ['t'])).not.toContain('go-to-main');
     expect(header(plain, ['t'])).not.toContain(Action.GoToMain);
   });
 });
