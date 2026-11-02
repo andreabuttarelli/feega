@@ -22,6 +22,7 @@
   import type { KeyRef } from '@feega/motion-core/motion/timeline';
   import type { CommentMark } from '$lib/canvas/comment-marks';
   import { setDuration } from '$lib/motion/fit-duration';
+  import { setPoster } from '@feega/motion-core/motion/still';
   import { parseDecimal } from '$lib/motion/inspector';
 
   let {
@@ -132,6 +133,12 @@
     edit(setDuration(doc, next * doc.fps), `Set the duration to ${next}s`);
   }
 
+  const posterHere = $derived(doc.poster?.frame === frame);
+
+  function togglePoster() {
+    edit(setPoster(doc, posterHere ? null : frame), posterHere ? 'Cleared the poster frame' : `Set the poster frame at ${(frame / doc.fps).toFixed(2)}s`);
+  }
+
   function scrub(next: number) {
     playing = false;
     cancelAnimationFrame(raf);
@@ -177,6 +184,7 @@
       <span>s</span>
     </label>
     {#each grouping as id (id)}<IconButton action={id} size={14} data-testid={`frame-timeline-${id}`} onclick={() => onaction(id)} />{/each}
+    <button type="button" class="pin-here" data-testid="frame-timeline-poster" aria-pressed={posterHere} title="The frame this video shows on the canvas and in image exports. Click again on it to clear." onclick={togglePoster}>{doc.poster ? `Poster ${(doc.poster.frame / doc.fps).toFixed(2)}s` : 'Set poster'}</button>
     {#if notice}<span class="notice" role="status" data-testid="frame-timeline-notice">{notice}</span>{/if}
     {#if onpin}<button type="button" class="pin-here" data-testid="frame-timeline-pin" onclick={onpin}>Comment here</button>{/if}
     <span class="spacer"></span>

@@ -22,6 +22,14 @@ describe('the timeline under a frame on the canvas', () => {
     expect(body).toMatch(/<input[^>]*data-testid="frame-timeline-duration"[^>]*value="6"|<input[^>]*value="6"[^>]*data-testid="frame-timeline-duration"/);
   });
 
+  it('marks the poster frame at the playhead, and names it once marked', () => {
+    const doc = newMotionDoc(MotionFormat.Landscape);
+    const shown = (d: typeof doc) => render(FrameTimeline, { props: { doc: d, frame: 60, selection: [], onframe: () => {}, onselect: () => {}, onchange: () => {} } }).body;
+
+    expect(shown(doc)).toContain('data-testid="frame-timeline-poster"');
+    expect(shown({ ...doc, poster: { frame: 60 } })).toContain(`Poster ${(60 / doc.fps).toFixed(2)}s`);
+  });
+
   it('offers the proxies toggle, on by default', () => {
     const doc = newMotionDoc(MotionFormat.Landscape);
     const body = render(FrameTimeline, { props: { doc, frame: 0, selection: [], onframe: () => {}, onselect: () => {}, onchange: () => {} } }).body;

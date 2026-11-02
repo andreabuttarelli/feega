@@ -1,6 +1,5 @@
 import { FrameKind, MOTION_NODE_BAR_H, docKindOf, frameChrome, holdsDoc } from '$lib/canvas/motion-node';
-import { restFrameOf } from '$lib/motion/poster-time';
-import { stillFrame as docStill } from '@feega/motion-core/motion/still';
+import { posterFrameOf } from '$lib/motion/poster-time';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { ItemKind, type DisplayList, type Item, type Scissor } from '@feega/motion-core/motion/gpu-full/display-list';
 import { mul2d, type Affine } from '@feega/motion-core/motion/affine';
@@ -31,7 +30,7 @@ export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string)
   });
 }
 
-export const stillFrame = (doc: MotionDoc): number => docStill(doc) ?? restFrameOf(doc);
+export const stillFrame = posterFrameOf;
 
 export const frameOfLive = (live: { doc: Parameters<typeof stillFrame>[0]; playhead?: number }): number => live.playhead ?? stillFrame(live.doc);
 

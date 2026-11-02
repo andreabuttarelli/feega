@@ -54,6 +54,13 @@ describe('exporting a selection', () => {
     expect(drawn[0].targets[0].docScale).toBe(0.5);
   });
 
+  it('draws a frame at the time it was shown when the export was asked, not at its first frame', async () => {
+    const { base, drawn } = ports();
+    await exportSelection(base, { targets: [{ nodeId: 'a', seconds: 1.5 }], rows, name: 'Poster' });
+
+    expect(drawn[0].targets[0].doc.poster).toEqual({ frame: 1.5 * withTitle.fps });
+  });
+
   it('draws every frame for every row, transparent when asked, and stores one zip', async () => {
     const { base, drawn, stored } = ports();
     const two = exportRowsSchema.parse([{ format: 'png', by: 'scale', value: 2, transparent: true }, { format: 'jpg', by: 'width', value: 540, quality: 70 }]);
