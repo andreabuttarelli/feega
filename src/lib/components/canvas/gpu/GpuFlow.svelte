@@ -223,7 +223,7 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
-  import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
@@ -3110,7 +3110,7 @@
       view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
-    view = panBy(view, { x: -e.deltaX, y: -e.deltaY });
+    view = panBy(view, wheelPan(e));
   }
 
 
@@ -3484,6 +3484,9 @@
       endCrop(e.key === 'Enter');
       return;
     }
+    if (e.key === 'Escape' && !typing && !isTypingTarget(e.target) && frameBar.disarm()) {
+      return;
+    }
     const up = climbsUp(e);
     const group = up && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
     if (inside && group) {
@@ -3712,6 +3715,12 @@
     'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => duplicateTiles(ids),
+    rename: (ids) => {
+      const tile = byId.get(ids[0]);
+      if (tile) {
+        startNaming(tile);
+      }
+    },
     'connect-new': () => {
       if (selection.box) {
         connectPickerAt = { x: selection.box.x + selection.box.width + 24, y: selection.box.y };
