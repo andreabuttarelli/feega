@@ -239,6 +239,14 @@
     run(action === LayerAction.Up ? targets : [...targets].reverse(), action, SUMMARY[action]);
   }
 
+  const takeFocus = (input: HTMLInputElement) => {
+    const frame = requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  };
+
   function rename(row: LayerRow, name: string) {
     renaming = null;
     if (row.kind === LayerKind.Node) {
@@ -347,8 +355,7 @@
       {/if}
       <span class="icon" data-instance={row.instance || undefined}><RowIcon size={ICON} strokeWidth={1.75} /></span>
       {#if renaming === row.id}
-        <!-- svelte-ignore a11y_autofocus -->
-        <input class="name-input" value={row.label} autofocus aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
+        <input class="name-input" value={row.label} {@attach takeFocus} aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
       {:else}
         <span class="name">{row.label}</span>
       {/if}

@@ -1,5 +1,5 @@
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { Depth, drill, type Gesture, type Level, type Probe } from '$lib/motion/drill';
+import { Depth, Gesture, drill, type Level, type Probe } from '$lib/motion/drill';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
@@ -78,7 +78,16 @@ export enum Root {
   Own = 'own'
 }
 
+const WRAPPER_PICKABLE: Record<Root, boolean> = { [Root.Page]: true, [Root.Own]: false };
+
+export function leaveLevel(root: Root, level: Level): Level | null {
+  const up = stepInside(level, Gesture.Leave, null);
+  return up.clip === null && !WRAPPER_PICKABLE[root] ? null : up;
+}
+
 const visualClips = (doc: MotionDoc) => doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips as MotionClip[]);
+
+export const rootLayersOf = (doc: MotionDoc): string[] => visualClips(doc).flatMap((c) => (!c.parent && isLayer(doc, c.id) ? [c.id] : []));
 
 export const ownClipOf = (doc: MotionDoc): string | null => visualClips(doc).find((c) => !c.parent)?.id ?? null;
 

@@ -32,6 +32,7 @@
   import SegmentedControl, { type SegmentOption } from '$lib/components/ui/shell/SegmentedControl.svelte';
   import { SegmentedShape } from '$lib/components/ui/shell/segmented-shape';
   import { EditorMode, MODES, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { readMode } from '$lib/motion/edit-mode';
   import { SlotPhase, slotTransition } from '$lib/canvas/slot-motion';
   import ProviderIcon from './ProviderIcon.svelte';
   import { hotDrag, type HotModel } from '$lib/canvas/hot-models';
@@ -208,14 +209,16 @@
     [DrawTool.Stack]: Command.ToolStack
   };
 
-  const DRAW_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
-    const name = ACTIONS[command].name;
-    const keys = canvasToolKeys(command);
-    return { tool, name, keys, label: keys ? `${name} (${keys})` : name, icon: ACTIONS[command].icon };
-  });
+  const DRAW_TOOLS = $derived(
+    (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
+      const name = ACTIONS[command].name;
+      const keys = canvasToolKeys(command, readMode(editorMode.spec.edit));
+      return { tool, name, keys, label: keys ? `${name} (${keys})` : name, icon: ACTIONS[command].icon };
+    })
+  );
   const toolOf = (tool: DrawTool) => DRAW_TOOLS.find((t) => t.tool === tool)!;
-  const MENU_TOOLS = [...toolsIn(DockPlace.Bar), ...toolsIn(DockPlace.More)].filter((tool) => tool !== DrawTool.Select).map(toolOf);
-  const SELECT_TOOL = toolOf(DrawTool.Select);
+  const MENU_TOOLS = $derived([...toolsIn(DockPlace.Bar), ...toolsIn(DockPlace.More)].filter((tool) => tool !== DrawTool.Select).map(toolOf));
+  const SELECT_TOOL = $derived(toolOf(DrawTool.Select));
 
   let phone = $state(typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches);
 
