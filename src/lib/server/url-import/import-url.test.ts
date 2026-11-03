@@ -285,6 +285,18 @@ describe('importPageAt', () => {
     expect(components).not.toHaveBeenCalled();
   });
 
+  it('a database that stays too busy to save answers busy, so the dialog tries again, and leaves no frame', async () => {
+    const { ask, docs } = askOf();
+    ask.store.create = vi.fn(async () => {
+      throw { code: '57014', message: 'canceling statement due to statement timeout' };
+    });
+
+    const done = await importPageAt(ask);
+
+    expect(done.outcome).toBe(UrlImportOutcome.Busy);
+    expect(docs.size).toBe(0);
+  });
+
   it('le immagini della pagina vengono importate e messe nel frame', async () => {
     const { ask, docs } = askOf();
 

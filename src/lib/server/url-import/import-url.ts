@@ -291,11 +291,15 @@ async function readAndLand(ask: PageAsk): Promise<UrlImported> {
   return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
 }
 
+const STATEMENT_TIMEOUT = '57014';
+
+const timedOut = (e: unknown) => typeof e === 'object' && e !== null && (e as { code?: unknown }).code === STATEMENT_TIMEOUT;
+
 export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   try {
     return await readAndLand(ask);
   } catch (e) {
-    if (e instanceof BrowserBusy) {
+    if (e instanceof BrowserBusy || timedOut(e)) {
       return refused(UrlImportOutcome.Busy);
     }
     if (e instanceof DocRejected) {
