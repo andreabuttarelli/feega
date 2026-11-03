@@ -47,7 +47,7 @@ const ROLE_NAMES: Record<string, string> = {
   table: 'Table'
 };
 
-const RAW_NAMES = new Set(['div', 'span', 'stack', 'row', 'column', 'g', 'path', 'circle', 'rect', 'line', 'polygon', 'polyline', 'ellipse', 'use', 'i', 'b', 'em', 'strong', 'small', 'body', 'html', 'fieldset', 'clip', 'group', 'frame', 'vector', 'background', 'outline', 'border top', 'border right', 'border bottom', 'border left']);
+const RAW_NAMES = new Set(['feega-pseudo', 'div', 'span', 'stack', 'row', 'column', 'g', 'path', 'circle', 'rect', 'line', 'polygon', 'polyline', 'ellipse', 'use', 'i', 'b', 'em', 'strong', 'small', 'body', 'html', 'fieldset', 'clip', 'group', 'frame', 'vector', 'background', 'outline', 'border top', 'border right', 'border bottom', 'border left']);
 
 const LAYOUT_NAMES: Record<string, string> = { HORIZONTAL: 'Row', VERTICAL: 'Column' };
 
@@ -304,13 +304,20 @@ const contentName = (n: RestNode) => CONTENT_NAMES.find((rule) => rule.when(n))!
 
 const ROLE_PATTERNS: [RegExp, string][] = [[/(^|[-_ ])logo([-_ ]|$)/i, 'Logo']];
 
+const TITLED_ROLES = new Set(['Section', 'Article']);
+
+const titled = (role: string, n: RestNode) => (TITLED_ROLES.has(role) ? textsIn(n)[0]?.characters?.trim().slice(0, MAX_NAME) || role : role);
+
 function ownName(n: RestNode): string {
   const tag = (n.name ?? '').toLowerCase();
-  return ROLE_NAMES[tag] ?? ROLE_PATTERNS.find(([re]) => re.test(tag))?.[1] ?? (raw(n.name) ? contentName(n) : n.name!);
+  const role = ROLE_NAMES[tag];
+  return (role && titled(role, n)) ?? ROLE_PATTERNS.find(([re]) => re.test(tag))?.[1] ?? (raw(n.name) ? contentName(n) : n.name!);
 }
 
+const tagNamed = (n: RestNode) => raw(n.name) || Boolean(ROLE_NAMES[(n.name ?? '').toLowerCase()]);
+
 function named(n: RestNode, parentName: string | undefined): RestNode {
-  const keeps = n.type === 'TEXT' || boundary(n);
+  const keeps = n.type === 'TEXT' || (boundary(n) && !tagNamed(n));
   const first = keeps ? n.name : ownName(n);
   const name = !keeps && first === parentName ? contentName(n) : first;
   return { ...n, name, ...(n.children ? { children: n.children.map((k) => named(k, name)) } : {}) };

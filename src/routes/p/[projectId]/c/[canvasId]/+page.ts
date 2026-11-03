@@ -1,6 +1,7 @@
 import type { PageLoad } from './$types';
 import { loadPageData } from '$lib/api/page-action';
 import type { CanvasPageData } from '$lib/server/canvas/canvas-page';
+import { openCanvasOutbox } from '$lib/canvas/outbox';
 
 export const ssr = false;
 
@@ -14,7 +15,9 @@ function warmRenderer(url: URL) {
   void import('@feega/motion-core/motion/gpu-full/core-web').then((m) => m.warmCore()).catch(() => undefined);
 }
 
-export const load: PageLoad = ({ url }) => {
+export const load: PageLoad = async ({ url, params, parent }) => {
   warmRenderer(url);
-  return loadPageData<CanvasPageData>(url);
+  const kept = parent().then((shell) => openCanvasOutbox(shell.session?.user?.id, params.canvasId));
+  const [page, outbox] = await Promise.all([loadPageData<CanvasPageData>(url), kept]);
+  return { ...page, outbox };
 };

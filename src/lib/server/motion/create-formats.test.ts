@@ -40,7 +40,7 @@ describe('create formats', () => {
 
   it('refuses a size the renderer cannot make, before creating anything', async () => {
     const { store, made } = memory(frame);
-    const out = await createFormats(store, { nodeId: 'f', targets: [{ format: MotionFormat.Square }, { size: { width: 9000, height: 9000 } }] });
+    const out = await createFormats(store, { nodeId: 'f', targets: [{ format: MotionFormat.Square }, { size: { width: 17000, height: 9000 } }] });
     expect(out).toMatchObject({ outcome: FormatsOutcome.Invalid });
     expect(made).toEqual([]);
   });

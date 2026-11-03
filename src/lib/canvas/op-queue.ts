@@ -17,21 +17,32 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function createOpQueue(options: OpQueueOptions) {
   const ops: Op[] = [];
   let running: Promise<void> | null = null;
+  let sending: Op | null = null;
 
   function persist() {
     options.store.save([...ops]);
     options.onSize?.(ops.length);
   }
 
-  async function sendHead(op: Op) {
+  async function sendOnce(op: Op): Promise<SendResult> {
+    sending = op;
+    const result = await options.send(op).catch(() => SendResult.Retry);
+    sending = null;
+    return result;
+  }
+
+  async function sendHead(op: Op): Promise<SendResult | null> {
     let failures = 0;
     for (;;) {
-      const result = await options.send(op).catch(() => SendResult.Retry);
+      const result = await sendOnce(op);
       if (result !== SendResult.Retry) {
         return result;
       }
       failures += 1;
       await pause(options.backoffMs(failures));
+      if (!ops.includes(op)) {
+        return null;
+      }
     }
   }
 
@@ -39,7 +50,10 @@ export function createOpQueue(options: OpQueueOptions) {
     while (ops.length) {
       const head = ops[0];
       const result = await sendHead(head);
-      ops.shift();
+      if (result === null) {
+        continue;
+      }
+      ops.splice(ops.indexOf(head), 1);
       persist();
       if (result === SendResult.Dropped) {
         options.onDropped(head);
@@ -66,7 +80,17 @@ export function createOpQueue(options: OpQueueOptions) {
     void drain();
   }
 
-  return { push, restore, drain, size: () => ops.length, pending: () => [...ops] };
+  function takeBack(opId: string): boolean {
+    const at = ops.findIndex((op) => op.opId === opId);
+    if (at < 0 || ops[at] === sending) {
+      return false;
+    }
+    ops.splice(at, 1);
+    persist();
+    return true;
+  }
+
+  return { push, restore, drain, takeBack, size: () => ops.length, pending: () => [...ops] };
 }
 
 export enum LineAction {

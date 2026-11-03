@@ -50,6 +50,7 @@ export type AppTab = Tab & {
   overlay: () => Promise<Overlay | null>;
   press: (key: string) => Promise<void>;
   paint: (html: string, size: { width: number; height: number }) => Promise<Buffer>;
+  beside: () => Promise<AppTab>;
 };
 
 export type OpenBrowser = () => Promise<Tab>;
@@ -149,6 +150,7 @@ async function fenced(page: Page): Promise<void> {
   page.on('request', (request) => void gate(request));
   const cdp = await page.createCDPSession();
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' }).catch(() => undefined);
+  await cdp.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => undefined);
 }
 
 const locator = (target: Target) => target.selector ?? `::-p-text(${target.text ?? ''})`;
@@ -248,6 +250,20 @@ const IDLE_MS = 500;
 const LONG_LIVED_MS = 4_000;
 const QUIET_POLL_MS = 100;
 const FONTS_MS = 3_000;
+const TEXT_STILL = { stepMs: 150, maxMs: 2_500 };
+
+async function textStill(wait: { stepMs: number; maxMs: number }): Promise<void> {
+  const until = Date.now() + wait.maxMs;
+  let last = document.body?.innerText ?? '';
+  while (Date.now() < until) {
+    await new Promise((done) => setTimeout(done, wait.stepMs));
+    const now = document.body?.innerText ?? '';
+    if (now === last) {
+      return;
+    }
+    last = now;
+  }
+}
 
 function quietOf(page: Page): (ms: number) => Promise<void> {
   const inflight = new Map<HTTPRequest, number>();
@@ -464,10 +480,23 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     settle: async (ms) => {
       await quiet(ms);
       await page.evaluate((fontsMs) => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, fontsMs))]), FONTS_MS).catch(() => undefined);
+      await page.evaluate(textStill, TEXT_STILL).catch(() => undefined);
     },
     marks: (names) => page.evaluate(componentMarksOf, { names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr }),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
     press: (key) => page.keyboard.press(key as Parameters<Page['keyboard']['press']>[0]),
+    beside: async () => {
+      const next = await page.browser().newPage();
+      await fenced(next);
+      return tabOf(
+        next,
+        async () => {
+          await next.close().catch(() => undefined);
+          return 0;
+        },
+        left
+      );
+    },
     paint: async (html, size) => {
       await page.setContent(html, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
       await page.evaluate(() => document.fonts.ready);
