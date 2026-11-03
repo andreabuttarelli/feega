@@ -15,6 +15,7 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { Command } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
+import { Axis } from '$lib/motion/space';
 import { EditMode } from '$lib/motion/edit-mode';
 import { Flip } from '$lib/motion/layer-props';
 
@@ -376,6 +377,15 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('ß', { altKey: true, code: 'KeyS' }))).toEqual({ id: 'align', edge: Edge.Bottom });
     expect(matchCanvasShortcut(ev('†', { altKey: true, ctrlKey: true, code: 'KeyT' }))).toEqual({ id: 'tidy' });
     expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
+  });
+
+  it('⌃⌥H and ⌃⌥V distribute the selected tiles, as in Figma', () => {
+    expect(matchCanvasShortcut(ev('˙', { altKey: true, ctrlKey: true, code: 'KeyH' }))).toEqual({ id: 'distribute', axis: Axis.X });
+    expect(matchCanvasShortcut(ev('√', { altKey: true, ctrlKey: true, code: 'KeyV' }))).toEqual({ id: 'distribute', axis: Axis.Y });
+  });
+
+  it('A arms the frame tool in Design, as in Figma', () => {
+    expect(matchCanvasShortcut(ev('a'), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Frame });
   });
 
   it('⇧A wraps the selection with a stack', () => {

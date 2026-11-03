@@ -92,7 +92,10 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Arrows + Shift | Move by a longer step |
 | Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
 | Shift+0 | Zoom to 100% |
-| F | Frame tool |
+| F or A | Frame tool (A in Design) |
+| Control+Option/Alt+H / V | Distribute the selection horizontally / vertically |
+| Cmd/Ctrl+/ or Cmd/Ctrl+K | Quick actions: search every command by name |
+| / | Cursor chat: say something next to your cursor |
 | Shift + wheel | Scroll sideways |
 | Space + drag | Pan; the canvas follows the pointer exactly and stops when you let go |
 | + / = | Zoom in |

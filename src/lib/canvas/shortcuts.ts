@@ -1,7 +1,7 @@
 import { isTypingTarget } from '$lib/shortcuts';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Command, OPACITY_KEYS, SHORTCUTS, commandFor } from '$lib/motion/shortcuts';
-import { Edge } from '$lib/motion/space';
+import { Axis, Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 import { EditMode } from '$lib/motion/edit-mode';
 import { Flip } from '$lib/motion/layer-props';
@@ -21,6 +21,7 @@ export type CanvasCommandId =
   | 'zoom-out'
   | 'nudge'
   | 'align'
+  | 'distribute'
   | 'tidy'
   | 'wrap-stack'
   | 'edit-mode'
@@ -57,9 +58,10 @@ export type CanvasCommand =
   | { id: 'nudge'; dx: number; dy: number }
   | { id: 'tool'; tool: DrawTool }
   | { id: 'align'; edge: Edge }
+  | { id: 'distribute'; axis: Axis }
   | { id: 'view'; view: FrameView }
   | { id: 'flip'; flip: Flip }
-  | { id: Exclude<CanvasCommandId, 'opacity' | 'nudge' | 'tool' | 'align' | 'view' | 'flip'> };
+  | { id: Exclude<CanvasCommandId, 'opacity' | 'nudge' | 'tool' | 'align' | 'distribute' | 'view' | 'flip'> };
 
 const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolSelect]: DrawTool.Select,
@@ -215,7 +217,7 @@ const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'>
 
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
-const MOD_ALT_KEYS: Record<string, CanvasCommand> = { KeyT: { id: 'tidy' }, BracketLeft: { id: 'send-back' }, BracketRight: { id: 'bring-front' } };
+const MOD_ALT_KEYS: Record<string, CanvasCommand> = { KeyT: { id: 'tidy' }, KeyH: { id: 'distribute', axis: Axis.X }, KeyV: { id: 'distribute', axis: Axis.Y }, BracketLeft: { id: 'send-back' }, BracketRight: { id: 'bring-front' } };
 
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
   if (isTypingTarget(e.target)) return null;
@@ -336,6 +338,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'paste', keys: ['mod', 'V'], label: 'Paste' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
+  { id: 'distribute', keys: ['⌃⌥H', '⌃⌥V'], label: 'Distribute horizontally, vertically' },
   { id: 'wrap-stack', keys: ['⇧A'], label: 'Wrap with stack, or add auto layout to a frame' },
   { id: 'flip', keys: ['⇧H'], label: 'Flip horizontal' },
   { id: 'flip', keys: ['⇧V'], label: 'Flip vertical' },
@@ -390,6 +393,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   export: GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
+  distribute: GuideGroup.Edit,
   'wrap-stack': GuideGroup.Edit,
   flip: GuideGroup.Edit,
   'edit-mode': GuideGroup.Edit,
