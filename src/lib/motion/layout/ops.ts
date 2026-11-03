@@ -1,6 +1,7 @@
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { cloneDoc, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { pivotBox } from '@feega/motion-core/motion/parent';
+import { withSurface } from '@feega/motion-core/motion/surface';
 import { KeepWorld, setParent } from '../parent-ops';
 import { layerOrder } from '../siblings';
 import { addClip, duplicateClip, moveClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
@@ -209,7 +210,7 @@ enum Container {
 
 const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.Stack]: 'Stack', [Container.Group]: 'Group' };
 
-const CONTAINER_NAME: Partial<Record<Container, string>> = { [Container.Frame]: CONTAINER_TRACK[Container.Frame] };
+const CONTAINER_LOOK: Record<Container, Partial<MotionClip>> = { [Container.Frame]: { name: CONTAINER_TRACK[Container.Frame], clipContent: true }, [Container.Stack]: {}, [Container.Group]: { group: true } };
 
 export const wrapInStack = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Stack);
 
@@ -313,9 +314,7 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
   let result = addClip({ ...doc, tracks }, { component: 'Shape', from, durationInFrames: end - from, trackId, props }, id);
   result = result.ok ? takePlace(result.doc, sharedParent(placed), placed.map((p) => p.clip.id), id) : result;
   result = container === Container.Stack && result.ok ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
-  result = container === Container.Group && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, group: true })) } : result;
-  const name = CONTAINER_NAME[container];
-  result = name && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, name })) } : result;
+  result = result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, ...CONTAINER_LOOK[container] })) } : result;
   for (const p of placed) {
     if (!result.ok) {
       return result;
@@ -331,6 +330,26 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
 export function wrapWithStack(doc: MotionDoc, clipIds: readonly string[], newId: () => string): { result: OpResult; containerId: string } {
   const containerId = newId();
   return { result: wrapInStack(doc, clipIds, containerId, newId()), containerId };
+}
+
+export function addAutoLayout(doc: MotionDoc, containerId: string): OpResult {
+  const kids = allClips(doc).filter((c) => c.parent === containerId);
+  const placed: Placed[] = kids.flatMap((clip) => {
+    const box = shownBox(doc, clip.id);
+    return box ? [{ clip, trackIndex: 0, box }] : [];
+  });
+  if (!placed.length) {
+    return fail(`${containerId} holds nothing to lay out`);
+  }
+  return setAutoLayout(doc, containerId, { ...guessFlow(placed), align: Align.Start });
+}
+
+export function stackFrame(source: MotionDoc, surfaceId: string): OpResult {
+  const doc = withSurface(source, surfaceId);
+  const surface = doc.surface!;
+  const layers = doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips as MotionClip[]).filter((c) => !c.parent && c.id !== surface);
+  const parented = layers.reduce<OpResult>((r, c) => (r.ok ? setParent(r.doc, c.id, surface, { at: c.from }) : r), { ok: true, doc });
+  return parented.ok ? addAutoLayout(parented.doc, surface) : parented;
 }
 
 export function removeStack(doc: MotionDoc, stackId: string): OpResult {

@@ -6,7 +6,8 @@ import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { EditorMode, editorMode } from '$lib/canvas/editor-mode.svelte';
-import { frameProperties } from './frame-properties.svelte';
+import { frameProperties, type NodePlace } from './frame-properties.svelte';
+import { stackFrame } from '$lib/motion/layout/ops';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -91,27 +92,59 @@ describe('a free element reads as one object on the canvas', () => {
 const html = (selection: string[], part: string | null = null) => render(FrameInspectorPanel, { props: { session: sessionOf(selection), tokens: FEEGA_TOKENS, part } }).body;
 
 describe('the frame itself', () => {
+  const placed = (patch: Partial<NodePlace> = {}): NodePlace => ({ x: 120, y: 40, rotation: 0, set: () => undefined, turn: () => undefined, flip: () => undefined, align: null, follow: () => undefined, ...patch });
+
   it('places the frame with X and Y and heads the panel with its name', () => {
-    frameProperties.place = { x: 120, y: 40, set: () => undefined };
+    frameProperties.place = placed();
     frameProperties.name = 'Hero';
     const body = html([]);
     frameProperties.clear();
 
     expect(body).toMatch(/aria-label="Frame X"[^>]*value="120"|value="120"[^>]*aria-label="Frame X"/);
     expect(body).toContain('aria-label="Frame Y"');
-    expect(body).not.toContain('aria-label="Frame rotation"');
     expect(body).toMatch(/data-testid="layer-name"[^>]*value="Hero"|value="Hero"[^>]*data-testid="layer-name"/);
   });
-});
 
-describe('a free group or image', () => {
-  it('turns from the panel with the node rotation', () => {
-    frameProperties.place = { x: 0, y: 0, set: () => undefined };
-    frameProperties.host = { clipId: 'a', box: { x: 0, y: 0, w: 10, h: 10, rotation: 30 }, move: () => undefined, resize: () => undefined, turn: () => undefined };
+  it('turns and flips like any layer', () => {
+    frameProperties.place = placed({ rotation: 30 });
     const body = html([]);
     frameProperties.clear();
 
     expect(body).toMatch(/aria-label="Frame rotation"[^>]*value="30"|value="30"[^>]*aria-label="Frame rotation"/);
+    expect(body).toContain('data-testid="frame-flip-horizontal"');
+    expect(body).toContain('data-testid="frame-flip-vertical"');
+  });
+
+  it('aligns inside what holds it, and offers nothing to align to when nothing does', () => {
+    frameProperties.place = placed({ align: () => undefined });
+    const held = html([]);
+    frameProperties.place = placed();
+    const loose = html([]);
+    frameProperties.clear();
+
+    expect(held).toContain('data-testid="frame-align"');
+    expect(held).not.toMatch(/data-testid="frame-align"[^>]*disabled/);
+    expect(loose).toMatch(/<fieldset[^>]*disabled[^>]*data-testid="frame-align"|data-testid="frame-align"[^>]*disabled/);
+  });
+
+  it('adds auto layout to the frame itself', () => {
+    frameProperties.place = placed();
+    const body = html([]);
+    frameProperties.clear();
+
+    expect(body).toContain('data-testid="frame-add-auto-layout"');
+  });
+
+  it('once stacked, the frame shows its stack settings instead of the entry', () => {
+    const doc = must(stackFrame(sessionOf([]).history.present, 'frame-surface'));
+    const session = new FrameEditSession(
+      { head: { version: 1, doc }, selection: [] },
+      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    );
+    const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
+
+    expect(body).toContain('data-testid="stack-section"');
+    expect(body).not.toContain('data-testid="frame-add-auto-layout"');
   });
 });
 
@@ -222,5 +255,27 @@ describe('frame inspector panel', () => {
 
     editorMode.set(EditorMode.Design);
     expect(html(['a'])).toContain('data-testid="header-actions"');
+  });
+});
+
+describe('export, where Figma puts it', () => {
+  it('the frame panel ends with an Export section: a 1x PNG row, a + for more and an Export button', () => {
+    frameProperties.exportRows = async () => 'off';
+    const body = html([]);
+    frameProperties.clear();
+
+    expect(body).toContain('data-testid="export-section"');
+    expect(body).toContain('data-testid="export-add"');
+    expect(body).toMatch(/aria-label="Export scale"/);
+    expect(body).toMatch(/aria-label="Export format"/);
+    expect(body).toMatch(/data-testid="export-go"[^>]*>[^<]*Export Frame/);
+  });
+
+  it('a selected layer exports from the same section', () => {
+    frameProperties.exportRows = async () => 'off';
+    const body = html(['a']);
+    frameProperties.clear();
+
+    expect(body).toContain('data-testid="export-go"');
   });
 });

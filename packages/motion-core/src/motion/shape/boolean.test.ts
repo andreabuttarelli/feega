@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BooleanOp, combineShapes, flattenShapes, polygonArea } from './boolean';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
-import { addClip, addTrack, type OpResult } from '../timeline';
+import { addClip, addTrack, setProps, type OpResult } from '../timeline';
+import { newStroke, strokesOf } from '../stroke/model';
 import { TrackKind } from '../components';
 import { parsePath, flatten } from './geometry';
 
@@ -71,6 +72,19 @@ describe('boolean operations on shapes', () => {
 
   it('exclude keeps what only one of them covers', () => {
     expect(areaOf(ok(combineShapes(overlapping(), ['top', 'bottom'], BooleanOp.Exclude, 0)))).toBeCloseTo(1, 2);
+  });
+
+  it('names the result after the operation', () => {
+    const doc = ok(combineShapes(overlapping(), ['top', 'bottom'], BooleanOp.Subtract, 0));
+
+    expect(findClip(doc, 'bottom')!.clip.name).toBe('Subtract');
+  });
+
+  it('drops the strokes of the cut shapes, so no rim traces the result', () => {
+    const stroked = ok(setProps(overlapping(), 'bottom', { strokes: [newStroke('#ff0000')] }));
+    const doc = ok(combineShapes(stroked, ['top', 'bottom'], BooleanOp.Subtract, 0));
+
+    expect(strokesOf(findClip(doc, 'bottom')!.clip.props)).toEqual([]);
   });
 
   it('needs two shapes', () => {

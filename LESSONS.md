@@ -3683,3 +3683,16 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## test:gate red while the product is fine: selectors of a UI that was replaced
 
 **Signal:** most gate specs time out waiting for `motion-editor`, `editor-stage` or `input.hex`; the same flows work by hand. **Move:** probe the live DOM once (list `data-testid`s after the action) before editing specs; the inspector is `motion-inspector`, the fill hex is `Fill colour hex`, a text node mounts its prompt on click, `gpu-canvas` is `core-canvas`. A selector that matches a Vite dev module URL (`/frame-outlines`) is a test bug, match the API path.
+
+## An undo entry vanishes when two edits record at once
+
+**Signal:** after a gesture that writes several nodes, Cmd+Z undoes the step before it (a create), not the gesture. **Move:** `undoStack.collect` is not reentrant: two collects awaited in parallel restore the wrong outer bucket, and every later push lands in a finished collection. Run collecting writes one after another (`for … await`), never in `Promise.all`.
+
+## A line on the GPU canvas that a re-render does not clear
+
+**Signal:** a 1–2 px artefact on a canvas element moves with pan and drag, survives a partial repaint of its rect, and goes away on zoom or reload. **Move:** before touching gpu-core, hide DOM layers one at a time (`motion-node-stage`, `gpu-dom-node`) and re-sample the pixels; hiding `core-canvas` proves nothing, since a canvas-coloured DOM line looks the same either way. The ⌘G seam was the `MotionPreview` outline inside the node's DOM, not a damage rect.
+
+## Agent worktrees
+
+### The Vite dev server in a worktree serves stale code after an edit
+**Signal:** a browser check after an edit shows the old behaviour, client or server side, as if the change was never made; the test for it is green. **Move:** stop the dev server and start it again after every change, before each browser check; never trust HMR or a server-side reload in an agent worktree.

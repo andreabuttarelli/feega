@@ -27,6 +27,8 @@
   import FrameColoursSection from '$lib/components/motion/FrameColoursSection.svelte';
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
   import FramePlaceSection from './FramePlaceSection.svelte';
+  import FrameAutoLayoutEntry from './FrameAutoLayoutEntry.svelte';
+  import { stackFrame } from '$lib/motion/layout/ops';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -88,6 +90,15 @@
   const commitShown = (result: OpResult, summary: string) => result.ok && editShown(result.doc, summary);
   const editGuides = (result: OpResult, summary: string) => result.ok && edit(result.doc, summary);
 
+  function resizeFrame(result: OpResult, summary: string) {
+    if (!result.ok || !doc) {
+      return;
+    }
+    const before = { width: doc.width, height: doc.height };
+    edit(result.doc, summary);
+    frameProperties.place?.follow(before, result.doc);
+  }
+
   const alignPicks = (edge: Edge) => doc && session && editGuides(alignSpace(doc, session.selection, session.playhead, propBoxes(doc), edge, session.mode), `Aligned ${edge}`);
   const distributePicks = (axis: Axis, spacing?: number) => doc && session && editGuides(distributeSpace(doc, session.selection, session.playhead, propBoxes(doc), axis, session.mode, spacing), `Distributed along ${axis}`);
 
@@ -107,8 +118,9 @@
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
 
 {#snippet frameLead()}
-  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} host={frameProperties.host} />{/if}
-  {#if doc}<FramePresetSection {doc} onchange={editGuides} />{/if}
+  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} />{/if}
+  {#if doc}<FramePresetSection {doc} onchange={resizeFrame} />{/if}
+  {#if surfaced && !surface?.autoLayout}<FrameAutoLayoutEntry onadd={() => surfaced && editGuides(stackFrame(surfaced, SURFACE_ID), 'Added auto layout')} />{/if}
 {/snippet}
 
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
@@ -135,6 +147,7 @@
       </div>
     {/if}
     <LayoutGuidesSection {doc} onchange={editGuides} />
+    {#if frameProperties.exportRows}<ExportSection name={frameProperties.name} onexport={frameProperties.exportRows} />{/if}
     <details class="frame-settings" data-testid="frame-settings">
       <summary>Frame settings</summary>
       <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
@@ -161,7 +174,7 @@
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
       <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} onchange={editShown} onalign={alignPicks} />
-      {#if frameProperties.exportPicks}<ExportSection onexport={frameProperties.exportPicks} />{/if}
+      {#if frameProperties.exportRows}<ExportSection name="selection" onexport={frameProperties.exportRows} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}
         <StatesSection doc={shownDoc!} clip={shown.clip} current={statePreview.stateOf(nodeId, shown.clip.id)} commit={commitShown} onpreview={(next) => statePreview.pick(nodeId, shown.clip.id, next)} />

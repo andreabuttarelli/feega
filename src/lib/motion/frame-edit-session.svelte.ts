@@ -1,5 +1,5 @@
 import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { applyOps, type DocOp } from './doc-ops';
+import { applyOps, rebase, type DocOp } from './doc-ops';
 import type { PeerStep } from './frame-step';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
@@ -111,6 +111,11 @@ export class FrameEditSession {
   }
 
   settleHeld(root: MotionDoc) {
+    this.history = amend(this.history, root);
+  }
+
+  adoptSaved(root: MotionDoc) {
+    this.baseDoc = rebase(this.history.present, root, this.baseDoc);
     this.history = amend(this.history, root);
   }
 

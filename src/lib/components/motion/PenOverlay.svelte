@@ -3,11 +3,10 @@
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import { mapOutline, parsePath, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
   import { Handle, Mirror, addPoint, deletePoint, dragHandle, insertPoint, movePoint, segmentHit, toggleClosed, toggleSmooth, type PointRef } from '$lib/motion/shape/pen';
-  import { setPath } from '$lib/motion/shape/ops';
   import { pathSpace } from '@feega/motion-core/motion/shape/space';
   import { isTyping } from '$lib/motion/shortcuts';
   import type { Guide } from '$lib/motion/scene-select';
-  import { pointBounds, snapPoint, snapReach, snapTargets } from '$lib/motion/shape/vector-edit';
+  import { commitOutline, pointBounds, snapPoint, snapReach, snapTargets } from '$lib/motion/shape/vector-edit';
 
   let { doc, clip, frame, onchange, onexit }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void; onexit: () => void } = $props();
 
@@ -48,7 +47,7 @@
   }
 
   function commit(next: Outline, summary: string) {
-    const result = setPath(doc, clip.id, pathData(next));
+    const result = commitOutline(doc, clip.id, next, frame);
     if (result.ok) {
       onchange(result.doc, summary);
     }

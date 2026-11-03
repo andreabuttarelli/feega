@@ -20,23 +20,35 @@ function two(): MotionDoc {
 }
 
 describe('the box of each selected layer', () => {
-  it('reads one value where the layers agree and Mixed where they differ', () => {
-    const placed = layerBoxes(two(), ['a', 'b'], 0);
+  it('reads the bounds of the whole selection, as Figma does, never Mixed', () => {
+    const doc = two();
+    const placed = layerBoxes(doc, ['a', 'b'], 0);
+    const [a, b] = placed.map((p) => p.bounds);
+    expect(boxValue(placed, BoxKey.X)).toBe(Math.round(a.left * 100) / 100);
+    expect(boxValue(placed, BoxKey.Width)).toBe(Math.round((b.right - a.left) * 100) / 100);
     expect(boxValue(placed, BoxKey.Y)).not.toBe(MIXED);
-    expect(boxValue(placed, BoxKey.X)).toBe(MIXED);
-    expect(boxValue(placed, BoxKey.Width)).toBe(MIXED);
   });
 
-  it('typing X moves every layer to that X', () => {
+  it('typing X moves the selection so its left edge lands there, keeping the gap between layers', () => {
     const doc = two();
+    const before = layerBoxes(doc, ['a', 'b'], 0).map((p) => p.bounds.left);
     const next = must(setLayerBox(doc, layerBoxes(doc, ['a', 'b'], 0), BoxKey.X, 100, 0, EditMode.Design));
+    const after = layerBoxes(next, ['a', 'b'], 0).map((p) => p.bounds.left);
     expect(boxValue(layerBoxes(next, ['a', 'b'], 0), BoxKey.X)).toBe(100);
+    expect(Math.round(after[1] - after[0])).toBe(Math.round(before[1] - before[0]));
   });
 
-  it('typing W sets each layer width, heights untouched', () => {
+  it('typing W stretches the selection to that width', () => {
     const doc = two();
-    const next = must(setLayerBox(doc, layerBoxes(doc, ['a', 'b'], 0), BoxKey.Width, 50, 0, EditMode.Design));
-    expect(boxValue(layerBoxes(next, ['a', 'b'], 0), BoxKey.Width)).toBe(50);
+    const next = must(setLayerBox(doc, layerBoxes(doc, ['a', 'b'], 0), BoxKey.Width, 600, 0, EditMode.Design));
+    expect(boxValue(layerBoxes(next, ['a', 'b'], 0), BoxKey.Width)).toBe(600);
+    expect(boxValue(layerBoxes(next, ['a', 'b'], 0), BoxKey.X)).toBe(boxValue(layerBoxes(doc, ['a', 'b'], 0), BoxKey.X));
+  });
+
+  it('typing W on one layer sets its width, height untouched', () => {
+    const doc = two();
+    const next = must(setLayerBox(doc, layerBoxes(doc, ['a'], 0), BoxKey.Width, 50, 0, EditMode.Design));
+    expect(boxValue(layerBoxes(next, ['a'], 0), BoxKey.Width)).toBe(50);
     expect(findClip(next, 'a')!.clip.props.height).toBe(RECT.height);
   });
 

@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import PageHeader from '$lib/components/app/PageHeader.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
+  import NewCanvasButton from '$lib/components/app/NewCanvasButton.svelte';
 
   let { data } = $props();
 </script>
@@ -12,9 +11,7 @@
 <div class="canvases">
   <PageHeader title="canvases">
     {#snippet actions()}
-      <form method="POST" action="/app?/project" use:apiEnhance>
-        <Button type="submit" data-testid="new-canvas">new canvas</Button>
-      </form>
+      <NewCanvasButton projects={data.projects} action="/app?/project" />
     {/snippet}
   </PageHeader>
 

@@ -69,6 +69,7 @@ import ClipboardCopy from '@lucide/svelte/icons/clipboard-copy';
 import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
 import ListChecks from '@lucide/svelte/icons/list-checks';
 import X from '@lucide/svelte/icons/x';
+import Download from '@lucide/svelte/icons/download';
 import AlignStart from '@lucide/svelte/icons/align-start-vertical';
 import AlignEnd from '@lucide/svelte/icons/align-end-vertical';
 import ArrowRightFromLine from '@lucide/svelte/icons/arrow-right-from-line';
@@ -244,6 +245,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.SelectSameStroke]: { name: 'Select same stroke', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectSameFont]: { name: 'Select same font', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectSameEffect]: { name: 'Select same effect', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Export]: { name: 'Export…', icon: Download, group: GuideGroup.Edit, place: Place.Menu },
   [Command.SelectMatching]: { name: 'Select matching layers', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },

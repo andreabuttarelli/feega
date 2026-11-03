@@ -9,7 +9,8 @@
   let { clip, quad: drawn, kind = SelectionKind.Element, highlight = HighlightKind.Element, ongrab, turn = 0, pivot = null }: { clip: string; quad: ScreenQuad; kind?: SelectionKind; highlight?: HighlightKind; turn?: number; pivot?: Pt | null; ongrab: (grip: Grip, handle: number, e: PointerEvent) => void } = $props();
 
   const rect = $derived(quadBox(drawn));
-  const TESTID: Record<SelectionKind, string> = { [SelectionKind.Element]: 'frame-selection', [SelectionKind.Member]: 'frame-selection', [SelectionKind.Group]: 'frame-group-selection' };
+  const TESTID: Record<SelectionKind, string> = { [SelectionKind.Element]: 'frame-selection', [SelectionKind.Member]: 'frame-selection', [SelectionKind.Group]: 'frame-group-selection', [SelectionKind.Many]: 'frame-selection' };
+  const PASSES_THROUGH: ReadonlySet<SelectionKind> = new Set([SelectionKind.Group, SelectionKind.Many]);
 
   const quad = $derived<Quad>([
     [0, 0],
@@ -33,7 +34,7 @@
     u === 0.5 ? `left:0;width:100%;top:${v * rect.height - EDGE_PX / 2}px;height:${EDGE_PX}px` : `top:0;height:100%;left:${u * rect.width - EDGE_PX / 2}px;width:${EDGE_PX}px`;
 </script>
 
-<div class="selection" class:group={kind === SelectionKind.Group} data-testid={TESTID[kind]} data-clip={clip || undefined} style={`${quadStyle(drawn)};${highlightStyle(highlight)}`}>
+<div class="selection" class:group={kind === SelectionKind.Group} class:passes={PASSES_THROUGH.has(kind)} data-testid={TESTID[kind]} data-clip={clip || undefined} style={`${quadStyle(drawn)};${highlightStyle(highlight)}`}>
   <div class="body" data-testid="frame-selection-body" onpointerdown={(e) => ongrab(Grip.Move, 0, e)} role="presentation"></div>
   {#each corners as h, i (i)}
     <div class="rotate" data-testid="frame-selection-rotate" data-rotate={i} style={zoneStyle(h)} onpointerdown={(e) => ongrab(Grip.Rotate, i, e)} role="presentation"></div>
@@ -69,7 +70,7 @@
     pointer-events: auto;
   }
 
-  .group .body {
+  .passes .body {
     pointer-events: none;
   }
 

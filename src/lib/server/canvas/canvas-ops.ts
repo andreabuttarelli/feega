@@ -70,6 +70,7 @@ import { Side } from '$lib/motion/branch-merge';
 import { ResolveOutcome, resolveConflict } from '$lib/server/canvas/conflicts';
 import { Resolution } from '$lib/server/repos/canvas-conflicts';
 import { canvasPath } from '$lib/server/tenancy/entry';
+import { showAgentAt, touchedNodes } from './agent-cursor';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
@@ -334,7 +335,7 @@ const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.s
 const stackElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 1') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
-const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a frame, element or group on the canvas; a group turns its members with it'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
 const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
@@ -1917,4 +1918,10 @@ export function isCanvasOp(name: string): name is CanvasOpName {
 
 export function chatSendsOp(name: CanvasOpName): boolean {
   return (CANVAS_OPS[name].audience ?? Audience.Everyone) === Audience.Everyone;
+}
+
+export async function runOp(ctx: CanvasCtx, name: CanvasOpName, input: unknown): Promise<unknown> {
+  const result = await CANVAS_OPS[name].run(ctx, input as never);
+  showAgentAt(ctx, touchedNodes(input, result), name);
+  return result;
 }

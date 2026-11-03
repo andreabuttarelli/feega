@@ -7,6 +7,7 @@ import { pathSpace } from './space';
 import { ClipOp, clipPolygons } from './polygon-clip';
 
 import { BooleanOp } from './boolean-op';
+import { renameClip } from '../organize';
 
 export { BooleanOp };
 
@@ -15,6 +16,13 @@ const CLIP_OP: Record<BooleanOp, ClipOp> = {
   [BooleanOp.Subtract]: ClipOp.Difference,
   [BooleanOp.Intersect]: ClipOp.Intersection,
   [BooleanOp.Exclude]: ClipOp.Xor
+};
+
+const RESULT_NAME: Record<BooleanOp, string> = {
+  [BooleanOp.Union]: 'Union',
+  [BooleanOp.Subtract]: 'Subtract',
+  [BooleanOp.Intersect]: 'Intersect',
+  [BooleanOp.Exclude]: 'Exclude'
 };
 
 const UNIT = { w: 1, h: 1 };
@@ -107,7 +115,9 @@ export function combineShapes(doc: MotionDoc, ids: readonly string[], op: Boolea
   const bottom = ordered[0];
   const local = pathSpace(doc, bottom.id, frame);
   const reshaped = reshapedTo(doc, bottom, result.map((poly) => polyline(poly.map(local.toLocal), true)), frame);
-  return reshaped.ok ? removeClips(reshaped.doc, ordered.slice(1).map((c) => c.id)) : reshaped;
+  const unstroked = reshaped.ok ? setProps(reshaped.doc, bottom.id, { strokes: [] }) : reshaped;
+  const named = unstroked.ok ? renameClip(unstroked.doc, bottom.id, RESULT_NAME[op]) : unstroked;
+  return named.ok ? removeClips(named.doc, ordered.slice(1).map((c) => c.id)) : named;
 }
 
 export function flattenShapes(doc: MotionDoc, ids: readonly string[], frame: number): OpResult {

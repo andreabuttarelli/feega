@@ -97,7 +97,6 @@ test.describe('dialogs from a selected canvas frame @real', () => {
     await frameKept(page, before, '01b-fonts-after');
 
     await page.getByTestId('frame-timeline').getByText('Image · pic').click();
-    await page.getByTestId('media-add').click();
     await page.getByTestId('media-file').setInputFiles(BLUE_SQUARE);
     await expect(page.getByTestId('media-preview')).toBeVisible({ timeout: 30_000 });
     await frameKept(page, before, '02-media-uploaded');

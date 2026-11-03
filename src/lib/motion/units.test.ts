@@ -3,7 +3,7 @@ import { ANIMATABLE } from '@feega/motion-core/motion/keyframes';
 import { COMPONENT_IDS } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE } from '@feega/motion-core/motion/camera';
-import { Unit, propsOwner, sliderOf, spaceOf, toShown, toStored, unitOf } from './units';
+import { Unit, propsOwner, shownNumber, sliderOf, spaceOf, toShown, toStored, unitOf } from './units';
 
 const PORTRAIT = { width: 1080, height: 1920 };
 const MIN_STEPS = 20;
@@ -133,5 +133,12 @@ describe('an element on the canvas reads in canvas px', () => {
 
   it('rotation is degrees at any scale', () => {
     expect(toShown('Shape', 'rotateZ', 30, space)).toBe(30);
+  });
+});
+
+describe('a transform offset read back in the inspector', () => {
+  it('shows the 260 px typed, not 261 from a share rounded before scaling', () => {
+    const frame = { width: 1080, height: 1350 };
+    expect(shownNumber('Precomp', 'y', toStored('Precomp', 'y', 260, frame), frame)).toBe(260);
   });
 });

@@ -4,7 +4,7 @@ import { setStill } from '@feega/motion-core/motion/still';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
 import { EditMode } from './edit-mode';
-import { CANVAS_INK, CanvasTheme, drawClip, drawStart, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
+import { CANVAS_INK, CanvasTheme, blankElement, drawClip, drawStart, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
 import { parsePath, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
@@ -57,12 +57,12 @@ describe('creating an element by drawing inside a frame', () => {
     expect(clip.props).toMatchObject({ shape: 'rect', ...BOX });
   });
 
-  it('a drawn element pivots from its top-left corner', () => {
+  it('a drawn element pivots from its centre, like Figma and After Effects', () => {
     const inFrame = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, 0, 'r1')), 'r1')!.clip;
     const onCanvas = drawnElement({ tool: DrawTool.Rectangle, box: { left: 100, top: 50, width: 300, height: 100 } }, 'r2');
 
-    expect(inFrame.transform).toEqual({ anchorX: 0, anchorY: 0 });
-    expect(onCanvas.ok && findClip(onCanvas.doc, 'r2')!.clip.transform).toEqual({ anchorX: 0, anchorY: 0 });
+    expect(inFrame.transform).toEqual({});
+    expect(onCanvas.ok && findClip(onCanvas.doc, 'r2')!.clip.transform).toEqual({});
   });
 
   it('an ellipse is an ellipse Shape, a text is a Text clip, both on the box', () => {
@@ -370,3 +370,10 @@ describe('shape tools', () => {
   });
 });
 
+
+describe('blankElement', () => {
+  it('a box off by float noise keeps the pixels of the box it means', () => {
+    const made = blankElement({ left: -320, top: -149.99999999999994, width: 400, height: 119.99999999999994 });
+    expect(made.ok && { width: made.doc.width, height: made.doc.height }).toEqual({ width: 400, height: 120 });
+  });
+});

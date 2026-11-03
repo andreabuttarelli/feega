@@ -1,10 +1,11 @@
 import { DrawTool } from '$lib/motion/draw-tool';
 import { NEW_TEXT_SIZING, TEXT_SIZINGS } from '@feega/motion-core/motion/text-sizing';
-import { CANVAS_INK, CanvasTheme, LINE_PAINT, drawClip, drawnElement, drawnOf, penClip, penPaint, type CanvasBox, type DrawnWire, type PenPaint } from '$lib/motion/draw-create';
+import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, drawnOf, penClip, penInk, type CanvasBox, type DrawnWire, type PenPaint } from '$lib/motion/draw-create';
 import { mapOutline, parsePath, pathData } from '@feega/motion-core/motion/shape/geometry';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { joinStackAt } from '$lib/motion/layout/stack-drag';
 
 type Point = { x: number; y: number };
 type DrawnClip = { component: string; props: Record<string, unknown>; autoLayout?: unknown };
@@ -66,10 +67,6 @@ export function drawnOnCanvas(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow, 
 
 type FrameBox = { x: number; y: number; w: number; h: number };
 
-const FRAME_INK = 'brand.text';
-
-const framePaint = (stroked: boolean): Record<string, unknown> => (stroked ? penPaint(LINE_PAINT[DrawTool.Line](FRAME_INK)) : {});
-
 export function drawnInFrame(doc: MotionDoc, frame: FrameBox, wire: DrawnWire, at: number, id: string): OpResult {
   const drawn = drawnOf(wire);
   if (typeof drawn === 'string') {
@@ -77,15 +74,21 @@ export function drawnInFrame(doc: MotionDoc, frame: FrameBox, wire: DrawnWire, a
   }
   if (drawn.tool === DrawTool.Pen) {
     const outline = mapOutline(drawn.outline, ([x, y]) => [(x - frame.x) / frame.w, (y - frame.y) / frame.h]);
-    return penClip(doc, outline, at, id, framePaint(Boolean(drawn.stroke)));
+    return penClip(doc, outline, at, id, penInk(doc));
   }
   const { left, top, width, height } = drawn.box;
   const box = { x: (left + width / 2 - frame.x) / frame.w, y: (top + height / 2 - frame.y) / frame.h, width: width / frame.w, height: height / frame.h };
-  return drawClip(doc, drawn.tool, box, at, id, drawn.sizing ?? NEW_TEXT_SIZING);
+  const made = drawClip(doc, drawn.tool, box, at, id, drawn.sizing ?? NEW_TEXT_SIZING);
+  const anchor = drawnAnchor(wire);
+  return made.ok && anchor ? joinStackAt(made.doc, id, [((anchor.x - frame.x) / frame.w) * doc.width, ((anchor.y - frame.y) / frame.h) * doc.height]) : made;
 }
 
-export function drawnCentre(wire: DrawnWire): Point | null {
+export function drawnAnchor(wire: DrawnWire): Point | null {
   const drawn = drawnOf(wire);
   const made = typeof drawn === 'string' ? null : drawnElement(drawn, '');
-  return made?.ok ? { x: made.box.left + made.box.width / 2, y: made.box.top + made.box.height / 2 } : null;
+  if (!made?.ok) {
+    return null;
+  }
+  const { left, top, width, height } = made.box;
+  return { x: wire.tool === DrawTool.Text ? left : left + width / 2, y: top + height / 2 };
 }

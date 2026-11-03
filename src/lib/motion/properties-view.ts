@@ -49,7 +49,7 @@ const TEXT_ORDER: readonly Section[] = [Section.Align, Section.Layout, Section.S
 const FAMILY_ORDER: Partial<Record<ClipFamily, readonly Section[]>> = { [ClipFamily.Text]: TEXT_ORDER };
 
 const PART_SECTIONS: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Transform, Section.Layer, Section.Fill, Section.Stroke, Section.Text]);
-const FRAME_SECTIONS: ReadonlySet<Section> = new Set([Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
+const FRAME_SECTIONS: ReadonlySet<Section> = new Set([Section.Stack, Section.Layer, Section.Fill, Section.Stroke, Section.Effects]);
 
 const VIEW_KEEPS: Partial<Record<PropertiesView, ReadonlySet<Section>>> = { [PropertiesView.Part]: PART_SECTIONS, [PropertiesView.Frame]: FRAME_SECTIONS };
 

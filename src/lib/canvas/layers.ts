@@ -79,6 +79,7 @@ export type LayerRow = {
   nested: boolean;
   thumb?: string | null;
   foldable?: boolean;
+  frame?: boolean;
   element?: boolean;
   own?: string;
   instance?: boolean;
@@ -176,6 +177,7 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     hidden: !!clip.hidden,
     locked: template || !!clip.locked,
     nested,
+    ...(clip.clipContent ? { frame: true } : {}),
     ...(doc.comps[comp]?.component ? { instance: true } : {})
   };
   const nests = comp !== '' && !template;
@@ -339,11 +341,11 @@ const DROP: Record<LayerKind, (at: number) => Place> = {
 
 export const dropPlace = (kind: LayerKind, at: number): Place => DROP[kind](at);
 
-type DropRow = { kind: LayerKind; type: string; foldable?: boolean };
+type DropRow = { kind: LayerKind; type: string; foldable?: boolean; frame?: boolean };
 
 const LAYOUT_TYPES: ReadonlySet<string> = new Set(Object.values(LayoutKind));
 
-const holdsLayers = (row: DropRow): boolean => row.kind === LayerKind.Clip && (LAYOUT_TYPES.has(row.type) || !!row.foldable);
+const holdsLayers = (row: DropRow): boolean => row.kind === LayerKind.Clip && (LAYOUT_TYPES.has(row.type) || !!row.foldable || !!row.frame);
 
 export const rowDrop = (row: DropRow, at: number): Place => (holdsLayers(row) ? GROUP_DROP(at) : dropPlace(row.kind, at));
 

@@ -1,6 +1,7 @@
 import { Command, SHORTCUTS } from '$lib/motion/shortcuts';
-import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from './frame-view';
+import { FrameView, flipView, shows, type FrameViews } from './frame-view';
 import { flipRulers, rulersPref } from './rulers-pref.svelte';
+import { readFrameViews, writeFrameViews } from '$lib/shell-prefs';
 
 const keysOf = (command: Command): string => SHORTCUTS.find((b) => b.command === command)?.label ?? '';
 
@@ -14,11 +15,29 @@ export const VIEW_ITEMS = [
   item(FrameView.Pivot, Command.TogglePivot, 'Rotation pivot')
 ] as const;
 
-export const ZOOM_ITEMS = [
-  item(FrameView.Outlines, Command.PreviewFit, 'Zoom to fit'),
-  item(FrameView.Outlines, Command.PreviewActual, 'Zoom to 100%'),
-  item(FrameView.Outlines, Command.PreviewSelection, 'Zoom to selection')
-].map(({ command, label, keys }) => ({ command, label, keys }));
+const shiftKeysOf = (command: Command): string => SHORTCUTS.find((b) => b.command === command && b.shift && !b.mod)?.label ?? '';
+
+const zoomItem = (command: Command, label: string) => ({ command, label, keys: shiftKeysOf(command) });
+
+export const ZOOM_ITEMS = [zoomItem(Command.PreviewFit, 'Zoom to fit'), zoomItem(Command.PreviewActual, 'Zoom to 100%'), zoomItem(Command.PreviewSelection, 'Zoom to selection')];
+
+const PERCENT = 100;
+
+export const zoomPercent = (zoom: number): string => `${Math.round(zoom * PERCENT)}%`;
+
+class ZoomLevel {
+  zoom = $state(1);
+
+  get label(): string {
+    return zoomPercent(this.zoom);
+  }
+
+  show(zoom: number) {
+    this.zoom = zoom;
+  }
+}
+
+export const zoomLevel = new ZoomLevel();
 
 class ZoomRequest {
   current = $state<{ command: Command; seq: number } | null>(null);
@@ -32,7 +51,7 @@ class ZoomRequest {
 export const zoomRequest = new ZoomRequest();
 
 class FrameViewState {
-  local = $state<FrameViews>(FRAME_VIEW_DEFAULT);
+  local = $state<FrameViews>(readFrameViews());
 
   get all(): FrameViews {
     return { ...this.local, [FrameView.Rulers]: rulersPref.on };
@@ -49,6 +68,7 @@ class FrameViewState {
     }
 
     this.local = flipView(this.local, view);
+    writeFrameViews(this.local);
   }
 }
 

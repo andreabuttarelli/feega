@@ -9,12 +9,16 @@ export const SETTLE_MS = 3000;
 export const CHAT_MAX = 120;
 const MS_PER_SECOND = 1000;
 const MAX_SELECTION = 200;
+export const AGENT_IDLE_MS = 6000;
+export const DOING_MAX = 80;
 
 export type View = { cx: number; cy: number; zoom: number };
 
 export type LiveBox = { id: string; x: number; y: number; w?: number; h?: number; r?: number };
 
-export type CanvasMark = { sessionId: string; userId: string; name: string; cursor: FrameCursor | null; selection: string[]; live: LiveBox[]; view: View | null; presenting: boolean; chat: string | null; at: number };
+export type AgentWork = { doing: string };
+
+export type CanvasMark = { sessionId: string; userId: string; name: string; cursor: FrameCursor | null; selection: string[]; live: LiveBox[]; view: View | null; presenting: boolean; chat: string | null; agent?: AgentWork | null; at: number };
 
 export type CanvasSelf = Pick<CanvasMark, 'sessionId' | 'userId' | 'name'>;
 
@@ -47,6 +51,7 @@ const markSchema = z.object({
   view: z.object({ cx: z.number().finite(), cy: z.number().finite(), zoom: z.number().finite().positive() }).nullable().default(null),
   presenting: z.boolean().default(false),
   chat: z.string().max(CHAT_MAX).nullable().default(null),
+  agent: z.object({ doing: z.string().max(DOING_MAX) }).nullable().default(null),
   at: z.number().finite()
 });
 
@@ -68,7 +73,7 @@ export function keepCanvasMark(marks: Map<string, HeldMark>, mark: CanvasMark): 
 
 export function canvasPeersOf(marks: Map<string, HeldMark>, selfSession: string, now: number, landed: (box: LiveBox) => boolean = () => false): CanvasPeer[] {
   return [...marks.values()]
-    .filter((m) => m.sessionId !== selfSession && now - m.at <= MARK_STALE_MS)
+    .filter((m) => m.sessionId !== selfSession && now - m.at <= (m.agent ? AGENT_IDLE_MS : MARK_STALE_MS))
     .map(({ dropped = [], ...m }) => {
       const settling = dropped.filter((box) => now <= box.until && !landed(box)).map(({ until: _until, ...box }) => box);
       return { ...m, live: [...m.live, ...settling], colour: colourOf(m.userId) };

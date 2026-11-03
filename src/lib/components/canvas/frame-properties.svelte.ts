@@ -4,12 +4,19 @@ import type { FrameExtras } from '$lib/canvas/frame-extras.svelte';
 import { docMode, type DocMode } from '@feega/motion-core/motion/doc';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { ElementHost } from '$lib/motion/element-host';
+import type { Flip } from '$lib/motion/layer-props';
+import type { Edge } from '$lib/motion/space';
+import type { ExportRow } from '$lib/motion/export-rows';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
 export const UNNAMED_FRAME = 'Frame';
 const TEXT_FIELDS = new Set(['TEXTAREA', 'INPUT']);
 
-export type NodePlace = { x: number; y: number; set: (x: number, y: number) => void };
+type Size = { width: number; height: number };
+
+export type NodePlace = { x: number; y: number; rotation: number; set: (x: number, y: number) => void; turn: (degrees: number) => void; flip: (flip: Flip) => void; align: ((edge: Edge) => void) | null; follow: (before: Size, after: Size) => void };
+
+export type ExportMade = { url: string; name: string; files: string[]; skipped?: string[] };
 
 export type OpenFrame = { nodeId: string; selection: string[]; playhead: number; mode: DocMode };
 
@@ -21,6 +28,7 @@ export class FrameProperties {
   name = $state(UNNAMED_FRAME);
   part = $state<string | null>(null);
   exportPicks: (() => void) | null = null;
+  exportRows = $state.raw<((rows: ExportRow[]) => Promise<ExportMade | string>) | null>(null);
   runAction = $state.raw<((id: SelectionActionId) => void) | null>(null);
   place = $state.raw<NodePlace | null>(null);
   rename = $state.raw<((name: string) => void) | null>(null);
@@ -56,6 +64,7 @@ export class FrameProperties {
     this.name = UNNAMED_FRAME;
     this.part = null;
     this.exportPicks = null;
+    this.exportRows = null;
     this.runAction = null;
     this.place = null;
     this.rename = null;

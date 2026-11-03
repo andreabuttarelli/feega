@@ -1,4 +1,5 @@
 import { localStore } from '$lib/browser-storage';
+import { FRAME_VIEW_DEFAULT, FrameView, type FrameViews } from '$lib/canvas/frame-view';
 /** Persistent shell layout prefs (sidebar). Browser localStorage. */
 
 export const SHELL_PREF_KEYS = {
@@ -9,7 +10,8 @@ export const SHELL_PREF_KEYS = {
   chatOpen: 'feega.chatOpen',
   chatTab: 'feega.chatTab',
   rulers: 'feega.rulers',
-  stylesSplit: 'feega.stylesSplit'
+  stylesSplit: 'feega.stylesSplit',
+  frameViews: 'feega.frameViews'
 } as const;
 
 const SHELL_PREF_KEYS_LEGACY = {
@@ -20,7 +22,8 @@ const SHELL_PREF_KEYS_LEGACY = {
   chatOpen: 'dazero.chatOpen',
   chatTab: 'dazero.chatTab',
   rulers: 'dazero.rulers',
-  stylesSplit: 'dazero.stylesSplit'
+  stylesSplit: 'dazero.stylesSplit',
+  frameViews: 'dazero.frameViews'
 } as const;
 
 export const CHAT_TABS = ['chat', 'guide', 'properties'] as const;
@@ -194,4 +197,23 @@ export function clampStylesSplit(ratio: number): number {
 
 export function writeStylesSplit(ratio: number) {
   writeRaw(SHELL_PREF_KEYS.stylesSplit, String(ratio));
+}
+
+const FRAME_VIEWS = Object.values(FrameView);
+
+function storedViews(raw: string | null): Partial<FrameViews> {
+  try {
+    const parsed = JSON.parse(raw ?? '{}') as Record<string, unknown> | null;
+    return Object.fromEntries(FRAME_VIEWS.filter((view) => typeof parsed?.[view] === 'boolean').map((view) => [view, parsed![view]]));
+  } catch {
+    return {};
+  }
+}
+
+export function readFrameViews(): FrameViews {
+  return { ...FRAME_VIEW_DEFAULT, ...storedViews(readRaw(SHELL_PREF_KEYS.frameViews)) };
+}
+
+export function writeFrameViews(views: FrameViews) {
+  writeRaw(SHELL_PREF_KEYS.frameViews, JSON.stringify(views));
 }

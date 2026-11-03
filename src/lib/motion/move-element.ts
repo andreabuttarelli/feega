@@ -4,7 +4,7 @@ import { FPS, maxFrames } from '@feega/motion-core/motion/design';
 import { fieldsOf } from './inspector';
 import { retimer } from './frame-rate';
 import { DocMode } from '@feega/motion-core/motion/still';
-import { TOP_LEFT_START, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
+import { NEW_CLIP_START, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
 import { CLIP_NAME_MAX } from '@feega/motion-core/motion/organize';
 import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
 
@@ -378,7 +378,7 @@ export function frameOf(element: Element, mode: DocMode, box: Box | null, newId:
 export function mediaElement(output: Output, fps: number = FPS): Element {
   const media = MEDIA[output.kind];
   const durationInFrames = media.frames(output, fps) ?? Math.round((COMPONENTS[media.component].durationInFrames * fps) / FPS);
-  const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, name: media.name(output), constraints: TOP_LEFT_START.constraints, props: { ...defaultProps(media.component), ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
+  const clip = newClip({ id: `${media.component.toLowerCase()}-${crypto.randomUUID().slice(0, 8)}`, from: 0, durationInFrames, component: media.component, name: media.name(output), constraints: NEW_CLIP_START.constraints, props: { ...defaultProps(media.component), ...MEDIA_FIT[output.kind], [media.prop]: media.value(output) } });
   const asset = media.asset(output);
   return { clip, fps, size: media.size(output), stillAt: 0, fillsFrame: output.kind === OutputKind.Image, carried: { assets: asset ? [asset] : [], fonts: [], components: {}, comps: {} } };
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COLOUR_TAGS } from './node-colour';
+import { Flip } from '$lib/motion/layer-props';
 
 export const nodeLayoutSchema = z.object({
   rotation: z.number().finite().min(-180).max(180).optional(),
@@ -43,6 +44,28 @@ export function rotateGroup(group: Placed, members: readonly Placed[], deg: numb
     return { ...n, x: nx - n.w / 2, y: ny - n.h / 2, rotation: wrapAngle(n.rotation + deg) };
   };
   return [{ ...group, rotation: wrapAngle(group.rotation + deg) }, ...members.map(turn)];
+}
+
+const MIRROR_AXIS: Record<Flip, { axis: number; turn: number }> = {
+  [Flip.Horizontal]: { axis: 90, turn: HALF_TURN },
+  [Flip.Vertical]: { axis: 0, turn: 0 }
+};
+
+export function mirrorGroup(group: Placed, members: readonly Placed[], flip: Flip): Placed[] {
+  const { axis, turn } = MIRROR_AXIS[flip];
+  const across = group.rotation + axis;
+  const cx = group.x + group.w / 2;
+  const cy = group.y + group.h / 2;
+  const cos = Math.cos(2 * across * RADIANS);
+  const sin = Math.sin(2 * across * RADIANS);
+  const mirror = (n: Placed): Placed => {
+    const mx = n.x + n.w / 2 - cx;
+    const my = n.y + n.h / 2 - cy;
+    const nx = cx + mx * cos + my * sin;
+    const ny = cy + mx * sin - my * cos;
+    return { ...n, x: nx - n.w / 2, y: ny - n.h / 2, rotation: wrapAngle(2 * across - n.rotation + turn) };
+  };
+  return members.map(mirror);
 }
 
 export function translateGroup(members: readonly Pick<Placed, 'id' | 'x' | 'y'>[], delta: { dx: number; dy: number }): { id: string; x: number; y: number }[] {

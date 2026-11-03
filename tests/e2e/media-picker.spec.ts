@@ -76,7 +76,6 @@ test.describe('media picker @real', () => {
     await expect(detail).not.toContainText('id or link');
     await shoot(page, '01-empty');
 
-    await picker.getByTestId('media-add').click();
     await shoot(page, '02-chooser');
     await picker.getByTestId('media-file').setInputFiles(RED);
     await expect(picker.getByTestId('media-preview').locator('img')).toBeVisible({ timeout: 60_000 });
@@ -137,7 +136,6 @@ test.describe('media picker @real', () => {
 
     let picker = await openPicker();
     await shoot(page, 'legacy-01-picker');
-    await picker.getByTestId('media-add').click();
     await picker.getByTestId('media-file').setInputFiles(RED);
     await expect(picker.getByTestId('media-preview').locator('img')).toBeVisible({ timeout: 60_000 });
     await expect.poll(() => splitMedia(admin, session.canvasId), { timeout: 15_000, message: 'the upload is stored as an asset id' }).toMatch(ASSET_ID);
@@ -177,7 +175,7 @@ test.describe('media picker @real', () => {
       await expect(picker).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 30_000 });
 
-    await picker.getByTestId('media-add').click();
+    await picker.getByTestId('media-more').click();
     await picker.getByTestId('media-tab-link').click();
     await picker.getByTestId('media-link').fill(BLUE_LINK);
     await picker.getByTestId('media-link-check').click();

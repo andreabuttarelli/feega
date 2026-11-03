@@ -1,4 +1,5 @@
 import type { CanvasBox } from '$lib/motion/draw-create';
+import { MediaKind, kindOfFile } from '$lib/motion/media/pick';
 import { tileChromeOf } from './motion-node';
 
 type Holder = { id: string; type: string; data: Record<string, unknown>; x: number; y: number; w: number; h: number };
@@ -18,4 +19,12 @@ export function groupHolding(tiles: readonly Holder[], boxes: readonly CanvasBox
   const right = Math.max(...boxes.map((b) => b.left + b.width));
   const bottom = Math.max(...boxes.map((b) => b.top + b.height));
   return frameHolding(tiles, { left, top, width: right - left, height: bottom - top });
+}
+
+export function fileHolding(tiles: readonly Holder[], mimeType: string, at: { x: number; y: number }): FrameHold | null {
+  if (kindOfFile(mimeType) !== MediaKind.Image) {
+    return null;
+  }
+
+  return frameHolding(tiles, { left: at.x, top: at.y, width: 0, height: 0 });
 }

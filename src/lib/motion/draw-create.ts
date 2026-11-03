@@ -13,7 +13,7 @@ import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout'
 import { setAutoLayout, setLayoutItem } from './layout/ops';
 import { EditMode } from './edit-mode';
 import { DocMode, docMode, setStill, settledStill } from '@feega/motion-core/motion/still';
-import { TOP_LEFT_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { NEW_CLIP_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame | DrawTool.Stack;
 
@@ -71,7 +71,7 @@ export const drawStart = (mode: EditMode, playhead: number): number => DRAW_STAR
 const fail = (error: string): OpResult => ({ ok: false, error });
 
 function place(doc: MotionDoc, component: ComponentId, props: Record<string, unknown>, frame: number, id: string): OpResult {
-  return addClip(doc, { component, props, ...TOP_LEFT_START, ...SPAN[docMode(doc)](doc, frame, component) }, id);
+  return addClip(doc, { component, props, ...NEW_CLIP_START, ...SPAN[docMode(doc)](doc, frame, component) }, id);
 }
 
 const TEXT_TYPE = COMPONENTS.Text.schema.parse({});
@@ -207,6 +207,10 @@ export function penPaint({ fill, stroke, gradient, fillRule }: PenPaint): Record
   };
 }
 
+const HAIRLINE_PX = 1;
+
+export const penInk = (doc: Pick<MotionDoc, 'width' | 'height'>): Record<string, unknown> => ({ ...penPaint(LINE_PAINT[DrawTool.Line](DEFAULT_COLOUR.ink)), strokeWidth: HAIRLINE_PX / Math.min(doc.width, doc.height) });
+
 export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
 
 const ELEMENT_PX_PER_CANVAS_PX = 1;
@@ -223,9 +227,13 @@ type Sides = { long: number; short: number };
 const VIDEO_SIDES: Sides = { long: MAX_SIDE, short: MAX_SHORT_SIDE };
 const STILL_SIDES: Sides = { long: DESIGN_MAX_SIDE, short: DESIGN_MAX_SIDE };
 
+const FLOAT_NOISE = 1e6;
+
+const settled = (n: number) => Math.round(n * FLOAT_NOISE) / FLOAT_NOISE;
+
 function docPixels(box: CanvasBox, density: number, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
-  const long = Math.max(box.width, box.height);
-  const short = Math.min(box.width, box.height);
+  const long = settled(Math.max(box.width, box.height));
+  const short = settled(Math.min(box.width, box.height));
   const scale = Math.min(density, sides.long / long, sides.short / short);
   const shortSide = evenFloor(short * scale);
   const longSide = Math.min(evenSide((long * shortSide) / short), evenSide(long * scale));

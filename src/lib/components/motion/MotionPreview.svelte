@@ -521,6 +521,7 @@
 
   .stage[data-backdrop='transparent'] {
     background: transparent;
+    outline: none;
   }
 
   .host {

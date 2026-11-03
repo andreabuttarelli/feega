@@ -33,7 +33,7 @@
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
-  import { frameViews, zoomRequest } from '$lib/canvas/view-menu.svelte';
+  import { frameViews, zoomLevel, zoomRequest } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
@@ -81,7 +81,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Press, Reach, Root, childBelow, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Extend, Press, Reach, Root, childBelow, extendOf, framePage, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { holdsLock, ownLocked } from '$lib/canvas/locks';
   import { altCopies } from '$lib/canvas/alt-copy';
   import { clickPick, pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
@@ -100,7 +100,7 @@
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-  import { stackPlaced } from '$lib/motion/layout/ops';
+  import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
   import { dragInStack, dropInStack, followCursor, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
@@ -115,7 +115,8 @@
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
   import { CopyShown, type Drawing } from '$lib/canvas/optimistic-insert';
-  import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { drawnAnchor, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { TypeAhead } from '$lib/canvas/type-ahead';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { frameDocs, type FrameDocEdit, type HeldDoc } from '$lib/canvas/frame-docs';
@@ -137,13 +138,14 @@
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import { missingAssets } from '$lib/canvas/live-assets';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
   import { instanceOf } from '$lib/motion/main-component';
   import { appendVariant } from '$lib/motion/variants';
   import VariantPlus from '../VariantPlus.svelte';
   import ComponentSetOutline from '../ComponentSetOutline.svelte';
-  import { addSetVariant, setMainOf } from '$lib/motion/component-set';
+  import { addSetVariant, mainDragged, setMainOf } from '$lib/motion/component-set';
   import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
@@ -169,7 +171,7 @@
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty, tileForDoc } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -202,7 +204,7 @@
   import { GraphScope } from '$lib/canvas/run-graph';
   import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, enabledFor, isCanvasAction, shownFor, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
-  import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { STACK_GAP, alignTiles, alignWithin, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
@@ -224,7 +226,7 @@
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -241,9 +243,11 @@
   import { engineOf } from '@feega/motion-core/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
-  import { dragAngle, followGroup } from '$lib/canvas/node-layout';
+  import { dragAngle, followGroup, mirrorGroup, type Placed } from '$lib/canvas/node-layout';
+  import { Flip, flipStage } from '$lib/motion/layer-props';
+  import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -321,8 +325,9 @@
   const tier = $derived(assetTier(view.zoom));
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
-  let turning = $state<{ id: string; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) }, liveOf(t.id)?.doc ?? null)));
+  let turning = $state<ReadonlyMap<string, number>>(new Map());
+  let spin = $state<{ box: Box; degrees: number } | null>(null);
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -613,6 +618,28 @@
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && !selectedBoxes[0].locked && editable ? selectedBoxes[0] : null);
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && !selectedBoxes[0].locked && editable);
+  const transformable = (t: (typeof placed)[number]) => t.minW != null && t.minH != null && !t.locked;
+  const placedOf = (t: (typeof placed)[number]): Placed => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 });
+  const many = $derived(editable && selectedBoxes.length > 1 && selectedBoxes.every(transformable) ? selectedBoxes.map(placedOf) : []);
+  const manyBox = $derived(many.length ? selectionBox(many) : null);
+  const manyQuad = $derived.by(() => {
+    const box = spin?.box ?? manyBox;
+    if (!box) {
+      return null;
+    }
+    const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    const r = ((spin?.degrees ?? 0) * Math.PI) / 180;
+    return [
+      [box.x, box.y],
+      [box.x + box.w, box.y],
+      [box.x + box.w, box.y + box.h],
+      [box.x, box.y + box.h]
+    ].map(([x, y]) => {
+      const dx = x - centre.x;
+      const dy = y - centre.y;
+      return [view.x + (centre.x + dx * Math.cos(r) - dy * Math.sin(r)) * view.zoom, view.y + (centre.y + dx * Math.sin(r) + dy * Math.cos(r)) * view.zoom] as const;
+    });
+  });
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
@@ -793,14 +820,19 @@
         return;
       }
     }
-    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null, focusPlacement(mode)))));
     return () => cancelAnimationFrame(frame);
   });
 
-  function focusOn(ids: readonly string[], free: Insets | null) {
+  function focusOn(ids: readonly string[], free: Insets | null, placement: Placement) {
     const boxes = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
     const b = boundsOf(boxes);
     if (!b) {
+      return;
+    }
+    if (placement === Placement.Slide) {
+      const s = screenSize();
+      animateTo(revealIn(b, view, { width: s.width, height: s.height }, free ?? undefined));
       return;
     }
     if (free) {
@@ -814,8 +846,10 @@
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
-    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number }; main?: string; dragged?: Box }
     | { kind: GestureKind.Rotate; id: string; centre: Point; start: Point; base: number; degrees: number }
+    | { kind: GestureKind.ResizeMany; unit: [number, number]; start: Point; box: Box; items: Placed[] }
+    | { kind: GestureKind.TurnMany; centre: Point; start: Point; box: Box; items: Placed[] }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
     | { kind: GestureKind.PickEdge; edgeId: string };
@@ -1215,19 +1249,34 @@
   }
 
   function extendPick(e: PointerEvent, w: Point): boolean {
-    const deep = (e.metaKey || e.ctrlKey) && !e.shiftKey;
-    const hit = (e.shiftKey || deep) && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
-    if (!hit || inside?.nodeId !== hit.nodeId) {
+    const keys = { shift: e.shiftKey, mod: e.metaKey || e.ctrlKey };
+    const hit = e.button === 0 && e.pointerType === 'mouse' && mode !== CanvasMode.View && !space ? framePickAt(w) : null;
+    const doc = hit ? liveOf(hit.nodeId)?.doc : null;
+    if (!hit || !doc || frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
       return false;
     }
-    if (hit.clip && deep) {
+    const entered = inside?.nodeId === hit.nodeId;
+    const { box } = hit.frame;
+    const onBody = w.x >= box.x && w.y >= box.y && w.x <= box.x + box.w && w.y <= box.y + box.h;
+    const page = framePage(doc, frameChrome(kindOfNode(hit.nodeId)).root);
+    const clips = doc.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.id !== page && (c.parent ?? null) === page).map((c) => c.id));
+    const bandable = kindOfNode(hit.nodeId) === FrameKind.Frame && clips.length > 0;
+    const plan = extendOf(keys, { onClip: !!hit.clip, onBody, held: selected.includes(hit.nodeId), entered, selectedElsewhere: selected.some((id) => id !== hit.nodeId), picks: entered ? picks.length : 0, bandable });
+    if (plan.extend === Extend.None) {
       return false;
     }
-    if (hit.clip) {
-      pickMany(hit.nodeId, toggleId(picks, elementAt(w, Reach.Top)?.clip ?? hit.clip));
+    if (!entered) {
+      select([hit.nodeId]);
+      pickMany(hit.nodeId, []);
+    }
+    if (plan.extend === Extend.Toggle) {
+      const clip = elementAt(w, plan.reach)?.clip ?? hit.clip;
+      if (clip) {
+        pickMany(hit.nodeId, toggleId(picks, clip));
+      }
       return true;
     }
-    const clips = liveOf(hit.nodeId)?.doc.tracks.flatMap((t) => t.clips.map((c) => c.id)) ?? [];
+    const deep = plan.reach === Reach.Deep;
     const from = w;
     const move = (ev: PointerEvent) => {
       bandDrag = { nodeId: hit.nodeId, from, to: toWorld(view, local(ev)) };
@@ -1404,12 +1453,16 @@
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(doc, statePreview.picksOf(nodeId)) }),
         recorded: () => {
           settle.edited(nodeId);
+          queueMicrotask(() => adoptAssets(nodeId));
           leaveHost(nodeId, session.history.present);
           queueMicrotask(() => settleHost(nodeId));
           autosize(nodeId);
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
-        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) }),
+        saved: () => {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) });
+          adoptAssets(nodeId);
+        },
         landed: (from, to) => {
           const step = stepOf(nodeId, from, to);
           if (step) {
@@ -1434,6 +1487,14 @@
     }
     savers.set(nodeId, session);
     return session;
+  }
+
+  function adoptAssets(nodeId: string) {
+    const live = liveOf(nodeId);
+    const added = live ? missingAssets(live.doc, live.assets, assetUrl) : null;
+    if (live && added) {
+      liveDocs.set(nodeId, { ...live, assets: { ...live.assets, ...added } });
+    }
   }
 
   const extras = new Map<string, FrameExtras>();
@@ -1599,6 +1660,7 @@
     frameProperties.name = placed.find((t) => t.id === panelNodeId)?.displayName?.trim() || UNNAMED_FRAME;
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
+    frameProperties.exportRows = (rows) => (picks.length ? props.onExportElementRows?.(panelNodeId, picks, rows) : props.onExportRows?.([panelNodeId], rows)) ?? Promise.resolve('Export failed');
     frameProperties.runAction = runSelectionAction;
     frameProperties.place = nodePlaceOf(panelNodeId);
     frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
@@ -1617,7 +1679,8 @@
       runQuote: props.runQuoteFor?.(ids) ?? null,
       onpropertychange: (patch) => props.onPropertyChange?.(ids, patch),
       onalign: (edge) => alignSelection(ids, edge),
-      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis))
+      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis)),
+      box: many.length ? { items: many, set: (field, value) => placeAll(many, withField(many, field, value)) } : null
     });
     return () => selectionProperties.clear();
   });
@@ -1696,6 +1759,45 @@
     }
   }
 
+  function setMainPicked(nodeId: string, clip: string | null): string | undefined {
+    const doc = clip && isComponentSet(nodeId) ? saverOf(nodeId)?.history.present : null;
+    const main = doc ? doc.tracks.flatMap((t) => t.clips).find((c) => c.id === clip) : null;
+    return main?.component === 'Precomp' ? main.id : undefined;
+  }
+
+  function mainResizedTo(nodeId: string, clip: string, was: Box, to: Box) {
+    const before = saverOf(nodeId)?.history.present;
+    return before ? mainDragged(before, clip, { w: to.w - was.w, h: to.h - was.h }, was) : null;
+  }
+
+  function showMainResized(nodeId: string, clip: string, was: Box, to: Box) {
+    const dragged = mainResizedTo(nodeId, clip, was, to);
+    const live = liveOf(nodeId);
+    if (!dragged?.result.ok || !live) {
+      return;
+    }
+    liveDocs.set(nodeId, { ...live, doc: dragged.result.doc });
+    overrides = new Map([[nodeId, { x: was.x, y: was.y, ...dragged.node }]]);
+  }
+
+  function unshowMainResized(nodeId: string) {
+    const live = liveOf(nodeId);
+    const present = saverOf(nodeId)?.history.present;
+    if (live && present) {
+      liveDocs.set(nodeId, { ...live, doc: present });
+    }
+  }
+
+  function resizeSetMainBy(nodeId: string, clip: string, was: Box, to: Box) {
+    const dragged = mainResizedTo(nodeId, clip, was, to);
+    if (!dragged?.result.ok) {
+      unshowMainResized(nodeId);
+      return;
+    }
+    commit(nodeId, dragged.result, 'Resized the main component');
+    props.onNodeSize?.(nodeId, dragged.node.w, dragged.node.h);
+  }
+
   function editFrameDoc(nodeId: string, change: FrameDocEdit, summary: string): boolean {
     const live = liveOf(nodeId);
     if (!live || !saverOf(nodeId)) {
@@ -1713,19 +1815,21 @@
     if (!live) {
       const like = liveOf(held.like);
       holdLive(held.nodeId, { doc: held.doc, tokens: like?.tokens ?? heldTokens() ?? FEEGA_TOKENS, assets: like?.assets ?? {} }, saved);
+      adoptAssets(held.nodeId);
       return;
     }
     const session = saverOf(held.nodeId);
     const before = frameDocOf(held.nodeId) ?? live.doc;
-    session?.settleHeld(held.doc);
+    session?.adoptSaved(held.doc);
     session?.holdSave(saved);
-    liveDocs.set(held.nodeId, { ...live, doc: held.doc });
+    liveDocs.set(held.nodeId, { ...live, doc: held.doc, assets: { ...liveOf(held.like)?.assets, ...live.assets } });
+    adoptAssets(held.nodeId);
     void saved.then((landed) => {
       const now = liveOf(held.nodeId);
       if (landed || !now) {
         return;
       }
-      session?.settleHeld(before);
+      session?.adoptSaved(before);
       liveDocs.set(held.nodeId, { ...now, doc: before });
     });
   }
@@ -1981,7 +2085,7 @@
 
   function drawnInside(nodeId: string, id: string) {
     picks = [id];
-    typeOnArrival = frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null;
+    arrive(frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null);
     frameBar.tool = DrawTool.Select;
   }
 
@@ -1995,10 +2099,10 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: string };
   let typing = $state<Typing | null>(null);
 
-  async function startTyping(nodeId: string, clip: string) {
+  async function startTyping(nodeId: string, clip: string, ahead?: TypeAhead) {
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
@@ -2006,19 +2110,29 @@
     const found = scope ? findClip(scope.view, scope.id)?.clip : null;
     const size = at?.picker.frameSize();
     if (editedView(nodeId) || !saver || !at || !doc || !scope || !found || !size || !editsText(scope.view, scope.id)) {
+      ahead?.release();
       return;
     }
     const laid = await caretSource(() => at.live.tokens, () => at.live.assets)(scope.view, scope.id);
     if (!laid || saver.history.present !== doc) {
+      ahead?.release();
       return;
     }
     const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
     const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens) };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: ahead?.release() ?? '' };
     liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
   let typeOnArrival = $state<{ nodeId: string; clip: string | null } | null>(null);
+  const typeAhead = new TypeAhead();
+
+  function arrive(next: { nodeId: string; clip: string | null } | null) {
+    typeOnArrival = next;
+    if (next) {
+      typeAhead.hold(performance.now());
+    }
+  }
 
   const drawSaves = new Map<string, Promise<boolean>>();
 
@@ -2068,9 +2182,10 @@
   }
 
   function frameUnderDrawing(drawn: DrawnWire) {
-    const centre = drawnCentre(drawn);
-    const id = centre ? topNodeAt(centre) : null;
-    const frame = id && !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation ? coreFrames.find((f) => f.id === id && !f.linked) : null;
+    const anchor = drawnAnchor(drawn);
+    const hosts = (id: string) => !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation && coreFrames.some((f) => f.id === id && !f.linked);
+    const id = anchor ? hitIndex.allAt(anchor).find(hosts) : null;
+    const frame = id ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? liveOf(frame.id) : null;
     return frame && live && saverOf(frame.id) ? { frame, live } : null;
   }
@@ -2089,7 +2204,7 @@
     commit(frame.id, made, DRAW_SUMMARY[drawn.tool]);
     select([frame.id]);
     goInside(frame.id, Gesture.Click, clip);
-    typeOnArrival = drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null;
+    arrive(drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null);
     return true;
   }
 
@@ -2100,7 +2215,7 @@
     }
     const drawing = props.onDraw?.(drawn);
     seed(drawing);
-    typeOnArrival = drawn.tool === DrawTool.Text && drawing ? { nodeId: drawing.id, clip: null } : null;
+    arrive(drawn.tool === DrawTool.Text && drawing ? { nodeId: drawing.id, clip: null } : null);
   }
 
   $effect(() => {
@@ -2111,7 +2226,7 @@
       return;
     }
     typeOnArrival = null;
-    untrack(() => void startTyping(wanted.nodeId, clip.id));
+    untrack(() => void startTyping(wanted.nodeId, clip.id, typeAhead));
   });
 
   function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
@@ -2137,12 +2252,21 @@
     const z = view.zoom;
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
-    return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+    return { text: open.text, typed: open.typed, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
   }
 
   function nodePlaceOf(nodeId: string): NodePlace | null {
     const tile = byId.get(nodeId);
-    return tile ? { x: tile.x, y: tile.y, set: (x, y) => props.onMove?.(nodeId, x, y) } : null;
+    if (!tile) {
+      return null;
+    }
+    const follow = (before: { width: number; height: number }, after: { width: number; height: number }) => {
+      const size = tileForDoc(tile, before, after);
+      if (size) {
+        props.onNodeSize?.(nodeId, size.w, size.h);
+      }
+    };
+    return { x: tile.x, y: tile.y, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId), follow };
   }
 
   const hostLedger = new HostLedger();
@@ -2226,9 +2350,9 @@
     [0, 1]
   ];
 
-  function resizeOf(nodeId: string, unit: [number, number], start: Point): Active {
+  function resizeOf(nodeId: string, unit: [number, number], start: Point, main?: string): Active {
     const t = byId.get(nodeId)!;
-    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 }, main };
   }
 
   function rotateOf(nodeId: string, start: Point): Active {
@@ -2246,13 +2370,55 @@
     gesturing = true;
   }
 
-  function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
+  const MANY_MIN = { w: 1, h: 1 };
+
+  function grabMany(grip: Grip, handle: number, e: PointerEvent) {
+    const turns = grip === Grip.Rotate && selectedBoxes.every((t) => t.rotatable);
+    if (!manyBox || e.button !== PRIMARY_BUTTON || (grip !== Grip.Scale && !turns)) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     downAt = local(e);
     captureId = e.pointerId;
     holdSelection(true);
-    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)));
+    const start = toWorld(view, local(e));
+    const centre = { x: manyBox.x + manyBox.w / 2, y: manyBox.y + manyBox.h / 2 };
+    active = turns ? { kind: GestureKind.TurnMany, centre, start, box: manyBox, items: many } : { kind: GestureKind.ResizeMany, unit: handlesOf(UNIT_SQUARE)[handle].unit, start, box: manyBox, items: many };
+    gesturing = true;
+  }
+
+  function placeAll(before: Placed[], after: Placed[]) {
+    props.onPlaceMany?.(before.map((b, i) => ({ before: b, after: after[i] })));
+  }
+
+  function showMany(next: Placed[]) {
+    overrides = new Map(next.map((n) => [n.id, { x: n.x, y: n.y, w: n.w, h: n.h }]));
+    turning = new Map(next.map((n) => [n.id, n.rotation]));
+    props.onLive?.(next.map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h })));
+  }
+
+  function endMany(items: Placed[]) {
+    props.onLive?.([]);
+    const changes = items.flatMap((before) => {
+      const box = overrides.get(before.id);
+      return box ? [{ before, after: { ...before, ...box, rotation: turning.get(before.id) ?? before.rotation } }] : [];
+    });
+    if (changes.length) {
+      props.onPlaceMany?.(changes);
+    }
+    spin = null;
+    turning = new Map();
+    settleOverrides();
+  }
+
+  function resizeHost(nodeId: string, handle: number, e: PointerEvent, main?: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)), main);
     gesturing = true;
   }
 
@@ -2270,14 +2436,14 @@
 
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
     if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
-      resizeHost(nodeId, handle, e);
+      resizeHost(nodeId, handle, e, setMainPicked(nodeId, clip));
       return;
     }
     if (grip === Grip.Rotate && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.get(nodeId)?.rotatable) {
       rotateHost(nodeId, e);
       return;
     }
-    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
+    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && (extendPick(e, toWorld(view, local(e))) || pickElement(e, toWorld(view, local(e))))) {
       e.stopPropagation();
       return;
     }
@@ -2587,7 +2753,9 @@
         ghost = { from, at: w, ok: false };
         return { kind: GestureKind.Connect, from };
       },
-      [GestureKind.PickEdge]: () => (hit.kind === HitKind.Edge ? { kind: GestureKind.PickEdge, edgeId: hit.edgeId } : null)
+      [GestureKind.PickEdge]: () => (hit.kind === HitKind.Edge ? { kind: GestureKind.PickEdge, edgeId: hit.edgeId } : null),
+      [GestureKind.ResizeMany]: () => null,
+      [GestureKind.TurnMany]: () => null
     };
     active = START[kind]();
     gesturing = active !== null;
@@ -2685,12 +2853,17 @@
         props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
       },
       [GestureKind.Resize]: (a) => {
-        if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id))) {
+        if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id) && !overrides.has(a.id))) {
+          return;
+        }
+        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
+        const box = snapResized(a, free, e.shiftKey, e.altKey);
+        if (a.main) {
+          a.dragged = box;
+          showMainResized(a.id, a.main, a.box, box);
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
-        const box = snapResized(a, free, e.shiftKey, e.altKey);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
@@ -2700,7 +2873,23 @@
         }
         const target = a.base + dragAngle(a.centre, a.start, w);
         a.degrees = e.shiftKey ? Math.round(target / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : target;
-        turning = byId.get(a.id)?.members?.length ? null : { id: a.id, degrees: a.degrees };
+        turning = byId.get(a.id)?.members?.length ? new Map() : new Map([[a.id, a.degrees]]);
+      },
+      [GestureKind.ResizeMany]: (a) => {
+        if (a.kind !== GestureKind.ResizeMany || (!far && !overrides.size)) {
+          return;
+        }
+        const to = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, MANY_MIN, { shift: e.shiftKey, alt: e.altKey }, 0);
+        showMany(scaledTo(a.items, a.box, to));
+      },
+      [GestureKind.TurnMany]: (a) => {
+        if (a.kind !== GestureKind.TurnMany || (!far && !spin)) {
+          return;
+        }
+        const swept = dragAngle(a.centre, a.start, w);
+        const degrees = e.shiftKey ? Math.round(swept / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : swept;
+        spin = { box: a.box, degrees };
+        showMany(turnedAbout(a.items, a.centre, degrees));
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -2751,7 +2940,7 @@
         if (a.kind === GestureKind.Pan && !a.moved && e.button === 0) {
           clearSelection();
         }
-        if (a.kind === GestureKind.Pan && a.moved) {
+        if (a.kind === GestureKind.Pan && a.moved && glidesAfterPan(pointerOf(e))) {
           startGlide();
         }
       },
@@ -2777,13 +2966,15 @@
         props.onLive?.([]);
         snapGuides = [];
         const box = overrides.get(a.id);
-        if (box) {
+        if (a.main && a.dragged) {
+          resizeSetMainBy(a.id, a.main, a.box, a.dragged);
+        } else if (box) {
           props.onResizeEnd?.(a.id, a.box, { x: box.x, y: box.y, w: box.w, h: box.h });
         }
         settleOverrides();
       },
       [GestureKind.Rotate]: () => {
-        turning = null;
+        turning = new Map();
         if (a.kind === GestureKind.Rotate && a.degrees !== a.base) {
           props.onRotate?.(a.id, a.degrees - a.base);
         }
@@ -2809,6 +3000,8 @@
           props.onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
         }
       },
+      [GestureKind.ResizeMany]: () => a.kind === GestureKind.ResizeMany && endMany(a.items),
+      [GestureKind.TurnMany]: () => a.kind === GestureKind.TurnMany && endMany(a.items),
       [GestureKind.PickEdge]: () => {
         if (a.kind !== GestureKind.PickEdge) {
           return;
@@ -2825,8 +3018,12 @@
   }
 
   function cancelGesture() {
+    if (active?.kind === GestureKind.Resize && active.main) {
+      unshowMainResized(active.id);
+    }
     active = null;
-    turning = null;
+    turning = new Map();
+    spin = null;
     gesturing = false;
     resizing = new Set();
     marquee = null;
@@ -2992,6 +3189,71 @@
   }
 
   const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+
+  const holderOf = (id: string) => placed.find((t) => t.members?.includes(id)) ?? null;
+
+  function alignInHolder(id: string): ((edge: Edge) => void) | null {
+    const holder = holderOf(id);
+    const [tile] = placedBoxes([id]);
+    return holder && tile ? (edge) => placeTiles(alignWithin(tile, { id: holder.id, x: holder.x, y: holder.y, width: holder.w, height: holder.h }, edge)) : null;
+  }
+
+  const FLIP_SUMMARY: Record<Flip, string> = { [Flip.Horizontal]: 'Flipped horizontally', [Flip.Vertical]: 'Flipped vertically' };
+
+  const nodeBox = (id: string): Placed | null => {
+    const t = byId.get(id);
+    return t ? { id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 } : null;
+  };
+
+  function flipOwn(id: string, flip: Flip, rotation: number) {
+    const box = nodeBox(id);
+    const session = saverOf(id);
+    if (!box) {
+      return;
+    }
+    mirrorAround(byId.get(id)?.members ?? [], box, flip);
+    if (session) {
+      commit(id, { ok: true, doc: flipStage(session.history.present, flip) }, FLIP_SUMMARY[flip]);
+    }
+    if (rotation !== box.rotation) {
+      props.onRotate?.(id, rotation - box.rotation);
+    }
+  }
+
+  function mirrorAround(ids: readonly string[], about: Placed, flip: Flip) {
+    const boxes = ids.flatMap((id) => nodeBox(id) ?? []);
+    const mirrored = mirrorGroup(about, boxes, flip);
+    placeTiles(mirrored.filter((m, i) => m.x !== boxes[i].x || m.y !== boxes[i].y).map(({ id, x, y }) => ({ id, x, y })));
+    for (const m of mirrored) {
+      flipOwn(m.id, flip, m.rotation);
+    }
+  }
+
+  function flipNodes(ids: readonly string[], flip: Flip) {
+    const flippable = ids.filter((id) => holdsDoc(summaries.get(id)?.type ?? '') && !byId.get(id)?.locked);
+    const boxes = flippable.flatMap((id) => nodeBox(id) ?? []);
+    if (!boxes.length) {
+      return;
+    }
+    const [left, top] = [Math.min(...boxes.map((b) => b.x)), Math.min(...boxes.map((b) => b.y))];
+    const about: Placed = boxes.length === 1 ? boxes[0] : { id: '', x: left, y: top, w: Math.max(...boxes.map((b) => b.x + b.w)) - left, h: Math.max(...boxes.map((b) => b.y + b.h)) - top, rotation: 0 };
+    const run = () => mirrorAround(flippable, about, flip);
+    if (props.onBatch) {
+      props.onBatch(run);
+      return;
+    }
+    run();
+  }
+
+  function stackFrameNode(id: string): boolean {
+    const session = kindOfNode(id) === FrameKind.Frame ? saverOf(id) : null;
+    const result = session ? stackFrame(session.history.present, crypto.randomUUID().slice(0, 8)) : null;
+    if (!result?.ok) {
+      return false;
+    }
+    commit(id, result, 'Added auto layout');
+    return true;
+  }
   const alignRun = (id: AlignActionId) => (ids: string[]) => alignHere(ids, ALIGN_EDGE[id]);
 
   function selectSibling(direction: Direction) {
@@ -3129,7 +3391,8 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    'wrap-stack': () => shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected),
+    'wrap-stack': () => (selected.length === 1 && stackFrameNode(selected[0])) || (shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected)),
+    flip: (c) => c.id === 'flip' && flipNodes(selected, c.flip),
     'edit-mode': () => editorMode.toggleMotion(),
     'code-mode': () => editorMode.toggleCode(),
     timeline: () => editorMode.toggleTimeline(),
@@ -3170,12 +3433,17 @@
     'toggle-hidden': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Hidden),
     'toggle-locked': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Locked),
     help: () => (shortcutHelp.open = true),
+    export: () => selected.length && SELECTION_RUN.export(selected),
     view: (c) => {
       if (c.id === 'view') {
         frameViews.flip(c.view);
       }
     }
   };
+
+  $effect(() => {
+    zoomLevel.show(view.zoom);
+  });
 
   $effect(() => {
     const asked = zoomRequest.current;
@@ -3206,6 +3474,10 @@
 
   function onKeydown(e: KeyboardEvent) {
     if (frameDialog) {
+      return;
+    }
+    if (!isTypingTarget(e.target) && typeAhead.take(e, performance.now())) {
+      e.preventDefault();
       return;
     }
     markBusy();
@@ -3471,6 +3743,8 @@
     paste: () => menuAt && void pasteSystem(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
+    hide: (ids) => props.onToggleFlag?.(ids, NodeFlag.Hidden),
+    lock: (ids) => props.onToggleFlag?.(ids, NodeFlag.Locked),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     'combine-video': (ids) => props.onCombineScenes?.(ids),
     'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
@@ -3723,7 +3997,7 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
+          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
@@ -3785,6 +4059,9 @@
         {/if}
       {/snippet}
     </FrameOverlays>
+    {#if manyQuad}
+      <FrameSelection clip="" quad={manyQuad} kind={SelectionKind.Many} ongrab={grabMany} />
+    {/if}
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />
