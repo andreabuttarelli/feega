@@ -41,7 +41,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onsource = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onfallback: (why: string) => void } = $props();
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -135,7 +135,7 @@
     }
 
     const away = f.scenes ? null : await buildAway(source, smoothing).catch(() => null);
-    return away ? { list: away, custom: null } : buildSource(f, source);
+    return { ...(away ? { list: away, custom: null } : await buildSource(f, source)), source };
   }
 
   const HTTP_NO_CONTENT = 204;
@@ -156,9 +156,13 @@
 
   async function load(f: FrameAt) {
     const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
-    const built = given ? await buildSource(f, given) : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
+    const read = given ? null : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
+    const built = given ? await buildSource(f, given) : read;
     if (!built) {
       return;
+    }
+    if (read) {
+      onsource(f.id, { ...read.source, revision: f.revision });
     }
     const ready = await media.ready(built.list);
     if (built.custom) {
