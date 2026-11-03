@@ -3,7 +3,7 @@ import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from './save-
 
 type Sent = { id: string; patch: Record<string, unknown>; resolve: (result: SendResult) => void };
 
-function harness(opts: { debounceMs?: number; maxWaitMs?: number; maxFailures?: number } = {}) {
+function harness(opts: { debounceMs?: number; maxWaitMs?: number; maxFailures?: number; reachable?: () => boolean } = {}) {
   const sent: Sent[] = [];
   const statuses: SaveStatus[] = [];
   const saves = createSaveScheduler({
@@ -12,6 +12,7 @@ function harness(opts: { debounceMs?: number; maxWaitMs?: number; maxFailures?: 
     maxWaitMs: opts.maxWaitMs ?? 2000,
     backoffMs: (attempt) => 1000 * attempt,
     maxFailures: opts.maxFailures,
+    reachable: opts.reachable,
     onStatus: (status) => statuses.push(status)
   });
   return { saves, sent, statuses };
@@ -140,6 +141,20 @@ describe('save scheduler', () => {
     expect(saves.status()).toBe(SaveStatus.Saved);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(sent).toHaveLength(2);
+  });
+
+  it('a save that fails while the browser is offline is never given up, however often it is flushed', async () => {
+    const { saves, sent } = harness({ maxFailures: 2, reachable: () => false });
+    saves.schedule('a', { x: 1 }, SaveTiming.Now);
+    for (let i = 0; i < 6; i += 1) {
+      await settle();
+      sent.at(-1)!.resolve(SendResult.Retry);
+      await settle();
+      void saves.flush();
+    }
+
+    expect(saves.unsentPatches()).toEqual({ a: { x: 1 } });
+    expect(saves.status()).toBe(SaveStatus.Retrying);
   });
 
   it('a refused save resolves false and frees the node', async () => {

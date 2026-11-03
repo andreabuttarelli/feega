@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SaveStatus } from './save-scheduler';
-import { SyncState, syncOf } from './sync-status';
+import { SyncState, pendingWrites, syncOf } from './sync-status';
 
 describe('syncOf: one quiet status for everything still unsent', () => {
   it('is saved only when nodes, placements and lines all landed', () => {
@@ -18,5 +18,15 @@ describe('syncOf: one quiet status for everything still unsent', () => {
 
   it('says retrying when the server keeps failing while online', () => {
     expect(syncOf({ nodes: SaveStatus.Retrying, places: SaveStatus.Saved, unsent: 1, online: true }).state).toBe(SyncState.Retrying);
+  });
+});
+
+describe('pendingWrites: every write still on its way is counted', () => {
+  it('counts draws, element contents and runner ops next to patches, placements and lines', () => {
+    expect(pendingWrites({ patches: 1, places: 2, lines: 1, draws: 3, drafts: 2, sent: 1 })).toBe(10);
+  });
+
+  it('is zero only when nothing at all is waiting', () => {
+    expect(pendingWrites({ patches: 0, places: 0, lines: 0, draws: 0, drafts: 0, sent: 0 })).toBe(0);
   });
 });

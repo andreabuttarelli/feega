@@ -9,7 +9,11 @@ export enum SyncState {
 
 type SyncInput = { nodes: SaveStatus; places: SaveStatus; unsent: number; online: boolean };
 
-const plural = (count: number) => (count === 1 ? '1 change' : `${count} changes`);
+export type PendingParts = { patches: number; places: number; lines: number; draws: number; drafts: number; sent: number };
+
+export const pendingWrites = (parts: PendingParts) => Object.values(parts).reduce((sum, count) => sum + count, 0);
+
+const plural =(count: number) => (count === 1 ? '1 change' : `${count} changes`);
 
 export function syncOf(input: SyncInput): { state: SyncState; label: string } {
   const statuses = [input.nodes, input.places];
