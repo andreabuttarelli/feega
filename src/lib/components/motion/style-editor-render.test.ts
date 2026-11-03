@@ -19,8 +19,8 @@ globalThis.ResizeObserver ??= class {
 let app: Record<string, unknown> | null = null;
 
 function edit(name: string, style: Style) {
-  const calls = { onrename: vi.fn(), onremove: vi.fn(), onedit: vi.fn() };
-  app = mount(StyleEditor, { target: document.body, props: { name, style, swatch: null, tokens: FEEGA_TOKENS, unit: 1080, ...calls } });
+  const calls = { onrename: vi.fn(), onremove: vi.fn(), onedit: vi.fn(), onsize: vi.fn() };
+  app = mount(StyleEditor, { target: document.body, props: { name, style, swatch: null, tokens: FEEGA_TOKENS, sizePx: 16, ...calls } });
   flushSync();
   return calls;
 }

@@ -18,6 +18,7 @@ export class StyleLibrary {
   private store: LibraryStore | null = null;
   private seen: Library = {};
   private queue: Promise<unknown> = Promise.resolve();
+  private renamedTo = new Map<string, string>();
 
   connect(sink: StyleSink | null) {
     this.sink = sink;
@@ -65,7 +66,13 @@ export class StyleLibrary {
     }
   }
 
-  push(name: string, style: Style): Promise<void> {
+  private current(name: string): string {
+    const to = this.styles[name] ? undefined : this.renamedTo.get(name);
+    return to ? this.current(to) : name;
+  }
+
+  push(stale: string, style: Style): Promise<void> {
+    const name = this.current(stale);
     const before = this.styles[name];
     this.styles = { ...this.styles, [name]: style };
     this.sink?.push(name, style);
@@ -98,6 +105,8 @@ export class StyleLibrary {
   }
 
   private moved(from: string, to: string) {
+    this.renamedTo.set(from, to);
+    this.renamedTo.delete(to);
     this.styles = Object.fromEntries(Object.entries(this.styles).map(([name, style]) => [name === from ? to : name, style]));
     this.sink?.rename(from, to);
   }

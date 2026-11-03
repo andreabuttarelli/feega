@@ -42,6 +42,16 @@ describe('the canvas style library a person edits', () => {
     expect(renamed).toEqual([]);
   });
 
+  it('an edit still holding the old name lands on the renamed style, never brings the old one back', () => {
+    const library = new StyleLibrary();
+    library.styles = { 'Colour 3': { kind: StyleKind.Colour, color: '#111111' } };
+
+    library.rename('Colour 3', 'Accent');
+    library.push('Colour 3', { kind: StyleKind.Colour, color: '#ff0000' });
+
+    expect(library.styles).toEqual({ Accent: { kind: StyleKind.Colour, color: '#ff0000' } });
+  });
+
   it('editing a text style reaches every frame', () => {
     const library = new StyleLibrary();
     const pushed: [string, unknown][] = [];
