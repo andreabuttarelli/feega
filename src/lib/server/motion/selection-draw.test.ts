@@ -87,7 +87,7 @@ describe('drawing an export', () => {
     const typed = addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Get started' } }, 'label');
     const withText = typed.ok ? typed.doc : doc;
 
-    await drawTargets(ports(port), [{ nodeId: 'a', doc: withText }], row({ format: 'png', by: 'scale', value: 1 }));
+    await drawTargets(ports(port), [{ nodeId: 'a', doc: withText, docScale: 1 }], row({ format: 'png', by: 'scale', value: 1 }));
 
     expect(log).toContain(`seek ${restFrameOf(withText) / withText.fps}`);
     expect(log).not.toContain('seek 0');

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { SaveFailure } from '$lib/motion/frame-edit-session.svelte';
-import { OpKind } from '$lib/motion/doc-ops';
+import { OpKind, type DocOp } from '$lib/motion/doc-ops';
 import { frameDrafts, refusedNotice, sendResultOf } from './frame-save';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
@@ -35,7 +35,7 @@ function memoryShelf() {
 }
 
 describe('the frame drafts shelf', () => {
-  const draft = { version: 3, ops: [{ kind: OpKind.DocSet, field: 'durationInFrames', value: 60 }] };
+  const draft = { version: 3, ops: [{ kind: OpKind.DocSet, field: 'durationInFrames', value: 60 }] as DocOp[] };
 
   it('reads back the draft kept for a frame of this canvas', async () => {
     const drafts = frameDrafts('c1', memoryShelf());
