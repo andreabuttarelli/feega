@@ -7,7 +7,19 @@ const EMPTY_LINE = '​';
 const NEWLINE = '\n';
 const AFTER = 1;
 
-const visible = (data: string) => data.replaceAll(EMPTY_LINE, '');
+export type LineMove = { alter: 'move' | 'extend'; direction: 'forward' | 'backward' };
+
+const LINE_KEYS: Record<string, LineMove['direction']> = { End: 'forward', Home: 'backward' };
+
+export function lineMove(e: Pick<KeyboardEvent, 'key' | 'shiftKey'>): LineMove | null {
+  const direction = LINE_KEYS[e.key];
+  if (!direction) {
+    return null;
+  }
+  return { alter: e.shiftKey ? 'extend' : 'move', direction };
+}
+
+const visible =(data: string) => data.replaceAll(EMPTY_LINE, '');
 
 function blocksOf(root: HTMLElement): Node[][] {
   const blocks: Node[][] = [];

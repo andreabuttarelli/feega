@@ -2112,7 +2112,7 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: string };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: () => string };
   let typing = $state<Typing | null>(null);
 
   async function startTyping(nodeId: string, clip: string, ahead?: TypeAhead) {
@@ -2133,7 +2133,7 @@
     }
     const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
     const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: ahead?.release() ?? '' };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: () => ahead?.release() ?? '' };
     liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
