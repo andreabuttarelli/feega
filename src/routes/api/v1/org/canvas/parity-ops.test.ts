@@ -116,6 +116,15 @@ describe('canvas_tool does what the canvas UI does', () => {
     expect(updatesOf(calls, 'nodes_connections')[0]?.payload).toEqual({ mode: 'iterate' });
   });
 
+  it('set_edge_tie bundles lines through one cable tie, and null unties them', async () => {
+    const { calls } = seed();
+
+    await call('set_edge_tie', { connectionIds: [EDGE], tie: { id: 't1', x: 4, y: 8 } });
+    await call('set_edge_tie', { connectionIds: [EDGE], tie: null });
+
+    expect(updatesOf(calls, 'nodes_connections').map((u) => u.payload)).toEqual([{ tie: { id: 't1', x: 4, y: 8 } }, { tie: null }]);
+  });
+
   it('resize_node never shrinks a node under the size it is born with', async () => {
     const { calls } = seed();
 

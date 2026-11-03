@@ -9,7 +9,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { findClip } from '@feega/motion-core/motion/doc';
-import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, pickIdOf, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -189,6 +189,27 @@ describe('a group folds like a frame', () => {
     expect(group.label).toBe('Group 1');
     expect(layerRows(NODES, open).some((r) => r.id === 'deep')).toBe(true);
     expect(layerRows(NODES, open, {}, new Set([group.key])).some((r) => r.id === 'deep')).toBe(false);
+  });
+});
+
+describe('a row inside a component', () => {
+  const card = () => {
+    let n = 0;
+    const made = createComponent(video(), ['t1'], () => `c${++n}`, 'Card');
+    return made.ok ? made.doc : video();
+  };
+
+  it('carries the scene id the canvas picks it by', () => {
+    const inside = layerRows(NODES, { nodeId: 'm1', doc: card() }).find((r) => r.id === 't1')!;
+
+    expect(inside.scene).toBe('c2__0__t1');
+  });
+
+  it('shows as picked when the canvas picked that element', () => {
+    const inside = layerRows(NODES, { nodeId: 'm1', doc: card() }).find((r) => r.id === 't1')!;
+
+    expect(rowPicked(inside, { canvas: [], video: { nodeId: 'm1', selection: ['c2__0__t1'], part: null } })).toBe(true);
+    expect(pickIdOf(inside)).toBe('c2__0__t1');
   });
 });
 

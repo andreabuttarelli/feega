@@ -75,7 +75,7 @@ describe('the canvas styles library over MCP', () => {
     const store = frames({ a: must(defineStyle(textDoc(), 'Brand', RED)), b: textDoc() });
     const out = await canvasStyle(store, { name: 'Brand', ids: ['b:t'] });
     expect(out).toMatchObject({ ok: true });
-    expect(findClip(store.docs.b, 't')!.clip.styleRef).toBe('Brand');
+    expect(findClip(store.docs.b, 't')!.clip.paintStyleRef).toBe('Brand');
   });
 
   it('renaming changes the name in every frame that has it, keeping elements linked', async () => {

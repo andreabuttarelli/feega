@@ -258,6 +258,7 @@
   const positioned = $derived(transformProps.length > 0);
   const ownBox = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number');
   const own = $derived(host?.clipId === clip.id ? host : null);
+  const shownByContent = $derived(!own && componentOf(doc, clip) !== null);
   const pinnable = $derived(positioned && ownBox && !clip.parent && !own);
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));

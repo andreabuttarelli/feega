@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Ease } from '@feega/motion-core/motion/design';
 import { ActionKind, DEFAULT_OVERLAY, Direction, OverlayPosition, TransitionKind } from '@feega/motion-core/motion/prototype/model';
-import { MoveKind, act, closeTopOverlay, startPlayer } from './player';
+import { MoveKind, act, closeTopOverlay, linkOf, startPlayer } from './player';
 
 const known = new Set(['a', 'b', 'c', 'modal']);
 const slide = { kind: TransitionKind.Slide, direction: Direction.Left, easing: Ease.Standard, durationMs: 300 } as const;
@@ -102,5 +102,13 @@ describe('player', () => {
     const there = act(startPlayer('a'), { kind: ActionKind.Navigate, target: 'b' }, instant, known).state;
 
     expect(act(there, { kind: ActionKind.CloseOverlay }, instant, known)).toEqual({ state: there, move: null });
+  });
+
+  it('open url leaves the prototype where it is and hands out the link', () => {
+    const action = { kind: ActionKind.OpenUrl, url: 'https://feega.app' } as const;
+
+    expect(act(startPlayer('a'), action, instant, known)).toEqual({ state: startPlayer('a'), move: null });
+    expect(linkOf(action)).toBe('https://feega.app');
+    expect(linkOf({ kind: ActionKind.Navigate, target: 'b' })).toBeNull();
   });
 });

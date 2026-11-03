@@ -28,6 +28,16 @@ describe('alt-drag copies what it drags', () => {
     expect(findClip(copied.doc, 'a')!.clip.props).toEqual(findClip(two, 'a')!.clip.props);
   });
 
+  it('an alt-drag copy shows at the same moment, with what is inside it', () => {
+    const late = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 20, durationInFrames: 30, props: { shape: 'rect', x: 0.2, y: 0.5, width: 0.1, height: 0.1 } }, 'late'));
+    const stacked = must(wrapInStack(shape(late, 'b', 0.5), ['late', 'b'], 'row', 'lane'));
+    const copied = altCopies(stacked, ['row'], newId)!;
+    const kids = copied.doc.tracks.flatMap((t) => t.clips).filter((c) => c.parent === copied.ids[0]);
+
+    expect(findClip(copied.doc, copied.ids[0])!.clip.from).toBe(findClip(stacked, 'row')!.clip.from);
+    expect(kids).toHaveLength(2);
+  });
+
   it('a copy of a stack child stays in the stack, next to it', () => {
     const stacked = must(wrapInStack(two, ['a', 'b'], 'row', 'lane'));
     const copied = altCopies(stacked, ['a'], newId)!;

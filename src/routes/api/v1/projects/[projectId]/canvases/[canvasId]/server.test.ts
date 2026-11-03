@@ -167,6 +167,42 @@ describe('the canvas page action and its /api/v1 canvas endpoint answer the same
   });
 });
 
+describe('a draw sent again after a lost answer', () => {
+  const DRAWN_ID = '66666666-6666-6666-6666-666666666666';
+
+  async function twice(action: string, fields: Record<string, string>) {
+    current.db = seed();
+    const event = {
+      request: { formData: async () => formOf({ ...fields, node_id: DRAWN_ID }) },
+      params: { projectId: PROJECT, canvasId: CANVAS },
+      setHeaders: () => {},
+      locals: { safeGetSession: async () => ({ session: {}, user: USER }), db: async () => current.db }
+    };
+    const run = actions[action] as (e: unknown) => Promise<{ outcome?: string; node?: { id: string } | null }>;
+    const first = await run(event);
+    const again = await run(event);
+    const { data } = await (current.db as Db).from('nodes').select('id').eq('id', DRAWN_ID);
+    return { first, again, rows: (data ?? []).length };
+  }
+
+  it('drawElement lands one node and answers the second send with it', async () => {
+    const { first, again, rows } = await twice('drawElement', { drawn: JSON.stringify(DRAWN) });
+
+    expect(first.outcome).toBe('done');
+    expect(again.outcome).toBe('done');
+    expect(again.node?.id).toBe(DRAWN_ID);
+    expect(rows).toBe(1);
+  });
+
+  it('drawFrame lands one frame and answers the second send with it', async () => {
+    const { again, rows } = await twice('drawFrame', { box: JSON.stringify(DRAWN.box) });
+
+    expect(again.outcome).toBe('done');
+    expect(again.node?.id).toBe(DRAWN_ID);
+    expect(rows).toBe(1);
+  });
+});
+
 describe('GET /api/v1/projects/[projectId]/canvases/[canvasId]', () => {
   it('answers the page load', async () => {
     current.db = seed();

@@ -74,6 +74,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   list_connections: 'Lines of a canvas.',
   disconnect_nodes: 'Remove a line.',
   set_edge_mode: 'Set a line to fixed or iterate.',
+  set_edge_tie: 'Bundle lines through a cable tie, or untie them.',
   rename_node: 'Rename a node; empty resets it.',
   set_node_color: 'Tag a node with a colour (red, orange, yellow, green, blue, purple, grey); null clears it.',
   resize_node: 'Set the width and height of a node.',

@@ -212,6 +212,7 @@ const CULL_SLACK_PX: f64 = 2.0;
 const RUNGS_PER_DOUBLING: f64 = 4.0;
 const RUNG_SLACK: f64 = 1e-9;
 const FAR_PX: f64 = 4096.0;
+const MAX_STRETCH: f64 = std::f64::consts::SQRT_2;
 const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
 #[derive(Debug, Clone, Copy)]
@@ -565,6 +566,10 @@ fn sharp_enough(motion: Motion, want: f64, held: f64) -> bool {
     }
 }
 
+fn too_stretched(on_screen: f64, held: f64) -> bool {
+    on_screen > held * MAX_STRETCH * (1.0 + RUNG_SLACK)
+}
+
 fn distance_to(r: Rect, view: Rect) -> f64 {
     (r.center() - view.center()).hypot()
 }
@@ -680,6 +685,18 @@ impl Library {
             return used_within(u, group, start, view);
         }
         used(u, group, start)
+    }
+
+    fn live(&self, u: &UseItem, group: &DisplayList, cast: Option<&Cast>, view: Rect, items: &mut Vec<Item>, encoded: &mut HashMap<String, Arc<Encoded>>) {
+        let start = items.len();
+        match cast {
+            Some(cast) => {
+                let (laid, spans) = laid(u, group, cast, view);
+                items.extend(laid);
+                encoded.extend(spans);
+            }
+            None => items.extend(self.cheapened(self.expanded(u, group, start, view), view)),
+        }
     }
 
     fn cheapened(&self, items: Vec<Item>, view: Rect) -> Vec<Item> {
@@ -820,15 +837,7 @@ impl Library {
             }
             if !u.cache || want <= 0.0 || w.max(h) > limits.side {
                 if on_screen {
-                    let start = items.len();
-                    match &cast {
-                        Some(cast) => {
-                            let (laid, spans) = laid(u, group, cast, view);
-                            items.extend(laid);
-                            encoded.extend(spans);
-                        }
-                        None => items.extend(self.cheapened(self.expanded(u, group, start, view), view)),
-                    }
+                    self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded);
                 }
                 continue;
             }
@@ -866,13 +875,12 @@ impl Library {
                     held.map(|h| h.scale)
                 }
             };
-            match (on_screen, shown) {
-                (false, _) => {}
-                (true, Some(scale)) => items.push(cached_image(u, group, scale)),
-                (true, None) => {
-                    let start = items.len();
-                    items.extend(used(u, group, start));
-                }
+            if !on_screen {
+                continue;
+            }
+            match shown.filter(|held| u.hold || !too_stretched(scale_of(u.matrix), *held)) {
+                Some(scale) => items.push(cached_image(u, group, scale)),
+                None => self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded),
             }
         }
         let gone: Vec<String> = self.held.keys().filter(|k| !seen.contains(*k)).cloned().collect();

@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { EDITORIAL_COMPONENT, EDITORIAL_FONTS, EDITORIAL_PROPS, EDITORIAL_VAR_PREFIX, editorialComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const EDITORIAL_TEMPLATE_ID = `${BUILTIN_PREFIX}editorial-words-media`;
 export const EDITORIAL_CLIP = 'editorial';
@@ -16,10 +17,9 @@ const EDITORIAL_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([g
 
 export const EDITORIAL_WORDS_MEDIA_TEMPLATE: TemplateEntry = {
   id: EDITORIAL_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'editorial-words-media', component: EDITORIAL_COMPONENT, code: editorialComponent(), props: EDITORIAL_PROPS, fonts: EDITORIAL_FONTS, varPrefix: EDITORIAL_VAR_PREFIX, vars: EDITORIAL_VARS, clip: EDITORIAL_CLIP, seconds: 15, fps: 30, groups: EDITORIAL_GROUPS }), {
     name: 'Editorial words and media',
     description: 'Very large words land on a loose grid, phrase by phrase, while pictures and clips open in the empty cells between them.',
-    keyFields: ['phrases', 'media', 'background', 'text_color', 'beat'],
-    doc: customTemplateDoc({ name: 'editorial-words-media', component: EDITORIAL_COMPONENT, code: editorialComponent(), props: EDITORIAL_PROPS, fonts: EDITORIAL_FONTS, varPrefix: EDITORIAL_VAR_PREFIX, vars: EDITORIAL_VARS, clip: EDITORIAL_CLIP, seconds: 15, fps: 30, groups: EDITORIAL_GROUPS })
-  }
+    keyFields: ['phrases', 'media', 'background', 'text_color', 'beat']
+  })
 };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DisplayList, Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
+import { listWire } from '@feega/motion-core/motion/gpu-full/wire';
 
 const bar = (n: number, red = 1) => ({ kind: 'path', clip: `bar${n}`, contours: [[n, 0, n + 5, 0, n + 5, 5]], paint: { kind: 'solid', color: [red, 0, 0, 1] } }) as unknown as Item;
 const listOf = (items: Item[], extra: Partial<DisplayList> = {}) => ({ width: 100, height: 50, background: null, items, ...extra }) as unknown as DisplayList;
@@ -69,5 +70,23 @@ describe('group splice', () => {
     } finally {
       JSON.stringify = original;
     }
+  });
+
+  it('serialises only the items that are new when the list it diffs against was already sent', () => {
+    const items = many(10);
+    const before = listOf(items);
+    listWire(before);
+    const after = listOf([...items.slice(0, 9), bar(9, 0.5)]);
+    const reads = { count: 0 };
+    const original = JSON.stringify;
+    JSON.stringify = ((...args: Parameters<typeof JSON.stringify>) => ((reads.count += 1), original(...args))) as typeof JSON.stringify;
+
+    try {
+      expect(spliceOf(before, after)).toEqual({ head: 9, tail: 0, items: [bar(9, 0.5)] });
+    } finally {
+      JSON.stringify = original;
+    }
+
+    expect(reads.count).toBe(1);
   });
 });

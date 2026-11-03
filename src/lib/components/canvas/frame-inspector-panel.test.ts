@@ -24,7 +24,7 @@ function sessionOf(selection: string[]) {
   const doc = must(addClip(device, { component: 'Particles', from: 0, durationInFrames: 30, props: {} }, 'sparks'));
   return new FrameEditSession(
     { head: { version: 1, doc }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
 }
 
@@ -38,7 +38,7 @@ const element = (() => {
 function elementSession() {
   return new FrameEditSession(
     { head: { version: 1, doc: element }, selection: ['a'] },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
 }
 
@@ -57,7 +57,7 @@ describe('a layer aligned in its frame', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 }, transform: { x: 0.1 } }, 'a'));
     const session = new FrameEditSession(
       { head: { version: 1, doc }, selection: ['a'] },
-      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
     );
     const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
 
@@ -109,7 +109,7 @@ const doubledPanel = (selection: string[]) => {
   frameProperties.place = placeOf({ x: 0, y: 0, w: 700, h: 460 });
   const session = new FrameEditSession(
     { head: { version: 1, doc: doubled }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
   const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
   frameProperties.clear();
@@ -183,7 +183,7 @@ describe('the frame itself', () => {
     const doc = must(stackFrame(sessionOf([]).history.present, 'frame-surface'));
     const session = new FrameEditSession(
       { head: { version: 1, doc }, selection: [] },
-      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
     );
     const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
 

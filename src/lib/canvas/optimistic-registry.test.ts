@@ -78,6 +78,13 @@ describe('optimistic registry: every action says how it looks before the server 
     expect(optimisticOp(OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }, start(), ctx, async () => null).apply(start()).edges[0].mode).toBe('iterate');
   });
 
+  it('a cable tie lands on every wire it bundles, and untying clears it', () => {
+    const tie = { id: 't', x: 1, y: 2 };
+    const tied = optimisticOp(OptimisticAction.EdgeTie, { connectionIds: ['e'], tie }, start(), ctx, async () => null).apply(start());
+    expect(tied.edges[0].tie).toEqual(tie);
+    expect(optimisticOp(OptimisticAction.EdgeTie, { connectionIds: ['e'], tie: null }, tied, ctx, async () => null).apply(tied).edges[0].tie).toBeNull();
+  });
+
   it('duplicate shows the copies, picked, under the ids the server will give them', () => {
     const shown = optimisticOp(OptimisticAction.Duplicate, duplicated, start(), ctx, async () => null).apply(start());
     expect(shown.nodes.map((n) => [n.id, n.select ?? false])).toEqual([['a', false], ['b', false], ['a2', true]]);
@@ -139,6 +146,7 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
     [OptimisticAction.Restack, { ids: ['a'], to: Stack.Front }],
     [OptimisticAction.Rename, { id: 'a', name: 'x' }],
     [OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }],
+    [OptimisticAction.EdgeTie, { connectionIds: ['e'], tie: null }],
     [OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }],
     [OptimisticAction.Duplicate, duplicated],
     [OptimisticAction.MoveElement, carried],

@@ -18,6 +18,7 @@ import {
   findNode,
   listConnections,
   setConnectionMode,
+  setConnectionTie,
   listCanvases,
   listNodes,
   moveNode,
@@ -398,6 +399,7 @@ const canvasIdInput = z.object({ canvasId: z.string() }).strict();
 const renameCanvasInput = z.object({ canvasId: z.string(), name: z.string().min(1) }).strict();
 const renameProjectInput = z.object({ name: z.string().min(1) }).strict();
 const connectionIdInput = z.object({ connectionId: z.string().describe('from list_connections') }).strict();
+const edgeTieInput = z.object({ connectionIds: z.array(z.string()).min(1), tie: z.object({ id: z.string(), x: z.number(), y: z.number() }).strict().nullable().describe('the cable tie every listed line passes through; null unties them') }).strict();
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
 const renameNodeInput = z.object({ nodeId: z.string(), name: z.string() }).strict();
 const setNodeColorInput = z.object({ nodeId: z.string(), color: z.enum(COLOUR_TAGS).nullable().describe('null removes the tag') }).strict();
@@ -1400,6 +1402,12 @@ export const CANVAS_OPS = {
       const connection = await setConnectionMode(ctx.db, { orgId: ctx.orgId, ...input });
       return connection ? { connection } : { error: 'connection_not_found' };
     }
+  }),
+
+  set_edge_tie: op({
+    access: Access.Write,
+    input: edgeTieInput,
+    run: async (ctx, input) => ({ connections: await setConnectionTie(ctx.db, { orgId: ctx.orgId, ...input }) })
   }),
 
   rename_node: op({

@@ -53,7 +53,8 @@ import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '@feega/motion-core/moti
 import { sceneEdit } from '$lib/motion/scenes';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { ClipEdge, Side, NEW_CLIP_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, duplicateKeyframes, setKeyEase, setLaneMuted, type OpResult } from '@feega/motion-core/motion/timeline';
-import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
+import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
+import { altCopies } from '$lib/canvas/alt-copy';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '@feega/motion-core/motion/mask';
 import { pathProblem } from '@feega/motion-core/motion/path';
 import { aabb, quadOf } from '$lib/motion/scene-select';
@@ -69,6 +70,22 @@ const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) =
 const OUTLINE_STROKE = 'outline_stroke';
 const FLATTEN = 'flatten';
 const isBooleanOp = (op: string): op is BooleanOp => (Object.values(BooleanOp) as string[]).includes(op);
+enum DuplicatePlace {
+  After = 'after',
+  InPlace = 'in_place'
+}
+const DUPLICATE_PLACES = Object.values(DuplicatePlace) as [DuplicatePlace, ...DuplicatePlace[]];
+
+function duplicatedInPlace(doc: MotionDoc, ids: readonly string[], newId: () => string): ClipDone {
+  const copied = altCopies(doc, ids, newId);
+  return copied ? { ok: true, doc: copied.doc, summary: 'Duplicated', selection: copied.ids } : { ok: false, error: `could not duplicate ${ids.join(', ')}` };
+}
+
+const DUPLICATE: Record<DuplicatePlace, (doc: MotionDoc, ids: readonly string[], newId: () => string) => ClipDone> = {
+  [DuplicatePlace.After]: (doc, ids, newId) => runClipOp(ClipOp.Duplicate, { doc, selection: ids, frame: 0, parent: null, newId }),
+  [DuplicatePlace.InPlace]: duplicatedInPlace
+};
+
 const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude, OUTLINE_STROKE, FLATTEN] as const;
 
 type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
@@ -196,7 +213,7 @@ import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, rem
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { clearTextRuns, listTextRange, styleTextRange } from '$lib/motion/text-run-ops';
 import { ListChange } from '@feega/motion-core/motion/text-lists';
-import { resizeSetMain } from '$lib/motion/component-set';
+import { addVariantBeside, resizeSetMain } from '$lib/motion/component-set';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
 import { addVariant, defineVariantProp, pickVariant, setVariant, swapInstance } from '$lib/motion/variants';
 import { defineProperty, removeProperty, resetProperty, setPreferred, setProperty } from '$lib/motion/component-properties';
@@ -481,6 +498,7 @@ export function docSummary(doc: MotionDoc, selection: string[], scale = DOC_PX) 
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
+        paintStyleRef: c.paintStyleRef ?? null,
         effectStyleRef: c.effectStyleRef ?? null,
         bind: c.bind ?? null,
         expressions: c.expressions,
@@ -1223,10 +1241,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     duplicate_clip: tool({
-      description: 'Duplicate clips, like the editor Duplicate: each copy starts where its original ends, on the same track; a copy of a stack child instead stays at the same time, right after it in the stack. Returns the copy ids.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      description: 'Duplicate clips. place "after" (default, timeline Duplicate): each copy starts where its original ends; a copy of a stack child stays at the same time, right after it in the stack. place "in_place" (canvas ⌘D): the copy starts with its original, carries everything inside it, and a copy of a main component is a new main (a new variant when the main is in a set). Returns the copy ids.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), place: z.enum(DUPLICATE_PLACES).default(DuplicatePlace.After) }),
       execute: async (input) => {
-        const done = runClipOp(ClipOp.Duplicate, { doc: session.doc, selection: input.clip_ids, frame: 0, parent: null, newId: deps.newId });
+        const done = DUPLICATE[input.place ?? DuplicatePlace.After](session.doc, input.clip_ids, deps.newId);
         const applied = apply(done, `duplicated ${input.clip_ids.length} clip(s)`);
         return done.ok && applied.ok ? { ...applied, clip_ids: done.selection } : applied;
       }
@@ -2447,7 +2465,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     named_style: tool({
-      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color; kind ${StyleKind.Colour} with color; kind ${StyleKind.Paint} with fills (gradient or image fill stack, as set_props fills); kind ${StyleKind.Effect} with effects (shadows, blurs: effect stack as add_effect, each {id, kind, enabled, params}); editing restyles every clip using it. save (name, clip_ids [one clip], kind) makes a style from that clip's current look and links it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill, a paint style to any clip with fills, an effect style to any visual clip (its own slot: a clip keeps one effect style next to one text, colour or paint style). detach (clip_ids, slot ${Object.values(StyleSlot).join('|')} optional: both when omitted) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames a style of any kind, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
+      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color; kind ${StyleKind.Colour} with color; kind ${StyleKind.Paint} with fills (gradient or image fill stack, as set_props fills); kind ${StyleKind.Effect} with effects (shadows, blurs: effect stack as add_effect, each {id, kind, enabled, params}); editing restyles every clip using it. save (name, clip_ids [one clip], kind) makes a style from that clip's current look and links it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill, a paint style to any clip with fills, an effect style to any visual clip (three slots: a clip keeps one text style, one colour or paint style and one effect style). detach (clip_ids, slot ${Object.values(StyleSlot).join('|')} optional: both when omitted) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames a style of any kind, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
       inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional(), kind: z.enum(StyleKind).optional(), slot: z.enum(StyleSlot).optional() }),
       execute: async (input) => STYLE_ACTIONS[input.action](input)
     }),
@@ -2542,7 +2560,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_interaction: tool({
-      description: `Link a layer to something that happens when the viewer acts on it in a prototype. trigger kind ${TRIGGER_KINDS.join('|')} (after_delay needs delayMs). action kind ${ACTION_KINDS.join('|')}: navigate and open_overlay take target, the id of another frame on the canvas (see the canvas frames); open_overlay also takes overlay { position center|top|bottom|manual (default center), x and y in px from the frame's top left when manual, closeOutside (default true), backdrop hex colour with alpha #rrggbbaa (default #00000073) } and shows the frame at its own size over the current one; close_overlay takes none and closes the top overlay; scroll_to takes the target id, back takes none (it closes the top overlay first), change_to takes variant ({ property: value }, e.g. { State: 'Open' }) and swaps the nearest component instance around the layer to that variant of its set, the way Figma interactive components do. transition kind ${LINK_TRANSITIONS.join('|')}; slide and push take direction left|right|up|down, smart_animate matches layers of the two frames by layer name (or id when unnamed) and animates position, size, rotation, opacity, fill and radius, while layers found in only one frame fade; dissolve, slide, push and smart_animate take easing and durationMs (default 300). Default transition is instant. Pass interaction_id of an existing link to replace it. At most 16 per layer.`,
+      description: `Link a layer to something that happens when the viewer acts on it in a prototype. trigger kind ${TRIGGER_KINDS.join('|')} (after_delay needs delayMs). action kind ${ACTION_KINDS.join('|')}: navigate and open_overlay take target, the id of another frame on the canvas (see the canvas frames); open_overlay also takes overlay { position center|top|bottom|manual (default center), x and y in px from the frame's top left when manual, closeOutside (default true), backdrop hex colour with alpha #rrggbbaa (default #00000073) } and shows the frame at its own size over the current one; close_overlay takes none and closes the top overlay; scroll_to takes the target id, back takes none (it closes the top overlay first), change_to takes variant ({ property: value }, e.g. { State: 'Open' }) and swaps the nearest component instance around the layer to that variant of its set, the way Figma interactive components do. open_url takes url (http or https) and opens it in a new tab. transition kind ${LINK_TRANSITIONS.join('|')}; slide and push take direction left|right|up|down, smart_animate matches layers of the two frames by layer name (or id when unnamed) and animates position, size, rotation, opacity, fill and radius, while layers found in only one frame fade; dissolve, slide, push and smart_animate take easing and durationMs (default 300). Default transition is instant. Pass interaction_id of an existing link to replace it. At most 16 per layer.`,
       inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string().optional(), trigger: triggerSchema, action: actionSchema, transition: transitionSchema.optional() }),
       execute: async ({ clip_id, interaction_id, ...link }) => {
         const id = interaction_id ?? deps.newId();
@@ -3177,7 +3195,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop). Variant matrix: define-variant (comp, prop = axis e.g. Size, values e.g. [S,M,L]): adds the axis and fills every Size x State combination; set-variant (clip_id, variant {Size:L,State:hover}): switch an instance on several axes at once, overrides kept. set-preferred (comp, prop = a swap property, preferred = main comp ids): suggested swaps listed first. resize-set-main (clip_id = a main on a Components-page set, width, height in frame px): resizes only that main, moves the variants after it and grows the frame to hug them.',
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set; or (clip_id = a main on the canvas): the next variant, placed 20 px to its right. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop). Variant matrix: define-variant (comp, prop = axis e.g. Size, values e.g. [S,M,L]): adds the axis and fills every Size x State combination; set-variant (clip_id, variant {Size:L,State:hover}): switch an instance on several axes at once, overrides kept. set-preferred (comp, prop = a swap property, preferred = main comp ids): suggested swaps listed first. resize-set-main (clip_id = a main on a Components-page set, width, height in frame px): resizes only that main, moves the variants after it and grows the frame to hug them.',
       inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional(), values: z.array(z.string().min(1).max(40)).max(20).optional(), preferred: z.array(z.string()).max(40).optional(), width: z.number().positive().max(MAX_SIDE).optional(), height: z.number().positive().max(MAX_SIDE).optional() }),
       execute: async (input) => {
         const ids: string[] = [];
@@ -3195,7 +3213,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.Push]: () => pushOverrides(session.doc, id),
           [ComponentAction.Reset]: () => resetOverrides(session.doc, id),
           [ComponentAction.Detach]: () => detachInstance(session.doc, id, newId),
-          [ComponentAction.AddVariant]: () => addVariant(session.doc, input.comp ?? '', input.variant ?? {}, newId),
+          [ComponentAction.AddVariant]: () => (input.comp ? addVariant(session.doc, input.comp, input.variant ?? {}, newId) : addVariantBeside(session.doc, id, newId)),
           [ComponentAction.Swap]: () => (input.comp ? swapInstance(session.doc, id, input.comp) : pickVariant(session.doc, id, input.prop ?? '', String(input.value ?? ''))),
           [ComponentAction.DefineProp]: () => (input.property ? defineProperty(session.doc, input.comp ?? '', input.prop ?? '', input.property as PropertyDef) : { ok: false, error: 'define-prop needs property' }),
           [ComponentAction.RemoveProp]: () => removeProperty(session.doc, input.comp ?? '', input.prop ?? ''),

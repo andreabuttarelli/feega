@@ -26,6 +26,13 @@ describe('per-property overrides of a style', () => {
     expect(overridesOf(styled(), 't1')).toEqual([]);
   });
 
+  it('a shape just given a colour style has no overrides', () => {
+    const shape = ok(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, props: { shape: 'rect' } }, 's1'));
+    const doc = ok(applyStyle(ok(defineStyle(shape, 'Ink', { kind: StyleKind.Colour, color: '#111111' })), ['s1'], 'Ink'));
+
+    expect(overridesOf(doc, 's1')).toEqual([]);
+  });
+
   it('changing the size of a styled text keeps it linked and marks size overridden', () => {
     const doc = ok(setProps(styled(), 't1', { size: 0.5 }));
 

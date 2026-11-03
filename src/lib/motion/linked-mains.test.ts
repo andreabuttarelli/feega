@@ -3,6 +3,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@fe
 import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { createComponent, instanceOf, overrideInstance } from './main-component';
 import { homed, placeInstance } from './canvas-components';
+import { addVariant, setMembers } from './variants';
 import { linkedMains, mainHomesOf, mainsSignature } from './linked-mains';
 import { compBox, reframed } from './comp-frame';
 
@@ -35,6 +36,27 @@ const relabel = (doc: MotionDoc, compId: string, text: string): MotionDoc => ({
 });
 
 const innerText = (doc: MotionDoc, compId: string) => (doc.comps[compId].tracks[0].clips[0] as MotionClip).props.text;
+
+describe('an instance of a variant knows its whole set', () => {
+  it('placing one variant brings every variant of the set, for the pickers', () => {
+    const { doc: main, compId } = mainFrame();
+    const set = must(addVariant(main, compId, { State: 'Hover' }, newId));
+    const { doc } = instanceFrame(set, compId);
+
+    expect(setMembers(doc, compId)).toHaveLength(2);
+  });
+
+  it('following the main brings a variant added after the instance was placed', () => {
+    const { doc: main, compId } = mainFrame();
+    const { doc } = instanceFrame(main, compId);
+    const later = homed(must(addVariant(main, compId, { State: 'Pressed' }, newId)), 'A');
+
+    const resolved = linkedMains(doc, 'B', new Map([['A', later]]));
+
+    expect(setMembers(resolved, compId)).toHaveLength(2);
+    expect(Object.values(resolved.comps).every((c) => !c.component || c.component.home === 'A')).toBe(true);
+  });
+});
 
 describe('instances follow their main across frames', () => {
   it('names the frames a copy depends on, never its own', () => {

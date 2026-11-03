@@ -46,3 +46,24 @@ so History can still offer "keep mine".
   apply locally and retry offline from IndexedDB; the runner covers single-shot writes that
   do not retry. Runner ops are kept in the outbox `sent` list from the gesture to the answer and
   sent again after a reload (`src/lib/canvas/sent-ops.ts`); client-chosen ids make that safe.
+
+## Amendment 2026-11-03 — every write is durable, not only placements
+
+The runner was never the only write path. Element contents (frame-doc ops from
+`FrameEditSession`) and draws were posted once, outside the outbox: lost offline, on a closed
+tab, while the status said "Saved". Decision:
+
+- **One outbox, more parts.** `feega-outbox` also keeps `draws` (an `op-queue` with
+  client-minted node ids, replayed in order) and `docs` (`FrameDraft`: the ops from the last
+  landed revision plus that revision, one per editing session, `src/lib/canvas/frame-drafts.ts`).
+- **Idempotent on the server.** A draw resent with an id that exists answers that node. Frame ops
+  are sets and add-if-missing, applied by `commitOps` on the current head from the sent version,
+  so a replayed draft rebases instead of conflicting.
+- **Unreachable is not refused.** A send that throws, 5xx or busy keeps the edit pending and
+  retries with capped backoff; only a refusal drops it (and its draft).
+- **A write waits for its node's draw.** Nothing naming a node reaches the server before the
+  draw that creates it; snapshots keep the ghost of a queued draw.
+- **One count.** The status and `beforeunload` read `pendingWrites` over every part, plus runner
+  ops in flight.
+- Server undo is kept in the `sent` log until answered; move undo is a placement write and does
+  not wait for it.

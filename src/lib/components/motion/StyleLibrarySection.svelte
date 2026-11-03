@@ -1,17 +1,11 @@
 <script lang="ts">
   import Plus from '@lucide/svelte/icons/plus';
-  import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import * as Popover from '$lib/components/ui/popover/index.js';
-  import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-  import ColorField from './ColorField.svelte';
-  import NumberField from './NumberField.svelte';
-  import FontPicker from './FontPicker.svelte';
+  import StyleEditor from './StyleEditor.svelte';
   import { fontPreviewHref } from '$lib/design/font-preview';
-  import { ColourDisplay } from '$lib/motion/colour-field';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
-  import { MAX_TYPE_PX, StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
-  import { TYPE } from '@feega/motion-core/motion/components';
-  import { inDoc, inLibrary, styleLabel } from '$lib/motion/style-library';
+  import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
+  import { folderOf, foldered, inDoc, inLibrary, styleLabel } from '$lib/motion/style-library';
   import { swatchOf } from '$lib/motion/fill/swatch';
   import { textFace, textMetrics } from '$lib/motion/type-px';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -40,7 +34,7 @@
   ];
 
   const entries = $derived(Object.entries(styleLibrary.styles));
-  const inGroup = (group: Group) => entries.filter(([, style]) => group.kinds.includes(style.kind));
+  const inGroup = (group: Group) => foldered(entries.filter(([, style]) => group.kinds.includes(style.kind)));
   const color = (value: string) => resolveColor(value, tokens);
   const swatch = (style: Style) => {
     if (style.kind === StyleKind.Paint) {
@@ -172,8 +166,10 @@
             <button type="button" class="icon" aria-label={`New ${group.title.toLowerCase()} style`} data-testid={`style-library-new-${make.style.kind}`} onclick={() => create(make)}><Plus size={14} /></button>
           {/if}
         </header>
-        {#each rows as [name, style] (name)}
+        {#each rows as [name, style], index (name)}
           {@const chip = swatch(style)}
+          {@const folder = folderOf(name)}
+          {#if folder.group && folder.group !== folderOf(rows[index - 1]?.[0] ?? '').group}<span class="muted folder" data-testid="style-library-folder">{folder.group}</span>{/if}
           <Popover.Root open={open === name} onOpenChange={(next) => toggle(name, next)}>
             <Popover.Trigger class="row" data-testid="style-library-row" data-kind={style.kind} data-style={name}>
               {#if style.kind === StyleKind.Text}
@@ -182,32 +178,12 @@
                 <span class="swatch" data-testid={`style-library-swatch-${name}`} style:background={chip ?? 'var(--ui-input)'}></span>
               {/if}
               {@const m = meta(style)}
-              <span class="name">{name}</span>
+              <span class="name" class:nested={!!folder.group}>{folder.leaf}</span>
               <span class="muted meta"><span class="face">{m.face}</span>{#if m.face && m.metrics}<span>&nbsp;·&nbsp;</span>{/if}<span class="metrics">{m.metrics}</span></span>
               <span class="trail">{#if style.kind === StyleKind.Text && chip}<span class="dot" style:background={chip}></span>{/if}</span>
             </Popover.Trigger>
             <Popover.Content side="left" class="style-editor w-64 gap-2 p-3" onkeydown={closeOnEnter}>
-              <div class="head">
-                <input class="text" type="text" value={name} aria-label="Style name" data-testid={`style-library-name-${name}`} onchange={(e) => rename(name, e.currentTarget.value)} />
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger class="icon" aria-label={`More for ${name}`} data-testid={`style-library-more-${name}`}><Ellipsis size={14} /></DropdownMenu.Trigger>
-                  <DropdownMenu.Content align="end">
-                    <DropdownMenu.Item onSelect={() => remove(name)} data-testid={`style-library-remove-${name}`}>Delete style</DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
-              </div>
-              {#if style.kind === StyleKind.Text}
-                <span data-testid={`style-library-font-${name}`}><FontPicker value={style.font ?? ''} fonts={[]} brand={tokens.fonts ?? []} onpick={(family) => edit(name, style, { font: family })} /></span>
-                <div class="grid">
-                  <span data-testid={`style-library-size-${name}`}><NumberField label="Size" name="Size" unit="px" value={pxOfStyle(style)} range={{ min: 1, max: MAX_TYPE_PX, step: 1 }} onchange={(px) => edit(name, inLibrary(style, square), { sizePx: px })} /></span>
-                  <span data-testid={`style-library-weight-${name}`}><NumberField label="W" name="Weight" value={style.weight ?? 400} range={{ min: TYPE.weight.min, max: TYPE.weight.max, step: 100 }} onchange={(v) => edit(name, style, { weight: Math.round(v) })} /></span>
-                  <span data-testid={`style-library-tracking-${name}`}><NumberField label="Tr" name="Tracking" unit="%" value={(style.tracking ?? 0) * PERCENT} range={{ min: TYPE.tracking.min * PERCENT, max: TYPE.tracking.max * PERCENT, step: 0.5 }} onchange={(v) => edit(name, style, { tracking: v / PERCENT })} /></span>
-                  <span data-testid={`style-library-leading-${name}`}><NumberField label="Ld" name="Leading" value={style.leading ?? 1.2} range={TYPE.leading} onchange={(v) => edit(name, style, { leading: v })} /></span>
-                </div>
-              {/if}
-              {#if (style.kind === StyleKind.Text && style.color) || style.kind === StyleKind.Colour}
-                <span data-testid={`style-library-colour-${name}`}><ColorField {name} display={ColourDisplay.Field} value={chip} {tokens} onchange={(v) => edit(name, style, { color: v })} /></span>
-              {/if}
+              <StyleEditor {name} {style} swatch={chip} {tokens} sizePx={pxOfStyle(style)} onrename={(to) => rename(name, to)} onremove={() => remove(name)} onedit={(patch) => edit(name, style, patch)} onsize={(px) => edit(name, inLibrary(style, square), { sizePx: px })} />
             </Popover.Content>
           </Popover.Root>
         {:else}
@@ -379,13 +355,20 @@
     color: var(--ui-text-tertiary);
   }
 
+  .folder {
+    padding: var(--ui-space-1) 4px 0;
+  }
+
+  .nested {
+    padding-left: var(--ui-space-2);
+  }
+
   .empty {
     margin: 0;
     padding: 4px;
   }
 
-  .library :global(.icon),
-  :global(.style-editor .icon) {
+  .library :global(.icon) {
     display: grid;
     place-items: center;
     width: 20px;
@@ -395,31 +378,5 @@
     border-radius: var(--ui-radius-sm);
     background: none;
     color: var(--ui-text-tertiary);
-  }
-
-  :global(.style-editor) .head {
-    display: grid;
-    grid-template-columns: 1fr 20px;
-    align-items: center;
-    gap: var(--ui-space-2);
-  }
-
-  :global(.style-editor) .grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--ui-space-2);
-  }
-
-  :global(.style-editor) .text {
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 4px 6px;
-    border: 1px solid var(--ui-line);
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-surface);
-    color: var(--ui-text);
-    font: inherit;
-    font-size: var(--ui-type-caption);
   }
 </style>

@@ -15,6 +15,10 @@ export function retriggered(interaction: Interaction, kind: TriggerKind): Intera
 
 type Picked = Record<string, string>;
 
+export const DEFAULT_URL = 'https://example.com';
+
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
 const overlayOf = (action: Action): Overlay => (action.kind === ActionKind.OpenOverlay ? action.overlay : DEFAULT_OVERLAY);
 
 const ACTION_OF: Record<ActionKind, (target: string, variant: Picked, was: Action) => Action> = {
@@ -23,7 +27,8 @@ const ACTION_OF: Record<ActionKind, (target: string, variant: Picked, was: Actio
   [ActionKind.CloseOverlay]: () => ({ kind: ActionKind.CloseOverlay }),
   [ActionKind.ScrollTo]: (target) => ({ kind: ActionKind.ScrollTo, target }),
   [ActionKind.Back]: () => ({ kind: ActionKind.Back }),
-  [ActionKind.ChangeTo]: (_target, variant) => ({ kind: ActionKind.ChangeTo, variant })
+  [ActionKind.ChangeTo]: (_target, variant) => ({ kind: ActionKind.ChangeTo, variant }),
+  [ActionKind.OpenUrl]: () => ({ kind: ActionKind.OpenUrl, url: DEFAULT_URL })
 };
 
 export function retargeted(interaction: Interaction, kind: ActionKind, target: string, variant: Picked = {}): Interaction {
@@ -54,4 +59,14 @@ export function backdropParts(hex: string): { colour: string; opacity: number } 
 export function backdropOf(colour: string, opacity: number): string {
   const alpha = Math.round((Math.min(PERCENT, Math.max(0, opacity)) / PERCENT) * OPAQUE);
   return `${colour.slice(0, RGB_HEX_LENGTH)}${alpha.toString(16).padStart(2, '0')}`;
+}
+
+export function relinked(interaction: Interaction, typed: string): Interaction {
+  const url = typed.trim();
+  return { ...interaction, action: { kind: ActionKind.OpenUrl, url: HAS_SCHEME.test(url) ? url : `https://${url}` } };
+}
+
+export function freshInteraction(id: string, firstFrame: string | null): Interaction {
+  const action: Action = firstFrame ? { kind: ActionKind.Navigate, target: firstFrame } : { kind: ActionKind.OpenUrl, url: DEFAULT_URL };
+  return { id, trigger: { kind: TriggerKind.Click }, action, transition: { kind: TransitionKind.Instant } };
 }
