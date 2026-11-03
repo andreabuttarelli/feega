@@ -83,7 +83,7 @@ describe('drawing an export', () => {
 
   it('a raster row of a video is shot at its poster frame, not its first', async () => {
     const { port, log } = fakePort();
-    await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, poster: { frame: 60 } } }], row({ format: 'png', by: 'scale', value: 1 }));
+    await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: { ...withCard, poster: { frame: 60 } } }], row({ format: 'png', by: 'scale', value: 1 }));
 
     expect(log).toContain(`seek ${60 / doc.fps}`);
   });
