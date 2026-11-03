@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { withSurface } from '@feega/motion-core/motion/surface';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
@@ -221,5 +221,17 @@ describe('the frame surface', () => {
 
     expect(surfaced.pick(corner, space)).toBeNull();
     expect(surfaced.stack(corner, space)).toEqual([]);
+  });
+});
+
+describe('picking inside a frame', () => {
+  it('reads the laid-out doc, never the frame parsed as an HTML page', () => {
+    const parse = vi.spyOn(DOMParser.prototype, 'parseFromString');
+    const fresh = framePicker({ ...live, doc: { ...live.doc } });
+    const outline = fresh.outline('card', space)!;
+
+    expect(fresh.pick({ x: outline.x + outline.w / 2, y: outline.y + outline.h / 2 }, space)).toBe('card');
+    expect(parse).not.toHaveBeenCalled();
+    parse.mockRestore();
   });
 });

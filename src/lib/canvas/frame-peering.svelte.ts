@@ -1,5 +1,5 @@
 import type { MeasuredBox } from '@feega/motion-core/motion/hyperframes/measure';
-import type { FrameRect } from '$lib/motion/gpu/pick';
+import type { FrameRect } from '$lib/canvas/frame-placements';
 import { keepMark, peersIn, type FrameCursor, type FrameMark, type FramePeer, type FramePresence } from '$lib/realtime/frame-presence';
 
 export const CURSOR_SEND_MS = 60;
