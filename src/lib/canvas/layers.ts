@@ -520,7 +520,7 @@ export function rowsInside<R extends { key: string; depth: number }>(rows: reado
   return inside;
 }
 
-export function searchRows<R extends { depth: number; label: string }>(rows: readonly R[], query: string): R[] {
+export function searchRows<R extends { depth: number; label: string; nodeId: string }>(rows: readonly R[], query: string, frameId: string | null = null): R[] {
   const needle = query.trim().toLowerCase();
   if (!needle) {
     return [...rows];
@@ -530,9 +530,26 @@ export function searchRows<R extends { depth: number; label: string }>(rows: rea
   rows.forEach((row, i) => {
     trail.length = row.depth;
     trail[row.depth] = i;
+    if (frameId && row.nodeId !== frameId) {
+      return;
+    }
     if (row.label.toLowerCase().includes(needle)) {
       trail.forEach((at) => kept.add(at));
     }
   });
   return rows.filter((_, i) => kept.has(i));
+}
+
+export function childIds<R extends { id: string; depth: number; kind: LayerKind }>(rows: readonly R[], parent: R): string[] {
+  const at = rows.indexOf(parent);
+  const ids: string[] = [];
+  for (const row of rows.slice(at + 1)) {
+    if (row.depth <= parent.depth) {
+      break;
+    }
+    if (row.depth === parent.depth + 1 && row.kind !== LayerKind.Part) {
+      ids.push(row.id);
+    }
+  }
+  return ids;
 }

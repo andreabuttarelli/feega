@@ -32,6 +32,8 @@ In the Layers panel, Shift-click selects every row between the last picked one a
 
 The Layers panel lists layers in paint order, like Figma: the top row is the frontmost layer, on the canvas and inside each frame. Groups and sections, which paint behind everything, list under the rest.
 
+The search box above the Layers list looks only inside the current frame. Enter on a focused layer row selects that layer's children; rename with a double-click or Cmd/Ctrl+R.
+
 The Layers panel lists what the canvas has loaded: a page far off screen shows as one row, and its elements appear once the canvas loads it.
 
 ## Align

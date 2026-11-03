@@ -9,7 +9,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { findClip } from '@feega/motion-core/motion/doc';
-import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -562,7 +562,7 @@ describe('the rows inside a picked row are tinted with it', () => {
 });
 
 describe('searching the layers keeps a match where it lives', () => {
-  const row = (key: string, depth: number, label: string) => ({ key, depth, label });
+  const row = (key: string, depth: number, label: string, nodeId = 'f') => ({ key, depth, label, nodeId });
   const rows = [row('f', 0, 'Frame'), row('v', 1, 'Video 1'), row('t', 2, 'Title'), row('a', 1, 'Audio 1'), row('x', 0, 'Text')];
 
   it('a match brings its parents with it, so it is never shown out of place', () => {
@@ -575,6 +575,26 @@ describe('searching the layers keeps a match where it lives', () => {
 
   it('an empty query shows every row', () => {
     expect(searchRows(rows, ' ')).toHaveLength(rows.length);
+  });
+
+  it('a search inside a frame ignores matches in other frames', () => {
+    const two = [...rows, row('g', 0, 'Other', 'g'), row('gt', 1, 'Title', 'g')];
+
+    expect(searchRows(two, 'title', 'f').map((r) => r.key)).toEqual(['f', 'v', 't']);
+  });
+});
+
+describe('the children of a layer', () => {
+  const row = (id: string, depth: number, kind = LayerKind.Clip) => ({ id, depth, kind });
+  const rows = [row('f', 0, LayerKind.Node), row('a', 1), row('a1', 2), row('a2', 2), row('b', 1)];
+
+  it('are the rows one level below it, up to the next sibling', () => {
+    expect(childIds(rows, rows[1])).toEqual(['a1', 'a2']);
+    expect(childIds(rows, rows[0])).toEqual(['a', 'b']);
+  });
+
+  it('are none for a leaf', () => {
+    expect(childIds(rows, rows[4])).toEqual([]);
   });
 });
 

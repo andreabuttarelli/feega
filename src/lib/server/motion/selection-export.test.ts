@@ -105,3 +105,23 @@ describe('exporting a selection', () => {
     expect(drawn).toEqual([]);
   });
 });
+
+describe('exporting a breakpoint view', () => {
+  const PHONE = { id: 'ph', name: 'Phone', width: 390 };
+  const responsive = { ...withTitle, breakpoints: [PHONE] };
+  const responsivePorts = (): SelectionPorts => ({ ...ports().base, read: async () => ({ name: 'Home', doc: responsive, docScale: 0.5 }) });
+
+  it('draws the frame resolved at that breakpoint, named after it', async () => {
+    const { drawn, base } = ports();
+    const out = await exportSelection({ ...base, read: responsivePorts().read }, { targets: [{ nodeId: 'a', breakpointId: PHONE.id }], rows, name: 'X' });
+
+    expect(drawn[0].targets[0].doc.width).toBe(PHONE.width);
+    expect(out).toMatchObject({ outcome: ExportOutcome.Done, files: ['Home Phone.png'] });
+  });
+
+  it('refuses a breakpoint the frame does not have', async () => {
+    const out = await exportSelection(responsivePorts(), { targets: [{ nodeId: 'a', breakpointId: 'nope' }], rows, name: 'X' });
+
+    expect(out).toEqual({ outcome: ExportOutcome.NotFound, nodeId: 'a' });
+  });
+});

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { sourceAssetIdOf } from '$lib/canvas/image-source';
   import { byId } from '$lib/canvas/by-id';
+  import { baseNodeId } from '$lib/canvas/breakpoint-views';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import CanvasCommentsPanel from '$lib/components/canvas/CanvasCommentsPanel.svelte';
   import CommentPin from '$lib/components/canvas/CommentPin.svelte';
@@ -3711,7 +3712,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function exportFrames(frameIds: string[], rows: ExportRow[], seconds?: number) {
-    await Promise.all(frameIds.map((id) => saves.flush(id)));
+    await Promise.all(frameIds.map((id) => saves.flush(baseNodeId(id))));
     const at: Record<string, string> = seconds === undefined ? {} : { seconds: String(seconds) };
     const answer = await send('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export', ...at });
     return answer.type === 'success' ? (answer.data as { url: string; name: string; files: string[]; skipped?: string[] }) : exportFailure(answer);
