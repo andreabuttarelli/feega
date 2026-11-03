@@ -60,4 +60,10 @@ describe('the bind chip', () => {
   it('an unbound chip has no unbind', () => {
     expect(chip(themed, 'fill')).not.toContain('bind-unbind-fill');
   });
+
+  it('a bound colour opens its editor from the chip itself', () => {
+    const body = chip(bound, 'fill');
+    expect(body).toContain('data-testid="bind-edit-fill"');
+    expect(body).toContain('aria-label="Edit Theme/surface"');
+  });
 });
