@@ -1,4 +1,4 @@
-import type { FrameRect } from '$lib/motion/gpu/pick';
+import type { FrameRect } from '$lib/canvas/frame-placements';
 
 export type FrameStep = { back: () => void; forward: () => void };
 
