@@ -141,6 +141,7 @@
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import type { FrameDoc } from '$lib/canvas/core/frame-build';
   import { missingAssets } from '$lib/canvas/live-assets';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
@@ -1238,7 +1239,17 @@
     }
   });
 
+  function adoptSource(id: string, source: FrameDoc) {
+    if ((fetched.get(id)?.revision ?? 0) >= source.revision) {
+      return;
+    }
+    fetched = new Map(fetched).set(id, { revision: source.revision, live: { doc: source.doc, tokens: source.tokens, assets: source.assets ?? {} } });
+  }
+
   $effect(() => {
+    if (!failed) {
+      return;
+    }
     const due = toFetch(coreFrames.filter((f) => fetched.get(f.id)?.revision !== f.revision), pickKey, asked, liveDocs.map);
     if (!due.length) {
       return;
@@ -4229,7 +4240,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
