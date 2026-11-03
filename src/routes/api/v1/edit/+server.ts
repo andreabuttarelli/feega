@@ -17,7 +17,7 @@ const MAX_STEPS = 500;
 
 const step = z.object({ op: z.string().min(1), target: z.string().optional(), element: z.string().optional(), input: z.record(z.string(), z.unknown()).optional(), version: z.number().int().min(0).optional() });
 
-const body = z.object({ project_id: z.string().optional(), verbose: z.boolean().optional(), ops: z.array(step).min(1).max(MAX_STEPS).optional() }).extend(step.shape).partial({ op: true });
+const body = z.object({ project_id: z.guid().optional(), verbose: z.boolean().optional(), ops: z.array(step).min(1).max(MAX_STEPS).optional() }).extend(step.shape).partial({ op: true });
 
 export const POST: RequestHandler = async ({ request, url }) => {
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
