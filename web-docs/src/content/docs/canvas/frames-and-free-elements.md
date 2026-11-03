@@ -36,6 +36,9 @@ A free element behaves like a single object, as in Figma ([ADR 0032](/architectu
 A frame works in design units, as in Figma ([ADR 0033](/architecture/adr/0033-a-frame-is-its-size-on-the-canvas/)): a frame 700 px wide on the canvas reads **W 700**, and every number of the layers inside it (width, height, type size, radius, stroke, gap, padding, effects, camera) is in the same canvas pixels. A radius of 12 draws 12 px.
 
 - **Frame size**, **W** and **H** set the size of the frame on the canvas, the same as dragging its handle. A preset (Phone 393 × 852, Desktop 1440 × 1024…) makes the frame that big on the canvas.
+- Resizing a frame, by its handle or by typing W and H, keeps every layer, type size and corner radius at its size and moves layers by their constraints.
+- A text style is a pixel size: 16 px is 16 px in every frame that uses it.
+- Typing W on an auto-width text makes it fixed width; wrapping a text in a stack keeps how it sizes.
 - Frames made before this change keep their content untouched; their numbers read in canvas pixels too.
 - The resolution of a file is picked when you export it: see [Export](/motion/export/).
 

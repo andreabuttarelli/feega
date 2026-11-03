@@ -17,4 +17,9 @@ preset frames ~4.6×. Decision in [ADR 0033](../docs/adr/0033-a-frame-is-its-siz
   still action reads the node. Defaults 2× in `ExportRows`, `StillExport`, CLI `canvas export`.
   The motion agent's `export_image` stays in doc px (`IN_DOC_PX`).
 - **In-tab video** `exportSize` no longer caps at the doc size: same pixels as the farm.
+- **Resize keeps the inside** (mobile B4/M9/M10, landing #2/#17): `fitToNode` takes the old
+  node box and keeps the density; `heldPixels` for every frame plus `heldRadii`. The canvas
+  passes the box (`sizeBefore` in `+page.svelte`), the server its stage.
+- **Text** (mobile M17, landing #11): `MotionInspector.commit` runs `resizedTexts`; `wrapInStack` uses `TEXT_ITEM` by sizing.
+- **Text styles in px** (mobile B3, landing #8): library `sizePx`, `inLibrary`/`inDoc`.
 - Not changed: the timeline's value fields still read doc px; legacy docs untouched.

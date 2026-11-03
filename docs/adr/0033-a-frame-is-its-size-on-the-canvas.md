@@ -33,7 +33,18 @@ Figma: a frame's size is design units; resolution is chosen at export (1×, 2×,
 5. **Video keeps its resolution.** MP4 already picks a short side (720p–4K) independent of the
    doc; the browser render now scales up to it like the farm (`exportSize` = `outputSize`, no
    cap at the doc size), so 1× docs render as sharp as 2× ones did.
-6. **The motion agent speaks doc px.** Its session has no node box and its sizing is tuned to the
+6. **Resizing a frame keeps what is inside it.** A resize (handle or typed) keeps the doc px per
+   canvas px the frame had (`densityKept`, `custom-size.ts`), applies constraints, and holds type
+   size, strokes and corner radius in px (`heldPixels` for every frame, not only stills, plus
+   `heldRadii`: roundness is a share of a layer's short side, so a stretched surface grew from 12
+   to 92 px). Typing W on an auto-width text makes it fixed width
+   (`resizedTexts`, now run on every inspector edit). Wrapping a text in a stack keeps its sizing
+   (`TEXT_ITEM`, shared with the Figma import).
+7. **A library text style is px.** The project library holds `sizePx`; a doc holds the share of
+   its own short side. `inLibrary`/`inDoc` (`style-library.ts`) are the only conversions, so a 16
+   px style is 16 px in a phone and in a 52 px button. Legacy library entries with `size` keep
+   their share until edited.
+8. **The motion agent speaks doc px.** Its session has no node box and its sizing is tuned to the
    composition; for new frames doc px are canvas px. `export_image` stays relative to the doc.
 
 ## Rejected

@@ -116,6 +116,7 @@
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '@feega/motion-core/motion/expression/bake';
   import { Unit, propsOwner, shownNumber, sliderOf, spaceOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
+  import { resizedTexts } from '$lib/motion/text-fit';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
@@ -300,7 +301,7 @@
       return;
     }
     error = '';
-    onchange(result.doc, summary);
+    onchange(resizedTexts(doc, result.doc), summary);
   }
 
   function setProp(field: Field, value: unknown) {
