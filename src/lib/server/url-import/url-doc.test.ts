@@ -5,6 +5,7 @@ import type { PageTree } from './page-tree';
 import type { PageOutline } from './page-outline';
 import { frameRows } from '$lib/canvas/layers';
 import { FULL_SHAPE, PLAIN_SHAPE, Sectioning, urlPlan } from './url-doc';
+import { sameColour } from './page-tokens';
 
 const FIXTURES = ['linear', 'stripe', 'vercel'];
 
@@ -189,6 +190,13 @@ describe('urlPlan', () => {
     const clip = clipsOf(urlPlan(tree, newId)!).find((c) => c.props.text);
 
     expect(clip?.props.sizing).not.toBe('auto');
+  });
+
+  it.each(FIXTURES)('%s: no two colours of the frame are ones a person cannot tell apart', (name) => {
+    const doc = urlPlan(outlined(name), newId, undefined, {}, FULL_SHAPE)!.plan.items[0].doc;
+    const hexes = [...new Set((JSON.stringify(doc).match(/"#[0-9a-f]{6}/gi) ?? []).map((h) => h.slice(1).toLowerCase()))];
+
+    expect(hexes.flatMap((a, i) => hexes.slice(i + 1).filter((b) => sameColour(a, b)).map((b) => `${a}~${b}`))).toEqual([]);
   });
 
   it('a tall page lands at one doc px per CSS px, so a 64 px heading reads 64 and the frames are 1280 wide', () => {
