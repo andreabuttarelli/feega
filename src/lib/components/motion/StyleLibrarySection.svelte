@@ -15,11 +15,15 @@
   import { swatchOf } from '$lib/motion/fill/swatch';
   import { textFace, textMetrics } from '$lib/motion/type-px';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
+  import { clampStylesSplit, readStylesSplit, writeStylesSplit } from '$lib/shell-prefs';
+  import { StyleLayout } from './style-layout';
 
   const DEFAULT_UNIT = 1080;
   const PERCENT = 100;
 
-  let { tokens, unit = DEFAULT_UNIT }: { tokens: BrandTokens; unit?: number } = $props();
+  const SPLIT_STEP = 0.05;
+
+  let { tokens, unit = DEFAULT_UNIT, layout = StyleLayout.Stack }: { tokens: BrandTokens; unit?: number; layout?: StyleLayout } = $props();
 
   const NEW_STYLE_PX = 16;
   const square = $derived({ width: unit, height: unit });
@@ -63,6 +67,48 @@
   });
 
   let open = $state<string | null>(null);
+
+  const REGIONS = [GROUPS.slice(0, 1), GROUPS.slice(1)];
+  const filled = (region: Group[]) => region.some((group) => inGroup(group).length > 0);
+  const bothFilled = $derived(REGIONS.every(filled));
+  let ratio = $state(readStylesSplit());
+  let section = $state<HTMLElement>();
+
+  const grow = (index: number) => {
+    if (!bothFilled) {
+      return filled(REGIONS[index]) ? 1 : 0;
+    }
+    return index === 0 ? ratio : 1 - ratio;
+  };
+
+  function setRatio(next: number) {
+    ratio = clampStylesSplit(next);
+    writeStylesSplit(ratio);
+  }
+
+  function drag(e: PointerEvent) {
+    if (!section || !(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+      return;
+    }
+    const box = section.getBoundingClientRect();
+    setRatio((e.clientY - box.top) / box.height);
+  }
+
+  const SPLIT_KEYS: Record<string, () => number> = {
+    ArrowUp: () => ratio - SPLIT_STEP,
+    ArrowDown: () => ratio + SPLIT_STEP,
+    Home: () => 0,
+    End: () => 1
+  };
+
+  function splitKey(e: KeyboardEvent) {
+    const next = SPLIT_KEYS[e.key];
+    if (!next) {
+      return;
+    }
+    e.preventDefault();
+    setRatio(next());
+  }
 
   function edit(name: string, style: Style, patch: Record<string, unknown>) {
     const next = styleSchema.safeParse({ ...style, ...patch });
@@ -114,13 +160,8 @@
   };
 </script>
 
-<svelte:head>
-  {#each previews as href (href)}<link rel="stylesheet" {href} />{/each}
-</svelte:head>
-
-<section class="library" data-testid="style-library">
-  {#if styleLibrary.failed}<p class="muted" data-testid="style-library-failed">A style change could not be saved and was undone.</p>{/if}
-  {#each GROUPS as group (group.title)}
+{#snippet groups(list: Group[])}
+  {#each list as group (group.title)}
     {@const rows = inGroup(group)}
     {#if group.create || rows.length}
       <div class="group">
@@ -175,6 +216,24 @@
       </div>
     {/if}
   {/each}
+{/snippet}
+
+<svelte:head>
+  {#each previews as href (href)}<link rel="stylesheet" {href} />{/each}
+</svelte:head>
+
+<section class="library" class:split={layout === StyleLayout.Split} bind:this={section} data-testid="style-library">
+  {#if styleLibrary.failed}<p class="muted" data-testid="style-library-failed">A style change could not be saved and was undone.</p>{/if}
+  {#if layout === StyleLayout.Split}
+    {#each REGIONS as region, index (index)}
+      {#if index === 1 && bothFilled}
+        <div class="divider" role="separator" tabindex="0" aria-label="Resize text and colour styles" aria-orientation="horizontal" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ratio * PERCENT)} data-testid="style-library-divider" onpointerdown={(e) => e.currentTarget.setPointerCapture(e.pointerId)} onpointermove={drag} onkeydown={splitKey}></div>
+      {/if}
+      <div class="region" class:collapsed={grow(index) === 0} style:flex-grow={grow(index)} data-testid={`style-library-region-${index}`}>{@render groups(region)}</div>
+    {/each}
+  {:else}
+    {@render groups(GROUPS)}
+  {/if}
 </section>
 
 <style>
@@ -185,6 +244,49 @@
     padding: var(--ui-space-3) var(--ui-space-4);
     border-top: 1px solid var(--ui-line);
     font-size: var(--ui-type-caption);
+  }
+
+  .split {
+    flex: 1;
+    min-height: 0;
+    gap: 0;
+    padding: 0;
+  }
+
+  .region {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 var(--ui-space-4) var(--ui-space-2);
+  }
+
+  .collapsed {
+    flex: none;
+  }
+
+  .split header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: var(--ui-space-2);
+    background: var(--ui-panel-raised);
+  }
+
+  .divider {
+    flex: none;
+    height: 5px;
+    margin: -2px 0;
+    z-index: 2;
+    cursor: row-resize;
+    touch-action: none;
+    background: linear-gradient(var(--ui-line), var(--ui-line)) center / 100% 1px no-repeat;
+  }
+
+  .divider:hover,
+  .divider:focus-visible {
+    outline: none;
+    background-size: 100% 3px;
+    background-image: linear-gradient(var(--ui-accent), var(--ui-accent));
   }
 
   .group {
