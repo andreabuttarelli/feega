@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stagedBox, stillFrame, toFetch, untilFound } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toFetch, untilFound } from './frame-source';
 import { ItemKind, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 import { BlendMode } from '@feega/motion-core/motion/blend';
@@ -167,6 +167,17 @@ describe('frames to fetch', () => {
 
   it('a frame already asked for at this revision is not fetched twice', () => {
     expect(toFetch([at('a', 2)], keyOf, new Set(['a:2']), new Set())).toEqual([]);
+  });
+
+  it('a frame picked right after a reload is fetched now, not after the queue of every other frame', () => {
+    const frames = [at('a', 1), at('picked', 2)];
+    const fetched = new Map([['a', 1]]);
+
+    expect(pickedToFetch(frames, ['picked', 'a'], fetched, new Set()).map((f) => f.id)).toEqual(['picked']);
+  });
+
+  it('a picked frame already rushed at this revision is not fetched twice', () => {
+    expect(pickedToFetch([at('picked', 2)], ['picked'], new Map(), new Set(['picked:2']))).toEqual([]);
   });
 });
 

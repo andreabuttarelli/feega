@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { Extend, Reach, clickTarget, picksOwnKeys, extendOf, frameLevel, grabbedInstead, ownClipToPick, siblingsOf, stepInside, videoSide, Press, pressOn } from './frame-select';
+import { FrameKind, enteredClips } from './motion-node';
+import { Extend, Reach, Root, clickTarget, picksOwnKeys, extendOf, frameLevel, grabbedInstead, leaveLevel, ownClipToPick, siblingsOf, stepInside, videoSide, Press, pressOn } from './frame-select';
 
 const FRAME = frameLevel();
 const clipLevel = (clip: string) => ({ depth: Depth.Clip, clip, part: null });
@@ -22,6 +23,20 @@ describe('stepInside', () => {
   it('Esc goes up from the element to the frame, then to the canvas', () => {
     expect(stepInside(clipLevel('card'), Gesture.Leave, null)).toEqual(FRAME);
     expect(stepInside(FRAME, Gesture.Leave, null).depth).toBe(Depth.Canvas);
+  });
+});
+
+describe('leaveLevel', () => {
+  it('Esc on a free element leaves to the canvas, never to its wrapper frame', () => {
+    expect(leaveLevel(Root.Own, clipLevel('text'))).toBeNull();
+  });
+
+  it('Esc on an element of a frame goes up to the frame', () => {
+    expect(leaveLevel(Root.Page, clipLevel('card'))).toEqual(FRAME);
+  });
+
+  it('Esc on a part of a free element goes back to the element', () => {
+    expect(leaveLevel(Root.Own, { depth: Depth.Part, clip: 'text', part: 'lines.0' })?.clip).toBe('text');
   });
 });
 
@@ -84,6 +99,17 @@ describe('clickTarget', () => {
 
   it('a cmd-click selects the deepest element', () => {
     expect(clickTarget(nested(), 'leaf', [], Reach.Deep)).toBe('leaf');
+  });
+});
+
+describe('enteredClips', () => {
+  it('Enter on a group picks every element it holds', () => {
+    expect(enteredClips(FrameKind.Group, nested())).toEqual(['outer', 'other']);
+  });
+
+  it('Enter on a frame or a free element picks nothing here', () => {
+    expect(enteredClips(FrameKind.Frame, nested())).toEqual([]);
+    expect(enteredClips(FrameKind.Element, nested())).toEqual([]);
   });
 });
 

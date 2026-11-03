@@ -26,7 +26,12 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 - Shift-click adds or removes the element a click would select, even before the frame is selected. Shift+Cmd-click does the same with the deepest element.
 - Dragging on the background of a frame that is not selected draws a selection box over its elements; with Cmd/Ctrl held it selects the deepest ones. A frame moves when you drag its title, when it is already selected, or when it is empty.
 - Dropping an element onto a stack, from the same frame, another frame or the free canvas, puts it in the stack at the slot under the pointer. While a free element is dragged over a frame, a line shows the slot it would take in the stack under the pointer.
-- Esc goes up one level.
+- Esc goes up one level. On a free text or shape, Esc clears the selection: there is no frame around it to select.
+
+## Groups on the canvas
+
+- A click on a group selects the group; its properties show position, rotation, size and export.
+- Enter, or a double-click, goes inside and selects what it holds; then a click picks one member. Cmd/Ctrl-click reaches a member directly.
 
 In the Layers panel, Shift-click selects every row between the last picked one and the clicked one; Cmd-click (Ctrl-click on Windows) adds or removes one row. It works on canvas nodes and on the elements inside a frame, and the canvas and the right bar follow.
 
@@ -83,7 +88,7 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
 | Cmd/Ctrl+] / Cmd/Ctrl+[ | Bring forward / send backward one step |
 | Option/Alt+Cmd/Ctrl+] / Option/Alt+Cmd/Ctrl+[ | Bring to front / send to back |
-| Cmd/Ctrl+R | Rename the selection in Layers |
+| Cmd/Ctrl+R | Rename the selection in Layers; Esc or Enter closes the field |
 | Cmd/Ctrl+C | Copy |
 | Cmd/Ctrl+V | Paste at the centre of the view |
 | Cmd/Ctrl+Z | Undo, resizing included |
@@ -92,6 +97,8 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Arrows + Shift | Move by a longer step |
 | Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
 | Shift+0 | Zoom to 100% |
+| R | Rectangle tool (Shift+R in Motion) |
+| Shift+R | Rulers (in Design) |
 | F | Frame tool |
 | Shift + wheel | Scroll sideways |
 | Space + drag | Pan; the canvas follows the pointer exactly and stops when you let go |
