@@ -11,9 +11,10 @@ import { restoreRows, type OptimisticOp, type Touched } from './optimistic-ops';
 import { SECTION_TYPE, sectionBoxAround } from './section';
 import { stackedLocally, type Stack } from './stacking';
 import type { UndoItem } from './undo-plan';
+import type { Tie } from './gpu/wire-magnet';
 
 export type OptTile = { id: string; type: string; displayName: string | null; x: number; y: number; w: number; h: number; data: Record<string, unknown>; version: number; select?: boolean; userHeight?: number | null };
-export type OptEdge = { id: string; source: string; target: string; mode?: string };
+export type OptEdge = { id: string; source: string; target: string; mode?: string; tie?: Tie | null };
 export type CanvasRows<N extends OptTile, E extends OptEdge> = { nodes: N[]; edges: E[] };
 export type RowContext<N, E = OptEdge> = { toTile: (record: CanvasNodeRecord) => N; toEdge?: (connection: Connection) => E };
 export type Answer = Record<string, unknown>;
@@ -28,6 +29,7 @@ export enum OptimisticAction {
   Restack = 'restack',
   Rename = 'rename',
   EdgeMode = 'set_edge_mode',
+  EdgeTie = 'set_edge_tie',
   Remove = 'remove',
   Duplicate = 'duplicate',
   ScaleGroup = 'scaleGroup',
@@ -63,6 +65,7 @@ type Inputs = {
   [OptimisticAction.Restack]: { ids: string[]; to: Stack };
   [OptimisticAction.Rename]: { id: string; name: string };
   [OptimisticAction.EdgeMode]: { connectionId: string; mode: string };
+  [OptimisticAction.EdgeTie]: { connectionIds: string[]; tie: Tie | null };
   [OptimisticAction.Remove]: { nodeIds: string[]; edgeIds: string[] };
   [OptimisticAction.Duplicate]: { ids: string[]; copies: CanvasNodeRecord[]; copyIds: CopyIds; offset?: Offset };
   [OptimisticAction.ScaleGroup]: { id: string; width: number; height: number };
@@ -251,6 +254,15 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
     undo: noUndo,
     refresh: Refresh.None,
     notice: 'The wire mode did not save and was undone.'
+  },
+  [OptimisticAction.EdgeTie]: {
+    fields: (i) => ({ connection_ids: i.connectionIds.join(','), ...(i.tie ? { tie: JSON.stringify(i.tie) } : {}) }),
+    apply: (rows, i) => ({ ...rows, edges: rows.edges.map((e) => (i.connectionIds.includes(e.id) ? ({ ...e, tie: i.tie } as typeof e) : e)) }),
+    touched: (i) => ({ nodes: [], edges: i.connectionIds }),
+    landing: Landing.Answered,
+    undo: noUndo,
+    refresh: Refresh.None,
+    notice: 'The cable tie did not save and was undone.'
   },
   [OptimisticAction.Remove]: {
     fields: (i) => ({ node_ids: i.nodeIds.join(','), connection_ids: i.edgeIds.join(',') }),

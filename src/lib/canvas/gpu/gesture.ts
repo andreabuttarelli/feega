@@ -28,7 +28,8 @@ export enum GestureKind {
   Connect = 'connect',
   PickEdge = 'pick-edge',
   ResizeMany = 'resize-many',
-  TurnMany = 'turn-many'
+  TurnMany = 'turn-many',
+  Tie = 'tie'
 }
 
 export enum Pointer {
@@ -37,7 +38,7 @@ export enum Pointer {
   Touch = 'touch'
 }
 
-export type Press = { pointer: Pointer; button: number; shift: boolean; space: boolean; mode: CanvasMode };
+export type Press = { pointer: Pointer; button: number; shift: boolean; alt: boolean; space: boolean; mode: CanvasMode };
 
 const PAN_BUTTONS = new Set([1, 2]);
 
@@ -48,8 +49,8 @@ const ON_HIT: Record<HitKind, (p: Press) => GestureKind> = {
   [HitKind.Corner]: () => GestureKind.Resize,
   [HitKind.Rotate]: () => GestureKind.Rotate,
   [HitKind.Node]: () => GestureKind.Drag,
-  [HitKind.Edge]: () => GestureKind.PickEdge,
-  [HitKind.Empty]: (p) => (p.pointer === Pointer.Touch ? GestureKind.Pan : GestureKind.Marquee)
+  [HitKind.Edge]: (p) => (p.alt ? GestureKind.Tie : GestureKind.PickEdge),
+  [HitKind.Empty]: (p) => (p.alt ? GestureKind.Tie : p.pointer === Pointer.Touch ? GestureKind.Pan : GestureKind.Marquee)
 };
 
 export function gestureFor(hit: Hit, press: Press): GestureKind {

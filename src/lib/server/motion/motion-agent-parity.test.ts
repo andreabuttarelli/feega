@@ -85,6 +85,7 @@ const CLIP: Record<string, Access> = {
   states: { write: ['set_element_state', 'remove_element_state'], read: 'states' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
   styleRef: { write: ['named_style'], read: 'styleRef' },
+  paintStyleRef: { write: ['named_style'], read: 'paintStyleRef' },
   bind: { write: ['variable', 'bind_variable', 'unbind_variable'], read: 'bind' },
   effectStyleRef: { write: ['named_style'], read: 'effectStyleRef' },
   expressions: { write: ['set_expression', 'expression_to_keys', 'pulse_with_music'], read: 'expressions' },

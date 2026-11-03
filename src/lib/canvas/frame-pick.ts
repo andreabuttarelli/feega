@@ -1,8 +1,7 @@
-import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
-import { leafRectsAt, pathRect, pickOwnersAt, pickStackAt, quadOf, rectOf, type FrameRect } from '$lib/motion/gpu/pick';
+import { prepare, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
 import { isLayer } from '@feega/motion-core/motion/surface';
-import { compileScene, type Scene } from '$lib/motion/gpu/scene';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
+import { FramePlacements, type FrameRect } from './frame-placements';
 import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
 import { containFit } from './frame-hover';
 import type { Box } from './core/canvas-scene';
@@ -12,8 +11,6 @@ type Size = { width: number; height: number };
 type World = { x: number; y: number };
 export type WorldRect = { x: number; y: number; w: number; h: number };
 export type FrameSpace = { toFrame(world: World): [number, number]; toWorld(rect: { left: number; top: number; width: number; height: number }): WorldRect; pointToWorld(p: [number, number]): World };
-
-const ORIGIN = 'https://app.local';
 
 function turn(p: World, about: World, degrees: number): World {
   const r = (degrees * Math.PI) / 180;
@@ -56,21 +53,25 @@ export function frameSpace(box: Box, frame: Size, rotation: number, fit = FrameF
 const covers = (r: FrameRect | null, x: number, y: number): boolean => Boolean(r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height);
 
 export function framePicker(live: LiveDoc, playhead: () => number | undefined = () => live.playhead) {
-  let compiled: Scene | null = null;
-  const scene = () => (compiled ??= compileScene(composeHtml({ doc: live.doc, tokens: live.tokens, assets: live.assets, origin: ORIGIN })));
-  const time = () => frameOfLive({ doc: live.doc, playhead: playhead() }) / live.doc.fps;
-  const ownersAt = (world: World, space: FrameSpace): string[] => {
-    const s = scene();
-    const [x, y] = space.toFrame(world);
-    if (x < 0 || y < 0 || x > s.width || y > s.height) {
-      return [];
+  let prepared: Prepared | null = null;
+  let shown: { frame: number; placements: FramePlacements } | null = null;
+  const size = (): Size => ({ width: live.doc.width, height: live.doc.height });
+  const placements = (): FramePlacements => {
+    const frame = frameOfLive({ doc: live.doc, playhead: playhead() });
+    if (shown?.frame !== frame) {
+      prepared ??= prepare(live.doc, live.tokens, live.assets);
+      shown = { frame, placements: new FramePlacements(prepared, frame) };
     }
-    return pickOwnersAt(s, [x, y], time());
+    return shown!.placements;
+  };
+  const inFrame = ([x, y]: [number, number]) => x >= 0 && y >= 0 && x <= live.doc.width && y <= live.doc.height;
+  const ownersAt = (world: World, space: FrameSpace): string[] => {
+    const at = space.toFrame(world);
+    return inFrame(at) ? placements().ownersAt(at) : [];
   };
   return {
     spaceOf(box: Box, rotation: number, fit = FrameFit.Contain): FrameSpace {
-      const s = scene();
-      return frameSpace(box, { width: s.width, height: s.height }, rotation, fit);
+      return frameSpace(box, size(), rotation, fit);
     },
     pick(world: World, space: FrameSpace): string | null {
       return ownersAt(world, space).findLast((id) => isLayer(live.doc, id)) ?? null;
@@ -81,43 +82,40 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
         return hit;
       }
       const [x, y] = space.toFrame(world);
-      return held.find((id) => covers(rectOf(scene(), id, time()), x, y)) ?? null;
+      return held.find((id) => covers(placements().rectOf(id), x, y)) ?? null;
     },
     stack(world: World, space: FrameSpace): string[] {
-      const s = scene();
-      const [x, y] = space.toFrame(world);
-      return x < 0 || y < 0 || x > s.width || y > s.height ? [] : pickStackAt(s, [x, y], time()).filter((id) => isLayer(live.doc, id));
+      const at = space.toFrame(world);
+      return inFrame(at) ? placements().stackAt(at).filter((id) => isLayer(live.doc, id)) : [];
     },
     chain(world: World, space: FrameSpace): string[] {
       return ownersAt(world, space).filter((id) => id !== live.doc.surface && scopeOf(live.doc, id));
     },
     unitAt(world: World, space: FrameSpace): World {
-      const s = scene();
       const [x, y] = space.toFrame(world);
-      return { x: x / s.width, y: y / s.height };
+      return { x: x / live.doc.width, y: y / live.doc.height };
     },
     frameSize(): Size {
-      const s = scene();
-      return { width: s.width, height: s.height };
+      return size();
     },
     leafRects() {
-      return leafRectsAt(scene(), time());
+      return placements().leafRects();
     },
     frameRect(clip: string) {
-      return rectOf(scene(), clip, time());
+      return placements().rectOf(clip);
     },
     pathRect(path: readonly string[]) {
-      return pathRect(scene(), path, time());
+      return placements().pathRect(path);
     },
     framePoint(world: World, space: FrameSpace): [number, number] {
       return space.toFrame(world);
     },
     outlineQuad(clip: string, space: FrameSpace): [World, World, World, World] | null {
-      const q = quadOf(scene(), clip, time());
+      const q = placements().quadOf(clip);
       return q ? (q.map((p) => space.pointToWorld(p)) as [World, World, World, World]) : null;
     },
     outline(clip: string, space: FrameSpace): WorldRect | null {
-      const r = rectOf(scene(), clip, time());
+      const r = placements().rectOf(clip);
       return r ? space.toWorld(r) : null;
     }
   };

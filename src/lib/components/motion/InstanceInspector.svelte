@@ -10,7 +10,8 @@
   import { Action, type ActionId } from '$lib/motion/actions';
   import { defineProperty, exposable, instanceProperties, removeProperty, resetProperty, setPreferred, setProperty, type Exposure } from '$lib/motion/component-properties';
   import { PropertyKind, type PropertyDef } from '@feega/motion-core/motion/property-resolve';
-  import { addVariant, pickVariant, swapInstance, variantChips, variantProps } from '$lib/motion/variants';
+  import { addVariantBeside, setMainOf } from '$lib/motion/component-set';
+  import { pickVariant, swapInstance, variantChips, variantProps } from '$lib/motion/variants';
   import VariantMatrix from './VariantMatrix.svelte';
 
   let { doc, clipId, here = null, onchange, onrun }: { doc: MotionDoc; clipId: string; here?: string | null; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();
@@ -26,7 +27,6 @@
   const variantValues = $derived(instance ? variantProps(doc, instance.compId) : {});
   const chips = $derived(instance ? variantChips(doc, instance.compId) : null);
   const mains = $derived(Object.entries(doc.comps).filter(([, c]) => c.component));
-  const VARIANT_KEY = 'Variant';
 
   function applied(result: ReturnType<typeof swapInstance>, summary: string) {
     if (result.ok) {
@@ -38,9 +38,7 @@
     if (!instance) {
       return;
     }
-    const key = Object.keys(variantValues)[0] ?? VARIANT_KEY;
-    const count = (variantValues[key]?.length ?? 1) + 1;
-    applied(addVariant(doc, instance.compId, { [key]: `${VARIANT_KEY} ${count}` }, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+    applied(addVariantBeside(doc, clipId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
   }
 
   function change(result: ReturnType<typeof overrideInstance>, summary: string) {
@@ -200,7 +198,7 @@
     </label>
     {/if}
     <div class="actions">
-      <button type="button" data-testid="instance-add-variant" onclick={newVariant}>Add variant</button>
+      {#if role === ComponentRole.Main && !setMainOf(doc)}<button type="button" data-testid="instance-add-variant" onclick={newVariant}>Add variant</button>{/if}
       {#if parts.has(InstancePart.Reset)}<button type="button" data-testid="instance-reset" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.ResetInstance)}>Reset overrides</button>{/if}
       {#if parts.has(InstancePart.Push)}<button type="button" data-testid="instance-push" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.PushInstance)}>Push to main</button>{/if}
       {#if parts.has(InstancePart.Detach)}<button type="button" data-testid="instance-detach" onclick={() => onrun(Action.DetachInstance)}>Detach</button>{/if}

@@ -26,3 +26,9 @@ Text blue, images green, video pink, audio orange, first frame purple, last fram
 ## First and last frame
 
 A video node can have separate **first frame** and **last frame** ports. An image wired there gets that temporal role instead of being a generic reference.
+
+## Magnetic ports, cable ties and cutting wires
+
+- **Magnetic ports.** While you drag a wire, the nearest port that accepts it pulls the wire's end into a soft bubble. Let go inside the bubble and the wire connects. Ports that can't take the wire are dimmed.
+- **Cable ties.** Hold <kbd>Alt</kbd> and drag a line across two or more wires to tie them together. Drag the tie to move the bundle. Hover it and click **×** to remove it. Agents can do the same with the `set_edge_tie` canvas tool.
+- **Cut a wire.** Hover the middle of a wire and click **×**.

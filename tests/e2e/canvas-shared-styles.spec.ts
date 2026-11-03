@@ -15,13 +15,13 @@ const frame = (text: string, styled: boolean) => ({
   durationInFrames: 150,
   background: 'brand',
   still: { frame: 0 },
-  tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 't', component: 'Text', from: 0, durationInFrames: 150, ...(styled ? { styleRef: 'Brand' } : {}), props: { text, size: 0.12, x: 0.5, y: 0.5, width: 0.6, height: 0.25, ...(styled ? { color: RED } : {}) } }] }],
+  tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [{ id: 't', component: 'Text', from: 0, durationInFrames: 150, ...(styled ? { paintStyleRef: 'Brand' } : {}), props: { text, size: 0.12, x: 0.5, y: 0.5, width: 0.6, height: 0.25, ...(styled ? { color: RED } : {}) } }] }],
   comps: {},
   assets: [],
   ...(styled ? { styles: { Brand: { kind: 'colour', color: RED } } } : {})
 });
 
-type Head = { tracks: { clips: { styleRef?: string; props: { color?: string } }[] }[] };
+type Head = { tracks: { clips: { paintStyleRef?: string; props: { color?: string } }[] }[] };
 
 test.describe('styles shared by the frames of a canvas @real', () => {
   test.skip(!REAL_STACK, 'requires a stack: E2E_REAL_STACK=1');
@@ -48,7 +48,7 @@ test.describe('styles shared by the frames of a canvas @real', () => {
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(boxB.x + boxB.width / 2, boxB.y + boxB.height / 2);
 
-    const pick = page.getByTestId('clip-style');
+    const pick = page.getByTestId('clip-paint-style');
     await expect(pick).toBeVisible({ timeout: 15_000 });
     await pick.selectOption('Brand');
     await page.waitForTimeout(SETTLE_MS);
@@ -67,7 +67,7 @@ test.describe('styles shared by the frames of a canvas @real', () => {
     };
     for (const node of [a, b]) {
       await expect.poll(async () => (await head(node.id)).props.color, { timeout: 20_000 }).toBe(GREEN);
-      expect((await head(node.id)).styleRef).toBe('Brand');
+      expect((await head(node.id)).paintStyleRef).toBe('Brand');
     }
   });
 

@@ -15,7 +15,7 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
-  import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
+  import { BUDGET, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
@@ -23,7 +23,9 @@
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
+  import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
+  import { frameSources } from '$lib/canvas/core/frame-sources';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
@@ -39,7 +41,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onsource = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onfallback: (why: string) => void } = $props();
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -87,14 +89,6 @@
   const smoothing = smoothingOf(navigator.userAgent);
   const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null));
 
-  async function buildHere(f: FrameAt, url: string): Promise<{ list: DisplayList; custom: CustomFrame | null } | null> {
-    const res = await fetch(url);
-    if (!res.ok || res.status === HTTP_NO_CONTENT) {
-      return null;
-    }
-    return buildSource(f, (await res.json()) as FrameDoc);
-  }
-
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
     return res.ok && res.status !== HTTP_NO_CONTENT ? ((await res.json()) as FrameDoc) : null;
@@ -135,9 +129,13 @@
   }
 
   async function fetchAndBuild(f: FrameAt) {
-    const url = new URL(`${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`, location.href).href;
-    const away = f.scenes ? null : await buildAway(url, smoothing).catch(() => null);
-    return away ? { list: away, custom: null } : buildHere(f, url);
+    const source = await frameSources(`${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`);
+    if (!source) {
+      return null;
+    }
+
+    const away = f.scenes ? null : await buildAway(source, smoothing).catch(() => null);
+    return { ...(away ? { list: away, custom: null } : await buildSource(f, source)), source };
   }
 
   const HTTP_NO_CONTENT = 204;
@@ -158,9 +156,13 @@
 
   async function load(f: FrameAt) {
     const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
-    const built = given ? await buildSource(f, given) : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
+    const read = given ? null : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
+    const built = given ? await buildSource(f, given) : read;
     if (!built) {
       return;
+    }
+    if (read) {
+      onsource(f.id, { ...read.source, revision: f.revision });
     }
     const ready = await media.ready(built.list);
     if (built.custom) {
@@ -168,7 +170,7 @@
     }
     logGaps(f.id, built.list);
     loaded.set(f.id, keyOf(f));
-    lists = new Map(lists).set(keyOf(f), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind));
+    lists = listed(lists, f.id, keyOf(f), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
   }
 
   let liveGroup = $state(new Map<string, string>());
@@ -193,7 +195,7 @@
     }
     const key = `${f.id}:live${generation}`;
     logGaps(f.id, built.list);
-    lists = new Map(lists).set(key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind));
+    lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
   }
@@ -268,7 +270,7 @@
   const cardPuts = $derived(shownCards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, bytes: pictureBytes(c.frame.list.items), turn: c.turn }] : [])));
 
   const whole = $derived([...cardPuts, ...framePuts]);
-  const textureBytes = budget.textureBytes;
+  const textureBytes = $derived(textureBudget(budget.textureBytes, { width: area.width * resolution, height: area.height * resolution }));
   const real = $derived(resident(whole, view, area, textureBytes));
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
@@ -355,7 +357,7 @@
         putting.clear();
         sent = new SentUses();
         sentOverlay = new SentParts();
-        r.setBudget?.(budget.textureBytes);
+        r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         raster = r;
       },
       (e: unknown) => {

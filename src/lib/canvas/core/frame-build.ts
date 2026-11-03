@@ -13,7 +13,7 @@ export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string
 
 export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>;
 
-export type BuildAsk = { id: number; url: string; smoothing: Smoothing; locals: LocalFilesSnapshot };
+export type BuildAsk = { id: number; source: FrameDoc; smoothing: Smoothing; locals: LocalFilesSnapshot };
 
 export type BuildAnswer = { id: number; list: DisplayList | null; wires: string[] } | { id: number; error: string };
 
@@ -32,7 +32,7 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
 
 export const builtAnswer = (id: number, list: DisplayList | null): BuildAnswer => ({ id, list, wires: list ? list.items.map(itemWire) : [] });
 
-export function frameBuilder(spawn: () => BuildWorker | null): (url: string, smoothing: Smoothing) => Promise<DisplayList | null> {
+export function frameBuilder(spawn: () => BuildWorker | null): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
   let worker: BuildWorker | null = null;
   let dead = false;
   let next = 0;
@@ -59,7 +59,7 @@ export function frameBuilder(spawn: () => BuildWorker | null): (url: string, smo
     waiting.clear();
   };
 
-  return (url, smoothing) => {
+  return (source, smoothing) => {
     worker = dead ? null : (worker ?? spawn());
     if (!worker) {
       return Promise.reject(new Error('no frame worker'));
@@ -67,7 +67,7 @@ export function frameBuilder(spawn: () => BuildWorker | null): (url: string, smo
     worker.onmessage = answer;
     worker.onerror = die;
     const id = next++;
-    worker.postMessage({ id, url, smoothing, locals: localFilesSnapshot() });
+    worker.postMessage({ id, source, smoothing, locals: localFilesSnapshot() });
     return new Promise((resolve, reject) => waiting.set(id, { resolve, reject }));
   };
 }

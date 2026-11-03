@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActionKind, DEFAULT_OVERLAY, Direction, OverlayPosition, TransitionKind, TriggerKind, type Interaction } from '@feega/motion-core/motion/prototype/model';
-import { TRANSITION_FIELDS, backdropOf, backdropParts, reoverlaid, retimed, retargeted, retriggered } from './edit';
+import { DEFAULT_URL, TRANSITION_FIELDS, backdropOf, freshInteraction, relinked, backdropParts, reoverlaid, retimed, retargeted, retriggered } from './edit';
 
 const base: Interaction = { id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.Navigate, target: 'b' }, transition: { kind: TransitionKind.Instant } };
 
@@ -68,5 +68,18 @@ describe('inspector edits of an interaction', () => {
     expect(backdropOf('#1a2b3c', 45)).toBe('#1a2b3c73');
     expect(backdropOf('#1a2b3c', 140)).toBe('#1a2b3cff');
     expect(backdropOf('#1a2b3c', -3)).toBe('#1a2b3c00');
+  });
+
+  it('switching to open url starts from a placeholder link, and a new url replaces it', () => {
+    const opened = retargeted(base, ActionKind.OpenUrl, 'b');
+
+    expect(opened.action).toEqual({ kind: ActionKind.OpenUrl, url: DEFAULT_URL });
+    expect(relinked(opened, 'https://feega.app').action).toEqual({ kind: ActionKind.OpenUrl, url: 'https://feega.app' });
+    expect(relinked(opened, 'feega.app').action).toEqual({ kind: ActionKind.OpenUrl, url: 'https://feega.app' });
+  });
+
+  it('a new interaction is a click that navigates to the first frame, or opens a link when there is none', () => {
+    expect(freshInteraction('n1', 'b').action).toEqual({ kind: ActionKind.Navigate, target: 'b' });
+    expect(freshInteraction('n1', null)).toEqual({ id: 'n1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenUrl, url: DEFAULT_URL }, transition: { kind: TransitionKind.Instant } });
   });
 });
