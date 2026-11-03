@@ -1,6 +1,6 @@
 import { resolveColor, type BrandTokens } from '../brand';
 import { Background, type MotionClip, type MotionDoc } from '../doc';
-import { TrackKind, type ComponentId } from '../components';
+import { TEXT_ENTRANCES, TrackKind, type ComponentId } from '../components';
 import { imageRectangle } from '../image-dress';
 import { animProp, sampleColor, Source, TRANSFORM, ValueKind, type TransformKey } from '../keyframes';
 import { sampleTrack } from '../sample-track';
@@ -654,6 +654,53 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;
   const bleed = paintBleed(doc);
   return { ...size, background, items: faded(doc, framed, frameFadeAt(doc, frame)), unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}), ...(bleed ? { bleed } : {}) };
+}
+
+export type Corner = [number, number];
+
+export type Placed = { clip: string; corners: [Corner, Corner, Corner, Corner]; cuts: Corner[][]; opacity: number };
+
+export type Placer = { drawn: readonly string[]; place: (clipId: string) => Placed | null };
+
+const [STILL_ENTRANCE] = TEXT_ENTRANCES;
+
+const entersFading = (clip: MotionClip) => isText(clip) && (clip.props.entrance ?? STILL_ENTRANCE) !== STILL_ENTRANCE;
+
+const placementOf = (clip: MotionClip): Placement => (PAINTERS[clip.component]?.place === fullFrame ? fullFrame : boxed);
+
+const cutCorners = (cut: MaskLayer): Corner[] => {
+  const contour = cut.cover.kind === CoverKind.Path ? (cut.cover.contours[0] ?? []) : [];
+  return Array.from({ length: contour.length / 2 }, (_, i) => apply2d(cut.cover.matrix, [contour[i * 2], contour[i * 2 + 1]]));
+};
+
+const scissorCorners = ([x, y, w, h]: Scissor): Corner[] => [
+  [x, y],
+  [x + w, y],
+  [x + w, y + h],
+  [x, y + h]
+];
+
+export function placerAt(prepared: Prepared, frame: number): Placer {
+  const { doc } = prepared;
+  const { css, size, byId, effectiveEdge, drawable, alphaOf } = stageAt(prepared, frame);
+
+  const place = (clipId: string): Placed | null => {
+    const clip = byId.get(clipId);
+    if (!clip) {
+      return null;
+    }
+    const { box, turn, opacity } = placementOf(clip)(propsAt(clip, frame, css), size);
+    const edge = effectiveEdge(clip);
+    const world = mul2d(posed(edge, size.width, size.height), worldAt(doc, clipId, frame, size));
+    const placed = mul2d(mul2d(mul2d(world, [1, 0, 0, 1, box.left, box.top]), turn), posed(moveAt(clip, frame), box.width, box.height));
+    const corner = (x: number, y: number): Corner => apply2d(placed, [x, y]);
+    const corners: Placed['corners'] = [corner(0, 0), corner(box.width, 0), corner(box.width, box.height), corner(0, box.height)];
+    const scissor = scissorOf(edge, size.width, size.height);
+    const cuts = [...contentCuts(doc, clip, byId, size, frame).map(cutCorners), ...(scissor ? [scissorCorners(scissor)] : [])];
+    return { clip: clipId, corners, cuts, opacity: alphaOf(clip, opacity, edge) * (entersFading(clip) ? textFadeAt(prepared, frame, clip) : 1) };
+  };
+
+  return { drawn: drawable.map((c) => c.id), place };
 }
 
 const CLEAR: Rgba = [0, 0, 0, 0];
