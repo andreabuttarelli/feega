@@ -1,5 +1,6 @@
 import type { Point } from './camera';
 import { curvePoint, type Curve, type Port } from './geometry';
+import { CONNECTOR_STYLE } from '../connectors';
 
 export type Spring = { value: number; velocity: number };
 
@@ -87,4 +88,37 @@ export type Tie = { id: string; x: number; y: number };
 export function tieOf(raw: unknown): Tie | null {
   const t = raw as Partial<Tie> | null;
   return t && typeof t.id === 'string' && Number.isFinite(t.x) && Number.isFinite(t.y) ? { id: t.id, x: t.x!, y: t.y! } : null;
+}
+
+export const UNTYPED_BUBBLE = '#0099ff';
+
+export const bubbleColour = (p: Port): string => (p.port ? CONNECTOR_STYLE[p.port].color : UNTYPED_BUBBLE);
+
+export enum Wiring {
+  Idle = 'idle',
+  Dragging = 'dragging'
+}
+
+export enum WireAim {
+  None = 'none',
+  Port = 'port',
+  Drop = 'drop',
+  Refused = 'refused'
+}
+
+export const WIRE_CURSOR: Record<WireAim, string | null> = {
+  [WireAim.None]: null,
+  [WireAim.Port]: 'crosshair',
+  [WireAim.Drop]: 'copy',
+  [WireAim.Refused]: 'not-allowed'
+};
+
+export function wireAim(wiring: Wiring, under: Port | null, magnet: Port | null): WireAim {
+  if (wiring === Wiring.Idle) {
+    return under ? WireAim.Port : WireAim.None;
+  }
+  if (magnet) {
+    return WireAim.Drop;
+  }
+  return under ? WireAim.Refused : WireAim.None;
 }

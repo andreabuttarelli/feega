@@ -140,6 +140,14 @@ describe('tileChrome', () => {
     expect(ports[1].paint).toEqual({ kind: PaintKind.Solid, color: rgbaOf(CONNECTOR_STYLE.images.color) });
   });
 
+  it('draws a port as a hollow ring in its colour with a dot at its centre', () => {
+    const [port] = ofPart(tile({ outputs: marks('videos') }), ChromePart.PortOut);
+
+    expect(port.contours).toHaveLength(3);
+    expect(box([port.contours[1]])).toEqual([402, 272, 408, 278]);
+    expect(box([port.contours[2]])).toEqual([404, 274, 407, 277]);
+  });
+
   it('centres the output port on the right edge', () => {
     const [port] = ofPart(tile({ outputs: marks('videos') }), ChromePart.PortOut);
 

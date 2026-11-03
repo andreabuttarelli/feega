@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bubbleRadius, crossings, magnetPort, atRest, springTo, throughPoint, tieAcross, type Spring } from './wire-magnet';
+import { UNTYPED_BUBBLE, WIRE_CURSOR, WireAim, Wiring, atRest, bubbleColour, bubbleRadius, crossings, magnetPort, springTo, throughPoint, tieAcross, wireAim, type Spring } from './wire-magnet';
+import { CONNECTOR_STYLE } from '../connectors';
 import { PortSide, curvePoint, wireCurve, type Port } from './geometry';
 
 const port = (nodeId: string, x: number, y: number): Port => ({ nodeId, side: PortSide.In, handle: null, port: null, x, y });
@@ -77,5 +78,28 @@ describe('tieAcross — a stroke across wires bundles the ones it cuts', () => {
 
   it('counts a wire once', () => {
     expect(crossings(wires[0].curve, { x: 100, y: -10 }, { x: 100, y: 10 })).toHaveLength(1);
+  });
+});
+
+describe('bubbleColour — the bubble wears the colour of the port it is drawn to', () => {
+  it('uses the connector colour of a typed port, the accent for an untyped one', () => {
+    expect(bubbleColour({ ...port('a', 0, 0), port: 'images' })).toBe(CONNECTOR_STYLE.images.color);
+    expect(bubbleColour(port('a', 0, 0))).toBe(UNTYPED_BUBBLE);
+  });
+});
+
+describe('wireAim — the cursor tells what a release would do', () => {
+  const p = port('a', 0, 0);
+  it('idle: crosshair on a port, default elsewhere', () => {
+    expect(wireAim(Wiring.Idle, p, null)).toBe(WireAim.Port);
+    expect(wireAim(Wiring.Idle, null, null)).toBe(WireAim.None);
+  });
+  it('dragging: drop inside a bubble, refused on a port that would not take it, default elsewhere', () => {
+    expect(wireAim(Wiring.Dragging, p, p)).toBe(WireAim.Drop);
+    expect(wireAim(Wiring.Dragging, null, p)).toBe(WireAim.Drop);
+    expect(wireAim(Wiring.Dragging, p, null)).toBe(WireAim.Refused);
+    expect(wireAim(Wiring.Dragging, null, null)).toBe(WireAim.None);
+    expect(WIRE_CURSOR[WireAim.Drop]).toBe('copy');
+    expect(WIRE_CURSOR[WireAim.Refused]).toBe('not-allowed');
   });
 });

@@ -226,7 +226,7 @@
   import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { atRest, bubbleRadius, magnetPort, springTo, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
+  import { WIRE_CURSOR, Wiring, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
@@ -638,6 +638,10 @@
   function tieAt(t: Tie): Tie {
     return tieMove?.id === t.id ? tieMove : t;
   }
+
+  let underPort = $state<Port | null>(null);
+  const wireCursor = $derived(WIRE_CURSOR[wireAim(ghost ? Wiring.Dragging : Wiring.Idle, ghost ? underPort : hoverPort, magnet)]);
+  let bubbleTint = $state<string>('');
 
   const ties = $derived(
     [...new Set(edges.flatMap((e) => (e.tie ? [e.tie.id] : [])))].flatMap((id) => {
@@ -2937,6 +2941,7 @@
         hoverHandle(w);
       }
       hoverPort = e.pointerType === 'mouse' && connectable ? portAt(ports, w, view.zoom) : null;
+      bubbleTint = hoverPort ? bubbleColour(hoverPort) : bubbleTint;
       if (e.pointerType === 'mouse') {
         hoverWires(w);
       }
@@ -3042,6 +3047,8 @@
           return;
         }
         magnet = magnetPort(ports, w, MAGNET_REACH_PX / view.zoom, accepts(a.from));
+        underPort = portAt(ports, w, view.zoom);
+        bubbleTint = magnet ? bubbleColour(magnet) : bubbleTint;
         const c = magnet ? wireTo(a.from, magnet) : candidate(a.from, w);
         const why = c ? connectionRefusal(placed, edges, lookup, c) : '';
         refusal = why || null;
@@ -3138,6 +3145,7 @@
         ghost = null;
         wiringFrom = null;
         magnet = null;
+        underPort = null;
         refusal = null;
         if (!c || connectionRefusal(placed, edges, lookup, c) !== null) {
           return;
@@ -4151,7 +4159,7 @@
       pickHover = null;
     }}
     class:panning={space}
-    style:cursor={handleCursor}
+    style:cursor={wireCursor ?? handleCursor}
     data-owns-pinch
   >
     {#if !failed}
@@ -4257,12 +4265,13 @@
           <circle class="port-dim" cx={p.x} cy={p.y} r={7 / view.zoom} />
         {/each}
         {#if bubble && bubble.r > 0}
-          <g class="goo" class:snapping={magnet !== null} filter="url(#wire-goo)" data-testid="wire-magnet-bubble" data-target={magnet ? `${magnet.nodeId}:${magnet.handle ?? ''}` : ''}>
+          <g class="goo" class:snapping={magnet !== null} style:--bubble={bubbleTint} filter="url(#wire-goo)" data-testid="wire-magnet-bubble" data-target={magnet ? `${magnet.nodeId}:${magnet.handle ?? ''}` : ''}>
             <circle cx={bubble.x} cy={bubble.y} r={bubble.r} />
             {#if bubble.er > 0}
               <circle cx={bubble.ex} cy={bubble.ey} r={bubble.er} />
             {/if}
           </g>
+          <circle class="goo-rim" style:--bubble={bubbleTint} cx={bubble.x} cy={bubble.y} r={bubble.r} stroke-width={1 / view.zoom} />
         {/if}
         {#if tieStroke}
           <line class="tie-stroke" data-testid="tie-stroke" x1={tieStroke.from.x} y1={tieStroke.from.y} x2={tieStroke.to.x} y2={tieStroke.to.y} stroke-width={1.5 / view.zoom} />
@@ -4642,11 +4651,18 @@
   }
 
   .wire-magnet .goo {
-    fill: color-mix(in srgb, var(--ui-accent, #0a84ff) 35%, transparent);
+    fill: var(--bubble, var(--ui-accent));
+    opacity: 0.18;
   }
 
   .wire-magnet .goo.snapping {
-    fill: color-mix(in srgb, var(--ui-accent, #0a84ff) 55%, transparent);
+    opacity: 0.25;
+  }
+
+  .wire-magnet .goo-rim {
+    fill: none;
+    stroke: var(--bubble, var(--ui-accent));
+    opacity: 0.5;
   }
 
   .wire-magnet .port-dim {
