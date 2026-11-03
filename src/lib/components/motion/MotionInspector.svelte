@@ -616,7 +616,7 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
-    {#if layerExtras}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<StyleSection {doc} {clip} {scale} {commit} />{/if}
     {#if layerExtras}<VariablesSection {doc} {clip} {commit} />{/if}
   {/if}
 

@@ -24,7 +24,7 @@ describe('the styles library shared by the frames of a canvas', () => {
   it('is every frame style, matched by name', () => {
     const a = must(defineStyle(withText(), 'Brand', RED));
     const b = must(defineStyle(withText(), 'Accent', BLUE));
-    expect(libraryOf([a, b])).toEqual({ Brand: RED, Accent: BLUE });
+    expect(libraryOf([{ doc: a, scale: 1 }, { doc: b, scale: 1 }])).toEqual({ Brand: RED, Accent: BLUE });
   });
 
   it('applying a style a frame lacks copies it in and links the element', () => {
@@ -71,11 +71,11 @@ describe('a text style is the same px in every frame, as in Figma', () => {
   const body = { kind: StyleKind.Text, size: 16 / 390, weight: 400 } as const;
 
   it('the library holds the px the style has in its frame', () => {
-    expect(libraryOf([must(defineStyle(sized(390, 844), 'Body', body))]).Body).toEqual({ kind: StyleKind.Text, sizePx: 16, weight: 400 });
+    expect(libraryOf([{ doc: must(defineStyle(sized(390, 844), 'Body', body)), scale: 1 }]).Body).toEqual({ kind: StyleKind.Text, sizePx: 16, weight: 400 });
   });
 
   it('a 16 px style applied in a 342×52 button is 16 px there', () => {
-    const library = libraryOf([must(defineStyle(sized(390, 844), 'Body', body))]);
+    const library = libraryOf([{ doc: must(defineStyle(sized(390, 844), 'Body', body)), scale: 1 }]);
 
     expect(sizeOf(must(adoptStyle(sized(342, 52), ['t'], 'Body', library.Body)))).toBeCloseTo(16, 3);
   });
@@ -84,5 +84,34 @@ describe('a text style is the same px in every frame, as in Figma', () => {
     const small = must(adoptStyle(sized(342, 52), ['t'], 'Body', { kind: StyleKind.Text, sizePx: 16 }));
 
     expect(sizeOf(syncedDoc(small, 'Body', { kind: StyleKind.Text, sizePx: 20 })!)).toBeCloseTo(20, 3);
+  });
+});
+
+describe('a text style on a frame drawn at two doc px per canvas px', () => {
+  const LEGACY_SCALE = 0.5;
+  const legacy = () => must(addClip({ ...newMotionDoc(MotionFormat.Landscape), width: 780, height: 1688, freeSize: true }, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'a' } }, 't'));
+  const canvasPxOf = (doc: MotionDoc) => Number(findClip(doc, 't')!.clip.props.size) * Math.min(doc.width, doc.height) * LEGACY_SCALE;
+  const body = { kind: StyleKind.Text, sizePx: 16, weight: 400 } as const;
+
+  it('a 16 px style draws 16 canvas px, not 8', () => {
+    expect(canvasPxOf(must(adoptStyle(legacy(), ['t'], 'Body', body, LEGACY_SCALE)))).toBeCloseTo(16, 3);
+  });
+
+  it('editing it keeps it in canvas px', () => {
+    const using = must(adoptStyle(legacy(), ['t'], 'Body', body, LEGACY_SCALE));
+
+    expect(canvasPxOf(syncedDoc(using, 'Body', { ...body, sizePx: 20 }, LEGACY_SCALE)!)).toBeCloseTo(20, 3);
+  });
+
+  it('the library reads the canvas px the style draws at', () => {
+    const using = must(adoptStyle(legacy(), ['t'], 'Body', body, LEGACY_SCALE));
+
+    expect(libraryOf([{ doc: using, scale: LEGACY_SCALE }]).Body).toEqual(body);
+  });
+
+  it('the offered style is sized for this frame', () => {
+    const offered = offeredStyles(legacy(), 'Text', { Body: body }, LEGACY_SCALE).find((o) => o.name === 'Body');
+
+    expect(offered?.style).toMatchObject({ size: 16 / (780 * LEGACY_SCALE) });
   });
 });

@@ -37,8 +37,9 @@
     ram = [],
     onram = () => {},
     assetUrl,
+    scale = 1,
     onchange
-  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; assetUrl?: (assetId: string) => string; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  }: { doc: MotionDoc; frame: number; selection: string[]; mode?: EditMode; onframe: (frame: number) => void; onselect: (ids: string[]) => void; onmode?: () => void; onaction?: (id: ActionId) => void; marks?: CommentMark[]; onmark?: (id: string, frame: number) => void; onpin?: () => void; ram?: FrameRange[]; onram?: () => void; assetUrl?: (assetId: string) => string; scale?: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const GROUPING: readonly ActionId[] = [Action.Group, Action.Ungroup];
 
@@ -172,7 +173,7 @@
     {#if graphOpen}
       <GraphEditor {doc} {frame} {selection} bind:keySelection {camera} {onchange} />
     {:else}
-      <MotionTimeline {doc} bind:frame={() => frame, scrub} bind:selection={() => selection, onselect} bind:keySelection bind:camera bind:zoom snap={Snap.On} cached={ram} {onchange} />
+      <MotionTimeline {doc} bind:frame={() => frame, scrub} bind:selection={() => selection, onselect} bind:keySelection bind:camera bind:zoom snap={Snap.On} cached={ram} {scale} {onchange} />
     {/if}
   </div>
 </section>

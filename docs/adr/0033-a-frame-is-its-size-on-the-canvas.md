@@ -44,13 +44,21 @@ Figma: a frame's size is design units; resolution is chosen at export (1×, 2×,
    its own short side. `inLibrary`/`inDoc` (`style-library.ts`) are the only conversions, so a 16
    px style is 16 px in a phone and in a 52 px button. Legacy library entries with `size` keep
    their share until edited.
-8. **The motion agent speaks doc px.** Its session has no node box and its sizing is tuned to the
-   composition; for new frames doc px are canvas px. `export_image` stays relative to the doc.
+8. **The motion agent and MCP speak canvas px too** (amended 2026-11-03). Where tools run
+   (`turn.ts`, `tool-run.ts`, `motionSummary`) the node box gives the scale (`docScaleOf`,
+   `doc-scale.ts`) and `toolSpace(doc, scale)` (`tool-space.ts`) is the one boundary: its
+   `frame` feeds every units conversion, `toDoc`/`toCanvas` the raw px (arrange offsets, guides,
+   depth, `set_canvas` sizes), `layoutIn`/`layoutOut` the stack gap, padding and fixed tracks.
+   `export_image` scale 1 is one image px per canvas px. The timeline value fields and project
+   text styles convert through the same scale.
 
 ## Rejected
 
 - Keeping drawn frames at 2× and converting at every agent tool: ~30 conversion sites in
-  `motion-tools.ts` without a node box, and agent sizing would shift on every legacy frame.
+  `motion-tools.ts`. The amendment of 8 converts at one boundary instead: the sites take the
+  `toolSpace` frame, no per-tool condition.
+- Rescaling the doc for the tool run and back: custom component CSS and stored doc px (blur,
+  depth, gaps) would need a full uniform rescale, lossy on every save.
 - Rescaling old docs to 1× on open (same reason as 0032).
 - A separate 1×/2× control for MP4: the resolution control already is the video's scale.
 - Defaulting export to each frame's native density: one more rule; 2× covers the frames people
