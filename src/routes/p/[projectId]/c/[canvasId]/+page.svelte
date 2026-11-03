@@ -54,7 +54,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { createPlaceSaves, keepPending, placedRows } from '$lib/canvas/place-save';
   import { LineAction, createOpQueue, keepLines } from '$lib/canvas/op-queue';
-  import { idbShelf, openOutbox, type Outbox } from '$lib/canvas/outbox';
+  import { outboxKey, type Outbox } from '$lib/canvas/outbox';
   import { pendingWrites, syncOf } from '$lib/canvas/sync-status';
   import { DrawAction, drawOp, isDraw, keepDrawn } from '$lib/canvas/draw-queue';
   import { draftLog, replayDrafts, type DraftEntry, type DraftLog } from '$lib/canvas/frame-drafts';
@@ -718,31 +718,25 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function saveFrame(id: string, box: CanvasBox): Promise<boolean> {
-    const land = holdGesture();
     const res = await queueDraw(DrawAction.Frame, id, { box: JSON.stringify(box) });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
-      land(null);
       nodes = settle(nodes, id, null);
       return false;
     }
-    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     focusOn([id], undefined, FocusMode.Drawn);
     return true;
   }
 
   async function saveDrawn(id: string, drawn: DrawnWire): Promise<boolean> {
-    const land = holdGesture();
     const res = await queueDraw(DrawAction.Element, id, { drawn: JSON.stringify(drawn) });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
-      land(null);
       catalogPosters.delete(id);
       nodes = settle(nodes, id, null);
       return false;
     }
-    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     const hold = 'box' in drawn ? frameHolding(nodes, drawn.box) : null;
     if (hold) {
@@ -869,7 +863,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     };
   }
 
-  let nodes = $state<Tile[]>((data.nodes as CanvasNodeRecord[]).map((n) => toTile(n)));
+  const membersIn = (rows: Tile[]) => (id: string): Set<string> => new Set(rows.filter((n) => layoutOf(n.data).groupId === id).map((n) => n.id));
+  const keptPlaces = (rows: Tile[]) => placedRows(rows, places.unsentEntries(), membersIn(rows));
+  const loadedTiles = (data.nodes as CanvasNodeRecord[]).map((n) => toTile(n));
+  let nodes = $state<Tile[]>(placedRows(loadedTiles, data.outbox?.places ?? [], membersIn(loadedTiles)));
   let heldCanvas = $state(untrack(() => data.canvas.id));
   const nodeById = $derived(byId(nodes));
 
@@ -1661,9 +1658,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function queueDraw(action: DrawAction, id: string, fields: Record<string, string>): Promise<DrawAnswer> {
-    const done = drawPending(id);
-    draws.push(drawOp(action, id, fields));
-    return done;
+    const op = drawOp(action, id, fields);
+    const answer = drawPending(id);
+    draws.push(op);
+    undoStack.push({ source: 'draw', op, answer });
+    return answer;
   }
 
   const draws = createOpQueue({
@@ -1698,6 +1697,30 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     },
     [DrawAction.Frame]: (op) => drawnFrameTile(op.opId, JSON.parse(op.fields.box) as CanvasBox).node
   };
+
+  function redraw(op: Op): StackEntry {
+    const ghost = GHOST_OF[op.action as DrawAction](op);
+    if (ghost && !nodes.some((n) => n.id === op.opId)) {
+      nodes = [...nodes, toTile(ghost)];
+    }
+    const answer = drawPending(op.opId);
+    void answer.then((landed) => settleDrawn(op.opId, landed));
+    draws.push(op);
+    return { source: 'draw', op, answer };
+  }
+
+  async function undraw(entry: DrawEntry): Promise<StackEntry | null> {
+    if (draws.takeBack(entry.op.opId)) {
+      drawAnswered(entry.op.opId, null);
+      return { source: 'undrawn', op: entry.op };
+    }
+    const items = ((await entry.answer)?.undo ?? []) as UndoItem[];
+    let out: StackEntry | null = null;
+    if (items.length) {
+      await applyUndo({ items }, (redo) => (out = { source: 'server', gesture: redo }));
+    }
+    return out;
+  }
 
   function restoreDraws(ops: Op[]) {
     const ghosts = ops.filter((op) => isDraw(op.action) && !nodes.some((n) => n.id === op.opId)).map((op) => GHOST_OF[op.action as DrawAction](op));
@@ -1751,17 +1774,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void outbox?.save({ nodes: saves.unsentPatches(), places: places.unsentEntries() });
   }
 
-  const membersOf = (id: string): Set<string> => new Set(nodes.filter((n) => layoutOf(n.data).groupId === id).map((n) => n.id));
-
-  async function reopenOutbox(key: string) {
-    const opened = await openOutbox(idbShelf(), key);
+  async function reopenOutbox(opened: Outbox) {
     outbox = opened;
     for (const [id, patch] of Object.entries(opened.nodes)) {
       if (nodes.some((node) => node.id === id)) {
         void write(id, patch, SaveTiming.Now);
       }
     }
-    nodes = placedRows(nodes, opened.places, membersOf);
+    nodes = placedRows(nodes, opened.places, membersIn(nodes));
     places.restore(opened.places);
     lines.restore(opened.ops);
     restoreDraws(opened.draws);
@@ -1777,12 +1797,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
+  const openedOutboxKey = $derived(data.session?.user?.id ? outboxKey(data.session.user.id, data.canvas.id) : null);
+
   $effect(() => {
-    const user = data.session?.user?.id;
-    if (!user || typeof indexedDB === 'undefined') {
+    if (!openedOutboxKey) {
       return;
     }
-    void untrack(() => reopenOutbox(`${user}:${data.canvas.id}`));
+    const kept = untrack(() => data.outbox);
+    if (kept) {
+      void reopenOutbox(kept);
+    }
   });
 
   $effect(() => {
@@ -1810,7 +1834,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
   type ResizeEntry = { source: 'resize'; gesture: ResizeGesture; inner: StackEntry[] };
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
+  type DrawEntry = { source: 'draw'; op: Op; answer: Promise<DrawAnswer> };
+  type StackEntry = DrawEntry | { source: 'undrawn'; op: Op } | { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -2081,7 +2106,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function openCanvas(loaded: CanvasNodeRecord[]) {
     snapshotVersion += 1;
     runsOverride = null;
-    nodes = keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty);
+    nodes = keptPlaces(keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty));
     heldCanvas = data.canvas.id;
     edges = (data.connections as Connection[]).map(toEdge);
     seenRevision = data.revision;
@@ -4346,6 +4371,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     if (entry.source === 'resize') {
       return reverseResize(entry, way);
+    }
+    if (entry.source === 'draw') {
+      return undraw(entry);
+    }
+    if (entry.source === 'undrawn') {
+      return redraw(entry.op);
     }
     if (entry.source === 'many') {
       const steps = await reverseEach(entry.steps, (step) => reverse(step, way));
