@@ -22,7 +22,7 @@
 
   const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles));
   const offeredIn = (slot: StyleSlot) => offered.filter((s) => slotOf(s.style.kind) === slot);
-  const linkedStyles = $derived([clip.styleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
+  const linkedStyles = $derived([clip.styleRef, clip.paintStyleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
   const overridden = $derived(overridesOf(doc, clip.id));
   let name = $state('');
 
@@ -55,7 +55,10 @@
 </script>
 
 <Section title="Style">
-  {@render picker('Style', 'clip-style', StyleSlot.Look, clip.styleRef)}
+  {#if 'font' in clip.props || clip.styleRef}
+    {@render picker('Text style', 'clip-style', StyleSlot.Look, clip.styleRef)}
+  {/if}
+  {@render picker('Colour style', 'clip-paint-style', StyleSlot.Paint, clip.paintStyleRef)}
   {#if clip.component in FILLED || clip.effects.length || offeredIn(StyleSlot.Effect).length || clip.effectStyleRef}
     {@render picker('Effect style', 'clip-effect-style', StyleSlot.Effect, clip.effectStyleRef)}
   {/if}

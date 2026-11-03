@@ -1,8 +1,10 @@
 import type { z } from 'zod';
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { fieldsOf } from './inspector';
+import { registerFont } from './fonts/ops';
+import { GOOGLE_FONTS } from './fonts/catalogue';
 import { inEveryScope } from './doc-scopes';
-import { FillType } from '@feega/motion-core/motion/fill/model';
+import { FillType, fillsSchema } from '@feega/motion-core/motion/fill/model';
 import { FILLED, elementFills } from '@feega/motion-core/motion/fill/elements';
 import { effectOfKey, effectsProblem, type Effect } from '@feega/motion-core/motion/effects/model';
 import { editClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
@@ -23,6 +25,7 @@ export enum StyleAction {
 
 export enum StyleSlot {
   Look = 'styleRef',
+  Paint = 'paintStyleRef',
   Effect = 'effectStyleRef'
 }
 
@@ -31,8 +34,8 @@ export type NamedStyle = { name: string; style: Style; clips: string[] };
 export const SLOTS = Object.values(StyleSlot);
 const SLOT_OF: Record<StyleKind, StyleSlot> = {
   [StyleKind.Text]: StyleSlot.Look,
-  [StyleKind.Colour]: StyleSlot.Look,
-  [StyleKind.Paint]: StyleSlot.Look,
+  [StyleKind.Colour]: StyleSlot.Paint,
+  [StyleKind.Paint]: StyleSlot.Paint,
   [StyleKind.Effect]: StyleSlot.Effect
 };
 
@@ -63,7 +66,7 @@ function textPatch(style: z.infer<typeof textStyleSchema>, keys: Set<string>): R
 }
 
 function colourPatch(style: z.infer<typeof colourStyleSchema>, keys: Set<string>): Record<string, unknown> {
-  return keys.has(COLOUR_KEY) ? { color: style.color } : { fills: [{ type: FillType.Solid, color: style.color, opacity: 1, visible: true }] };
+  return keys.has(COLOUR_KEY) ? { color: style.color } : { fills: fillsSchema.parse([{ type: FillType.Solid, color: style.color }]) };
 }
 
 const omitKeys = <T>(record: Record<string, T>, drop: (key: string) => boolean): Record<string, T> => Object.fromEntries(Object.entries(record).filter(([key]) => !drop(key)));
@@ -125,8 +128,16 @@ function withoutRefs(doc: MotionDoc, ids: readonly string[], slots: readonly Sty
   return slots.reduce((next, slot) => withRef(next, ids, slot, undefined), doc);
 }
 
+function withFontOf(doc: MotionDoc, style: Style): MotionDoc {
+  if (style.kind !== StyleKind.Text || !style.font) {
+    return doc;
+  }
+  const registered = registerFont(doc, style.font, GOOGLE_FONTS);
+  return registered.ok ? registered.doc : doc;
+}
+
 function paint(doc: MotionDoc, ids: readonly string[], style: Style, before?: Style): OpResult {
-  let next = doc;
+  let next = ids.length ? withFontOf(doc, style) : doc;
   for (const id of ids) {
     const found = findClip(next, id);
     if (!found) {

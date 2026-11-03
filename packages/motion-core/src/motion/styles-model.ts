@@ -11,7 +11,7 @@ export enum StyleKind {
 }
 
 export const MAX_STYLES = 40;
-export const STYLE_NAME = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$/;
+export const STYLE_NAME = /^(?=.{1,40}$)[A-Za-z0-9][A-Za-z0-9 _-]*(?:\/ *[A-Za-z0-9][A-Za-z0-9 _-]*)*$/;
 
 const colour = z.string().min(1).max(64);
 
@@ -38,6 +38,6 @@ export const styleSchema = z.discriminatedUnion('kind', [textStyleSchema, colour
 export type Style = z.infer<typeof styleSchema>;
 
 export const stylesSchema = z
-  .record(z.string().regex(STYLE_NAME, 'style names are letters, digits, spaces, - or _'), styleSchema)
+  .record(z.string().regex(STYLE_NAME, 'style names are letters, digits, spaces, - or _, and / for groups'), styleSchema)
   .refine((s) => Object.keys(s).length <= MAX_STYLES, `at most ${MAX_STYLES} styles`)
   .optional();

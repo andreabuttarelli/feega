@@ -19,6 +19,15 @@ describe('the canvas style library a person edits', () => {
     expect(renamed).toEqual([['Headline', 'Display']]);
   });
 
+  it('a name with / puts the style in a group', () => {
+    const library = new StyleLibrary();
+    library.styles = { Primary: HEADLINE };
+
+    library.rename('Primary', 'Brand / Primary');
+
+    expect(Object.keys(library.styles)).toEqual(['Brand / Primary']);
+  });
+
   it('refuses a name that is taken, invalid or the same one', () => {
     const library = new StyleLibrary();
     const renamed: string[] = [];

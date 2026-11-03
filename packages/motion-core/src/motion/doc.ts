@@ -134,6 +134,7 @@ const clipSchema = z.object({
   acceptsLights: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
+  paintStyleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),
   bind: bindSchema
 });

@@ -5,7 +5,7 @@
   import { fontPreviewHref } from '$lib/design/font-preview';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
-  import { styleLabel } from '$lib/motion/style-library';
+  import { folderOf, foldered, styleLabel } from '$lib/motion/style-library';
   import { swatchOf } from '$lib/motion/fill/swatch';
   import { textFace, textMetrics } from '$lib/motion/type-px';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -23,7 +23,7 @@
   ];
 
   const entries = $derived(Object.entries(styleLibrary.styles));
-  const inGroup = (group: Group) => entries.filter(([, style]) => group.kinds.includes(style.kind));
+  const inGroup = (group: Group) => foldered(entries.filter(([, style]) => group.kinds.includes(style.kind)));
   const color = (value: string) => resolveColor(value, tokens);
   const swatch = (style: Style) => {
     if (style.kind === StyleKind.Paint) {
@@ -118,8 +118,10 @@
             <button type="button" class="icon" aria-label={`New ${group.title.toLowerCase()} style`} data-testid={`style-library-new-${make.style.kind}`} onclick={() => create(make)}><Plus size={14} /></button>
           {/if}
         </header>
-        {#each rows as [name, style] (name)}
+        {#each rows as [name, style], index (name)}
           {@const chip = swatch(style)}
+          {@const folder = folderOf(name)}
+          {#if folder.group && folder.group !== folderOf(rows[index - 1]?.[0] ?? '').group}<span class="muted folder" data-testid="style-library-folder">{folder.group}</span>{/if}
           <Popover.Root open={open === name} onOpenChange={(next) => toggle(name, next)}>
             <Popover.Trigger class="row" data-testid="style-library-row" data-kind={style.kind} data-style={name}>
               {#if style.kind === StyleKind.Text}
@@ -128,7 +130,7 @@
                 <span class="swatch" data-testid={`style-library-swatch-${name}`} style:background={chip ?? 'var(--ui-input)'}></span>
               {/if}
               {@const m = meta(style)}
-              <span class="name">{name}</span>
+              <span class="name" class:nested={!!folder.group}>{folder.leaf}</span>
               <span class="muted meta"><span class="face">{m.face}</span>{#if m.face && m.metrics}<span>&nbsp;·&nbsp;</span>{/if}<span class="metrics">{m.metrics}</span></span>
               <span class="trail">{#if style.kind === StyleKind.Text && chip}<span class="dot" style:background={chip}></span>{/if}</span>
             </Popover.Trigger>
@@ -242,6 +244,14 @@
 
   .muted {
     color: var(--ui-text-tertiary);
+  }
+
+  .folder {
+    padding: var(--ui-space-1) 4px 0;
+  }
+
+  .nested {
+    padding-left: var(--ui-space-2);
   }
 
   .empty {

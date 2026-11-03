@@ -476,6 +476,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
+        paintStyleRef: c.paintStyleRef ?? null,
         effectStyleRef: c.effectStyleRef ?? null,
         bind: c.bind ?? null,
         expressions: c.expressions,
@@ -2437,7 +2438,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     named_style: tool({
-      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color; kind ${StyleKind.Colour} with color; kind ${StyleKind.Paint} with fills (gradient or image fill stack, as set_props fills); kind ${StyleKind.Effect} with effects (shadows, blurs: effect stack as add_effect, each {id, kind, enabled, params}); editing restyles every clip using it. save (name, clip_ids [one clip], kind) makes a style from that clip's current look and links it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill, a paint style to any clip with fills, an effect style to any visual clip (its own slot: a clip keeps one effect style next to one text, colour or paint style). detach (clip_ids, slot ${Object.values(StyleSlot).join('|')} optional: both when omitted) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames a style of any kind, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
+      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color; kind ${StyleKind.Colour} with color; kind ${StyleKind.Paint} with fills (gradient or image fill stack, as set_props fills); kind ${StyleKind.Effect} with effects (shadows, blurs: effect stack as add_effect, each {id, kind, enabled, params}); editing restyles every clip using it. save (name, clip_ids [one clip], kind) makes a style from that clip's current look and links it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill, a paint style to any clip with fills, an effect style to any visual clip (three slots: a clip keeps one text style, one colour or paint style and one effect style). detach (clip_ids, slot ${Object.values(StyleSlot).join('|')} optional: both when omitted) unlinks them, keeping their look. remove (name) deletes a style. rename (name, to) renames a style of any kind, elements stay linked. list returns the styles with their clips (also in get_motion_doc).`,
       inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional(), to: z.string().regex(STYLE_NAME).optional(), kind: z.enum(StyleKind).optional(), slot: z.enum(StyleSlot).optional() }),
       execute: async (input) => STYLE_ACTIONS[input.action](input)
     }),

@@ -28,7 +28,7 @@ const frame = (source: boolean) => ({
           component: 'Shape',
           from: 0,
           durationInFrames: 150,
-          ...(source ? { styleRef: 'Sunset', effectStyleRef: 'Lifted', effects: LIFTED.effects } : {}),
+          ...(source ? { paintStyleRef: 'Sunset', effectStyleRef: 'Lifted', effects: LIFTED.effects } : {}),
           props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.5, height: 0.5, fills: source ? SUNSET.fills : [{ type: 'solid', color: '#888888' }] }
         }
       ]
@@ -39,7 +39,7 @@ const frame = (source: boolean) => ({
   ...(source ? { styles: { Sunset: SUNSET, Lifted: LIFTED } } : {})
 });
 
-type Card = { styleRef?: string; effectStyleRef?: string; effects: { params: { blur?: number } }[]; props: { fills: { type: string; angle?: number }[] } };
+type Card = { paintStyleRef?: string; effectStyleRef?: string; effects: { params: { blur?: number } }[]; props: { fills: { type: string; angle?: number }[] } };
 
 test.describe('effect and paint styles shared across frames @real', () => {
   test.skip(!REAL_STACK, 'requires a stack: E2E_REAL_STACK=1');
@@ -71,17 +71,17 @@ test.describe('effect and paint styles shared across frames @real', () => {
       await page.mouse.click(box.x + 4, box.y + 4);
       await page.waitForTimeout(SETTLE_MS);
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await expect(page.getByTestId('clip-style')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('clip-paint-style')).toBeVisible({ timeout: 15_000 });
     };
 
     await selectCard(hostB);
-    const look = page.getByTestId('clip-style');
+    const look = page.getByTestId('clip-paint-style');
     await expect(look).toBeVisible({ timeout: 15_000 });
     await look.selectOption('Sunset');
     await page.getByTestId('clip-effect-style').selectOption('Lifted');
     await page.waitForTimeout(SETTLE_MS);
     await page.screenshot({ path: `${SHOTS}/styles2-1-applied.png` });
-    await expect.poll(async () => (await head(b.id)).styleRef, { timeout: 20_000 }).toBe('Sunset');
+    await expect.poll(async () => (await head(b.id)).paintStyleRef, { timeout: 20_000 }).toBe('Sunset');
     expect((await head(b.id)).effectStyleRef).toBe('Lifted');
     expect((await head(b.id)).props.fills[0].type).toBe('linear-gradient');
     expect((await head(b.id)).effects[0].params.blur).toBe(40);
@@ -108,7 +108,7 @@ test.describe('effect and paint styles shared across frames @real', () => {
     await page.screenshot({ path: `${SHOTS}/styles2-3-renamed.png` });
 
     for (const node of [a, b]) {
-      await expect.poll(async () => (await head(node.id)).styleRef, { timeout: 20_000 }).toBe(RENAMED);
+      await expect.poll(async () => (await head(node.id)).paintStyleRef, { timeout: 20_000 }).toBe(RENAMED);
     }
   });
 });

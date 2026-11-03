@@ -6,7 +6,7 @@ import { StyleKind, type Style } from '@feega/motion-core/motion/styles-model';
 import { EffectKind } from '@feega/motion-core/motion/effects/registry';
 import { FillType } from '@feega/motion-core/motion/fill/model';
 import { BlendMode } from '@feega/motion-core/motion/blend';
-import { adoptStyle, libraryOf, offeredStyles, styleLabel, syncedDoc } from './style-library';
+import { adoptStyle, folderOf, foldered, libraryOf, offeredStyles, styleLabel, syncedDoc } from './style-library';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -30,7 +30,7 @@ describe('the styles library shared by the frames of a canvas', () => {
   it('applying a style a frame lacks copies it in and links the element', () => {
     const doc = must(adoptStyle(withText(), ['t'], 'Brand', RED));
     expect(doc.styles?.Brand).toEqual(RED);
-    expect(findClip(doc, 't')!.clip.styleRef).toBe('Brand');
+    expect(findClip(doc, 't')!.clip.paintStyleRef).toBe('Brand');
     expect(findClip(doc, 't')!.clip.props.color).toBe('#ff0000');
   });
 
@@ -62,5 +62,18 @@ describe('the styles library shared by the frames of a canvas', () => {
     expect(styleLabel({ kind: StyleKind.Colour, color: '#ff0000' })).toBe('Colour');
     expect(styleLabel({ kind: StyleKind.Effect, effects: [{ id: 'a', kind: EffectKind.DropShadow, enabled: true, params: {} }, { id: 'b', kind: EffectKind.GaussianBlur, enabled: true, params: {} }] })).toBe('Drop shadow + Gaussian blur');
     expect(styleLabel({ kind: StyleKind.Paint, fills: [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }], opacity: 1, visible: true, blend: BlendMode.Normal }] })).toBe('Linear');
+  });
+});
+
+describe('a style name with /', () => {
+  it('splits into the group it sits in and the name shown in it', () => {
+    expect(folderOf('Brand / Primary')).toEqual({ group: 'Brand', leaf: 'Primary' });
+    expect(folderOf('Brand/Text/Body')).toEqual({ group: 'Brand / Text', leaf: 'Body' });
+    expect(folderOf('Ink')).toEqual({ group: '', leaf: 'Ink' });
+  });
+
+  it('keeps a group together, groups in the order they first appear', () => {
+    const rows = ['Brand/Primary', 'Ink', 'Brand/Muted', 'Text/Body'].map((name) => [name, null] as const);
+    expect(foldered(rows).map(([name]) => name)).toEqual(['Brand/Primary', 'Brand/Muted', 'Ink', 'Text/Body']);
   });
 });

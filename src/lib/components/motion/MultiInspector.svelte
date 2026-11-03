@@ -153,8 +153,9 @@
         <h3>{clips.every((c) => c.component === first.component) ? first.component : 'Style'}</h3>
         {#each styleFields as { field: f, value } (f.key)}
           {#if f.control === Control.Range}
+            {@const slider = sliderOf(first.component, { key: f.key, min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }, doc)}
             <div data-prop={f.key}>
-              <NumberField {gesture} label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={{ min: f.min ?? PROP_RANGE.min, max: f.max ?? PROP_RANGE.max, step: f.step ?? PROP_RANGE.step }} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
+              <NumberField {gesture} label={f.label} kind={FieldKind.Named} name={f.label} value={numberShown(f.key, value)} range={slider} unit={slider.unit ?? ''} onchange={(v) => setStyle(f.key, toStored(first.component, f.key, v, doc))} />
             </div>
           {:else if f.control === Control.Color}
             <label class="line" data-prop={f.key}>

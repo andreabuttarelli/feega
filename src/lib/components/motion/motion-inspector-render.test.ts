@@ -250,4 +250,19 @@ describe('Properties for several clips', () => {
     expect(html).toContain('>Left</option>');
     expect(html).not.toContain('>left</option>');
   });
+
+  const texts = () => {
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    for (const id of ['a', 'b']) {
+      const added = addClip(doc, { component: 'Text', from: 0, props: { text: id, size: 0.036 } }, id);
+      doc = added.ok ? added.doc : doc;
+    }
+    return doc;
+  };
+
+  it('shows a text size in whole px, not the raw share of the frame', () => {
+    const html = render(MultiInspector, { props: { doc: texts(), ids: ['a', 'b'], frame: 0, onchange: () => {} } }).body;
+
+    expect(html).toMatch(/aria-label="Size"[^>]*value="39"/);
+  });
 });
