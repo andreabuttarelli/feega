@@ -5,6 +5,8 @@ export type Revision = { version: number; doc: MotionDoc };
 
 export type Synced = { base: Revision; present: MotionDoc };
 
+export type FrameDraft = { version: number; ops: DocOp[]; summary: string };
+
 export function outgoing(base: Revision, present: MotionDoc): DocOp[] {
   return diffDoc(base.doc, present);
 }

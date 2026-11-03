@@ -39,7 +39,7 @@ describe('outbox: unsent work kept in the browser per user and canvas', () => {
   it('works empty and never throws when the browser refuses storage', async () => {
     const box = await openOutbox(broken, 'k');
 
-    expect(box).toMatchObject({ ops: [], nodes: {}, places: [] });
+    expect(box).toMatchObject({ ops: [], nodes: {}, places: [], draws: [], docs: [] });
     await expect(box.save({ nodes: {} })).resolves.toBeUndefined();
   });
 });

@@ -1538,7 +1538,7 @@ export const actions: Actions<CanvasParams> = {
     if (!ask.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid drawing' });
     }
-    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data);
+    const drawn = (await madeBefore(scope, id)) ?? (await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data));
     if (drawn.outcome !== MoveOutcome.Done) {
       return movedAnswer(drawn);
     }
@@ -1553,7 +1553,7 @@ export const actions: Actions<CanvasParams> = {
     if (!box.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid frame' });
     }
-    const drawn = await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data);
+    const drawn = (await madeBefore(scope, id)) ?? (await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data));
     return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
   },
 

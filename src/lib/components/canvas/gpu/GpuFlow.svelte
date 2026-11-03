@@ -95,7 +95,8 @@
   import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
-  import { postPageAction } from '$lib/api/page-action';
+  import { postFrameOps } from '$lib/canvas/frame-ops-send';
+  import type { FrameDraft } from '$lib/motion/frame-sync';
   import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
@@ -248,7 +249,7 @@
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
   import { backToFront } from '$lib/canvas/paint-order';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void; onFrameDraft?: (id: string, nodeId: string, draft: FrameDraft | null) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -1183,8 +1184,13 @@
       open.forEach((s) => void s.flushPending());
       event.preventDefault();
     };
+    const backOnline = () => [...savers.values()].forEach((s) => void s.flushPending());
     window.addEventListener('beforeunload', warnUnsaved);
-    return () => window.removeEventListener('beforeunload', warnUnsaved);
+    window.addEventListener('online', backOnline);
+    return () => {
+      window.removeEventListener('beforeunload', warnUnsaved);
+      window.removeEventListener('online', backOnline);
+    };
   });
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
@@ -1446,7 +1452,8 @@
     if (held || !live || !frame) {
       return held ?? null;
     }
-    const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
+    const place = { projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId };
+    const draftId = crypto.randomUUID();
     const session: FrameEditSession = new FrameEditSession(
       { head: { version: frame.revision, doc: live.doc }, selection: [], mode: frameMode },
       {
@@ -1472,14 +1479,8 @@
           }
         },
         pull: async () => {},
-        send: async (ops, version, summary) => {
-          const form = new FormData();
-          form.set('ops', JSON.stringify(ops));
-          form.set('version', String(version));
-          form.set('summary', summary);
-          const result = await postPageAction(url, 'ops', form);
-          return result.type === 'success' ? { ok: true, version: Number(result.data?.version), doc: result.data?.doc as LiveDoc['doc'] } : { ok: false, error: 'Save failed' };
-        }
+        send: (ops, version, summary) => postFrameOps(place, { ops, version, summary }),
+        draft: (draft) => props.onFrameDraft?.(draftId, nodeId, draft)
       }
     );
     session.access = editorMode.spec.access;

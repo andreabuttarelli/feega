@@ -3,7 +3,7 @@ import { applyOps, rebase, type DocOp } from './doc-ops';
 import type { PeerStep } from './frame-step';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
-import { landed, outgoing, remote, type Revision, type Synced } from './frame-sync';
+import { landed, outgoing, remote, type FrameDraft, type Revision, type Synced } from './frame-sync';
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
 import { liveEdits, type LiveEdits } from './live-edit';
 import { settleGroups } from './light-group';
@@ -13,8 +13,19 @@ import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
 
 const SAVE_DEBOUNCE_MS = 250;
 const COALESCE_MS = 800;
+const RETRY_FIRST_MS = 1000;
+const RETRY_CAP_MS = 30000;
 
-export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string };
+export enum Delivery {
+  Refused = 'refused',
+  Unreachable = 'unreachable'
+}
+
+export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string; delivery?: Delivery };
+
+const UNREACHABLE: SendResult = { ok: false, error: 'offline', delivery: Delivery.Unreachable };
+
+const retryDelay = (failures: number) => Math.min(RETRY_CAP_MS, RETRY_FIRST_MS * 2 ** (failures - 1));
 
 export type SessionPort = {
   viewPath: () => string[];
@@ -26,6 +37,7 @@ export type SessionPort = {
   landed: (from: Revision, to: Revision) => void;
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
+  draft: (draft: FrameDraft | null) => void;
 };
 
 export enum DocAccess {
@@ -54,6 +66,7 @@ export class FrameEditSession {
   private lastEdit = { summary: '', at: 0 };
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private unsavedSummary = '';
+  private failures = 0;
   private readonly port: SessionPort;
 
   constructor(start: SessionStart, port: SessionPort) {
@@ -164,6 +177,20 @@ export class FrameEditSession {
       clearTimeout(this.saveTimer);
     }
     this.saveTimer = setTimeout(() => void this.save(), SAVE_DEBOUNCE_MS);
+    this.keepDraft();
+  }
+
+  private keepDraft() {
+    const ops = outgoing({ version: this.version, doc: this.baseDoc }, this.history.present);
+    this.port.draft(ops.length ? { version: this.version, ops, summary: this.unsavedSummary } : null);
+  }
+
+  private retryLater() {
+    this.failures += 1;
+    this.resave = false;
+    this.saveState = SaveState.Pending;
+    this.saveTimer = setTimeout(() => void this.save(), retryDelay(this.failures));
+    this.keepDraft();
   }
 
   unsaved(): boolean {
@@ -237,18 +264,25 @@ export class FrameEditSession {
     this.saveState = SaveState.Saving;
     const sent = this.history.present;
     const base = { version: this.version, doc: this.baseDoc };
-    const result = await this.port.send(outgoing(base, sent), this.version, this.unsavedSummary);
+    const result = await this.port.send(outgoing(base, sent), this.version, this.unsavedSummary).catch(() => UNREACHABLE);
     this.saving = false;
 
+    if (!result.ok && result.delivery === Delivery.Unreachable) {
+      this.retryLater();
+      return;
+    }
+    this.failures = 0;
     if (result.ok && result.doc) {
       this.port.landed(base, { version: result.version, doc: result.doc });
     }
     if (result.ok) {
       this.follow(landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc }));
       this.saveState = SaveState.Saved;
+      this.keepDraft();
     } else {
       this.saveState = SaveState.Failed;
       this.notice = result.error;
+      this.port.draft(null);
     }
     if (this.resave) {
       this.resave = false;
