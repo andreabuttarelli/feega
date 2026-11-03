@@ -16,6 +16,7 @@ import { BlendMode } from '@feega/motion-core/motion/blend';
 import { MaskKind, maskSchema } from '@feega/motion-core/motion/mask';
 import { instanceOverrides } from './instance-diff';
 import { Align, Direction, Justify as MotionJustify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+import { TEXT_ITEM } from '@feega/motion-core/motion/layout/model';
 import { setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
 import { setParent } from '$lib/motion/parent-ops';
 import { mapOutline, parsePath, type Pt } from '@feega/motion-core/motion/shape/geometry';
@@ -315,12 +316,6 @@ function oneLineFixed(layer: TextLayer): boolean {
   const line = PX_SUFFIX.test(layer.lineHeight) ? parseFloat(layer.lineHeight) : layer.size * AUTO_LINE;
   return layer.sizing === TextSizing.Fixed && layer.box.height < line * ONE_LINE_SHARE;
 }
-
-const TEXT_ITEM: Record<TextSizing, Partial<{ width: Sizing; height: Sizing }>> = {
-  [TextSizing.Fixed]: {},
-  [TextSizing.AutoHeight]: { height: Sizing.Hug },
-  [TextSizing.AutoWidth]: { width: Sizing.Hug, height: Sizing.Hug }
-};
 
 function itemFor(child: Layer, parent: AutoLayout, scale: number, width: number): Partial<{ width: Sizing; height: Sizing; absolute: boolean; maxWidth: number }> {
   const row = parent.flow === Flow.Row;

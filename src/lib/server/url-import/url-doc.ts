@@ -242,7 +242,7 @@ function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: Site
   return { ...plan, items: plan.items.map((item) => ({ ...item, doc: componentKit(tokenised(item.doc, tokens, site, units), site, newId) })) };
 }
 
-const NO_PAGES: ComponentPages = { sets: [], homes: {}, setHomes: {} };
+const NO_PAGES: ComponentPages = { sets: [], homes: {}, setHomes: {}, dropped: [] };
 
 const PAGED: Record<Tokening, (plan: FigmaPlan, newId: () => string) => ComponentPages> = {
   [Tokening.On]: (plan, newId) => componentPages(plan.items, newId),
@@ -293,6 +293,6 @@ export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPE
   const tokening = shape.tokening ?? Tokening.Off;
   const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
   const counts = tokened.items.map((item) => countOf(item.doc));
-  const { sets, homes, setHomes } = PAGED[tokening](tokened, newId);
-  return { plan: tokened, images, name, sets, homes, setHomes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
+  const { sets, homes, setHomes, dropped } = PAGED[tokening](tokened, newId);
+  return { plan: { ...tokened, skipped: [...tokened.skipped, ...dropped] }, images, name, sets, homes, setHomes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
 }

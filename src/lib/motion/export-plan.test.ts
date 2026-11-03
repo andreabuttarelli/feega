@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { Resolution } from './render-quote';
-import { AudioMode, BROWSER_RESOLUTIONS, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
+import { AudioMode, BROWSER_RESOLUTIONS, ExportRange, Support, eta, exportRanges, rangeSeconds, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
 import { BROWSER_SAMPLES } from '@feega/motion-core/motion/motion-blur';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
@@ -14,6 +14,12 @@ describe('export plan', () => {
     expect(exportSize(vertical, Resolution.P1080)).toEqual({ width: 1080, height: 1920 });
     expect(exportSize(vertical, Resolution.P720)).toEqual({ width: 720, height: 1280 });
     expect(exportSize(portrait, Resolution.P720)).toEqual({ width: 720, height: 900 });
+  });
+
+  it('the browser draws a small frame up to the resolution, as the farm does', () => {
+    const small = { width: 700, height: 460 };
+
+    expect(exportSize(small, Resolution.P1080)).toEqual({ width: outputSize(small, Resolution.P1080).width, height: 1080 });
   });
 
   it('one frame every 1/30 s, for the whole length', () => {
@@ -83,5 +89,21 @@ describe('export plan', () => {
   it('without H.264 at 1080p, 720p is the fallback', () => {
     expect(exportSupport({ webCodecs: true, h264: false, h264At720: true, aac: true }).support).toBe(Support.Only720);
     expect(exportSupport({ webCodecs: true, h264: false, h264At720: false, aac: true }).support).toBe(Support.None);
+  });
+});
+
+describe('what part of the video an export covers', () => {
+  const doc = { ...newMotionDoc(MotionFormat.Portrait), fps: 30, durationInFrames: 450 } as MotionDoc;
+
+  it('is the whole video when there is no work area', () => {
+    expect(exportRanges(doc)).toEqual([ExportRange.Whole]);
+    expect(rangeSeconds(doc, ExportRange.Whole)).toEqual({ from: 0, to: 15 });
+  });
+
+  it('offers the work area first when one is set, so a 6 s loop region exports a 6 s file', () => {
+    const looped = { ...doc, workArea: { from: 0, to: 180 } };
+
+    expect(exportRanges(looped)).toEqual([ExportRange.WorkArea, ExportRange.Whole]);
+    expect(rangeSeconds(looped, ExportRange.WorkArea)).toEqual({ from: 0, to: 6 });
   });
 });

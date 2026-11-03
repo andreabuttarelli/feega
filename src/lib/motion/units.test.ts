@@ -3,7 +3,7 @@ import { ANIMATABLE } from '@feega/motion-core/motion/keyframes';
 import { COMPONENT_IDS } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE } from '@feega/motion-core/motion/camera';
-import { Unit, propsOwner, shownNumber, sliderOf, spaceOf, toShown, toStored, unitOf } from './units';
+import { Unit, propsOwner, scaleOf, shownNumber, sliderOf, spaceOf, toShown, toStored, unitOf } from './units';
 
 const PORTRAIT = { width: 1080, height: 1920 };
 const MIN_STEPS = 20;
@@ -108,14 +108,14 @@ describe('physics units', () => {
 
 describe('an element on the canvas reads in canvas px', () => {
   const doc = { width: 400, height: 240 };
-  const space = spaceOf(doc, { w: 200, h: 120 });
+  const space = spaceOf(doc, scaleOf(doc, { w: 200, h: 120 }));
 
   it('the stage of an element is its node, two doc px to a canvas px', () => {
     expect(space).toEqual({ width: 200, height: 120, scale: 0.5 });
   });
 
-  it('a frame reads in its own pixels', () => {
-    expect(spaceOf(doc, null)).toEqual(doc);
+  it('a doc with no node reads in its own pixels', () => {
+    expect(spaceOf(doc, scaleOf(doc, null))).toEqual({ ...doc, scale: 1 });
   });
 
   it('a width, a type size and a blur all come out in canvas px', () => {
@@ -140,5 +140,27 @@ describe('a transform offset read back in the inspector', () => {
   it('shows the 260 px typed, not 261 from a share rounded before scaling', () => {
     const frame = { width: 1080, height: 1350 };
     expect(shownNumber('Precomp', 'y', toStored('Precomp', 'y', 260, frame), frame)).toBe(260);
+  });
+});
+
+describe('a frame reads in its size on the canvas, whatever its doc holds', () => {
+  const doc = { width: 1400, height: 920 };
+  const space = spaceOf(doc, scaleOf(doc, { w: 700, h: 460 }));
+
+  it('a 700×460 frame drawn at two doc px per canvas px is 700×460', () => {
+    expect(space).toEqual({ width: 700, height: 460, scale: 0.5 });
+  });
+
+  it('a child 160 px wide on screen reads W 160', () => {
+    expect(toShown('Shape', 'width', 320 / 1400, space)).toBe(160);
+  });
+
+  it('a radius of 12 doc px draws 6 canvas px and reads 6', () => {
+    expect(toShown('Shape', 'cornerRadius', 12, space)).toBe(6);
+    expect(toStored('Shape', 'cornerRadius', 6, space)).toBe(12);
+  });
+
+  it('a frame drawn one doc px per canvas px reads as its doc', () => {
+    expect(spaceOf(doc, scaleOf(doc, { w: 1400, h: 920 }))).toEqual({ ...doc, scale: 1 });
   });
 });

@@ -157,7 +157,7 @@ describe('a stretched frame space', () => {
 
 describe('a text at its first frame, still fading up', () => {
   const START = 60;
-  const fading = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: START, durationInFrames: 90, props: { text: 'Hi', x: 0.1, y: 0.6, width: 0.4, height: 0.15 } }, 'copy');
+  const fading = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: START, durationInFrames: 90, props: { text: 'Hi', x: 0.1, y: 0.6, width: 0.4, height: 0.15, entrance: 'fade-up' } }, 'copy');
   if (!fading.ok) {
     throw new Error(fading.error);
   }

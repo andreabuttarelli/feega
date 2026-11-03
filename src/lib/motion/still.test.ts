@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newClip, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { Quality, TIMELINE_ONLY, docProblems } from './direction';
-import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, setStill, stillFrame } from '@feega/motion-core/motion/still';
+import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, posterFrame, setPoster, setStill, stillFrame } from '@feega/motion-core/motion/still';
 import { setCanvas } from '@feega/motion-core/motion/timeline';
 import { ImageFormat, IMAGE_FORMATS, IMAGE_SCALES, ImageScale, stillExport } from '@feega/motion-core/motion/still-model';
 
@@ -97,24 +97,31 @@ describe('poster formats', () => {
 describe('image export settings', () => {
   it('scales from 1x to 4x', () => {
     expect([...IMAGE_SCALES]).toEqual([1, 2, 3, 4]);
-    expect(stillExport(ImageFormat.Png, ImageScale.Four).size({ width: 100, height: 50 } as never)).toEqual({ width: 400, height: 200 });
+    expect(stillExport(ImageFormat.Png, ImageScale.Four, 1).size({ width: 100, height: 50 } as never)).toEqual({ width: 400, height: 200 });
   });
 
   it('png, jpg and webp each carry their mime and extension', () => {
-    expect(IMAGE_FORMATS.map((f) => stillExport(f, ImageScale.One).mime)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
-    expect(stillExport(ImageFormat.Jpg, ImageScale.One).ext).toBe('jpg');
+    expect(IMAGE_FORMATS.map((f) => stillExport(f, ImageScale.One, 1).mime)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
+    expect(stillExport(ImageFormat.Jpg, ImageScale.One, 1).ext).toBe('jpg');
   });
 
   it('2x doubles the pixels of the doc, 1x keeps them', () => {
     const doc = newMotionDoc(MotionFormat.Portrait);
 
-    expect(stillExport(ImageFormat.Png, ImageScale.Two).size(doc)).toEqual({ width: 2160, height: 2700 });
-    expect(stillExport(ImageFormat.Png, ImageScale.One).size(doc)).toEqual({ width: 1080, height: 1350 });
+    expect(stillExport(ImageFormat.Png, ImageScale.Two, 1).size(doc)).toEqual({ width: 2160, height: 2700 });
+    expect(stillExport(ImageFormat.Png, ImageScale.One, 1).size(doc)).toEqual({ width: 1080, height: 1350 });
+  });
+
+  it('1x is the frame as big as it is on the canvas, though its doc holds two px for each', () => {
+    const doc = { width: 1400, height: 920 };
+
+    expect(stillExport(ImageFormat.Png, ImageScale.One, 0.5).size(doc)).toEqual({ width: 700, height: 460 });
+    expect(stillExport(ImageFormat.Png, ImageScale.Two, 0.5).size(doc)).toEqual({ width: 1400, height: 920 });
   });
 
   it('png is lossless: no quality, the lossy ones have one', () => {
-    expect(stillExport(ImageFormat.Png, ImageScale.One).quality).toBeUndefined();
-    expect(stillExport(ImageFormat.Jpg, ImageScale.One).quality).toBeGreaterThan(80);
+    expect(stillExport(ImageFormat.Png, ImageScale.One, 1).quality).toBeUndefined();
+    expect(stillExport(ImageFormat.Jpg, ImageScale.One, 1).quality).toBeGreaterThan(80);
   });
 });
 
@@ -184,5 +191,39 @@ describe('a still design frame is not held to the video resolution', () => {
     const tall = setCanvas(page(), { size: { width: 1440, height: 5000 } });
 
     expect(tall.ok && setStill(tall.doc, null).ok).toBe(false);
+  });
+});
+
+describe('the poster frame of a video', () => {
+  const video = { ...newMotionDoc(MotionFormat.Portrait), durationInFrames: 180 };
+
+  it('is marked at a frame and keeps the doc a video', () => {
+    const made = setPoster(video, 60);
+
+    expect(made.ok && posterFrame(made.doc)).toBe(60);
+    expect(made.ok && docMode(made.doc)).toBe(DocMode.Video);
+    const parsed = made.ok ? parseMotionDoc(made.doc) : null;
+    expect(parsed?.ok && parsed.doc.poster).toEqual({ frame: 60 });
+  });
+
+  it('never lands past the end, and null clears it', () => {
+    const made = setPoster(video, 999);
+    expect(made.ok && posterFrame(made.doc)).toBe(179);
+    const cleared = made.ok ? setPoster(made.doc, null) : made;
+    expect(cleared.ok && posterFrame(cleared.doc)).toBeNull();
+  });
+
+  it('a still frame wins over the poster', () => {
+    const marked = setPoster(video, 60);
+    const still = marked.ok ? setStill(marked.doc, 1) : marked;
+
+    expect(still.ok && posterFrame(still.doc)).toBe(30);
+  });
+
+  it('follows a shorter video back inside it', () => {
+    const marked = setPoster(video, 150);
+    const shorter = marked.ok ? setCanvas(marked.doc, { durationInFrames: 90 }) : marked;
+
+    expect(shorter.ok && posterFrame(shorter.doc)).toBe(89);
   });
 });

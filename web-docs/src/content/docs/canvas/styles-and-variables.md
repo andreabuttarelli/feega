@@ -24,6 +24,7 @@ Define colour, number, text and on/off variables, with modes such as light and d
 - The Variables section is in Properties.
 - Variable collections belong to the project, like styles: every canvas and page sees them. Each frame keeps its own mode.
 - Collections from a URL import are saved to the project.
+- Colour tokens are listed in the Styles panel under the styles. Click a token's colour to change it: every layer bound to it, in every frame of the project, updates.
 - Agents can create and bind variables through the [edit ops](/reference/generated/edit-ops/).
 
 ## Bind a field to a variable
@@ -34,7 +35,8 @@ Every colour, number, text and on/off field in Properties has a small diamond ch
 2. Click the diamond. The list shows the variables of the same type, with their value in the current mode.
 3. Pick one. The field turns into a pill with the variable name and its value.
 4. Switch the mode of the collection: every bound field follows it.
-5. Click the cross on the pill to unbind. The field keeps its current value.
+5. Click the pill name to edit a colour variable in place or swap it for another variable of the same type. A colour change updates every layer bound to it.
+6. Click the cross on the pill to unbind. The field keeps its current value.
 
 The chip appears once a variable of that type exists in the frame or in the project library. A bound fill replaces the fill stack of that layer.
 

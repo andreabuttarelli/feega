@@ -15,4 +15,6 @@ sidebar:
 6. **Comment.** Press `C`, then click anywhere to leave a comment.
 7. **Share.** Copy a viewer link for a single frame from the export dialog. See [Sharing](/canvas/sharing/).
 
+**Start from a website.** Paste a site on feega.app, or open `https://oh.feega.app/app?start_url=stripe.com`. After sign-in a new project and canvas open, and the page is imported there as an editable frame.
+
 Free shapes, text, images and SVGs placed on the canvas are saved as elements, not frames. See [Frames and free elements](/canvas/frames-and-free-elements/).

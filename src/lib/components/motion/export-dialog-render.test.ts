@@ -85,6 +85,16 @@ describe('the export dialog asks what you want first', () => {
     expect(body).toContain('data-testid="export-quote"');
   });
 
+  it('offers the work area as the range when one is set, and says how long the file is', () => {
+    const looped = { ...doc, durationInFrames: 15 * doc.fps, workArea: { from: 0, to: 6 * doc.fps } };
+    const body = dialog(ExportMode.Video, looped);
+
+    expect(body).toContain('data-testid="export-range"');
+    expect(body).toMatch(/aria-checked="true"[^>]*data-range="work-area"/);
+    expect(body).toContain('· 6 s ·');
+    expect(dialog(ExportMode.Video)).not.toContain('data-testid="export-range"');
+  });
+
   it('offers image files only when the host can draw them', () => {
     expect(dialog()).not.toContain('data-testid="export-mode-images"');
     expect(dialog(null, doc, { count: 1, onexport: async () => 'no' })).toContain('data-testid="export-mode-images"');

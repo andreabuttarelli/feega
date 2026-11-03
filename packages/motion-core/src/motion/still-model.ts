@@ -38,8 +38,9 @@ export const stillAskSchema = z.object({
   scale: z.coerce.number().pipe(z.literal(IMAGE_SCALES)).default(ImageScale.One)
 });
 
-export function stillExport(format: ImageFormat, scale: ImageScale): StillExport {
-  return { format, scale, ...IMAGE[format], size: (doc) => ({ width: doc.width * scale, height: doc.height * scale }) };
+export function stillExport(format: ImageFormat, scale: ImageScale, docScale: number): StillExport {
+  const drawn = scale * docScale;
+  return { format, scale: drawn, ...IMAGE[format], size: (doc) => ({ width: Math.round(doc.width * drawn), height: Math.round(doc.height * drawn) }) };
 }
 
 export function attachmentUrl(signed: string, fileName: string): string {

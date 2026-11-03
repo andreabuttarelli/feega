@@ -78,7 +78,7 @@ describe('paintText', () => {
   });
 
   it('fades body text up from transparent', () => {
-    const e = env('Text', { text: 'a' });
+    const e = env('Text', { text: 'a', entrance: 'fade-up' });
     const opacity = (time: number) => drawn(paintText({ ...e, time }))[0]?.opacity ?? 0;
 
     expect(opacity(0)).toBe(0);

@@ -14,6 +14,7 @@
   import HistoryPanel from './HistoryPanel.svelte';
   import StyleLibrarySection from '$lib/components/motion/StyleLibrarySection.svelte';
   import { StyleLayout } from '$lib/components/motion/style-layout';
+  import ColourTokensSection from '$lib/components/motion/ColourTokensSection.svelte';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import X from '@lucide/svelte/icons/x';
   import Search from '@lucide/svelte/icons/search';
@@ -80,6 +81,7 @@
         <ProjectComponentsPanel {projectId} />
       {:else if kind === 'styles'}
         <StyleLibrarySection tokens={FEEGA_TOKENS} layout={StyleLayout.Split} />
+        <div class="tokens-region"><ColourTokensSection /></div>
       {:else if kind === 'history'}
         {#if pages.currentId}
           <HistoryPanel {projectId} canvasId={pages.currentId} />
@@ -127,6 +129,13 @@
     flex-direction: column;
     overflow: hidden;
     padding: 0;
+  }
+
+  .tokens-region {
+    flex: 0 1 auto;
+    max-height: 40%;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .is-tree .left-panel-body,

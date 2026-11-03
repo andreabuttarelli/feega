@@ -5,13 +5,18 @@
   import { Interp, type Keyframe } from '@feega/motion-core/motion/keyframes';
   import { EASE_PRESETS, EASE_PRESET_IDS, EasePreset, GraphMode, KeyEnd, curvePoints, dragHandle, easeHandles, fitView, handlePoints, type GraphPoint, type GraphView } from '@feega/motion-core/motion/graph';
   import { applyEasePreset, copyEase, pasteEase, setKeyEase, type EaseBoard, type KeyRef } from '@feega/motion-core/motion/timeline';
-  import { graphLanes, type GraphLane } from '$lib/motion/timeline-view';
+  import { axisTicks, graphLanes, type GraphLane } from '$lib/motion/timeline-view';
 
   const CURVE_STEPS = 240;
   const FIT_PAD = 0.1;
   const KEY_PX = 7;
   const HANDLE_PX = 6;
-  const MARGIN_PX = 24;
+  const MARGIN_PX = 32;
+  const VALUE_TICKS = 4;
+  const TIME_TICKS = 8;
+  const LABEL_INSET_PX = 4;
+  const TIME_BASELINE_PX = 6;
+  const LABEL_DECIMALS = 2;
 
   const F9_PRESET: Record<string, EasePreset> = { plain: EasePreset.EasyEase, shift: EasePreset.EasyEaseIn, modShift: EasePreset.EasyEaseOut };
 
@@ -198,6 +203,15 @@
     {#if lane && view}
       <svg bind:this={svg} {width} {height} role="application" aria-label="Graph editor" onpointermove={move} onpointerup={release}>
         <line class="zero" x1={0} x2={width} y1={sy(0)} y2={sy(0)} />
+        <g class="axes" data-testid="graph-axes" aria-hidden="true">
+          {#each axisTicks(view.values, VALUE_TICKS) as v (v)}
+            <line class="grid" x1={MARGIN_PX} x2={width} y1={sy(v)} y2={sy(v)} />
+            <text class="tick" x={LABEL_INSET_PX} y={sy(v)} dominant-baseline="middle">{Number(v.toFixed(LABEL_DECIMALS))}</text>
+          {/each}
+          {#each axisTicks([view.frames[0] / shown.fps, view.frames[1] / shown.fps], TIME_TICKS) as t (t)}
+            <text class="tick" x={sx(t * shown.fps)} y={height - TIME_BASELINE_PX} text-anchor="middle">{t}s</text>
+          {/each}
+        </g>
         <polyline class="curve" points={curve.map((p) => `${sx(lane.from + p.frame)},${sy(p.value)}`).join(' ')} />
         {#each lane.track.slice(0, -1) as k, i (k.frame)}
           {#if bezierSegment(i)}
@@ -297,6 +311,16 @@
   .zero {
     stroke: var(--ui-line-strong);
     stroke-dasharray: 3 3;
+  }
+
+  .grid {
+    stroke: var(--ui-line);
+  }
+
+  .tick {
+    fill: var(--ui-ink-3);
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
   }
 
   .curve {

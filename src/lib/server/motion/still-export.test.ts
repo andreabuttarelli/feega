@@ -36,7 +36,7 @@ describe('exportStill', () => {
     vi.stubEnv('CHROMIUM_PATH', '/chrome');
     const port: StillPort = { open: async () => Promise.reject(new Error('Session closed')) };
 
-    const made = await exportStill({} as never, { orgId: 'o', projectId: 'p', nodeId: 'n' }, newMotionDoc(MotionFormat.Square), stillExport(ImageFormat.Png, ImageScale.One), { tokens: TOKENS, assets: [] }, port);
+    const made = await exportStill({} as never, { orgId: 'o', projectId: 'p', nodeId: 'n' }, newMotionDoc(MotionFormat.Square), stillExport(ImageFormat.Png, ImageScale.One, 1), { tokens: TOKENS, assets: [] }, port);
 
     expect(made).toEqual({ ok: false, error: expect.stringContaining('Session closed') });
     vi.unstubAllEnvs();
@@ -49,7 +49,7 @@ describe('drawStill', () => {
     const doc = pinned.ok ? pinned.doc : newMotionDoc(MotionFormat.Portrait);
     const { port, opened, seeks, pictures } = fakePort();
 
-    const bytes = await drawStill(port, { doc, tokens: TOKENS, assets: {} }, stillExport(ImageFormat.Png, ImageScale.Two));
+    const bytes = await drawStill(port, { doc, tokens: TOKENS, assets: {} }, stillExport(ImageFormat.Png, ImageScale.Two, 1));
 
     expect(bytes.toString()).toBe('picture');
     expect(opened).toEqual([{ width: 1080, height: 1350, scale: 2 }]);
@@ -60,7 +60,7 @@ describe('drawStill', () => {
   it('a video draws its first frame, a lossy format carries its quality', async () => {
     const { port, seeks, pictures } = fakePort();
 
-    await drawStill(port, { doc: newMotionDoc(MotionFormat.Square), tokens: TOKENS, assets: {} }, stillExport(ImageFormat.Jpg, ImageScale.One));
+    await drawStill(port, { doc: newMotionDoc(MotionFormat.Square), tokens: TOKENS, assets: {} }, stillExport(ImageFormat.Jpg, ImageScale.One, 1));
 
     expect(seeks).toEqual([0]);
     expect(pictures[0]).toMatchObject({ mime: 'image/jpeg', quality: expect.any(Number) });

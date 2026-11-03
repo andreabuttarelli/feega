@@ -1,7 +1,8 @@
 import type { Db } from '$lib/server/db/client';
-import { paletteSchema, voiceSchema } from '$lib/brand-kit';
+import { paletteSchema, voiceSchema, type Palette, type Voice } from '$lib/brand-kit';
 import { startHost } from '$lib/start-url';
-import type { SiteKit } from './brand-from-site';
+
+export type SiteKit = { name: string; website: string; shortDescription: string | null; palette: Palette; fonts: string[]; logoUrl: string | null; voice: Voice; content: string };
 
 const BRAND_COLUMNS = 'id, name, website, short_description, palette, voice, logo_url, content';
 

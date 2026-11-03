@@ -2912,19 +2912,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   type Picture = { width: number; height: number };
 
-  function elementSizeOf(id: string): Picture | null {
+  type Was = { box: Picture; element: boolean };
+
+  function sizeBefore(id: string): Was | null {
     const row = nodes.find((n) => n.id === id);
-    return row && motionOf(row)?.kind === FrameKind.Element ? { width: row.w, height: row.h } : null;
+    return row ? { box: { width: row.w, height: row.h }, element: motionOf(row)?.kind === FrameKind.Element } : null;
   }
 
-  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Picture | null, mode: ResizeMode) => (was ? handResized(doc, was, picture) : fitToNode(doc, picture, mode));
+  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Was | null, mode: ResizeMode) => (was?.element ? handResized(doc, was.box, picture) : fitToNode(doc, picture, mode, was?.box));
 
-  async function sizeFrameDoc(id: string, picture: Picture, was: Picture | null = null) {
+  async function sizeFrameDoc(id: string, picture: Picture, was: Was | null = null) {
     const mode = resizeMode;
     if (frameDocs.edit(id, (doc) => resizedDoc(doc, picture, was, mode), 'Resized the frame')) {
       return;
     }
-    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: was ? ResizeMode.Element : resizeMode });
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: was?.element ? ResizeMode.Element : resizeMode });
     if (result?.undo) {
       pushGesture({ items: result.undo as UndoItem[] });
     }
@@ -2941,7 +2943,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     const plan = framePlan(id, width, height);
-    const was = elementSizeOf(id);
+    const was = sizeBefore(id);
     liveResized([]);
     livePreview(id, null);
     const sized = plan?.picture ? sizeFrameDoc(id, plan.picture, was) : null;
@@ -3028,7 +3030,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function livePreview(id: string, size: { w: number; h: number } | null) {
     const base = frameDocs.doc(id);
     const plan = size && base ? framePlan(id, size.w, size.h) : null;
-    const fitted = base && plan?.picture ? resizedDoc(base, plan.picture, elementSizeOf(id), resizeMode) : null;
+    const fitted = base && plan?.picture ? resizedDoc(base, plan.picture, sizeBefore(id), resizeMode) : null;
     const shown = fitted?.ok ? fitted.doc : null;
     frameDocs.preview(id, shown);
     const open = layersSource.video;
@@ -3700,9 +3702,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return answer.type === 'success' ? (answer.data as { url: string; name: string; files: string[]; skipped?: string[] }) : exportFailure(answer);
   }
 
-  async function exportFrames(frameIds: string[], rows: ExportRow[]) {
+  async function exportFrames(frameIds: string[], rows: ExportRow[], seconds?: number) {
     await Promise.all(frameIds.map((id) => saves.flush(id)));
-    const answer = await send('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    const at: Record<string, string> = seconds === undefined ? {} : { seconds: String(seconds) };
+    const answer = await send('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export', ...at });
     return answer.type === 'success' ? (answer.data as { url: string; name: string; files: string[]; skipped?: string[] }) : exportFailure(answer);
   }
 
@@ -3878,9 +3881,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   afterNavigate(takeStartUrl);
 
-  function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
+  function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean; skipped: string[] }) {
     landImported(landed);
     void invalidate(CANVAS_LIST_DEPENDENCY);
+    if (landed.skipped.length) {
+      failed = `Imported, with parts left out: ${landed.skipped.join('; ')}`;
+      return;
+    }
     if (startUrl && landed.truncated) {
       failed = `Imported the top of ${startHost(startUrl)}.`;
     }

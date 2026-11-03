@@ -73,7 +73,7 @@ describe('a block in an auto layout row', () => {
   it('takes the room of its box, not only of what it draws', () => {
     const block: RestNode = { id: id(), type: 'GROUP', name: 'div', absoluteBoundingBox: box(0, 0, 640, 100), children: [text('Agentic', 24, 40)] };
     const tree = page([{ id: id(), type: 'FRAME', name: 'row', layoutMode: 'HORIZONTAL', absoluteBoundingBox: box(0, 0, 1280, 100), children: [block] }]);
-    const scale = 2;
+    const scale = 1;
 
     expect(drawn(tree).find((l) => l.startsWith('Text Agentic'))).toContain(` ${24 * scale},${40 * scale} `);
   });

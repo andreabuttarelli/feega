@@ -921,8 +921,9 @@ export const CANVAS_OPS = {
       .object({
         frameIds: z.array(z.string()).max(EXPORT_MAX_FRAMES).default([]),
         elements: exportElementsSchema.default([]),
-        rows: exportRowsSchema.describe('value: 0.5–4 for scale, px for width/height'),
-        name: z.string().max(60).optional()
+        rows: exportRowsSchema.describe('value: 0.5–4 for scale of the frame as big as it is on the canvas (1 = one image px per canvas px, 2 = the default sharp export), px for width/height'),
+        name: z.string().max(60).optional(),
+        seconds: z.number().min(0).optional().describe('the time each frame is drawn at; by default its poster frame, else the frame where it settles')
       })
       .strict()
       .refine((i) => i.frameIds.length + i.elements.length > 0),
@@ -930,7 +931,7 @@ export const CANVAS_OPS = {
       if (needsBrowser(input.rows) && !serverFramesOpen()) {
         return { error: 'renderer_unavailable', message: 'image export needs the server renderer, which is not available here' };
       }
-      const targets = [...input.frameIds.map((nodeId) => ({ nodeId })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))];
+      const targets = [...input.frameIds.map((nodeId) => ({ nodeId, seconds: input.seconds })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds: input.seconds }))];
       const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
       if (out.outcome !== ExportOutcome.Done) {
         return { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
