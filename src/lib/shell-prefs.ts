@@ -10,6 +10,7 @@ export const SHELL_PREF_KEYS = {
   chatOpen: 'feega.chatOpen',
   chatTab: 'feega.chatTab',
   rulers: 'feega.rulers',
+  stylesSplit: 'feega.stylesSplit',
   frameViews: 'feega.frameViews'
 } as const;
 
@@ -21,6 +22,7 @@ const SHELL_PREF_KEYS_LEGACY = {
   chatOpen: 'dazero.chatOpen',
   chatTab: 'dazero.chatTab',
   rulers: 'dazero.rulers',
+  stylesSplit: 'dazero.stylesSplit',
   frameViews: 'dazero.frameViews'
 } as const;
 
@@ -176,6 +178,25 @@ export function readRulers(): boolean {
 
 export function writeRulers(on: boolean) {
   writeRaw(SHELL_PREF_KEYS.rulers, on ? 'true' : 'false');
+}
+
+export const STYLES_SPLIT = { DEFAULT: 0.5, MIN: 0.15, MAX: 0.85 } as const;
+
+export function readStylesSplit(): number {
+  const raw = readRaw(SHELL_PREF_KEYS.stylesSplit);
+  const n = raw === null ? NaN : Number(raw);
+  if (!Number.isFinite(n)) {
+    return STYLES_SPLIT.DEFAULT;
+  }
+  return clampStylesSplit(n);
+}
+
+export function clampStylesSplit(ratio: number): number {
+  return Math.min(STYLES_SPLIT.MAX, Math.max(STYLES_SPLIT.MIN, ratio));
+}
+
+export function writeStylesSplit(ratio: number) {
+  writeRaw(SHELL_PREF_KEYS.stylesSplit, String(ratio));
 }
 
 const FRAME_VIEWS = Object.values(FrameView);

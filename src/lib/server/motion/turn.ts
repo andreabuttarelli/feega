@@ -31,6 +31,7 @@ import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion
 import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
+import { docScaleOf } from '$lib/server/motion/doc-scale';
 import { commitDoc, revisionWriteOf } from '$lib/server/motion/frame-ops';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { Reserve, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
@@ -190,6 +191,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const tools = createMotionTools({
     spawn: { offers, run: (input) => spawnRun(input) as never },
     session,
+    scale: docScaleOf(motion.record, head.doc),
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
     templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),

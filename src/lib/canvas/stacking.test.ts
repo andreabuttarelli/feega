@@ -22,6 +22,32 @@ describe('restacked', () => {
     ]);
   });
 
+  it('brings the picked node forward past the one above it only', () => {
+    expect(restacked(layers, ['a'], Stack.Forward)).toEqual([
+      { id: 'b', z: 0 },
+      { id: 'a', z: 2 }
+    ]);
+  });
+
+  it('sends the picked node backward past the one below it only', () => {
+    expect(restacked(layers, ['c'], Stack.Backward)).toEqual([
+      { id: 'c', z: 2 },
+      { id: 'b', z: 5 }
+    ]);
+  });
+
+  it('separates tied layers to step one forward', () => {
+    const tied = [
+      { id: 'a', z: 0 },
+      { id: 'b', z: 0 },
+      { id: 'c', z: 0 }
+    ];
+    expect(restacked(tied, ['a'], Stack.Forward)).toEqual([
+      { id: 'a', z: 1 },
+      { id: 'c', z: 2 }
+    ]);
+  });
+
   it('ignores ids that are not on the canvas', () => {
     expect(restacked(layers, ['ghost'], Stack.Front)).toEqual([]);
   });
@@ -36,5 +62,11 @@ describe('stackedLocally', () => {
 
   it('moves the picked tiles to the start of the draw order, keeping their order', () => {
     expect(stackedLocally(tiles, ['d', 'b'], Stack.Back).map((t) => t.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  it('moves the picked tiles one step later or earlier', () => {
+    expect(stackedLocally(tiles, ['b'], Stack.Forward).map((t) => t.id)).toEqual(['a', 'c', 'b', 'd']);
+    expect(stackedLocally(tiles, ['c'], Stack.Backward).map((t) => t.id)).toEqual(['a', 'c', 'b', 'd']);
+    expect(stackedLocally(tiles, ['d'], Stack.Forward).map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
   });
 });

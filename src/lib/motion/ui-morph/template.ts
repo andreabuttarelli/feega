@@ -3,6 +3,7 @@ import { GOOGLE_FONTS } from '../fonts/catalogue';
 import { BUILTIN_PREFIX } from '../template/design-kit';
 import { exposeField, FieldType } from '../template/fields';
 import type { TemplateEntry } from '../template/library';
+import { lazyTemplate } from '../template/lazy';
 import { addMorphReel } from './ops';
 import { DEFAULT_REEL } from './reel';
 
@@ -31,5 +32,5 @@ function reelDoc(): MotionDoc {
 
 export const UI_MORPH_TEMPLATE: TemplateEntry = {
   id: `${BUILTIN_PREFIX}ui-morph-reel`,
-  template: { name: 'UI morph reel', description: 'One shape morphing through eleven UI states on the beat, cursor-driven, looping.', keyFields: ['button', 'toast', 'accent'], doc: reelDoc() }
+  template: lazyTemplate(reelDoc, { name: 'UI morph reel', description: 'One shape morphing through eleven UI states on the beat, cursor-driven, looping.', keyFields: ['button', 'toast', 'accent'] })
 };

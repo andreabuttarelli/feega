@@ -273,7 +273,7 @@
     <div class="point" data-testid="history-revert-conflicts">
       <p class="empty">Changed again since. Keep which?</p>
       {#each asking.conflicts as conflict (conflictKey(conflict))}
-        <div class="conflict">
+        <div class="choice">
           <span class="summary">{conflict.path.replace(/^data\./, '')}</span>
           <label><input type="radio" bind:group={asking.picks[conflictKey(conflict)]} value={Keep.Mine} /> Now: {JSON.stringify(conflict.mine)}</label>
           <label><input type="radio" bind:group={asking.picks[conflictKey(conflict)]} value={Keep.Reject} /> Before: {JSON.stringify(conflict.original)}</label>
@@ -610,7 +610,7 @@
     transition: transform 120ms ease;
   }
 
-  .conflict {
+  .choice {
     display: flex;
     flex-direction: column;
     gap: 2px;

@@ -119,6 +119,13 @@ describe('barAction', () => {
     expect(done?.doc.tracks.flatMap((t) => t.clips)).toHaveLength(3);
   });
 
+  it('a duplicate on the canvas shows at the same moment as its original', () => {
+    const done = barAction(Action.Duplicate, { doc: fixture(), selection: ['a'], frame: 0, newId: ids });
+    const copy = done?.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === done.selection[0]);
+
+    expect(copy?.from).toBe(done?.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')?.from);
+  });
+
   it('ignores actions the canvas panel does not run', () => {
     expect(barAction(Action.OpenComp, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })).toBeNull();
   });
@@ -413,6 +420,16 @@ describe('acting on a whole free element', () => {
     expect(wholeElementAction(Command.Duplicate, doc, ['a', 'b'])).toBe(ElementAction.Duplicate);
     expect(wholeElementAction(Action.Duplicate, doc, ['a', 'b'])).toBe(ElementAction.Duplicate);
     expect(wholeElementAction(Command.Duplicate, doc, ['a'])).toBeNull();
+  });
+
+  it('restacks the whole element among the canvas layers, not its clip inside it', () => {
+    const doc = fixture();
+
+    expect(wholeElementAction(Command.BringForward, doc, ['a', 'b'])).toBe(ElementAction.BringForward);
+    expect(wholeElementAction(Command.SendBackward, doc, ['a', 'b'])).toBe(ElementAction.SendBackward);
+    expect(wholeElementAction(Command.BringToFront, doc, ['a', 'b'])).toBe(ElementAction.BringToFront);
+    expect(wholeElementAction(Command.SendToBack, doc, ['a', 'b'])).toBe(ElementAction.SendToBack);
+    expect(wholeElementAction(Command.BringForward, doc, ['a'])).toBeNull();
   });
 });
 

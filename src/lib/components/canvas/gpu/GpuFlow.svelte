@@ -46,6 +46,7 @@
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
   import { inDoc, libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { scaleOf, spaceOf } from '$lib/motion/units';
   import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
@@ -92,12 +93,11 @@
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
-  import { postPageAction } from '$lib/api/page-action';
-  import { browserDrafts, refusedNotice, sendResultOf, type FrameDrafts } from '$lib/canvas/frame-save';
-  import type { FrameDraft } from '$lib/motion/frame-edit-session.svelte';
+  import { postFrameOps } from '$lib/canvas/frame-ops-send';
+  import type { FrameDraft } from '$lib/motion/frame-sync';
   import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
@@ -117,7 +117,8 @@
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
   import { CopyShown, type Drawing } from '$lib/canvas/optimistic-insert';
-  import { drawnAnchor, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { docPoint, drawnAnchor, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { dropIntoMain, landInside, landedScene, mainUnder } from '$lib/motion/into-main';
   import { TypeAhead } from '$lib/canvas/type-ahead';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -140,20 +141,20 @@
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import type { FrameDoc } from '$lib/canvas/core/frame-build';
   import { missingAssets } from '$lib/canvas/live-assets';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
-  import { instanceOf } from '$lib/motion/main-component';
-  import { appendVariant } from '$lib/motion/variants';
+  import { ComponentRole, roleOf } from '$lib/motion/main-component';
   import VariantPlus from '../VariantPlus.svelte';
   import ComponentSetOutline from '../ComponentSetOutline.svelte';
-  import { addSetVariant, mainDragged, setMainOf } from '$lib/motion/component-set';
+  import { addSetVariant, addVariantBeside, mainDragged, setMainOf } from '$lib/motion/component-set';
   import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
   import { fetchComponentSource } from '$lib/canvas/project-components';
-  import { homed, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
+  import { homed, homedAt, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -161,8 +162,9 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
   import { imageSourceTile } from '$lib/canvas/free-image';
-  import { frameRinged } from '$lib/canvas/layers';
+  import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
@@ -225,9 +227,10 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
-  import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
+  import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
@@ -248,8 +251,9 @@
   import { dragAngle, followGroup, mirrorGroup, type Placed } from '$lib/canvas/node-layout';
   import { Flip, flipStage } from '$lib/motion/layer-props';
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
+  import { backToFront } from '$lib/canvas/paint-order';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void; onFrameDraft?: (id: string, nodeId: string, draft: FrameDraft | null) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -311,6 +315,12 @@
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
   let ghost = $state<{ from: Port; at: Point; ok: boolean } | null>(null);
+  let wiringFrom = $state<Port | null>(null);
+  let magnet = $state<Port | null>(null);
+  let hoverPort = $state<Port | null>(null);
+  let hoverWire = $state<string | null>(null);
+  let tieMove = $state<Tie | null>(null);
+  let tieStroke = $state<{ from: Point; to: Point } | null>(null);
   let refusal = $state<string | null>(null);
   let menuAt = $state<Point | null>(null);
   let picked = $state<{ edge: FlowEdge; screen: Point } | null>(null);
@@ -329,7 +339,7 @@
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
+  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -449,7 +459,8 @@
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
-      const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
+      const openId = layersSource.video?.nodeId ?? null;
+      const ringed = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
@@ -613,9 +624,134 @@
     (showsPrototype ? [] : edges).flatMap((e) => {
       const from = portFor(e.source, PortSide.Out, e.sourceHandle);
       const to = portFor(e.target, PortSide.In, e.targetHandle);
-      return from && to ? [{ edge: e, curve: wireCurve({ x: from.x + PORT_OFFSET, y: from.y }, { x: to.x - PORT_OFFSET, y: to.y }) }] : [];
+      if (!from || !to) {
+        return [];
+      }
+      const curve = wireCurve({ x: from.x + PORT_OFFSET, y: from.y }, { x: to.x - PORT_OFFSET, y: to.y });
+      return [{ edge: e, curve: e.tie ? throughPoint(curve, tieAt(e.tie)) : curve }];
     })
   );
+
+  const MAGNET_REACH_PX = 56;
+  const BUBBLE_REST_PX = 7;
+  const BUBBLE_FULL_PX = 20;
+  const WIRE_END_PX = 6;
+  const HOVER_BUBBLE_PX = 9;
+  const CUT_REACH_PX = 16;
+
+  function tieAt(t: Tie): Tie {
+    return tieMove?.id === t.id ? tieMove : t;
+  }
+
+  let underPort = $state<Port | null>(null);
+  const wireCursor = $derived(WIRE_CURSOR[wireAim(ghost ? Wiring.Dragging : Wiring.Idle, ghost ? underPort : hoverPort, magnet)]);
+  let bubbleTint = $state<string>('');
+
+  const ties = $derived(
+    [...new Set(edges.flatMap((e) => (e.tie ? [e.tie.id] : [])))].flatMap((id) => {
+      const tied = edges.filter((e) => e.tie?.id === id);
+      return [{ tie: tieAt(tied[0].tie!), ids: tied.map((e) => e.id) }];
+    })
+  );
+
+  function wireTo(from: Port, to: Port): Connection {
+    if (from.side === PortSide.Out) {
+      return { source: from.nodeId, sourceHandle: from.handle, target: to.nodeId, targetHandle: to.handle };
+    }
+    return { source: to.nodeId, sourceHandle: to.handle, target: from.nodeId, targetHandle: from.handle };
+  }
+
+  const accepts = (from: Port) => (p: Port) => p.side !== from.side && p.nodeId !== from.nodeId && typesMeet(from, p) && connectionRefusal(placed, edges, lookup, wireTo(from, p)) === null;
+
+  const dimmedPorts = $derived(wiringFrom ? ports.filter((p) => p.side !== wiringFrom!.side && p.nodeId !== wiringFrom!.nodeId && !accepts(wiringFrom!)(p)) : []);
+
+  type Bubble = { x: number; y: number; r: number; ex: number; ey: number; er: number };
+  const BUBBLE_KEYS = ['x', 'y', 'r', 'ex', 'ey', 'er'] as const;
+
+  const bubbleTarget = $derived.by((): Bubble | null => {
+    if (magnet && ghost) {
+      const distance = Math.hypot(ghost.at.x - magnet.x, ghost.at.y - magnet.y) * view.zoom;
+      return { x: magnet.x, y: magnet.y, r: bubbleRadius(distance, MAGNET_REACH_PX, BUBBLE_REST_PX, BUBBLE_FULL_PX) / view.zoom, ex: ghost.at.x, ey: ghost.at.y, er: WIRE_END_PX / view.zoom };
+    }
+    if (hoverPort && !ghost) {
+      return { x: hoverPort.x, y: hoverPort.y, r: HOVER_BUBBLE_PX / view.zoom, ex: hoverPort.x, ey: hoverPort.y, er: 0 };
+    }
+    return null;
+  });
+
+  const restingSprings = (): Record<(typeof BUBBLE_KEYS)[number], Spring> => ({ x: { value: 0, velocity: 0 }, y: { value: 0, velocity: 0 }, r: { value: 0, velocity: 0 }, ex: { value: 0, velocity: 0 }, ey: { value: 0, velocity: 0 }, er: { value: 0, velocity: 0 } });
+  let springs = restingSprings();
+  let bubble = $state<Bubble | null>(null);
+
+  function stepBubble(dt: number): boolean {
+    const target = bubbleTarget ?? { x: springs.x.value, y: springs.y.value, r: 0, ex: springs.ex.value, ey: springs.ey.value, er: 0 };
+    if (springs.r.value * view.zoom < 0.5 && bubbleTarget) {
+      springs = { ...springs, x: { value: target.x, velocity: 0 }, y: { value: target.y, velocity: 0 }, ex: { value: target.ex, velocity: 0 }, ey: { value: target.ey, velocity: 0 } };
+    }
+    for (const k of BUBBLE_KEYS) {
+      springs[k] = springTo(springs[k], target[k], dt);
+    }
+    const done = BUBBLE_KEYS.every((k) => atRest(springs[k], target[k]));
+    bubble = !bubbleTarget && done ? null : { x: springs.x.value, y: springs.y.value, r: Math.max(0, springs.r.value), ex: springs.ex.value, ey: springs.ey.value, er: Math.max(0, springs.er.value) };
+    return done;
+  }
+
+  $effect(() => {
+    void bubbleTarget;
+    let frame = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      const dt = last ? Math.min((now - last) / 1000, 0.1) : 1 / 60;
+      last = now;
+      frame = untrack(() => stepBubble(dt)) ? 0 : requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  });
+
+  function grabTie(e: PointerEvent, tie: Tie, ids: string[]) {
+    if (e.button !== PRIMARY_BUTTON || !props.onEdgeTie) {
+      return;
+    }
+    e.stopPropagation();
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const start = toWorld(view, local(e));
+    const move = (m: PointerEvent) => {
+      const w = toWorld(view, local(m));
+      tieMove = { id: tie.id, x: tie.x + w.x - start.x, y: tie.y + w.y - start.y };
+    };
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      if (tieMove) {
+        props.onEdgeTie?.(ids, tieMove);
+      }
+      tieMove = null;
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  }
+
+  function hoverWires(w: Point) {
+    if (!connectable || !props.onEdgeDelete || hovered) {
+      hoverWire = null;
+      return;
+    }
+    const kept = hoverWire ? curves.find((c) => c.edge.id === hoverWire) : null;
+    if (kept && Math.hypot(kept.curve.mid.x - w.x, kept.curve.mid.y - w.y) * view.zoom <= CUT_REACH_PX) {
+      return;
+    }
+    hoverWire = edgeAt(curves.map((c) => ({ id: c.edge.id, curve: c.curve })), w, view.zoom);
+  }
+
+  function cutWire(id: string) {
+    hoverWire = null;
+    props.onEdgeDelete?.(id);
+  }
 
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && !selectedBoxes[0].locked && editable ? selectedBoxes[0] : null);
@@ -854,6 +990,7 @@
     | { kind: GestureKind.TurnMany; centre: Point; start: Point; box: Box; items: Placed[] }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
+    | { kind: GestureKind.Tie; start: Point }
     | { kind: GestureKind.PickEdge; edgeId: string };
 
   let active: Active | null = null;
@@ -878,6 +1015,10 @@
     })
   );
   const hitIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => [r.body, ...r.labels])));
+  const viewLabelIndex = $derived.by(() => {
+    const glyphs = coreType?.glyphs ?? NO_GLYPHS;
+    return new SpatialIndex(bpViews.flatMap((v) => nodeHitRects({ id: v.frame.id, x: v.frame.box.x, y: v.frame.box.y, width: v.frame.box.w, height: v.frame.box.h, inputs: [], outputs: [], label: `${v.name} ${v.width}`, icon: null, tag: null, zoom: labelZoom }, glyphs).slice(1)));
+  });
   const labelIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => r.labels)));
 
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
@@ -1038,8 +1179,7 @@
   const pickKey = (f: { id: string; revision: number; linked?: string }) => `${f.id}:${f.revision}:${f.linked ?? ''}`;
 
   async function fetchPickDoc(id: string, revision: number, attempt = 0) {
-    const res = await fetch(`${coreSource(id)}?revision=${revision}`, { cache: 'no-store' }).catch(() => null);
-    const body = res?.ok ? ((await res.json().catch(() => null)) as { doc: LiveDoc['doc']; tokens: LiveDoc['tokens']; assets: LiveDoc['assets'] } | null) : null;
+    const body = await frameSources(`${coreSource(id)}?revision=${revision}`);
     if (body?.doc) {
       fetched = new Map(fetched).set(id, { revision, live: { doc: body.doc, tokens: body.tokens, assets: body.assets ?? {} } });
       return;
@@ -1099,7 +1239,17 @@
     }
   });
 
+  function adoptSource(id: string, source: FrameDoc) {
+    if ((fetched.get(id)?.revision ?? 0) >= source.revision) {
+      return;
+    }
+    fetched = new Map(fetched).set(id, { revision: source.revision, live: { doc: source.doc, tokens: source.tokens, assets: source.assets ?? {} } });
+  }
+
   $effect(() => {
+    if (!failed) {
+      return;
+    }
     const due = toFetch(coreFrames.filter((f) => fetched.get(f.id)?.revision !== f.revision), pickKey, asked, liveDocs.map);
     if (!due.length) {
       return;
@@ -1183,8 +1333,13 @@
       open.forEach((s) => void s.flushPending());
       event.preventDefault();
     };
+    const backOnline = () => [...savers.values()].forEach((s) => void s.flushPending());
     window.addEventListener('beforeunload', warnUnsaved);
-    return () => window.removeEventListener('beforeunload', warnUnsaved);
+    window.addEventListener('online', backOnline);
+    return () => {
+      window.removeEventListener('beforeunload', warnUnsaved);
+      window.removeEventListener('online', backOnline);
+    };
   });
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
@@ -1336,7 +1491,11 @@
 
   const WHOLE_ELEMENT_RUN: Record<ElementAction, (nodeId: string) => void> = {
     [ElementAction.WrapStack]: (nodeId) => props.onWrapStack?.([nodeId]),
-    [ElementAction.Duplicate]: (nodeId) => duplicateTiles([nodeId])
+    [ElementAction.Duplicate]: (nodeId) => duplicateTiles([nodeId]),
+    [ElementAction.BringForward]: (nodeId) => props.onRestack?.([nodeId], Stack.Forward),
+    [ElementAction.SendBackward]: (nodeId) => props.onRestack?.([nodeId], Stack.Backward),
+    [ElementAction.BringToFront]: (nodeId) => props.onRestack?.([nodeId], Stack.Front),
+    [ElementAction.SendToBack]: (nodeId) => props.onRestack?.([nodeId], Stack.Back)
   };
 
   async function runFrameAction(id: ActionId) {
@@ -1350,7 +1509,7 @@
       WHOLE_ELEMENT_RUN[whole](nodeId);
       return;
     }
-    const at = scoped(live.doc, picks, frameOfLive(live));
+    const at = scoped(live.doc, picks, frameOfLive(live), nodeId);
     if (!at) {
       return;
     }
@@ -1359,15 +1518,19 @@
       pickMany(nodeId, at.scene(picked));
       return;
     }
-    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets), layer: elementName(nodeId) });
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets), layer: elementName(nodeId), here: nodeId });
     if (!done) {
       return;
     }
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
     if (id === Action.CreateComponent && !onComponentsPage) {
-      await saverOf(nodeId)?.flushScheduled();
-      props.onComponentMade?.(nodeId);
+      await saverOf(nodeId)?.settled();
+      const homes = await props.onComponentMade?.(nodeId);
+      const present = saverOf(nodeId)?.history.present;
+      if (homes && present && Object.keys(homes).length) {
+        commit(nodeId, { ok: true, doc: homedAt(present, homes) }, 'Moved the main to the Components page');
+      }
     }
   }
 
@@ -1446,7 +1609,8 @@
     if (held || !live || !frame) {
       return held ?? null;
     }
-    const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
+    const place = { projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId };
+    const draftId = crypto.randomUUID();
     const session: FrameEditSession = new FrameEditSession(
       { head: { version: frame.revision, doc: live.doc }, selection: [], mode: frameMode },
       {
@@ -1472,16 +1636,8 @@
           }
         },
         pull: async () => {},
-        send: async (ops, version, summary) => {
-          const form = new FormData();
-          form.set('ops', JSON.stringify(ops));
-          form.set('version', String(version));
-          form.set('summary', summary);
-          return sendResultOf(await postPageAction(url, 'ops', form));
-        },
-        refused: (error) => props.onfail?.(refusedNotice(error)),
-        keep: (draft) => void drafts?.keep(nodeId, draft),
-        release: () => void drafts?.release(nodeId)
+        send: (ops, version, summary) => postFrameOps(place, { ops, version, summary }),
+        draft: (draft) => props.onFrameDraft?.(draftId, nodeId, draft)
       }
     );
     session.access = editorMode.spec.access;
@@ -1500,30 +1656,6 @@
       liveDocs.set(nodeId, { ...live, assets: { ...live.assets, ...added } });
     }
   }
-
-  const drafts: FrameDrafts | null = $derived(typeof indexedDB === 'undefined' ? null : browserDrafts(page.params.canvasId ?? ''));
-  const draftsRead = new Set<string>();
-
-  function restoreDraft(nodeId: string, draft: FrameDraft) {
-    const session = saverOf(nodeId);
-    const live = liveOf(nodeId);
-    if (!session || !live || !session.restore(draft)) {
-      void drafts?.release(nodeId);
-      return;
-    }
-    liveDocs.set(nodeId, { ...live, doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) });
-  }
-
-  $effect(() => {
-    const shelf = drafts;
-    for (const frame of coreFrames) {
-      if (draftsRead.has(frame.id) || !liveOf(frame.id)) {
-        continue;
-      }
-      draftsRead.add(frame.id);
-      void shelf?.read(frame.id).then((draft) => draft && untrack(() => restoreDraft(frame.id, draft)));
-    }
-  });
 
   const extras = new Map<string, FrameExtras>();
 
@@ -1582,14 +1714,20 @@
   onMount(lockOverscroll);
 
   $effect(() => {
-    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
+    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => placedDoc(f.id))));
   });
+
+  const placedDoc = (id: string) => {
+    const doc = liveOf(id)?.doc;
+    return doc ? [{ doc, scale: scaleOf(doc, byId.get(id) ?? null) }] : [];
+  };
 
   function syncStyle(name: string, style: Style) {
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && !sameValue(present.styles?.[name], inDoc(style, present)) ? syncedDoc(present, name, style) : null;
+      const scale = present ? scaleOf(present, byId.get(frame.id) ?? null) : 1;
+      const synced = present && !sameValue(present.styles?.[name], inDoc(style, spaceOf(present, scale))) ? syncedDoc(present, name, style, scale) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -1755,14 +1893,14 @@
   function variantMark(nodeId: string) {
     const mark = picks.length === 1 && !typing && !isComponentSet(nodeId) ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const instance = mark && saver ? instanceOf(saver.history.present, mark.clip) : null;
-    return mark && instance ? { rect: quadBox(mark.quad), compId: instance.compId } : null;
+    const main = mark && saver ? roleOf(saver.history.present, mark.clip, nodeId) === ComponentRole.Main : false;
+    return mark && main ? { rect: quadBox(mark.quad), hostId: mark.clip } : null;
   }
 
-  function addVariantAt(nodeId: string, compId: string) {
+  function addVariantAt(nodeId: string, hostId: string) {
     const saver = saverOf(nodeId);
     if (saver) {
-      commit(nodeId, appendVariant(saver.history.present, compId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+      commit(nodeId, addVariantBeside(saver.history.present, hostId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
     }
   }
 
@@ -1947,7 +2085,7 @@
     const live = nodeId ? liveOf(nodeId) : null;
     const mode = nodeId && live ? frameMode : EditMode.Design;
     const access = nodeId ? frameTimeline(editorMode.timeline, frameChrome(kindOfNode(nodeId)).timeline, mode) : TimelineAccess.Hidden;
-    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), frame: frameOfLive(live), access } : null;
+    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), scale: scaleOf(live.doc, byId.get(nodeId) ?? null), frame: frameOfLive(live), access } : null;
   });
 
   const TIMELINE_CHANGE: Record<TimelineAccess, (nodeId: string) => (doc: LiveDoc['doc'], summary: string) => void> = {
@@ -1961,7 +2099,7 @@
     if (!at) {
       return [];
     }
-    const kind = picks.length > 1 ? SelectionKind.Member : SelectionKind.Element;
+    const kind = selectionKindOf(picks.length, picks.length === 1 ? findClip(at.live.doc, picks[0])?.clip : null);
     const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
@@ -1974,7 +2112,7 @@
   function gradientMark(nodeId: string) {
     const mark = picks.length === 1 && typing?.nodeId !== nodeId ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip) : null;
+    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip, frameProperties.editingFill) : null;
     return mark && target ? { clip: mark.clip, rect: quadBox(mark.quad), index: target.index, fill: target.fill } : null;
   }
 
@@ -2091,7 +2229,7 @@
   function deletePicks(): boolean {
     const nodeId = inside?.nodeId;
     const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
-    const at = tools ? scoped(tools.doc, picks, tools.frame) : null;
+    const at = tools ? scoped(tools.doc, picks, tools.frame, nodeId) : null;
     const done = at ? barAction(Action.Delete, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8) }) : null;
     if (!nodeId || !at || !done) {
       return false;
@@ -2112,8 +2250,14 @@
   }
 
   function drawnInside(nodeId: string, id: string) {
-    picks = [id];
-    arrive(frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null);
+    const doc = saverOf(nodeId)?.history.present;
+    const inMain = doc ? dropIntoMain(doc, id, nodeId) : null;
+    if (inMain?.ok) {
+      commit(nodeId, inMain, 'Added to the main component');
+    }
+    const scene = inMain?.ok ? (landedScene(inMain.doc, id) ?? id) : id;
+    picks = [scene];
+    arrive(frameBar.tool === DrawTool.Text ? { nodeId, clip: scene } : null);
     frameBar.tool = DrawTool.Select;
   }
 
@@ -2127,14 +2271,14 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: string };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: () => string };
   let typing = $state<Typing | null>(null);
 
   async function startTyping(nodeId: string, clip: string, ahead?: TypeAhead) {
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
-    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live)) : null;
+    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live), nodeId) : null;
     const found = scope ? findClip(scope.view, scope.id)?.clip : null;
     const size = at?.picker.frameSize();
     if (editedView(nodeId) || !saver || !at || !doc || !scope || !found || !size || !editsText(scope.view, scope.id)) {
@@ -2148,7 +2292,7 @@
     }
     const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
     const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: ahead?.release() ?? '' };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: () => ahead?.release() ?? '' };
     liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
@@ -2211,11 +2355,18 @@
 
   function frameUnderDrawing(drawn: DrawnWire) {
     const anchor = drawnAnchor(drawn);
-    const hosts = (id: string) => !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation && coreFrames.some((f) => f.id === id && !f.linked);
+    const takes = (id: string) => kindOfNode(id) === FrameKind.Frame || (kindOfNode(id) === FrameKind.Element && anchor !== null && holdsMainAt(id, anchor));
+    const hosts = (id: string) => !domIds.has(id) && takes(id) && !byId.get(id)?.rotation && coreFrames.some((f) => f.id === id && !f.linked);
     const id = anchor ? hitIndex.allAt(anchor).find(hosts) : null;
     const frame = id ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? liveOf(frame.id) : null;
     return frame && live && saverOf(frame.id) ? { frame, live } : null;
+  }
+
+  function holdsMainAt(id: string, at: Point): boolean {
+    const frame = coreFrames.find((f) => f.id === id);
+    const doc = liveOf(id)?.doc;
+    return !!frame && !!doc && mainUnder(doc, docPoint(doc, frame.box, at), id) !== null;
   }
 
   function drawIntoFrame(drawn: DrawnWire): boolean {
@@ -2225,14 +2376,17 @@
     }
     const { frame, live } = under;
     const clip = crypto.randomUUID().slice(0, 8);
-    const made = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode, frameOfLive(live)), clip);
-    if (!made.ok) {
+    const drawnHere = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode, frameOfLive(live)), clip);
+    const anchor = drawnAnchor(drawn);
+    const made = drawnHere.ok ? landInside(drawnHere.doc, clip, frame.id, anchor ? docPoint(drawnHere.doc, frame.box, anchor) : undefined) : drawnHere;
+    const scene = made.ok ? landedScene(made.doc, clip) : null;
+    if (!made.ok || !scene) {
       return false;
     }
     commit(frame.id, made, DRAW_SUMMARY[drawn.tool]);
     select([frame.id]);
-    goInside(frame.id, Gesture.Click, clip);
-    arrive(drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null);
+    goInside(frame.id, Gesture.Click, scene);
+    arrive(drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip: scene } : null);
     return true;
   }
 
@@ -2249,12 +2403,13 @@
   $effect(() => {
     const wanted = typeOnArrival;
     const saver = wanted ? saverOf(wanted.nodeId) : null;
-    const clip = saver?.history.present.tracks.flatMap((t) => t.clips).find((c) => (wanted?.clip ? c.id === wanted.clip : c.component === 'Text'));
+    const present = saver?.history.present;
+    const clip = wanted?.clip ? (present && scopeOf(present, wanted.clip) ? wanted.clip : null) : present?.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Text')?.id;
     if (!wanted || !clip || !pickerOf(wanted.nodeId)) {
       return;
     }
     typeOnArrival = null;
-    untrack(() => void startTyping(wanted.nodeId, clip.id, typeAhead));
+    untrack(() => void startTyping(wanted.nodeId, clip, typeAhead));
   });
 
   function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
@@ -2264,7 +2419,7 @@
     if (!open || !saver) {
       return;
     }
-    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }));
+    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }), open.nodeId);
     liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
     if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs) || JSON.stringify(lists) !== JSON.stringify(open.lists))) {
       commit(open.nodeId, result, 'Edited text');
@@ -2487,11 +2642,11 @@
     const shownView = editedView(nodeId);
     const start = shownView ? at.live.doc : source;
     const lifted = (doc: MotionDoc) => (shownView ? liftViewEdit(source, shownView.breakpointId, start, doc) : doc);
-    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }));
+    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }), nodeId);
     if (!inScope || holdsLock(inScope.view, inScope.ids)) {
       return;
     }
-    const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8)) : null) ?? { doc: inScope.view, ids: inScope.ids };
+    const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8), nodeId) : null) ?? { doc: inScope.view, ids: inScope.ids };
     const boxes = guessedBoxes(withAutoLayout(work.doc));
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
@@ -2565,6 +2720,14 @@
       }
       if (!result?.ok) {
         liveDocs.set(nodeId, at.live);
+        return;
+      }
+      const [only] = work.ids;
+      const atRoot = grip === Grip.Move && work.ids.length === 1 && inScope.scene(work.ids)[0] === only;
+      const adopted = atRoot ? dropIntoMain(result.doc, only, nodeId) : null;
+      if (adopted?.ok) {
+        commit(nodeId, adopted, GRIP_SUMMARY[grip]);
+        pickMany(nodeId, [landedScene(adopted.doc, only) ?? only]);
         return;
       }
       commit(nodeId, result, GRIP_SUMMARY[grip]);
@@ -2718,7 +2881,7 @@
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
       return;
     }
-    const kind = gestureFor(hit, { pointer: pointerOf(e), button: e.button, shift: e.shiftKey, space, mode });
+    const kind = gestureFor(hit, { pointer: pointerOf(e), button: e.button, shift: e.shiftKey, alt: e.altKey, space, mode });
     downAt = p;
     suppressMenu = false;
     captureId = e.pointerId;
@@ -2773,7 +2936,16 @@
           return null;
         }
         ghost = { from, at: w, ok: false };
+        wiringFrom = from;
+        hoverPort = null;
         return { kind: GestureKind.Connect, from };
+      },
+      [GestureKind.Tie]: () => {
+        if (!connectable || !props.onEdgeTie) {
+          return null;
+        }
+        tieStroke = { from: w, to: w };
+        return { kind: GestureKind.Tie, start: w };
       },
       [GestureKind.PickEdge]: () => (hit.kind === HitKind.Edge ? { kind: GestureKind.PickEdge, edgeId: hit.edgeId } : null),
       [GestureKind.ResizeMany]: () => null,
@@ -2823,6 +2995,11 @@
       if (e.pointerType === 'mouse' && !e.buttons) {
         hoverElement(w, reachOf(e));
         hoverHandle(w);
+      }
+      hoverPort = e.pointerType === 'mouse' && connectable ? portAt(ports, w, view.zoom) : null;
+      bubbleTint = hoverPort ? bubbleColour(hoverPort) : bubbleTint;
+      if (e.pointerType === 'mouse') {
+        hoverWires(w);
       }
       return;
     }
@@ -2925,10 +3102,18 @@
         if (a.kind !== GestureKind.Connect) {
           return;
         }
-        const c = candidate(a.from, w);
+        magnet = magnetPort(ports, w, MAGNET_REACH_PX / view.zoom, accepts(a.from));
+        underPort = portAt(ports, w, view.zoom);
+        bubbleTint = magnet ? bubbleColour(magnet) : bubbleTint;
+        const c = magnet ? wireTo(a.from, magnet) : underPort ? null : candidate(a.from, w);
         const why = c ? connectionRefusal(placed, edges, lookup, c) : '';
         refusal = why || null;
         ghost = { from: a.from, at: w, ok: c !== null && why === null };
+      },
+      [GestureKind.Tie]: (a) => {
+        if (a.kind === GestureKind.Tie) {
+          tieStroke = { from: a.start, to: w };
+        }
       },
       [GestureKind.PickEdge]: () => {}
     };
@@ -3011,8 +3196,12 @@
         if (a.kind !== GestureKind.Connect) {
           return;
         }
-        const c = candidate(a.from, w);
+        const target = magnetPort(ports, w, MAGNET_REACH_PX / view.zoom, accepts(a.from));
+        const c = target ? wireTo(a.from, target) : portAt(ports, w, view.zoom) ? null : candidate(a.from, w);
         ghost = null;
+        wiringFrom = null;
+        magnet = null;
+        underPort = null;
         refusal = null;
         if (!c || connectionRefusal(placed, edges, lookup, c) !== null) {
           return;
@@ -3020,6 +3209,13 @@
         const landing = landingOf(placed, lookup, c);
         if (landing) {
           props.onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
+        }
+      },
+      [GestureKind.Tie]: () => {
+        tieStroke = null;
+        const tie = a.kind === GestureKind.Tie ? tieAcross(curves.map((c) => ({ id: c.edge.id, curve: c.curve })), a.start, w) : null;
+        if (tie) {
+          props.onEdgeTie?.(tie.ids, { id: crypto.randomUUID(), ...tie.at });
         }
       },
       [GestureKind.ResizeMany]: () => a.kind === GestureKind.ResizeMany && endMany(a.items),
@@ -3050,6 +3246,9 @@
     resizing = new Set();
     marquee = null;
     ghost = null;
+    wiringFrom = null;
+    magnet = null;
+    tieStroke = null;
     refusal = null;
     settleOverrides();
   }
@@ -3138,7 +3337,7 @@
       view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
-    view = panBy(view, { x: -e.deltaX, y: -e.deltaY });
+    view = panBy(view, wheelPan(e));
   }
 
 
@@ -3300,9 +3499,18 @@
     menuAt = at;
   }
 
+  const VIEW_MENU_IDS: ReadonlySet<SelectionActionId> = new Set(['export']);
+  let viewMenu = $state<{ at: Point; id: string } | null>(null);
+
   function openMenuAt(at: Point) {
     const e = { clientX: at.x, clientY: at.y };
     if (suppressMenu || !spec.chrome || openElementMenu(e)) {
+      return;
+    }
+    const world = toWorld(view, local(e));
+    const viewId = viewLabelIndex.topAt(world) ?? viewAt(bpViews, world)?.frame.id;
+    if (viewId) {
+      viewMenu = { at, id: viewId };
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
@@ -3368,7 +3576,7 @@
     if (!nodeId || !tools) {
       return false;
     }
-    const at = scoped(tools.doc, picks, tools.frame);
+    const at = scoped(tools.doc, picks, tools.frame, nodeId);
     const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
@@ -3382,7 +3590,7 @@
     if (!nodeId || !tools) {
       return false;
     }
-    const at = scoped(tools.doc, picks, tools.frame);
+    const at = scoped(tools.doc, picks, tools.frame, nodeId);
     const result = at ? alignSpace(at.view, at.ids, at.frame, propBoxes(at.view), edge, savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, `Aligned ${edge}`);
@@ -3452,6 +3660,9 @@
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
     'send-back': () => props.onRestack?.(selected, Stack.Back),
+    'bring-forward': () => props.onRestack?.(selected, Stack.Forward),
+    'send-backward': () => props.onRestack?.(selected, Stack.Backward),
+    rename: () => layersSource.askRename(),
     'toggle-hidden': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Hidden),
     'toggle-locked': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Locked),
     help: () => (shortcutHelp.open = true),
@@ -3512,6 +3723,9 @@
       endCrop(e.key === 'Enter');
       return;
     }
+    if (e.key === 'Escape' && !typing && !isTypingTarget(e.target) && frameBar.disarm()) {
+      return;
+    }
     const up = climbsUp(e);
     const group = up && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
     if (inside && group) {
@@ -3558,7 +3772,7 @@
   let pointer: Point | null = null;
 
   function clipboardTarget(e: ClipboardEvent): boolean {
-    return Boolean(spec.chrome && !frameDialog && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
+    return Boolean(spec.chrome && !frameDialog && !typing && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
   }
 
   const framePicks = (): string[] => (inside && picks.length && frameChrome(kindOfNode(inside.nodeId)).root !== Root.Own ? picks : []);
@@ -3566,7 +3780,7 @@
   function clipOfSelection(): ClipboardPayload | null {
     const tools = inside && framePicks().length ? toolsOf(inside.nodeId) : null;
     if (inside && tools) {
-      const elements = copyElements(tools.doc, picks);
+      const elements = copyElements(homed(tools.doc, inside.nodeId), picks);
       elementClipboard.copyElements(inside.nodeId, [...picks], elements);
       return { elements: elementClipboard.elements! };
     }
@@ -3740,6 +3954,12 @@
     'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => duplicateTiles(ids),
+    rename: (ids) => {
+      const tile = byId.get(ids[0]);
+      if (tile) {
+        startNaming(tile);
+      }
+    },
     'connect-new': () => {
       if (selection.box) {
         connectPickerAt = { x: selection.box.x + selection.box.width + 24, y: selection.box.y };
@@ -3985,6 +4205,7 @@
         ram={ramNode === nodeId ? ramRuns : []}
         onram={() => cacheRam(nodeId, timeline!.doc)}
         {assetUrl}
+        scale={timeline.scale}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={TIMELINE_CHANGE[timeline.access](nodeId)}
       />
@@ -4007,12 +4228,12 @@
       pickHover = null;
     }}
     class:panning={space}
-    style:cursor={handleCursor}
+    style:cursor={wireCursor ?? handleCursor}
     data-owns-pinch
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
@@ -4033,7 +4254,7 @@
         {/if}
         {@const plus = variantMark(frame.id)}
         {#if plus}
-          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.compId)} />
+          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.hostId)} />
         {/if}
         {@const crop = cropMark(frame.id)}
         {#if crop}
@@ -4102,6 +4323,41 @@
           </g>
         {/each}
       </svg>
+      <svg class="wire-magnet" aria-hidden="true">
+        <defs>
+          <filter id="wire-goo" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation={4 / view.zoom} />
+            <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" />
+          </filter>
+        </defs>
+        {#each dimmedPorts as p (`${p.nodeId}:${p.side}:${p.handle}`)}
+          <circle class="port-dim" cx={p.x} cy={p.y} r={7 / view.zoom} />
+        {/each}
+        {#if bubble && bubble.r > 0}
+          <g class="goo" class:snapping={magnet !== null} style:--bubble={bubbleTint} filter="url(#wire-goo)" data-testid="wire-magnet-bubble" data-target={magnet ? `${magnet.nodeId}:${magnet.handle ?? ''}` : ''}>
+            <circle cx={bubble.x} cy={bubble.y} r={bubble.r} />
+            {#if bubble.er > 0}
+              <circle cx={bubble.ex} cy={bubble.ey} r={bubble.er} />
+            {/if}
+          </g>
+          <circle class="goo-rim" style:--bubble={bubbleTint} cx={bubble.x} cy={bubble.y} r={bubble.r} stroke-width={1 / view.zoom} />
+        {/if}
+        {#if tieStroke}
+          <line class="tie-stroke" data-testid="tie-stroke" x1={tieStroke.from.x} y1={tieStroke.from.y} x2={tieStroke.to.x} y2={tieStroke.to.y} stroke-width={1.5 / view.zoom} />
+        {/if}
+      </svg>
+      {#each ties as t (t.tie.id)}
+        <div class="wire-tie" data-testid="wire-tie" data-tie={t.tie.id} data-wires={t.ids.length} style={`transform: translate(${t.tie.x}px, ${t.tie.y}px) scale(${1 / view.zoom})`}>
+          <button type="button" class="wire-tie-clip" aria-label="Move cable tie" onpointerdown={(e) => grabTie(e, t.tie, t.ids)}></button>
+          <button type="button" class="wire-tie-cut" aria-label="Remove cable tie" data-testid="wire-tie-remove" onpointerdown={(e) => e.stopPropagation()} onclick={() => props.onEdgeTie?.(t.ids, null)}>×</button>
+        </div>
+      {/each}
+      {#if hoverWire && !ghost}
+        {@const c = curves.find((x) => x.edge.id === hoverWire)}
+        {#if c}
+          <button type="button" class="wire-cut" data-testid="wire-cut" aria-label="Cut wire" style={`transform: translate(${c.curve.mid.x}px, ${c.curve.mid.y}px) scale(${1 / view.zoom})`} onpointerdown={(e) => e.stopPropagation()} onclick={() => cutWire(c.edge.id)}>×</button>
+        {/if}
+      {/if}
       {#each [...copies] as [id, c] (id)}
         <div class="gpu-copy-ghost" data-testid="gpu-copy-ghost" style={`transform: translate(${c.x}px, ${c.y}px);width:${c.w}px;height:${c.h}px`}></div>
       {/each}
@@ -4268,7 +4524,7 @@
       frame={frameOfLive(liveOf(nodeId)!)}
       onedit={(result, summary) => commit(nodeId, result, summary)}
       onswitch={(next) => (frameDialog = { nodeId, dialog: next })}
-      onimages={(rows) => props.onExportRows?.([nodeId], rows) ?? Promise.resolve('Export failed')}
+      onimages={(rows) => props.onExportRows?.([nodeId], rows, frameOfLive(liveOf(nodeId)!) / liveOf(nodeId)!.doc.fps) ?? Promise.resolve('Export failed')}
       onpreview={(doc) => showDialogDoc(nodeId, doc)}
       onclose={() => closeDialog(nodeId)}
     />
@@ -4281,6 +4537,10 @@
 
   {#if spec.chrome}
     <CommandPalette onrun={runPaletteCommand} />
+  {/if}
+
+  {#if viewMenu && spec.chrome}
+    <CanvasContextMenu at={viewMenu.at} summaries={(props.nodeSummaries ?? []).filter((n) => n.id === baseNodeId(viewMenu!.id))} available={VIEW_MENU_IDS} onpick={() => props.onExport?.([viewMenu!.id])} onclose={() => (viewMenu = null)} />
   {/if}
 
   {#if menuAt && spec.chrome}
@@ -4451,6 +4711,88 @@
 
   .gpu-edges.core {
     visibility: hidden;
+  }
+
+  .wire-magnet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .wire-magnet .goo {
+    fill: var(--bubble, var(--ui-accent));
+    opacity: 0.18;
+  }
+
+  .wire-magnet .goo.snapping {
+    opacity: 0.25;
+  }
+
+  .wire-magnet .goo-rim {
+    fill: none;
+    stroke: var(--bubble, var(--ui-accent));
+    opacity: 0.5;
+  }
+
+  .wire-magnet .port-dim {
+    fill: var(--paper, #fff);
+    opacity: 0.7;
+  }
+
+  .wire-magnet .tie-stroke {
+    stroke: var(--ui-accent, #0a84ff);
+    stroke-dasharray: 4 3;
+  }
+
+  .wire-tie,
+  .wire-cut {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    pointer-events: auto;
+  }
+
+  .wire-tie-clip {
+    position: absolute;
+    left: -6px;
+    top: -12px;
+    width: 12px;
+    height: 24px;
+    border-radius: var(--ui-radius-full, 999px);
+    background: var(--ui-panel-raised, #fff);
+    border: 1px solid var(--ink-soft, #6e6e73);
+    cursor: grab;
+  }
+
+  .wire-tie-cut,
+  .wire-cut {
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border-radius: var(--ui-radius-full, 999px);
+    background: var(--ui-panel-raised, #fff);
+    border: 1px solid var(--ink-soft, #6e6e73);
+    color: var(--ink, #1d1d1f);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .wire-tie-cut {
+    position: absolute;
+    left: 18px;
+    top: -14px;
+    margin: 0;
+    opacity: 0;
+  }
+
+  .wire-tie:hover .wire-tie-cut {
+    opacity: 1;
   }
 
   .wire-iterate-badge circle {

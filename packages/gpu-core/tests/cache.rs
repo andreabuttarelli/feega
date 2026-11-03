@@ -48,15 +48,15 @@ fn a_zoom_past_the_threshold_draws_the_stale_texture_scaled_while_it_re_rasters(
     lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
     lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
 
-    let zoomed = lib.plan(&screen(&[("a", 1.5, 0.0), ("b", 1.5, 300.0)]), LIMITS);
+    let zoomed = lib.plan(&screen(&[("a", 1.3, 0.0), ("b", 1.3, 300.0)]), LIMITS);
 
     assert_eq!(zoomed.rasters.len(), 1);
     assert_eq!(kinds(&zoomed.screen), vec!["image", "image"]);
     let Item::Image(stale) = &zoomed.screen.items[1] else { panic!() };
-    assert_eq!(stale.look.matrix[0], 1.5);
+    assert_eq!(stale.look.matrix[0], 1.3);
     assert!(zoomed.pending);
 
-    let next = lib.plan(&screen(&[("a", 1.5, 0.0), ("b", 1.5, 300.0)]), LIMITS);
+    let next = lib.plan(&screen(&[("a", 1.3, 0.0), ("b", 1.3, 300.0)]), LIMITS);
     assert_eq!(next.rasters.len(), 1);
     assert!(!next.pending);
 }
@@ -227,10 +227,10 @@ fn while_a_zoom_re_raster_is_in_chunks_the_stale_texture_stays_on_screen() {
     let mut lib = library(&["a"]);
     lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
 
-    let zoomed = lib.plan(&screen(&[("a", 2.0, 0.0)]), ONE_ITEM);
+    let zoomed = lib.plan(&screen(&[("a", 1.4, 0.0)]), ONE_ITEM);
 
     let Item::Image(stale) = &zoomed.screen.items[0] else { panic!() };
-    assert_eq!(stale.look.matrix[0], 2.0);
+    assert_eq!(stale.look.matrix[0], 1.4);
     assert!(zoomed.pending);
 }
 

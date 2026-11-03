@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
-import { DocAccess, FrameEditSession, SaveFailure, type SessionPort, type SendResult } from './frame-edit-session.svelte';
+import { Delivery, DocAccess, FrameEditSession, type SessionPort, type SendResult } from './frame-edit-session.svelte';
 import { outgoing } from './frame-sync';
 import { OpKind } from './doc-ops';
 import { addClip } from '@feega/motion-core/motion/timeline';
@@ -23,9 +23,7 @@ function open(send: SessionPort['send'] = accepted) {
     landed: vi.fn(),
     pull: vi.fn(async () => {}),
     send: vi.fn(send),
-    refused: vi.fn(),
-    keep: vi.fn(),
-    release: vi.fn()
+    draft: vi.fn()
   };
   return { port, session: new FrameEditSession({ head: { version: 1, doc: base }, selection: [] }, port) };
 }
@@ -189,89 +187,13 @@ describe('save queue', () => {
   });
 
   it('a refused save is Failed and carries the server error', async () => {
-    const { session } = open(async () => ({ ok: false, error: 'stale', failure: SaveFailure.Refused }));
+    const { session } = open(async () => ({ ok: false, error: 'stale' }));
 
     session.apply({ ok: true, doc: longer(60) }, 'Longer');
     await vi.advanceTimersByTimeAsync(300);
 
     expect(session.saveState).toBe(SaveState.Failed);
     expect(session.notice).toBe('stale');
-  });
-
-  it('a refused save is never silent: the host hears it, and the edit stays unsaved', async () => {
-    const { session, port } = open(async () => ({ ok: false, error: 'tracks: Too big', failure: SaveFailure.Refused }));
-
-    session.apply({ ok: true, doc: longer(60) }, 'Longer');
-    await vi.advanceTimersByTimeAsync(300);
-
-    expect(port.refused).toHaveBeenCalledWith('tracks: Too big');
-    expect(session.unsaved()).toBe(true);
-    expect(session.history.present.durationInFrames).toBe(60);
-  });
-
-  it('a save that could not reach the server is sent again until it lands', async () => {
-    let calls = 0;
-    const { session, port } = open(async (_ops, version) => (++calls < 3 ? { ok: false, error: 'offline', failure: SaveFailure.Transient } : { ok: true, version: version + 1, doc: longer(60) }));
-
-    session.apply({ ok: true, doc: longer(60) }, 'Longer');
-    await vi.advanceTimersByTimeAsync(60_000);
-
-    expect(port.send).toHaveBeenCalledTimes(3);
-    expect(session.saveState).toBe(SaveState.Saved);
-    expect(port.refused).not.toHaveBeenCalled();
-  });
-
-  it('a send that throws is retried, not left saving forever', async () => {
-    let calls = 0;
-    const { session, port } = open(async (_ops, version) => {
-      if (++calls === 1) {
-        throw new Error('network');
-      }
-      return { ok: true, version: version + 1, doc: longer(60) };
-    });
-
-    session.apply({ ok: true, doc: longer(60) }, 'Longer');
-    await vi.advanceTimersByTimeAsync(60_000);
-
-    expect(port.send).toHaveBeenCalledTimes(2);
-    expect(session.saveState).toBe(SaveState.Saved);
-  });
-
-  it('the edit is kept on the host shelf from the send until it lands', async () => {
-    const { session, port } = open();
-
-    session.apply({ ok: true, doc: longer(60) }, 'Longer');
-    await vi.advanceTimersByTimeAsync(300);
-
-    expect(port.keep).toHaveBeenCalledWith({ version: 1, ops: outgoing({ version: 1, doc: base }, longer(60)) });
-    expect(port.release).toHaveBeenCalledTimes(1);
-  });
-
-  it('a refused edit stays on the shelf, so a reload does not lose it', async () => {
-    const { session, port } = open(async () => ({ ok: false, error: 'nope', failure: SaveFailure.Refused }));
-
-    session.apply({ ok: true, doc: longer(60) }, 'Longer');
-    await vi.advanceTimersByTimeAsync(300);
-
-    expect(port.keep).toHaveBeenCalled();
-    expect(port.release).not.toHaveBeenCalled();
-  });
-
-  it('a kept edit made on the revision the session opened is restored and saved again', async () => {
-    const { session, port } = open();
-
-    expect(session.restore({ version: 1, ops: outgoing({ version: 1, doc: base }, longer(60)) })).toBe(true);
-    await vi.advanceTimersByTimeAsync(300);
-
-    expect(session.history.present.durationInFrames).toBe(60);
-    expect(port.send).toHaveBeenCalledTimes(1);
-  });
-
-  it('a kept edit made on another revision is not replayed over it', () => {
-    const { session } = open();
-
-    expect(session.restore({ version: 7, ops: outgoing({ version: 7, doc: base }, longer(60)) })).toBe(false);
-    expect(session.history.present).toBe(base);
   });
 
   it('flushPending saves now instead of waiting for the debounce', async () => {
@@ -453,5 +375,121 @@ describe('a scrub saves once', () => {
 
     expect(port.send).toHaveBeenCalledTimes(1);
     expect(port.recorded).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a save the network did not deliver', () => {
+  const unreachable: SendResult = { ok: false, error: 'offline', delivery: Delivery.Unreachable };
+
+  it('is sent again after a pause, not marked failed', async () => {
+    const answers: SendResult[] = [unreachable, { ok: true, version: 2, doc: longer(60) }];
+    const { session, port } = open(async () => answers.shift()!);
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(session.saveState).toBe(SaveState.Pending);
+    expect(session.unsaved()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(port.send).toHaveBeenCalledTimes(2);
+    expect(session.saveState).toBe(SaveState.Saved);
+  });
+
+  it('a send that throws does not leave the session stuck saving', async () => {
+    let calls = 0;
+    const { session, port } = open(async (_ops, version) => {
+      calls += 1;
+      if (calls === 1) {
+        throw new TypeError('Failed to fetch');
+      }
+      return { ok: true, version: version + 1, doc: longer(70) };
+    });
+
+    session.apply({ ok: true, doc: longer(60) }, 'A');
+    await vi.advanceTimersByTimeAsync(300);
+    session.apply({ ok: true, doc: longer(70) }, 'B');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(port.send).toHaveBeenCalledTimes(2);
+    expect(session.saveState).toBe(SaveState.Saved);
+  });
+});
+
+describe('the draft the host keeps until the save lands', () => {
+  const lastDraft = (port: SessionPort) => vi.mocked(port.draft).mock.calls.at(-1)?.[0];
+
+  it('an edit hands over the ops from the last saved revision', () => {
+    const { session, port } = open();
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+
+    expect(lastDraft(port)).toEqual({ version: 1, ops: outgoing({ version: 1, doc: base }, longer(60)), summary: 'Longer' });
+  });
+
+  it('a landed save clears it', async () => {
+    const { session, port } = open();
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(lastDraft(port)).toBeNull();
+  });
+
+  it('a save that never arrived keeps it', async () => {
+    const { session, port } = open(async () => ({ ok: false, error: 'offline', delivery: Delivery.Unreachable }));
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(lastDraft(port)).toMatchObject({ version: 1, summary: 'Longer' });
+  });
+
+  it('a refused save clears it, since sending it again would be refused again', async () => {
+    const { session, port } = open(async () => ({ ok: false, error: 'invalid_ops' }));
+
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(lastDraft(port)).toBeNull();
+  });
+
+  it('an undo is a draft too, so the last undo before a reload is kept', () => {
+    const { session, port } = open();
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    session.undo();
+
+    expect(lastDraft(port)).toBeNull();
+
+    session.redo();
+
+    expect(lastDraft(port)).toMatchObject({ version: 1, summary: 'Redo' });
+  });
+});
+
+describe('waiting for the doc to reach the server', () => {
+  it('settles only once a save already in flight, and the edit made after it, have landed', async () => {
+    const wire = held();
+    const { session, port } = open(wire.send);
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    void session.flushScheduled();
+    session.apply({ ok: true, doc: longer(70) }, 'Longer again');
+    let settled = false;
+    const done = session.settled().then(() => (settled = true));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+    wire.release({ ok: true, version: 2, doc: longer(60) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(port.send).toHaveBeenCalledTimes(2);
+    expect(settled).toBe(false);
+    wire.release({ ok: true, version: 3, doc: longer(70) });
+    await done;
+    expect(settled).toBe(true);
+  });
+
+  it('settles at once when nothing is waiting to be saved', async () => {
+    await expect(open().session.settled()).resolves.toBeUndefined();
   });
 });

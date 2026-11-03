@@ -11,6 +11,9 @@
     DIRECTIONS,
     DIRECTION_LABEL,
     Direction,
+    OVERLAY_POSITIONS,
+    OVERLAY_POSITION_LABEL,
+    OverlayPosition,
     TRANSITION_KINDS,
     TRANSITION_LABEL,
     TRIGGER_KINDS,
@@ -18,12 +21,13 @@
     TransitionKind,
     TriggerKind,
     needsTarget,
-    type Interaction
+    type Interaction,
+    type Overlay
   } from '@feega/motion-core/motion/prototype/model';
   import SmartAnimatePreview from './SmartAnimatePreview.svelte';
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
-  import { TRANSITION_FIELDS, retimed, retriggered, retargeted } from '$lib/motion/prototype/edit';
+  import { TRANSITION_FIELDS, backdropOf, freshInteraction, relinked, backdropParts, reoverlaid, retimed, retriggered, retargeted } from '$lib/motion/prototype/edit';
   import { variantChoices } from '$lib/motion/prototype/variant-change';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
@@ -36,12 +40,16 @@
   const choiceLabel = (variant: Record<string, string>) => Object.entries(variant).map(([prop, value]) => `${prop}: ${value}`).join(', ');
   const choiceOf = (i: Interaction) => ('variant' in i.action ? choiceLabel(i.action.variant) : '');
   const put = (next: Interaction, summary: string) => commit(putInteraction(doc, clip.id, next), summary);
+  const overlayOf = (i: Interaction): Overlay | null => (i.action.kind === ActionKind.OpenOverlay ? i.action.overlay : null);
+  const px = (text: string, fallback: number) => (Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : fallback);
+  const add = () => put(freshInteraction(crypto.randomUUID().slice(0, 8), prototypeLink.targets[0]?.id ?? null), 'Added an interaction');
   const ms = (text: string, fallback: number) => (Number.isFinite(Number(text)) && text.trim() !== '' ? Math.round(Number(text)) : fallback);
 </script>
 
 <section class="prototype" data-testid="prototype-section" aria-label="Prototype">
   <header>
     <h3>Prototype</h3>
+    <button type="button" class="link" data-testid="prototype-add" onclick={add}>Add interaction</button>
     <button type="button" class="link" data-testid="prototype-link" aria-pressed={aiming} onclick={() => (aiming ? prototypeLink.stop() : prototypeLink.aim({ clipId: clip.id, interactionId: null }))}>
       {aiming ? 'Cancel' : 'Link to frame'}
     </button>
@@ -70,6 +78,9 @@
             {#each choices as choice (choiceLabel(choice))}<option value={choiceLabel(choice)}>{choiceLabel(choice)}</option>{/each}
           </select>
         {/if}
+        {#if 'url' in interaction.action}
+          <input type="url" class="url" aria-label="Link URL" placeholder="https://" value={interaction.action.url} onchange={(e) => put(relinked(interaction, e.currentTarget.value), 'Changed the link')} />
+        {/if}
         {#if needsTarget(interaction.action.kind)}
           <select aria-label="Target frame" value={targetOf(interaction)} onchange={(e) => put(retargeted(interaction, interaction.action.kind, e.currentTarget.value), 'Changed the target frame')}>
             {#if !prototypeLink.targets.some((t) => t.id === targetOf(interaction))}<option value={targetOf(interaction)}>{nameOf(targetOf(interaction))}</option>{/if}
@@ -78,6 +89,29 @@
           <button type="button" class="aim" aria-label="Pick the target on the canvas" onclick={() => prototypeLink.aim({ clipId: clip.id, interactionId: interaction.id })}>Pick</button>
         {/if}
       </div>
+      {#if overlayOf(interaction)}
+        {@const overlay = overlayOf(interaction)!}
+        {@const backdrop = backdropParts(overlay.backdrop)}
+        <div class="line" data-testid="overlay-settings">
+          <select aria-label="Overlay position" value={overlay.position} onchange={(e) => put(reoverlaid(interaction, { position: e.currentTarget.value as OverlayPosition }), 'Changed the overlay position')}>
+            {#each OVERLAY_POSITIONS as position (position)}<option value={position}>{OVERLAY_POSITION_LABEL[position]}</option>{/each}
+          </select>
+          {#if overlay.position === OverlayPosition.Manual}
+            <input type="text" inputmode="numeric" aria-label="Overlay X" value={String(overlay.x)} onchange={(e) => put(reoverlaid(interaction, { x: px(e.currentTarget.value, overlay.x) }), 'Moved the overlay')} />
+            <input type="text" inputmode="numeric" aria-label="Overlay Y" value={String(overlay.y)} onchange={(e) => put(reoverlaid(interaction, { y: px(e.currentTarget.value, overlay.y) }), 'Moved the overlay')} />
+          {/if}
+        </div>
+        <label class="line">
+          <input type="checkbox" class="check" aria-label="Close when clicking outside" checked={overlay.closeOutside} onchange={(e) => put(reoverlaid(interaction, { closeOutside: e.currentTarget.checked }), 'Changed how the overlay closes')} />
+          <span>Close when clicking outside</span>
+        </label>
+        <div class="line">
+          <span class="unit">Background</span>
+          <input type="color" class="swatch" aria-label="Overlay background colour" value={backdrop.colour} onchange={(e) => put(reoverlaid(interaction, { backdrop: backdropOf(e.currentTarget.value, backdrop.opacity) }), 'Changed the overlay background')} />
+          <input type="text" inputmode="numeric" aria-label="Overlay background opacity" value={String(backdrop.opacity)} onchange={(e) => put(reoverlaid(interaction, { backdrop: backdropOf(backdrop.colour, px(e.currentTarget.value, backdrop.opacity)) }), 'Changed the overlay background')} />
+          <span class="unit">%</span>
+        </div>
+      {/if}
       <div class="line">
         <select aria-label="Transition" value={interaction.transition.kind} onchange={(e) => put(retimed(interaction, { kind: e.currentTarget.value as TransitionKind }), 'Changed the transition')}>
           {#each TRANSITION_KINDS as kind (kind)}<option value={kind}>{TRANSITION_LABEL[kind]}</option>{/each}
@@ -120,10 +154,12 @@
   header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--ui-space-1);
   }
 
+
   h3 {
+    flex: 1;
     margin: 0;
     font-size: var(--ui-type-caption);
     font-weight: 600;
@@ -152,6 +188,23 @@
 
   input {
     max-width: 64px;
+  }
+
+  input.check {
+    flex: none;
+  }
+
+  input.swatch {
+    flex: none;
+    width: 24px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-xs);
+  }
+
+  input.url {
+    max-width: none;
   }
 
   .hint,

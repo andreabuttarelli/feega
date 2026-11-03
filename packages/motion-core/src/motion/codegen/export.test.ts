@@ -121,7 +121,7 @@ describe('instances that do not differ', () => {
   });
 });
 
-describe('a frame without auto layout', () => {
+describe('a frame without auto layout whose layers overlap', () => {
   it('positions its layers absolutely inside a relative parent', () => {
     const css = file(exportCode(absoluteDoc(), { name: 'Poster', target: CodeTarget.Html }), 'styles/page.css');
     expect(css).toContain('position: relative;');

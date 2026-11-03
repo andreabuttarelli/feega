@@ -10,7 +10,6 @@ import { drawTargets } from './selection-draw';
 import type { DrawTarget } from './selection-export';
 import { Span } from './vector-list';
 import { unzipSync } from 'fflate';
-import { restFrameOf } from '$lib/motion/poster-time';
 
 const doc = newMotionDoc(MotionFormat.Square);
 const ELEMENT_BOX: PageBox = { left: 100, top: 200, width: 300, height: 120 };
@@ -82,15 +81,11 @@ describe('drawing an export', () => {
     expect(bytes.toString()).toContain(`width="${doc.width / 2}"`);
   });
 
-  it('a raster row of a video frame is shot where the canvas shows it, after the text has faded in', async () => {
+  it('a raster row of a video is shot at its poster frame, not its first', async () => {
     const { port, log } = fakePort();
-    const typed = addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Get started' } }, 'label');
-    const withText = typed.ok ? typed.doc : doc;
+    await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, poster: { frame: 60 } }, docScale: 1 }], row({ format: 'png', by: 'scale', value: 1 }));
 
-    await drawTargets(ports(port), [{ nodeId: 'a', doc: withText, docScale: 1 }], row({ format: 'png', by: 'scale', value: 1 }));
-
-    expect(log).toContain(`seek ${restFrameOf(withText) / withText.fps}`);
-    expect(log).not.toContain('seek 0');
+    expect(log).toContain(`seek ${60 / doc.fps}`);
   });
 
   it('an SVG row is drawn from the display list: paths, no foreign object, no browser', async () => {

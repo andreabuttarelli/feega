@@ -32,11 +32,6 @@ A free element behaves like a single object, as in Figma ([ADR 0032](/architectu
 - `Resize to fit` (`⌥⇧⌘R`) fits a frame to its contents.
 - A frame takes up to 16 384 px a side and up to 1000 layers; a bigger size is scaled to fit, and the canvas says so.
 
-## Saving
-
-- Edits inside a frame save in the background. A save that drops on a bad connection is sent again on its own.
-- A save the server refuses shows its reason at the bottom of the canvas. The edit stays on screen and on this device, and goes again with your next change; after a reload it is put back and sent again.
-
 ## A frame's numbers are canvas pixels
 
 A frame works in design units, as in Figma ([ADR 0033](/architecture/adr/0033-a-frame-is-its-size-on-the-canvas/)): a frame 700 px wide on the canvas reads **W 700**, and every number of the layers inside it (width, height, type size, radius, stroke, gap, padding, effects, camera) is in the same canvas pixels. A radius of 12 draws 12 px.
@@ -45,7 +40,8 @@ A frame works in design units, as in Figma ([ADR 0033](/architecture/adr/0033-a-
 - Resizing a frame, by its handle or by typing W and H, keeps every layer, type size and corner radius at its size and moves layers by their constraints.
 - A text style is a pixel size: 16 px is 16 px in every frame that uses it.
 - Typing W on an auto-width text makes it fixed width; wrapping a text in a stack keeps how it sizes.
-- Frames made before this change keep their content untouched; their numbers read in canvas pixels too.
+- Frames made before this change keep their content untouched; their numbers read in canvas pixels too, in the inspector, the timeline value fields, the motion agent and the MCP motion tools.
+- The motion agent and `motion_tool` speak the same canvas pixels: `get_motion_doc` reports the frame as big as it is on the canvas, and positions, sizes, strokes, gaps, padding, guides and `set_canvas` sizes are canvas pixels. `export_image` scale 1 is one image pixel per canvas pixel.
 - The resolution of a file is picked when you export it: see [Export](/motion/export/).
 
 ## Styling the frame

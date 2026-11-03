@@ -3,7 +3,8 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { fontLoader } from '@feega/motion-core/motion/gpu-full/text/load';
-import { shownFrame } from '$lib/motion/poster-time';
+import { stillSeconds } from '@feega/motion-core/motion/still';
+import { posterFrameOf } from '$lib/motion/poster-time';
 import { imageSources } from '$lib/motion/export-svg';
 
 export type VectorInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> };
@@ -39,8 +40,8 @@ export async function inlineImages(sources: string[], fetcher: Fetcher): Promise
 export type VectorIo = { fetcher?: Fetcher; fonts?: ReturnType<typeof fontLoader> };
 
 function framesOf(doc: MotionDoc, span: Span): number[] {
-  if (doc.still || span === Span.Still) {
-    return [shownFrame(doc)];
+  if (stillSeconds(doc) !== null || span === Span.Still) {
+    return [posterFrameOf(doc)];
   }
   if (doc.durationInFrames > LOTTIE_MAX_SECONDS * doc.fps) {
     throw new Error(`an animation can be at most ${LOTTIE_MAX_SECONDS} s: shorten the video`);

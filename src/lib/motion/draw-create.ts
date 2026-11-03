@@ -24,7 +24,7 @@ export type LineTool = DrawTool.Line | DrawTool.Arrow;
 export const DRAWN_TEXT: ComponentId = 'Text';
 
 const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, unknown> }> = {
-  [DrawTool.Text]: { component: DRAWN_TEXT, props: { text: 'Text' } },
+  [DrawTool.Text]: { component: DRAWN_TEXT, props: { text: 'Text', align: 'left' } },
   [DrawTool.Rectangle]: { component: 'Shape', props: { shape: ShapeKind.Rect } },
   [DrawTool.Ellipse]: { component: 'Shape', props: { shape: ShapeKind.Ellipse } },
   [DrawTool.Polygon]: { component: 'Shape', props: { shape: ShapeKind.Polygon, sides: 3 } },
@@ -82,8 +82,18 @@ function fittedSize(doc: MotionDoc, box: DrawBox): number {
   return Math.round(Math.min(Math.max(fit, TYPE_SIZE.min), TYPE_SIZE.max) * SIZE_PRECISION) / SIZE_PRECISION;
 }
 
+const BODY_PX = 16;
+
+const bodySize = (doc: MotionDoc): number => Math.max(TYPE_SIZE.min, BODY_PX / Math.min(doc.width, doc.height));
+
+const TEXT_SIZE: Record<TextSizing, (doc: MotionDoc, box: DrawBox) => number> = {
+  [TextSizing.AutoWidth]: fittedSize,
+  [TextSizing.AutoHeight]: bodySize,
+  [TextSizing.Fixed]: bodySize
+};
+
 const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizing) => Record<string, unknown>> = {
-  [DrawTool.Text]: (doc, box, sizing) => ({ size: fittedSize(doc, box), sizing }),
+  [DrawTool.Text]: (doc, box, sizing) => ({ size: TEXT_SIZE[sizing](doc, box), sizing }),
   [DrawTool.Rectangle]: () => ({}),
   [DrawTool.Ellipse]: () => ({}),
   [DrawTool.Polygon]: () => ({}),

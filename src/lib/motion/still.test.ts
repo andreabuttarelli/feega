@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newClip, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { Quality, TIMELINE_ONLY, docProblems } from './direction';
-import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, setStill, stillFrame } from '@feega/motion-core/motion/still';
+import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, posterFrame, setPoster, setStill, stillFrame } from '@feega/motion-core/motion/still';
 import { setCanvas } from '@feega/motion-core/motion/timeline';
 import { ImageFormat, IMAGE_FORMATS, IMAGE_SCALES, ImageScale, stillExport } from '@feega/motion-core/motion/still-model';
 
@@ -197,5 +197,39 @@ describe('a still design frame is not held to the video resolution', () => {
     const dot = setCanvas(page(), { size: { width: 1, height: 1 } });
 
     expect(dot.ok && setStill(dot.doc, null).ok).toBe(false);
+  });
+});
+
+describe('the poster frame of a video', () => {
+  const video = { ...newMotionDoc(MotionFormat.Portrait), durationInFrames: 180 };
+
+  it('is marked at a frame and keeps the doc a video', () => {
+    const made = setPoster(video, 60);
+
+    expect(made.ok && posterFrame(made.doc)).toBe(60);
+    expect(made.ok && docMode(made.doc)).toBe(DocMode.Video);
+    const parsed = made.ok ? parseMotionDoc(made.doc) : null;
+    expect(parsed?.ok && parsed.doc.poster).toEqual({ frame: 60 });
+  });
+
+  it('never lands past the end, and null clears it', () => {
+    const made = setPoster(video, 999);
+    expect(made.ok && posterFrame(made.doc)).toBe(179);
+    const cleared = made.ok ? setPoster(made.doc, null) : made;
+    expect(cleared.ok && posterFrame(cleared.doc)).toBeNull();
+  });
+
+  it('a still frame wins over the poster', () => {
+    const marked = setPoster(video, 60);
+    const still = marked.ok ? setStill(marked.doc, 1) : marked;
+
+    expect(still.ok && posterFrame(still.doc)).toBe(30);
+  });
+
+  it('follows a shorter video back inside it', () => {
+    const marked = setPoster(video, 150);
+    const shorter = marked.ok ? setCanvas(marked.doc, { durationInFrames: 90 }) : marked;
+
+    expect(shorter.ok && posterFrame(shorter.doc)).toBe(89);
   });
 });

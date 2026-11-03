@@ -12,6 +12,20 @@ export enum PresetSide {
   Out = 'out'
 }
 
+export enum PresetPlace {
+  Edge = 'edge',
+  Playhead = 'playhead'
+}
+
+export const PRESET_PLACE_LABEL: Record<PresetPlace, string> = { [PresetPlace.Edge]: 'Clip edge', [PresetPlace.Playhead]: 'Playhead' };
+
+const PLACE_START: Record<PresetPlace, (frame: number, clipFrom: number) => number> = {
+  [PresetPlace.Edge]: () => 0,
+  [PresetPlace.Playhead]: (frame, clipFrom) => Math.max(0, frame - clipFrom)
+};
+
+export const presetStart = (place: PresetPlace, frame: number, clip: { from: number }): number => PLACE_START[place](frame, clip.from);
+
 export enum InOutPreset {
   Fade = 'fade',
   SlideUp = 'slide-up',

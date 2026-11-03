@@ -264,6 +264,13 @@ describe('the help card', () => {
     expect(rows.some((r) => r.keys === '?')).toBe(true);
     expect(rows.find((r) => r.name === 'Undo')?.keys).toBe('⌘ Z');
   });
+
+  it('the card spells the platform modifier inside a combined key, ⌘Y not mod Y', () => {
+    const keys = canvasGuide('⌘').flatMap((s) => s.rows).map((r) => r.keys);
+
+    expect(keys.some((k) => k.includes('mod'))).toBe(false);
+    expect(keys.some((k) => k.includes('⌘Y'))).toBe(true);
+  });
 });
 
 describe('comment mode', () => {
@@ -342,9 +349,20 @@ describe('la scheda che le elenca', () => {
 });
 
 describe('stacking order', () => {
-  it('⌘] brings the selection to the front and ⌘[ sends it to the back', () => {
-    expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-front' });
-    expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-back' });
+  it('⌘] brings the selection one step forward and ⌘[ sends it one step backward', () => {
+    expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-forward' });
+    expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-backward' });
+  });
+
+  it('⌘R renames the selection instead of reloading the page', () => {
+    expect(matchCanvasShortcut(ev('r', { metaKey: true }))).toEqual({ id: 'rename' });
+  });
+
+  it('the card names ⌘] bring forward and ⌥⌘] bring to front', () => {
+    const rows = canvasGuide('⌘').flatMap((s) => s.rows);
+
+    expect(rows.find((r) => r.name === 'Bring forward')?.keys).toBe('⌘ ]');
+    expect(rows.find((r) => r.name === 'Bring to front')?.keys).toBe('⌥ ⌘ ]');
   });
 
   it('Enter goes into the selected frame, Tab and ⇧Tab walk the tiles', () => {

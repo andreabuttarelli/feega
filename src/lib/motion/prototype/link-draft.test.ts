@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { Ease } from '@feega/motion-core/motion/design';
-import { ActionKind, TransitionKind, TriggerKind } from '@feega/motion-core/motion/prototype/model';
+import { ActionKind, DEFAULT_OVERLAY, OverlayPosition, TransitionKind, TriggerKind } from '@feega/motion-core/motion/prototype/model';
 import { interactionsOf, putInteraction } from './ops';
 import { linkToFrame } from './link-draft';
 
@@ -33,5 +33,13 @@ describe('linkToFrame', () => {
     const moved = base.ok ? linkToFrame(base.doc, { clipId: 'c1', interactionId: 'i1' }, 'frame-c', () => 'x') : base;
 
     expect(moved.ok && interactionsOf(moved.doc, 'c1')).toMatchObject([{ action: { kind: ActionKind.Navigate, target: 'frame-c' } }]);
+  });
+
+  it('re-aiming an overlay link keeps where it opens and how it closes', () => {
+    const overlay = { ...DEFAULT_OVERLAY, position: OverlayPosition.Top, closeOutside: false, backdrop: '#ff000080' };
+    const base = putInteraction(docWithClip(), 'c1', { id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenOverlay, target: 'frame-b', overlay } });
+    const moved = base.ok ? linkToFrame(base.doc, { clipId: 'c1', interactionId: 'i1' }, 'frame-c', () => 'x') : base;
+
+    expect(moved.ok && interactionsOf(moved.doc, 'c1')[0].action).toEqual({ kind: ActionKind.OpenOverlay, target: 'frame-c', overlay });
   });
 });

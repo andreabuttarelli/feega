@@ -1,7 +1,7 @@
 import { TrackKind, type ComponentId } from '@feega/motion-core/motion/components';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { STYLES, styleOf } from './style';
-import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { setCanvas, type OpResult } from '@feega/motion-core/motion/timeline';
 
 type Clip = MotionDoc['tracks'][number]['clips'][number];
 
@@ -98,6 +98,18 @@ export function fitDuration(doc: MotionDoc): OpResult {
   const workArea = doc.workArea && doc.workArea.to > target ? null : doc.workArea;
 
   return { ok: true, doc: { ...doc, durationInFrames: target, tracks: cutTracks(tracks, target), workArea } };
+}
+
+function reachTracks(tracks: MotionDoc['tracks'], from: number, to: number): MotionDoc['tracks'] {
+  return tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.from + c.durationInFrames >= from ? { ...c, durationInFrames: to - c.from } : c)) }));
+}
+
+export function setDuration(doc: MotionDoc, durationInFrames: number): OpResult {
+  const end = Math.max(1, Math.round(durationInFrames));
+  const longer = end > doc.durationInFrames;
+  const tracks = longer ? reachTracks(doc.tracks, doc.durationInFrames, end) : cutTracks(doc.tracks, end);
+  const workArea = doc.workArea && doc.workArea.to > end ? null : doc.workArea;
+  return setCanvas({ ...doc, tracks, workArea }, { durationInFrames: end });
 }
 
 export function fitNewVideo(start: MotionDoc, built: MotionDoc): MotionDoc {

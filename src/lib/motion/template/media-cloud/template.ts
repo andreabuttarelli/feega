@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { CLOUD_COMPONENT, CLOUD_FONTS, CLOUD_PROPS, CLOUD_VAR_PREFIX, cloudComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const CLOUD_TEMPLATE_ID = `${BUILTIN_PREFIX}media-cloud-white`;
 export const CLOUD_CLIP = 'cloud';
@@ -17,10 +18,9 @@ const CLOUD_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([group
 
 export const MEDIA_CLOUD_TEMPLATE: TemplateEntry = {
   id: CLOUD_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'media-cloud-white', component: CLOUD_COMPONENT, code: cloudComponent(), props: CLOUD_PROPS, fonts: CLOUD_FONTS, varPrefix: CLOUD_VAR_PREFIX, vars: CLOUD_VARS, clip: CLOUD_CLIP, seconds: 12, fps: 30, groups: CLOUD_GROUPS }), {
     name: 'Media cloud',
     description: 'The camera flies slowly through a dense cloud of small pictures and videos on white; a title can fade in at the end. Loops.',
-    keyFields: CLOUD_KEY_FIELDS,
-    doc: customTemplateDoc({ name: 'media-cloud-white', component: CLOUD_COMPONENT, code: cloudComponent(), props: CLOUD_PROPS, fonts: CLOUD_FONTS, varPrefix: CLOUD_VAR_PREFIX, vars: CLOUD_VARS, clip: CLOUD_CLIP, seconds: 12, fps: 30, groups: CLOUD_GROUPS })
-  }
+    keyFields: CLOUD_KEY_FIELDS
+  })
 };

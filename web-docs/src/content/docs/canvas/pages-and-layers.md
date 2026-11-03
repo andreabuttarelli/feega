@@ -13,7 +13,8 @@ Every canvas of the project is a page.
 
 - **Switch** by clicking a page. It opens on its own content, where you last left it or fitted to it.
 - **New page** with **+**.
-- **Rename** with a double click on the current page, or from its **…** menu.
+- **Rename** with a double click on any page (it opens, then its name turns editable), or from its **…** menu.
+- A long list scrolls inside the panel; drag the handle under it to show more rows.
 - **Versions** and **Comments** of the current page are in its **…** menu (shown on hover).
 - **Collapse** Pages with its chevron; drag the line below the list to resize it.
 - **Delete** from the same menu, after a confirmation. The last page cannot be deleted.

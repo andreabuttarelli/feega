@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import FrameInspectorPanel from './FrameInspectorPanel.svelte';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
-import { FrameEditSession, SaveFailure } from '$lib/motion/frame-edit-session.svelte';
+import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { addBreakpoint, BreakpointPreset, OverrideKey, setOverride } from '@feega/motion-core/motion/breakpoints/model';
@@ -20,7 +20,7 @@ function sessionAt(breakpoint: string, selection: string[]) {
   const doc = must(setOverride(phone, 'ph', 'a', OverrideKey.Hidden, true));
   const session = new FrameEditSession(
     { head: { version: 1, doc }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off', failure: SaveFailure.Refused }), refused: () => {}, keep: () => {}, release: () => {} }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
   session.breakpoint = breakpoint;
   return session;

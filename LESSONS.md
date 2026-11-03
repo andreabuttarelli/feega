@@ -24,6 +24,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
 
+### Heap grows by hundreds of MB in a canvas session: diff snapshots, skip the source strings
+**Signal:** JS heap triples over a few minutes of editing on the dev server; a snapshot diff is led by `string` and `array`, and the biggest strings are `data:application/json;base64` source maps and module sources. **Move:** those are dev-mode code, not the leak. Group the new strings by retainer path and drop paths through `Script`/`SharedFunctionInfo`; what remains names the real holder (the 2026-11-03 one: `lists` in `CoreFrames`, one display list per live edit step). Take snapshots after `HeapProfiler.collectGarbage`, phase by phase, so the phase that grows is the one to read.
+
+### A harness run while the worktree rebases measures neither build
+**Signal:** an "after" run that mixes old and new numbers; `git rebase` ran while the dev server was serving the worktree. **Move:** the dev server serves the working tree, so a rebase or checkout swaps the code mid-run. Finish or stop the run first, then rebase, restart the server and measure again.
+
 ### A fresh core raster per still costs seconds, whatever its size
 **Signal:** a batch of small stills (component thumbnails, posters) takes 1–2 s each; timings show `raster.draw` in a few ms and the first `createImageBitmap(canvas)` eating the rest, the same at 1920×1080 and at 192×50. **Move:** the cost is the new GL context compiling its shaders on first readback, not pixels. Create one raster (`stillRaster` in `core-export.ts`) and reuse it for the whole batch; dispose it when idle.
 
@@ -3691,6 +3697,14 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ## A line on the GPU canvas that a re-render does not clear
 
 **Signal:** a 1–2 px artefact on a canvas element moves with pan and drag, survives a partial repaint of its rect, and goes away on zoom or reload. **Move:** before touching gpu-core, hide DOM layers one at a time (`motion-node-stage`, `gpu-dom-node`) and re-sample the pixels; hiding `core-canvas` proves nothing, since a canvas-coloured DOM line looks the same either way. The ⌘G seam was the `MotionPreview` outline inside the node's DOM, not a damage rect.
+
+## A strip of canvas background over a frame, above a scrolling panel
+
+**Signal:** a frame on the GPU canvas shows a rectangle of canvas background exactly as wide as a DOM panel above it (the insert menu), from the frame's top down to the panel; hiding the panel removes it, `overflow: hidden` removes it. **Move:** Chromium paints an opaque scroller background into the scrolling contents layer and culls the canvas under that layer's whole bounds. Put the background on a non-scrolling wrapper and scroll an inner, transparent element.
+
+## A reload flashes an older frame for a few seconds
+
+**Signal:** after a reload a frame shows an earlier state (grey shapes, no text) and then the current one; a fresh context may not show it. **Move:** look for any stored picture of the frame drawn before the doc is built: the card face drew the last MP4 render and an unversioned poster. Show a still only with a recorded revision ≥ `docHeadRevision` (`posterFresh`).
 
 ## Agent worktrees
 

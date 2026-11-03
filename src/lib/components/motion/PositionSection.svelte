@@ -28,7 +28,7 @@
   import type { ElementHost } from '$lib/motion/element-host';
   import type { Frame } from '$lib/motion/units';
   import { liveEdits } from '$lib/motion/live-edit';
-  import { FieldKind } from '$lib/motion/number-field';
+  import { FieldKind, FieldText } from '$lib/motion/number-field';
   import NumberField from './NumberField.svelte';
 
   let { doc, clip, part, placement = Placement.Free, within = null, host = null, space = doc, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; host?: ElementHost | null; space?: Frame; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
@@ -77,8 +77,8 @@
   const scale = $derived({ x: space.width / doc.width, y: space.height / doc.height });
   const seat = $derived(host ? { x: host.box.x, y: host.box.y } : { x: 0, y: 0 });
   const offset = $derived({ x: (clip.transform.x ?? 0) * doc.width, y: (clip.transform.y ?? 0) * doc.height });
-  const shownX = $derived(Math.round(seat.x + (box.left + offset.x - origin.left) * scale.x));
-  const shownY = $derived(Math.round(seat.y + (box.top + offset.y - origin.top) * scale.y));
+  const shownX = $derived(seat.x + (box.left + offset.x - origin.left) * scale.x);
+  const shownY = $derived(seat.y + (box.top + offset.y - origin.top) * scale.y);
   const hostEdit = liveEdits<() => void>({ show: () => {}, record: (run) => run() });
   const gesture = $derived(host ? hostEdit : null);
 
@@ -110,8 +110,8 @@
 
   {#if part === PositionPart.Position && placed}
     <div class="row xy">
-      <div class="slot"><NumberField label="X" name="X" testid="position-x" kind={FieldKind.Glyph} value={shownX} range={PLACE_RANGE} unit="px" {gesture} onchange={moveX} /></div>
-      <div class="slot"><NumberField label="Y" name="Y" testid="position-y" kind={FieldKind.Glyph} value={shownY} range={PLACE_RANGE} unit="px" {gesture} onchange={moveY} /></div>
+      <div class="slot"><NumberField label="X" name="X" testid="position-x" kind={FieldKind.Glyph} shows={FieldText.Precise} value={shownX} range={PLACE_RANGE} unit="px" {gesture} onchange={moveX} /></div>
+      <div class="slot"><NumberField label="Y" name="Y" testid="position-y" kind={FieldKind.Glyph} shows={FieldText.Precise} value={shownY} range={PLACE_RANGE} unit="px" {gesture} onchange={moveY} /></div>
     </div>
   {/if}
 

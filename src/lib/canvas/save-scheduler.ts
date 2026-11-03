@@ -27,6 +27,7 @@ type NodeSaves = {
   firstEditAt: number | null;
   timer: ReturnType<typeof setTimeout> | null;
   failures: number;
+  answeredFailures: number;
 };
 
 type SchedulerOptions = {
@@ -37,12 +38,14 @@ type SchedulerOptions = {
   maxFailures?: number;
   onGaveUp?: (id: string) => void;
   onStatus?: (status: SaveStatus) => void;
+  reachable?: () => boolean;
 };
 
 export const SAVE_MAX_FAILURES = 8;
 
 export function createSaveScheduler(options: SchedulerOptions) {
   const maxFailures = options.maxFailures ?? SAVE_MAX_FAILURES;
+  const reachable = options.reachable ?? (() => true);
   const nodes = new Map<string, NodeSaves>();
   const held = new Set<string>();
   let lastStatus = SaveStatus.Saved;
@@ -53,7 +56,7 @@ export function createSaveScheduler(options: SchedulerOptions) {
       return known;
     }
     const fresh: NodeSaves = {
-      pending: null, pendingWaiters: [], inflight: null, inflightWaiters: [], firstEditAt: null, timer: null, failures: 0
+      pending: null, pendingWaiters: [], inflight: null, inflightWaiters: [], firstEditAt: null, timer: null, failures: 0, answeredFailures: 0
     };
     nodes.set(id, fresh);
     return fresh;
@@ -106,6 +109,7 @@ export function createSaveScheduler(options: SchedulerOptions) {
     state.pendingWaiters = [];
     state.firstEditAt = null;
     state.failures = 0;
+    state.answeredFailures = 0;
     settle(waiters, false);
     options.onGaveUp?.(id);
     announce();
@@ -138,7 +142,8 @@ export function createSaveScheduler(options: SchedulerOptions) {
       state.pending = { ...sent, ...(state.pending ?? {}) };
       state.pendingWaiters = [...waiters, ...state.pendingWaiters];
       state.failures += 1;
-      if (state.failures >= maxFailures) {
+      state.answeredFailures += reachable() ? 1 : 0;
+      if (state.answeredFailures >= maxFailures) {
         giveUp(id, state);
         return;
       }
@@ -148,6 +153,7 @@ export function createSaveScheduler(options: SchedulerOptions) {
     }
 
     state.failures = 0;
+    state.answeredFailures = 0;
     settle(waiters, result === SendResult.Saved);
     if (state.pending) {
       armDebounced(id);

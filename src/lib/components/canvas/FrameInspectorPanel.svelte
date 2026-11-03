@@ -82,7 +82,8 @@
   const doc = $derived(source && session ? inView(source, session.breakpoint) : source);
   const surfaced = $derived(doc ? withSurface(doc, SURFACE_ID) : null);
   const surface = $derived(surfaced ? frameSurface(surfaced) : null);
-  const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const inspected = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const shown = $derived(inspected && { ...inspected, here: frameProperties.nodeId });
   const scale = $derived(source ? scaleOf(source, frameProperties.place) : 1);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session && source && session.edit(liftEdit(source, session.breakpoint, next), summary);
   const editSource = (result: OpResult, summary: string) => session?.apply(result, summary);
@@ -99,7 +100,7 @@
     if (!session || !doc) {
       return;
     }
-    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}) });
+    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}), here: frameProperties.nodeId });
     if (!done) {
       return;
     }
@@ -149,7 +150,7 @@
       <CameraInspector {doc} frame={FIRST_FRAME} {scale} onchange={edit} />
       <BreakpointsSection doc={source!} active={session.breakpoint} onchange={editSource} onpick={pickView} />
       <FlowSection {doc} onchange={editGuides} />
-      <StyleLibrarySection {tokens} unit={Math.min(doc.width, doc.height)} />
+      <StyleLibrarySection {tokens} unit={Math.min(doc.width, doc.height) * scale} />
       <VariablesLibrarySection {doc} onchange={editGuides} />
     </details>
   </aside>
@@ -166,7 +167,7 @@
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} onchange={editShown} onalign={alignPicks} />
+      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} bind:fillOpen={frameProperties.editingFill} onchange={editShown} onalign={alignPicks} />
       {#if frameProperties.exportRows}<ExportSection name="selection" onexport={frameProperties.exportRows} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}

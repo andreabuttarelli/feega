@@ -34,6 +34,7 @@ let video = $state.raw<VideoSide | null>(null);
 let hovered = $state.raw<LayerHover>(null);
 let docs = $state.raw<HeldDocs>(new Map());
 let glyphs = $state.raw<ReadonlyMap<string, string | undefined>>(new Map());
+let renameAsked = $state(false);
 
 function publisher<T>(set: (side: T | null) => void, current: () => T | null) {
   return (side: T) => {
@@ -58,6 +59,17 @@ export const layersSource = {
   },
   get glyphs() {
     return glyphs;
+  },
+  get renameAsked() {
+    return renameAsked;
+  },
+  askRename() {
+    renameAsked = true;
+  },
+  takeRename(): boolean {
+    const asked = renameAsked;
+    renameAsked = false;
+    return asked;
   },
   get docs() {
     return docs;

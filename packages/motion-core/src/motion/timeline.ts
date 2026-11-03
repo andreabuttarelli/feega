@@ -375,9 +375,10 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; size?:
     return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
   const still = fitted.still ? { still: { frame: Math.min(fitted.still.frame, durationInFrames - 1) } } : {};
+  const poster = fitted.poster ? { poster: { frame: Math.min(fitted.poster.frame, durationInFrames - 1) } } : {};
   const { freeSize: _, ...rest } = fitted;
   const free = freeSize ? { freeSize } : {};
-  return { ok: true, doc: { ...rest, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still, ...free } };
+  return { ok: true, doc: { ...rest, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still, ...poster, ...free } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {

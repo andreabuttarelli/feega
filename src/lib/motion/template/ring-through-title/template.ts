@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { RING_COMPONENT, RING_FONTS, RING_PROPS, RING_VAR_PREFIX, ringComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const RING_TEMPLATE_ID = `${BUILTIN_PREFIX}ring-through-title`;
 export const RING_CLIP = 'ring';
@@ -17,10 +18,9 @@ const RING_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([group,
 
 export const RING_THROUGH_TITLE_TEMPLATE: TemplateEntry = {
   id: RING_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'ring-through-title', component: RING_COMPONENT, code: ringComponent(), props: RING_PROPS, fonts: RING_FONTS, varPrefix: RING_VAR_PREFIX, vars: RING_VARS, clip: RING_CLIP, seconds: 12, fps: 30, groups: RING_GROUPS }), {
     name: 'Ring through title',
     description: 'A huge title, then a tilted ring of pictures and videos turns around it, passing in front of the letters on one side and behind them on the other. Every part is a field or a runtime variable.',
-    keyFields: RING_KEY_FIELDS,
-    doc: customTemplateDoc({ name: 'ring-through-title', component: RING_COMPONENT, code: ringComponent(), props: RING_PROPS, fonts: RING_FONTS, varPrefix: RING_VAR_PREFIX, vars: RING_VARS, clip: RING_CLIP, seconds: 12, fps: 30, groups: RING_GROUPS })
-  }
+    keyFields: RING_KEY_FIELDS
+  })
 };

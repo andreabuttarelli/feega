@@ -9,7 +9,7 @@
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { overridesOf, resetOverride } from '$lib/motion/style-overrides';
 
-  let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, scale = 1, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; commit: (result: OpResult, summary: string) => void } = $props();
 
   const NONE = '';
 
@@ -20,9 +20,9 @@
     { kind: StyleKind.Effect, label: 'Effect style', offered: (c) => c.effects.length > 0 }
   ];
 
-  const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles));
+  const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles, scale));
   const offeredIn = (slot: StyleSlot) => offered.filter((s) => slotOf(s.style.kind) === slot);
-  const linkedStyles = $derived([clip.styleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
+  const linkedStyles = $derived([clip.styleRef, clip.paintStyleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
   const overridden = $derived(overridesOf(doc, clip.id));
   let name = $state('');
 
@@ -55,7 +55,10 @@
 </script>
 
 <Section title="Style">
-  {@render picker('Style', 'clip-style', StyleSlot.Look, clip.styleRef)}
+  {#if 'font' in clip.props || clip.styleRef}
+    {@render picker('Text style', 'clip-style', StyleSlot.Look, clip.styleRef)}
+  {/if}
+  {@render picker('Colour style', 'clip-paint-style', StyleSlot.Paint, clip.paintStyleRef)}
   {#if clip.component in FILLED || clip.effects.length || offeredIn(StyleSlot.Effect).length || clip.effectStyleRef}
     {@render picker('Effect style', 'clip-effect-style', StyleSlot.Effect, clip.effectStyleRef)}
   {/if}

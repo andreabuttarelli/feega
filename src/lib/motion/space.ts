@@ -3,6 +3,7 @@ import { EditMode } from './edit-mode';
 import type { Transform, TransformKey } from '@feega/motion-core/motion/keyframes';
 import { isLocked } from '@feega/motion-core/motion/organize';
 import { pivotBox, transformAt } from '@feega/motion-core/motion/parent';
+import { instanceBoxes } from '@feega/motion-core/motion/layout/resolve';
 import { Grip, aabb, dragPatch, quadOf, writePatch, type Bounds, type Boxes, type Pt } from './scene-select';
 import { setKeyframes, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { tidyMoves } from './tidy';
@@ -33,7 +34,8 @@ const fail = (error: string): OpResult => ({ ok: false, error });
 
 export function propBoxes(doc: MotionDoc): Boxes {
   const size = { width: doc.width, height: doc.height };
-  return Object.fromEntries(doc.tracks.flatMap((t) => t.clips.map((c) => [c.id, pivotBox(c.props, size)])));
+  const instances = instanceBoxes(doc);
+  return Object.fromEntries(doc.tracks.flatMap((t) => t.clips.map((c) => [c.id, instances.get(c.id) ?? pivotBox(c.props, size)])));
 }
 
 function shifted(doc: MotionDoc, clipId: string, frame: number, patch: Transform): OpResult {

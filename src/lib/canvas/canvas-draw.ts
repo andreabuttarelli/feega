@@ -67,6 +67,8 @@ export function drawnOnCanvas(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow, 
 
 type FrameBox = { x: number; y: number; w: number; h: number };
 
+export const docPoint = (doc: MotionDoc, frame: FrameBox, at: Point): [number, number] => [((at.x - frame.x) / frame.w) * doc.width, ((at.y - frame.y) / frame.h) * doc.height];
+
 export function drawnInFrame(doc: MotionDoc, frame: FrameBox, wire: DrawnWire, at: number, id: string): OpResult {
   const drawn = drawnOf(wire);
   if (typeof drawn === 'string') {
@@ -80,7 +82,7 @@ export function drawnInFrame(doc: MotionDoc, frame: FrameBox, wire: DrawnWire, a
   const box = { x: (left + width / 2 - frame.x) / frame.w, y: (top + height / 2 - frame.y) / frame.h, width: width / frame.w, height: height / frame.h };
   const made = drawClip(doc, drawn.tool, box, at, id, drawn.sizing ?? NEW_TEXT_SIZING);
   const anchor = drawnAnchor(wire);
-  return made.ok && anchor ? joinStackAt(made.doc, id, [((anchor.x - frame.x) / frame.w) * doc.width, ((anchor.y - frame.y) / frame.h) * doc.height]) : made;
+  return made.ok && anchor ? joinStackAt(made.doc, id, docPoint(doc, frame, anchor)) : made;
 }
 
 export function drawnAnchor(wire: DrawnWire): Point | null {

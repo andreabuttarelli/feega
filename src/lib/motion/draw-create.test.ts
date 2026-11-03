@@ -249,7 +249,17 @@ describe('a drawn text shows settled', () => {
     expect(findClip(drawn.doc, 't1')!.clip.props.color).toBe(CANVAS_INK[CanvasTheme.Dark]);
   });
 
-  it('its type fills the drawn box height instead of a body size meant for a full video', () => {
+  it('a dragged text box sets 16 px type, left aligned, whatever the box height', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 }, sizing: TextSizing.AutoHeight }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    const props = findClip(drawn.doc, 't1')!.clip.props as { size: number; align: string };
+    expect(props.size * Math.min(drawn.doc.width, drawn.doc.height)).toBeCloseTo(16, 1);
+    expect(props.align).toBe('left');
+  });
+
+  it('a clicked text is sized to the click box', () => {
     const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 } }, 't1');
     if (!drawn.ok) {
       throw new Error(drawn.error);

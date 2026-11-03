@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { RIBBON_COMPONENT, RIBBON_FONTS, RIBBON_PROPS, RIBBON_VAR_PREFIX, ribbonComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const RIBBON_TEMPLATE_ID = `${BUILTIN_PREFIX}particle-ribbon`;
 export const RIBBON_CLIP = 'ribbon';
@@ -17,10 +18,9 @@ const RIBBON_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([grou
 
 export const PARTICLE_RIBBON_TEMPLATE: TemplateEntry = {
   id: RIBBON_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'particle-ribbon', component: RIBBON_COMPONENT, code: ribbonComponent(), props: RIBBON_PROPS, fonts: RIBBON_FONTS, varPrefix: RIBBON_VAR_PREFIX, vars: RIBBON_VARS, clip: RIBBON_CLIP, seconds: 10, fps: 30, groups: RIBBON_GROUPS }), {
     name: 'Particle ribbon',
     description: 'A fluid sheet of fine grain twists and unfolds on a warm background, coloured along a four-stop gradient and dissolving into dust at its tips. Loops seamlessly; an optional title takes its own beat.',
-    keyFields: RIBBON_KEY_FIELDS,
-    doc: customTemplateDoc({ name: 'particle-ribbon', component: RIBBON_COMPONENT, code: ribbonComponent(), props: RIBBON_PROPS, fonts: RIBBON_FONTS, varPrefix: RIBBON_VAR_PREFIX, vars: RIBBON_VARS, clip: RIBBON_CLIP, seconds: 10, fps: 30, groups: RIBBON_GROUPS })
-  }
+    keyFields: RIBBON_KEY_FIELDS
+  })
 };

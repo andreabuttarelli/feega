@@ -167,6 +167,12 @@ describe('the fill stack in Properties', () => {
     expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-meta', 'fill-opacity', 'fill-eye', 'fill-remove']);
   });
 
+  it('a transparent solid reads None, never the keyword', () => {
+    show(stack([{ type: 'solid', color: 'transparent' }, { type: 'solid', color: '#11aa3300' }]));
+    expect(inRow(0, 'fill-label').textContent).toBe('None');
+    expect(inRow(1, 'fill-label').textContent).toBe('None');
+  });
+
   it('a row reads its hex over a muted line with the layer opacity and the type', () => {
     show(stack([{ type: 'solid', color: '#ff2a69', opacity: 0.4 }]));
     expect(inRow(0, 'fill-label').textContent).toBe('FF2A69');

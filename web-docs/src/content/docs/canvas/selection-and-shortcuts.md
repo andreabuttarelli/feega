@@ -10,7 +10,8 @@ sidebar:
 - Drag the background to draw a marquee.
 - Shift-click or Cmd/Ctrl-click adds or removes a node.
 - Cmd/Ctrl+A selects all nodes (not while typing in a field).
-- Esc clears the selection.
+- Esc puts a drawing tool down and goes back to Select; with Select in hand it clears the selection.
+- Right-click a frame (or its name) for **Rename** and **Duplicate**.
 
 ## Select inside a frame
 
@@ -28,6 +29,10 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 - Esc goes up one level.
 
 In the Layers panel, Shift-click selects every row between the last picked one and the clicked one; Cmd-click (Ctrl-click on Windows) adds or removes one row. It works on canvas nodes and on the elements inside a frame, and the canvas and the right bar follow.
+
+The Layers panel lists layers in paint order, like Figma: the top row is the frontmost layer, on the canvas and inside each frame. Groups and sections, which paint behind everything, list under the rest.
+
+The search box above the Layers list looks only inside the current frame. Enter on a focused layer row selects that layer's children; rename with a double-click or Cmd/Ctrl+R.
 
 The Layers panel lists what the canvas has loaded: a page far off screen shows as one row, and its elements appear once the canvas loads it.
 
@@ -76,6 +81,9 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Shift+Cmd/Ctrl+G | Ungroup |
 | Option/Alt+Cmd/Ctrl+G | Frame the selection |
 | Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
+| Cmd/Ctrl+] / Cmd/Ctrl+[ | Bring forward / send backward one step |
+| Option/Alt+Cmd/Ctrl+] / Option/Alt+Cmd/Ctrl+[ | Bring to front / send to back |
+| Cmd/Ctrl+R | Rename the selection in Layers |
 | Cmd/Ctrl+C | Copy |
 | Cmd/Ctrl+V | Paste at the centre of the view |
 | Cmd/Ctrl+Z | Undo, resizing included |
@@ -85,14 +93,16 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
 | Shift+0 | Zoom to 100% |
 | F | Frame tool |
+| Shift + wheel | Scroll sideways |
 | Space + drag | Pan; the canvas follows the pointer exactly and stops when you let go |
 | + / = | Zoom in |
 | - | Zoom out |
 | 1 to 9, 0 | Opacity of the selection: 10 to 90%, 0 for 100% |
+| C | Comment mode; Esc leaves it and closes the comments panel it opened |
 
 The View menu (eye icon, top right) shows the current zoom and lists the same three zoom commands with their keys.
 
-None fire while typing in a text field, except Esc, which always closes an open menu or overlay. Deleting asks no confirmation.
+None fire while typing in a text field: Cmd/Ctrl+V while editing a text pastes into the text only. The exception is Esc, which always closes an open menu or overlay. Deleting asks no confirmation.
 
 ## Copy a node id
 

@@ -120,13 +120,13 @@ fn a_rough_pass_paints_at_half_scale() {
         clock
     })
     .unwrap();
-    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 2.0), 16.0, &mut || 0.0).unwrap();
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.3), 16.0, &mut || 0.0).unwrap();
 
-    let frame = c.frame(&mut fake, &mut lib, at(0.0, 0.0, 2.0), 300.0, &mut || 0.0).unwrap();
+    let frame = c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.3), 300.0, &mut || 0.0).unwrap();
 
     let (_, quality, items) = fake.painted.last().unwrap();
     assert_eq!(*quality, Quality::Rough);
-    assert_eq!(width(items), 100.0);
+    assert_eq!(width(items), 65.0);
     assert!(frame.pending);
 }
 

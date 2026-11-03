@@ -4,6 +4,7 @@
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
+  import LineEndsOverlay from '$lib/components/motion/LineEndsOverlay.svelte';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import Rulers from '$lib/components/canvas/Rulers.svelte';
@@ -121,6 +122,7 @@
   {#if shown.has(FrameOverlay.Rulers)}<Rulers {doc} size={{ width: fit.width, height: fit.height }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Mask)}<MaskOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if pointClip && shown.has(FrameOverlay.Pen)}<PenOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
+  {#if only && shown.has(FrameOverlay.LineEnds)}<LineEndsOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if pointClip && shown.has(FrameOverlay.Vector)}<VectorOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}

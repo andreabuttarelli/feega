@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActionKind, TransitionKind, TriggerKind, interactionSchema, needsTarget } from './model';
+import { ActionKind, DEFAULT_OVERLAY, OverlayPosition, TransitionKind, TriggerKind, interactionSchema, needsTarget } from './model';
 
 const parse = (input: unknown) => interactionSchema.safeParse(input);
 
@@ -53,5 +53,34 @@ describe('interactionSchema', () => {
     expect(parsed.success && parsed.data.action).toEqual({ kind: ActionKind.ChangeTo, variant: { State: 'Open' } });
     expect(needsTarget(ActionKind.ChangeTo)).toBe(false);
     expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.ChangeTo, variant: {} } }).success).toBe(false);
+  });
+
+  it('an overlay opens centred, closes on a click outside and dims what is behind it, unless told otherwise', () => {
+    const parsed = parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenOverlay, target: 'sheet' } });
+
+    expect(parsed.success && parsed.data.action).toEqual({ kind: ActionKind.OpenOverlay, target: 'sheet', overlay: DEFAULT_OVERLAY });
+    expect(DEFAULT_OVERLAY).toEqual({ position: OverlayPosition.Center, x: 0, y: 0, closeOutside: true, backdrop: '#00000073' });
+  });
+
+  it('an overlay keeps a manual position, its outside-click choice and its backdrop colour', () => {
+    const overlay = { position: OverlayPosition.Manual, x: 24, y: 120, closeOutside: false, backdrop: '#ffffff00' };
+    const parsed = parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenOverlay, target: 'sheet', overlay } });
+
+    expect(parsed.success && parsed.data.action).toEqual({ kind: ActionKind.OpenOverlay, target: 'sheet', overlay });
+    expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenOverlay, target: 'sheet', overlay: { backdrop: 'grey' } } }).success).toBe(false);
+  });
+
+  it('close overlay needs no target', () => {
+    expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.CloseOverlay } }).success).toBe(true);
+    expect(needsTarget(ActionKind.CloseOverlay)).toBe(false);
+  });
+
+  it('open url keeps an http link and refuses any other scheme', () => {
+    const parsed = parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenUrl, url: 'https://feega.app/pricing' } });
+
+    expect(parsed.success && parsed.data.action).toEqual({ kind: ActionKind.OpenUrl, url: 'https://feega.app/pricing' });
+    expect(needsTarget(ActionKind.OpenUrl)).toBe(false);
+    expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenUrl, url: 'javascript:alert(1)' } }).success).toBe(false);
+    expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenUrl, url: 'not a url' } }).success).toBe(false);
   });
 });

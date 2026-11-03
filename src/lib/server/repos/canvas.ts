@@ -1,4 +1,5 @@
 import { codeVarsError } from '$lib/server/canvas/code-source';
+import { tieOf, type Tie } from '$lib/canvas/gpu/wire-magnet';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
 import type { NarrowedDatabase } from '$lib/server/db/typed-database';
@@ -57,7 +58,7 @@ type NodeColumns = Pick<
 type ConnectionColumns = Pick<
   Database['public']['Tables']['nodes_connections']['Row'],
   'id' | 'canvas_id' | 'source_node_id' | 'target_node_id' | 'source_handle' | 'target_handle' | 'mode'
->;
+> & { tie?: unknown };
 
 /** Gli stessi due valori di `nodes_connections_mode_check`. */
 export const WIRE_MODES = ['fixed', 'iterate'] as const;
@@ -101,6 +102,7 @@ export type Connection = {
   /** Fisso (default) entra in OGNI iterazione di un loop a valle; `iterate` è un asse del
    *  prodotto cartesiano/zip che `loop-plan.ts` calcola (CLAUDE.md — loop mode). */
   mode: WireMode;
+  tie?: Tie | null;
 };
 
 export type DataWrite =
@@ -110,7 +112,7 @@ export type DataWrite =
 const NODE_COLUMNS =
   'id, canvas_id, project_id, type, display_name, x, y, z, width, height, data, version';
 const CONNECTION_COLUMNS =
-  'id, canvas_id, source_node_id, target_node_id, source_handle, target_handle, mode';
+  'id, canvas_id, source_node_id, target_node_id, source_handle, target_handle, mode, tie';
 const CANVAS_COLUMNS = 'id, project_id, name, viewport';
 
 function toCanvas(row: CanvasColumns): Canvas {
@@ -147,7 +149,8 @@ function toConnection(row: ConnectionColumns): Connection {
     targetNodeId: row.target_node_id,
     sourceHandle: row.source_handle,
     targetHandle: row.target_handle,
-    mode: isWireMode(row.mode) ? row.mode : 'fixed'
+    mode: isWireMode(row.mode) ? row.mode : 'fixed',
+    tie: tieOf(row.tie)
   };
 }
 
@@ -896,6 +899,23 @@ export async function setConnectionMode(
     throw error;
   }
   return data ? toConnection(data) : null;
+}
+
+export async function setConnectionTie(
+  db: Db,
+  input: { orgId: string; connectionIds: string[]; tie: Tie | null }
+): Promise<Connection[]> {
+  const { data, error } = await db
+    .from('nodes_connections')
+    .update({ tie: input.tie })
+    .in('id', input.connectionIds)
+    .eq('org_id', input.orgId)
+    .select(CONNECTION_COLUMNS);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toConnection);
 }
 
 /**

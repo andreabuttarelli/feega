@@ -8,20 +8,21 @@
   import { onMount, tick } from 'svelte';
   import PlayerFrameView from './PlayerFrameView.svelte';
   import { portalInto } from '$lib/components/brand-agent/right-bar-host.svelte';
-  import { MoveKind, act, closeTopOverlay, startPlayer, type Move, type PlayerState, type Step } from '$lib/motion/prototype/player';
+  import { MoveKind, act, closeTopOverlay, linkOf, startPlayer, type Move, type PlayerState, type Step } from '$lib/motion/prototype/player';
   import { delayed, type Hotspot } from '$lib/motion/prototype/hotspots';
   import { flowsOf } from '$lib/motion/prototype/flows';
   import { transitionPlan } from '$lib/motion/prototype/transition-plan';
-  import { ActionKind, TransitionKind, TriggerKind } from '@feega/motion-core/motion/prototype/model';
+  import { ActionKind, DEFAULT_OVERLAY, TransitionKind, TriggerKind, type Overlay } from '@feega/motion-core/motion/prototype/model';
+  import { Background } from '@feega/motion-core/motion/doc';
+  import { overlayBox } from '$lib/motion/prototype/overlay-place';
   import { MODES, MODE_ORDER, WIDTH_PRESETS, ViewportMode, activeView, clampWidth, docAtWidth, frameBox, type Viewport } from '$lib/motion/prototype/viewport';
   import { readViewport, writeViewport } from '$lib/motion/prototype/viewport-pref';
 
   let { frames, start: first, onclose }: { frames: PlayerFrame[]; start: string; onclose?: () => void } = $props();
 
-  type Layer = { uid: number; frame: string; overlay: boolean };
+  type Layer = { uid: number; frame: string; overlay: Overlay | null };
 
   const HINT_MS = 700;
-  const OVERLAY_SHARE = 0.8;
   const STAGE_PAD_PX = 16;
   const EDGE_FACTOR_CENTERED = 2;
 
@@ -33,7 +34,7 @@
   let seed = 0;
   let start = $state(first);
   let at = $state<PlayerState>(startPlayer(first));
-  let layers = $state<Layer[]>([{ uid: ++seed, frame: first, overlay: false }]);
+  let layers = $state<Layer[]>([{ uid: ++seed, frame: first, overlay: null }]);
   let busy = $state(false);
   let hint = $state(false);
   let hoverUndo: string | null = null;
@@ -56,9 +57,14 @@
     baseLive ? frameBox(view.mode, { w: stageW - STAGE_PAD_PX * 2, h: stageH - STAGE_PAD_PX }, { w: baseLive.doc.width, h: baseLive.doc.height }, view.width) : null
   );
   const breakpoint = $derived(baseFrame ? activeView(baseFrame.live.doc, view.width) : null);
-  const ratioOf = (id: string) => {
-    const doc = liveOf(id)?.doc;
-    return doc ? doc.width / doc.height : 1;
+  const percent = (fraction: number) => `${fraction * 100}%`;
+  const sheetStyle = (id: string, overlay: Overlay) => {
+    const sheet = liveOf(id)?.doc;
+    if (!sheet || !baseLive) {
+      return '';
+    }
+    const at = overlayBox(baseLive.doc, sheet, overlay);
+    return `left:${percent(at.left)};top:${percent(at.top)};width:${percent(at.width)};height:${percent(at.height)}`;
   };
 
   function setView(next: Partial<Viewport>) {
@@ -104,13 +110,13 @@
         layers = layers.filter((l) => l.uid !== top.uid);
       }
     } else if (move.kind === MoveKind.Open) {
-      const next: Layer = { uid: ++seed, frame: move.to, overlay: true };
+      const next: Layer = { uid: ++seed, frame: move.to, overlay: move.overlay ?? DEFAULT_OVERLAY };
       layers = [...layers, next];
       await tick();
       await finish([play(next.uid, plan.incoming as Keyframe[], plan)]);
     } else {
       const previous = layers.find((l) => !l.overlay);
-      const next: Layer = { uid: ++seed, frame: move.to, overlay: false };
+      const next: Layer = { uid: ++seed, frame: move.to, overlay: null };
       layers = [...layers.filter((l) => !l.overlay), next];
       await tick();
       await finish([play(next.uid, plan.incoming as Keyframe[], plan), previous ? play(previous.uid, plan.outgoing as Keyframe[], plan) : null]);
@@ -129,6 +135,11 @@
   }
 
   function fire(spot: Hotspot) {
+    const link = linkOf(spot.interaction.action);
+    if (link) {
+      window.open(link, '_blank', 'noopener,noreferrer');
+      return;
+    }
     const fired = apply(act(at, spot.interaction.action, spot.interaction.transition, known));
     hoverUndo = fired && spot.interaction.trigger.kind === TriggerKind.Hover ? spot.interaction.id : null;
   }
@@ -150,7 +161,7 @@
       return;
     }
     at = startPlayer(start);
-    layers = [{ uid: ++seed, frame: start, overlay: false }];
+    layers = [{ uid: ++seed, frame: start, overlay: null }];
   }
 
   function startAt(frame: string) {
@@ -242,11 +253,13 @@
               <div class="layer" use:register={layer.uid}>
                 <PlayerFrameView live={frame} {hint} interactive={!busy && layer.frame === at.current && !at.overlays.length} onfire={fire} onrelease={release} />
               </div>
-            {:else if frame}
-              <div class="scrim">
-                <button type="button" class="dismiss" aria-label="Close overlay" onclick={() => apply(closeTopOverlay(at))}></button>
-                <div class="sheet" use:register={layer.uid} style={`--ratio:${ratioOf(layer.frame)};--share:${OVERLAY_SHARE}`}>
-                  <PlayerFrameView live={frame} {hint} interactive={!busy && layer.frame === topFrameId} onfire={fire} onrelease={release} />
+            {:else if frame && layer.overlay}
+              <div class="scrim" style:background={layer.overlay.backdrop} data-testid="prototype-scrim">
+                {#if layer.overlay.closeOutside}
+                  <button type="button" class="dismiss" aria-label="Close overlay" data-testid="prototype-dismiss" onclick={() => apply(closeTopOverlay(at))}></button>
+                {/if}
+                <div class="sheet" use:register={layer.uid} data-testid="prototype-sheet" style={sheetStyle(layer.frame, layer.overlay)}>
+                  <PlayerFrameView live={frame} {hint} background={Background.Transparent} interactive={!busy && layer.frame === topFrameId} onfire={fire} onrelease={release} />
                 </div>
               </div>
             {/if}
@@ -430,10 +443,7 @@
   }
 
   .scrim {
-    display: grid;
-    place-items: center;
     container-type: size;
-    background: rgb(0 0 0 / 0.45);
   }
 
   .dismiss {
@@ -445,10 +455,6 @@
   }
 
   .sheet {
-    position: relative;
-    width: min(calc(100cqw * var(--share)), calc(100cqh * var(--share) * var(--ratio)));
-    aspect-ratio: var(--ratio);
-    overflow: hidden;
-    border-radius: var(--ui-radius-lg, 10px);
+    position: absolute;
   }
 </style>

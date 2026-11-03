@@ -3,7 +3,7 @@ import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
 import type { Outcome } from './core-outcome';
 import { OverlayPart } from './core-overlay';
-import type { Splice } from '../../canvas/core/group-diff';
+import { listWire, spliceWire, type Splice } from './wire';
 import { inlineCore, unzipBase64 } from './inline-core';
 import { releaseOnDispose, type GpuSurface } from './gpu-release';
 
@@ -32,8 +32,6 @@ const OVERLAY_SETTERS: Record<OverlayPart, (core: Attached, items: string) => vo
 };
 
 const NO_PICTURES: Pictures = () => null;
-
-const wired = (list: DisplayList) => JSON.stringify({ ...list, width: Math.ceil(list.width), height: Math.ceil(list.height) });
 
 const coverPicture = (src: string) => ({ kind: ItemKind.Image, clip: src, src, video: false }) as ImageItem;
 
@@ -174,22 +172,22 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
-      return attached.draw(wired(list)).split('\n').filter(Boolean);
+      return attached.draw(listWire(list)).split('\n').filter(Boolean);
     },
     putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
       show(key, list.items, '');
-      attached.put_group(key, wired(list));
+      attached.put_group(key, listWire(list));
     },
     appendGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
       show(key, list.items);
-      attached.append_group(key, wired(list));
+      attached.append_group(key, listWire(list));
     },
     patchGroup: (from: string, to: string, splice: Splice, pictures = NO_PICTURES) => {
       wantedPictures(splice.items).forEach((item) => upload(item, pictures));
       show(to, splice.items, from);
-      return attached.patch_group(from, to, JSON.stringify(splice));
+      return attached.patch_group(from, to, spliceWire(splice));
     },
     dropGroup: (key: string) => {
       attached.drop_group(key);

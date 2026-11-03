@@ -39,6 +39,7 @@ describe('group and ungroup', () => {
       ['group', 'Mod+G'],
       ['ungroup', 'Mod+Shift+G'],
       ['duplicate', 'Mod+D'],
+      ['rename', null],
       ['run-technique', null],
       ['run-downstream', null],
       ['run-stale', null],
@@ -156,6 +157,14 @@ describe('group and ungroup', () => {
     expect(shownFor('export', [element])).toBe(true);
     expect(shownFor('create-formats', [element])).toBe(false);
     expect(shownFor('ungroup', [{ type: 'element', data: { docHeadRevision: 1, kind: 'group' } }])).toBe(true);
+  });
+
+  it('one frame can be renamed and duplicated from its menu', () => {
+    const frame = { type: 'motion', data: { kind: 'frame' } };
+    const ids = menuFor(canvasMenuIds(), [frame]).map((a) => a.id);
+    expect(ids).toContain('rename');
+    expect(ids).toContain('duplicate');
+    expect(menuFor(canvasMenuIds(), [frame, frame]).map((a) => a.id)).not.toContain('rename');
   });
 
   it('each surface shows the shared menu, in its order, limited to what it can run', () => {

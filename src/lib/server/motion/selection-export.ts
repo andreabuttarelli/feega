@@ -4,6 +4,7 @@ import { CoreEvent, ExportKind } from '$lib/core-usage';
 import { Bundle, FILE, bundleOf, exportFiles, type ExportFile, type ExportRow } from '$lib/motion/export-rows';
 import { Background, findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { elementName } from '$lib/motion/element-name';
+import { inView, viewsOf } from '@feega/motion-core/motion/breakpoints/model';
 
 export type Packed = { name: string; mime: string; bytes: Uint8Array };
 
@@ -39,7 +40,7 @@ export type SelectionPorts = {
   store: (packed: Packed) => Promise<{ asset_id: string; url: string }>;
 };
 
-export type ExportTarget = { nodeId: string; elementId?: string };
+export type ExportTarget = { nodeId: string; elementId?: string; seconds?: number; breakpointId?: string };
 
 export type SelectionAsk = { targets: ExportTarget[]; rows: ExportRow[]; name: string };
 
@@ -47,9 +48,13 @@ export type SelectionExported =
   | { outcome: ExportOutcome.Done; asset_id: string; url: string; name: string; files: string[]; skipped: string[] }
   | { outcome: ExportOutcome.NotFound | ExportOutcome.NoElement; nodeId: string; elementId?: string };
 
-const asDrawn = (doc: MotionDoc, row: ExportRow): MotionDoc => (row.transparent ? { ...doc, background: Background.Transparent } : doc);
+const atTime = (doc: MotionDoc, seconds: number | undefined): MotionDoc => (seconds === undefined ? doc : { ...doc, poster: { frame: Math.min(Math.max(0, Math.round(seconds * doc.fps)), doc.durationInFrames - 1) } });
 
-const keyOf = (target: ExportTarget) => `${target.nodeId}#${target.elementId ?? ''}`;
+const asDrawn = (doc: MotionDoc, row: ExportRow, seconds?: number): MotionDoc => atTime(row.transparent ? { ...doc, background: Background.Transparent } : doc, seconds);
+
+const keyOf = (target: ExportTarget) => `${target.nodeId}#${target.elementId ?? ''}#${target.breakpointId ?? ''}`;
+
+const breakpointOf = (frame: SelectionFrame, target: ExportTarget) => viewsOf(frame.doc).find((v) => v.id === target.breakpointId);
 
 export function noteImageExport(userId: string, rows: readonly ExportRow[]) {
   for (const target of new Set(rows.map((r) => r.format))) {
@@ -64,6 +69,9 @@ export async function exportSelection(ports: SelectionPorts, ask: SelectionAsk):
     if (!frame) {
       return { outcome: ExportOutcome.NotFound, nodeId: target.nodeId };
     }
+    if (target.breakpointId && !breakpointOf(frame, target)) {
+      return { outcome: ExportOutcome.NotFound, nodeId: target.nodeId };
+    }
     if (target.elementId && !findClip(frame.doc, target.elementId)) {
       return { outcome: ExportOutcome.NoElement, nodeId: target.nodeId, elementId: target.elementId };
     }
@@ -74,7 +82,8 @@ export async function exportSelection(ports: SelectionPorts, ask: SelectionAsk):
   const listed = ask.targets.map((t) => {
     const frame = frames.get(t.nodeId)!;
     const clip = t.elementId ? findClip(frame.doc, t.elementId)!.clip : null;
-    return { id: keyOf(t), name: frame.name, ...(clip ? { elementId: clip.id, elementName: elementName(clip) } : {}) };
+    const view = breakpointOf(frame, t);
+    return { id: keyOf(t), name: view ? `${frame.name} ${view.name}` : frame.name, ...(clip ? { elementId: clip.id, elementName: elementName(clip) } : {}) };
   });
   const files = exportFiles(listed, ask.rows, ask.name);
   const skipped = new Set<string>();
@@ -85,7 +94,7 @@ export async function exportSelection(ports: SelectionPorts, ask: SelectionAsk):
         file.targets.map((listedTarget) => {
           const target = byKey.get(listedTarget.id)!;
           const frame = frames.get(target.nodeId)!;
-          return { nodeId: target.nodeId, doc: asDrawn(frame.doc, file.row), docScale: frame.docScale, ...(target.elementId ? { elementId: target.elementId } : {}) };
+          return { nodeId: target.nodeId, doc: asDrawn(target.breakpointId ? inView(frame.doc, target.breakpointId) : frame.doc, file.row, target.seconds), docScale: frame.docScale, ...(target.elementId ? { elementId: target.elementId } : {}) };
         }),
         file.row
       );

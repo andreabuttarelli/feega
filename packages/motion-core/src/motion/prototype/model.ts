@@ -11,9 +11,11 @@ export enum TriggerKind {
 export enum ActionKind {
   Navigate = 'navigate',
   OpenOverlay = 'open_overlay',
+  CloseOverlay = 'close_overlay',
   Back = 'back',
   ScrollTo = 'scroll_to',
-  ChangeTo = 'change_to'
+  ChangeTo = 'change_to',
+  OpenUrl = 'open_url'
 }
 
 export enum TransitionKind {
@@ -31,10 +33,18 @@ export enum Direction {
   Down = 'down'
 }
 
+export enum OverlayPosition {
+  Center = 'center',
+  Top = 'top',
+  Bottom = 'bottom',
+  Manual = 'manual'
+}
+
 export const TRIGGER_KINDS = Object.values(TriggerKind) as [TriggerKind, ...TriggerKind[]];
 export const ACTION_KINDS = Object.values(ActionKind) as [ActionKind, ...ActionKind[]];
 export const TRANSITION_KINDS = Object.values(TransitionKind) as [TransitionKind, ...TransitionKind[]];
 export const DIRECTIONS = Object.values(Direction) as [Direction, ...Direction[]];
+export const OVERLAY_POSITIONS = Object.values(OverlayPosition) as [OverlayPosition, ...OverlayPosition[]];
 
 export const MAX_INTERACTIONS = 16;
 export const MAX_DELAY_MS = 60_000;
@@ -44,7 +54,25 @@ export const DEFAULT_DURATION_MS = 300;
 
 const target = z.string().min(1);
 
+export const HEX_COLOUR = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
+
+export const overlaySchema = z.object({
+  position: z.enum(OVERLAY_POSITIONS).default(OverlayPosition.Center),
+  x: z.number().default(0),
+  y: z.number().default(0),
+  closeOutside: z.boolean().default(true),
+  backdrop: z.string().regex(HEX_COLOUR).default('#00000073')
+});
+
+export type Overlay = z.infer<typeof overlaySchema>;
+
+export const DEFAULT_OVERLAY: Overlay = overlaySchema.parse({});
+
 export const MAX_VARIANT_PART = 80;
+export const MAX_URL = 2048;
+
+const WEB_SCHEMES = /^https?:\/\//i;
+const url = z.string().max(MAX_URL).url().regex(WEB_SCHEMES, 'only http and https links');
 
 const variantPart = z.string().min(1).max(MAX_VARIANT_PART);
 const variant = z.record(variantPart, variantPart).refine((picked) => Object.keys(picked).length > 0, 'pick at least one variant property');
@@ -58,10 +86,12 @@ export const triggerSchema = z.discriminatedUnion('kind', [
 
 export const actionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(ActionKind.Navigate), target }),
-  z.object({ kind: z.literal(ActionKind.OpenOverlay), target }),
+  z.object({ kind: z.literal(ActionKind.OpenOverlay), target, overlay: overlaySchema.prefault({}) }),
+  z.object({ kind: z.literal(ActionKind.CloseOverlay) }),
   z.object({ kind: z.literal(ActionKind.Back) }),
   z.object({ kind: z.literal(ActionKind.ScrollTo), target }),
-  z.object({ kind: z.literal(ActionKind.ChangeTo), variant })
+  z.object({ kind: z.literal(ActionKind.ChangeTo), variant }),
+  z.object({ kind: z.literal(ActionKind.OpenUrl), url })
 ]);
 
 const timing = { easing: z.enum(EASE_IDS).default(Ease.Standard), durationMs: z.number().int().min(1).max(MAX_DURATION_MS).default(DEFAULT_DURATION_MS) };
@@ -92,9 +122,11 @@ export type InteractionInput = z.input<typeof interactionSchema>;
 const TARGETED: Record<ActionKind, boolean> = {
   [ActionKind.Navigate]: true,
   [ActionKind.OpenOverlay]: true,
+  [ActionKind.CloseOverlay]: false,
   [ActionKind.Back]: false,
   [ActionKind.ScrollTo]: true,
-  [ActionKind.ChangeTo]: false
+  [ActionKind.ChangeTo]: false,
+  [ActionKind.OpenUrl]: false
 };
 
 export const needsTarget = (kind: ActionKind): boolean => TARGETED[kind];
@@ -109,9 +141,11 @@ export const TRIGGER_LABEL: Record<TriggerKind, string> = {
 export const ACTION_LABEL: Record<ActionKind, string> = {
   [ActionKind.Navigate]: 'Navigate to',
   [ActionKind.OpenOverlay]: 'Open overlay',
+  [ActionKind.CloseOverlay]: 'Close overlay',
   [ActionKind.Back]: 'Back',
   [ActionKind.ScrollTo]: 'Scroll to',
-  [ActionKind.ChangeTo]: 'Change to'
+  [ActionKind.ChangeTo]: 'Change to',
+  [ActionKind.OpenUrl]: 'Open URL'
 };
 
 export const TRANSITION_LABEL: Record<TransitionKind, string> = {
@@ -120,6 +154,13 @@ export const TRANSITION_LABEL: Record<TransitionKind, string> = {
   [TransitionKind.Slide]: 'Slide in',
   [TransitionKind.Push]: 'Push',
   [TransitionKind.SmartAnimate]: 'Smart animate'
+};
+
+export const OVERLAY_POSITION_LABEL: Record<OverlayPosition, string> = {
+  [OverlayPosition.Center]: 'Centre',
+  [OverlayPosition.Top]: 'Top',
+  [OverlayPosition.Bottom]: 'Bottom',
+  [OverlayPosition.Manual]: 'Manual'
 };
 
 export const DIRECTION_LABEL: Record<Direction, string> = {

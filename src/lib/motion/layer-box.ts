@@ -50,7 +50,7 @@ function unionOf(placed: readonly LayerBox[]): Bounds {
 export const boxValue = (placed: readonly LayerBox[], key: BoxKey): Shared<number> => (placed.length ? Math.round(READ[key](unionOf(placed)) * HUNDREDTHS) / HUNDREDTHS : MIXED);
 
 function placeOne(doc: MotionDoc, clip: MotionClip, at: LayerBox, key: BoxKey, value: number, frame: number, mode: EditMode): OpResult {
-  if (!MOVES.has(key) && typeof clip.props[key] === 'number') {
+  if (!MOVES.has(key) && typeof clip.props[key] === 'number' && !doc.comps[String(clip.props.comp)]?.component) {
     return setProps(doc, clip.id, { [key]: toStored(clip.component, key, value, doc) });
   }
   return placeBox(doc, [clip.id], frame, at.bounds, { [key]: value }, mode);

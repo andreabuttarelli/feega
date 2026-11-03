@@ -42,7 +42,7 @@
   import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
   import type { DrawTool } from '$lib/motion/draw-tool';
   import { highlightStyle, rowHighlight } from '$lib/canvas/highlight';
-  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, rowDrop, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, rowDrop, frameRows, layerEdit, pickIdOf, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, childIds, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -150,7 +150,8 @@
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
   const inside = $derived(rowsInside(rows, isPicked));
   let query = $state('');
-  const shown = $derived(searchRows(rows, query));
+  const currentFrame = $derived(video?.nodeId ?? canvas?.selected[0] ?? null);
+  const shown = $derived(searchRows(rows, query, currentFrame));
   const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
@@ -158,9 +159,22 @@
   const nodeFlagged = (row: LayerRow) => row.kind === LayerKind.Node && !row.nested && !!canvas && !(row.own && video?.nodeId === row.id);
   const renamable =(row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
+  $effect(() => {
+    if (!layersSource.renameAsked) {
+      return;
+    }
+    untrack(() => {
+      layersSource.takeRename();
+      renaming = shown.find((row) => isPicked(row) && renamable(row))?.id ?? null;
+    });
+  });
+
   function enterRow(row: LayerRow, e: KeyboardEvent) {
-    if (isPicked(row) && renamable(row)) {
-      renaming = row.id;
+    e.preventDefault();
+    e.stopPropagation();
+    const children = childIds(rows, row);
+    if (video?.nodeId === row.nodeId && children.length) {
+      video.select(children);
       return;
     }
     choose(row, e as unknown as MouseEvent);
@@ -168,11 +182,11 @@
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => pickFor({ shift: e.shiftKey, mod: e.metaKey || e.ctrlKey });
   const sameScope = (a: LayerRow, b: LayerRow) => (a.kind === LayerKind.Node) === (b.kind === LayerKind.Node) && (a.kind === LayerKind.Node || a.nodeId === b.nodeId) && b.kind !== LayerKind.Part;
-  const rangeRows = (row: LayerRow) => shown.filter((r) => sameScope(row, r)).map((r) => r.id);
+  const rangeRows = (row: LayerRow) => shown.filter((r) => sameScope(row, r)).map(pickIdOf);
 
   function choose(row: LayerRow, e: MouseEvent) {
     if (row.kind !== LayerKind.Node && video?.nodeId !== row.nodeId) {
-      opening = { nodeId: row.nodeId, id: row.id };
+      opening = { nodeId: row.nodeId, id: pickIdOf(row) };
       canvas?.select([row.nodeId]);
       return;
     }
@@ -189,7 +203,7 @@
       canvas?.select(pickLayers(canvas.selected, row.id, pickOf(e), rangeRows(row)));
       return;
     }
-    video?.select(pickLayers(video.selection, row.id, pickOf(e), rangeRows(row)));
+    video?.select(pickLayers(video.selection, pickIdOf(row), pickOf(e), rangeRows(row)));
   }
 
   function run(ids: readonly string[], action: LayerAction, summary: string, name?: string) {

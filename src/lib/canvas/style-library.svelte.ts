@@ -17,6 +17,8 @@ export class StyleLibrary {
   private sink: StyleSink | null = null;
   private store: LibraryStore | null = null;
   private seen: Library = {};
+  private queue: Promise<unknown> = Promise.resolve();
+  private renamedTo = new Map<string, string>();
 
   connect(sink: StyleSink | null) {
     this.sink = sink;
@@ -41,7 +43,7 @@ export class StyleLibrary {
     const fresh = Object.fromEntries(Object.entries(inDocs).filter(([name]) => !this.styles[name]));
     if (Object.keys(fresh).length) {
       this.styles = { ...this.styles, ...fresh };
-      void this.store.send({ op: LibraryOp.Adopt, entries: fresh });
+      void this.send({ op: LibraryOp.Adopt, entries: fresh });
     }
     for (const [name, style] of Object.entries(inDocs)) {
       if (!sameValue(style, this.styles[name])) {
@@ -50,15 +52,27 @@ export class StyleLibrary {
     }
   }
 
+  private send(ask: LibraryAsk): Promise<boolean> {
+    const turn = this.queue.then(() => this.store?.send(ask) ?? true).catch(() => false);
+    this.queue = turn;
+    return turn;
+  }
+
   private async saved(ask: LibraryAsk, undo: () => void) {
-    const ok = (await this.store?.send(ask)) ?? true;
+    const ok = await this.send(ask);
     this.failed = !ok;
     if (!ok) {
       undo();
     }
   }
 
-  push(name: string, style: Style): Promise<void> {
+  private current(name: string): string {
+    const to = this.styles[name] ? undefined : this.renamedTo.get(name);
+    return to ? this.current(to) : name;
+  }
+
+  push(stale: string, style: Style): Promise<void> {
+    const name = this.current(stale);
     const before = this.styles[name];
     this.styles = { ...this.styles, [name]: style };
     this.sink?.push(name, style);
@@ -91,8 +105,9 @@ export class StyleLibrary {
   }
 
   private moved(from: string, to: string) {
-    const { [from]: style, ...others } = this.styles;
-    this.styles = { ...others, [to]: style };
+    this.renamedTo.set(from, to);
+    this.renamedTo.delete(to);
+    this.styles = Object.fromEntries(Object.entries(this.styles).map(([name, style]) => [name === from ? to : name, style]));
     this.sink?.rename(from, to);
   }
 

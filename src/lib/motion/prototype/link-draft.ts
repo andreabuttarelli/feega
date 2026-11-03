@@ -10,8 +10,8 @@ const FRAME_ACTIONS = new Set([ActionKind.Navigate, ActionKind.OpenOverlay]);
 const fresh = (id: string, target: string): InteractionInput => ({ id, trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.Navigate, target }, transition: { kind: TransitionKind.Instant } });
 
 function aimed(existing: Interaction, target: string): InteractionInput {
-  const kind = FRAME_ACTIONS.has(existing.action.kind) ? existing.action.kind : ActionKind.Navigate;
-  return { ...existing, action: { kind, target } as Interaction['action'] };
+  const action = FRAME_ACTIONS.has(existing.action.kind) ? { ...existing.action, target } : { kind: ActionKind.Navigate, target };
+  return { ...existing, action: action as Interaction['action'] };
 }
 
 export function linkToFrame(doc: MotionDoc, draft: LinkDraft, target: string, newId: () => string): OpResult {

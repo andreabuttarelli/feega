@@ -3,7 +3,7 @@ import { applyOps, rebase, type DocOp } from './doc-ops';
 import type { PeerStep } from './frame-step';
 import { EditMode } from './edit-mode';
 import { SaveState } from './editor-bar';
-import { landed, outgoing, remote, type Revision, type Synced } from './frame-sync';
+import { landed, outgoing, remote, type FrameDraft, type Revision, type Synced } from './frame-sync';
 import { adoptHead, amend, followHead, record, redo, startHistory, undo, type History } from './history';
 import { liveEdits, type LiveEdits } from './live-edit';
 import { settleGroups } from './light-group';
@@ -13,21 +13,19 @@ import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
 
 const SAVE_DEBOUNCE_MS = 250;
 const COALESCE_MS = 800;
-const RETRY_FIRST_MS = 1_000;
-const RETRY_LONGEST_MS = 30_000;
-const UNREACHABLE = 'Could not reach the server: retrying';
-const RESTORED = 'Restored unsaved edits';
+const RETRY_FIRST_MS = 1000;
+const RETRY_CAP_MS = 30000;
 
-export enum SaveFailure {
-  Transient = 'transient',
-  Refused = 'refused'
+export enum Delivery {
+  Refused = 'refused',
+  Unreachable = 'unreachable'
 }
 
-export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string; failure: SaveFailure };
+export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string; delivery?: Delivery };
 
-export type FrameDraft = { version: number; ops: DocOp[] };
+const UNREACHABLE: SendResult = { ok: false, error: 'offline', delivery: Delivery.Unreachable };
 
-const retryDelay = (failures: number) => Math.min(RETRY_LONGEST_MS, RETRY_FIRST_MS * 2 ** (failures - 1));
+const retryDelay = (failures: number) => Math.min(RETRY_CAP_MS, RETRY_FIRST_MS * 2 ** (failures - 1));
 
 export type SessionPort = {
   viewPath: () => string[];
@@ -39,9 +37,7 @@ export type SessionPort = {
   landed: (from: Revision, to: Revision) => void;
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
-  refused: (error: string) => void;
-  keep: (draft: FrameDraft) => void;
-  release: () => void;
+  draft: (draft: FrameDraft | null) => void;
 };
 
 export enum DocAccess {
@@ -69,8 +65,9 @@ export class FrameEditSession {
   private held: Promise<unknown> | null = null;
   private lastEdit = { summary: '', at: 0 };
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
-  private failures = 0;
+  private idlers: (() => void)[] = [];
   private unsavedSummary = '';
+  private failures = 0;
   private readonly port: SessionPort;
 
   constructor(start: SessionStart, port: SessionPort) {
@@ -181,18 +178,24 @@ export class FrameEditSession {
       clearTimeout(this.saveTimer);
     }
     this.saveTimer = setTimeout(() => void this.save(), SAVE_DEBOUNCE_MS);
+    this.keepDraft();
+  }
+
+  private keepDraft() {
+    const ops = outgoing({ version: this.version, doc: this.baseDoc }, this.history.present);
+    this.port.draft(ops.length ? { version: this.version, ops, summary: this.unsavedSummary } : null);
+  }
+
+  private retryLater() {
+    this.failures += 1;
+    this.resave = false;
+    this.saveState = SaveState.Pending;
+    this.saveTimer = setTimeout(() => void this.save(), retryDelay(this.failures));
+    this.keepDraft();
   }
 
   unsaved(): boolean {
-    return this.saveState !== SaveState.Saved;
-  }
-
-  restore(draft: FrameDraft): boolean {
-    if (draft.version !== this.version || !draft.ops.length) {
-      return false;
-    }
-    this.recordRoot(applyOps(this.history.present, draft.ops), RESTORED);
-    return true;
+    return this.saveState === SaveState.Pending || this.saveState === SaveState.Saving;
   }
 
   async flushPending() {
@@ -210,6 +213,22 @@ export class FrameEditSession {
     clearTimeout(this.saveTimer);
     this.saveTimer = null;
     await this.save();
+  }
+
+  async settled(): Promise<void> {
+    await this.flushScheduled();
+    if (this.saving || this.saveState === SaveState.Pending) {
+      await new Promise<void>((resolve) => this.idlers.push(resolve));
+    }
+  }
+
+  private wake() {
+    if (this.saving || this.saveState === SaveState.Pending) {
+      return;
+    }
+    const waiting = this.idlers;
+    this.idlers = [];
+    waiting.forEach((resolve) => resolve());
   }
 
   adopt(head: Revision) {
@@ -262,21 +281,25 @@ export class FrameEditSession {
     this.saveState = SaveState.Saving;
     const sent = this.history.present;
     const base = { version: this.version, doc: this.baseDoc };
-    const ops = outgoing(base, sent);
-    this.port.keep({ version: base.version, ops });
-    const result = await this.port.send(ops, this.version, this.unsavedSummary).catch((): SendResult => ({ ok: false, error: UNREACHABLE, failure: SaveFailure.Transient }));
+    const result = await this.port.send(outgoing(base, sent), this.version, this.unsavedSummary).catch(() => UNREACHABLE);
     this.saving = false;
 
+    if (!result.ok && result.delivery === Delivery.Unreachable) {
+      this.retryLater();
+      return;
+    }
+    this.failures = 0;
     if (result.ok && result.doc) {
       this.port.landed(base, { version: result.version, doc: result.doc });
     }
     if (result.ok) {
-      this.failures = 0;
       this.follow(landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc }));
       this.saveState = SaveState.Saved;
-      this.port.release();
+      this.keepDraft();
     } else {
-      this.failed(result.error, result.failure);
+      this.saveState = SaveState.Failed;
+      this.notice = result.error;
+      this.port.draft(null);
     }
     if (this.resave) {
       this.resave = false;
@@ -287,19 +310,7 @@ export class FrameEditSession {
       this.missedRemote = false;
       await this.port.pull();
     }
-  }
-
-  private failed(error: string, failure: SaveFailure) {
-    if (failure === SaveFailure.Transient) {
-      this.failures += 1;
-      this.saveState = SaveState.Pending;
-      this.notice = error;
-      this.saveTimer = setTimeout(() => void this.save(), retryDelay(this.failures));
-      return;
-    }
-    this.saveState = SaveState.Failed;
-    this.notice = error;
-    this.port.refused(error);
+    this.wake();
   }
 
   private follow(next: Synced) {

@@ -106,6 +106,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   scaleGroup: canvas('scale_group'),
   disconnect: canvas('disconnect_nodes'),
   set_edge_mode: canvas('set_edge_mode'),
+  set_edge_tie: canvas('set_edge_tie'),
   remove: canvas('delete_node'),
   duplicate: canvas('duplicate_nodes'),
   paste: canvas('paste_nodes'),
@@ -332,6 +333,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
 
 export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   duplicate: canvas('duplicate_nodes'),
+  rename: canvas('rename_node'),
   'connect-new': canvas('connect_nodes'),
   'connect-existing': canvas('connect_nodes'),
   'run-workflow': canvas('run_workflow'),

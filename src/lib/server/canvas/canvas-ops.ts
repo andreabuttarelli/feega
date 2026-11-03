@@ -18,6 +18,7 @@ import {
   findNode,
   listConnections,
   setConnectionMode,
+  setConnectionTie,
   listCanvases,
   listNodes,
   moveNode,
@@ -398,6 +399,7 @@ const canvasIdInput = z.object({ canvasId: z.string() }).strict();
 const renameCanvasInput = z.object({ canvasId: z.string(), name: z.string().min(1) }).strict();
 const renameProjectInput = z.object({ name: z.string().min(1) }).strict();
 const connectionIdInput = z.object({ connectionId: z.string().describe('from list_connections') }).strict();
+const edgeTieInput = z.object({ connectionIds: z.array(z.string()).min(1), tie: z.object({ id: z.string(), x: z.number(), y: z.number() }).strict().nullable().describe('the cable tie every listed line passes through; null unties them') }).strict();
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
 const renameNodeInput = z.object({ nodeId: z.string(), name: z.string() }).strict();
 const setNodeColorInput = z.object({ nodeId: z.string(), color: z.enum(COLOUR_TAGS).nullable().describe('null removes the tag') }).strict();
@@ -922,7 +924,8 @@ export const CANVAS_OPS = {
         frameIds: z.array(z.string()).max(EXPORT_MAX_FRAMES).default([]),
         elements: exportElementsSchema.default([]),
         rows: exportRowsSchema.describe('value: 0.5–4 for scale of the frame as big as it is on the canvas (1 = one image px per canvas px, 2 = the default sharp export), px for width/height'),
-        name: z.string().max(60).optional()
+        name: z.string().max(60).optional(),
+        seconds: z.number().min(0).optional().describe('the time each frame is drawn at; by default its poster frame, else the frame where it settles')
       })
       .strict()
       .refine((i) => i.frameIds.length + i.elements.length > 0),
@@ -930,7 +933,7 @@ export const CANVAS_OPS = {
       if (needsBrowser(input.rows) && !serverFramesOpen()) {
         return { error: 'renderer_unavailable', message: 'image export needs the server renderer, which is not available here' };
       }
-      const targets = [...input.frameIds.map((nodeId) => ({ nodeId })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))];
+      const targets = [...input.frameIds.map((nodeId) => ({ nodeId, seconds: input.seconds })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds: input.seconds }))];
       const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
       if (out.outcome !== ExportOutcome.Done) {
         return { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
@@ -1399,6 +1402,12 @@ export const CANVAS_OPS = {
       const connection = await setConnectionMode(ctx.db, { orgId: ctx.orgId, ...input });
       return connection ? { connection } : { error: 'connection_not_found' };
     }
+  }),
+
+  set_edge_tie: op({
+    access: Access.Write,
+    input: edgeTieInput,
+    run: async (ctx, input) => ({ connections: await setConnectionTie(ctx.db, { orgId: ctx.orgId, ...input }) })
   }),
 
   rename_node: op({

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import FrameInspectorPanel from './FrameInspectorPanel.svelte';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
-import { FrameEditSession, SaveFailure } from '$lib/motion/frame-edit-session.svelte';
+import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { EditorMode, editorMode } from '$lib/canvas/editor-mode.svelte';
@@ -23,7 +23,7 @@ function sessionOf(selection: string[]) {
   const doc = must(addClip(device, { component: 'Particles', from: 0, durationInFrames: 30, props: {} }, 'sparks'));
   return new FrameEditSession(
     { head: { version: 1, doc }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off', failure: SaveFailure.Refused }), refused: () => {}, keep: () => {}, release: () => {} }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
 }
 
@@ -37,7 +37,7 @@ const element = (() => {
 function elementSession() {
   return new FrameEditSession(
     { head: { version: 1, doc: element }, selection: ['a'] },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off', failure: SaveFailure.Refused }), refused: () => {}, keep: () => {}, release: () => {} }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
 }
 
@@ -56,7 +56,7 @@ describe('a layer aligned in its frame', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2 }, transform: { x: 0.1 } }, 'a'));
     const session = new FrameEditSession(
       { head: { version: 1, doc }, selection: ['a'] },
-      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off', failure: SaveFailure.Refused }), refused: () => {}, keep: () => {}, release: () => {} }
+      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
     );
     const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
 
@@ -74,6 +74,13 @@ describe('a free element reads as one object on the canvas', () => {
 
     expect(valueOf(body, 'data-testid="position-x"')).toBe('30');
     expect(valueOf(body, 'data-testid="position-y"')).toBe('40');
+  });
+
+  it('its X and Y keep their decimals, two at most, like Figma', () => {
+    const body = hosted({ x: 30.5, y: 40.257, w: 200, h: 120, rotation: 0 });
+
+    expect(valueOf(body, 'data-testid="position-x"')).toBe('30.5');
+    expect(valueOf(body, 'data-testid="position-y"')).toBe('40.26');
   });
 
   it('its W and H are canvas px, though its doc holds two px for each', () => {
@@ -101,7 +108,7 @@ const doubledPanel = (selection: string[]) => {
   frameProperties.place = placeOf({ x: 0, y: 0, w: 700, h: 460 });
   const session = new FrameEditSession(
     { head: { version: 1, doc: doubled }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off', failure: SaveFailure.Refused }), refused: () => {}, keep: () => {}, release: () => {} }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
   const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
   frameProperties.clear();
@@ -175,7 +182,7 @@ describe('the frame itself', () => {
     const doc = must(stackFrame(sessionOf([]).history.present, 'frame-surface'));
     const session = new FrameEditSession(
       { head: { version: 1, doc }, selection: [] },
-      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off', failure: SaveFailure.Refused }), refused: () => {}, keep: () => {}, release: () => {} }
+      { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
     );
     const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
 

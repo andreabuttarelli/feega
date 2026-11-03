@@ -12,6 +12,11 @@ export const BUDGET: Record<Device, Budget> = {
   [Device.Phone]: { textureBytes: 128 * MB, pictureSide: 2048, resolution: 2 }
 };
 
+const RGBA_BYTES = 4;
+const SCREENS_HELD = 12;
+
+export const textureBudget = (ceiling: number, canvas: { width: number; height: number }): number => Math.min(ceiling, SCREENS_HELD * canvas.width * canvas.height * RGBA_BYTES);
+
 const LOW_MEMORY_GB = 4;
 
 const COARSE_POINTER = '(pointer: coarse)';

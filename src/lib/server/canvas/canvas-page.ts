@@ -18,6 +18,7 @@ import type { Db } from '$lib/server/db/client';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import type { Canvas } from '$lib/server/repos/canvas';
+import { tieOf } from '$lib/canvas/gpu/wire-magnet';
 import {
   createConnection,
   createNode,
@@ -28,6 +29,7 @@ import {
   moveNode,
   nodeRowExists,
   setConnectionMode,
+  setConnectionTie,
   patchNodeData,
   DataCheck,
   type PatchWrite
@@ -111,6 +113,7 @@ import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
+import { viewOf } from '$lib/canvas/breakpoint-views';
 import { ExportOutcome, exportSelection, noteImageExport } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -171,7 +174,7 @@ function canvasMembers(scope: Scope) {
   return nodeMembers(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope) });
 }
 
-async function madeBefore(scope: Scope, id: string | undefined): Promise<Moved | null> {
+async function madeBefore(scope: Scope, id: string | undefined): Promise<Extract<Moved, { outcome: MoveOutcome.Done }> | null> {
   if (!id || !(await nodeRowExists(scope.db, { orgId: scope.orgId, nodeId: id }))) {
     return null;
   }
@@ -1039,13 +1042,10 @@ export const actions: Actions<CanvasParams> = {
     }
 
     if (!(await listNodes(scope.db, scope)).some((node) => node.id === nodeId)) {
-      return fail(404, { error: 'node not found' });
+      return { moved: true };
     }
 
-    const node = await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
-    if (!node) {
-      return fail(404, { error: 'node not found' });
-    }
+    await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
 
     return { moved: true };
   },
@@ -1288,7 +1288,9 @@ export const actions: Actions<CanvasParams> = {
       return fail(503, { error: 'image export needs the server renderer, which is not available here' });
     }
     const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
-    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ nodeId: String(id) })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    const shownAt = Number(fd.get('seconds'));
+    const seconds = fd.has('seconds') && Number.isFinite(shownAt) && shownAt >= 0 ? shownAt : undefined;
+    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ ...(viewOf(String(id)) ?? { nodeId: String(id) }), seconds })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
     if (out instanceof Error) {
       return fail(502, { error: `the images could not be drawn: ${out.message}` });
     }
@@ -1539,7 +1541,7 @@ export const actions: Actions<CanvasParams> = {
     if (!ask.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid drawing' });
     }
-    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data);
+    const drawn = (await madeBefore(scope, id)) ?? (await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data));
     if (drawn.outcome !== MoveOutcome.Done) {
       return movedAnswer(drawn);
     }
@@ -1554,7 +1556,7 @@ export const actions: Actions<CanvasParams> = {
     if (!box.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid frame' });
     }
-    const drawn = await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data);
+    const drawn = (await madeBefore(scope, id)) ?? (await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data));
     return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
   },
 
@@ -1644,6 +1646,20 @@ export const actions: Actions<CanvasParams> = {
     return { connection };
   },
 
+  set_edge_tie: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const connectionIds = String(fd.get('connection_ids') ?? '').split(',').filter(Boolean);
+    const raw = jsonField(fd, 'tie');
+    const tie = tieOf(raw);
+    if (!connectionIds.length || (raw !== undefined && !tie)) {
+      return fail(400, { error: 'invalid tie' });
+    }
+
+    return { connections: await setConnectionTie(scope.db, { orgId: scope.orgId, connectionIds, tie }) };
+  },
+
   /**
    * CANCELLARE È MORBIDO, e le linee cadono con i nodi: `nodes_connections` non ha un cascade su
    * un `deleted_at`, quindi una linea verso un nodo sparito resterebbe nel database e tornerebbe
@@ -1661,9 +1677,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'nothing to delete' });
     }
 
-    if (!(await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) }))) {
-      return fail(404, { error: 'node not found' });
-    }
+    await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) });
     return { removed: true };
   },
 

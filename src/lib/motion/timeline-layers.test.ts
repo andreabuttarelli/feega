@@ -3,7 +3,8 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionTrack } from '@
 import { Interp, type Keyframe } from '@feega/motion-core/motion/keyframes';
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { Ease } from '@feega/motion-core/motion/design';
-import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerName, layerRows, pinched, rowWindow, propValue, rulerMarks } from './timeline-layers';
+import { layerLabel } from './element-name';
+import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerRows, pinched, rowWindow, propValue, rulerMarks } from './timeline-layers';
 
 const clip = (id: string, over: Partial<MotionClip> = {}): MotionClip => ({ id, component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Better marketing' }, keyframes: {}, ...over }) as MotionClip;
 const track = (id: string, clips: MotionClip[]): MotionTrack => ({ id, kind: TrackKind.Visual, name: id, clips }) as MotionTrack;
@@ -34,12 +35,13 @@ describe('timeline layers', () => {
   });
 
   it('shows the name a layer was given, such as a Figma layer name', () => {
-    expect(layerName({ ...clip('t1'), name: 'Headline' } as Partial<MotionClip> as MotionClip, {})).toBe('Headline · t1');
+    expect(layerLabel({ ...clip('t1'), name: 'Headline' } as Partial<MotionClip> as MotionClip, {})).toBe('Headline');
   });
 
-  it('names a layer by component and id, so eighteen shapes stop being called "Shape"', () => {
-    expect(layerName(clip('hook'), {})).toBe('Title · hook');
-    expect(layerName(clip('p1', { component: 'Precomp', props: { comp: 'c1' } } as Partial<MotionClip>), { c1: { name: 'Intro' } })).toBe('Intro · p1');
+  it('names a layer as the layers panel does, never by its id', () => {
+    expect(layerLabel(clip('hook'), {})).toBe('Better marketing');
+    expect(layerLabel(clip('s1', { component: 'Shape', props: { shape: 'ellipse' } }), {})).toBe('Ellipse');
+    expect(layerLabel(clip('p1', { component: 'Precomp', props: { comp: 'c1' } } as Partial<MotionClip>), { c1: { name: 'Intro' } })).toBe('Intro');
   });
 
   it('marks a property keyed here, animated elsewhere, or still', () => {

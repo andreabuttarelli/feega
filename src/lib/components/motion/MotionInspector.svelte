@@ -155,7 +155,8 @@
     title = null,
     here = null,
     onrename = null,
-    onalign
+    onalign,
+    fillOpen = $bindable(null)
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -185,6 +186,7 @@
     here?: string | null;
     onrename?: ((name: string) => void) | null;
     onalign?: (edge: AlignEdge) => void;
+    fillOpen?: number | null;
   } = $props();
 
   function leaveOnEscape(e: KeyboardEvent) {
@@ -256,6 +258,7 @@
   const positioned = $derived(transformProps.length > 0);
   const ownBox = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number');
   const own = $derived(host?.clipId === clip.id ? host : null);
+  const shownByContent = $derived(!own && componentOf(doc, clip) !== null);
   const pinnable = $derived(positioned && ownBox && !clip.parent && !own);
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));
@@ -616,7 +619,7 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
-    {#if layerExtras}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<StyleSection {doc} {clip} {scale} {commit} />{/if}
     {#if layerExtras}<VariablesSection {doc} {clip} {commit} />{/if}
   {/if}
 
@@ -708,7 +711,7 @@
     {@const fillBind = fillTarget(clip)}
     <div class="stack bindable" data-prop={field.key}>
       {#if fillBind && clip.bind?.[fillBind]}<BindChip {doc} {clip} target={fillBind} {commit} />{:else}
-        <FillStack {gesture} {palette} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
+        <FillStack {gesture} {palette} keys={fillKeys} bind:open={fillOpen} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
         {#if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
       {/if}
     </div>

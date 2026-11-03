@@ -7,7 +7,7 @@ vi.mock('svelte', async () => await import(join(dirname(fileURLToPath(import.met
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { FrameEditSession, SaveFailure } from '$lib/motion/frame-edit-session.svelte';
+import { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
 import { wrapInFrame } from '$lib/motion/layout/ops';
 import { aabb, quadOf } from '$lib/motion/scene-select';
 import { propBoxes } from '$lib/motion/space';
@@ -35,7 +35,7 @@ function framedSession() {
   const doc = must(wrapInFrame(rect(rect(newMotionDoc(MotionFormat.Square), 'card', 0.3, 0.3, 0.4), 'dot', 0.2, 0.2, 0.05), ['card', 'dot'], 'box', 'lane'));
   return new FrameEditSession(
     { head: { version: 1, doc }, selection: ['dot'] },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off', failure: SaveFailure.Refused }), refused: () => {}, keep: () => {}, release: () => {} }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
 }
 

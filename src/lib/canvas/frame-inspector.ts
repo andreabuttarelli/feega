@@ -14,6 +14,7 @@ import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
 import { pasteOverElements, replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
+import { altCopies } from './alt-copy';
 import { setClipFlags } from '@feega/motion-core/motion/organize';
 import { BooleanOp, combineShapes, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
 import { bakeBooleanGroup, isBooleanGroup } from '$lib/motion/shape/boolean-group';
@@ -51,7 +52,7 @@ export function inspectorOf(doc: MotionDoc, selection: readonly string[]): Inspe
   return { view: template ? PropertiesView.Template : PropertiesView.Clip, clip: found.clip, path, hosts };
 }
 
-type BarCtx = { doc: MotionDoc; selection: readonly string[]; frame: number; newId: () => string; layer?: string };
+type BarCtx = { doc: MotionDoc; selection: readonly string[]; frame: number; newId: () => string; layer?: string; here?: string | null };
 type Done = Extract<ClipDone, { ok: true }>;
 type BarOp = { shown: (doc: MotionDoc, selection: readonly string[]) => boolean; run: (ctx: BarCtx) => Done | null };
 
@@ -127,6 +128,11 @@ const loneStack = (doc: MotionDoc, selection: readonly string[]): (MotionClip & 
 function unwrapStack(ctx: BarCtx): Done | null {
   const stack = loneStack(ctx.doc, ctx.selection);
   return stack ? done(removeStack(ctx.doc, stack.id), 'Removed the stack', childrenInOrder(clipsOf(ctx.doc, topIds(ctx.doc)), stack).map((c) => c.id)) : null;
+}
+
+function duplicated(ctx: BarCtx): Done | null {
+  const copied = altCopies(ctx.doc, ctx.selection, ctx.newId, ctx.here ?? null);
+  return copied ? { ok: true, doc: copied.doc, summary: 'Duplicated', selection: copied.ids } : null;
 }
 
 const clipOp = (op: ClipOp): BarOp => ({ shown: any, run: (ctx) => {
@@ -238,7 +244,7 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
   [Action.ResetInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, resetOverrides(ctx.doc, ctx.selection[0]), 'Reset all overrides') },
   [Action.Split]: clipOp(ClipOp.Split),
-  [Action.Duplicate]: clipOp(ClipOp.Duplicate),
+  [Action.Duplicate]: { shown: any, run: duplicated },
   [Action.Delete]: clipOp(ClipOp.Delete),
   [Action.Group]: { shown: several, run: (ctx) => (ctx.selection.length >= MIN_COMBINED ? regrouped(ctx, groupLight(ctx.doc, ctx.selection, ctx.newId(), ctx.newId()), 'Grouped') : null) },
   [Action.Ungroup]: { shown: oneGroup, run: ungrouped },
@@ -311,12 +317,20 @@ const rootIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips.filter((c)
 
 export enum ElementAction {
   WrapStack = 'wrap-stack',
-  Duplicate = 'duplicate'
+  Duplicate = 'duplicate',
+  BringForward = 'bring-forward',
+  SendBackward = 'send-backward',
+  BringToFront = 'bring-front',
+  SendToBack = 'send-back'
 }
 
 const WHOLE_ELEMENT: Partial<Record<ActionId, ElementAction>> = {
   [Action.WrapStack]: ElementAction.WrapStack,
-  [Action.Duplicate]: ElementAction.Duplicate
+  [Action.Duplicate]: ElementAction.Duplicate,
+  [Command.BringForward]: ElementAction.BringForward,
+  [Command.SendBackward]: ElementAction.SendBackward,
+  [Command.BringToFront]: ElementAction.BringToFront,
+  [Command.SendToBack]: ElementAction.SendToBack
 };
 
 export function wholeElementAction(id: ActionId, doc: MotionDoc, picks: readonly string[]): ElementAction | null {

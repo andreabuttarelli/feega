@@ -228,3 +228,32 @@ describe('a component made from a stack child', () => {
     expect(findClip(doc, 'row')!.clip.autoLayout!.order).toEqual(['a', instance.id, 'c']);
   });
 });
+
+describe('a component made from a container', () => {
+  const button = () => {
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    doc = must(addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Continue', x: 0.5, y: 0.5, width: 0.2, height: 0.05 } }, 'label'));
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x: 0.6, y: 0.5, width: 0.05, height: 0.05 } }, 'icon'));
+    return must(wrapInStack(doc, ['label', 'icon'], 'button', 'lane'));
+  };
+  const made = () => {
+    const doc = must(createComponent(button(), ['button'], newId, 'Button'));
+    const instance = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+    return { doc, instance, inside: doc.comps[String(instance.props.comp)].tracks.flatMap((t) => t.clips) };
+  };
+
+  it('takes the whole subtree into the main, not only the picked stack', () => {
+    const { doc, instance, inside } = made();
+
+    expect(inside.map((c) => c.id).sort()).toEqual(['button', 'icon', 'label']);
+    expect(inside.find((c) => c.id === 'label')!.parent).toBe('button');
+    expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual([instance.id]);
+  });
+
+  it('draws the subtree through the instance', () => {
+    const { doc, instance } = made();
+    const texts = flattenComps(doc).tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Text');
+
+    expect(texts.map((c) => c.id)).toEqual([`${instance.id}__0__label`]);
+  });
+});

@@ -73,6 +73,21 @@ export const resolvedRequest = <R extends Omit<Request, 'size'>>(request: R, reg
 
 export const SYMBOL_FALLBACKS = ['Noto Sans', 'Noto Sans Mono', 'Noto Sans Symbols 2', 'Noto Sans Math', 'Noto Sans Symbols'];
 
+const PAST_LATIN = 0x250;
+
+export type Fallback = { families: readonly string[]; ranges: readonly [number, number][] };
+
+export const FALLBACKS: readonly Fallback[] = [
+  { families: ['Noto Emoji'], ranges: [[0x200d, 0x200d], [0xfe0f, 0xfe0f], [0x1f000, 0x1faff]] },
+  { families: ['Noto Sans KR'], ranges: [[0x1100, 0x11ff], [0x3130, 0x318f], [0xa960, 0xa97f], [0xac00, 0xd7ff]] },
+  { families: ['Noto Sans SC'], ranges: [[0x2e80, 0x9fff], [0xf900, 0xfaff], [0xfe30, 0xfe4f], [0xff00, 0xffef], [0x20000, 0x3134f]] },
+  { families: SYMBOL_FALLBACKS, ranges: [[PAST_LATIN, 0x10ffff]] }
+];
+
+const FALLBACK_FAMILIES = [...SYMBOL_FALLBACKS, ...FALLBACKS.flatMap((f) => f.families).filter((f) => !SYMBOL_FALLBACKS.includes(f))];
+
+export const fallbackOf = (codePoint: number): Fallback | undefined => FALLBACKS.find((f) => f.ranges.some(([lo, hi]) => lo <= codePoint && codePoint <= hi));
+
 export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string, Source>, registry: readonly FontFace[]): FaceBook {
   const keyed = new Map<string, Face>();
   const stamped = (font: string, coords: Record<string, number>): Face => {
@@ -95,7 +110,7 @@ export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string
 
   const resolve = (request: Parameters<FaceBook>[0], codePoint: number): Resolved | null => {
     const { family, weight: desired } = resolvedRequest(request, registry);
-    const found = [family, familyName(BuiltinFont.Sans, registry), ...SYMBOL_FALLBACKS].reduce<ReturnType<typeof ruleFor>>((hit, f) => hit ?? ruleFor(f, request, desired, codePoint), null);
+    const found = [family, familyName(BuiltinFont.Sans, registry), ...FALLBACK_FAMILIES].reduce<ReturnType<typeof ruleFor>>((hit, f) => hit ?? ruleFor(f, request, desired, codePoint), null);
     if (!found) {
       return null;
     }

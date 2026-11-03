@@ -126,6 +126,10 @@ describe('tileChrome', () => {
     expect(ofPart(tile({ hovered: true, ring: NodeChrome.Selected }), ChromePart.Hover)).toHaveLength(0);
   });
 
+  it('outlines a frame being edited inside when the pointer is on its empty area, like Figma', () => {
+    expect(ofPart(tile({ hovered: true, ring: NodeChrome.Editing }), ChromePart.Hover)).toHaveLength(1);
+  });
+
   it('spaces input ports evenly on the left edge, outside the box, in their connector colour', () => {
     const ports = ofPart(tile({ inputs: marks('text', 'images') }), ChromePart.PortIn);
 
@@ -134,6 +138,14 @@ describe('tileChrome', () => {
       [90, 295, 100, 305]
     ]);
     expect(ports[1].paint).toEqual({ kind: PaintKind.Solid, color: rgbaOf(CONNECTOR_STYLE.images.color) });
+  });
+
+  it('draws a port as a hollow ring in its colour with a dot at its centre', () => {
+    const [port] = ofPart(tile({ outputs: marks('videos') }), ChromePart.PortOut);
+
+    expect(port.contours).toHaveLength(3);
+    expect(box([port.contours[1]])).toEqual([402, 272, 408, 278]);
+    expect(box([port.contours[2]])).toEqual([404, 274, 407, 277]);
   });
 
   it('centres the output port on the right edge', () => {

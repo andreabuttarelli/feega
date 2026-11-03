@@ -6,20 +6,20 @@ import { buildPage } from './build';
 import { withMedia } from './media';
 import { resolveAt, viewsOf } from '../breakpoints/model';
 import type { PageSpec } from './ir';
-import { CodeTarget, type CodeExport, type CodeFile } from './model';
+import { CodeTarget, type CodeAsset, type CodeExport, type CodeFile } from './model';
 import { kebab } from './naming';
 import { htmlProject } from './targets/html';
 import { reactProject } from './targets/react';
 import { svelteProject } from './targets/svelte';
 
-export { CodeTarget, CODE_TARGETS, type CodeExport, type CodeFile } from './model';
+export { CodeTarget, CODE_TARGETS, type CodeAsset, type CodeExport, type CodeFile } from './model';
 
-type TargetSpec = { label: string; stack: string; project: (page: PageSpec, slug: string) => CodeFile[] };
+type TargetSpec = { label: string; stack: string; publicDir: string; assetBase: string; project: (page: PageSpec, slug: string) => CodeFile[] };
 
 export const TARGETS: Record<CodeTarget, TargetSpec> = {
-  [CodeTarget.React]: { label: 'React', stack: 'React + Tailwind', project: reactProject },
-  [CodeTarget.Html]: { label: 'HTML', stack: 'HTML + CSS', project: (page) => htmlProject(page) },
-  [CodeTarget.Svelte]: { label: 'Svelte', stack: 'SvelteKit', project: svelteProject }
+  [CodeTarget.React]: { label: 'React', stack: 'React + Tailwind', publicDir: 'public/', assetBase: '/assets/', project: reactProject },
+  [CodeTarget.Html]: { label: 'HTML', stack: 'HTML + CSS', publicDir: '', assetBase: 'assets/', project: (page) => htmlProject(page) },
+  [CodeTarget.Svelte]: { label: 'Svelte', stack: 'SvelteKit', publicDir: 'static/', assetBase: '/assets/', project: svelteProject }
 };
 
 export const DEFAULT_TARGET = CodeTarget.React;
@@ -33,13 +33,18 @@ const byPath = (a: CodeFile, b: CodeFile) => (a.path < b.path ? -1 : a.path > b.
 export function exportCode(doc: MotionDoc, options: ExportOptions = {}): CodeExport {
   const target = options.target ?? DEFAULT_TARGET;
   const name = options.name?.trim() || DEFAULT_NAME;
-  const build = (at: MotionDoc) => buildPage({ doc: withAutoLayout(at), name, assets: options.assets ?? {}, brand: options.brand ?? null });
+  const spec = TARGETS[target];
+  const build = (at: MotionDoc) => buildPage({ doc: withAutoLayout(at), name, assets: options.assets ?? {}, assetBase: spec.assetBase, brand: options.brand ?? null });
   const views = viewsOf(doc)
     .slice(1)
     .map((v) => ({ maxWidth: v.width, page: build(resolveAt(doc, v.id)) }));
   const page = withMedia(build(doc), views);
-  const files = TARGETS[target].project(page, kebab(name)).sort(byPath);
-  return { target, files, notes: page.notes };
+  const files = spec.project(page, kebab(name)).sort(byPath);
+  return { target, files, assets: bundled(page, spec), notes: page.notes };
+}
+
+function bundled(page: PageSpec, spec: TargetSpec): CodeAsset[] {
+  return page.assets.flatMap(({ url, ref }) => (url ? [{ path: `${spec.publicDir}${ref.replace(/^\//, '')}`, ref, url }] : []));
 }
 
 export function codeAssetIds(doc: MotionDoc): string[] {

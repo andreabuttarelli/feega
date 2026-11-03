@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hitTop, panBy, toWorld, visibleIds, zoomAt } from './camera';
+import { hitTop, panBy, toWorld, visibleIds, wheelPan, zoomAt } from './camera';
 
 const rects = [
   { id: 'a', x: 0, y: 0, w: 100, h: 100 },
@@ -34,5 +34,19 @@ describe('camera', () => {
 
   it('culls nodes outside the screen', () => {
     expect(visibleIds(rects, { x: 0, y: 0, zoom: 1 }, { width: 800, height: 600 })).toEqual(new Set(['a', 'b']));
+  });
+});
+
+describe('a wheel turned with Shift', () => {
+  it('scrolls sideways, as in Figma', () => {
+    expect(wheelPan({ deltaX: 0, deltaY: 40, shiftKey: true })).toEqual({ x: -40, y: 0 });
+  });
+
+  it('keeps a trackpad that already scrolls sideways', () => {
+    expect(wheelPan({ deltaX: 30, deltaY: 0, shiftKey: true })).toEqual({ x: -30, y: 0 });
+  });
+
+  it('without Shift scrolls both ways', () => {
+    expect(wheelPan({ deltaX: 5, deltaY: 40, shiftKey: false })).toEqual({ x: -5, y: -40 });
   });
 });

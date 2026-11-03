@@ -10,7 +10,9 @@ import { boxBook } from '$lib/motion/gpu-full/text/test-face';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
-import { buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
+import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
+import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import { builtAnswer, buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -69,8 +71,8 @@ describe('the builder', () => {
   it('answers each request with its own list', async () => {
     const worker = echo();
     const build = frameBuilder(() => worker);
-    const [a, b] = await Promise.all([build('/a', Smoothing.Plain), build('/b', Smoothing.Plain)]);
-    expect(worker.asked.map((a) => a.url)).toEqual(['/a', '/b']);
+    const [a, b] = await Promise.all([build(source(shapeDoc), Smoothing.Plain), build(source(customDoc), Smoothing.Plain)]);
+    expect(worker.asked.map((a) => a.source.doc)).toEqual([shapeDoc, customDoc]);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
   });
@@ -78,7 +80,7 @@ describe('the builder', () => {
   it('hands the worker the local font files it cannot see from its own thread', async () => {
     keepLocalFiles('Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]);
     const worker = echo();
-    await frameBuilder(() => worker)('/a', Smoothing.Plain);
+    await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
     forgetLocalFiles();
 
     expect(worker.asked[0].locals).toEqual([['Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]]]);
@@ -88,14 +90,34 @@ describe('the builder', () => {
     const dead = { onmessage: null, onerror: null as BuildWorker['onerror'], postMessage: () => queueMicrotask(() => dead.onerror?.(new Event('error') as never)) };
     let spawned = 0;
     const build = frameBuilder(() => (spawned++, dead));
-    await expect(build('/a', Smoothing.Plain)).rejects.toThrow();
-    await expect(build('/b', Smoothing.Plain)).rejects.toThrow();
+    await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
+    await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
     expect(spawned).toBe(1);
+  });
+
+  it('the worker sends each item already wired, so the main thread never serialises it', async () => {
+    const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
+    const answer = builtAnswer(7, list);
+
+    expect(answer).toEqual({ id: 7, list, wires: list.items.map((i) => JSON.stringify(i)) });
+  });
+
+  it('the main thread keeps the wires the worker sent with the list', async () => {
+    const item = { kind: 'path', clip: 'card' };
+    const worker = {
+      onerror: null,
+      onmessage: null as BuildWorker['onmessage'],
+      postMessage: (ask: BuildAsk) => queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, list: { width: 1, height: 1, background: null, items: [item], unsupported: [] }, wires: ['"from the worker"'] } } as never))
+    };
+
+    const list = await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
+
+    expect(itemWire(list!.items[0])).toBe('"from the worker"');
   });
 
   it('says it cannot build when no worker can start', async () => {
     const build = frameBuilder(() => null);
-    await expect(build('/a', Smoothing.Plain)).rejects.toThrow();
+    await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
   });
 });
 

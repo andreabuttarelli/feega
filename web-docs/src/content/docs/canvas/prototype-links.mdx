@@ -9,7 +9,7 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 <DemoVideo name="prototype-links" caption="Link a button to another frame and pick a transition." />
 
-A prototype link says what happens when someone acts on a layer: open another frame, show it as an overlay, go back, or scroll to something. Links are stored on the layer, so duplicating a layer copies them and deleting it removes them.
+A prototype link says what happens when someone acts on a layer: open another frame, show it as an overlay, go back, scroll to something, or open a web page. Links are stored on the layer, so duplicating a layer copies them and deleting it removes them.
 
 ## Link a layer to a frame
 
@@ -18,6 +18,12 @@ A prototype link says what happens when someone acts on a layer: open another fr
 3. Click the target frame on the canvas. A dashed arrow follows the pointer until you click.
 
 An arrow now runs from the layer to the target frame, labelled with its trigger.
+
+## Add an interaction to an element
+
+Select any element inside a frame, such as a button, in Design or Play mode. In **Prototype**, press **Add interaction**: it adds On click, Navigate to the first frame (or Open URL when the canvas has no other frame). Change the action to **Open URL** and type the address; `feega.app/pricing` becomes `https://feega.app/pricing`. Only http and https links are kept.
+
+When an element and the layer around it both react to a click, the element wins.
 
 ## In Play mode
 
@@ -33,10 +39,10 @@ Each link has three rows in Prototype.
 | Part | Options |
 |---|---|
 | Trigger | On click, While hovering, On drag, After delay (milliseconds) |
-| Action | Navigate to, Open overlay, Back, Scroll to, Change to |
+| Action | Navigate to, Open overlay, Close overlay, Back, Scroll to, Change to, Open URL |
 | Transition | Instant, Dissolve, Slide in, Push, [Smart animate](/canvas/smart-animate/); slide and push take a direction; every transition but Instant takes an easing and a duration in milliseconds |
 
-Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back needs none. **Change to** works on a layer inside a component (or on an instance) and picks one of the set's variants, such as `State: Open`: in the player the instance around the layer switches to it, as Figma interactive components do. A layer holds up to 16 links. Remove deletes one.
+Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back and Close overlay need none. **Open URL** opens its address in a new browser tab and leaves the prototype where it was. **Open overlay** adds three settings: **Position** (Centre, Top, Bottom, or Manual with X and Y in pixels from the frame's top left), **Close when clicking outside**, and **Background**, the colour and opacity that dims the frame behind (black at 45% by default). **Change to** works on a layer inside a component (or on an instance) and picks one of the set's variants, such as `State: Open`: in the player the instance around the layer switches to it, as Figma interactive components do. A layer holds up to 16 links. Remove deletes one.
 
 A new link is On click, Navigate to, Instant.
 
@@ -44,7 +50,7 @@ A new link is On click, Navigate to, Instant.
 
 The motion agent has three tools, also reachable through `motion_tool` in MCP and `feega motion tool`:
 
-- `add_interaction` with `clip_id`, `trigger`, `action` and an optional `transition`; pass `interaction_id` to replace a link.
+- `add_interaction` with `clip_id`, `trigger`, `action` and an optional `transition`; pass `interaction_id` to replace a link. An `open_overlay` action takes `overlay` `{ position, x, y, closeOutside, backdrop }`; `close_overlay` takes nothing.
 - `list_interactions` lists every link of a frame.
 - `remove_interaction` with `clip_id` and `interaction_id`.
 
@@ -73,11 +79,17 @@ feega motion tool <nodeId> list_interactions
 { "clip_id": "question", "trigger": { "kind": "click" }, "action": { "kind": "change_to", "variant": { "State": "Open" } } }
 ```
 
+`open_url` takes a `url`:
+
+```json
+{ "clip_id": "cta", "trigger": { "kind": "click" }, "action": { "kind": "open_url", "url": "https://feega.app/pricing" } }
+```
+
 Clips also show their `interactions` in `get_motion_doc`.
 
 ## Limits
 
-Links are played in the [Prototype player](/canvas/prototype-player/). A link whose target frame was deleted is kept on the layer but no arrow is drawn.
+Links are played in the [Prototype player](/canvas/prototype-player/). Code export does not emit prototype links yet. A link whose target frame was deleted is kept on the layer but no arrow is drawn.
 
 ## Viewport in the player
 

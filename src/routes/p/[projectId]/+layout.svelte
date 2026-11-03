@@ -1,6 +1,7 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { historyPanel } from '$lib/canvas/history-panel.svelte';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { commentsPanel } from '$lib/canvas/comments-panel.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
@@ -122,6 +123,12 @@
   $effect(() => {
     if (historyPanel.asked) {
       leftPanel = 'history';
+    }
+  });
+
+  $effect(() => {
+    if (layersSource.renameAsked) {
+      leftPanel = 'layers';
     }
   });
 

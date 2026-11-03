@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { offsetOf, pointAt, select, selectionIn, textOf } from './editable-text';
+import { lineMove, offsetOf, pointAt, select, selectionIn, textOf } from './editable-text';
 import { textBody, TextBodyFor } from '@feega/motion-core/motion/hyperframes/text-body';
 import { ListKind } from '@feega/motion-core/motion/text-lists';
 
@@ -52,5 +52,20 @@ describe('the editable text maps the DOM to the text model', () => {
     const root = editor('Alpha\nBeta', []);
     root.append(document.createTextNode('!'));
     expect(textOf(root)).toBe('Alpha\nBeta!');
+  });
+});
+
+describe('Home and End move the caret on every platform', () => {
+  it('End collapses to the line end, Home to the line start', () => {
+    expect(lineMove({ key: 'End', shiftKey: false })).toEqual({ alter: 'move', direction: 'forward' });
+    expect(lineMove({ key: 'Home', shiftKey: false })).toEqual({ alter: 'move', direction: 'backward' });
+  });
+
+  it('with Shift they extend the selection', () => {
+    expect(lineMove({ key: 'End', shiftKey: true })).toEqual({ alter: 'extend', direction: 'forward' });
+  });
+
+  it('other keys are left to the browser', () => {
+    expect(lineMove({ key: 'ArrowRight', shiftKey: false })).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import type { MotionClip } from '../doc';
 import type { Box } from '../layout';
-import { FillType, ImageFit, fillsOf, type Fill } from '../fill/model';
+import { FillType, ImageFit, cssLinearAngle, fillsOf, type Fill } from '../fill/model';
 import { strokesOf, type Stroke } from '../stroke/model';
 import { ShapeKind } from '../shape/schema';
 import { EffectKind } from '../effects/registry';
@@ -40,7 +40,7 @@ const stopsOf = (fill: Extract<Fill, { stops: unknown }>) => fill.stops.map((s) 
 type FillLayer = (fill: Fill, painter: Painter) => string;
 
 const LAYER: Partial<Record<FillType, FillLayer>> = {
-  [FillType.Linear]: (f) => `linear-gradient(${round((f as Extract<Fill, { angle: number }>).angle)}deg, ${stopsOf(f as Extract<Fill, { stops: unknown }>)})`,
+  [FillType.Linear]: (f) => `linear-gradient(${round(cssLinearAngle((f as Extract<Fill, { angle: number }>).angle))}deg, ${stopsOf(f as Extract<Fill, { stops: unknown }>)})`,
   [FillType.Radial]: (f) => `radial-gradient(circle, ${stopsOf(f as Extract<Fill, { stops: unknown }>)})`,
   [FillType.Image]: (f, painter) => `url("${painter.asset((f as Extract<Fill, { type: FillType.Image }>).assetId)}")`
 };
