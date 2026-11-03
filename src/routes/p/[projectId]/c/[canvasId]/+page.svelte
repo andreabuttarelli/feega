@@ -1398,6 +1398,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return grownTextNodeHeight(grownHeights[n.id], n.userHeight);
   }
 
+  const paintsBehind = (n: Tile) => tileChromeOf(n).behind || n.type === SECTION_TYPE;
+
   const tiles = $derived(
     nodes.filter((n) => !flagHeld(nodes, n.id, NodeFlag.Hidden)).map((n) => ({ n, chrome: tileChromeOf(n), ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, chrome, ports, outputs }) => ({
       id: n.id,
@@ -1415,8 +1417,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
       rotatable: !!motionOf(n),
-      behind: chrome.behind || n.type === SECTION_TYPE,
-      members: chrome.behind || n.type === SECTION_TYPE ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
+      behind: paintsBehind(n),
+      members: paintsBehind(n) ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -3261,7 +3263,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   $effect(() =>
     layersSource.publishCanvas({
       get nodes() {
-        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), ...flagsOf(n.data), ...frameLook(n) }));
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), behind: paintsBehind(n), ...flagsOf(n.data), ...frameLook(n) }));
       },
       get selected() {
         return selectedIds;

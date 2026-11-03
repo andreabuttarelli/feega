@@ -1,6 +1,6 @@
 import { BlendMode } from '../blend';
 import { toneOf, type Tone } from './adjust';
-import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, linearEnds, withAlpha, type Fill, type FillOf, type Stop } from './model';
+import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, cssLinearAngle, linearEnds, withAlpha, type Fill, type FillOf, type Stop } from './model';
 
 export type FillPaint = {
   id: string;
@@ -173,7 +173,7 @@ const halfway = (stops: Stop[]) => stops.map((s) => ({ ...s, pos: s.pos / 2 }));
 
 const TEXT_LAYER: { [T in FillType]: (f: FillOf<T>) => TextLayer[] } = {
   [FillType.Solid]: (f) => [flat(`linear-gradient(${faded(f.color, f.opacity)},${faded(f.color, f.opacity)})`)],
-  [FillType.Linear]: (f) => [flat(`linear-gradient(${round(f.angle + 90)}deg,${cssStops(f.stops, f.opacity)})`)],
+  [FillType.Linear]: (f) => [flat(`linear-gradient(${round(cssLinearAngle(f.angle))}deg,${cssStops(f.stops, f.opacity)})`)],
   [FillType.Radial]: (f) => [flat(`radial-gradient(${round(f.radius * 50)}% ${round(f.radius * 50)}% at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`)],
   [FillType.Angular]: (f) => [flat(`conic-gradient(from ${round(f.angle)}deg at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`)],
   [FillType.Diamond]: (f) => DIAMOND_CORNERS.map(([to, position]) => ({ image: `linear-gradient(${to},${cssStops(halfway(f.stops), f.opacity)})`, size: QUADRANT, position, repeat: 'no-repeat' })),
