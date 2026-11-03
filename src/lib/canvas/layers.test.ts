@@ -9,7 +9,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { findClip } from '@feega/motion-core/motion/doc';
-import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, pickIdOf, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { dropTool, freeLanding, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, pickIdOf, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers, type LayerRow } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -906,5 +906,26 @@ describe('a layer dragged into a main in the layers panel goes inside the main',
     const done = dropLayers(homed, ['subtitle'], 'm2', Place.Into, ['m2', 'subtitle'], 'screen');
 
     expect(done.ok && inside(done.doc).some((c) => c.id === 'subtitle')).toBe(false);
+  });
+});
+
+describe('dropping a free element row in Layers', () => {
+  const frames = new Set(['frame']);
+  const row = (over: Partial<LayerRow>): LayerRow => ({ id: 'x', key: 'x', kind: LayerKind.Clip, depth: 1, label: 'x', type: 'rect', nodeId: 'frame', hidden: false, locked: false, nested: false, ...over });
+
+  it('on a frame row it moves into the frame', () => {
+    expect(freeLanding(row({ id: 'frame', kind: LayerKind.Node, nodeId: 'frame', depth: 0 }), Place.Above, frames)).toEqual({ frameId: 'frame' });
+  });
+
+  it('on a layer of an open frame it takes that layer slot', () => {
+    expect(freeLanding(row({ id: 'stack' }), Place.Into, frames)).toEqual({ frameId: 'frame', slot: { target: 'stack', place: Place.Into } });
+    expect(freeLanding(row({ id: 'child' }), Place.Below, frames)).toEqual({ frameId: 'frame', slot: { target: 'child', place: Place.Below } });
+  });
+
+  it('never lands on another free element, a closed outline or a part', () => {
+    expect(freeLanding(row({ id: 'other', kind: LayerKind.Node, nodeId: 'other', depth: 0 }), Place.Above, frames)).toBeNull();
+    expect(freeLanding(row({ id: 'child', nested: true }), Place.Above, frames)).toBeNull();
+    expect(freeLanding(row({ id: 'child', kind: LayerKind.Part }), Place.Above, frames)).toBeNull();
+    expect(freeLanding(row({ id: 'child', nodeId: 'other' }), Place.Above, frames)).toBeNull();
   });
 });

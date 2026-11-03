@@ -159,6 +159,26 @@ describe('motion revisions', () => {
   });
 });
 
+describe('a write the database cancels for its statement timeout', () => {
+  const STATEMENT_TIMEOUT = { code: '57014', message: 'canceling statement due to statement timeout' };
+  const timingOut = (db: Db, times: number) => {
+    let left = times;
+    const rpc = (db as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<unknown> }).rpc;
+    return { ...db, rpc: async (name: string, args: Record<string, unknown>) => (left-- > 0 ? { data: null, error: STATEMENT_TIMEOUT } : rpc(name, args)) } as unknown as Db;
+  };
+
+  it('is tried again and lands, so an import of a big page does not answer 500 (stripe: 57014 in commit_motion_revision)', async () => {
+    vi.useFakeTimers();
+    const { db, rows } = revisionsDb();
+    const written = appendRevision(timingOut(db, 2), { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor: user });
+    await vi.runAllTimersAsync();
+
+    expect((await written).outcome).toBe(RevisionOutcome.Written);
+    expect(rows).toHaveLength(1);
+    vi.useRealTimers();
+  });
+});
+
 describe('revisions are checkpoints, not one row per edit', () => {
   afterEach(() => vi.useRealTimers());
 

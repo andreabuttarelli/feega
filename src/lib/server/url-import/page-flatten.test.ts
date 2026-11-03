@@ -125,6 +125,21 @@ describe('flattened', () => {
     expect(made.children![0].type).toBe('RECTANGLE');
   });
 
+  it('no layer is named after an HTML tag or the stand-in of a pseudo-element, instances included', () => {
+    const link = node('INSTANCE', 0, 100, 120, 40, { name: 'a', componentId: 'k1', fills: red, children: [text('Pricing', [10, 110, 60, 20])] });
+    const button = node('INSTANCE', 200, 100, 40, 40, { name: 'button', componentId: 'k2', fills: red, children: [node('VECTOR', 210, 110, 20, 20, { name: 'svg', fills: red, fillGeometry: [{ path: 'M 0 0 L 1 1 Z' }] })] });
+    const pseudo = node('RECTANGLE', 300, 100, 20, 20, { name: 'feega-pseudo', fills: red });
+    const names = namesOf(flattened(page([link, button, pseudo])));
+
+    expect(names.filter((x) => ['a', 'button', 'feega-pseudo'].includes(x))).toEqual([]);
+  });
+
+  it('a section is named after the first words it shows', () => {
+    const section = frame('section', [0, 0, 1000, 400], [text('Built for agents', [0, 0, 400, 60]), text('Ship faster', [0, 100, 400, 20]), node('RECTANGLE', 0, 200, 400, 100, { fills: red })], { fills: red });
+
+    expect(flattened(page([section])).children![0].name).toBe('Built for agents');
+  });
+
   it('la home di vercel ha molti meno livelli e meno profondità', () => {
     const tree = JSON.parse(readFileSync(new URL('./fixtures/vercel.json', import.meta.url), 'utf8')) as PageTree;
     const root = repeatedOf(stacksOf(tree.root)).root;

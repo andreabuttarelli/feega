@@ -31,7 +31,7 @@ import type { VariantInto } from '$lib/canvas/variants';
 import type { HistoryItem } from '$lib/canvas/gen-history';
 import type { GraphScope } from '$lib/canvas/run-graph';
 import type { ImageTool } from '$lib/image-tools';
-import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
+import type { DragPhase, DropVerdict, ElementOut, FrameTarget, PointerPoint } from '$lib/canvas/canvas-drop';
 import type { Stack } from '$lib/canvas/stacking';
 import type { NodeFlag } from '$lib/canvas/node-flags';
 import type { DeleteMode } from '$lib/canvas/section';
@@ -72,7 +72,7 @@ export type FlowProps = {
   edges?: FlowEdge[];
   onMove?: (id: string, x: number, y: number) => void;
   onMoveEnd?: (moves: { id: string; x: number; y: number }[]) => void;
-  onTileDragOver?: (ids: string[], at: PointerPoint) => void;
+  onTileDragOver?: (ids: string[], at: PointerPoint) => FrameTarget | null;
   onTileDrop?: (ids: string[], at: PointerPoint) => DropVerdict;
   onElementOut?: (frameId: string, out: ElementOut, phase: DragPhase) => void;
   onConnect?: (

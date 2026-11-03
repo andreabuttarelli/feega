@@ -5,6 +5,7 @@ import type { CanvasLayer, LayerHover } from "./layers";
 import type { HeldDocs } from "./frame-outlines";
 import type { ActionId } from "$lib/motion/actions";
 import type { NodeFlag } from "./node-flags";
+import type { LayerSlot } from "$lib/motion/layer-place";
 
 export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
@@ -13,6 +14,7 @@ export type CanvasSide = {
   open(nodeId: string): void;
   rename(nodeId: string, name: string): void;
   flag(ids: string[], flag: NodeFlag): void;
+  moveInto(id: string, frameId: string, slot?: LayerSlot): void;
 };
 
 export type VideoSide = {

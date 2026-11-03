@@ -10,6 +10,7 @@ import { idsFrom, planCopy, planFree, planMove } from '$lib/motion/move-plan';
 import { motionNodeSize } from '$lib/canvas/motion-node';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { wrapInStack } from '$lib/motion/layout/ops';
 import { drawnTile } from '$lib/canvas/optimistic-insert';
 import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 
@@ -296,6 +297,25 @@ describe('elements in and out of frames', () => {
 
     expect(await actions.moveFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
     expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
+  });
+
+  it('moveFree lands a free element in the stack slot a Layers drop names', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const shape = (x: number) => ({ component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.3, width: 0.1, height: 0.1 } }) as const;
+    const two = [['a', 0.1], ['b', 0.3]] as const;
+    const placed = two.reduce<MotionDoc>((d, [id, x]) => {
+      const added = addClip(d, shape(x), id);
+      return added.ok ? added.doc : d;
+    }, newMotionDoc(MotionFormat.Vertical));
+    const stacked = wrapInStack(placed, ['a', 'b'], 'row', 'lane-row');
+    const target = stacked.ok ? stacked.doc : placed;
+    const drop = { on: 'frame', nodeId: TARGET, at: { x: 0.9, y: 0.9 }, slot: { target: 'a', place: 'above' } };
+    const input = event({ source: SOURCE, drop: JSON.stringify(drop) }, { nodes: [element, frameRow(TARGET)], motion_revisions: [revisionRow(SOURCE, 1, withText()), revisionRow(TARGET, 1, target)] });
+
+    expect(await actions.moveFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
+    const [landed] = written(input, TARGET);
+    const row = landed.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'row');
+    expect(row?.autoLayout?.order).toEqual(['txt', 'a', 'b']);
   });
 
   it('copyFree pastes a free element into a frame and keeps the free element', async () => {

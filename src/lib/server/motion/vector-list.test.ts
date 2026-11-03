@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
-import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionFormat, newMotionDoc, parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { LOTTIE_MAX_SECONDS, Span, inlineImages, vectorOf, type Fetcher } from './vector-list';
@@ -34,6 +34,16 @@ describe('vectorOf', () => {
     expect(lists).toHaveLength(1);
     expect(lists[0].items.some((i) => i.kind === ItemKind.Path && i.clip === 'card')).toBe(true);
     expect(images.size).toBe(0);
+  });
+
+  it('a video frame is drawn where the canvas shows it, after its layers have faded in', async () => {
+    const fading = shapeDoc(3);
+    const keyed = parseMotionDoc({ ...fading, tracks: fading.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, keyframes: { opacity: [{ frame: 0, value: 0 }, { frame: 10, value: 1 }] } })) })) });
+    const doc = keyed.ok ? keyed.doc : fading;
+
+    const { lists } = await vectorOf({ doc, tokens: FEEGA_TOKENS, assets: {} }, Span.Still, offline);
+
+    expect(lists[0].items.find((i) => i.clip === 'card')?.opacity).toBeCloseTo(1, 2);
   });
 
   it('draws every frame of an animation, one list per frame', async () => {

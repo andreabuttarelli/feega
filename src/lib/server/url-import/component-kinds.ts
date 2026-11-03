@@ -59,6 +59,7 @@ export type Kind = {
   labelled: boolean;
   stateful: boolean;
   props: Prop[];
+  component: boolean;
 };
 
 const HEADER_BOTTOM = 120;
@@ -79,6 +80,8 @@ const CARD_MIN_HEIGHT = 80;
 const CARD_MAX_HEIGHT = 1200;
 const CARD_MAX_SHARE = 0.7;
 const COLUMN_MAX_WIDTH = 360;
+const LONE_MAX_SHARE = 0.4;
+const LONE_MAX_TEXTS = 8;
 const LOGO_LEFT_SHARE = 0.3;
 const LOGO_MAX_HEIGHT = 200;
 const LOGO_MAX_SHARE = 0.5;
@@ -121,6 +124,7 @@ const bounded = (f: Facts) => f.width >= CARD_MIN_WIDTH && f.height >= CARD_MIN_
 
 const boxed = (f: Facts) => bounded(f) && ((f.filled && f.radius > 0) || f.outlined || f.shadowed);
 
+const tile = (f: Facts) => boxed(f) && f.width <= f.pageWidth * LONE_MAX_SHARE && f.texts <= LONE_MAX_TEXTS;
 const logoLike = (f: Facts) => !f.texts && (f.images > 0 || f.vectors > 0) && f.height <= LOGO_MAX_HEIGHT && f.width <= f.pageWidth * LOGO_MAX_SHARE;
 
 const iconOnly = (f: Facts) => f.vectors > 0 && !f.texts && !f.images;
@@ -147,7 +151,7 @@ const PRESSED_PROPS = [Prop.Style, Prop.Size, Prop.Icon];
 const LABEL_PROPS = [Prop.Style, Prop.Icon];
 const BLOCK_PROPS = [Prop.Style, Prop.Image, Prop.Items];
 
-const kind = (row: Row): Kind => ({ alone: never, merge: Merge.ByName, level: Level.Atom, nests: true, paintless: false, leaf: false, sized: false, labelled: false, stateful: false, props: BLOCK_PROPS, ...row });
+const kind = (row: Row): Kind => ({ alone: never, merge: Merge.ByName, level: Level.Atom, nests: true, paintless: false, leaf: false, sized: false, labelled: false, stateful: false, props: BLOCK_PROPS, component: true, ...row });
 
 const molecule = (row: Row): Kind => kind({ merge: Merge.BySimilarity, level: Level.Molecule, ...row });
 
@@ -163,12 +167,12 @@ export const KINDS: Kind[] = [
   kind({ name: 'Link', when: (f) => f.press === LINK && f.height <= LINK_HEIGHT && f.texts >= 1 && !f.images, leaf: true, sized: true, labelled: true, stateful: true, props: [Prop.Size, Prop.Icon] }),
   molecule({ name: 'Pricing tier', when: (f) => (TIER_HINTS.has(f.hint) || (f.priced && f.periodic)) && f.texts >= MIN_TIER_TEXTS && f.height >= TIER_MIN_HEIGHT && bounded(f), alone: always }),
   molecule({ name: 'Testimonial', when: (f) => (QUOTE_HINTS.has(f.hint) || f.quoted) && f.texts >= 2 && bounded(f), alone: always }),
-  molecule({ name: 'Footer column', when: (f) => f.landmark === 'footer' && f.links >= MIN_LINKS && f.width <= COLUMN_MAX_WIDTH, alone: always, paintless: true, props: [Prop.Items] }),
+  molecule({ name: 'Footer column', when: (f) => f.landmark === 'footer' && f.links >= MIN_LINKS && f.width <= COLUMN_MAX_WIDTH, alone: always, paintless: true, props: [Prop.Items], component: false }),
   kind({ name: 'Logo', when: (f) => logoLike(f) && logoNamed(f), alone: always, leaf: true, props: [] }),
   kind({ name: 'Icon', when: (f) => iconOnly(f) && f.drawing && f.width <= ICON_SIDE && f.height <= ICON_SIDE, nests: false, props: [] }),
   kind({ name: 'Logo', when: logoLike, props: [] }),
-  molecule({ name: 'Feature tile', when: (f) => (FEATURE_HINTS.has(f.hint) || (f.vectors > 0 && !f.images)) && f.texts >= 2, alone: boxed }),
-  molecule({ name: 'Card', when: (f) => f.hint === 'card' || (f.images > 0 && f.texts > 0) || f.texts >= 2, alone: (f) => boxed(f) && f.texts >= 2 }),
+  molecule({ name: 'Feature tile', when: (f) => (FEATURE_HINTS.has(f.hint) || (f.vectors > 0 && !f.images)) && f.texts >= 2, alone: tile }),
+  molecule({ name: 'Card', when: (f) => f.hint === 'card' || (f.images > 0 && f.texts > 0) || f.texts >= 2, alone: (f) => tile(f) && f.texts >= 2 }),
   molecule({ name: 'List item', when: (f) => f.tag === 'li', paintless: true, labelled: true }),
   molecule({ name: 'Item', when: always, nests: false, labelled: true })
 ];

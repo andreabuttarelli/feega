@@ -23,6 +23,7 @@ import { setParent } from '$lib/motion/parent-ops';
 import { placeInStack } from '$lib/motion/layout/stack-drag';
 import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
 import { frontToBack } from './paint-order';
+import { Place, type LayerSlot } from '$lib/motion/layer-place';
 
 export const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
 
@@ -281,11 +282,7 @@ function moveClipAlong(doc: MotionDoc, clipId: string, step: typeof ABOVE | type
   return next ? moveClip(doc, clipId, { from: found.clip.from, trackId: next.id }) : fail('no track of the same kind that way');
 }
 
-export enum Place {
-  Above = 'above',
-  Below = 'below',
-  Into = 'into'
-}
+export { Place };
 
 type NewId = () => string;
 
@@ -356,6 +353,18 @@ const LAYOUT_TYPES: ReadonlySet<string> = new Set(Object.values(LayoutKind));
 const holdsLayers = (row: DropRow): boolean => row.kind === LayerKind.Clip && (LAYOUT_TYPES.has(row.type) || !!row.foldable || !!row.frame);
 
 export const rowDrop = (row: DropRow, at: number): Place => (holdsLayers(row) ? GROUP_DROP(at) : dropPlace(row.kind, at));
+
+export type FreeLanding = { frameId: string; slot?: LayerSlot };
+
+export function freeLanding(row: LayerRow, place: Place, frames: ReadonlySet<string>): FreeLanding | null {
+  if (row.kind === LayerKind.Node) {
+    return frames.has(row.id) ? { frameId: row.id } : null;
+  }
+  if (row.nested || row.kind === LayerKind.Part || !frames.has(row.nodeId)) {
+    return null;
+  }
+  return { frameId: row.nodeId, slot: { target: row.id, place } };
+}
 
 function intoContainer(doc: MotionDoc, dragged: string, target: string): OpResult | null {
   const container = findClip(doc, target)?.clip as MotionClip | undefined;
