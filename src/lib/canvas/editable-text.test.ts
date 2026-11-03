@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { lineMove, offsetOf, pointAt, select, selectionIn, textOf } from './editable-text';
+import { TypingBurst, autoList, lineMove, offsetOf, pointAt, select, selectionIn, textOf } from './editable-text';
 import { textBody, TextBodyFor } from '@feega/motion-core/motion/hyperframes/text-body';
 import { ListKind } from '@feega/motion-core/motion/text-lists';
 
@@ -67,5 +67,47 @@ describe('Home and End move the caret on every platform', () => {
 
   it('other keys are left to the browser', () => {
     expect(lineMove({ key: 'ArrowRight', shiftKey: false })).toBeNull();
+  });
+});
+
+describe('undo while typing goes back a word, not a letter', () => {
+  const typeAll = (burst: TypingBurst, text: string, at = 0) => [...text].map((ch, i) => burst.starts('insertText', ch, at + i * 50));
+
+  it('a word typed in one go is one step; the space before the next word opens another', () => {
+    const steps = typeAll(new TypingBurst(), 'Hello world');
+
+    expect(steps.filter(Boolean)).toHaveLength(2);
+    expect(steps[5]).toBe(true);
+  });
+
+  it('a pause opens a new step, and so does switching from typing to deleting', () => {
+    const burst = new TypingBurst();
+    burst.starts('insertText', 'a', 0);
+
+    expect(burst.starts('insertText', 'b', 5000)).toBe(true);
+    expect(burst.starts('deleteContentBackward', null, 5050)).toBe(true);
+    expect(burst.starts('deleteContentBackward', null, 5100)).toBe(false);
+  });
+
+  it('a cut ends the burst, so the next key is its own step', () => {
+    const burst = new TypingBurst();
+    burst.starts('insertText', 'a', 0);
+    burst.cut();
+
+    expect(burst.starts('insertText', 'b', 10)).toBe(true);
+  });
+});
+
+describe('"- " and "1. " start a list, as in Figma', () => {
+  it('a dash and a space at the start of a paragraph make a bullet list', () => {
+    expect(autoList('one\n-', 5)).toEqual({ kind: ListKind.Bullet, cut: { start: 4, end: 5 } });
+  });
+
+  it('"1." and a space make a numbered list', () => {
+    expect(autoList('1.', 2)).toEqual({ kind: ListKind.Number, cut: { start: 0, end: 2 } });
+  });
+
+  it('a dash inside a sentence stays a dash', () => {
+    expect(autoList('a -', 3)).toBeNull();
   });
 });

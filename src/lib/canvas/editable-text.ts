@@ -1,4 +1,5 @@
 import { MARKER_ATTR } from '@feega/motion-core/motion/hyperframes/text-body';
+import { ListKind } from '@feega/motion-core/motion/text-lists';
 
 export type Span = { start: number; end: number };
 type Point = { node: Node; offset: number };
@@ -135,4 +136,38 @@ export function select(root: HTMLElement, span: Span) {
   }
   picked.removeAllRanges();
   picked.addRange(rangeOf(root, span));
+}
+
+const BURST_PAUSE_MS = 1000;
+const SPACE = /\s/;
+
+enum Stroke {
+  Insert = 'insert',
+  Delete = 'delete',
+  Space = 'space'
+}
+
+const strokeOf = (inputType: string, data: string | null): Stroke => (inputType.startsWith('delete') ? Stroke.Delete : data && SPACE.test(data) ? Stroke.Space : Stroke.Insert);
+
+export class TypingBurst {
+  #last: { at: number; stroke: Stroke } | null = null;
+
+  starts(inputType: string, data: string | null, now: number): boolean {
+    const stroke = strokeOf(inputType, data);
+    const last = this.#last;
+    this.#last = { at: now, stroke };
+    return !last || now - last.at > BURST_PAUSE_MS || (stroke !== last.stroke && stroke !== Stroke.Insert);
+  }
+
+  cut() {
+    this.#last = null;
+  }
+}
+
+const LIST_MARKERS: Record<string, ListKind> = { '-': ListKind.Bullet, '*': ListKind.Bullet, '1.': ListKind.Number };
+
+export function autoList(value: string, caret: number): { kind: ListKind; cut: Span } | null {
+  const start = value.lastIndexOf(NEWLINE, caret - 1) + 1;
+  const kind = LIST_MARKERS[value.slice(start, caret)];
+  return kind ? { kind, cut: { start, end: caret } } : null;
 }
