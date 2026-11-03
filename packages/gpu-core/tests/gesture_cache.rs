@@ -58,11 +58,11 @@ fn a_zoom_in_during_a_gesture_re_rasters_only_the_group_nearest_the_centre() {
     lib.plan(&screen(&[("edge", 1.0, 0.0), ("centre", 1.0, 350.0), ("off", 1.0, 900.0)]), MANY);
     lib.set_motion(Motion::Gesture);
 
-    let zoomed = lib.plan(&screen(&[("edge", 1.5, 0.0), ("centre", 1.5, 330.0), ("off", 1.5, 900.0)]), MANY);
+    let zoomed = lib.plan(&screen(&[("edge", 1.4, 0.0), ("centre", 1.4, 330.0), ("off", 1.4, 900.0)]), MANY);
 
     assert_eq!(zoomed.rasters.len(), 1);
-    assert!(zoomed.rasters[0].list.width > 150);
-    assert!(width_shown(&zoomed.screen, 1) > 150.0);
+    assert!(zoomed.rasters[0].list.width > 140);
+    assert!(width_shown(&zoomed.screen, 1) > 140.0);
     assert_eq!(width_shown(&zoomed.screen, 0), 100.0);
 }
 
@@ -76,4 +76,24 @@ fn over_budget_the_texture_farthest_off_screen_goes_first() {
 
     assert_eq!(next.evicted, vec!["cache:far".to_string()]);
     assert_eq!(lib.cache_bytes(), 2 * FRAME_BYTES);
+}
+
+const NO_RASTER: Limits = Limits { side: 4096, rasters: 0, items: 1000 };
+
+fn images(list: &DisplayList) -> usize {
+    list.items.iter().filter(|i| matches!(i, Item::Image(_))).count()
+}
+
+#[test]
+fn a_texture_stretched_past_root_two_is_drawn_live_until_its_sharper_raster_lands() {
+    let mut lib = library(&["a"]);
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+    lib.set_motion(Motion::Gesture);
+
+    assert_eq!(images(&lib.plan(&screen(&[("a", 1.3, 0.0)]), NO_RASTER).screen), 1);
+    let far = lib.plan(&screen(&[("a", 2.0, 0.0)]), NO_RASTER);
+
+    assert_eq!(images(&far.screen), 0);
+    assert!(!far.screen.items.is_empty());
+    assert!(far.pending);
 }

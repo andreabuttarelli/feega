@@ -97,4 +97,11 @@ describe('POST /api/v1/edit routes one op or a batch to the registry that owns i
     expect(listed.families.reduce((n: number, f: { ops: number }) => n + f.ops, 0)).toBeGreaterThan(200);
     expect((await post({})).status).toBe(400);
   });
+
+  it('a project id that is not a uuid is refused as bad input, never a server error', async () => {
+    const res = await post({ op: 'draw_frame', project_id: 'not-a-project', input: { canvasId: 'c-1', x: 0, y: 0, w: 100, h: 100 } });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'invalid_input' });
+  });
 });

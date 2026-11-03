@@ -146,13 +146,13 @@ fn a_slow_full_render_refines_at_quarter_resolution_first() {
     let mut r = Retained::new(W, H);
     rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
     r.took(20.0);
-    rendered(&mut r, at(0.0, 0.0, 2.0), 16.0);
+    rendered(&mut r, at(0.0, 0.0, 1.3), 16.0);
 
-    let Step::Raster(rough) = rendered(&mut r, at(0.0, 0.0, 2.0), 200.0) else { panic!("a raster") };
+    let Step::Raster(rough) = rendered(&mut r, at(0.0, 0.0, 1.3), 200.0) else { panic!("a raster") };
     assert_eq!(rough.quality, Quality::Rough);
     assert!(r.pending());
 
-    let Step::Raster(sharp) = rendered(&mut r, at(0.0, 0.0, 2.0), 216.0) else { panic!("a raster") };
+    let Step::Raster(sharp) = rendered(&mut r, at(0.0, 0.0, 1.3), 216.0) else { panic!("a raster") };
     assert_eq!(sharp.quality, Quality::Sharp);
 }
 
@@ -257,4 +257,38 @@ fn a_scene_that_misses_the_live_budget_falls_back_to_the_reprojected_texture() {
     r.took(14.0);
 
     assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.1), 32.0), Step::Present));
+}
+
+fn stretch(r: &Retained, camera: Camera, quality: Quality) -> f64 {
+    1.0 / (r.lookup(camera).scale * quality.scale())
+}
+
+#[test]
+fn during_a_zoom_in_a_slow_scene_is_re_rastered_sharp_before_it_stretches_past_root_two() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(20.0);
+
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.3), 16.0), Step::Present));
+    let Step::Raster(sharper) = rendered(&mut r, at(0.0, 0.0, 1.5), 32.0) else { panic!("a raster") };
+
+    assert_eq!((sharper.quality, sharper.camera.zoom), (Quality::Sharp, 1.5));
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.6), 48.0), Step::Present));
+}
+
+#[test]
+fn a_zoom_from_fit_to_four_hundred_percent_never_shows_the_retained_texture_stretched_past_root_two() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 0.05), 0.0);
+    r.took(40.0);
+    let mut quality = Quality::Sharp;
+
+    for i in 1..=40 {
+        let camera = at(0.0, 0.0, 0.05 * 80f64.powf(i as f64 / 40.0));
+        if let Step::Raster(raster) = rendered(&mut r, camera, 16.0 * i as f64) {
+            quality = raster.quality;
+        }
+        let shown = stretch(&r, camera, quality);
+        assert!(shown <= std::f64::consts::SQRT_2 + 1e-9, "stretched {shown} at zoom {}", camera.zoom);
+    }
 }

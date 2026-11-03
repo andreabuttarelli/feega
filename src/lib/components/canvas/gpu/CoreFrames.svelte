@@ -15,7 +15,7 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
-  import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
+  import { BUDGET, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
@@ -23,6 +23,7 @@
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
+  import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
@@ -168,7 +169,7 @@
     }
     logGaps(f.id, built.list);
     loaded.set(f.id, keyOf(f));
-    lists = new Map(lists).set(keyOf(f), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind));
+    lists = listed(lists, f.id, keyOf(f), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
   }
 
   let liveGroup = $state(new Map<string, string>());
@@ -193,7 +194,7 @@
     }
     const key = `${f.id}:live${generation}`;
     logGaps(f.id, built.list);
-    lists = new Map(lists).set(key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind));
+    lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), loaded.get(f.id), drawnLast.get(f.id)?.group]);
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
   }
@@ -268,7 +269,7 @@
   const cardPuts = $derived(shownCards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, bytes: pictureBytes(c.frame.list.items), turn: c.turn }] : [])));
 
   const whole = $derived([...cardPuts, ...framePuts]);
-  const textureBytes = budget.textureBytes;
+  const textureBytes = $derived(textureBudget(budget.textureBytes, { width: area.width * resolution, height: area.height * resolution }));
   const real = $derived(resident(whole, view, area, textureBytes));
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
@@ -355,7 +356,7 @@
         putting.clear();
         sent = new SentUses();
         sentOverlay = new SentParts();
-        r.setBudget?.(budget.textureBytes);
+        r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         raster = r;
       },
       (e: unknown) => {
