@@ -3646,6 +3646,7 @@
     undo: () => props.onUndo?.(),
     redo: () => props.onRedo?.(),
     group: () => props.onGroup?.(selected),
+    frame: () => props.onFrame?.(selected),
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
     'send-back': () => props.onRestack?.(selected, Stack.Back),

@@ -378,6 +378,11 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
   });
 
+  it('⌥⌘G frames the selected tiles, as Figma frames a selection', () => {
+    expect(matchCanvasShortcut(ev('©', { altKey: true, metaKey: true, code: 'KeyG' }))).toEqual({ id: 'frame' });
+    expect(CANVAS_SHORTCUTS.find((r) => r.id === 'frame')?.keys).toEqual(['⌥', 'mod', 'G']);
+  });
+
   it('⇧A wraps the selection with a stack', () => {
     expect(matchCanvasShortcut(ev('A', { shiftKey: true }))).toEqual({ id: 'wrap-stack' });
     expect(matchCanvasShortcut(ev('a'))).toBeNull();
