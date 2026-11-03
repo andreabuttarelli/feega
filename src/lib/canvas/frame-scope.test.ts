@@ -4,6 +4,7 @@ import { addClip, setProps, setTransform, type OpResult } from '@feega/motion-co
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips, instanceOf } from '$lib/motion/main-component';
 import { homedAt } from '$lib/motion/canvas-components';
+import { addVariant } from '$lib/motion/variants';
 import { Reach } from './frame-select';
 import { pickTarget, enteredFrom, parentPick, scopeOf, scoped } from './frame-scope';
 
@@ -158,6 +159,21 @@ describe('scoped inside a main', () => {
 
     expect(mainX(merged, host)).toBe(0.2);
     expect(instanceOf(merged, host)!.overrides).toEqual({ a: { x: 0.9 } });
+  });
+});
+
+describe('scoped inside one variant of a set', () => {
+  it('an edit inside one variant leaves the other variants alone', () => {
+    let n = 0;
+    const made = must(createComponent(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2), ['a'], () => `m${++n}`, 'Chip'));
+    const set = must(addVariant(made, 'm1', { State: 'Hover' }, () => 'v2'));
+    const both = must(addClip(set, { component: 'Precomp', from: 0, durationInFrames: 90, props: { comp: 'v2' } }, 'h2'));
+    const s = scoped(both, ['h2__0__a'], 0, 'set')!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+    const xIn = (comp: string) => merged.comps[comp].tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')!.props.x;
+
+    expect(xIn('v2')).toBe(0.9);
+    expect(xIn('m1')).toBe(0.2);
   });
 });
 
