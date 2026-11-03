@@ -1,11 +1,11 @@
-import { Background, parseMotionDoc, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Background, parseMotionDoc, type MotionClip, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, editClip } from '@feega/motion-core/motion/timeline';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { Destination } from '$lib/canvas/figma/scene';
 import { FrameKind } from '$lib/canvas/motion-node';
 import type { PlanItem } from '$lib/canvas/figma/figma-doc';
 import { componentSlice } from '$lib/motion/canvas-components';
-import { compBox, reframed, type Box } from '$lib/motion/comp-frame';
+import { compBox, reframed, type Box, type Point } from '$lib/motion/comp-frame';
 import type { NewId } from '$lib/motion/main-component';
 import { SET_BACKDROP, SET_GAP_PX, SET_PAD_PX } from '$lib/motion/component-set';
 import { backdropsOf, type Backdrop } from './main-backdrop';
@@ -79,16 +79,37 @@ function setDoc(set: SetOf, newId: NewId): MotionDoc {
   for (const { main, left } of slots.filter((s) => s.main.backdrop && backdropKey(s.main.backdrop) !== backdropKey(common))) {
     doc = backed(doc, main.backdrop!, { left: left - half, top: SET_PAD_PX - half, right: left + widthOf(main.box) + half, bottom: SET_PAD_PX + heightOf(main.box) + half }, newId);
   }
+  const shifts = new Map<string, Point>();
   for (const { main, left } of slots) {
-    const nested = Object.fromEntries(Object.entries(componentSlice(source, main.id).comps).filter(([id]) => id !== main.id && !doc.comps[id]).map(([id, comp]) => [id, reframed(comp, source, size)]));
-    const moved = reframed(main.comp, source, size, { x: left - main.box.left, y: SET_PAD_PX - main.box.top });
+    const nested = Object.entries(componentSlice(source, main.id).comps).filter(([id]) => id !== main.id && !doc.comps[id]);
+    nested.forEach(([id, comp]) => shifts.set(id, toCorner(comp, source)));
+    shifts.set(main.id, { x: left - main.box.left, y: SET_PAD_PX - main.box.top });
+    const carried = Object.fromEntries(nested.map(([id, comp]) => [id, reframed(comp, source, size, shifts.get(id))]));
+    const moved = reframed(main.comp, source, size, shifts.get(main.id));
     const { home: _home, ...component } = main.comp.component!;
-    doc = { ...doc, comps: { ...doc.comps, ...nested, [main.id]: { ...moved, component } } };
+    doc = { ...doc, comps: { ...doc.comps, ...carried, [main.id]: { ...moved, component } } };
     const placed = addClip(doc, { component: 'Precomp', from: 0, durationInFrames: Math.min(main.comp.durationInFrames, doc.durationInFrames), props: { comp: main.id } }, newId());
     doc = placed.ok ? placed.doc : doc;
   }
-  return doc;
+  return { ...doc, comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, followingMains(comp, shifts, size)])) };
 }
+
+const NO_SHIFT: Point = { x: 0, y: 0 };
+
+function toCorner(comp: MotionComp, size: { width: number; height: number }): Point {
+  const box = compBox(comp, size);
+  return box ? { x: -box.left, y: -box.top } : NO_SHIFT;
+}
+
+function followingMain(clip: MotionClip, shifts: Map<string, Point>, size: { width: number; height: number }): MotionClip {
+  const shift = shifts.get(String(clip.props.comp));
+  if (clip.component !== 'Precomp' || !shift) {
+    return clip;
+  }
+  return { ...clip, transform: { ...clip.transform, x: Number(clip.transform?.x ?? 0) - shift.x / size.width, y: Number(clip.transform?.y ?? 0) - shift.y / size.height } };
+}
+
+const followingMains = (comp: MotionComp, shifts: Map<string, Point>, size: { width: number; height: number }): MotionComp => ({ ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => followingMain(c, shifts, size)) })) });
 
 function laidOnPage(items: PlanItem[]): PlanItem[] {
   let [left, top, tall] = [0, 0, 0];
