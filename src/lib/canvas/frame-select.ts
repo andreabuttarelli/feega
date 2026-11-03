@@ -12,6 +12,8 @@ export type Inside = { nodeId: string; level: Level };
 
 export const frameLevel = (): Level => ({ depth: Depth.Frame, clip: null, part: null });
 
+export const picksOwnKeys = (inside: Inside | null, picks: readonly string[]): boolean => !!inside && picks.length > 0;
+
 const probeOf = (top: string | null): Probe => ({ top, picked: top, partOf: () => null, firstClip: null, firstPart: () => null, editable: () => false });
 
 export const stepInside = (level: Level, gesture: Gesture, top: string | null): Level => drill(level, gesture, probeOf(top)).level;

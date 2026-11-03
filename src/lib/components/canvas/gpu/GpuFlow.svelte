@@ -82,7 +82,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Extend, Press, Reach, Root, childBelow, extendOf, framePage, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Extend, Press, Reach, Root, childBelow, extendOf, framePage, pressOn, frameLevel, picksOwnKeys, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { holdsLock, ownLocked } from '$lib/canvas/locks';
   import { altCopies } from '$lib/canvas/alt-copy';
   import { clickPick, pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
@@ -103,7 +103,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
-  import { dragInStack, dropInStack, followCursor, type DropLine } from '$lib/motion/layout/stack-drag';
+  import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
@@ -194,7 +194,7 @@
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
   import { NodeFlag } from '$lib/canvas/node-flags';
-  import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut, type FrameTarget } from '$lib/canvas/canvas-drop';
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -3049,7 +3049,7 @@
           copies = new Map();
         }
         props.onLive?.(moved.map((m) => ({ id: m.id, x: m.x, y: m.y })));
-        props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
+        showStackLine(props.onTileDragOver?.([...a.origins.keys()], pointOf(e)) ?? null);
       },
       [GestureKind.Resize]: (a) => {
         if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id) && !overrides.has(a.id))) {
@@ -3277,7 +3277,14 @@
     select(clicked(selected, id, toggle));
   }
 
+  function showStackLine(over: FrameTarget | null) {
+    const doc = over ? liveOf(over.frameId)?.doc : null;
+    const drop = over && doc ? stackLineAt(doc, [over.at.x * doc.width, over.at.y * doc.height]) : null;
+    frameGuides = over && drop ? { nodeId: over.frameId, guides: [], gaps: [], drop } : null;
+  }
+
   function endDrag(ids: string[], e: PointerEvent) {
+    frameGuides = null;
     snapGuides = [];
     snapSpacing = [];
     props.onLive?.([]);
@@ -3695,7 +3702,7 @@
   }
 
   function runPaletteCommand(command: Command) {
-    if (inside?.level.clip && picks.length && canRunInFrame(command)) {
+    if (picksOwnKeys(inside, picks) && canRunInFrame(command)) {
       void runFrameAction(command);
       return;
     }
@@ -3752,7 +3759,7 @@
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
       return;
     }
-    const frameAction = inside?.level.clip && picks.length && !typing ? frameKeyAction(e) : null;
+    const frameAction = picksOwnKeys(inside, picks) && !typing ? frameKeyAction(e) : null;
     if (frameAction) {
       e.preventDefault();
       void runFrameAction(frameAction);
@@ -4264,7 +4271,7 @@
         {#if group}
           <FrameSelection clip="" quad={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
         {/if}
-        {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
+        {@const guideArea = inside?.nodeId === frame.id || frameGuides?.nodeId === frame.id ? frameArea(frame.id) : null}
         {@const measuredGapsIn = measuredIn(frame.id)}
         {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length || frameGuides.drop)) || measuredGapsIn.length)}
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} drop={frameGuides?.nodeId === frame.id ? (frameGuides.drop ?? null) : null} measured={measuredGapsIn} />

@@ -170,6 +170,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import type { LayerSlot } from '$lib/motion/layer-place';
   import { frameDocs } from '$lib/canvas/frame-docs';
   import { NOTHING_SHOWN, freshIds, shownDoc, shownFrame, shownLanding, shownMove, shownPending, snapOf, type Shown } from '$lib/canvas/frame-moves';
   import { planCombine, planInsert, type SceneTile } from '$lib/motion/scenes';
@@ -180,7 +181,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
-  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type FrameTarget, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -520,12 +521,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let toFlow: ((p: PointerPoint) => PointerPoint) | null = null;
 
-  function markFrame(at: PointerPoint | null, exceptId: string | null) {
+  function markFrame(at: PointerPoint | null, exceptId: string | null): FrameTarget | null {
     const target = at ? frameUnderPointer(at, exceptId) : null;
     for (const el of document.querySelectorAll<HTMLElement>(`.${FRAME_DROP_CLASS}`)) {
       if (el.dataset.motionNode !== target?.frameId) { el.classList.remove(FRAME_DROP_CLASS); }
     }
     if (target) { document.querySelector(`[data-motion-node="${target.frameId}"]`)?.classList.add(FRAME_DROP_CLASS); }
+    return target;
   }
 
   function dropAt(client: PointerPoint, exceptId: string | null): Drop | null {
@@ -557,9 +559,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return row && !tileChromeOf(row).takesDrops && !holdsNodes ? row.id : null;
   };
 
-  function tileDragOver(ids: string[], client: PointerPoint) {
+  function tileDragOver(ids: string[], client: PointerPoint): FrameTarget | null {
     const id = freeElement(ids);
-    markFrame(id ? client : null, id);
+    return markFrame(id ? client : null, id);
   }
 
   function tileDrop(ids: string[], client: PointerPoint): DropVerdict {
@@ -593,11 +595,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return saved;
   }
 
-  function moveFreeInto(id: string, hold: FrameHold): Promise<boolean> {
+  function moveFreeInto(id: string, hold: FrameHold, slot?: LayerSlot): Promise<boolean> {
     const ids = freshIds();
     const [source, target] = [snapAt(id), snapAt(hold.nodeId)];
-    const plan = source && target ? planFree(source, target, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }, idsFrom(ids, newClipId)) : null;
-    const saved = optimistic(OptimisticAction.MoveFree, { id, frameId: hold.nodeId, at: hold.at, ids }).then((outcome) => outcome === OpOutcome.Landed);
+    const plan = source && target ? planFree(source, target, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at, slot }, idsFrom(ids, newClipId)) : null;
+    const saved = optimistic(OptimisticAction.MoveFree, { id, frameId: hold.nodeId, at: hold.at, slot, ids }).then((outcome) => outcome === OpOutcome.Landed);
     shownLanding(plan, placeOf(hold.nodeId), id).docs.forEach((held) => frameDocs.hold(held, saved));
     return saved;
   }
@@ -3425,7 +3427,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       select: (ids) => focusOn(ids, undefined, FocusMode.Select),
       open: (id) => focusOn([id], undefined, FocusMode.Select),
       rename: renameNode,
-      flag: toggleFlag
+      flag: toggleFlag,
+      moveInto: (id, frameId, slot) => void moveFreeInto(id, { nodeId: frameId, at: FRAME_CENTRE }, slot)
     })
   );
 
