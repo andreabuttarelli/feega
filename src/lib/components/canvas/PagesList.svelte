@@ -102,7 +102,20 @@
     renaming = true;
   }
 
-  function saveRename(event: SubmitEvent) {
+  let arriving = $state<string | null>(null);
+
+  function renameOnArrival(id: string) {
+    arriving = id;
+  }
+
+  $effect(() => {
+    if (arriving && arriving === currentId && current) {
+      arriving = null;
+      startRename();
+    }
+  });
+
+    function saveRename(event: SubmitEvent) {
     event.preventDefault();
     renaming = false;
     if (current) {
@@ -163,7 +176,7 @@
             />
           </form>
         {:else}
-          <a class="page-link" href={canvas.href} title={canvas.name} aria-current={isCurrent ? 'page' : undefined} onclick={onpick} ondblclick={isCurrent ? startRename : undefined}>
+          <a class="page-link" href={canvas.href} title={canvas.name} aria-current={isCurrent ? 'page' : undefined} onclick={onpick} ondblclick={() => renameOnArrival(canvas.id)}>
             {#if isCurrent}<span class="current-dot" data-testid="current-dot" aria-hidden="true"></span>{/if}
             <span class="page-name">{canvas.name}</span>
             {#if isCurrent && commentsUnseen}<span class="unseen-dot" data-testid="comments-unseen" role="img" aria-label="Unread mention"></span>{/if}
@@ -288,6 +301,8 @@
     padding: 0;
     list-style: none;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 
   .page-row {

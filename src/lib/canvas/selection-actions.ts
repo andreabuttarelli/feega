@@ -7,6 +7,7 @@ import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-pl
 
 export type SelectionActionId =
   | 'duplicate'
+  | 'rename'
   | 'connect-new'
   | 'connect-existing'
   | 'run-workflow'
@@ -101,6 +102,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
   { id: 'connect-existing', label: 'Connect to…', group: 'secondary', minNodes: 1 },
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, shortcut: 'Mod+D' },
+  { id: 'rename', label: 'Rename', group: 'menu', minNodes: 1 },
   { id: 'group', label: 'Group', group: 'secondary', minNodes: 2, shortcut: 'Mod+G' },
   { id: 'ungroup', label: 'Ungroup', group: 'secondary', minNodes: 1, shortcut: 'Mod+Shift+G' },
   { id: 'remove-background', label: 'Remove background', group: 'secondary', minNodes: 1 },
@@ -184,7 +186,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame', 'create-formats', 'combine-video', 'export', 'frame-code', 'frame-interactive', 'frame-components', 'frame-templates', 'frame-history', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy', 'paste', 'copy-properties', 'paste-properties', 'copy-link', 'copy-id', 'bring-front', 'send-back', 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'wrap-stack', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'report', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'rename', 'run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame', 'create-formats', 'combine-video', 'export', 'frame-code', 'frame-interactive', 'frame-components', 'frame-templates', 'frame-history', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy', 'paste', 'copy-properties', 'paste-properties', 'copy-link', 'copy-id', 'bring-front', 'send-back', 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'wrap-stack', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'report', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -216,6 +218,7 @@ const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) =
   ...FRAME_DIALOG_SHOWN,
   'run-workflow': (summaries) => summaries.some((n) => GENERATIVE_TYPES.has(n.type)),
   'frame-history': isOneFrame,
+  rename: (summaries) => summaries.length === 1,
   'run-technique': isOneTechnique,
   'run-technique-rows': isOneTechnique,
   'edit-technique': isOneTechnique,

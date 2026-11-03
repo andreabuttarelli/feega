@@ -77,6 +77,7 @@ import type { SelectionActionId } from './selection-actions';
 
 export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   duplicate: Copy,
+  rename: Pencil,
   'connect-new': Workflow,
   'connect-existing': Link2,
   'run-workflow': Play,
