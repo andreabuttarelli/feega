@@ -670,7 +670,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function homeComponents(nodeId: string): Promise<Record<string, string> | null> {
-    const done = await post('homeComponents', { node_id: nodeId });
+    const done = await postAtVersion('homeComponents', nodeId, {});
     void invalidate(CANVAS_LIST_DEPENDENCY);
     return (done?.homes as Record<string, string> | undefined) ?? null;
   }

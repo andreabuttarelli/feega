@@ -467,3 +467,29 @@ describe('the draft the host keeps until the save lands', () => {
     expect(lastDraft(port)).toMatchObject({ version: 1, summary: 'Redo' });
   });
 });
+
+describe('waiting for the doc to reach the server', () => {
+  it('settles only once a save already in flight, and the edit made after it, have landed', async () => {
+    const wire = held();
+    const { session, port } = open(wire.send);
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    void session.flushScheduled();
+    session.apply({ ok: true, doc: longer(70) }, 'Longer again');
+    let settled = false;
+    const done = session.settled().then(() => (settled = true));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+    wire.release({ ok: true, version: 2, doc: longer(60) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(port.send).toHaveBeenCalledTimes(2);
+    expect(settled).toBe(false);
+    wire.release({ ok: true, version: 3, doc: longer(70) });
+    await done;
+    expect(settled).toBe(true);
+  });
+
+  it('settles at once when nothing is waiting to be saved', async () => {
+    await expect(open().session.settled()).resolves.toBeUndefined();
+  });
+});

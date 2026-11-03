@@ -1381,7 +1381,7 @@
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
     if (id === Action.CreateComponent && !onComponentsPage) {
-      await saverOf(nodeId)?.flushScheduled();
+      await saverOf(nodeId)?.settled();
       const homes = await props.onComponentMade?.(nodeId);
       const present = saverOf(nodeId)?.history.present;
       if (homes && present && Object.keys(homes).length) {

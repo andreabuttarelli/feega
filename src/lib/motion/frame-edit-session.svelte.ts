@@ -65,6 +65,7 @@ export class FrameEditSession {
   private held: Promise<unknown> | null = null;
   private lastEdit = { summary: '', at: 0 };
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private idlers: (() => void)[] = [];
   private unsavedSummary = '';
   private failures = 0;
   private readonly port: SessionPort;
@@ -214,6 +215,22 @@ export class FrameEditSession {
     await this.save();
   }
 
+  async settled(): Promise<void> {
+    await this.flushScheduled();
+    if (this.saving || this.saveState === SaveState.Pending) {
+      await new Promise<void>((resolve) => this.idlers.push(resolve));
+    }
+  }
+
+  private wake() {
+    if (this.saving || this.saveState === SaveState.Pending) {
+      return;
+    }
+    const waiting = this.idlers;
+    this.idlers = [];
+    waiting.forEach((resolve) => resolve());
+  }
+
   adopt(head: Revision) {
     this.history = adoptHead(this.history, head.doc, this.version);
     this.baseDoc = head.doc;
@@ -293,6 +310,7 @@ export class FrameEditSession {
       this.missedRemote = false;
       await this.port.pull();
     }
+    this.wake();
   }
 
   private follow(next: Synced) {
