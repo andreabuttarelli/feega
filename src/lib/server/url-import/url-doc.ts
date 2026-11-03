@@ -276,7 +276,7 @@ export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPE
   const patterns = tree.patterns ?? [];
   const shapedOf = (t: PageTree, sectioning: Sectioning, marker: Marker, parts: typeof patterns) => flattened(withPatterns(stacksOf(SECTIONED[sectioning](t)), parts, marker, stacksOf));
   const sectioning = views.length ? Sectioning.Off : shape.sectioning;
-  const shaped = shapedOf(tree, sectioning, mark, patterns);
+  const shaped = shapedOf(tree, sectioning, views.length ? UNMARKED : mark, patterns);
   const narrow = views.map(({ view, tree: t }) => ({ view, root: shapedOf(t, Sectioning.Off, UNMARKED, []) }));
   const images = refsOf([shaped, ...narrow.map((n) => n.root)]);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
