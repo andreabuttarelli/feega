@@ -3,13 +3,13 @@
   import { ColourDisplay } from '$lib/motion/colour-field';
   import { onMount, tick } from 'svelte';
   import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
-  import { rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
+  import { lineMove, rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
   import { ListKind, type ListItem } from '@feega/motion-core/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
 
-  let { layout, look, text, typedAhead = '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; typedAhead?: string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
+  let { layout, look, text, typedAhead = () => '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; typedAhead?: () => string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
   type Box = { left: number; top: number; width: number; height: number };
   type Snapshot = { text: string; runs: TextRun[]; lists: ListItem[]; sel: Span };
@@ -336,6 +336,13 @@
       restyle(shortcut);
       return;
     }
+    const line = composing ? null : lineMove(e);
+    if (line) {
+      e.preventDefault();
+      e.stopPropagation();
+      getSelection()?.modify(line.alter, line.direction, 'lineboundary');
+      return;
+    }
     if (e.key === 'Escape' && !composing) {
       e.preventDefault();
       e.stopPropagation();
@@ -354,14 +361,19 @@
   }
 
   onMount(() => {
-    value = typedAhead || text;
-    textRange.open({ clipId: styled ? clipId : '', text: value, runs: typedAhead ? [] : initialRuns, lists: typedAhead ? [] : initialLists, base });
+    value = text;
+    textRange.open({ clipId: styled ? clipId : '', text, runs: initialRuns, lists: initialLists, base });
     window.addEventListener('pointerdown', outside, true);
     const follow = () => focused() && !composing && selected();
     document.addEventListener('selectionchange', follow);
     void tick().then(() => {
-      sel = { start: typedAhead ? value.length : 0, end: value.length };
       field?.focus();
+      const ahead = typedAhead();
+      if (ahead) {
+        value = ahead;
+        textRange.open({ clipId: styled ? clipId : '', text: ahead, runs: [], lists: [], base });
+      }
+      sel = { start: ahead ? value.length : 0, end: value.length };
       paint();
       syncRange();
     });
