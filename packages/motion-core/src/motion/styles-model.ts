@@ -11,6 +11,7 @@ export enum StyleKind {
 }
 
 export const MAX_STYLES = 40;
+export const MAX_TYPE_PX = 4096;
 export const STYLE_NAME = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$/;
 
 const colour = z.string().min(1).max(64);
@@ -20,6 +21,7 @@ export const textStyleSchema = z
     kind: z.literal(StyleKind.Text),
     font: z.string().min(1).max(64).optional(),
     size: z.number().min(TYPE_SIZE.min).max(TYPE_SIZE.max).optional(),
+    sizePx: z.number().positive().max(MAX_TYPE_PX).optional(),
     weight: z.number().int().min(TYPE.weight.min).max(TYPE.weight.max).optional(),
     tracking: z.number().min(TYPE.tracking.min).max(TYPE.tracking.max).optional(),
     leading: z.number().min(TYPE.leading.min).max(TYPE.leading.max).optional(),

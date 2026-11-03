@@ -921,7 +921,7 @@ export const CANVAS_OPS = {
       .object({
         frameIds: z.array(z.string()).max(EXPORT_MAX_FRAMES).default([]),
         elements: exportElementsSchema.default([]),
-        rows: exportRowsSchema.describe('value: 0.5–4 for scale, px for width/height'),
+        rows: exportRowsSchema.describe('value: 0.5–4 for scale of the frame as big as it is on the canvas (1 = one image px per canvas px, 2 = the default sharp export), px for width/height'),
         name: z.string().max(60).optional()
       })
       .strict()

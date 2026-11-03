@@ -3,7 +3,7 @@ export type ExportFlags = { format?: string; scale?: string; width?: string; hei
 type Row = { format: string; by: string; value: number; suffix?: string; quality?: number; transparent?: boolean };
 
 const DEFAULT_FORMAT = 'png';
-const DEFAULT_SCALE = 1;
+const DEFAULT_SCALE = 2;
 
 function sizeOf(flags: ExportFlags): Pick<Row, 'by' | 'value'> {
   if (flags.width) {

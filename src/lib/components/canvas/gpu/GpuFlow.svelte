@@ -45,7 +45,7 @@
   import { sameValue } from '$lib/canvas/node-patch';
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
-  import { libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { inDoc, libraryOf, syncedDoc } from '$lib/motion/style-library';
   import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
@@ -171,7 +171,7 @@
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty, tileForDoc } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -1561,7 +1561,7 @@
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && !sameValue(present.styles?.[name], style) ? syncedDoc(present, name, style) : null;
+      const synced = present && !sameValue(present.styles?.[name], inDoc(style, present)) ? syncedDoc(present, name, style) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -2260,13 +2260,7 @@
     if (!tile) {
       return null;
     }
-    const follow = (before: { width: number; height: number }, after: { width: number; height: number }) => {
-      const size = tileForDoc(tile, before, after);
-      if (size) {
-        props.onNodeSize?.(nodeId, size.w, size.h);
-      }
-    };
-    return { x: tile.x, y: tile.y, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId), follow };
+    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
   }
 
   const hostLedger = new HostLedger();
@@ -4237,6 +4231,7 @@
     <FrameDialogs
       dialog={frameDialog.dialog}
       {nodeId}
+      box={byId.get(nodeId) ?? null}
       projectId={page.params.projectId ?? ''}
       canvasId={page.params.canvasId ?? ''}
       session={dialogSession}

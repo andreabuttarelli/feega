@@ -41,7 +41,10 @@ function elementSession() {
   );
 }
 
+const placeOf = (box: { x: number; y: number; w: number; h: number }): NodePlace => ({ ...box, rotation: 0, set: () => undefined, resize: () => undefined, turn: () => undefined, flip: () => undefined, align: null });
+
 const hosted = (box = { x: 30, y: 40, w: 200, h: 120, rotation: 90 }) => {
+  frameProperties.place = placeOf(box);
   frameProperties.host = { clipId: 'a', box, move: () => undefined, resize: () => undefined, turn: () => undefined };
   const body = render(FrameInspectorPanel, { props: { session: elementSession(), tokens: FEEGA_TOKENS } }).body;
   frameProperties.clear();
@@ -89,10 +92,43 @@ describe('a free element reads as one object on the canvas', () => {
   });
 });
 
+const doubled = (() => {
+  const doc = { ...newMotionDoc(MotionFormat.Landscape), still: { frame: 0 }, width: 1400, height: 920, freeSize: true } as MotionDoc;
+  return must(addClip(doc, { component: 'Shape', from: 0, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.2, height: 0.2, roundness: 0.25 } }, 'a'));
+})();
+
+const doubledPanel = (selection: string[]) => {
+  frameProperties.place = placeOf({ x: 0, y: 0, w: 700, h: 460 });
+  const session = new FrameEditSession(
+    { head: { version: 1, doc: doubled }, selection },
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+  );
+  const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
+  frameProperties.clear();
+  return body;
+};
+
+describe('a frame held at two doc px per canvas px reads as it is on the canvas', () => {
+  it('its size is the size of the frame on the canvas', () => {
+    const body = doubledPanel([]);
+
+    expect(valueOf(body, 'data-testid="frame-width"')).toBe('700');
+    expect(valueOf(body, 'data-testid="frame-height"')).toBe('460');
+  });
+
+  it('a child reads W, H and radius in canvas px', () => {
+    const body = doubledPanel(['a']);
+
+    expect(valueOf(body, 'aria-label="Width"')).toBe('140');
+    expect(valueOf(body, 'aria-label="Height"')).toBe('92');
+    expect(valueOf(body, 'aria-label="Roundness"')).toBe('23');
+  });
+});
+
 const html = (selection: string[], part: string | null = null) => render(FrameInspectorPanel, { props: { session: sessionOf(selection), tokens: FEEGA_TOKENS, part } }).body;
 
 describe('the frame itself', () => {
-  const placed = (patch: Partial<NodePlace> = {}): NodePlace => ({ x: 120, y: 40, rotation: 0, set: () => undefined, turn: () => undefined, flip: () => undefined, align: null, follow: () => undefined, ...patch });
+  const placed = (patch: Partial<NodePlace> = {}): NodePlace => ({ ...placeOf({ x: 120, y: 40, w: 100, h: 100 }), ...patch });
 
   it('places the frame with X and Y and heads the panel with its name', () => {
     frameProperties.place = placed();
@@ -179,7 +215,9 @@ describe('frame inspector panel', () => {
   });
 
   it('shows the frame look like a layer: fill, stroke, corners, effects, with the frame settings folded below', () => {
+    frameProperties.place = placeOf({ x: 0, y: 0, w: 540, h: 540 });
     const body = html([]);
+    frameProperties.clear();
 
     expect(body).toContain('data-testid="frame-look"');
     for (const section of ['layer', 'fill', 'stroke', 'effects']) {
