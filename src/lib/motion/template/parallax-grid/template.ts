@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { GridMotion, PGRID_COMPONENT, PGRID_FONTS, PGRID_PROPS, PGRID_VAR_PREFIX, pgridComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const PGRID_TEMPLATE_ID = `${BUILTIN_PREFIX}parallax-grid`;
 export const PGRID_CLIP = 'grid';
@@ -29,12 +30,11 @@ const variant = (v: (typeof VARIANTS)[number]): TemplateEntry => {
   const props = { ...PGRID_PROPS, motion: { ...PGRID_PROPS.motion, default: v.motion } };
   return {
     id: variantId(v.motion),
-    template: {
+    template: lazyTemplate(() => customTemplateDoc({ name: `parallax-grid-${v.motion}`, component: PGRID_COMPONENT, code: pgridComponent(), props, fonts: PGRID_FONTS, varPrefix: PGRID_VAR_PREFIX, vars: PGRID_VARS, clip: PGRID_CLIP, seconds: 10, fps: 30, groups: PGRID_GROUPS }), {
       name: v.name,
       description: `${v.description} Every part is a field or a runtime variable.`,
-      keyFields: PGRID_KEY_FIELDS,
-      doc: customTemplateDoc({ name: `parallax-grid-${v.motion}`, component: PGRID_COMPONENT, code: pgridComponent(), props, fonts: PGRID_FONTS, varPrefix: PGRID_VAR_PREFIX, vars: PGRID_VARS, clip: PGRID_CLIP, seconds: 10, fps: 30, groups: PGRID_GROUPS })
-    }
+      keyFields: PGRID_KEY_FIELDS
+    })
   };
 };
 
