@@ -15,8 +15,17 @@ describe('the canvas style library a person edits', () => {
 
     library.rename('Headline', 'Display');
 
-    expect(Object.keys(library.styles)).toEqual(['Body', 'Display']);
+    expect(Object.keys(library.styles)).toEqual(['Display', 'Body']);
     expect(renamed).toEqual([['Headline', 'Display']]);
+  });
+
+  it('a name with / puts the style in a group', () => {
+    const library = new StyleLibrary();
+    library.styles = { Primary: HEADLINE };
+
+    library.rename('Primary', 'Brand / Primary');
+
+    expect(Object.keys(library.styles)).toEqual(['Brand / Primary']);
   });
 
   it('refuses a name that is taken, invalid or the same one', () => {
@@ -31,6 +40,16 @@ describe('the canvas style library a person edits', () => {
 
     expect(Object.keys(library.styles)).toEqual(['A', 'B']);
     expect(renamed).toEqual([]);
+  });
+
+  it('an edit still holding the old name lands on the renamed style, never brings the old one back', () => {
+    const library = new StyleLibrary();
+    library.styles = { 'Colour 3': { kind: StyleKind.Colour, color: '#111111' } };
+
+    library.rename('Colour 3', 'Accent');
+    library.push('Colour 3', { kind: StyleKind.Colour, color: '#ff0000' });
+
+    expect(library.styles).toEqual({ Accent: { kind: StyleKind.Colour, color: '#ff0000' } });
   });
 
   it('editing a text style reaches every frame', () => {
@@ -75,6 +94,7 @@ describe('the project style library', () => {
     await library.open(backend);
 
     library.found({ Headline: { kind: StyleKind.Text, size: 0.9 }, Body: { kind: StyleKind.Text, size: 0.05 } });
+    await Promise.resolve();
 
     expect(library.styles.Headline).toEqual(HEADLINE);
     expect(library.styles.Body).toMatchObject({ size: 0.05 });
@@ -132,5 +152,35 @@ describe('the project style library', () => {
     library.found({ Headline: HEADLINE });
 
     expect(pushed).toEqual([]);
+  });
+});
+
+describe('a style changed right after it was made', () => {
+  it('reaches the project in the order it was made: the rename waits for the save', async () => {
+    const library = new StyleLibrary();
+    const sent: LibraryAsk[] = [];
+    const answers: (() => void)[] = [];
+    const backend: LibraryStore = {
+      load: async () => ({}),
+      send: (ask) => {
+        sent.push(ask);
+        return new Promise<boolean>((resolve) => answers.push(() => resolve(true)));
+      }
+    };
+    library.connect(sinkOf([]));
+    await library.open(backend);
+
+    const saving = library.push('Colour 1', { kind: StyleKind.Colour, color: '#111111' });
+    const renaming = library.rename('Colour 1', 'Danger');
+    await Promise.resolve();
+
+    expect(sent.map((ask) => ask.op)).toEqual([LibraryOp.Save]);
+    answers[0]();
+    await saving;
+    await Promise.resolve();
+    expect(sent.map((ask) => ask.op)).toEqual([LibraryOp.Save, LibraryOp.Rename]);
+    answers[1]();
+    await renaming;
+    expect(Object.keys(library.styles)).toEqual(['Danger']);
   });
 });

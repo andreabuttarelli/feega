@@ -14,6 +14,13 @@ describe('the project library', () => {
     expect(calls[0].filters).toEqual(expect.arrayContaining([['org_id', 'org-1'], ['project_id', 'p-1'], ['kind', 'style']]));
   });
 
+  it('lists in the order the entries were made, whatever row an edit moved', async () => {
+    const row = (name: string, created_at: string) => ({ name, value: HEADLINE, created_at, kind: 'style', org_id: 'org-1', project_id: 'p-1' });
+    const { db } = fakeDb({ project_library: [row('Body', '2026-11-02T10:00:01Z'), row('Title', '2026-11-02T10:00:00Z'), row('Muted', '2026-11-02T10:00:00Z')] }, { filter: true });
+
+    expect(Object.keys(await listEntries(db, SCOPE))).toEqual(['Muted', 'Title', 'Body']);
+  });
+
   it('a missing table reads as an empty library, not an error', async () => {
     const missing = { data: null, error: { code: '42P01', message: 'missing' } };
     const chain: Record<string, unknown> = { eq: () => chain, then: (resolve: (v: unknown) => unknown) => resolve(missing) };
