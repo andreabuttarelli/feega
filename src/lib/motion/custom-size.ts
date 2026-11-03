@@ -1,16 +1,16 @@
-import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DESIGN_MAX_SIDE, MIN_SIDE, sideRange, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { CanvasSize, OpResult } from '@feega/motion-core/motion/timeline';
 import { Horizontal, Vertical, resizeFrame } from './constraints/constraints';
 import { keepTextSize, resizedFreeText } from './text-fit';
 import { stackElementResized } from './layout/stack-fit';
 import { heldPixels } from '@feega/motion-core/motion/breakpoints/model';
 
-const evenSide = (n: number) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(n / 2) * 2));
+const FRAME_LIMIT_NOTE = `A frame is at most ${DESIGN_MAX_SIDE} px a side: resized to fit`;
+
+const evenSide = (n: number) => Math.min(DESIGN_MAX_SIDE, Math.max(MIN_SIDE, Math.round(n / 2) * 2));
 
 function videoSize(node: CanvasSize): CanvasSize {
-  const long = Math.max(node.width, node.height);
-  const short = Math.min(node.width, node.height);
-  const scale = Math.min(1, MAX_SIDE / long, MAX_SHORT_SIDE / short);
+  const scale = Math.min(1, DESIGN_MAX_SIDE / Math.max(node.width, node.height));
   return { width: evenSide(node.width * scale), height: evenSide(node.height * scale) };
 }
 
@@ -19,6 +19,8 @@ function stillSize(node: CanvasSize): CanvasSize {
   const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n)));
   return { width: clamp(node.width), height: clamp(node.height) };
 }
+
+export const frameSizeNote = (asked: CanvasSize): string | null => (Math.max(asked.width, asked.height) > DESIGN_MAX_SIDE ? FRAME_LIMIT_NOTE : null);
 
 export const customSize = (node: CanvasSize, doc: Pick<MotionDoc, 'still'> = {}): CanvasSize => (doc.still ? stillSize(node) : videoSize(node));
 
