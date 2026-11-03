@@ -34,14 +34,20 @@ function mover(from: Size, to: Size, shift: Point) {
   return { scale, move };
 }
 
-function reframedClip(clip: MotionClip, keys: { props: boolean; transform: boolean }, at: ReturnType<typeof mover>): MotionClip {
+enum Carry {
+  Own = 'own',
+  ByParent = 'by-parent'
+}
+
+function reframedClip(clip: MotionClip, carry: Carry, at: ReturnType<typeof mover>): MotionClip {
   const props = { ...clip.props };
   const transform = { ...clip.transform };
   const keyframes = { ...clip.keyframes };
   const viaProps = typeof props.x === 'number';
+  const own = carry === Carry.Own;
 
   for (const key of Object.keys(SCALED)) {
-    const moved = SHIFTED[key] && (viaProps ? keys.props : false);
+    const moved = SHIFTED[key] && viaProps && own;
     const change = (v: number) => (moved ? at.move(key, v) : at.scale(key, v));
     if (typeof props[key] === 'number') {
       props[key] = change(props[key] as number);
@@ -53,7 +59,7 @@ function reframedClip(clip: MotionClip, keys: { props: boolean; transform: boole
 
   for (const key of Object.keys(SHIFTED)) {
     const value = transform[key as keyof Point];
-    const moved = !viaProps && keys.transform;
+    const moved = !viaProps && own;
     if (typeof value === 'number' || moved) {
       transform[key as keyof Point] = moved ? at.move(key, value ?? 0) : at.scale(key, value ?? 0);
     }
@@ -73,6 +79,5 @@ export function reframed(comp: MotionComp, from: Size, to: Size, shift: Point = 
     const parent = clip.parent ? byId.get(clip.parent) : undefined;
     return parent ? typeof parent.props.x !== 'number' || carriedByParent(parent) : false;
   };
-  const keysOf = (clip: MotionClip) => ({ props: !carriedByParent(clip), transform: !clip.parent });
-  return { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => reframedClip(c, keysOf(c), at)) })) };
+  return { ...comp, tracks: comp.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => reframedClip(c, carriedByParent(c) ? Carry.ByParent : Carry.Own, at)) })) };
 }

@@ -57,6 +57,9 @@ function storeOf() {
     write: vi.fn(async (id: string, version: number, doc: unknown) => {
       docs.set(id, { ...docs.get(id), doc, version: version + 1 });
       return true;
+    }),
+    remove: vi.fn(async (id: string) => {
+      docs.delete(id);
     })
   } as unknown as FrameStore;
   return { store, docs };
@@ -247,6 +250,45 @@ describe('importPageAt', () => {
 
     expect(done).toEqual({ outcome: UrlImportOutcome.Rejected, error: reason });
     expect(docs.size).toBe(0);
+  });
+
+  it('a set frame the store refuses takes the page frame already placed with it', async () => {
+    const button = (id: string, x: number) => ({ id, type: 'FRAME', name: 'button', absoluteBoundingBox: { x, y: 600, width: 140, height: 44 }, fills: [{ type: 'SOLID', color: { r: 0.37, g: 0.42, b: 0.82, a: 1 } }], children: [{ id: `${id}t`, type: 'TEXT', characters: 'Go', absoluteBoundingBox: { x: x + 20, y: 612, width: 90, height: 20 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 15, fontWeight: 500 } }] });
+    const tree = { ...TREE, root: { ...TREE.root, children: [...TREE.root.children!, button('b1', 100), button('b2', 300)] } };
+    const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
+    const { ask, docs } = askOf({ open: async () => tabOf(tree), shape: FULL_SHAPE, components });
+    const create = ask.store.create;
+    ask.store.create = vi.fn(async (...args: Parameters<FrameStore['create']>) => {
+      if (docs.size) {
+        throw new DocRejected('comps.c1.tracks.0.clips.0.transform.y: Too big');
+      }
+      return create(...args);
+    });
+
+    const done = await importPageAt(ask);
+
+    expect(done.outcome).toBe(UrlImportOutcome.Rejected);
+    expect(docs.size).toBe(0);
+  });
+
+  it('a plan with a doc the schema refuses writes nothing, not even the Components page', async () => {
+    const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
+    const broken = (doc: MotionDoc): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, transform: { ...c.transform, y: 5 } })) })) });
+    const planner = {
+      prepare: async () => undefined,
+      plan: (t: PageTree, newId: () => string) => {
+        const made = urlPlan(t, newId)!;
+        return { ...made, sets: [{ ...made.plan.items[0], doc: broken(made.plan.items[0].doc) }] };
+      }
+    };
+    const { ask, docs } = askOf({ components, planner });
+
+    const done = await importPageAt(ask);
+
+    expect(done.outcome).toBe(UrlImportOutcome.Rejected);
+    expect(done.outcome === UrlImportOutcome.Ok ? '' : done.error).toContain('transform.y');
+    expect(docs.size).toBe(0);
+    expect(components).not.toHaveBeenCalled();
   });
 
   it('le immagini della pagina vengono importate e messe nel frame', async () => {
