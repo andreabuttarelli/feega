@@ -24,7 +24,7 @@
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
   import { svgDrawings } from '$lib/canvas/svg-drawings';
-import { pasteTargets } from '$lib/canvas/paste-into-frame';
+import { ElementPaste, elementPaste, pasteTargets } from '$lib/canvas/paste-into-frame';
   import { DeleteMode, SECTION_TYPE, membershipAfter, withMembers } from '$lib/canvas/section';
   import { Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
@@ -54,12 +54,12 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { createPlaceSaves, keepPending, placedRows } from '$lib/canvas/place-save';
   import { LineAction, createOpQueue, keepLines } from '$lib/canvas/op-queue';
-  import { idbShelf, openOutbox, type Outbox } from '$lib/canvas/outbox';
+  import { outboxKey, type Outbox } from '$lib/canvas/outbox';
   import { pendingWrites, syncOf } from '$lib/canvas/sync-status';
   import { DrawAction, drawOp, isDraw, keepDrawn } from '$lib/canvas/draw-queue';
   import { draftLog, replayDrafts, type DraftEntry, type DraftLog } from '$lib/canvas/frame-drafts';
   import { postFrameOps, queueResultOf } from '$lib/canvas/frame-ops-send';
-  import type { FrameDraft } from '$lib/motion/frame-sync';
+  import type { FrameDraft, Revision } from '$lib/motion/frame-sync';
   import type { Op } from '$lib/canvas/op-queue';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -166,10 +166,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { NodeFlag, flagHeld, flagsOf, toggledFlags } from '$lib/canvas/node-flags';
   import type { HostBox } from '$lib/motion/element-host';
   import { FORMATS, MotionFormat, formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
-  import { ResizeMode, fitToNode, handResized } from '$lib/motion/custom-size';
+  import { ResizeMode, fitToNode, frameSizeNote, handResized } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import type { LayerSlot } from '$lib/motion/layer-place';
   import { frameDocs } from '$lib/canvas/frame-docs';
   import { NOTHING_SHOWN, freshIds, shownDoc, shownFrame, shownLanding, shownMove, shownPending, snapOf, type Shown } from '$lib/canvas/frame-moves';
   import { planCombine, planInsert, type SceneTile } from '$lib/motion/scenes';
@@ -180,7 +181,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
-  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type FrameTarget, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/canvas-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -451,7 +452,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       mainPick = { nodeId: frameId, compId, key: (mainPick?.key ?? 0) + 1 };
       return;
     }
-    mainNav.canvases = await fetchProjectComponents(data.projectId);
+    await mainNav.refresh();
     const location = mainNav.where({ compId, home: frameId });
     if (location) {
       await goto(mainHref(data.projectId, location, frameId, compId));
@@ -459,8 +460,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   onMount(() => {
-    void fetchProjectComponents(data.projectId).then((found) => (mainNav.canvases = found));
-    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null) });
+    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null), load: () => fetchProjectComponents(data.projectId) });
   });
 
   afterNavigate(() => {
@@ -520,12 +520,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   let toFlow: ((p: PointerPoint) => PointerPoint) | null = null;
 
-  function markFrame(at: PointerPoint | null, exceptId: string | null) {
+  function markFrame(at: PointerPoint | null, exceptId: string | null): FrameTarget | null {
     const target = at ? frameUnderPointer(at, exceptId) : null;
     for (const el of document.querySelectorAll<HTMLElement>(`.${FRAME_DROP_CLASS}`)) {
       if (el.dataset.motionNode !== target?.frameId) { el.classList.remove(FRAME_DROP_CLASS); }
     }
     if (target) { document.querySelector(`[data-motion-node="${target.frameId}"]`)?.classList.add(FRAME_DROP_CLASS); }
+    return target;
   }
 
   function dropAt(client: PointerPoint, exceptId: string | null): Drop | null {
@@ -557,9 +558,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return row && !tileChromeOf(row).takesDrops && !holdsNodes ? row.id : null;
   };
 
-  function tileDragOver(ids: string[], client: PointerPoint) {
+  function tileDragOver(ids: string[], client: PointerPoint): FrameTarget | null {
     const id = freeElement(ids);
-    markFrame(id ? client : null, id);
+    return markFrame(id ? client : null, id);
   }
 
   function tileDrop(ids: string[], client: PointerPoint): DropVerdict {
@@ -593,11 +594,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return saved;
   }
 
-  function moveFreeInto(id: string, hold: FrameHold): Promise<boolean> {
+  function moveFreeInto(id: string, hold: FrameHold, slot?: LayerSlot): Promise<boolean> {
     const ids = freshIds();
     const [source, target] = [snapAt(id), snapAt(hold.nodeId)];
-    const plan = source && target ? planFree(source, target, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at }, idsFrom(ids, newClipId)) : null;
-    const saved = optimistic(OptimisticAction.MoveFree, { id, frameId: hold.nodeId, at: hold.at, ids }).then((outcome) => outcome === OpOutcome.Landed);
+    const plan = source && target ? planFree(source, target, { on: DropOn.Frame, nodeId: hold.nodeId, at: hold.at, slot }, idsFrom(ids, newClipId)) : null;
+    const saved = optimistic(OptimisticAction.MoveFree, { id, frameId: hold.nodeId, at: hold.at, slot, ids }).then((outcome) => outcome === OpOutcome.Landed);
     shownLanding(plan, placeOf(hold.nodeId), id).docs.forEach((held) => frameDocs.hold(held, saved));
     return saved;
   }
@@ -666,14 +667,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void optimistic(OptimisticAction.Group, { ids, id }).then((outcome) => (outcome === OpOutcome.Landed ? after?.(id) : undefined));
   }
 
+  function frameElements(ids: string[]) {
+    if (!ids.length) {
+      return;
+    }
+    void optimistic(OptimisticAction.Frame, { ids, id: crypto.randomUUID() });
+  }
+
   function wrapWithStack(ids: string[]) {
     void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
-  async function homeComponents(nodeId: string): Promise<Record<string, string> | null> {
+  async function homeComponents(nodeId: string): Promise<Revision | null> {
     const done = await postAtVersion('homeComponents', nodeId, {});
     void invalidate(CANVAS_LIST_DEPENDENCY);
-    return (done?.homes as Record<string, string> | undefined) ?? null;
+    return (done?.head as Revision | null | undefined) ?? null;
   }
 
   function wrapInSection(ids: string[]) {
@@ -721,31 +729,25 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   async function saveFrame(id: string, box: CanvasBox): Promise<boolean> {
-    const land = holdGesture();
     const res = await queueDraw(DrawAction.Frame, id, { box: JSON.stringify(box) });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
-      land(null);
       nodes = settle(nodes, id, null);
       return false;
     }
-    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     focusOn([id], undefined, FocusMode.Drawn);
     return true;
   }
 
   async function saveDrawn(id: string, drawn: DrawnWire): Promise<boolean> {
-    const land = holdGesture();
     const res = await queueDraw(DrawAction.Element, id, { drawn: JSON.stringify(drawn) });
     const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
     if (!node) {
-      land(null);
       catalogPosters.delete(id);
       nodes = settle(nodes, id, null);
       return false;
     }
-    land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
     const hold = 'box' in drawn ? frameHolding(nodes, drawn.box) : null;
     if (hold) {
@@ -872,7 +874,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     };
   }
 
-  let nodes = $state<Tile[]>((data.nodes as CanvasNodeRecord[]).map((n) => toTile(n)));
+  const membersIn = (rows: Tile[]) => (id: string): Set<string> => new Set(rows.filter((n) => layoutOf(n.data).groupId === id).map((n) => n.id));
+  const keptPlaces = (rows: Tile[]) => placedRows(rows, places.unsentEntries(), membersIn(rows));
+  const loadedTiles = (data.nodes as CanvasNodeRecord[]).map((n) => toTile(n));
+  let nodes = $state<Tile[]>(placedRows(loadedTiles, data.outbox?.places ?? [], membersIn(loadedTiles)));
   let heldCanvas = $state(untrack(() => data.canvas.id));
   const nodeById = $derived(byId(nodes));
 
@@ -1665,9 +1670,11 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   function queueDraw(action: DrawAction, id: string, fields: Record<string, string>): Promise<DrawAnswer> {
-    const done = drawPending(id);
-    draws.push(drawOp(action, id, fields));
-    return done;
+    const op = drawOp(action, id, fields);
+    const answer = drawPending(id);
+    draws.push(op);
+    undoStack.push({ source: 'draw', op, answer });
+    return answer;
   }
 
   const draws = createOpQueue({
@@ -1702,6 +1709,30 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     },
     [DrawAction.Frame]: (op) => drawnFrameTile(op.opId, JSON.parse(op.fields.box) as CanvasBox).node
   };
+
+  function redraw(op: Op): StackEntry {
+    const ghost = GHOST_OF[op.action as DrawAction](op);
+    if (ghost && !nodes.some((n) => n.id === op.opId)) {
+      nodes = [...nodes, toTile(ghost)];
+    }
+    const answer = drawPending(op.opId);
+    void answer.then((landed) => settleDrawn(op.opId, landed));
+    draws.push(op);
+    return { source: 'draw', op, answer };
+  }
+
+  async function undraw(entry: DrawEntry): Promise<StackEntry | null> {
+    if (draws.takeBack(entry.op.opId)) {
+      drawAnswered(entry.op.opId, null);
+      return { source: 'undrawn', op: entry.op };
+    }
+    const items = ((await entry.answer)?.undo ?? []) as UndoItem[];
+    let out: StackEntry | null = null;
+    if (items.length) {
+      await applyUndo({ items }, (redo) => (out = { source: 'server', gesture: redo }));
+    }
+    return out;
+  }
 
   function restoreDraws(ops: Op[]) {
     const ghosts = ops.filter((op) => isDraw(op.action) && !nodes.some((n) => n.id === op.opId)).map((op) => GHOST_OF[op.action as DrawAction](op));
@@ -1755,17 +1786,14 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void outbox?.save({ nodes: saves.unsentPatches(), places: places.unsentEntries() });
   }
 
-  const membersOf = (id: string): Set<string> => new Set(nodes.filter((n) => layoutOf(n.data).groupId === id).map((n) => n.id));
-
-  async function reopenOutbox(key: string) {
-    const opened = await openOutbox(idbShelf(), key);
+  async function reopenOutbox(opened: Outbox) {
     outbox = opened;
     for (const [id, patch] of Object.entries(opened.nodes)) {
       if (nodes.some((node) => node.id === id)) {
         void write(id, patch, SaveTiming.Now);
       }
     }
-    nodes = placedRows(nodes, opened.places, membersOf);
+    nodes = placedRows(nodes, opened.places, membersIn(nodes));
     places.restore(opened.places);
     lines.restore(opened.ops);
     restoreDraws(opened.draws);
@@ -1781,12 +1809,16 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
   }
 
+  const openedOutboxKey = $derived(data.session?.user?.id ? outboxKey(data.session.user.id, data.canvas.id) : null);
+
   $effect(() => {
-    const user = data.session?.user?.id;
-    if (!user || typeof indexedDB === 'undefined') {
+    if (!openedOutboxKey) {
       return;
     }
-    void untrack(() => reopenOutbox(`${user}:${data.canvas.id}`));
+    const kept = untrack(() => data.outbox);
+    if (kept) {
+      void reopenOutbox(kept);
+    }
   });
 
   $effect(() => {
@@ -1814,7 +1846,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
   type ResizeEntry = { source: 'resize'; gesture: ResizeGesture; inner: StackEntry[] };
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
+  type DrawEntry = { source: 'draw'; op: Op; answer: Promise<DrawAnswer> };
+  type StackEntry = DrawEntry | { source: 'undrawn'; op: Op } | { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | ResizeEntry | { source: 'turn'; turn: Turn } | { source: 'frame'; step: FrameStep } | { source: 'many'; steps: StackEntry[] };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -2085,7 +2118,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function openCanvas(loaded: CanvasNodeRecord[]) {
     snapshotVersion += 1;
     runsOverride = null;
-    nodes = keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty);
+    nodes = keptPlaces(keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty));
     heldCanvas = data.canvas.id;
     edges = (data.connections as Connection[]).map(toEdge);
     seenRevision = data.revision;
@@ -3056,6 +3089,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function sizeFrameDoc(id: string, picture: Picture, was: Was | null = null) {
     const mode = resizeMode;
+    failed = frameSizeNote(picture) ?? failed;
     if (frameDocs.edit(id, (doc) => resizedDoc(doc, picture, was, mode), 'Resized the frame')) {
       return;
     }
@@ -3399,7 +3433,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       select: (ids) => focusOn(ids, undefined, FocusMode.Select),
       open: (id) => focusOn([id], undefined, FocusMode.Select),
       rename: renameNode,
-      flag: toggleFlag
+      flag: toggleFlag,
+      moveInto: (id, frameId, slot) => void moveFreeInto(id, { nodeId: frameId, at: FRAME_CENTRE }, slot)
     })
   );
 
@@ -4149,7 +4184,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const selectedTiles = nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops }));
     if (elementClipboard.kind === Copied.Elements && copied) {
       const frames = pasteTargets(selectedTiles, copied.clipIds);
-      await (frames.length > 1 ? pasteElementsIntoEach(frames, copied) : pasteElementsAt(at, copied));
+      const pointed = pastedDrop(at);
+      const mode = elementPaste(frames, pointed.on === DropOn.Frame ? pointed.nodeId : null);
+      await (mode === ElementPaste.IntoFrames ? pasteElementsIntoEach(frames, copied) : pasteElementsAt(at, copied));
       return;
     }
     if (!clipboard) { return; }
@@ -4354,6 +4391,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     if (entry.source === 'resize') {
       return reverseResize(entry, way);
+    }
+    if (entry.source === 'draw') {
+      return undraw(entry);
+    }
+    if (entry.source === 'undrawn') {
+      return redraw(entry.op);
     }
     if (entry.source === 'many') {
       const steps = await reverseEach(entry.steps, (step) => reverse(step, way));
@@ -4601,6 +4644,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCloud={openCloud}
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
+    onFrame={frameElements}
     onWrapStack={wrapWithStack}
     onComponentMade={homeComponents}
     onNodeSize={(id, w, h) => void storeSize(id, w, h)}
@@ -4636,6 +4680,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCodeImport={(at) => (codeImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
+    onfail={(message: string) => (failed = message)}
     onRedo={() => inTurn(redo)}
     onConnectNew={connectNew}
     {focus}

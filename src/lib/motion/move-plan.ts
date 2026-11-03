@@ -7,6 +7,8 @@ import { blankElement, canvasReady } from './draw-create';
 import { elementName } from './element-name';
 import { homed, placeInstance } from './canvas-components';
 import { reframed } from './comp-frame';
+import { dropLayer } from '$lib/canvas/layers';
+import type { LayerSlot } from './layer-place';
 import { DropOn, clipCentre, elementBox, frameOf, guessedBoxes, liftElement, placeElement, type Box, type Drop, type Element, type NewId, type Point } from './move-element';
 
 export enum MoveOutcome {
@@ -80,6 +82,13 @@ export function landIn(target: FrameSnap, element: Element, drop: FrameDrop, new
   }
   return { ok: true, landing: { on: DropOn.Frame, nodeId: target.nodeId, doc: stackedAt(placed.doc, placed.clipId, drop.at), clipId: placed.clipId } };
 }
+
+function slotted(doc: MotionDoc, clipId: string, slot: LayerSlot): MotionDoc {
+  const placed = dropLayer(doc, clipId, slot.target, slot.place);
+  return placed.ok ? placed.doc : doc;
+}
+
+const landedAt = (doc: MotionDoc, clipId: string, drop: FrameDrop): MotionDoc => (drop.slot ? slotted(doc, clipId, drop.slot) : stackedAt(doc, clipId, drop.at));
 
 function stackedAt(doc: MotionDoc, clipId: string, at: Point): MotionDoc {
   const joined = dropInStack(doc, clipId, guessedBoxes(withAutoLayout(doc)), [at.x * doc.width, at.y * doc.height]);
@@ -193,5 +202,5 @@ export function planFree(source: FrameSnap, target: FrameSnap, drop: FrameDrop, 
     roots = clip.parent ? roots : [...roots, placed.clipId];
   }
   const [only] = roots;
-  return { ok: true, landing: { on: DropOn.Frame, nodeId: target.nodeId, doc: roots.length === 1 ? stackedAt(doc, only, drop.at) : doc, clipId } };
+  return { ok: true, landing: { on: DropOn.Frame, nodeId: target.nodeId, doc: roots.length === 1 ? landedAt(doc, only, drop) : doc, clipId } };
 }

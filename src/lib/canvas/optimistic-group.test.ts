@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupedLocally, inOrder, ungroupedLocally } from './optimistic-group';
+import { framedLocally, groupedLocally, inOrder, ungroupedLocally } from './optimistic-group';
 import { layoutOf } from './node-layout';
 
 type T = { id: string; x: number; y: number; w: number; h: number; data: Record<string, unknown>; select?: boolean };
@@ -32,6 +32,20 @@ describe('⌘G before the server answers', () => {
 
   it('changes nothing for a lone pick', () => {
     expect(groupedLocally(canvas, ['a', 'gone'], 'g', fromRecord)).toBe(canvas);
+  });
+});
+
+describe('⌥⌘G before the server answers', () => {
+  const framed = framedLocally(canvas, ['a', 'b'], 'f', fromRecord);
+  const frame = framed.find((t) => t.id === 'f')!;
+
+  it('draws a frame over the union of the picks, selected', () => {
+    expect(frame).toMatchObject({ x: 0, y: 0, w: 300, h: 200, select: true });
+  });
+
+  it('keeps the picks until the server moves them in, and leaves the rest alone', () => {
+    expect(framed.map((t) => t.id).sort()).toEqual(['a', 'b', 'c', 'f']);
+    expect(framed.filter((t) => t.id !== 'f').every((t) => !t.select)).toBe(true);
   });
 });
 

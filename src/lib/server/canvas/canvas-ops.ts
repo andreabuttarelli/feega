@@ -5,7 +5,7 @@ import { exportCodeNode } from '$lib/server/canvas/code-export-node';
 import { listProjectComponents } from './project-components';
 import { ExportMode } from '$lib/canvas/code-frame';
 import { codeVarsError } from '$lib/server/canvas/code-source';
-import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, stackElements, ungroupElement } from '$lib/server/motion/element-groups';
+import { frameElements, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, stackElements, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { wrapInSection } from './section';
 import { z } from 'zod';
@@ -334,6 +334,7 @@ const createdSize = (type: string, data: Record<string, unknown>) => {
 
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 2; or any nodes with section true'), section: z.boolean().optional().describe('wrap the nodes in a Section instead of a Group') }).strict();
 const stackElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 1') }).strict();
+const frameElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes or Groups), at least 1; frames are refused') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a frame, element or group on the canvas; a group turns its members with it'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
@@ -1019,7 +1020,10 @@ export const CANVAS_OPS = {
   home_components: op({
     access: Access.Write,
     input: homeComponentsInput,
-    run: async (ctx, input) => homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8))
+    run: async (ctx, input) => {
+      const { head, ...done } = await homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8));
+      return { ...done, version: head?.version ?? null };
+    }
   }),
 
   import_url: op({
@@ -1113,6 +1117,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: stackElementsInput,
     run: async (ctx, input) => frameAnswer(await stackElements(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
+  }),
+
+  frame_elements: op({
+    access: Access.Write,
+    input: frameElementsInput,
+    run: async (ctx, input) => frameAnswer(await frameElements(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
   }),
 
   ungroup_element: op({

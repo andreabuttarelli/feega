@@ -34,3 +34,5 @@ The top-left of the canvas keeps only the main menu and the project switcher.
 Drag a shape, text, frame or stack tile from the add menu onto a Layers row to create it there: above or below the row, or inside a frame or group. Undo removes it.
 
 Dragging a layer onto the middle of a frame, group or stack row puts it inside, even when that frame is empty; the top and bottom edges of the row drop it above or below.
+
+A free element row drags into a frame too: drop it on the frame row to put it inside, or on a layer of the open frame to land above, below or inside that layer, a stack included. The row under the pointer shows where it lands.

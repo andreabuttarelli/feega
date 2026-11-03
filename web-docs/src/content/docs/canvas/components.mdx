@@ -21,7 +21,9 @@ Drag a handle of a main inside a set to resize that main alone: the variants aft
 
 Imports made before this change keep their Components frame and keep working.
 
-- **MCP / API:** `home_components` with a `frameId` moves the mains of that frame to the Components page, the same as the app does after `⌥⌘K`.
+Homing is safe to repeat: a main moves to the Components page once, and asking again reuses its set instead of making a second one. Edits you make while it moves are kept.
+
+- **MCP / API:** `home_components` with a `frameId` moves the mains of that frame to the Components page, the same as the app does after `⌥⌘K`. Calling it twice for the same frame answers the same homes; the answer carries the frame's new `version`.
 
 ## Go to main component
 
@@ -33,7 +35,7 @@ Every instance depends on its main, in any frame and on any canvas of the projec
 
 ## Components across canvases
 
-The **Components** panel in the rail (`Alt+5`) shows the components of every canvas in the project as a grid of tiles, grouped by canvas. Each tile is a live preview of the component itself, cropped to what it draws on a light or dark tile that keeps it visible, with its name underneath; a variant gets its own tile. Previews redraw when the main changes. Search by component or canvas name. Drag a tile onto the canvas to add an instance, or hover it for **Show main** and **Copy**. The list response carries each frame's `revision`.
+The **Components** panel in the rail (`Alt+5`) shows the components of every canvas in the project as a grid of tiles, grouped by canvas. Each tile is a live preview of the component itself, cropped to what it draws on a light or dark tile that keeps it visible, with its name underneath; a variant gets its own tile. Previews redraw when the main changes, draw only when scrolled into view and are kept between sessions. Long lists load a page of tiles at a time as you scroll. Search by component or canvas name. Drag a tile onto the canvas to add an instance, or hover it for **Show main** and **Copy**. The list response carries each frame's `revision`.
 
 - **Drag** a component onto a frame of the current canvas to add an instance at the drop point. The frame under the pointer is highlighted while you drag; the main is copied into that frame.
 - **Drop on empty canvas** to place the instance as a free element at the drop point.
@@ -80,9 +82,9 @@ Agent: `set-preferred` with `comp`, `prop` (the swap property) and `preferred` (
 
 Inside the main, on the Components page, every edit changes the main: move, restyle or retype one of its layers and every instance follows. Inside an instance the same edit is an override of that instance only; a component nested in a main (a button inside a card) is an instance there, so its text or fill becomes an override of the card.
 
-To add a layer to a main, draw it over the main (text, shape, frame) or drop a layer onto it: it lands inside, in the stack under the pointer, and every instance shows it.
+To add a layer to a main, draw it over the main (text, shape, frame) or drop a layer onto it: it lands inside, in the stack under the pointer, and every instance shows it. In Layers, drag a layer onto a main's row to put it inside the main (at the end of its stack), or between the layers inside a main to put it there.
 
-In Layers, click a layer inside a component to select it on the canvas. An instance shows its own box in the inspector (X, Y, W, H of what it draws), not the box of the frame.
+In Layers, click a layer inside a component to select it on the canvas. An instance shows its own box in the inspector (X, Y, W, H of what it draws), not the box of the frame. Typing W or H resizes the instance like a frame, never scaling it: its layers follow their constraints and an auto layout main reflows, text keeping its size.
 
 ## Copy, paste and duplicate
 

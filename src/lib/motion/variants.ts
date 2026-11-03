@@ -12,7 +12,7 @@ const setOf = (compId: string, main: MainComponent) => main.set ?? compId;
 
 const sameVariant = (a: Variant, b: Variant) => Object.keys({ ...a, ...b }).every((k) => a[k] === b[k]);
 
-export function setMembers(doc: MotionDoc, compId: string): [string, MotionComp][] {
+export function setMembers<C extends Pick<MotionComp, 'component'>>(doc: { comps: Record<string, C> }, compId: string): [string, C][] {
   const main = doc.comps[compId]?.component;
   if (!main) {
     return [];

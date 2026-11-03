@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, tileFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
+import { EnterTo, FramePanel, FrameKind, clickReachesClip, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, tileFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -163,6 +163,19 @@ describe('a free element is a frame without chrome', () => {
   it('a group draws behind everything, even when selected, so a click on a member reaches the member', () => {
     expect(frameChrome(FrameKind.Group).behind).toBe(true);
     expect(frameChrome(FrameKind.Element).behind).toBe(false);
+  });
+
+  it('a group shows a group panel and Enter picks its children; a frame and an element keep the frame panel', () => {
+    expect(frameChrome(FrameKind.Group)).toMatchObject({ panel: FramePanel.Group, enter: EnterTo.Children });
+    expect(frameChrome(FrameKind.Frame)).toMatchObject({ panel: FramePanel.Frame, enter: EnterTo.Frame });
+    expect(frameChrome(FrameKind.Element).panel).toBe(FramePanel.Frame);
+  });
+
+  it('a first click on a group picks the group; once inside, a click picks the member', () => {
+    expect(clickReachesClip(FrameKind.Group, [])).toBe(false);
+    expect(clickReachesClip(FrameKind.Group, ['a'])).toBe(true);
+    expect(clickReachesClip(FrameKind.Frame, [])).toBe(true);
+    expect(clickReachesClip(FrameKind.Element, [])).toBe(true);
   });
 
   it('reads back as an element; an old frame without the field stays a frame', () => {

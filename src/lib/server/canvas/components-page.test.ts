@@ -10,14 +10,21 @@ function storeWith(doc: MotionDoc) {
   const frames = new Map<string, StoredFrame>([['page', { nodeId: 'page', projectId: 'p', canvasId: 'design', version: 1, doc }]]);
   const store = {
     read: vi.fn(async (id: string) => frames.get(id) ?? null),
-    create: vi.fn(async (at: { canvasId: string }, made: MotionDoc) => {
-      const id = `set-${frames.size}`;
+    create: vi.fn(async (at: { canvasId: string; id?: string }, made: MotionDoc) => {
+      const id = at.id ?? `set-${frames.size}`;
+      if (frames.has(id)) {
+        throw new Error('duplicate key');
+      }
       frames.set(id, { nodeId: id, projectId: 'p', canvasId: at.canvasId, version: 1, doc: made });
       return id;
     }),
     write: vi.fn(async (id: string, version: number, next: MotionDoc) => {
-      frames.set(id, { ...frames.get(id)!, doc: next, version: version + 1 });
-      return { outcome: 'written' };
+      const now = frames.get(id)!;
+      if (now.version !== version) {
+        return { outcome: 'conflict' };
+      }
+      frames.set(id, { ...now, doc: next, version: version + 1 });
+      return { outcome: 'written', head: { version: version + 1, doc: next, summary: null, actorKind: 'user' } };
     })
   } as unknown as FrameStore;
   return { store, frames };
@@ -76,10 +83,64 @@ describe('a component made by hand moves its main to the Components page', () =>
     expect(shape.height).toBe(Math.round(full.height / 2));
   });
 
+  it('two homings of the same main at once make one set, not two', async () => {
+    const { store, frames } = storeWith(designWithButton());
+
+    const [a, b] = await Promise.all([homeComponents(store, PAGE, 'page', newId), homeComponents(store, PAGE, 'page', newId)]);
+
+    const sets = [...frames.values()].filter((f) => f.canvasId === 'components');
+    expect(sets).toHaveLength(1);
+    expect(a.homes).toEqual(b.homes);
+  });
+
+  it('a save that lands between the read and the write keeps both the save and the home', async () => {
+    const doc = designWithButton();
+    const compId = String((doc.tracks.flatMap((t) => t.clips)[0] as MotionClip).props.comp);
+    const { store, frames } = storeWith(doc);
+    const read = vi.mocked(store.read).getMockImplementation()!;
+    let sneaked = false;
+    vi.mocked(store.read).mockImplementation(async (id) => {
+      const seen = await read(id);
+      if (id === 'page' && !sneaked) {
+        sneaked = true;
+        frames.set('page', { ...seen!, version: 2, doc: { ...seen!.doc, fps: 60 } });
+      }
+      return seen;
+    });
+
+    const done = await homeComponents(store, PAGE, 'page', newId);
+
+    const page = frames.get('page')!;
+    expect(page.doc.fps).toBe(60);
+    expect(page.doc.comps[compId].component!.home).toBe(done.setIds[0]);
+    expect([...frames.values()].filter((f) => f.canvasId === 'components')).toHaveLength(1);
+  });
+
+  it('answers the head it wrote, so the open editor rebases its next save on the home', async () => {
+    const doc = designWithButton();
+    const compId = String((doc.tracks.flatMap((t) => t.clips)[0] as MotionClip).props.comp);
+    const { store } = storeWith(doc);
+
+    const done = await homeComponents(store, PAGE, 'page', newId);
+
+    expect(done.head!.version).toBe(2);
+    expect(done.head!.doc.comps[compId].component!.home).toBe(done.setIds[0]);
+  });
+
+  it('homing a frame already homed creates nothing and answers its homes', async () => {
+    const { store, frames } = storeWith(designWithButton());
+    const first = await homeComponents(store, PAGE, 'page', newId);
+
+    const again = await homeComponents(store, PAGE, 'page', newId);
+
+    expect([...frames.values()].filter((f) => f.canvasId === 'components')).toHaveLength(1);
+    expect(again.homes).toEqual(first.homes);
+  });
+
   it('does nothing for a frame already on the Components page', async () => {
     const { store } = storeWith(designWithButton());
 
-    expect(await homeComponents(store, async () => ({ place: { projectId: 'p', canvasId: 'design' }, at: { x: 0, y: 0 } }), 'page', newId)).toEqual({ moved: [], setIds: [], homes: {} });
+    expect(await homeComponents(store, async () => ({ place: { projectId: 'p', canvasId: 'design' }, at: { x: 0, y: 0 } }), 'page', newId)).toEqual({ moved: [], setIds: [], homes: {}, head: null });
   });
 });
 

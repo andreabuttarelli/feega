@@ -130,6 +130,43 @@ describe('grouping free elements on the canvas', () => {
   });
 });
 
+describe('framing free elements on the canvas', () => {
+  const two = () => ({ nodes: [elementRow(A, AT_A), elementRow(B, AT_B)], motion_revisions: [revisionRow(A, box('a', AT_A)), revisionRow(B, box('b', AT_B))] });
+
+  it('⌥⌘G makes one frame whose stage covers both boxes, each where it was, and removes the two', async () => {
+    const id = '99999999-9999-4999-8999-999999999999';
+    const input = event({ ids: JSON.stringify([A, B]), node_id: id }, two());
+
+    const result = await actions.frameElements(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', created: true });
+    expect(input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload).toMatchObject({ id });
+    const [made] = inserted(input);
+    expect(made).toMatchObject({ x: 0, y: 0, width: 300, height: 200, display_name: 'Frame', data: { format: 'custom' } });
+    const doc = revisions(input)[0].doc;
+    expect(doc.surface).toBeTruthy();
+    const a = clipsOf(doc).find((c) => c.id === 'a')!;
+    expect(a.props.x).toBeCloseTo(50 / 300, 2);
+    expect(a.props.width).toBeCloseTo(100 / 300, 2);
+    expect(deletedIds(input).sort()).toEqual([A, B].sort());
+  });
+
+  it('frames a single element too, as Figma does', async () => {
+    const input = event({ ids: JSON.stringify([A]) }, { nodes: [elementRow(A, AT_A)], motion_revisions: [revisionRow(A, box('a', AT_A))] });
+
+    expect(await actions.frameElements(input as never)).toMatchObject({ outcome: 'done' });
+    expect(inserted(input)[0]).toMatchObject({ width: 100 });
+  });
+
+  it('refuses a frame among the picks: frames nest by dropping, not by framing', async () => {
+    const frame = { ...elementRow(B, AT_B), data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } };
+    const input = event({ ids: JSON.stringify([A, B]) }, { nodes: [elementRow(A, AT_A), frame], motion_revisions: [revisionRow(A, box('a', AT_A)), revisionRow(B, box('b', AT_B))] });
+
+    expect(await actions.frameElements(input as never)).toMatchObject({ status: 422 });
+    expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+});
+
 describe('wrapping free elements with a stack', () => {
   const two = () => ({ nodes: [elementRow(A, AT_A), elementRow(B, AT_B)], motion_revisions: [revisionRow(A, box('a', AT_A)), revisionRow(B, box('b', AT_B))] });
 

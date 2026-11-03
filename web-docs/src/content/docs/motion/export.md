@@ -12,7 +12,7 @@ The formats come from the exporter code: see the generated table in [Export form
 - GIF can loop forever, play once or boomerang, up to 30 seconds, 30 fps and 1920 px wide.
 - APNG keeps transparency, up to 10 seconds.
 - The file is as long as the video's duration (set it in the timeline). With a loop region set, the dialog offers **Range**: Work area (the default) or Whole video. A work-area range renders in the browser, without sound.
-- Video frames go up to 3840 × 2160 (2160p export). The resolution (720p to 4K) sets the short side of the video, whatever the size of the frame on the canvas; a browser render draws a small frame up to that resolution as the server does.
+- A frame takes up to 16 384 px a side, so a tall page can be animated too. The resolution (720p to 4K) sets the short side of the video, whatever the size of the frame on the canvas, at most 3840 px on the long side; the export dialog says when a size does not fit. A browser render draws a small frame up to that resolution as the server does.
 - 120 fps renders on servers.
 - "Render in this browser" draws every frame with the same GPU engine as the canvas, then encodes. Videos with line or vector shapes, motion blur or 3D devices are drawn by the previous HTML engine instead; the file has the same size, frame rate and sound either way.
 - A browser render keeps its full speed in a background tab; only the screen wake lock is let go.

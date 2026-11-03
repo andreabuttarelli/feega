@@ -266,6 +266,18 @@ export class FrameEditSession {
     this.held = hold;
   }
 
+  async rebaseOn(write: () => Promise<Revision | null>): Promise<Revision | null> {
+    await this.settled();
+    const written = write().then((head) => {
+      if (head) {
+        this.takeRemote(head);
+      }
+      return head;
+    });
+    this.holdSave(written);
+    return written;
+  }
+
   async save() {
     if (this.held) {
       await this.held;

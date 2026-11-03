@@ -1,10 +1,11 @@
 <script lang="ts">
   import { FRAME_PRESETS, PRESET_LABEL, PRESET_SIZE, presetOf, type FramePreset } from '$lib/motion/frame-presets';
   import type { NodePlace } from '$lib/components/canvas/frame-properties.svelte';
+  import { FrameSizing } from '$lib/motion/frame-presets';
 
   const CUSTOM = 'custom';
 
-  let { place }: { place: NodePlace } = $props();
+  let { place, sizing = FrameSizing.Presets }: { place: NodePlace; sizing?: FrameSizing } = $props();
 
   const size = $derived({ width: Math.round(place.w), height: Math.round(place.h) });
   const current = $derived(presetOf(size) ?? CUSTOM);
@@ -27,6 +28,7 @@
   }
 </script>
 
+{#if sizing === FrameSizing.Presets}
 <div class="preset" data-testid="frame-preset-section">
   <label for="frame-preset">Frame size</label>
   <select id="frame-preset" data-testid="frame-preset" value={current} onchange={(e) => pick(e.currentTarget.value)}>
@@ -36,6 +38,7 @@
     {/each}
   </select>
 </div>
+{/if}
 <div class="size">
   <label>W <input type="number" min="1" data-testid="frame-width" aria-label="Frame width" value={size.width} onchange={(e) => resize('width', e.currentTarget.value)} /></label>
   <label>H <input type="number" min="1" data-testid="frame-height" aria-label="Frame height" value={size.height} onchange={(e) => resize('height', e.currentTarget.value)} /></label>

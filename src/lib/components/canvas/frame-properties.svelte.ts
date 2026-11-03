@@ -7,6 +7,7 @@ import type { ElementHost } from '$lib/motion/element-host';
 import type { Flip } from '$lib/motion/layer-props';
 import type { Edge } from '$lib/motion/space';
 import type { ExportRow } from '$lib/motion/export-rows';
+import { FramePanel } from '$lib/canvas/motion-node';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
 export const UNNAMED_FRAME = 'Frame';
@@ -32,6 +33,7 @@ export class FrameProperties {
   rename = $state.raw<((name: string) => void) | null>(null);
   host = $state.raw<ElementHost | null>(null);
   editingFill = $state<number | null>(null);
+  panel = $state(FramePanel.Frame);
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
     this.nodeId = nodeId;
@@ -69,6 +71,7 @@ export class FrameProperties {
     this.editingFill = null;
     this.rename = null;
     this.host = null;
+    this.panel = FramePanel.Frame;
   }
 }
 

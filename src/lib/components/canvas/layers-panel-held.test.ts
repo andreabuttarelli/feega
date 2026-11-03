@@ -38,7 +38,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetched);
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   layersSource.setDocs(new Map([['loaded', docWith('Hero headline')]]));
-  unpublish = layersSource.publishCanvas({ nodes: frames, selected: [], select: () => {}, open: () => {}, rename: () => {}, flag: () => {} });
+  unpublish = layersSource.publishCanvas({ nodes: frames, selected: [], select: () => {}, open: () => {}, rename: () => {}, flag: () => {}, moveInto: () => {} });
   app = mount(LayersPanel, { target: document.body, props: { searching: false } });
   flushSync();
 });

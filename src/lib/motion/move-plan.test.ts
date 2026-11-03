@@ -6,6 +6,7 @@ import { wrapInStack } from './layout/ops';
 import { createComponent } from './main-component';
 import { DropOn, guessedBoxes, liftElement } from './move-element';
 import { landIn, planComponent, planFree } from './move-plan';
+import { Place } from './layer-place';
 
 function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!result.ok) {
@@ -87,5 +88,23 @@ describe('landing an element on a stack in another frame', () => {
       throw new Error('not landed');
     }
     expect(findClip(plan.landing.doc, plan.landing.clipId)?.clip.parent).toBe('row');
+  });
+
+  it('takes the slot a Layers drop names, wherever the point is', () => {
+    const free = must(addClip(newMotionDoc(MotionFormat.Square), shape(0.5), 'own'));
+    const stage = { width: 100, height: 100 };
+    const dropOn = (slot: { target: string; place: Place }) => {
+      const plan = planFree({ nodeId: 'free', doc: free, stage }, { nodeId: 'to', doc: target, stage: { width: 1080, height: 1080 } }, { on: DropOn.Frame, nodeId: 'to', at: { x: 0.9, y: 0.9 }, slot }, newId);
+      if (!plan.ok || plan.landing.on !== DropOn.Frame) {
+        throw new Error('not landed');
+      }
+      return { id: plan.landing.clipId, order: findClip(plan.landing.doc, 'row')?.clip.autoLayout?.order };
+    };
+
+    const first = dropOn({ target: 'a', place: Place.Above });
+    expect(first.order).toEqual([first.id, 'a', 'b']);
+
+    const last = dropOn({ target: 'row', place: Place.Into });
+    expect(last.order).toEqual(['a', 'b', last.id]);
   });
 });

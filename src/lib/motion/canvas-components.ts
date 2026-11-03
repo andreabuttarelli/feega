@@ -6,13 +6,14 @@ import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/
 import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 
 export type FrameDoc = { id: string; doc: MotionDoc };
+export type FrameMains = { id: string; doc: { comps: Record<string, Pick<MotionComp, 'component'>> } };
 export type ComponentVariant = { compId: string; variant: Variant };
 export type ComponentGroup = { key: string; frameId: string; home: string; name: string; variants: ComponentVariant[] };
 export type Offset = { x: number; y: number };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
-export function componentGroups(frames: readonly FrameDoc[]): ComponentGroup[] {
+export function componentGroups(frames: readonly FrameMains[]): ComponentGroup[] {
   const seen = new Set<string>();
   const present = new Set(frames.map((f) => f.id));
   return frames.flatMap(({ id, doc }) =>

@@ -82,7 +82,7 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Extend, Press, Reach, Root, childBelow, extendOf, framePage, pressOn, frameLevel, grabbedInstead, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { Extend, Press, Reach, Root, childBelow, extendOf, framePage, pressOn, frameLevel, picksOwnKeys, grabbedInstead, leaveLevel, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
   import { holdsLock, ownLocked } from '$lib/canvas/locks';
   import { altCopies } from '$lib/canvas/alt-copy';
   import { clickPick, pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
@@ -103,7 +103,7 @@
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
-  import { dragInStack, dropInStack, followCursor, type DropLine } from '$lib/motion/layout/stack-drag';
+  import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
@@ -154,7 +154,7 @@
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
   import { fetchComponentSource } from '$lib/canvas/project-components';
-  import { homed, homedAt, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
+  import { homed, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -163,7 +163,7 @@
   import { elementGlyph } from '$lib/canvas/layers';
   import { imageSourceTile } from '$lib/canvas/free-image';
   import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
-  import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { fetchKey, framesOnCanvas, pickedToFetch, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
@@ -175,7 +175,7 @@
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, clickReachesClip, enteredClips, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -186,7 +186,7 @@
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
-  import { CANVAS_COMMAND_OF, climbsUp, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import { CANVAS_COMMAND_OF, CANVAS_TILE_ATTR, climbsUp, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Command } from '$lib/motion/shortcuts';
   import { HTML_MIME, Pasted, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
   import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
@@ -194,7 +194,7 @@
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
   import { NodeFlag } from '$lib/canvas/node-flags';
-  import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut, type FrameTarget } from '$lib/canvas/canvas-drop';
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -1265,6 +1265,16 @@
     })();
   });
 
+  const rushed = new Set<string>();
+
+  $effect(() => {
+    const due = pickedToFetch(coreFrames, selected, new Map([...fetched].map(([id, held]) => [id, held.revision])), rushed).filter((f) => !liveDocs.map.has(f.id));
+    for (const f of due) {
+      rushed.add(fetchKey(f));
+      void fetchPickDoc(f.id, f.revision);
+    }
+  });
+
   function viewPickAt(w: Point, picked: readonly string[]) {
     const hit = viewAt(bpViews, w);
     const live = hit ? viewLives.get(hit.frame.id) : null;
@@ -1475,7 +1485,7 @@
   function pickElement(e: PointerEvent, w: Point): boolean {
     const reach = reachOf(e);
     const hit = e.button === 0 && !e.shiftKey && e.pointerType === 'mouse' ? elementAt(w, reach) : null;
-    if (!hit) {
+    if (!hit || (reach !== Reach.Deep && !clickReachesClip(kindOfNode(hit.nodeId), inside?.nodeId === hit.nodeId ? picks : []))) {
       return false;
     }
     select([hit.nodeId]);
@@ -1525,12 +1535,7 @@
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
     if (id === Action.CreateComponent && !onComponentsPage) {
-      await saverOf(nodeId)?.settled();
-      const homes = await props.onComponentMade?.(nodeId);
-      const present = saverOf(nodeId)?.history.present;
-      if (homes && present && Object.keys(homes).length) {
-        commit(nodeId, { ok: true, doc: homedAt(present, homes) }, 'Moved the main to the Components page');
-      }
+      await saverOf(nodeId)?.rebaseOn(async () => (await props.onComponentMade?.(nodeId)) ?? null);
     }
   }
 
@@ -1831,6 +1836,7 @@
     frameProperties.place = nodePlaceOf(panelNodeId);
     frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
     frameProperties.host = hostOf(panelNodeId);
+    frameProperties.panel = frameChrome(kindOfNode(panelNodeId)).panel;
     return () => frameProperties.clear();
   });
 
@@ -3049,7 +3055,7 @@
           copies = new Map();
         }
         props.onLive?.(moved.map((m) => ({ id: m.id, x: m.x, y: m.y })));
-        props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
+        showStackLine(props.onTileDragOver?.([...a.origins.keys()], pointOf(e)) ?? null);
       },
       [GestureKind.Resize]: (a) => {
         if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id) && !overrides.has(a.id))) {
@@ -3277,7 +3283,14 @@
     select(clicked(selected, id, toggle));
   }
 
+  function showStackLine(over: FrameTarget | null) {
+    const doc = over ? liveOf(over.frameId)?.doc : null;
+    const drop = over && doc ? stackLineAt(doc, [over.at.x * doc.width, over.at.y * doc.height]) : null;
+    frameGuides = over && drop ? { nodeId: over.frameId, guides: [], gaps: [], drop } : null;
+  }
+
   function endDrag(ids: string[], e: PointerEvent) {
+    frameGuides = null;
     snapGuides = [];
     snapSpacing = [];
     props.onLive?.([]);
@@ -3616,6 +3629,17 @@
     }
   }
 
+  function enterNode() {
+    const only = selected.length === 1 ? selected[0] : null;
+    const doc = only ? liveOf(only)?.doc : null;
+    const children = only && doc ? enteredClips(kindOfNode(only), doc) : [];
+    if (only && children.length) {
+      pickMany(only, children);
+      return;
+    }
+    enterSelected(selected, summaries);
+  }
+
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     opacity: (c) => c.id === 'opacity' && fadeTiles(selected, c.opacity),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
@@ -3627,7 +3651,7 @@
     'edit-mode': () => editorMode.toggleMotion(),
     'code-mode': () => editorMode.toggleCode(),
     timeline: () => editorMode.toggleTimeline(),
-    enter: () => enterSelected(selected, summaries),
+    enter: () => enterNode(),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
     tool: (c) => {
@@ -3658,6 +3682,7 @@
     undo: () => props.onUndo?.(),
     redo: () => props.onRedo?.(),
     group: () => props.onGroup?.(selected),
+    frame: () => props.onFrame?.(selected),
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
     'send-back': () => props.onRestack?.(selected, Stack.Back),
@@ -3696,7 +3721,7 @@
   }
 
   function runPaletteCommand(command: Command) {
-    if (inside?.level.clip && picks.length && canRunInFrame(command)) {
+    if (picksOwnKeys(inside, picks) && canRunInFrame(command)) {
       void runFrameAction(command);
       return;
     }
@@ -3733,6 +3758,10 @@
       pickMany(inside.nodeId, [group]);
       return;
     }
+    if (up && inside?.level.clip && !leaveLevel(frameChrome(kindOfNode(inside.nodeId)).root, inside.level)) {
+      select([]);
+      return;
+    }
     if (up && inside?.level.clip) {
       goInside(inside.nodeId, Gesture.Leave, null);
       return;
@@ -3753,7 +3782,7 @@
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
       return;
     }
-    const frameAction = inside?.level.clip && picks.length && !typing ? frameKeyAction(e) : null;
+    const frameAction = picksOwnKeys(inside, picks) && !typing ? frameKeyAction(e) : null;
     if (frameAction) {
       e.preventDefault();
       void runFrameAction(frameAction);
@@ -4265,7 +4294,7 @@
         {#if group}
           <FrameSelection clip="" quad={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
         {/if}
-        {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
+        {@const guideArea = inside?.nodeId === frame.id || frameGuides?.nodeId === frame.id ? frameArea(frame.id) : null}
         {@const measuredGapsIn = measuredIn(frame.id)}
         {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length || frameGuides.drop)) || measuredGapsIn.length)}
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} drop={frameGuides?.nodeId === frame.id ? (frameGuides.drop ?? null) : null} measured={measuredGapsIn} />
@@ -4373,6 +4402,7 @@
           aria-label={t.displayName || t.kind || 'node'}
           aria-pressed={on}
           data-testid="gpu-node"
+          {...{ [CANVAS_TILE_ATTR]: '' }}
           data-id={t.id}
           data-kind={t.kind}
           data-core={coreDrawn.has(t.id) || undefined}

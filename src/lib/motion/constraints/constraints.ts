@@ -65,6 +65,18 @@ function constrained(clip: MotionClip, from: CanvasSize, to: CanvasSize): Motion
   return keepsPixels(down) ? offsetKept(horizontally, 'y', from.height / to.height) : horizontally;
 }
 
+export type Rect = { left: number; top: number; width: number; height: number };
+
+export function followParent(clip: MotionClip, space: CanvasSize, from: Rect, to: Rect): MotionClip {
+  if (!clip.constraints || !placed(clip.props)) {
+    return clip;
+  }
+  const p = clip.props;
+  const wide = HORIZONTAL[clip.constraints.horizontal]({ start: (p.x - p.width / 2) * space.width - from.left, length: p.width * space.width }, from.width, to.width);
+  const high = VERTICAL[clip.constraints.vertical]({ start: (p.y - p.height / 2) * space.height - from.top, length: p.height * space.height }, from.height, to.height);
+  return { ...clip, props: { ...p, x: (to.left + wide.start + wide.length / 2) / space.width, y: (to.top + high.start + high.length / 2) / space.height, width: wide.length / space.width, height: high.length / space.height } };
+}
+
 export function withConstraints(before: MotionDoc, sized: OpResult): OpResult {
   if (!sized.ok) {
     return sized;

@@ -3710,3 +3710,6 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### The Vite dev server in a worktree serves stale code after an edit
 **Signal:** a browser check after an edit shows the old behaviour, client or server side, as if the change was never made; the test for it is green. **Move:** stop the dev server and start it again after every change, before each browser check; never trust HMR or a server-side reload in an agent worktree.
+
+### After `git switch` in a worktree the dev server still serves the old branch
+**Signal:** a before/after harness run on two branches gives the same numbers, or `curl` of a served module lacks a line `git show HEAD:<file>` has; the server was started before the switch (or a merge, or a fast-forward). **Move:** the watcher ignores worktree files, so a switch changes the disk, not the served modules. Stop the server, `npm ci` if the lockfile moved, start it again, and only then measure. Do the same after rebuilding `static/gpu-core`.

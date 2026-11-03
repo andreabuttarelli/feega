@@ -108,6 +108,23 @@ test.describe('edits made offline or mid-save are kept @real', () => {
     await expect.poll(() => headFill(admin, box), { timeout: LANDED_MS }).toBe(FILL);
   });
 
+  test('undo removes a shape drawn offline at once, and it never lands', async ({ page, session, admin }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const at = await pane(page);
+
+    await page.context().setOffline(true);
+    const ellipse = await drawn(page, 'ellipse', at);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Meta+z');
+    await expect(page.locator(`[data-motion-node="${ellipse}"]`), 'gone before the connection returns').toHaveCount(0, { timeout: 2000 });
+
+    await page.context().setOffline(false);
+    await expect(status(page)).toHaveAttribute('data-status', 'saved', { timeout: LANDED_MS });
+    expect(await alive(admin, ellipse)).toBe(false);
+  });
+
   test('undo, redo, undo then an immediate reload keeps the last undo', async ({ page, session, admin }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });
