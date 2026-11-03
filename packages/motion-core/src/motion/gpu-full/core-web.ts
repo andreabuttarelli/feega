@@ -10,7 +10,7 @@ import { releaseOnDispose, type GpuSurface } from './gpu-release';
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Size = { width: number; height: number };
-export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; free: () => void };
+export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; free: () => void };
 
 export enum CoreMotion {
   Still = 0,
@@ -45,6 +45,10 @@ export function wantedPictures(items: Item[]): PictureItem[] {
     ...(i.masks ?? []).flatMap((m) => (m.cover.kind === CoverKind.Picture ? [coverPicture(m.cover.src)] : []))
   ]);
 }
+
+const BAND_PIXELS = 1 << 21;
+
+const asBitmap = (source: unknown): ImageBitmap | null => (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap ? source : null);
 
 const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement) || (typeof HTMLCanvasElement !== 'undefined' && picture.source instanceof HTMLCanvasElement);
 
@@ -102,6 +106,7 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
   const uploaded = new Map<string, Picture['source']>();
   const stills = new Map<string, HTMLCanvasElement>();
   const shown = new Map<string, Set<string>>();
+  const arriving = new Map<string, { source: unknown; top: number }>();
 
   function show(group: string, items: Item[], from = group) {
     shown.set(group, new Set([...(shown.get(from) ?? []), ...wantedPictures(items).map(pictureKey)]));
@@ -115,6 +120,7 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     }
     uploaded.delete(key);
     stills.delete(key);
+    arriving.delete(key);
     attached.forget_picture(key);
   }
 
@@ -152,16 +158,38 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     return true;
   }
 
+  function sendRows(key: string, bitmap: ImageBitmap): boolean {
+    const { width, height } = bitmap;
+    const rows = Math.max(1, Math.floor(BAND_PIXELS / width));
+    if (!attached.picture_rows || rows >= height) {
+      attached.picture(key, bitmap, width, height);
+      return true;
+    }
+    const going = arriving.get(key);
+    const top = going?.source === bitmap ? going.top : 0;
+    const done = attached.picture_rows(key, bitmap, width, height, top, rows);
+    if (done) {
+      arriving.delete(key);
+    } else {
+      arriving.set(key, { source: bitmap, top: top + rows });
+    }
+    return done;
+  }
+
   function decodedOf(picture: Picture): ImageBitmap | null | undefined {
     if (typeof createImageBitmap !== 'function') {
       return undefined;
+    }
+    const size = fit(picture.size);
+    const own = asBitmap(picture.source);
+    if (own && own.width === size.width && own.height === size.height) {
+      return own;
     }
     const source = picture.source as object;
     if (decoded.has(source)) {
       return decoded.get(source);
     }
     decoded.set(source, null);
-    const size = fit(picture.size);
     void createImageBitmap(picture.source as ImageBitmapSource, { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'high' }).then(
       (bitmap) => decoded.set(source, bitmap),
       () => decoded.set(source, undefined)
@@ -205,14 +233,17 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
         if (bitmap === null) {
           continue;
         }
-        queue.splice(queue.indexOf(item), 1);
         const key = pictureKey(item);
         if (bitmap && uploaded.get(key) !== picture!.source) {
-          attached.picture(key, bitmap, bitmap.width, bitmap.height);
-          uploaded.set(key, picture!.source);
           sent++;
+          if (!sendRows(key, bitmap)) {
+            continue;
+          }
+          queue.splice(queue.indexOf(item), 1);
+          uploaded.set(key, picture!.source);
           continue;
         }
+        queue.splice(queue.indexOf(item), 1);
         sent += upload(item, pictures) ? 1 : 0;
       }
       return queue.length === 0;

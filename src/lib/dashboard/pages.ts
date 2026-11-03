@@ -28,3 +28,5 @@ export function pageAt(pathname: string): DashboardPage | null {
 export function isDashboardPage(name: string): name is DashboardPage {
   return Object.values(DashboardPage).includes(name as DashboardPage);
 }
+
+export const EDITOR_PRELOAD = '/p/_/c/_';

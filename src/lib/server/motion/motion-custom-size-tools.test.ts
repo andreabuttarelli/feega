@@ -28,10 +28,10 @@ describe('set_canvas with a custom size', () => {
     expect([session.doc.width, session.doc.height, formatOf(session.doc)]).toEqual([1920, 1080, MotionFormat.Custom]);
   });
 
-  it('refuses a size above 4K', async () => {
+  it('refuses a size above the frame limit', async () => {
     const { run, session } = setup();
 
-    expect(await run('set_canvas', { width: 3840, height: 3840 })).toMatchObject({ ok: false });
+    expect(await run('set_canvas', { width: 16386, height: 3840 })).toMatchObject({ ok: false });
     expect(session.doc.width).toBe(1920);
   });
 

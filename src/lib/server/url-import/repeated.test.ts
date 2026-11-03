@@ -227,5 +227,27 @@ describe('repeatedOf', () => {
     expect(root.children!.map((c) => c.type)).toEqual(['FRAME', 'FRAME']);
     expect(root.children!.map((c) => c.children![0].type)).toEqual(['INSTANCE', 'INSTANCE']);
   });
-});
 
+  it('footer columns of different lengths are not eight Footer column mains: the columns stay frames, their links are Footer link instances', () => {
+    const link = (label: string, x: number, y: number): RestNode => ({ ...text(label, x, y), dom: { tag: 'a', landmark: 'footer', press: 'link' } });
+    const column = (x: number, count: number): RestNode => ({ id: id(), type: 'FRAME', name: 'div', dom: { tag: 'div', landmark: 'footer' }, absoluteBoundingBox: { x, y: 600, width: 180, height: count * 30 }, fills: [], children: Array.from({ length: count }, (_, i) => link(`Link ${x}-${i}`, x, 600 + i * 30)) });
+    const { components } = repeatedOf(page([column(0, 3), column(200, 4), column(400, 5), column(600, 3)]));
+
+    expect(components.map((c) => c.name)).toEqual(['Footer link']);
+  });
+
+  it('a lone card as wide as half the page is a block, not a component', () => {
+    const wide: RestNode = { ...card('Platform', 0, 'https://a/1.png'), absoluteBoundingBox: { x: 0, y: 100, width: 660, height: 560 }, cornerRadius: 12, strokes: [{ type: 'SOLID', color: BLACK }] };
+    const { components } = repeatedOf(page([wide]));
+
+    expect(components).toEqual([]);
+  });
+
+  it('a second card set outside any named section takes the name of its first words, not Card 2', () => {
+    const GREY = { r: 0.9, g: 0.9, b: 0.9, a: 1 };
+    const priced = (x: number): RestNode => ({ id: id(), type: 'FRAME', name: 'div', absoluteBoundingBox: { x, y: 400, width: 200, height: 160 }, fills: [{ type: 'SOLID', color: GREY }], children: [{ ...text('Pro plan', x + 10, 410), style: { fontFamily: 'Inter', fontSize: 24, fontWeight: 700 } }, text('For teams', x + 10, 450)] });
+    const { components } = repeatedOf(page([card('One', 0, 'https://a/1.png'), card('Two', 220, 'https://a/2.png'), priced(500), priced(720)]));
+
+    expect(components.map((c) => c.name).sort()).toEqual(['One Card', 'Pro plan Card']);
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ResizeMode, customSize, fitElementToNode, fitToNode, handResized } from './custom-size';
+import { ResizeMode, customSize, fitElementToNode, fitToNode, frameSizeNote, handResized } from './custom-size';
 import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
-import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DESIGN_MAX_SIDE, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setCanvas } from '@feega/motion-core/motion/timeline';
 
 const ratio = (s: { width: number; height: number }) => s.width / s.height;
@@ -11,24 +11,21 @@ describe('customSize', () => {
     expect(customSize({ width: 500, height: 300 })).toEqual({ width: 500, height: 300 });
   });
 
-  it('keeps the aspect when a video side is over the limit', () => {
-    const size = customSize({ width: 16000, height: 1000 });
+  it('a video frame takes a tall page, as a design does: the video limits wait for the export', () => {
+    expect(customSize({ width: 1440, height: 5000 })).toEqual({ width: 1440, height: 5000 });
+    expect(motionDocSchema.safeParse({ ...newMotionDoc(MotionFormat.Landscape), width: 1440, height: 5000 }).success).toBe(true);
+  });
 
-    expect(size.width).toBe(MAX_SIDE);
+  it('keeps the aspect when a side is over the frame limit', () => {
+    const size = customSize({ width: 32000, height: 2000 });
+
+    expect(size.width).toBe(DESIGN_MAX_SIDE);
     expect(Math.abs(ratio(size) - 16)).toBeLessThan(0.01);
   });
 
-  it('caps the short side at 2160p', () => {
-    expect(customSize({ width: 5000, height: 5000 })).toEqual({ width: MAX_SHORT_SIDE, height: MAX_SHORT_SIDE });
-  });
-
-  it('allows a 4K frame', () => {
-    expect(customSize({ width: 3840, height: 2160 })).toEqual({ width: 3840, height: 2160 });
-    expect(motionDocSchema.safeParse({ ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 }).success).toBe(true);
-  });
-
-  it('keeps 4K as the ceiling of a frame', () => {
-    expect([MAX_SIDE, MAX_SHORT_SIDE]).toEqual([3840, 2160]);
+  it('says when the asked size was over the frame limit', () => {
+    expect(frameSizeNote({ width: 1440, height: 20000 })).toContain(`${DESIGN_MAX_SIDE}`);
+    expect(frameSizeNote({ width: 1440, height: 9000 })).toBeNull();
   });
 
   it('gives even sides the doc accepts', () => {
@@ -67,8 +64,8 @@ describe('custom format', () => {
     expect(back.ok && formatOf(back.doc)).toBe(MotionFormat.Square);
   });
 
-  it('refuses a size above 4K', () => {
-    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 3840, height: 3840 } }).ok).toBe(false);
+  it('refuses a size above the frame limit', () => {
+    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: DESIGN_MAX_SIDE + 2, height: 3840 } }).ok).toBe(false);
   });
 });
 

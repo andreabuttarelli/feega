@@ -19,6 +19,7 @@ import { componentKit } from './component-kit';
 import { componentPages, type ComponentPages } from './component-sheet';
 import { patternSets, withoutCarriers, withPatterns } from './pattern-sets';
 import { withHoverStates } from './hover-states';
+import { coloursMerged } from './page-colours';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -289,7 +290,7 @@ export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPE
     return null;
   }
   const dynamic = patternSets(patterns);
-  const stack = { ...made, items: made.items.map((item) => ({ ...item, doc: withoutCarriers(item.doc, dynamic) })) };
+  const stack = { ...made, items: made.items.map((item) => ({ ...item, doc: coloursMerged(withoutCarriers(item.doc, dynamic)) })) };
   const tokening = shape.tokening ?? Tokening.Off;
   const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
   const counts = tokened.items.map((item) => countOf(item.doc));
