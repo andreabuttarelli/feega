@@ -14,14 +14,14 @@ import { pivotBox, type Size } from '../parent';
 import type { Box } from '../layout';
 import { kebab, NameBook } from './naming';
 import { literal, NodeKind, type Attr, type Bound, type CodeNode, type ComponentSpec, type ElementNode, type PageSpec, type SetSpec, type Rule, type StyleBind } from './ir';
-import { absoluteRules, containerRules, flowItemRules, isFlowChild, px, Shape } from './place';
+import { absoluteRules, containerRules, flowItemRules, fluidWidth, isFlowChild, px, Shape, STACK_RULES, stackItemRules, stackOrder } from './place';
 import { backgroundRules, borderRules, effectRules, radiusRules, typeRules, type Painter } from './paint';
 import { ColourRole, TokenBook } from './tokens';
 import { animationOf, timelineOf, type Timeline } from './animate';
 import { stateStyleOf } from './states';
 import { planComponents, PlanExport, PropKey, READINGS, specsOf, type Binding, type ComponentPlan } from './instances';
 
-export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; brand: BrandTokens | null };
+export type BuildInput = { doc: MotionDoc; name: string; assets: Record<string, string>; assetBase: string; brand: BrandTokens | null };
 
 type Shared = {
   doc: MotionDoc;
@@ -29,7 +29,7 @@ type Shared = {
   plans: Map<string, ComponentPlan>;
   built: Map<string, ComponentSpec>;
   assets: Map<string, string | null>;
-  urls: Record<string, string>;
+  local: (id: string) => string;
   brand: BrandTokens | null;
   notes: Set<string>;
   h1: { taken: boolean };
@@ -49,6 +49,7 @@ type Scope = {
   rootId: string | null;
   open: string[];
   boxOf: (clip: MotionClip) => Box;
+  stacks: Map<string | null, MotionClip[] | null>;
   timeline: Timeline;
 };
 
@@ -103,8 +104,21 @@ function childrenOf(clip: MotionClip | null, scope: Scope): MotionClip[] {
   if (clip?.autoLayout) {
     return childrenInOrder(scope.clips, clip as MotionClip & { autoLayout: NonNullable<MotionClip['autoLayout']> }).filter((c) => kids.includes(c));
   }
-  return [...kids].sort((a, b) => (scope.rank.get(a.id) ?? 0) - (scope.rank.get(b.id) ?? 0));
+  return stackOf(clip, kids, scope) ?? [...kids].sort((a, b) => (scope.rank.get(a.id) ?? 0) - (scope.rank.get(b.id) ?? 0));
 }
+
+function stackOf(clip: MotionClip | null, kids: MotionClip[], scope: Scope): MotionClip[] | null {
+  const key = clip?.id ?? null;
+  if (!scope.stacks.has(key)) {
+    scope.stacks.set(key, clip?.autoLayout ? null : stackOrder(kids, scope.boxOf));
+  }
+  return scope.stacks.get(key) ?? null;
+}
+
+const stacked = (clip: MotionClip | null, scope: Scope) => {
+  childrenOf(clip, scope);
+  return scope.stacks.get(clip?.id ?? null) ?? null;
+};
 
 const layerName = (clip: MotionClip) => clip.name || clip.component;
 
@@ -128,6 +142,12 @@ function placement(clip: MotionClip, parent: MotionClip | null, scope: Scope): R
     return flowItemRules(clip.component === 'Precomp' ? { ...placed, clip: hugged(clip) } : placed, parent.autoLayout!);
   }
   const parentBox = parent ? scope.boxOf(parent) : { left: 0, top: 0, ...scope.space };
+  const stack = stacked(parent, scope);
+  const index = stack?.indexOf(clip) ?? -1;
+  if (stack && index >= 0) {
+    const above = index ? scope.boxOf(stack[index - 1]) : null;
+    return stackItemRules(placed, above ? above.top + above.height : parentBox.top, parentBox);
+  }
   return absoluteRules(placed, parentBox);
 }
 
@@ -138,11 +158,11 @@ function hugged(clip: MotionClip): MotionClip {
   return { ...clip, layoutItem: { ...item, width: FIXED_TO_HUG(item.width), height: FIXED_TO_HUG(item.height) } };
 }
 
-const hasAbsoluteChild = (clip: MotionClip | null, kids: MotionClip[]) => kids.some((k) => !isFlowChild(k, clip));
+const hasAbsoluteChild = (clip: MotionClip | null, kids: MotionClip[], scope: Scope) => !stacked(clip, scope) && kids.some((k) => !isFlowChild(k, clip));
 
 function frameRules(clip: MotionClip | null, kids: MotionClip[], scope: Scope): Rule[] {
-  const flow = clip?.autoLayout ? containerRules(clip.autoLayout, scope.shared.tokens) : [];
-  const relative: Rule[] = hasAbsoluteChild(clip, kids) ? [['position', 'relative']] : [];
+  const flow = clip?.autoLayout ? containerRules(clip.autoLayout, scope.shared.tokens) : stacked(clip, scope) ? STACK_RULES : [];
+  const relative: Rule[] = hasAbsoluteChild(clip, kids, scope) ? [['position', 'relative']] : [];
   const clipped: Rule[] = clip?.clipContent ? [['overflow', 'hidden']] : [];
   return [...relative, ...flow, ...clipped];
 }
@@ -152,8 +172,9 @@ function sized(rules: Rule[], clip: MotionClip, kids: MotionClip[], scope: Scope
     return rules;
   }
   const box = scope.boxOf(clip);
-  const has = (p: string) => rules.some(([q]) => q === p || q === `min-${p}`);
-  return [...rules.filter(([p]) => p !== 'min-height'), ...(has('width') ? [] : [['width', px(box.width)] as Rule]), ['height', px(box.height)]];
+  const has = (p: string) => rules.some(([q]) => q === p || q === `min-${p}` || q === `max-${p}`);
+  const height: Rule = [stacked(clip, scope) ? 'min-height' : 'height', px(box.height)];
+  return [...rules.filter(([p]) => p !== 'min-height'), ...(has('width') ? [] : fluidWidth(box.width)), height];
 }
 
 function noteDropped(clip: MotionClip, dropped: string[], scope: Scope) {
@@ -277,9 +298,17 @@ function assetUrl(id: string | null | undefined, scope: Scope, fallbackName: str
   if (!id) {
     return shared.brand?.logoUrl ?? `/assets/${kebab(fallbackName)}.svg`;
   }
-  const url = shared.urls[id] ?? null;
-  shared.assets.set(id, url);
-  return url ?? `/assets/${id}`;
+  return shared.local(id);
+}
+
+const EXTENSION = /\.[a-z0-9]{2,5}$/i;
+
+function extensionOf(url: string): string {
+  try {
+    return new URL(url).pathname.match(EXTENSION)?.[0].toLowerCase() ?? '';
+  } catch {
+    return '';
+  }
 }
 
 const MEDIA_TAG: Partial<Record<ComponentId, string>> = { Image: 'img', Logo: 'img', Video: 'video' };
@@ -384,7 +413,7 @@ function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, pl
   const painter: Painter = {
     tokens: shared.tokens,
     unit: Math.min(space.width, space.height),
-    asset: (id) => (id ? (shared.urls[id] ?? `/assets/${id}`) : ''),
+    asset: (id) => (id ? shared.local(id) : ''),
     colourVar: (clip, key) => clip.bind?.[key]?.split('/').at(-1)
   };
   const boxOf = (clip: MotionClip): Box => {
@@ -396,7 +425,7 @@ function scopeOf(shared: Shared, tracks: readonly MotionTrack[], space: Size, pl
     const dy = (clip.transform.y ?? 0) * space.height;
     return { ...content, left: content.left + dx, top: content.top + dy };
   };
-  return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf, timeline };
+  return { shared, space, clips, rank: rankOf(tracks), names: new NameBook(), plan, uses: new Set(), painter, rootId: null, open: [], boxOf, stacks: new Map(), timeline };
 }
 
 const HIDDEN: Rule[] = [['overflow', 'hidden']];
@@ -422,7 +451,8 @@ function rootOf(scope: Scope, tag: string, own: Rule[], framed: Rule[]): Element
     }
   }
   const cut = scope.plan ? HIDDEN : pageCut(scope.shared.doc);
-  const rules: Rule[] = [['position', 'relative'], ...own, ...framed, ['min-height', px(scope.space.height)], ...cut];
+  const flow = stacked(null, scope) ? STACK_RULES : [];
+  const rules: Rule[] = [['position', 'relative'], ...flow, ...own, ...framed, ['min-height', px(scope.space.height)], ...cut];
   const children = top.flatMap((c) => nodeOf(c, null, scope, tag) ?? []);
   return { kind: NodeKind.Element, tag, className: '', rules, attrs: [], children, styleBinds: [] };
 }
@@ -472,10 +502,15 @@ const pageBackground = (doc: MotionDoc, tokens: TokenBook): Rule[] => (doc.backg
 export function buildPage(input: BuildInput): PageSpec {
   const { doc } = input;
   const tokens = new TokenBook(input.brand);
-  const urls = input.assets;
-  const resolve = (key: PropKey, value: string | boolean) => (key === PropKey.Image && typeof value === 'string' ? (urls[value] ?? `/assets/${value}`) : value);
+  const assets = new Map<string, string | null>();
+  const local = (id: string) => {
+    const url = input.assets[id] ?? null;
+    assets.set(id, url);
+    return `${input.assetBase}${id}${url ? extensionOf(url) : ''}`;
+  };
+  const resolve = (key: PropKey, value: string | boolean) => (key === PropKey.Image && typeof value === 'string' ? local(value) : value);
   const notes = new Set<string>();
-  const shared: Shared = { doc, tokens, plans: planComponents(doc, resolve), built: new Map(), assets: new Map(), urls, brand: input.brand, notes, h1: { taken: false }, content: contentOf(doc), timeline: timelineOf(doc, notes) };
+  const shared: Shared = { doc, tokens, plans: planComponents(doc, resolve), built: new Map(), assets, local, brand: input.brand, notes, h1: { taken: false }, content: contentOf(doc), timeline: timelineOf(doc, notes) };
   const scope = scopeOf(shared, doc.tracks, { width: doc.width, height: doc.height }, null, doc.still?.frame ?? 0, shared.timeline);
   const backdrop = scope.clips.find((c) => c.component === 'BrandBackground' && !c.parent);
   const background: Rule[] = backdrop ? [['background-color', tokens.colour(String(backdrop.props.fill ?? 'brand.background'), ColourRole.Page)]] : pageBackground(doc, tokens);
@@ -490,7 +525,7 @@ export function buildPage(input: BuildInput): PageSpec {
     components: order,
     sets: setsOf([...shared.plans.values()], shared.built),
     tokens: tokens.tokens(),
-    assets: [...shared.assets.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([id, url]) => ({ id, url })),
+    assets: [...shared.assets.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([id, url]) => ({ id, url, ref: local(id) })),
     notes: [...shared.notes].sort()
   };
 }

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { loadSession } from '../lib/auth.ts';
-import { awaitRun, CODE_TARGETS, motionApi, type CodeTarget, type FrameElementMoved, type MotionRun, type RenderStart } from '../lib/motion.ts';
+import { awaitRun, CODE_TARGETS, motionApi, type CodeAsset, type CodeTarget, type FrameElementMoved, type MotionRun, type RenderStart } from '../lib/motion.ts';
 import { attachmentSource } from '../lib/attachments.ts';
 
 type AskOpts = { org?: string; wait?: boolean; attach?: string[]; follow?: string[]; avoid?: string[]; note?: string; reject?: string | boolean; avoidAll?: boolean };
@@ -120,12 +120,26 @@ export async function cmdMotionCode(nodeId: string, opts: { org?: string; target
   }
   const code = await motionApi.code(await token(), nodeId, target, opts.org);
   const root = opts.out ?? code.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  for (const file of code.files) {
-    const path = join(root, file.path);
+  const write = async (relative: string, content: string | Uint8Array) => {
+    const path = join(root, relative);
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, file.content);
+    await writeFile(path, content);
+  };
+
+  const missing: CodeAsset[] = [];
+  for (const asset of code.assets ?? []) {
+    const res = await fetch(asset.url).catch(() => null);
+    if (!res?.ok) {
+      missing.push(asset);
+      continue;
+    }
+    await write(asset.path, new Uint8Array(await res.arrayBuffer()));
   }
-  console.log(`Wrote ${code.files.length} files to ${root}/ (${code.target}).`);
+
+  for (const file of code.files) {
+    await write(file.path, missing.reduce((text, a) => text.replaceAll(a.ref, a.url), file.content));
+  }
+  console.log(`Wrote ${code.files.length} files and ${(code.assets?.length ?? 0) - missing.length} images to ${root}/ (${code.target}).`);
   for (const note of code.notes) {
     console.log(`  not exported: ${note}`);
   }
