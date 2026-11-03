@@ -22,6 +22,7 @@ import { setParent } from '$lib/motion/parent-ops';
 import { placeInStack } from '$lib/motion/layout/stack-drag';
 import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
 import { frontToBack } from './paint-order';
+import { Place } from '$lib/motion/layer-place';
 
 const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
 
@@ -280,11 +281,7 @@ function moveClipAlong(doc: MotionDoc, clipId: string, step: typeof ABOVE | type
   return next ? moveClip(doc, clipId, { from: found.clip.from, trackId: next.id }) : fail('no track of the same kind that way');
 }
 
-export enum Place {
-  Above = 'above',
-  Below = 'below',
-  Into = 'into'
-}
+export { Place };
 
 type NewId = () => string;
 
