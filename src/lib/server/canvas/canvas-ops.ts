@@ -1020,7 +1020,10 @@ export const CANVAS_OPS = {
   home_components: op({
     access: Access.Write,
     input: homeComponentsInput,
-    run: async (ctx, input) => homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8))
+    run: async (ctx, input) => {
+      const { head, ...done } = await homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8));
+      return { ...done, version: head?.version ?? null };
+    }
   }),
 
   import_url: op({

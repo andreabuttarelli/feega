@@ -69,6 +69,10 @@ E2E_BASE_URL=http://host:port npx playwright test   # against an already-running
 # dev server that was started with those (not the placeholder env test:e2e starts on its own) —
 # point E2E_BASE_URL at it, e.g. your own `npm run dev` on :5173:
 E2E_REAL_STACK=1 E2E_BASE_URL=http://localhost:5173 npx playwright test canvas.spec.ts settings-brand.spec.ts onboarding.real.spec.ts
+
+# Offline and mid-save durability, on production as the test account: a throwaway project in
+# test@dazero.co's org, dropped after; no org or user is created.
+E2E_TEST_EMAIL=test@dazero.co E2E_TEST_PASSWORD=… E2E_BASE_URL=http://localhost:5173 npm run test:offline
 ```
 
 In CI (`.github/workflows/ci.yml`) retries are 1 with trace on first retry; locally 0 so

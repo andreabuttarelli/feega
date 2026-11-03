@@ -48,6 +48,8 @@
   import SoundSection from './SoundSection.svelte';
   import PlayInspector from './PlayInspector.svelte';
   import NodeInspector from './NodeInspector.svelte';
+  import GroupInspector from './GroupInspector.svelte';
+  import { FramePanel } from '$lib/canvas/motion-node';
   import { selectionProperties } from './selection-properties.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import { frameSurface, withSurface } from '@feega/motion-core/motion/surface';
@@ -132,6 +134,8 @@
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}
   </aside>
+{:else if session && doc && frameProperties.panel === FramePanel.Group && !session.selection.length}
+  <GroupInspector />
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     {#if editorMode.spec.sounds === SoundEntries.Shown && frameProperties.runAction}<SoundSection onrun={frameProperties.runAction} />{/if}

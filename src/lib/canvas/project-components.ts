@@ -28,6 +28,22 @@ export function matchingComponents(canvases: readonly CanvasComponents[], query:
   });
 }
 
+const tilesOf = (component: ProjectComponent): number => Math.max(1, component.variants.length);
+
+export const tileCount = (canvases: readonly CanvasComponents[]): number => canvases.reduce((sum, canvas) => sum + canvas.components.reduce((n, c) => n + tilesOf(c), 0), 0);
+
+export function firstTiles(canvases: readonly CanvasComponents[], limit: number): CanvasComponents[] {
+  let left = limit;
+  return canvases.flatMap((canvas) => {
+    const components = canvas.components.filter((component) => {
+      const fits = left > 0;
+      left -= fits ? tilesOf(component) : 0;
+      return fits;
+    });
+    return components.length ? [{ ...canvas, components }] : [];
+  });
+}
+
 export type MainLocation = { canvasId: string; label: string };
 
 export function mainLocation(canvases: readonly CanvasComponents[], frameId: string): MainLocation | null {

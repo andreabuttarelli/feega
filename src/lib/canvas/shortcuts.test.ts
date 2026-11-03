@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CANVAS_TILE_ATTR,
   CANVAS_SHORTCUTS,
   canvasGuide,
   NUDGE_STEP,
@@ -132,6 +133,13 @@ describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
 
   it('the help card names F for the frame tool', () => {
     expect(CANVAS_SHORTCUTS.find((r) => r.id === 'tool')?.keys).toContain('F');
+  });
+
+  it('in Design R is the rectangle and ⇧R the rulers, as in Figma, and the tooltip says R', () => {
+    expect(matchCanvasShortcut(ev('R', { shiftKey: true }), EditMode.Design)).toEqual({ id: 'view', view: FrameView.Rulers });
+    expect(canvasToolKeys(Command.ToolRectangle, EditMode.Design)).toBe('R');
+    expect(canvasToolKeys(Command.ToolText, EditMode.Design)).toBe('T ⇧T');
+    expect(CANVAS_SHORTCUTS.find((r) => r.id === 'tool')?.keys).toEqual(['V', 'T', 'R', 'O', 'P', 'F']);
   });
 
   it('il tooltip di uno strumento mostra solo i tasti che la tela ascolta', () => {
@@ -433,6 +441,12 @@ describe('a focused control keeps its own activation keys', () => {
   it('other shortcuts still work with a button focused, and Enter on the canvas still enters', () => {
     expect(press('Delete', { tagName: 'BUTTON' })).toEqual({ id: 'delete' });
     expect(press('Enter', { tagName: 'DIV', isContentEditable: false })).toEqual({ id: 'enter' });
+  });
+
+  it('Enter on a clicked canvas tile enters it: the tile is the canvas, not a control', () => {
+    const tile = { tagName: 'DIV', getAttribute: (n: string) => ({ role: 'button', [CANVAS_TILE_ATTR]: '' })[n] ?? null };
+
+    expect(press('Enter', tile)).toEqual({ id: 'enter' });
   });
 });
 

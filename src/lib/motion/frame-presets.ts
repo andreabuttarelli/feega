@@ -1,6 +1,11 @@
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { CanvasSize } from '@feega/motion-core/motion/timeline';
 
+export enum FrameSizing {
+  Presets = 'presets',
+  Free = 'free'
+}
+
 export enum FramePreset {
   Phone = 'phone',
   Tablet = 'tablet',

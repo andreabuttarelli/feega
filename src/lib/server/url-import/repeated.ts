@@ -163,6 +163,9 @@ function chosenOf({ seen, parent, byId }: Tree): Chosen[] {
       return [];
     }
     variants.flat().forEach((s) => claimed.set(s.node.id, s.kind));
+    if (!set[0].kind.component) {
+      return [];
+    }
     return [{ name: set[0].kind.name, kind: set[0].kind, variants: variants.map((v) => v.sort((a, b) => a.order - b.order)) }];
   });
 }
@@ -255,6 +258,8 @@ const LABELS: ((n: RestNode) => string | null)[] = [
 
 const labelOf = (n: RestNode): string | null => LABELS.reduce<string | null>((found, rule) => found ?? rule(n), null);
 
+const firstWordsOf = (n: RestNode): string | null => labelled(descendants(n).find((d) => d.type === 'TEXT' && /[A-Za-z]{3}/.test(d.characters ?? ''))?.characters?.trim().split(/\s+/).slice(0, MAX_LABEL_WORDS).join(' '));
+
 function sectionOf(rootId: string, tree: Tree, id: string): string | null {
   let at = id;
   for (let up = tree.parent.get(at); up && up !== rootId; up = tree.parent.get(at)) {
@@ -272,7 +277,7 @@ function uniquelyNamed(chosen: Chosen[], rootId: string, tree: Tree): Chosen[] {
     const n = (uses.get(c.name) ?? 0) + 1;
     uses.set(c.name, n);
     const main = c.variants[0][0].node;
-    const qualifiers = count.get(c.name) === 1 ? [] : [sectionOf(rootId, tree, main.id), labelOf(main)].flatMap((q) => (q ? [`${q} ${c.name}`] : []));
+    const qualifiers = count.get(c.name) === 1 ? [] : [sectionOf(rootId, tree, main.id), labelOf(main), firstWordsOf(main)].flatMap((q) => (q ? [`${q} ${c.name}`] : []));
     const name = [...qualifiers, n === 1 ? c.name : `${c.name} ${n}`].find((candidate) => !taken.has(candidate))!;
     taken.add(name);
     return name === c.name ? c : { ...c, name };

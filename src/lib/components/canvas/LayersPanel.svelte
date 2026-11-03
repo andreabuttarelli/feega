@@ -42,7 +42,7 @@
   import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
   import type { DrawTool } from '$lib/motion/draw-tool';
   import { highlightStyle, rowHighlight } from '$lib/canvas/highlight';
-  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, rowDrop, frameRows, layerEdit, pickIdOf, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, childIds, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, Place, DROP_BOX, dropLayers, dropTool, freeLanding, landsInMain, rowDrop, frameRows, layerEdit, pickIdOf, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, childIds, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -131,16 +131,51 @@
   let dragged = $state<string | null>(null);
   let block = $state<string[]>([]);
   let landing = $state<{ key: string; place: Place } | null>(null);
+  let carried = $state<string | null>(null);
 
-  function over(row: LayerRow, e: DragEvent) {
-    const tool = e.dataTransfer?.types.includes(CANVAS_DRAG_TOOL);
-    if ((!dragged && !tool) || !editable(row) || block.includes(row.id)) {
+  const isFree = (row: LayerRow) => row.kind === LayerKind.Node && !!row.element;
+  const dropFraction = (e: DragEvent) => {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return (e.clientY - box.top) / box.height;
+  };
+  const freePlace = (row: LayerRow, e: DragEvent) => (row.kind === LayerKind.Node ? Place.Into : rowDrop(row, dropFraction(e)));
+
+  function overWithFree(row: LayerRow, e: DragEvent) {
+    const place = freePlace(row, e);
+    if (!freeLanding(row, place, frames)) {
       landing = null;
       return;
     }
     e.preventDefault();
-    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    landing = { key: row.key, place: rowDrop(row, (e.clientY - box.top) / box.height) };
+    landing = { key: row.key, place };
+  }
+
+  function startDrag(row: LayerRow, e: DragEvent) {
+    dragged = row.id;
+    carried = isFree(row) ? row.id : null;
+    block = isPicked(row) && picked.length > 1 && !carried ? [...picked] : [row.id];
+    e.dataTransfer?.setData('text/plain', row.id);
+  }
+
+  function endDrag() {
+    dragged = null;
+    carried = null;
+    block = [];
+    landing = null;
+  }
+
+  function over(row: LayerRow, e: DragEvent) {
+    if (carried) {
+      overWithFree(row, e);
+      return;
+    }
+    const tool = e.dataTransfer?.types.includes(CANVAS_DRAG_TOOL);
+    if ((!dragged && !tool) || !landable(row) || block.includes(row.id)) {
+      landing = null;
+      return;
+    }
+    e.preventDefault();
+    landing = { key: row.key, place: rowDrop(row, dropFraction(e)) };
   }
 
   const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, shape: Shapes, Audio: Music, rect: Square, circle: Circle, ellipse: Circle, line: Minus, polygon: Hexagon, star: Star, path: PenTool, vector: PenTool, Text: TypeIcon, Title: TypeIcon, Kicker: TypeIcon, Caption: TypeIcon, Image: ImageIcon, Video: Clapperboard, [LayoutKind.Stack]: StretchHorizontal, [LayoutKind.Grid]: LayoutGrid };
@@ -155,6 +190,7 @@
   const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
+  const landable = (row: LayerRow) => editable(row) || (!!video && !!row.scene && landsInMain(video.doc, row.scene, video.nodeId));
   const flagTarget = (row: LayerRow): string | null => (editable(row) ? row.id : row.own && video?.nodeId === row.id ? row.own : null);
   const nodeFlagged = (row: LayerRow) => row.kind === LayerKind.Node && !row.nested && !!canvas && !(row.own && video?.nodeId === row.id);
   const renamable =(row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
@@ -241,6 +277,14 @@
     run(action === LayerAction.Up ? targets : [...targets].reverse(), action, SUMMARY[action]);
   }
 
+  const takeFocus = (input: HTMLInputElement) => {
+    const frame = requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  };
+
   function rename(row: LayerRow, name: string) {
     renaming = null;
     if (row.kind === LayerKind.Node) {
@@ -255,18 +299,29 @@
   }
 
   function dropFromMenu(row: LayerRow, tool: DrawTool, place: Place) {
-    const result = dropTool(video!.doc, tool, row.id, place, crypto.randomUUID().slice(0, 8));
+    const result = dropTool(video!.doc, tool, row.scene ?? row.id, place, crypto.randomUUID().slice(0, 8), DROP_BOX, video!.nodeId);
     video!.edit(result, 'Added a layer');
+  }
+
+  function dropFree(id: string, row: LayerRow, place: Place) {
+    const target = freeLanding(row, place, frames);
+    if (target) {
+      canvas?.moveInto(id, target.frameId, target.slot);
+    }
   }
 
   function drop(row: LayerRow, e: DragEvent) {
     const from = dragged;
+    const free = carried;
     const place = landing?.place;
     const moving = block;
     const tool = e.dataTransfer?.getData(CANVAS_DRAG_TOOL) as DrawTool | undefined;
-    dragged = null;
-    block = [];
-    landing = null;
+    endDrag();
+    if (free && place) {
+      e.preventDefault();
+      dropFree(free, row, place);
+      return;
+    }
     if (video && tool && place) {
       dropFromMenu(row, tool, place);
       return;
@@ -274,7 +329,7 @@
     if (!video || !from || !place || moving.includes(row.id)) {
       return;
     }
-    video.edit(dropLayers(video.doc, moving, row.id, place, frameRows(video.doc, video.nodeId).map((r) => r.id)), moving.length > 1 ? `Moved ${moving.length} layers` : 'Moved a layer');
+    video.edit(dropLayers(video.doc, moving, row.scene ?? row.id, place, frameRows(video.doc, video.nodeId).map((r) => r.id), video.nodeId), moving.length > 1 ? `Moved ${moving.length} layers` : 'Moved a layer');
   }
 
   let menu = $state<{ x: number; y: number } | null>(null);
@@ -324,18 +379,18 @@
       data-kind={row.kind}
       data-highlight={rowHighlight(row)}
       style={`padding-left: ${FOLD_GUTTER + row.depth * INDENT_PX}px;${highlightStyle(rowHighlight(row))}`}
-      draggable={editable(row)}
+      draggable={editable(row) || isFree(row)}
       class:hovered={layersSource.hovered?.id === row.id && layersSource.hovered?.nodeId === row.nodeId}
       onclick={(e) => choose(row, e)}
       onpointerenter={() => layersSource.hover({ nodeId: row.nodeId, id: row.id })}
       onpointerleave={() => layersSource.hover(null)}
       onkeydown={(e) => e.target === e.currentTarget && e.key === 'Enter' && enterRow(row, e)}
       ondblclick={() => renamable(row) && (renaming = row.id)}
-      ondragstart={(e) => ((dragged = row.id), (block = isPicked(row) && picked.length > 1 ? [...picked] : [row.id]), e.dataTransfer?.setData('text/plain', row.id))}
+      ondragstart={(e) => startDrag(row, e)}
       data-drop={landing?.key === row.key ? landing.place : undefined}
       ondragover={(e) => over(row, e)}
       ondragleave={() => landing?.key === row.key && (landing = null)}
-      ondragend={() => ((dragged = null), (block = []), (landing = null))}
+      ondragend={endDrag}
       ondrop={(e) => drop(row, e)}
       oncontextmenu={(e) => openMenu(row, e)}
     >
@@ -349,8 +404,7 @@
       {/if}
       <span class="icon" data-instance={row.instance || undefined}><RowIcon size={ICON} strokeWidth={1.75} /></span>
       {#if renaming === row.id}
-        <!-- svelte-ignore a11y_autofocus -->
-        <input class="name-input" value={row.label} autofocus aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
+        <input class="name-input" value={row.label} {@attach takeFocus} aria-label="Layer name" data-testid="layer-rename" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => (e.stopPropagation(), e.key === 'Escape' ? ((e.currentTarget.value = row.label), e.currentTarget.blur()) : e.key === 'Enter' && e.currentTarget.blur())} onclick={(e) => e.stopPropagation()} />
       {:else}
         <span class="name">{row.label}</span>
       {/if}

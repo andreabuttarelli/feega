@@ -119,8 +119,8 @@ function toolFor(e: KeyboardEvent, mode: EditMode = EditMode.Motion): DrawTool |
   return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
 }
 
-export function canvasToolKeys(command: Command): string {
-  const heard = SHORTCUTS.filter((b) => b.command === command && !b.mod && !b.alt && toolFor({ key: b.key, shiftKey: Boolean(b.shift) } as KeyboardEvent) === TOOL_OF_COMMAND[command]);
+export function canvasToolKeys(command: Command, mode: EditMode = EditMode.Motion): string {
+  const heard = SHORTCUTS.filter((b) => b.command === command && !b.mod && !b.alt && (b.mode ?? mode) === mode && toolFor({ key: b.key, shiftKey: Boolean(b.shift) } as KeyboardEvent, mode) === TOOL_OF_COMMAND[command] && !viewFor({ key: b.key, shiftKey: Boolean(b.shift) } as KeyboardEvent, mode));
   return [...new Set(heard.map((b) => b.label))].join(' ');
 }
 
@@ -232,11 +232,14 @@ const ACTIVATION_KEYS = new Set(['Enter', ' ']);
 const CONTROL_TAGS = new Set(['button', 'select', 'summary', 'input', 'textarea']);
 const CONTROL_ROLES = new Set(['button', 'link', 'checkbox', 'radio', 'switch', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'tab', 'combobox']);
 
+export const CANVAS_TILE_ATTR = 'data-canvas-tile';
+
 function isControl(target: EventTarget | null): boolean {
   const el = target as (Partial<HTMLElement> & { tagName?: string }) | null;
   if (!el?.tagName) return false;
   const tag = el.tagName.toLowerCase();
   const attr = (name: string) => el.getAttribute?.(name) ?? null;
+  if (attr(CANVAS_TILE_ATTR) !== null) return false;
   if (CONTROL_TAGS.has(tag) || el.isContentEditable === true) return true;
   if (tag === 'a' && attr('href') !== null) return true;
   return CONTROL_ROLES.has(attr('role') ?? '');
@@ -323,7 +326,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Redo' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
-  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', 'F'], label: 'Select, text, box, ellipse, pen, frame' },
+  { id: 'tool', keys: ['V', 'T', 'R', 'O', 'P', 'F'], label: 'Select, text, box, ellipse, pen, frame' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'frame', keys: ['⌥', 'mod', 'G'], label: 'Frame the selection' },

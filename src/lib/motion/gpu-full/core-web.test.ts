@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BlendMode } from '@feega/motion-core/motion/blend';
 import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
@@ -104,5 +104,63 @@ describe('dropping a group', () => {
 describe('pictureSize', () => {
   it('fits a picture inside the side the device budget allows', () => {
     expect(pictureSize(1024)({ width: 4000, height: 2000 })).toEqual({ width: 1024, height: 512 });
+  });
+});
+
+describe('uploading a decoded still', () => {
+  class FakeBitmap {
+    constructor(
+      readonly width: number,
+      readonly height: number
+    ) {}
+    close() {}
+  }
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const one = (clip: string) => ({ width: 1, height: 1, background: null, items: [{ kind: ItemKind.Image, clip, src: clip, video: false }] }) as unknown as DisplayList;
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  function wired() {
+    const rows: [number, number][] = [];
+    const whole: unknown[] = [];
+    const attached = {
+      picture: (_clip: string, source: unknown) => whole.push(source),
+      picture_rows: (_clip: string, _source: unknown, _width: number, height: number, top: number, count: number) => (rows.push([top, count]), top + count >= height)
+    } as unknown as Parameters<typeof rasterOf>[0];
+    return { raster: rasterOf(attached), rows, whole };
+  }
+
+  it('sends a large picture a band of rows at a time and calls it in only with the last band', async () => {
+    vi.stubGlobal('ImageBitmap', FakeBitmap);
+    vi.stubGlobal('createImageBitmap', vi.fn());
+    const big = new FakeBitmap(4096, 3072);
+    const pictures = () => ({ source: big, size: { width: 4096, height: 3072 } }) as unknown as ReturnType<Pictures>;
+    const { raster, rows } = wired();
+    const list = one('big');
+
+    const done: boolean[] = [];
+    for (let call = 0; call < 6 && !done.at(-1); call++) {
+      done.push(raster.upload(list, pictures, 1));
+      await settle();
+    }
+
+    expect(done.at(-1)).toBe(true);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.every(([, count]) => count * 4096 <= 1 << 21)).toBe(true);
+    expect(rows.map(([top]) => top)).toEqual(rows.map((_, i) => i * rows[0][1]));
+    expect(done.slice(0, -1).every((d) => !d)).toBe(true);
+  });
+
+  it('sends a bitmap already at its size as it is, without copying it again on the main thread', async () => {
+    vi.stubGlobal('ImageBitmap', FakeBitmap);
+    const copy = vi.fn();
+    vi.stubGlobal('createImageBitmap', copy);
+    const small = new FakeBitmap(64, 64);
+    const pictures = () => ({ source: small, size: { width: 64, height: 64 } }) as unknown as ReturnType<Pictures>;
+    const { raster, whole } = wired();
+
+    expect(raster.upload(one('small'), pictures, 1)).toBe(true);
+    expect(copy).not.toHaveBeenCalled();
+    expect(whole).toEqual([small]);
   });
 });
