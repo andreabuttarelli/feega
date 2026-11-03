@@ -42,7 +42,9 @@ The **Components** panel in the rail (`Alt+5`) shows the components of every can
 
 ## Variants
 
-Select an instance or a main to switch its variant from the right bar: one dropdown per property, listing every variant of the set, in any frame or canvas, and, when the set has one property or a few variants, a row of chips, one per variant. Overrides stay. In the prototype player, an instance whose set has a `State=Hover` or `State=Pressed` variant shows it while hovered or pressed.
+Select a main and click **Add variant** in the right bar (or the **+** under it) to add the next variant 20 px to its right; on the Components page the set's **+** does the same and widens the set. Agents: `component` `add-variant` with `clip_id`.
+
+Select an instance or a main to switch its variant from the right bar: one dropdown per property, listing every variant of the set, in any frame or canvas, and, when the set has one property or a few variants, a row of chips, one per variant. Overrides stay. In the prototype player, a **Change to** interaction switches an instance to another variant of its set, wherever the instance is; an instance whose set has a `State=Hover` or `State=Pressed` variant shows it while hovered or pressed.
 
 A component can have several variant properties, like Size (S, M, L) and State (default, hover). Select an instance and the variant matrix appears in Properties: one cell per combination, the current one highlighted.
 
@@ -78,9 +80,14 @@ Agent: `set-preferred` with `comp`, `prop` (the swap property) and `preferred` (
 
 Inside the main, on the Components page, every edit changes the main: move, restyle or retype one of its layers and every instance follows. Inside an instance the same edit is an override of that instance only; a component nested in a main (a button inside a card) is an instance there, so its text or fill becomes an override of the card.
 
+To add a layer to a main, draw it over the main (text, shape, frame) or drop a layer onto it: it lands inside, in the stack under the pointer, and every instance shows it.
+
 In Layers, click a layer inside a component to select it on the canvas. An instance shows its own box in the inspector (X, Y, W, H of what it draws), not the box of the frame.
 
-## Duplicate
+## Copy, paste and duplicate
+
+Copy a main and paste it in another frame: you get an instance linked to that main, at the size it had. Copy an instance and it stays an instance.
+
 
 `⌘D` and Alt-drag copy a layer in place, at the same moment of the timeline, with everything inside it. A copy of an instance is another instance; a copy of a main is a new main, and a copy of a variant inside a set is a new variant of that set, as in Figma. Agents: `duplicate_clip` with `place: "in_place"`.
 

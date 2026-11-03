@@ -1,5 +1,6 @@
 import type { MotionClip, MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
-import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
+import { instanceBoxes } from '@feega/motion-core/motion/layout/resolve';
 import { appendVariant } from './variants';
 import { compBox, reframed, type Box } from './comp-frame';
 import type { NewId } from './main-component';
@@ -46,6 +47,26 @@ export function addSetVariant(doc: MotionDoc, newId: NewId): OpResult {
   const right = Math.max(...boxes.map((b) => b.right));
   const comps = Object.fromEntries(Object.entries(added.doc.comps).map(([id, comp]) => [id, id === variantId ? reframed(comp, doc, size, { x: right + SET_GAP_PX - box.left, y: 0 }) : reframed(comp, doc, size)]));
   return addClip({ ...added.doc, ...size, comps }, { component: 'Precomp', from: 0, durationInFrames: Math.min(comps[variantId].durationInFrames, doc.durationInFrames), props: { comp: variantId } }, newId());
+}
+
+export function addVariantBeside(doc: MotionDoc, hostId: string, newId: NewId): OpResult {
+  const host = doc.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === hostId);
+  const compId = host ? String(host.props.comp) : '';
+  const box = instanceBoxes(doc).get(hostId);
+  if (!host || !box || !doc.comps[compId]?.component) {
+    return fail(`${hostId} is not a main component`);
+  }
+
+  const variantId = newId();
+  const added = appendVariant(doc, compId, () => variantId);
+  if (!added.ok) {
+    return added;
+  }
+
+  const clipId = newId();
+  const placed = addClip(added.doc, { component: 'Precomp', from: host.from, durationInFrames: host.durationInFrames, props: { comp: variantId } }, clipId);
+  const beside = { x: Number(host.transform.x ?? 0) + (box.width + SET_GAP_PX) / doc.width, y: Number(host.transform.y ?? 0) };
+  return placed.ok ? setTransform(placed.doc, clipId, beside) : placed;
 }
 
 type Size = { width: number; height: number };

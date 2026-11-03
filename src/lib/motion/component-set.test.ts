@@ -3,7 +3,9 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '@fe
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { createComponent } from './main-component';
 import { compBox } from './comp-frame';
-import { SET_GAP_PX, addSetVariant, mainDragged, resizeSetMain, setMainOf } from './component-set';
+import { SET_GAP_PX, addSetVariant, addVariantBeside, mainDragged, resizeSetMain, setMainOf } from './component-set';
+import { instanceBoxes } from '@feega/motion-core/motion/layout/resolve';
+import { setMembers } from './variants';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -79,5 +81,20 @@ describe('resizing the main of a set', () => {
 
   it('refuses a clip that is not a main of the set', () => {
     expect(resizeSetMain(setFrame(), 'nope', { width: 10, height: 10 }).ok).toBe(false);
+  });
+});
+
+describe('a variant added to a main in a design frame', () => {
+  it('lands beside the main, so the set reads left to right', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 30, props: { x: 0.2, y: 0.5, width: 0.1, height: 0.1 } }, 'pill'));
+    const made = must(createComponent(doc, ['pill'], () => `b${++n}`, 'Button'));
+    const main = precomps(made)[0];
+    const added = must(addVariantBeside(made, main.id, () => `b${++n}`));
+    const [first, second] = precomps(added).map((c) => instanceBoxes(added).get(c.id)!);
+    const shift = Number(precomps(added)[1].transform.x ?? 0) * added.width;
+
+    expect(precomps(added)).toHaveLength(2);
+    expect(setMembers(added, String(main.props.comp))).toHaveLength(2);
+    expect(second.left + shift).toBeCloseTo(first.left + first.width + SET_GAP_PX, 6);
   });
 });

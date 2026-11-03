@@ -42,9 +42,9 @@ export function mainsGained(before: MotionDoc, after: MotionDoc): boolean {
   return [...homeless(after)].some((id) => !had.has(id));
 }
 
-export type HomedOutcome = { moved: string[]; setIds: string[] };
+export type HomedOutcome = { moved: string[]; setIds: string[]; homes: Record<string, string> };
 
-const NOTHING: HomedOutcome = { moved: [], setIds: [] };
+const NOTHING: HomedOutcome = { moved: [], setIds: [], homes: {} };
 
 const HOMED_SUMMARY = 'Moved the main to the Components page';
 
@@ -76,5 +76,5 @@ export async function homeComponents(store: FrameStore, page: () => Promise<Comp
   const placed = await placeFigmaPlan(store, where.place, { items: sets.map((set) => scaled(set, scale)), skipped: [], fileKey: null }, where.at);
   const byComp = Object.fromEntries(Object.entries(homes[0] ?? {}).flatMap(([compId, set]) => (placed.frameIds[set] ? [[compId, placed.frameIds[set]]] : [])));
   await store.write(nodeId, frame.version, homedAt(frame.doc, byComp), HOMED_SUMMARY);
-  return { moved: Object.keys(byComp), setIds: placed.frameIds };
+  return { moved: Object.keys(byComp), setIds: placed.frameIds, homes: byComp };
 }

@@ -117,7 +117,8 @@
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
   import { CopyShown, type Drawing } from '$lib/canvas/optimistic-insert';
-  import { drawnAnchor, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { docPoint, drawnAnchor, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { dropIntoMain, landInside, landedScene, mainUnder } from '$lib/motion/into-main';
   import { TypeAhead } from '$lib/canvas/type-ahead';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -143,17 +144,16 @@
   import { missingAssets } from '$lib/canvas/live-assets';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
-  import { instanceOf } from '$lib/motion/main-component';
-  import { appendVariant } from '$lib/motion/variants';
+  import { ComponentRole, roleOf } from '$lib/motion/main-component';
   import VariantPlus from '../VariantPlus.svelte';
   import ComponentSetOutline from '../ComponentSetOutline.svelte';
-  import { addSetVariant, mainDragged, setMainOf } from '$lib/motion/component-set';
+  import { addSetVariant, addVariantBeside, mainDragged, setMainOf } from '$lib/motion/component-set';
   import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
   import { fetchComponentSource } from '$lib/canvas/project-components';
-  import { homed, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
+  import { homed, homedAt, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -1514,8 +1514,12 @@
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
     if (id === Action.CreateComponent && !onComponentsPage) {
-      await saverOf(nodeId)?.flushScheduled();
-      props.onComponentMade?.(nodeId);
+      await saverOf(nodeId)?.settled();
+      const homes = await props.onComponentMade?.(nodeId);
+      const present = saverOf(nodeId)?.history.present;
+      if (homes && present && Object.keys(homes).length) {
+        commit(nodeId, { ok: true, doc: homedAt(present, homes) }, 'Moved the main to the Components page');
+      }
     }
   }
 
@@ -1878,14 +1882,14 @@
   function variantMark(nodeId: string) {
     const mark = picks.length === 1 && !typing && !isComponentSet(nodeId) ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const instance = mark && saver ? instanceOf(saver.history.present, mark.clip) : null;
-    return mark && instance ? { rect: quadBox(mark.quad), compId: instance.compId } : null;
+    const main = mark && saver ? roleOf(saver.history.present, mark.clip, nodeId) === ComponentRole.Main : false;
+    return mark && main ? { rect: quadBox(mark.quad), hostId: mark.clip } : null;
   }
 
-  function addVariantAt(nodeId: string, compId: string) {
+  function addVariantAt(nodeId: string, hostId: string) {
     const saver = saverOf(nodeId);
     if (saver) {
-      commit(nodeId, appendVariant(saver.history.present, compId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+      commit(nodeId, addVariantBeside(saver.history.present, hostId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
     }
   }
 
@@ -2235,8 +2239,14 @@
   }
 
   function drawnInside(nodeId: string, id: string) {
-    picks = [id];
-    arrive(frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null);
+    const doc = saverOf(nodeId)?.history.present;
+    const inMain = doc ? dropIntoMain(doc, id, nodeId) : null;
+    if (inMain?.ok) {
+      commit(nodeId, inMain, 'Added to the main component');
+    }
+    const scene = inMain?.ok ? (landedScene(inMain.doc, id) ?? id) : id;
+    picks = [scene];
+    arrive(frameBar.tool === DrawTool.Text ? { nodeId, clip: scene } : null);
     frameBar.tool = DrawTool.Select;
   }
 
@@ -2334,11 +2344,18 @@
 
   function frameUnderDrawing(drawn: DrawnWire) {
     const anchor = drawnAnchor(drawn);
-    const hosts = (id: string) => !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation && coreFrames.some((f) => f.id === id && !f.linked);
+    const takes = (id: string) => kindOfNode(id) === FrameKind.Frame || (kindOfNode(id) === FrameKind.Element && anchor !== null && holdsMainAt(id, anchor));
+    const hosts = (id: string) => !domIds.has(id) && takes(id) && !byId.get(id)?.rotation && coreFrames.some((f) => f.id === id && !f.linked);
     const id = anchor ? hitIndex.allAt(anchor).find(hosts) : null;
     const frame = id ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? liveOf(frame.id) : null;
     return frame && live && saverOf(frame.id) ? { frame, live } : null;
+  }
+
+  function holdsMainAt(id: string, at: Point): boolean {
+    const frame = coreFrames.find((f) => f.id === id);
+    const doc = liveOf(id)?.doc;
+    return !!frame && !!doc && mainUnder(doc, docPoint(doc, frame.box, at), id) !== null;
   }
 
   function drawIntoFrame(drawn: DrawnWire): boolean {
@@ -2348,14 +2365,17 @@
     }
     const { frame, live } = under;
     const clip = crypto.randomUUID().slice(0, 8);
-    const made = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode, frameOfLive(live)), clip);
-    if (!made.ok) {
+    const drawnHere = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode, frameOfLive(live)), clip);
+    const anchor = drawnAnchor(drawn);
+    const made = drawnHere.ok ? landInside(drawnHere.doc, clip, frame.id, anchor ? docPoint(drawnHere.doc, frame.box, anchor) : undefined) : drawnHere;
+    const scene = made.ok ? landedScene(made.doc, clip) : null;
+    if (!made.ok || !scene) {
       return false;
     }
     commit(frame.id, made, DRAW_SUMMARY[drawn.tool]);
     select([frame.id]);
-    goInside(frame.id, Gesture.Click, clip);
-    arrive(drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null);
+    goInside(frame.id, Gesture.Click, scene);
+    arrive(drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip: scene } : null);
     return true;
   }
 
@@ -2372,12 +2392,13 @@
   $effect(() => {
     const wanted = typeOnArrival;
     const saver = wanted ? saverOf(wanted.nodeId) : null;
-    const clip = saver?.history.present.tracks.flatMap((t) => t.clips).find((c) => (wanted?.clip ? c.id === wanted.clip : c.component === 'Text'));
+    const present = saver?.history.present;
+    const clip = wanted?.clip ? (present && scopeOf(present, wanted.clip) ? wanted.clip : null) : present?.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Text')?.id;
     if (!wanted || !clip || !pickerOf(wanted.nodeId)) {
       return;
     }
     typeOnArrival = null;
-    untrack(() => void startTyping(wanted.nodeId, clip.id, typeAhead));
+    untrack(() => void startTyping(wanted.nodeId, clip, typeAhead));
   });
 
   function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
@@ -2688,6 +2709,14 @@
       }
       if (!result?.ok) {
         liveDocs.set(nodeId, at.live);
+        return;
+      }
+      const [only] = work.ids;
+      const atRoot = grip === Grip.Move && work.ids.length === 1 && inScope.scene(work.ids)[0] === only;
+      const adopted = atRoot ? dropIntoMain(result.doc, only, nodeId) : null;
+      if (adopted?.ok) {
+        commit(nodeId, adopted, GRIP_SUMMARY[grip]);
+        pickMany(nodeId, [landedScene(adopted.doc, only) ?? only]);
         return;
       }
       commit(nodeId, result, GRIP_SUMMARY[grip]);
@@ -3740,7 +3769,7 @@
   function clipOfSelection(): ClipboardPayload | null {
     const tools = inside && framePicks().length ? toolsOf(inside.nodeId) : null;
     if (inside && tools) {
-      const elements = copyElements(tools.doc, picks);
+      const elements = copyElements(homed(tools.doc, inside.nodeId), picks);
       elementClipboard.copyElements(inside.nodeId, [...picks], elements);
       return { elements: elementClipboard.elements! };
     }
@@ -4214,7 +4243,7 @@
         {/if}
         {@const plus = variantMark(frame.id)}
         {#if plus}
-          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.compId)} />
+          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.hostId)} />
         {/if}
         {@const crop = cropMark(frame.id)}
         {#if crop}

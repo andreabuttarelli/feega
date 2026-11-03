@@ -3,7 +3,9 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/mot
 import { addClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips, instanceOf } from '$lib/motion/main-component';
+import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { homedAt } from '$lib/motion/canvas-components';
+import { addVariant } from '$lib/motion/variants';
 import { Reach } from './frame-select';
 import { pickTarget, enteredFrom, parentPick, scopeOf, scoped } from './frame-scope';
 
@@ -158,6 +160,52 @@ describe('scoped inside a main', () => {
 
     expect(mainX(merged, host)).toBe(0.2);
     expect(instanceOf(merged, host)!.overrides).toEqual({ a: { x: 0.9 } });
+  });
+});
+
+describe('scoped inside one variant of a set', () => {
+  it('an edit inside one variant leaves the other variants alone', () => {
+    let n = 0;
+    const made = must(createComponent(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2), ['a'], () => `m${++n}`, 'Chip'));
+    const set = must(addVariant(made, 'm1', { State: 'Hover' }, () => 'v2'));
+    const both = must(addClip(set, { component: 'Precomp', from: 0, durationInFrames: 90, props: { comp: 'v2' } }, 'h2'));
+    const s = scoped(both, ['h2__0__a'], 0, 'set')!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+    const xIn = (comp: string) => merged.comps[comp].tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')!.props.x;
+
+    expect(xIn('v2')).toBe(0.9);
+    expect(xIn('m1')).toBe(0.2);
+  });
+});
+
+describe('a text override on a button nested in a card instance', () => {
+  function screen() {
+    let n = 0;
+    const id = () => `n${++n}`;
+    const label = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Buy', x: 0.3, y: 0.5, width: 0.1, height: 0.05 } }, 'label'));
+    const button = must(createComponent(label, ['label'], id, 'Button'));
+    const card = homedAt(must(createComponent(button, ['n2'], id, 'Card')), { n1: 'buttons', n3: 'cards' });
+    return { doc: card, card: 'n4', nested: 'n4__0__n2__0__label' };
+  }
+  const texts = (doc: MotionDoc) => flattenComps(doc).tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Text').map((c) => c.props.text);
+
+  it('changes that card only, as an override on the card instance', () => {
+    const { doc, card, nested } = screen();
+    const s = scoped(doc, [nested], 0, 'screen')!;
+    const merged = s.merge(must(setProps(s.view, 'label', { text: 'Sold out' })));
+
+    expect(texts(merged)).toEqual(['Sold out']);
+    expect(instanceOf(merged, card)!.comp.tracks.flatMap((t) => t.clips).find((c) => c.id === 'n2')!.props.overrides).toBeUndefined();
+    expect(instanceOf(merged, card)!.overrides).toEqual({ n2: { overrides: { label: { text: 'Sold out' } } } });
+  });
+
+  it('shows the override when the text is entered again', () => {
+    const { doc, nested } = screen();
+    const s = scoped(doc, [nested], 0, 'screen')!;
+    const merged = s.merge(must(setProps(s.view, 'label', { text: 'Sold out' })));
+    const again = scoped(merged, [nested], 0, 'screen')!;
+
+    expect(findClip(again.view, 'label')!.clip.props.text).toBe('Sold out');
   });
 });
 
