@@ -185,6 +185,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.SelectSameStroke]: VIEW,
   [Command.SelectSameFont]: VIEW,
   [Command.SelectSameEffect]: VIEW,
+  [Command.Export]: canvas('export_selection'),
   [Command.Deselect]: VIEW,
   [Command.SelectChild]: VIEW,
   [Command.SelectParent]: VIEW,

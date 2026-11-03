@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Bundle, EXPORT_PRESETS, FILE, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, needsBrowser, rowSize, sizeNote } from './export-rows';
+import { Bundle, EXPORT_PRESETS, FILE, FileFormat, SizeBy, bundleOf, exportFiles, exportRowsSchema, needsBrowser, nextExportRow, rowSize, sizeNote } from './export-rows';
 
 const frame = { width: 1080, height: 1350 };
 
@@ -84,5 +84,21 @@ describe('export presets', () => {
       expect(exportRowsSchema.safeParse([preset.row]).success).toBe(true);
     }
     expect(EXPORT_PRESETS[3].row).toMatchObject({ format: FileFormat.Png, by: SizeBy.Scale, value: 4 });
+  });
+});
+
+describe('the + of the Export section', () => {
+  it('starts at 1x PNG', () => {
+    expect(nextExportRow([])).toEqual({ format: FileFormat.Png, by: SizeBy.Scale, value: 1, suffix: '', transparent: false });
+  });
+
+  it('adds the next scale with its @2x suffix, as in Figma', () => {
+    const one = nextExportRow([]);
+    expect(nextExportRow([one])).toMatchObject({ format: FileFormat.Png, value: 2, suffix: '@2x' });
+  });
+
+  it('never goes past the largest scale', () => {
+    const big = { ...nextExportRow([]), value: 4, suffix: '@4x' };
+    expect(nextExportRow([big]).value).toBe(4);
   });
 });

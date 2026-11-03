@@ -147,7 +147,7 @@
   <button type="button" class={`${TRIGGER} rounded-sm bg-ui-input text-ui-text hover:bg-ui-input-hover`} style={`font-family: ${fontStack(value, fonts)}`} aria-expanded={open} aria-label={`Font ${value}`} onclick={toggle}>{value}</button>
   {#if missing}<p class="m-0 mt-0.5 text-[11px] text-amber-700 dark:text-amber-400" role="status" data-testid="font-missing">The file of {value} is gone: a fallback font is showing.</p>{/if}
   {#if open}
-    <div class="absolute inset-x-0 top-[calc(100%+2px)] z-20 grid max-h-[420px] gap-1 overflow-auto rounded-md bg-ui-raised p-1.5 text-ui-text shadow-ui-float" role="dialog" aria-label="Choose a font">
+    <div class="absolute inset-x-0 top-[calc(100%+2px)] z-20 grid max-h-[420px] gap-1 overflow-auto rounded-md bg-ui-raised p-1.5 text-ui-text shadow-ui-float" role="dialog" aria-label="Choose a font" {@attach (el) => el.scrollIntoView({ block: 'nearest' })}>
       <input type="search" class={`${FIELD_INPUT} w-full`} placeholder="Search Google Fonts…" aria-label="Search fonts" bind:value={query} />
       <p class={GROUP}>In this video</p>
       <ul class="m-0 list-none p-0">
@@ -163,9 +163,9 @@
               {#if renaming === font.family}
                 <input class={`${FIELD_INPUT} w-full`} value={font.family} aria-label={`Rename ${font.family}`} {@attach (el) => el.focus()} onkeydown={(e) => (e.key === 'Enter' ? rename(font.family, e.currentTarget.value) : e.key === 'Escape' ? (renaming = null) : null)} onblur={(e) => rename(font.family, e.currentTarget.value)} />
               {:else}
-                <button type="button" class={`${rowClass(font.family === value)} flex-1`} aria-current={font.family === value} style={`font-family: '${font.family}', system-ui`} onclick={() => pick(font.family)}>{font.family}<span class={TAG}>{font.variants.length > 1 ? `${font.variants.length} styles` : 'uploaded'}</span></button>
-                <button type="button" class="rounded-sm px-1 text-[10px] text-ui-text-3 hover:bg-ui-wash" aria-label={`Rename ${font.family}`} onclick={() => (renaming = font.family)}>Rename</button>
-                <button type="button" class="rounded-sm px-1 text-[10px] text-ui-text-3 hover:bg-ui-wash" aria-label={`Delete ${font.family}`} onclick={() => remove(font.family)}>Delete</button>
+                <button type="button" class={`${rowClass(font.family === value)} min-w-0 flex-1`} aria-current={font.family === value} style={`font-family: '${font.family}', system-ui`} onclick={() => pick(font.family)}>{font.family}<span class={TAG}>{font.variants.length > 1 ? `${font.variants.length} styles` : 'uploaded'}</span></button>
+                <button type="button" class="shrink-0 rounded-sm px-1 text-[10px] text-ui-text-3 hover:bg-ui-wash" aria-label={`Rename ${font.family}`} onclick={() => (renaming = font.family)}>Rename</button>
+                <button type="button" class="shrink-0 rounded-sm px-1 text-[10px] text-ui-text-3 hover:bg-ui-wash" aria-label={`Delete ${font.family}`} onclick={() => remove(font.family)}>Delete</button>
               {/if}
             </li>
           {:else}

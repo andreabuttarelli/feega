@@ -46,6 +46,7 @@ export type CanvasCommandId =
   | 'toggle-hidden'
   | 'toggle-locked'
   | 'flip'
+  | 'export'
   | 'view';
 
 export type CanvasCommand =
@@ -81,8 +82,8 @@ const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
   [Command.TogglePivot]: FrameView.Pivot
 };
 
-function viewFor(e: KeyboardEvent): FrameView | null {
-  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+function viewFor(e: KeyboardEvent, mode: EditMode): FrameView | null {
+  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }, mode);
   return command ? (VIEW_OF_COMMAND[command] ?? null) : null;
 }
 
@@ -138,6 +139,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.SendToBack]: { id: 'send-back' },
   [Command.ToggleHidden]: { id: 'toggle-hidden' },
   [Command.ToggleLocked]: { id: 'toggle-locked' },
+  [Command.Export]: { id: 'export' },
   [Command.PreviewZoomIn]: { id: 'zoom-in' },
   [Command.PreviewZoomOut]: { id: 'zoom-out' },
   [Command.PreviewFit]: { id: 'fit' },
@@ -244,7 +246,7 @@ export function matchCanvasShortcut(e: KeyboardEvent, mode: EditMode = EditMode.
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key;
 
-  const view = viewFor(e);
+  const view = viewFor(e, mode);
   if (view) return { id: 'view', view };
   if (codeModeFor(e)) return { id: 'code-mode' };
 
@@ -374,6 +376,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'send-back': GuideGroup.Edit,
   'toggle-hidden': GuideGroup.Edit,
   'toggle-locked': GuideGroup.Edit,
+  export: GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
   'wrap-stack': GuideGroup.Edit,

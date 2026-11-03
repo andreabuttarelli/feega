@@ -112,7 +112,7 @@ keeps only project switcher + burger.
 | Colour tag, export to cloud | "…" submenus | "…" + right bar |
 | Timeline ⌘J | Motion | Design (read-only scrub) and Motion |
 | Transport (Space, J/K/L, I/O, M, ⌥↵) | motion keys | Motion mode |
-| Outlines ⌘Y, pixel grid ⇧', guides ⇧G, rulers ⌥⇧R, pivot ⌥R | keys only | View menu + keys |
+| Outlines ⌘Y, pixel grid ⇧', guides ⇧G, rulers ⇧R (⌥⇧R in Motion), pivot ⌥R | keys only | View menu + keys |
 | Opacity 0–9 | motion keys | Design, with a selection |
 | Generated image/video properties | none | right bar |
 | Mobile insert sheet | bottom switch "Insert" | "+" menu sheet |

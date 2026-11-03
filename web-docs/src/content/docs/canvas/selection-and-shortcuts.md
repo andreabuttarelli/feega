@@ -43,7 +43,7 @@ Several shapes, texts or frames selected on the canvas get one box around them a
 Selecting a frame opens its properties in the right bar.
 
 - **Selection colours** lists every colour used in the frame, nested groups and pasted Figma vectors included, most used first with a count. Changing one swatch recolours every element that uses it, in one step you can undo.
-- With several elements selected inside a frame, the right bar shows the properties they all have: text properties when all are text, plus layout, opacity and their selection colours. Values that differ read **Mixed**; editing one applies it to every selected element at once.
+- With several elements selected inside a frame, the right bar shows the properties they all have: text properties when all are text, plus layout, opacity and their selection colours. Values that differ read **Mixed**; editing one applies it to every selected element at once. **X**, **Y**, **W** and **H** are the bounds of the whole selection, as in Figma: X and Y move it as one, W and H stretch it.
 
 ## Groups and frames inside a frame
 

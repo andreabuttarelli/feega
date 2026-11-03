@@ -160,6 +160,13 @@ export const heightFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>): boo
 
 export const tileFollowsDoc = (node: Pick<MotionNode, 'kind' | 'format'>, doc: Pick<MotionDoc, 'width' | 'height'>): boolean => heightFollowsDoc(node) || (node.kind === FrameKind.Frame && presetOf(doc) !== null);
 
+export function tileForDoc(tile: { w: number; h: number }, before: Picture, after: Picture): { w: number; h: number } | null {
+  if (before.width === after.width && before.height === after.height) {
+    return null;
+  }
+  return { w: Math.round((tile.w * after.width) / before.width), h: Math.round((tile.h * after.height) / before.height) };
+}
+
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 
 const RESIZE: Record<Sizing, (node: MotionNode, asked: { w: number; h: number }, picture: Picture, mode: NodeMode) => FrameResize> = {

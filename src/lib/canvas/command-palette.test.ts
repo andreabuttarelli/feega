@@ -21,6 +21,10 @@ describe('command palette', () => {
     expect(PALETTE.every((e) => canRunInFrame(e.command) || e.command in CANVAS_COMMAND_OF)).toBe(true);
   });
 
+  it('finds Export… by typing export, the way Figma users look for it', () => {
+    expect(searchPalette('export').map((e) => e.name)).toContain('Export…');
+  });
+
   it('keeps the shortcut label of an action that has one', () => {
     expect(PALETTE.find((e) => e.command === Command.FlipHorizontal)?.label).toBe('⇧H');
   });

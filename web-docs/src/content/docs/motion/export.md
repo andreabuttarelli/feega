@@ -24,6 +24,7 @@ Export a frame as Lottie or dotLottie, up to 30 seconds, with shapes, gradients,
 ## Stills and vectors
 
 - A still frame exports as an image straight from the canvas. Any element exports as PNG at 1× to 4× or as SVG.
+- The **Export** section at the bottom of the right bar works like Figma's: each row is a scale (0.5× to 4×) and a format, **+** adds the next scale, **−** removes a row, and **Export** downloads the file (a zip when there are several). It exports the frame, or the layers selected in it. Right-click → Export and **Export…** in the command palette (`⌘K`) open the same choices.
 - SVG and PDF are true vector: shapes, gradients, masks and text as outlines. Anything that cannot be drawn is listed.
 - Image export on the server needs headless Chromium; see [Self-hosting](/self-hosting/).
 

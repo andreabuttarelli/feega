@@ -92,7 +92,7 @@ describe('a free element reads as one object on the canvas', () => {
 const html = (selection: string[], part: string | null = null) => render(FrameInspectorPanel, { props: { session: sessionOf(selection), tokens: FEEGA_TOKENS, part } }).body;
 
 describe('the frame itself', () => {
-  const placed = (patch: Partial<NodePlace> = {}): NodePlace => ({ x: 120, y: 40, rotation: 0, set: () => undefined, turn: () => undefined, flip: () => undefined, align: null, ...patch });
+  const placed = (patch: Partial<NodePlace> = {}): NodePlace => ({ x: 120, y: 40, rotation: 0, set: () => undefined, turn: () => undefined, flip: () => undefined, align: null, follow: () => undefined, ...patch });
 
   it('places the frame with X and Y and heads the panel with its name', () => {
     frameProperties.place = placed();
@@ -255,5 +255,27 @@ describe('frame inspector panel', () => {
 
     editorMode.set(EditorMode.Design);
     expect(html(['a'])).toContain('data-testid="header-actions"');
+  });
+});
+
+describe('export, where Figma puts it', () => {
+  it('the frame panel ends with an Export section: a 1x PNG row, a + for more and an Export button', () => {
+    frameProperties.exportRows = async () => 'off';
+    const body = html([]);
+    frameProperties.clear();
+
+    expect(body).toContain('data-testid="export-section"');
+    expect(body).toContain('data-testid="export-add"');
+    expect(body).toMatch(/aria-label="Export scale"/);
+    expect(body).toMatch(/aria-label="Export format"/);
+    expect(body).toMatch(/data-testid="export-go"[^>]*>[^<]*Export Frame/);
+  });
+
+  it('a selected layer exports from the same section', () => {
+    frameProperties.exportRows = async () => 'off';
+    const body = html(['a']);
+    frameProperties.clear();
+
+    expect(body).toContain('data-testid="export-go"');
   });
 });
