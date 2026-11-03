@@ -2,7 +2,6 @@
   import ColorField from './ColorField.svelte';
   import NumberField from './NumberField.svelte';
   import FontPicker from './FontPicker.svelte';
-  import MinusGlyph from './MinusGlyph.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import { StyleKind, type Style } from '@feega/motion-core/motion/styles-model';
   import { TYPE, TYPE_SIZE } from '@feega/motion-core/motion/components';
@@ -26,7 +25,7 @@
 
 <div class="head">
   <input class="text" type="text" value={name} aria-label="Style name" data-testid={`style-library-name-${name}`} onchange={(e) => onrename(e.currentTarget.value)} />
-  <button type="button" class="icon" aria-label="Delete style" title="Delete style" data-testid={`style-library-remove-${name}`} onclick={onremove}><MinusGlyph /></button>
+  <button type="button" class="delete" data-testid={`style-library-remove-${name}`} onclick={onremove}>Delete</button>
 </div>
 {#if style.kind === StyleKind.Text}
   <span data-testid={`style-library-font-${name}`}><FontPicker value={style.font ?? BuiltinFont.Sans} fonts={[]} brand={tokens.fonts ?? []} onpick={(family) => onedit({ font: family })} /></span>
@@ -44,7 +43,7 @@
 <style>
   .head {
     display: grid;
-    grid-template-columns: 1fr 20px;
+    grid-template-columns: 1fr auto;
     align-items: center;
     gap: var(--ui-space-2);
   }
@@ -55,12 +54,9 @@
     gap: var(--ui-space-2);
   }
 
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
+  .delete {
+    height: 24px;
+    padding: 0 var(--ui-space-2);
     border: 0;
     border-radius: var(--ui-radius-sm);
     background: none;
@@ -68,7 +64,7 @@
     cursor: pointer;
   }
 
-  .icon:hover {
+  .delete:hover {
     background: var(--ui-wash);
     color: var(--ui-text);
   }
