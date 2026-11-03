@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { imagesFilled, type ImageAssets } from '$lib/canvas/figma/images';
 import { DocRejected, placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import type { UndoItem } from '$lib/canvas/undo-plan';
@@ -309,13 +310,34 @@ export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: bo
     return refused(UrlImportOutcome.Unreadable);
   }
 
+  const refusal = refusalOf(made.plan.items);
+  if (refusal) {
+    return refused(UrlImportOutcome.Rejected, refusal);
+  }
+
   const placed = await placeFigmaPlan(ask.store, ask.place, made.plan, ask.at);
-  const sets = await placedSets(ask, made.sets);
-  await homedOnSets(ask.store, placed.frameIds, sets.frameIds, made.homes);
-  await homedOnSets(ask.store, sets.frameIds, sets.frameIds, made.setHomes);
-  const assets = await imported(ask, made.images);
-  await filled(ask, placed.frameIds, made.plan.items, assets);
-  await filled(ask, sets.frameIds, made.sets, assets);
-  const frameId = placed.frameIds[0];
-  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: [...placed.undo, ...sets.undo], skipped: [...placed.skipped, ...sets.skipped], truncated };
+  const landed = [...placed.frameIds];
+  try {
+    const sets = await placedSets(ask, made.sets);
+    landed.push(...sets.frameIds.filter(Boolean));
+    await homedOnSets(ask.store, placed.frameIds, sets.frameIds, made.homes);
+    await homedOnSets(ask.store, sets.frameIds, sets.frameIds, made.setHomes);
+    const assets = await imported(ask, made.images);
+    await filled(ask, placed.frameIds, made.plan.items, assets);
+    await filled(ask, sets.frameIds, made.sets, assets);
+    return { outcome: UrlImportOutcome.Ok, frameId: placed.frameIds[0], name: made.name, undo: [...placed.undo, ...sets.undo], skipped: [...placed.skipped, ...sets.skipped], truncated };
+  } catch (e) {
+    await Promise.all(landed.map((id) => ask.store.remove(id).catch(() => undefined)));
+    throw e;
+  }
+}
+
+function refusalOf(items: UrlPlan['plan']['items']): string | null {
+  for (const item of items) {
+    const verdict = parseMotionDoc(item.doc);
+    if (!verdict.ok) {
+      return `${item.name}: ${verdict.error}`;
+    }
+  }
+  return null;
 }
