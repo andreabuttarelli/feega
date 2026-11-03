@@ -7,7 +7,8 @@ import { layerOrder } from '../siblings';
 import { addClip, duplicateClip, moveClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import type { SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
 import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
-import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
+import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, TEXT_ITEM, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
+import { NEW_TEXT_SIZING, type TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { childrenInOrder, shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
@@ -321,7 +322,7 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
     }
     result = setParent(result.doc, p.clip.id, id, { at: p.clip.from });
     if (result.ok && container === Container.Stack && isText(p.clip.component) && !p.clip.layoutItem) {
-      result = setLayoutItem(result.doc, p.clip.id, HUG);
+      result = setLayoutItem(result.doc, p.clip.id, TEXT_ITEM[(p.clip.props.sizing as TextSizing | undefined) ?? NEW_TEXT_SIZING]);
     }
   }
   return result.ok && container === Container.Stack ? setLayoutItem(result.doc, id, HUG) : result;

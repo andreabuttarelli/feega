@@ -88,13 +88,13 @@ describe('export presets', () => {
 });
 
 describe('the + of the Export section', () => {
-  it('starts at 1x PNG', () => {
-    expect(nextExportRow([])).toEqual({ format: FileFormat.Png, by: SizeBy.Scale, value: 1, suffix: '', transparent: false });
+  it('starts at 2x PNG: the frame as big as on the canvas, doubled, as sharp as a drawn frame always exported', () => {
+    expect(nextExportRow([])).toEqual({ format: FileFormat.Png, by: SizeBy.Scale, value: 2, suffix: '@2x', transparent: false });
   });
 
-  it('adds the next scale with its @2x suffix, as in Figma', () => {
-    const one = nextExportRow([]);
-    expect(nextExportRow([one])).toMatchObject({ format: FileFormat.Png, value: 2, suffix: '@2x' });
+  it('adds the next scale with its suffix, as in Figma', () => {
+    const two = nextExportRow([]);
+    expect(nextExportRow([two])).toMatchObject({ format: FileFormat.Png, value: 3, suffix: '@3x' });
   });
 
   it('never goes past the largest scale', () => {

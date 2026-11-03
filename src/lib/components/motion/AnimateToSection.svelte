@@ -6,9 +6,9 @@
   import { parseDecimal, valueAt } from '$lib/motion/inspector';
   import { TRANSFORM, type TransformKey } from '@feega/motion-core/motion/keyframes';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { toShown, toStored, unitOf } from '$lib/motion/units';
+  import { toShown, toStored, unitOf, type Frame } from '$lib/motion/units';
 
-  let { doc, clip, frame, commit }: { doc: MotionDoc; clip: MotionClip; frame: number; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, frame, space, commit }: { doc: MotionDoc; clip: MotionClip; frame: number; space: Frame; commit: (result: OpResult, summary: string) => void } = $props();
 
   const DEFAULT_SECONDS = 1;
   const identity = (color: string) => color;
@@ -20,7 +20,7 @@
 
   const start = $derived(Math.max(0, frame - clip.from));
   const current = $derived(Number(valueAt(withParams(doc, clip), key, clip.from + start, identity) ?? 0));
-  const shownNow = $derived(toShown(clip.component, key, current, doc));
+  const shownNow = $derived(toShown(clip.component, key, current, space));
   const unit = $derived(unitOf(clip.component, key) ?? '');
 
   function run() {
@@ -29,7 +29,7 @@
       return;
     }
     const duration = Math.max(1, Math.round((parseDecimal(seconds) ?? DEFAULT_SECONDS) * doc.fps));
-    commit(animateTo(doc, clip.id, { [key]: toStored(clip.component, key, shown, doc) }, { start, duration, ease }, identity), `Animated ${TRANSFORM[key].label} to ${shown}`);
+    commit(animateTo(doc, clip.id, { [key]: toStored(clip.component, key, shown, space) }, { start, duration, ease }, identity), `Animated ${TRANSFORM[key].label} to ${shown}`);
     target = '';
   }
 </script>

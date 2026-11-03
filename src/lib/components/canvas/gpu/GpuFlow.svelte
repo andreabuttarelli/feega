@@ -45,7 +45,7 @@
   import { sameValue } from '$lib/canvas/node-patch';
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
-  import { libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { inDoc, libraryOf, syncedDoc } from '$lib/motion/style-library';
   import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
@@ -115,7 +115,8 @@
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
   import { CopyShown, type Drawing } from '$lib/canvas/optimistic-insert';
-  import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { drawnAnchor, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { TypeAhead } from '$lib/canvas/type-ahead';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { frameDocs, type FrameDocEdit, type HeldDoc } from '$lib/canvas/frame-docs';
@@ -170,7 +171,7 @@
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty, tileForDoc } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -1560,7 +1561,7 @@
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && !sameValue(present.styles?.[name], style) ? syncedDoc(present, name, style) : null;
+      const synced = present && !sameValue(present.styles?.[name], inDoc(style, present)) ? syncedDoc(present, name, style) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -2084,7 +2085,7 @@
 
   function drawnInside(nodeId: string, id: string) {
     picks = [id];
-    typeOnArrival = frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null;
+    arrive(frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null);
     frameBar.tool = DrawTool.Select;
   }
 
@@ -2098,10 +2099,10 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: string };
   let typing = $state<Typing | null>(null);
 
-  async function startTyping(nodeId: string, clip: string) {
+  async function startTyping(nodeId: string, clip: string, ahead?: TypeAhead) {
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
@@ -2109,19 +2110,29 @@
     const found = scope ? findClip(scope.view, scope.id)?.clip : null;
     const size = at?.picker.frameSize();
     if (editedView(nodeId) || !saver || !at || !doc || !scope || !found || !size || !editsText(scope.view, scope.id)) {
+      ahead?.release();
       return;
     }
     const laid = await caretSource(() => at.live.tokens, () => at.live.assets)(scope.view, scope.id);
     if (!laid || saver.history.present !== doc) {
+      ahead?.release();
       return;
     }
     const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
     const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens) };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: ahead?.release() ?? '' };
     liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
   let typeOnArrival = $state<{ nodeId: string; clip: string | null } | null>(null);
+  const typeAhead = new TypeAhead();
+
+  function arrive(next: { nodeId: string; clip: string | null } | null) {
+    typeOnArrival = next;
+    if (next) {
+      typeAhead.hold(performance.now());
+    }
+  }
 
   const drawSaves = new Map<string, Promise<boolean>>();
 
@@ -2171,9 +2182,10 @@
   }
 
   function frameUnderDrawing(drawn: DrawnWire) {
-    const centre = drawnCentre(drawn);
-    const id = centre ? topNodeAt(centre) : null;
-    const frame = id && !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation ? coreFrames.find((f) => f.id === id && !f.linked) : null;
+    const anchor = drawnAnchor(drawn);
+    const hosts = (id: string) => !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation && coreFrames.some((f) => f.id === id && !f.linked);
+    const id = anchor ? hitIndex.allAt(anchor).find(hosts) : null;
+    const frame = id ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? liveOf(frame.id) : null;
     return frame && live && saverOf(frame.id) ? { frame, live } : null;
   }
@@ -2192,7 +2204,7 @@
     commit(frame.id, made, DRAW_SUMMARY[drawn.tool]);
     select([frame.id]);
     goInside(frame.id, Gesture.Click, clip);
-    typeOnArrival = drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null;
+    arrive(drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null);
     return true;
   }
 
@@ -2203,7 +2215,7 @@
     }
     const drawing = props.onDraw?.(drawn);
     seed(drawing);
-    typeOnArrival = drawn.tool === DrawTool.Text && drawing ? { nodeId: drawing.id, clip: null } : null;
+    arrive(drawn.tool === DrawTool.Text && drawing ? { nodeId: drawing.id, clip: null } : null);
   }
 
   $effect(() => {
@@ -2214,7 +2226,7 @@
       return;
     }
     typeOnArrival = null;
-    untrack(() => void startTyping(wanted.nodeId, clip.id));
+    untrack(() => void startTyping(wanted.nodeId, clip.id, typeAhead));
   });
 
   function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
@@ -2240,7 +2252,7 @@
     const z = view.zoom;
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
-    return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+    return { text: open.text, typed: open.typed, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
   }
 
   function nodePlaceOf(nodeId: string): NodePlace | null {
@@ -2248,13 +2260,7 @@
     if (!tile) {
       return null;
     }
-    const follow = (before: { width: number; height: number }, after: { width: number; height: number }) => {
-      const size = tileForDoc(tile, before, after);
-      if (size) {
-        props.onNodeSize?.(nodeId, size.w, size.h);
-      }
-    };
-    return { x: tile.x, y: tile.y, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId), follow };
+    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
   }
 
   const hostLedger = new HostLedger();
@@ -3464,6 +3470,10 @@
     if (frameDialog) {
       return;
     }
+    if (!isTypingTarget(e.target) && typeAhead.take(e, performance.now())) {
+      e.preventDefault();
+      return;
+    }
     markBusy();
     altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
@@ -3981,7 +3991,7 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
+          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
@@ -4221,6 +4231,7 @@
     <FrameDialogs
       dialog={frameDialog.dialog}
       {nodeId}
+      box={byId.get(nodeId) ?? null}
       projectId={page.params.projectId ?? ''}
       canvasId={page.params.canvasId ?? ''}
       session={dialogSession}

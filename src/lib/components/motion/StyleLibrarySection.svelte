@@ -9,11 +9,11 @@
   import { fontPreviewHref } from '$lib/design/font-preview';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
-  import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
-  import { TYPE, TYPE_SIZE } from '@feega/motion-core/motion/components';
-  import { styleLabel } from '$lib/motion/style-library';
+  import { MAX_TYPE_PX, StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
+  import { TYPE } from '@feega/motion-core/motion/components';
+  import { inDoc, inLibrary, styleLabel } from '$lib/motion/style-library';
   import { swatchOf } from '$lib/motion/fill/swatch';
-  import { fractionOf, pxOf, textFace, textMetrics } from '$lib/motion/type-px';
+  import { textFace, textMetrics } from '$lib/motion/type-px';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
 
   const DEFAULT_UNIT = 1080;
@@ -21,9 +21,16 @@
 
   let { tokens, unit = DEFAULT_UNIT }: { tokens: BrandTokens; unit?: number } = $props();
 
+  const NEW_STYLE_PX = 16;
+  const square = $derived({ width: unit, height: unit });
+  const pxOfStyle = (style: Style) => {
+    const held = inLibrary(style, square);
+    return held.kind === StyleKind.Text ? Math.round(held.sizePx ?? 0) : 0;
+  };
+
   type Group = { title: string; kinds: StyleKind[]; create?: { prefix: string; style: Style } };
   const GROUPS: Group[] = [
-    { title: 'Text', kinds: [StyleKind.Text], create: { prefix: 'Text style', style: { kind: StyleKind.Text, size: 0.08, weight: 600 } } },
+    { title: 'Text', kinds: [StyleKind.Text], create: { prefix: 'Text style', style: { kind: StyleKind.Text, sizePx: NEW_STYLE_PX, weight: 600 } } },
     { title: 'Colour', kinds: [StyleKind.Colour, StyleKind.Paint], create: { prefix: 'Colour', style: { kind: StyleKind.Colour, color: '#111111' } } },
     { title: 'Effect', kinds: [StyleKind.Effect] }
   ];
@@ -39,7 +46,7 @@
   };
   const meta = (style: Style) => {
     if (style.kind === StyleKind.Text) {
-      return { face: textFace(style), metrics: textMetrics(style, unit) };
+      return { face: textFace(style), metrics: textMetrics(inDoc(style, square), unit) };
     }
     return { face: '', metrics: style.kind === StyleKind.Colour ? color(style.color) : styleLabel(style) };
   };
@@ -151,7 +158,7 @@
               {#if style.kind === StyleKind.Text}
                 <span data-testid={`style-library-font-${name}`}><FontPicker value={style.font ?? ''} fonts={[]} brand={tokens.fonts ?? []} onpick={(family) => edit(name, style, { font: family })} /></span>
                 <div class="grid">
-                  <span data-testid={`style-library-size-${name}`}><NumberField label="Size" name="Size" unit="px" value={pxOf(style.size ?? 0, unit)} range={{ min: Math.ceil(TYPE_SIZE.min * unit), max: TYPE_SIZE.max * unit, step: 1 }} onchange={(px) => edit(name, style, { size: fractionOf(px, unit) })} /></span>
+                  <span data-testid={`style-library-size-${name}`}><NumberField label="Size" name="Size" unit="px" value={pxOfStyle(style)} range={{ min: 1, max: MAX_TYPE_PX, step: 1 }} onchange={(px) => edit(name, inLibrary(style, square), { sizePx: px })} /></span>
                   <span data-testid={`style-library-weight-${name}`}><NumberField label="W" name="Weight" value={style.weight ?? 400} range={{ min: TYPE.weight.min, max: TYPE.weight.max, step: 100 }} onchange={(v) => edit(name, style, { weight: Math.round(v) })} /></span>
                   <span data-testid={`style-library-tracking-${name}`}><NumberField label="Tr" name="Tracking" unit="%" value={(style.tracking ?? 0) * PERCENT} range={{ min: TYPE.tracking.min * PERCENT, max: TYPE.tracking.max * PERCENT, step: 0.5 }} onchange={(v) => edit(name, style, { tracking: v / PERCENT })} /></span>
                   <span data-testid={`style-library-leading-${name}`}><NumberField label="Ld" name="Leading" value={style.leading ?? 1.2} range={TYPE.leading} onchange={(v) => edit(name, style, { leading: v })} /></span>

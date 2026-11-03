@@ -5,6 +5,7 @@ import { mapOutline, parsePath, pathData } from '@feega/motion-core/motion/shape
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { joinStackAt } from '$lib/motion/layout/stack-drag';
 
 type Point = { x: number; y: number };
 type DrawnClip = { component: string; props: Record<string, unknown>; autoLayout?: unknown };
@@ -77,11 +78,17 @@ export function drawnInFrame(doc: MotionDoc, frame: FrameBox, wire: DrawnWire, a
   }
   const { left, top, width, height } = drawn.box;
   const box = { x: (left + width / 2 - frame.x) / frame.w, y: (top + height / 2 - frame.y) / frame.h, width: width / frame.w, height: height / frame.h };
-  return drawClip(doc, drawn.tool, box, at, id, drawn.sizing ?? NEW_TEXT_SIZING);
+  const made = drawClip(doc, drawn.tool, box, at, id, drawn.sizing ?? NEW_TEXT_SIZING);
+  const anchor = drawnAnchor(wire);
+  return made.ok && anchor ? joinStackAt(made.doc, id, [((anchor.x - frame.x) / frame.w) * doc.width, ((anchor.y - frame.y) / frame.h) * doc.height]) : made;
 }
 
-export function drawnCentre(wire: DrawnWire): Point | null {
+export function drawnAnchor(wire: DrawnWire): Point | null {
   const drawn = drawnOf(wire);
   const made = typeof drawn === 'string' ? null : drawnElement(drawn, '');
-  return made?.ok ? { x: made.box.left + made.box.width / 2, y: made.box.top + made.box.height / 2 } : null;
+  if (!made?.ok) {
+    return null;
+  }
+  const { left, top, width, height } = made.box;
+  return { x: wire.tool === DrawTool.Text ? left : left + width / 2, y: top + height / 2 };
 }

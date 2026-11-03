@@ -97,24 +97,31 @@ describe('poster formats', () => {
 describe('image export settings', () => {
   it('scales from 1x to 4x', () => {
     expect([...IMAGE_SCALES]).toEqual([1, 2, 3, 4]);
-    expect(stillExport(ImageFormat.Png, ImageScale.Four).size({ width: 100, height: 50 } as never)).toEqual({ width: 400, height: 200 });
+    expect(stillExport(ImageFormat.Png, ImageScale.Four, 1).size({ width: 100, height: 50 } as never)).toEqual({ width: 400, height: 200 });
   });
 
   it('png, jpg and webp each carry their mime and extension', () => {
-    expect(IMAGE_FORMATS.map((f) => stillExport(f, ImageScale.One).mime)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
-    expect(stillExport(ImageFormat.Jpg, ImageScale.One).ext).toBe('jpg');
+    expect(IMAGE_FORMATS.map((f) => stillExport(f, ImageScale.One, 1).mime)).toEqual(['image/png', 'image/jpeg', 'image/webp']);
+    expect(stillExport(ImageFormat.Jpg, ImageScale.One, 1).ext).toBe('jpg');
   });
 
   it('2x doubles the pixels of the doc, 1x keeps them', () => {
     const doc = newMotionDoc(MotionFormat.Portrait);
 
-    expect(stillExport(ImageFormat.Png, ImageScale.Two).size(doc)).toEqual({ width: 2160, height: 2700 });
-    expect(stillExport(ImageFormat.Png, ImageScale.One).size(doc)).toEqual({ width: 1080, height: 1350 });
+    expect(stillExport(ImageFormat.Png, ImageScale.Two, 1).size(doc)).toEqual({ width: 2160, height: 2700 });
+    expect(stillExport(ImageFormat.Png, ImageScale.One, 1).size(doc)).toEqual({ width: 1080, height: 1350 });
+  });
+
+  it('1x is the frame as big as it is on the canvas, though its doc holds two px for each', () => {
+    const doc = { width: 1400, height: 920 };
+
+    expect(stillExport(ImageFormat.Png, ImageScale.One, 0.5).size(doc)).toEqual({ width: 700, height: 460 });
+    expect(stillExport(ImageFormat.Png, ImageScale.Two, 0.5).size(doc)).toEqual({ width: 1400, height: 920 });
   });
 
   it('png is lossless: no quality, the lossy ones have one', () => {
-    expect(stillExport(ImageFormat.Png, ImageScale.One).quality).toBeUndefined();
-    expect(stillExport(ImageFormat.Jpg, ImageScale.One).quality).toBeGreaterThan(80);
+    expect(stillExport(ImageFormat.Png, ImageScale.One, 1).quality).toBeUndefined();
+    expect(stillExport(ImageFormat.Jpg, ImageScale.One, 1).quality).toBeGreaterThan(80);
   });
 });
 

@@ -3688,6 +3688,10 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** after a gesture that writes several nodes, Cmd+Z undoes the step before it (a create), not the gesture. **Move:** `undoStack.collect` is not reentrant: two collects awaited in parallel restore the wrong outer bucket, and every later push lands in a finished collection. Run collecting writes one after another (`for … await`), never in `Promise.all`.
 
+## A line on the GPU canvas that a re-render does not clear
+
+**Signal:** a 1–2 px artefact on a canvas element moves with pan and drag, survives a partial repaint of its rect, and goes away on zoom or reload. **Move:** before touching gpu-core, hide DOM layers one at a time (`motion-node-stage`, `gpu-dom-node`) and re-sample the pixels; hiding `core-canvas` proves nothing, since a canvas-coloured DOM line looks the same either way. The ⌘G seam was the `MotionPreview` outline inside the node's DOM, not a damage rect.
+
 ## Agent worktrees
 
 ### The Vite dev server in a worktree serves stale code after an edit

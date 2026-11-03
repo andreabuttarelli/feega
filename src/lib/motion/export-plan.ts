@@ -30,8 +30,8 @@ const MP4_EXT = 'mp4';
 const even = (n: number) => Math.round(n / 2) * 2;
 
 export function exportSize(doc: Pick<MotionDoc, 'width' | 'height'>, resolution: Resolution): Size {
-  const factor = Math.min(1, SHORT_SIDE[resolution] / Math.min(doc.width, doc.height));
-  return { width: even(doc.width * factor), height: even(doc.height * factor) };
+  const { width, height } = outputSize(doc, resolution);
+  return { width, height };
 }
 
 type Timed = Pick<MotionDoc, 'durationInFrames' | 'fps' | 'motionBlur'>;

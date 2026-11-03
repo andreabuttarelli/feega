@@ -116,6 +116,7 @@
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '@feega/motion-core/motion/expression/bake';
   import { Unit, propsOwner, shownNumber, sliderOf, spaceOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
+  import { resizedTexts } from '$lib/motion/text-fit';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
@@ -150,6 +151,7 @@
     mode = EditMode.Motion,
     as = null,
     host = null,
+    scale = 1,
     title = null,
     here = null,
     onrename = null,
@@ -178,6 +180,7 @@
     mode?: EditMode;
     as?: PropertiesView | null;
     host?: ElementHost | null;
+    scale?: number;
     title?: string | null;
     here?: string | null;
     onrename?: ((name: string) => void) | null;
@@ -298,7 +301,7 @@
       return;
     }
     error = '';
-    onchange(result.doc, summary);
+    onchange(resizedTexts(doc, result.doc), summary);
   }
 
   function setProp(field: Field, value: unknown) {
@@ -501,7 +504,7 @@
     }
     commit(result, summary);
   }
-  const space = $derived(spaceOf(doc, host?.box ?? null));
+  const space = $derived(spaceOf(doc, scale));
   const numberShown = (prop: AnimProp) => shownNumber(clip.component, prop.key, Number(shown(prop.key)), space);
   const stored = (key: string, v: number) => toStored(clip.component, key, v, space);
   const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, space));
@@ -1047,7 +1050,7 @@
 {#snippet animateBody()}
   {#if visual && clip.component !== 'Null'}
     <InOutPresetsSection {doc} {clip} {frame} {commit} />
-    <AnimateToSection {doc} {clip} {frame} {commit} />
+    <AnimateToSection {doc} {clip} {frame} {space} {commit} />
   {/if}
   {#if TEXT_COMPONENTS.has(clip.component)}
     <div class="stackable" data-testid="text-animators-section">
@@ -1149,7 +1152,7 @@
 
 
 {#snippet addStrokeButton()}
-  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props), Math.min(doc.width, doc.height)) }), 'Add stroke')}><Plus /></ShellIconButton>
+  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props), Math.min(space.width, space.height)) }), 'Add stroke')}><Plus /></ShellIconButton>
 {/snippet}
 
 {#snippet addEffectMenu()}
