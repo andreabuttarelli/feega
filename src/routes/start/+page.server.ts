@@ -24,6 +24,11 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
     throw redirect(SEE_OTHER, HOME);
   }
 
-  const { projectId, canvasId } = await startProject(await locals.db(), ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, startUrl);
+  const db = await locals.db();
+  if (!db) {
+    throw redirect(SEE_OTHER, HOME);
+  }
+
+  const { projectId, canvasId } = await startProject(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, startUrl);
   throw redirect(SEE_OTHER, `${canvasPath(projectId, canvasId)}?${START_URL_PARAM}=${encodeURIComponent(startUrl)}`);
 };
