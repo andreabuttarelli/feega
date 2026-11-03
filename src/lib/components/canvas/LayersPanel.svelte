@@ -42,7 +42,7 @@
   import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
   import type { DrawTool } from '$lib/motion/draw-tool';
   import { highlightStyle, rowHighlight } from '$lib/canvas/highlight';
-  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, rowDrop, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayers, dropTool, rowDrop, frameRows, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, childIds, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -150,7 +150,8 @@
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
   const inside = $derived(rowsInside(rows, isPicked));
   let query = $state('');
-  const shown = $derived(searchRows(rows, query));
+  const currentFrame = $derived(video?.nodeId ?? canvas?.selected[0] ?? null);
+  const shown = $derived(searchRows(rows, query, currentFrame));
   const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
@@ -159,8 +160,9 @@
   const renamable =(row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
   function enterRow(row: LayerRow, e: KeyboardEvent) {
-    if (isPicked(row) && renamable(row)) {
-      renaming = row.id;
+    const children = childIds(rows, row);
+    if (video?.nodeId === row.nodeId && children.length) {
+      video.select(children);
       return;
     }
     choose(row, e as unknown as MouseEvent);

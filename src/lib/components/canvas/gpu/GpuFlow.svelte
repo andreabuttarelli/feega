@@ -879,6 +879,10 @@
     })
   );
   const hitIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => [r.body, ...r.labels])));
+  const viewLabelIndex = $derived.by(() => {
+    const glyphs = coreType?.glyphs ?? NO_GLYPHS;
+    return new SpatialIndex(bpViews.flatMap((v) => nodeHitRects({ id: v.frame.id, x: v.frame.box.x, y: v.frame.box.y, width: v.frame.box.w, height: v.frame.box.h, inputs: [], outputs: [], label: `${v.name} ${v.width}`, icon: null, tag: null, zoom: labelZoom }, glyphs).slice(1)));
+  });
   const labelIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => r.labels)));
 
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
@@ -3281,9 +3285,18 @@
     menuAt = at;
   }
 
+  const VIEW_MENU_IDS: ReadonlySet<SelectionActionId> = new Set(['export']);
+  let viewMenu = $state<{ at: Point; id: string } | null>(null);
+
   function openMenuAt(at: Point) {
     const e = { clientX: at.x, clientY: at.y };
     if (suppressMenu || !spec.chrome || openElementMenu(e)) {
+      return;
+    }
+    const world = toWorld(view, local(e));
+    const viewId = viewLabelIndex.topAt(world) ?? viewAt(bpViews, world)?.frame.id;
+    if (viewId) {
+      viewMenu = { at, id: viewId };
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
@@ -4272,6 +4285,10 @@
 
   {#if spec.chrome}
     <CommandPalette onrun={runPaletteCommand} />
+  {/if}
+
+  {#if viewMenu && spec.chrome}
+    <CanvasContextMenu at={viewMenu.at} summaries={(props.nodeSummaries ?? []).filter((n) => n.id === baseNodeId(viewMenu!.id))} available={VIEW_MENU_IDS} onpick={() => props.onExport?.([viewMenu!.id])} onclose={() => (viewMenu = null)} />
   {/if}
 
   {#if menuAt && spec.chrome}
