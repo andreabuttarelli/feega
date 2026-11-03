@@ -11,7 +11,7 @@ import { transformAt } from '@feega/motion-core/motion/parent';
 import { GuideAlign, GuideKind, newGuide, setLayoutGuides } from '$lib/motion/layout-guides/guides';
 import { wrapInStack } from '$lib/motion/layout/ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-import { SnapMode, dragClips, measuredGaps, nudgeClips, type Drag } from './frame-transform';
+import { SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf, type Drag } from './frame-transform';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -277,5 +277,15 @@ describe('resizing a Hug stack in a frame', () => {
     expect(row.transform.scaleY ?? 1).toBe(1);
     expect(row.layoutItem).toMatchObject({ width: 'fixed', height: 'fixed' });
     expect((laidRow(next).props.height as number) * next.height).toBeCloseTo(boxes.row.height + 108, 0);
+  });
+});
+
+describe('the selection box a pick draws', () => {
+  const shape = (props: Record<string, unknown>) => ({ component: 'Shape' as const, props });
+
+  it('is two line ends for one straight line, a box with handles otherwise', () => {
+    expect(selectionKindOf(1, shape({ shape: 'path', path: 'M 0 0 L 10 10' }))).toBe(SelectionKind.Line);
+    expect(selectionKindOf(1, shape({ shape: 'rect' }))).toBe(SelectionKind.Element);
+    expect(selectionKindOf(2, shape({ shape: 'path', path: 'M 0 0 L 10 10' }))).toBe(SelectionKind.Member);
   });
 });

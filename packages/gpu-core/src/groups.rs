@@ -206,6 +206,7 @@ pub fn report(skipped: &[Skipped]) -> String {
 }
 
 const CACHE_PREFIX: &str = "cache:";
+const NORMAL_BLEND: &str = "normal";
 const RGBA_BYTES: u64 = 4;
 const CULL_SLACK_PX: f64 = 2.0;
 const RUNGS_PER_DOUBLING: f64 = 4.0;
@@ -324,7 +325,7 @@ fn chunk_of(u: &UseItem, group: &DisplayList, at: Building, items: usize) -> Chu
 }
 
 fn vector_only(item: &Item) -> bool {
-    let plain = |look: &Look| !needs_layer(look) && look.backdrop.is_none();
+    let plain = |look: &Look| !needs_layer(look) && look.backdrop.is_none() && look.blend == NORMAL_BLEND;
     match item {
         Item::Path(p) => plain(&p.look),
         Item::Group(g) => plain(&g.look) && g.items.iter().all(vector_only),

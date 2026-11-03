@@ -92,7 +92,7 @@
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
@@ -159,7 +159,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
   import { imageSourceTile } from '$lib/canvas/free-image';
-  import { frameRinged } from '$lib/canvas/layers';
+  import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
@@ -223,7 +223,7 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
-  import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
@@ -246,8 +246,9 @@
   import { dragAngle, followGroup, mirrorGroup, type Placed } from '$lib/canvas/node-layout';
   import { Flip, flipStage } from '$lib/motion/layer-props';
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
+  import { backToFront } from '$lib/canvas/paint-order';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -327,7 +328,7 @@
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
+  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -447,7 +448,8 @@
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
-      const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
+      const openId = layersSource.video?.nodeId ?? null;
+      const ringed = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
@@ -1933,7 +1935,7 @@
     if (!at) {
       return [];
     }
-    const kind = picks.length > 1 ? SelectionKind.Member : SelectionKind.Element;
+    const kind = selectionKindOf(picks.length, picks.length === 1 ? findClip(at.live.doc, picks[0])?.clip : null);
     const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
@@ -1946,7 +1948,7 @@
   function gradientMark(nodeId: string) {
     const mark = picks.length === 1 && typing?.nodeId !== nodeId ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip) : null;
+    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip, frameProperties.editingFill) : null;
     return mark && target ? { clip: mark.clip, rect: quadBox(mark.quad), index: target.index, fill: target.fill } : null;
   }
 
@@ -3110,7 +3112,7 @@
       view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
-    view = panBy(view, { x: -e.deltaX, y: -e.deltaY });
+    view = panBy(view, wheelPan(e));
   }
 
 
@@ -3484,6 +3486,9 @@
       endCrop(e.key === 'Enter');
       return;
     }
+    if (e.key === 'Escape' && !typing && !isTypingTarget(e.target) && frameBar.disarm()) {
+      return;
+    }
     const up = climbsUp(e);
     const group = up && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
     if (inside && group) {
@@ -3712,6 +3717,12 @@
     'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => duplicateTiles(ids),
+    rename: (ids) => {
+      const tile = byId.get(ids[0]);
+      if (tile) {
+        startNaming(tile);
+      }
+    },
     'connect-new': () => {
       if (selection.box) {
         connectPickerAt = { x: selection.box.x + selection.box.width + 24, y: selection.box.y };
@@ -4240,7 +4251,7 @@
       frame={frameOfLive(liveOf(nodeId)!)}
       onedit={(result, summary) => commit(nodeId, result, summary)}
       onswitch={(next) => (frameDialog = { nodeId, dialog: next })}
-      onimages={(rows) => props.onExportRows?.([nodeId], rows) ?? Promise.resolve('Export failed')}
+      onimages={(rows) => props.onExportRows?.([nodeId], rows, frameOfLive(liveOf(nodeId)!) / liveOf(nodeId)!.doc.fps) ?? Promise.resolve('Export failed')}
       onpreview={(doc) => showDialogDoc(nodeId, doc)}
       onclose={() => closeDialog(nodeId)}
     />

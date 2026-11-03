@@ -4,6 +4,7 @@
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { hotspotsOf, isDrag, type Hotspot } from '$lib/motion/prototype/hotspots';
   import { TriggerKind } from '@feega/motion-core/motion/prototype/model';
+  import { Background } from '@feega/motion-core/motion/doc';
   import { ElementState } from '@feega/motion-core/motion/states/model';
   import { StateSpotKind, stateHold, stateSpotsOf, type StateSpot } from '$lib/motion/states/spots';
   import { withStatedComps } from '$lib/motion/states/stated-comps';
@@ -11,7 +12,7 @@
   import { amountAt, settled, type TweenRun } from '$lib/motion/states/tween';
   import { changeTo, clipById, variantHotspotsOf, withSwaps, type Swaps, type VariantHotspot } from '$lib/motion/prototype/variant-change';
 
-  let { live, hint = false, interactive = true, onfire, onrelease }: { live: LiveDoc; hint?: boolean; interactive?: boolean; onfire: (spot: Hotspot) => void; onrelease: (spot: Hotspot) => void } = $props();
+  let { live, hint = false, interactive = true, background = Background.Brand, onfire, onrelease }: { live: LiveDoc; hint?: boolean; interactive?: boolean; background?: Background; onfire: (spot: Hotspot) => void; onrelease: (spot: Hotspot) => void } = $props();
 
   let swaps = $state<Swaps>({});
   let held = $state<Record<string, Swaps>>({});
@@ -138,7 +139,7 @@
 </script>
 
 <div class="view">
-  <CompositionPlayer doc={shown} assets={live.assets} tokens={live.tokens} />
+  <CompositionPlayer doc={shown} assets={live.assets} tokens={live.tokens} {background} />
   {#each stateSpots as spot (spot.path.join('/'))}
     <div
       class="state-spot"

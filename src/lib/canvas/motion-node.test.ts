@@ -139,11 +139,11 @@ describe('a free element is a frame without chrome', () => {
     expect(freshText(FrameKind.Element, FIRST_REVISION, [{ id: 's', component: 'Shape' }])).toBeNull();
   });
 
-  it('a poster shows only while it pictures the head revision; one saved before revisions were recorded is trusted', () => {
+  it('a poster shows only while it pictures the head revision; one without a revision is not known to, so it waits', () => {
     const node = { docHeadRevision: 2 };
     expect(posterFresh({ ...node, posterRevision: 2 })).toBe(true);
     expect(posterFresh({ ...node, posterRevision: 1 })).toBe(false);
-    expect(posterFresh(node)).toBe(true);
+    expect(posterFresh(node)).toBe(false);
   });
 
   it('the drawing ghost stands in only until the element is first edited', () => {

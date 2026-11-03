@@ -84,3 +84,33 @@ frame's units per pixel, and merged into the base doc:
 Rejected: overriding text, fills and images per view (the whitelist would cover content, and the
 inspector could no longer tell a layout change from a content change); one doc per view (edits made
 N times); replanning the view and matching clips by order (532 mismatches on feega.app).
+
+## Amendment 2026-11-03: an imported view is the same tree
+
+Amendment (2) made the views faithful and the frame hard to edit: on vercel.com 310 of the tablet's
+layers were view-only copies hidden on desktop, so a headline edited on desktop never reached
+tablet or phone. An imported view now links to the base tree the way a hand-made breakpoint does:
+
+- A base layer and a view layer from the same element and of the same kind are **one layer**
+  whatever their fill or picture: the base keeps its content, the view takes only layout overrides
+  (box, type size, wrap, visibility). A content edit reaches every view.
+- **Other words stay per view.** A text the narrower page words differently is a view-only layer:
+  the desktop sentence in the phone's box ran over the buttons below it (stripe phone fold
+  0.982 → 0.743).
+- A layer pairs when the view's counterpart sits anywhere inside the partner of its nearest paired
+  ancestor, so a wrapper only one width paints (or the desktop plan drops) no longer cuts its
+  subtree into copies. A base layer with no counterpart still shows when layers inside it are
+  linked.
+- **Snapshots stay per view.** A layer the doc holds only as a raster of the page (stretched
+  picture) pairs only with the same raster: the phone raster is another drawing, not a crop.
+- **No components with breakpoints.** An instance's placement (`transform`) and its per-instance
+  overrides are not breakpoint overrides, so an instance cannot follow a view; extracting
+  components made every repeated part a copy per view. A page imported with breakpoints keeps
+  plain layers; importing without breakpoints still extracts components.
+
+View-only layers remain for what only a narrower page has (a phone menu, a raster, other words):
+on vercel.com 66 at tablet, one of them text (a scrambling label). Fidelity on the v6 captures is
+unchanged or better (vercel, stripe, linear, feega; linear phone fold 0.864 → 0.945).
+
+Rejected: content overrides per view (texts and pictures varying silently per size); linking
+instances through comp-level overrides (every copy of a main would take the first copy's layout).

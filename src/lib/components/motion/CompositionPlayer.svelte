@@ -2,9 +2,9 @@
   import MotionPreview from './MotionPreview.svelte';
   import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
   import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
-  import type { MotionDoc } from '@feega/motion-core/motion/doc';
+  import { Background, type MotionDoc } from '@feega/motion-core/motion/doc';
 
-  let { doc, assets, tokens = FEEGA_TOKENS, active = true, restFrame = 0 }: { doc: MotionDoc; assets: Record<string, string>; tokens?: BrandTokens; active?: boolean; restFrame?: number } = $props();
+  let { doc, assets, tokens = FEEGA_TOKENS, active = true, restFrame = 0, background = Background.Brand }: { doc: MotionDoc; assets: Record<string, string>; tokens?: BrandTokens; active?: boolean; restFrame?: number; background?: Background } = $props();
 
   let frame = $state(restFrame);
   let playing = $state(false);
@@ -30,7 +30,7 @@
 </script>
 
 <div class="composition-player">
-  <MotionPreview {html} {fullDoc} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing />
+  <MotionPreview {html} {fullDoc} width={doc.width} height={doc.height} fps={doc.fps} {background} bind:frame bind:playing />
 </div>
 
 <style>

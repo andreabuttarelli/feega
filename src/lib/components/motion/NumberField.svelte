@@ -3,7 +3,7 @@
   import { fieldKeys } from '$lib/motion/field-keys';
   import { parseDecimal } from '$lib/motion/inspector';
   import { KeyMark } from '$lib/motion/timeline-layers';
-  import { FieldFill, FieldKind, Gesture, Nudge, fillShare, gestureOf, formatValue, nudged, precisionOf, scrubbed, valueAtShare, type Range } from '$lib/motion/number-field';
+  import { FieldFill, FieldKind, FieldText, Gesture, Nudge, fieldText, fillShare, gestureOf, nudged, precisionOf, scrubbed, valueAtShare, type Range } from '$lib/motion/number-field';
   import { MIXED, type Shared } from '$lib/motion/mixed';
   import type { LiveGesture } from '$lib/motion/live-edit';
 
@@ -15,6 +15,7 @@
     unit = '',
     fill = FieldFill.None,
     kind = FieldKind.Glyph,
+    shows = FieldText.Step,
     mark = null,
     expression = false,
     disabled = false,
@@ -34,6 +35,7 @@
     unit?: string;
     fill?: FieldFill;
     kind?: FieldKind;
+    shows?: FieldText;
     mark?: KeyMark | null;
     expression?: boolean;
     disabled?: boolean;
@@ -51,7 +53,7 @@
   let scrubbing = $state<number | null>(null);
   const shown = $derived(scrubbing ?? value);
   const known = $derived(shown === MIXED ? Math.min(range.max, Math.max(range.min, 0)) : shown);
-  const text = $derived(shown === MIXED || blank !== null ? '' : formatValue(shown, range.step));
+  const text = $derived(shown === MIXED || blank !== null ? '' : fieldText(shown, range.step, shows));
   const hint = $derived(value === MIXED ? MIXED_TEXT : (blank ?? undefined));
 
   const NUDGE_KEYS: Record<string, Nudge> = { ArrowUp: Nudge.Up, ArrowDown: Nudge.Down };

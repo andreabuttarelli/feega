@@ -34,6 +34,7 @@ const DOC: Record<string, Access> = {
   script: { write: ['write_script'], read: 'script' },
   referenceLook: { write: ['set_reference_look'], read: 'referenceLook' },
   still: { write: ['set_canvas'], read: 'still' },
+  poster: { write: ['set_canvas'], read: 'poster' },
   freeSize: { write: ['set_canvas'], read: 'format' },
   surface: { write: ['set_canvas'], read: 'surface' },
   breakpoints: { write: ['add_breakpoint', 'remove_breakpoint'], read: 'breakpoints' },

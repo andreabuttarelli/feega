@@ -24,7 +24,11 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 A shape drawn over a frame lands inside that frame; drawn on empty canvas it stays free. Either way it shows the moment you release, and saves in the background.
 
-Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. New layers rotate and scale around their centre. Gradients can be linear, radial, angular or diamond.
+Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. New layers rotate and scale around their centre. Gradients can be linear, radial, angular or diamond; their handles show on the canvas while that fill is open in the Fill section.
+
+A selected line shows a handle at each end instead of a box: drag one to move that end, hold Shift to snap the line to 45 degrees.
+
+X and Y keep decimals, shown up to two. A fill with no colour reads **None** over a checkerboard. With a layer selected, hovering the empty part of its frame highlights the frame.
 
 Colour fields accept hex with or without `#` (`f`, `ff` and `fff` all mean white; 4 and 8 digits carry opacity), `rgb()`/`rgba()`, or bare numbers such as `255, 0, 0` or `255 0 0 50%`. Opacity typed this way sets the fill's opacity. Anything else leaves the colour unchanged.
 

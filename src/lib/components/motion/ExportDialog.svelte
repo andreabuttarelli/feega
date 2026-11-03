@@ -6,10 +6,10 @@
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { Background, FORMATS, formatOf } from '@feega/motion-core/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
-  import { eta, exportSize, outputSize, type Capabilities, type ExportScope, type Size } from '$lib/motion/export-plan';
+  import { ExportRange, RANGE_LABEL, eta, exportRanges, exportSize, outputSize, rangeSeconds, type Capabilities, type ExportScope, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { capabilities } from '$lib/motion/export/encode';
-  import { BrowserStage, renderInBrowser } from '$lib/motion/export/browser-render';
+  import { BrowserStage, framesOf, renderInBrowser } from '$lib/motion/export/browser-render';
   import { RenderPlace, renderPlace, thisDevice, type Device } from '$lib/motion/render-place';
   import { saveExport } from '$lib/motion/export/save';
   import { joltNote } from '$lib/motion/smoothness';
@@ -133,6 +133,10 @@
     const paced = setFrameRate(doc, settings.fps);
     return paced.ok ? paced.doc : doc;
   });
+  const ranges = $derived(exportRanges(doc));
+  let range = $state(exportRanges(doc)[0]);
+  const span = $derived(range === ExportRange.Whole ? null : rangeSeconds(target, range));
+  const spanFrames = $derived(framesOf(target, span));
   const quote = $derived(renderQuote(target, settings.resolution));
   const output = $derived(outputSize(doc, settings.resolution));
   const problem = $derived(exportProblem(target, settings));
@@ -156,7 +160,8 @@
   let smoothNote = $state('');
   let controller: AbortController | null = null;
 
-  const total = $derived(target.durationInFrames);
+  const total = $derived(spanFrames.to - spanFrames.from);
+  const lengthSeconds = $derived(total / target.fps);
   const sounds = $derived(audioPlan(doc, assetUrls));
   const size = $derived<Size>(exportSize(doc, settings.resolution));
   const remaining = $derived(eta({ done, total, elapsedMs: now - startedAt }));
@@ -168,6 +173,7 @@
   const hasAudio = $derived(withAudio && sounds.length > 0);
   const place = $derived(caps && device ? renderPlace({ doc: target, settings, capabilities: caps, device, background, hasAudio }) : null);
   const onFarm = $derived(place?.place === RenderPlace.Farm || jobRunning);
+  const farmRange = $derived(span !== null && place?.place === RenderPlace.Farm);
   const canBack = $derived(mode !== null && !busy && !jobRunning);
   const STAGE_PHASE: Record<BrowserStage, Phase> = { [BrowserStage.Mixing]: Phase.Mixing, [BrowserStage.Rendering]: Phase.Rendering };
 
@@ -265,6 +271,7 @@
         assetUrls,
         size,
         quality: settings.quality,
+        range: span,
         withAudio: hasAudio && Boolean(caps?.aac),
         frames: render,
         fallback: fallbackRender,
@@ -282,7 +289,7 @@
       downloadUrl = URL.createObjectURL(blob);
 
       phase = Phase.Saving;
-      const saved = await saveExport(blob, { scope, editorUrl, size, seconds: target.durationInFrames / target.fps });
+      const saved = await saveExport(blob, { scope, editorUrl, size, seconds: lengthSeconds });
       savedNote = saved.ok ? 'Saved to the canvas assets and attached to this video.' : `Not saved to your assets (${saved.error}). The download below still works.`;
       phase = Phase.Done;
     } catch (e) {
@@ -362,6 +369,18 @@
       </div>
     </div>
 
+    {#if ranges.length > 1}
+      <div class="field">
+        <span class="label">Range</span>
+        <div class="seg" role="radiogroup" aria-label="Range" data-testid="export-range">
+          {#each ranges as r (r)}
+            {@const at = rangeSeconds(target, r)}
+            <button type="button" role="radio" aria-checked={range === r} disabled={locked} data-range={r} onclick={() => (range = r)}>{RANGE_LABEL[r]} · {Number((at.to - at.from).toFixed(1))} s</button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     {#if settings.format === ExportFormat.Gif}
       {@const gif = gifOf(settings)}
       <div class="field">
@@ -389,7 +408,7 @@
     {/if}
 
     <div class="summary" data-testid="export-quote">
-      <span class="out">{output.width}×{output.height} · {Math.round(quote.seconds)} s · up to ~{megabytes} MB</span>
+      <span class="out">{output.width}×{output.height} · {Number(lengthSeconds.toFixed(1))} s · up to ~{megabytes} MB</span>
       {#if !place}
         <span class="hint">Checking what this browser can encode…</span>
       {:else if onFarm}
@@ -474,6 +493,8 @@
         <button type="button" class="primary" disabled>Export video</button>
       {:else if place.place === RenderPlace.Browser}
         <button type="button" class="primary" onclick={start} data-testid="export-start">Export video</button>
+      {:else if farmRange}
+        <p class="warn" role="alert" data-testid="export-range-farm">Our servers render the whole video. Pick Whole video, or MP4 up to 1080p to export the work area in this browser.</p>
       {:else if server.configured}
         <button type="button" class="primary" onclick={startServer} disabled={!server.saved} data-testid="export-start-server">{server.saved ? `Export video · ~${quote.credits} credits` : 'Saving your changes…'}</button>
       {:else}

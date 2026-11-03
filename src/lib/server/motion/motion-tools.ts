@@ -255,7 +255,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '@feega/motion-core/motion/style-model';
 import { SPAWN_AGENT, type ModelOffer, type SpawnInput, type SpawnResult } from '$lib/server/agents/spawn';
 import { spawnAgentTool } from '$lib/server/agents/spawn-agent';
-import { animateStill, setStill, designStill } from '@feega/motion-core/motion/still';
+import { animateStill, setPoster, setStill, designStill } from '@feega/motion-core/motion/still';
 import { liftElement, type Element } from '$lib/motion/move-element';
 import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '@feega/motion-core/motion/still-model';
@@ -439,6 +439,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     motionBlur: doc.motionBlur,
     duration: secs(doc.durationInFrames),
     still: doc.still ? { time: secs(doc.still.frame) } : null,
+    poster: doc.poster ? { time: secs(doc.poster.frame) } : null,
     selected: selection,
     tracks: doc.tracks.map((t) => ({
       id: t.id,
@@ -2535,7 +2536,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_interaction: tool({
-      description: `Link a layer to something that happens when the viewer acts on it in a prototype. trigger kind ${TRIGGER_KINDS.join('|')} (after_delay needs delayMs). action kind ${ACTION_KINDS.join('|')}: navigate and open_overlay take target, the id of another frame on the canvas (see the canvas frames), scroll_to takes the target id, back takes none, change_to takes variant ({ property: value }, e.g. { State: 'Open' }) and swaps the nearest component instance around the layer to that variant of its set, the way Figma interactive components do. transition kind ${LINK_TRANSITIONS.join('|')}; slide and push take direction left|right|up|down, smart_animate matches layers of the two frames by layer name (or id when unnamed) and animates position, size, rotation, opacity, fill and radius, while layers found in only one frame fade; dissolve, slide, push and smart_animate take easing and durationMs (default 300). Default transition is instant. Pass interaction_id of an existing link to replace it. At most 16 per layer.`,
+      description: `Link a layer to something that happens when the viewer acts on it in a prototype. trigger kind ${TRIGGER_KINDS.join('|')} (after_delay needs delayMs). action kind ${ACTION_KINDS.join('|')}: navigate and open_overlay take target, the id of another frame on the canvas (see the canvas frames); open_overlay also takes overlay { position center|top|bottom|manual (default center), x and y in px from the frame's top left when manual, closeOutside (default true), backdrop hex colour with alpha #rrggbbaa (default #00000073) } and shows the frame at its own size over the current one; close_overlay takes none and closes the top overlay; scroll_to takes the target id, back takes none (it closes the top overlay first), change_to takes variant ({ property: value }, e.g. { State: 'Open' }) and swaps the nearest component instance around the layer to that variant of its set, the way Figma interactive components do. transition kind ${LINK_TRANSITIONS.join('|')}; slide and push take direction left|right|up|down, smart_animate matches layers of the two frames by layer name (or id when unnamed) and animates position, size, rotation, opacity, fill and radius, while layers found in only one frame fade; dissolve, slide, push and smart_animate take easing and durationMs (default 300). Default transition is instant. Pass interaction_id of an existing link to replace it. At most 16 per layer.`,
       inputSchema: z.object({ clip_id: z.string(), interaction_id: z.string().optional(), trigger: triggerSchema, action: actionSchema, transition: transitionSchema.optional() }),
       execute: async ({ clip_id, interaction_id, ...link }) => {
         const id = interaction_id ?? deps.newId();
@@ -2654,7 +2655,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to ${MAX_SHORT_SIDE}; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. layout_guides replaces the frame's layout guides (columns/rows: count a number or "auto" (as many sections of size px as fit), gutter px, align stretch|min|max|center (stretch fills the frame between margin px; the others draw sections of size px from the start/end by offset px, or centred), color #rrggbb (default red) and opacity 0..1 (default 0.1); grid: size px; hidden true keeps the guide snapping without drawing it; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
+      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to ${MAX_SHORT_SIDE}; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. poster: seconds of the frame a video shows as its picture (canvas preview, image export, thumbnail) instead of the frame where it settles; false clears it. layout_guides replaces the frame's layout guides (columns/rows: count a number or "auto" (as many sections of size px as fit), gutter px, align stretch|min|max|center (stretch fills the frame between margin px; the others draw sections of size px from the start/end by offset px, or centred), color #rrggbb (default red) and opacity 0..1 (default 0.1); grid: size px; hidden true keeps the guide snapping without drawing it; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
         preset: z.enum(FRAME_PRESETS).optional().describe('a device, paper or social size: phone, tablet, desktop, presentation, watch, paper, social; layers pinned with constraints keep their edge distance'),
@@ -2664,6 +2665,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         fps: z.literal(FRAME_RATES).optional(),
         background: z.enum([Background.Brand, Background.Transparent]).optional(),
         still: z.union([z.number().min(0), z.literal(false)]).optional(),
+        poster: z.union([z.number().min(0), z.literal(false)]).optional(),
         layout_guides: z.array(layoutGuideSchema).max(MAX_LAYOUT_GUIDES).optional(),
         surface: z.boolean().optional().describe('true gives the frame its own surface, a locked full-frame Shape under every layer (its id is `surface` in get_motion_doc): style it with set_props like any Shape (fills, strokes, roundness/corners) and effects for shadows and blur; false removes it and brings back the brand background')
       }),
@@ -2677,7 +2679,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
         const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.preset ? PRESET_SIZE[input.preset] : input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
-        const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
+        const postered = pinned.ok && input.poster !== undefined ? setPoster(pinned.doc, input.poster === false ? null : framesAt(input.poster, pinned.doc.fps)) : pinned;
+        const guided = postered.ok && input.layout_guides ? setLayoutGuides(postered.doc, input.layout_guides) : postered;
         const surfaced: OpResult = guided.ok && input.surface !== undefined ? { ok: true, doc: input.surface ? withSurface(guided.doc, deps.newId()) : dropSurface(guided.doc) } : guided;
         return apply(surfaced, 'changed the canvas');
       }

@@ -51,7 +51,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
-  import { createPlaceSaves, keepPending } from '$lib/canvas/place-save';
+  import { createPlaceSaves, keepPending, placedRows } from '$lib/canvas/place-save';
   import { LineAction, createOpQueue, keepLines } from '$lib/canvas/op-queue';
   import { idbShelf, openOutbox, type Outbox } from '$lib/canvas/outbox';
   import { syncOf } from '$lib/canvas/sync-status';
@@ -82,6 +82,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { REFUSED_NOTICE, watchRefusals } from '$lib/realtime/conflict-channel';
   import { afterNavigate, beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
   import { page, updated } from '$app/state';
   import { track } from '$lib/analytics';
@@ -1398,6 +1399,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return grownTextNodeHeight(grownHeights[n.id], n.userHeight);
   }
 
+  const paintsBehind = (n: Tile) => tileChromeOf(n).behind || n.type === SECTION_TYPE;
+
   const tiles = $derived(
     nodes.filter((n) => !flagHeld(nodes, n.id, NodeFlag.Hidden)).map((n) => ({ n, chrome: tileChromeOf(n), ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, chrome, ports, outputs }) => ({
       id: n.id,
@@ -1415,8 +1418,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
       rotatable: !!motionOf(n),
-      behind: chrome.behind || n.type === SECTION_TYPE,
-      members: chrome.behind || n.type === SECTION_TYPE ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
+      behind: paintsBehind(n),
+      members: paintsBehind(n) ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1636,6 +1639,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void outbox?.save({ nodes: saves.unsentPatches(), places: places.unsentEntries() });
   }
 
+  const membersOf = (id: string): Set<string> => new Set(nodes.filter((n) => layoutOf(n.data).groupId === id).map((n) => n.id));
+
   async function reopenOutbox(key: string) {
     const opened = await openOutbox(idbShelf(), key);
     outbox = opened;
@@ -1644,6 +1649,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         void write(id, patch, SaveTiming.Now);
       }
     }
+    nodes = placedRows(nodes, opened.places, membersOf);
     places.restore(opened.places);
     lines.restore(opened.ops);
     sent = sentLog([...opened.sent, ...sent.all()], (ops) => void outbox?.save({ sent: ops }));
@@ -2140,6 +2146,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * Il nodo nasce SOLO quando la riga torna, come `create`: niente tile senza riga dietro.
    */
   const supabase = createSupabaseBrowserClient();
+
+  onMount(() => watchRefusals(supabase, data.canvas.id, data.session?.user?.id ?? '', () => { failed = REFUSED_NOTICE; }));
 
   async function uploadFontFile(file: File) {
     const path = `${orgFontPrefix(data.orgId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
@@ -3252,13 +3260,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
     const motion = motionOf(n);
-    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
+    return motion ? { poster: posterFresh(motion) ? assetUrl(motion.posterAssetId) : null, still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
   }
 
   $effect(() =>
     layersSource.publishCanvas({
       get nodes() {
-        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), ...flagsOf(n.data), ...frameLook(n) }));
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), glyph: layersSource.glyphs.get(n.id), behind: paintsBehind(n), ...flagsOf(n.data), ...frameLook(n) }));
       },
       get selected() {
         return selectedIds;
@@ -3702,9 +3710,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     return answer.type === 'success' ? (answer.data as { url: string; name: string; files: string[]; skipped?: string[] }) : exportFailure(answer);
   }
 
-  async function exportFrames(frameIds: string[], rows: ExportRow[]) {
+  async function exportFrames(frameIds: string[], rows: ExportRow[], seconds?: number) {
     await Promise.all(frameIds.map((id) => saves.flush(id)));
-    const answer = await send('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    const at: Record<string, string> = seconds === undefined ? {} : { seconds: String(seconds) };
+    const answer = await send('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export', ...at });
     return answer.type === 'success' ? (answer.data as { url: string; name: string; files: string[]; skipped?: string[] }) : exportFailure(answer);
   }
 
@@ -3880,9 +3889,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   afterNavigate(takeStartUrl);
 
-  function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
+  function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean; skipped: string[] }) {
     landImported(landed);
     void invalidate(CANVAS_LIST_DEPENDENCY);
+    if (landed.skipped.length) {
+      failed = `Imported, with parts left out: ${landed.skipped.join('; ')}`;
+      return;
+    }
     if (startUrl && landed.truncated) {
       failed = `Imported the top of ${startHost(startUrl)}.`;
     }

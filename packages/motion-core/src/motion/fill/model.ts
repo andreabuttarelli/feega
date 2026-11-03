@@ -310,6 +310,9 @@ export function retypeFill(fills: readonly Fill[], i: number, type: FillType): F
 }
 
 const DEGREE = Math.PI / 180;
+const CSS_TURN = 90;
+
+export const cssLinearAngle = (angle: number) => angle + CSS_TURN;
 
 export function linearEnds(angle: number, w: number, h: number): [[number, number], [number, number]] {
   const [dx, dy] = [Math.cos(angle * DEGREE), Math.sin(angle * DEGREE)];

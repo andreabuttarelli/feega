@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { ActionKind, TriggerKind } from '@feega/motion-core/motion/prototype/model';
 import { putInteraction } from './ops';
@@ -46,6 +46,33 @@ describe('hotspotsOf', () => {
     const doc = docWith({ kind: TriggerKind.AfterDelay, delayMs: 500 });
 
     expect(hotspotsOf(doc, FRAME, () => ({ left: 0, top: 0, width: 10, height: 10 }))).toEqual([]);
+  });
+});
+
+function parented(doc: MotionDoc, child: string, parent: string): MotionDoc {
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === child ? { ...c, parent } : c)) })) };
+}
+
+function trackEach(doc: MotionDoc): MotionDoc {
+  const [visual, ...rest] = doc.tracks;
+  return { ...doc, tracks: [...visual.clips.map((clip) => ({ ...visual, id: `t-${clip.id}`, clips: [clip] })), ...rest] };
+}
+
+const spotOrder = (doc: MotionDoc) => hotspotsOf(doc, FRAME, () => ({ left: 0, top: 0, width: 10, height: 10 })).map((s) => s.clip);
+
+describe('hotspot stacking', () => {
+  it('the layer drawn on top takes the click where two links overlap', () => {
+    const shared = docWith({ kind: TriggerKind.Click }, { kind: TriggerKind.Click });
+
+    expect(spotOrder(shared)).toEqual(['c0', 'c1']);
+    expect(spotOrder(trackEach(shared))).toEqual(['c1', 'c0']);
+  });
+
+  it('a child with its own link sits above its parent, wherever its track is', () => {
+    const doc = trackEach(docWith({ kind: TriggerKind.Click }, { kind: TriggerKind.Click }));
+
+    expect(spotOrder(parented(doc, 'c0', 'c1'))).toEqual(['c1', 'c0']);
+    expect(spotOrder(parented(doc, 'c1', 'c0'))).toEqual(['c0', 'c1']);
   });
 });
 

@@ -1039,13 +1039,10 @@ export const actions: Actions<CanvasParams> = {
     }
 
     if (!(await listNodes(scope.db, scope)).some((node) => node.id === nodeId)) {
-      return fail(404, { error: 'node not found' });
+      return { moved: true };
     }
 
-    const node = await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
-    if (!node) {
-      return fail(404, { error: 'node not found' });
-    }
+    await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
 
     return { moved: true };
   },
@@ -1288,7 +1285,9 @@ export const actions: Actions<CanvasParams> = {
       return fail(503, { error: 'image export needs the server renderer, which is not available here' });
     }
     const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
-    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ nodeId: String(id) })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    const shownAt = Number(fd.get('seconds'));
+    const seconds = fd.has('seconds') && Number.isFinite(shownAt) && shownAt >= 0 ? shownAt : undefined;
+    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ nodeId: String(id), seconds })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
     if (out instanceof Error) {
       return fail(502, { error: `the images could not be drawn: ${out.message}` });
     }
@@ -1661,9 +1660,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'nothing to delete' });
     }
 
-    if (!(await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) }))) {
-      return fail(404, { error: 'node not found' });
-    }
+    await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) });
     return { removed: true };
   },
 

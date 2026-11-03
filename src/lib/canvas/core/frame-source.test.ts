@@ -73,6 +73,10 @@ describe('still frame', () => {
     expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), still: { frame: 7 } })).toBe(7);
   });
 
+  it('a video shows its poster frame when one is marked', () => {
+    expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), poster: { frame: 42 } })).toBe(42);
+  });
+
   it('a doc longer than its content rests once its text has faded in', () => {
     expect(stillFrame(instance as unknown as MotionDoc)).toBe(12);
   });

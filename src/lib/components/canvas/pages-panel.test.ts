@@ -18,6 +18,14 @@ describe('Pages: the canvases of the project', () => {
     expect(pages).toMatch(/title={canvas\.name}/);
   });
 
+  it('a double-click renames any page, opening it first when it is not the current one', () => {
+    expect(pages).toMatch(/ondblclick={\(\) => renameOnArrival\(canvas\.id\)}/);
+  });
+
+  it('a long list scrolls inside the panel, never past it', () => {
+    expect(pages).toMatch(/\.pages-list {[^}]*overscroll-behavior: contain/);
+  });
+
   it('creates, renames and deletes after confirmation', () => {
     expect(pages).toMatch(/data-testid="canvas-new"/);
     expect(pages).toMatch(/data-testid="canvas-rename"/);
