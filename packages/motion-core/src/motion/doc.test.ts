@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOC_VERSION, FORMATS, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc } from './doc';
+import { DESIGN_MAX_SIDE, DOC_VERSION, FORMATS, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc } from './doc';
 import { maxFrames } from './design';
 import { defaultProps } from './components';
 import { PropFormat } from './custom/component';
@@ -60,9 +60,9 @@ describe('MotionDoc', () => {
     expect(verdict.ok && verdict.doc.tracks[0].clips[0].props.size).toBe(defaultProps('Title').size);
   });
 
-  it('takes a 4K frame and refuses anything above', () => {
-    expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Landscape), width: 3840, height: 2160 }).ok).toBe(true);
-    const doc = { ...newMotionDoc(MotionFormat.Landscape), width: 3842, height: 2160 };
+  it('takes a tall page and refuses a side above the frame limit', () => {
+    expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Landscape), width: 1440, height: 5000 }).ok).toBe(true);
+    const doc = { ...newMotionDoc(MotionFormat.Landscape), width: DESIGN_MAX_SIDE + 2, height: 2160 };
 
     expect(parseMotionDoc(doc).ok).toBe(false);
   });

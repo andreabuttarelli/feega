@@ -24,10 +24,14 @@ element or frame (fill, text, anything inside it), lines between nodes, and undo
 Keep working. Shapes you draw stay on the canvas, and edits to their fill or text are kept.
 When the connection returns, Feega sends everything in the order you made it.
 
+Undo works offline too: ⌘Z on a shape that has not been sent yet removes it at once, and
+⌘⇧Z puts it back in the queue.
+
 ## Closing the tab mid-save
 
 Unsent changes are also kept in your browser. If you close or reload the tab before they
 land, the browser asks you to confirm; open the canvas again and Feega sends what was left.
+The canvas opens with those changes already in place, not the older server copy.
 Sending a change twice is harmless: the server recognises a shape it already created.
 
 ## When a change is refused

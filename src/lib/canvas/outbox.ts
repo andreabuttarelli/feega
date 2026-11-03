@@ -60,3 +60,12 @@ export async function openOutbox(shelf: Shelf, key: string) {
 }
 
 export type Outbox = Awaited<ReturnType<typeof openOutbox>>;
+
+export const outboxKey = (userId: string, canvasId: string) => `${userId}:${canvasId}`;
+
+export function openCanvasOutbox(userId: string | undefined, canvasId: string): Promise<Outbox | null> {
+  if (!userId || typeof indexedDB === 'undefined') {
+    return Promise.resolve(null);
+  }
+  return openOutbox(idbShelf(), outboxKey(userId, canvasId)).catch(() => null);
+}
