@@ -9,7 +9,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_AUTO_LAYOUT } from '@feega/motion-core/motion/layout/model';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { findClip } from '@feega/motion-core/motion/doc';
-import { dropTool, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, pickIdOf, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { dropTool, freeLanding, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropLayers, dropPlace, rowDrop, nodeIcon, elementGlyph, frameHover, frameRows, rowPicked, pickIdOf, rowsInside, searchRows, childIds, tileHovered, frameRinged, emptyAreaRinged, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers, type LayerRow } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -18,6 +18,7 @@ import { maskMembers, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
 import { CUSTOM_CLIP } from '@feega/motion-core/motion/poster-parts';
 import { createComponent } from '$lib/motion/main-component';
+import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
 const NODES = [
@@ -864,5 +865,67 @@ describe('Layers list the frontmost layer first, as painted', () => {
     const rows = layerRows([{ id: 'a', type: 'motion', name: 'A' }, { id: 'g', type: 'motion', name: 'Group', behind: true }, { id: 'b', type: 'motion', name: 'B' }], null);
 
     expect(rows.map((r) => r.id)).toEqual(['b', 'a', 'g']);
+  });
+});
+
+describe('a layer dragged into a main in the layers panel goes inside the main', () => {
+  const mustOk = (r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc => {
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r.doc;
+  };
+  const counter = (prefix: string) => {
+    let n = 0;
+    return () => `${prefix}${++n}`;
+  };
+  const textAt = (doc: MotionDoc, id: string, x: number, y: number) => mustOk(addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: id, x, y, width: 0.1, height: 0.05 } }, id));
+  const card = () => textAt(mustOk(createComponent(mustOk(wrapInStack(textAt(newMotionDoc(MotionFormat.Landscape), 'title', 0.3, 0.3), ['title'], 'card', 'lane')), ['card'], counter('m'), 'Card')), 'subtitle', 0.8, 0.8);
+  const inside = (doc: MotionDoc) => doc.comps.m1.tracks.flatMap((t) => t.clips);
+  const order = (doc: MotionDoc) => (inside(doc).find((c) => c.id === 'card') as { autoLayout?: { order?: string[] } }).autoLayout?.order;
+
+  it('dropped into the main row, it joins the main and its stack', () => {
+    const done = mustOk(dropLayers(card(), ['subtitle'], 'm2', Place.Into, ['m2', 'subtitle'], 'here'));
+
+    expect(done.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual(['m2']);
+    expect(inside(done).find((c) => c.id === 'subtitle')?.parent).toBe('card');
+    expect(order(done)).toEqual(['title', 'subtitle']);
+  });
+
+  it('dropped above a layer inside the main, it lands in the main stack before it', () => {
+    const done = mustOk(dropLayers(card(), ['subtitle'], `m2${SEPARATOR}0${SEPARATOR}title`, Place.Above, ['m2', 'subtitle'], 'here'));
+
+    expect(done.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual(['m2']);
+    expect(order(done)).toEqual(['subtitle', 'title']);
+  });
+
+  it('an instance is never a place to drop layers into', () => {
+    const doc = card();
+    const homed = { ...doc, comps: { ...doc.comps, m1: { ...doc.comps.m1, component: { ...doc.comps.m1.component!, home: 'components' } } } };
+
+    const done = dropLayers(homed, ['subtitle'], 'm2', Place.Into, ['m2', 'subtitle'], 'screen');
+
+    expect(done.ok && inside(done.doc).some((c) => c.id === 'subtitle')).toBe(false);
+  });
+});
+
+describe('dropping a free element row in Layers', () => {
+  const frames = new Set(['frame']);
+  const row = (over: Partial<LayerRow>): LayerRow => ({ id: 'x', key: 'x', kind: LayerKind.Clip, depth: 1, label: 'x', type: 'rect', nodeId: 'frame', hidden: false, locked: false, nested: false, ...over });
+
+  it('on a frame row it moves into the frame', () => {
+    expect(freeLanding(row({ id: 'frame', kind: LayerKind.Node, nodeId: 'frame', depth: 0 }), Place.Above, frames)).toEqual({ frameId: 'frame' });
+  });
+
+  it('on a layer of an open frame it takes that layer slot', () => {
+    expect(freeLanding(row({ id: 'stack' }), Place.Into, frames)).toEqual({ frameId: 'frame', slot: { target: 'stack', place: Place.Into } });
+    expect(freeLanding(row({ id: 'child' }), Place.Below, frames)).toEqual({ frameId: 'frame', slot: { target: 'child', place: Place.Below } });
+  });
+
+  it('never lands on another free element, a closed outline or a part', () => {
+    expect(freeLanding(row({ id: 'other', kind: LayerKind.Node, nodeId: 'other', depth: 0 }), Place.Above, frames)).toBeNull();
+    expect(freeLanding(row({ id: 'child', nested: true }), Place.Above, frames)).toBeNull();
+    expect(freeLanding(row({ id: 'child', kind: LayerKind.Part }), Place.Above, frames)).toBeNull();
+    expect(freeLanding(row({ id: 'child', nodeId: 'other' }), Place.Above, frames)).toBeNull();
   });
 });

@@ -160,6 +160,17 @@ describe('a snapshot asked for before a move never undoes it', () => {
     expect(places.placedAfter('a', places.mark())).toBe(false);
     expect(places.placedAfter('b', asked)).toBe(false);
   });
+
+  it('a placement replayed after a reload counts as placed for a snapshot asked before it landed', async () => {
+    const { places } = harness([]);
+    const asked = places.mark();
+
+    places.restore([{ action: 'move', id: 'a', fields: { x: 50, y: 60 } }]);
+    await places.flush();
+
+    expect(places.dirty('a')).toBe(false);
+    expect(places.placedAfter('a', asked)).toBe(true);
+  });
 });
 
 describe('placements kept offline, read back after a reload', () => {

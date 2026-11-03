@@ -73,6 +73,7 @@ export function createPlaceSaves(options: PlaceOptions) {
     for (const entry of entries) {
       const queue = queues[entry.action as Placement];
       if (queue) {
+        stamp(entry.id);
         void queue.schedule(entry.id, entry.fields, SaveTiming.Now);
       }
     }

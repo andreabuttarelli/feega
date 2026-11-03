@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { addClip } from '@feega/motion-core/motion/timeline';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import { addClip, addTrack } from '@feega/motion-core/motion/timeline';
 import { diffDoc } from '$lib/motion/doc-ops';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
@@ -85,5 +86,16 @@ describe('the editor sends its edits as ops', () => {
 
     expect(out.version).toBe(2);
     expect(findClip(out.doc, 'a')?.clip.props.text).toBe('from the agent');
+  });
+
+  it('a frame of 200 layers, each on its own track, saves and reads back whole', async () => {
+    const { db } = await seeded();
+    const layered = Array.from({ length: 200 }, (_, n) => `layer${n}`).reduce((doc, id) => must(addClip(must(addTrack(doc, TrackKind.Visual, `t-${id}`)), { component: 'Shape', from: 0, durationInFrames: 60, trackId: `t-${id}`, props: { shape: 'rect' } }, id)), start());
+
+    const out = (await actions.ops(event(db, { version: '1', ops: opsOf(layered), summary: 'Drew' }))) as { version?: number; status?: number };
+
+    expect(out.status).toBeUndefined();
+    const head = await readHead(db, SCOPE);
+    expect(head!.doc.tracks.flatMap((t) => t.clips)).toHaveLength(202);
   });
 });

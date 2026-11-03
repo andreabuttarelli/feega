@@ -1,14 +1,40 @@
 <script lang="ts">
   import Search from '@lucide/svelte/icons/search';
   import ComponentsList from './ComponentsList.svelte';
-  import { fetchProjectComponents, matchingComponents, type CanvasComponents } from '$lib/canvas/project-components';
+  import { fetchProjectComponents, firstTiles, matchingComponents, tileCount, type CanvasComponents } from '$lib/canvas/project-components';
 
   let { projectId }: { projectId: string } = $props();
 
   let canvases = $state<CanvasComponents[] | null>(null);
   let query = $state('');
 
-  const shown = $derived(matchingComponents(canvases ?? [], query));
+  const PAGE_TILES = 24;
+
+  let limit = $state(PAGE_TILES);
+  let more = $state<HTMLElement | null>(null);
+
+  const matching = $derived(matchingComponents(canvases ?? [], query));
+  const shown = $derived(firstTiles(matching, limit));
+  const hasMore = $derived(tileCount(matching) > limit);
+
+  $effect(() => {
+    void query;
+    limit = PAGE_TILES;
+  });
+
+  $effect(() => {
+    void limit;
+    if (!more) {
+      return;
+    }
+    const watch = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        limit += PAGE_TILES;
+      }
+    });
+    watch.observe(more);
+    return () => watch.disconnect();
+  });
 
   $effect(() => {
     void fetchProjectComponents(projectId).then((found) => (canvases = found));
@@ -30,6 +56,10 @@
   {#each shown as canvas (canvas.canvasId)}
     <ComponentsList groups={canvas.components} title={canvas.canvasName} {projectId} canvasId={canvas.canvasId} />
   {/each}
+
+  {#if hasMore}
+    <div class="more" bind:this={more} data-testid="components-more"></div>
+  {/if}
 </div>
 
 <style>
@@ -62,6 +92,10 @@
     font: inherit;
     font-size: var(--ui-type-body);
     color: var(--ui-text);
+  }
+
+  .more {
+    height: 1px;
   }
 
   .note {

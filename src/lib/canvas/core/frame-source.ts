@@ -41,6 +41,11 @@ export const sameLive = (a: Shown | undefined, b: Shown): boolean => Boolean(a) 
 export const toFetch = <F extends { id: string }>(frames: readonly F[], keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
   frames.filter((f) => !asked.has(keyOf(f)) && !drawnLive.has(f.id));
 
+export const fetchKey = (f: { id: string; revision: number }) => `${f.id}:${f.revision}`;
+
+export const pickedToFetch = <F extends { id: string; revision: number }>(frames: readonly F[], picked: readonly string[], fetched: ReadonlyMap<string, number>, rushed: ReadonlySet<string>): F[] =>
+  frames.filter((f) => picked.includes(f.id) && fetched.get(f.id) !== f.revision && !rushed.has(fetchKey(f)));
+
 export const shownGroup = (current: string, previous: string | undefined, built: (group: string) => boolean): string | null => {
   if (built(current)) {
     return current;

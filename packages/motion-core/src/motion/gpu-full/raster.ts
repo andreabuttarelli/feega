@@ -380,11 +380,13 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+  const unchanging = (source: TexImageSource) => source instanceof HTMLImageElement || (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap);
+
   function textureOf(source: TexImageSource): WebGLTexture {
     const known = textures.get(source);
     const tex = known ?? gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    if (!known || !(source instanceof HTMLImageElement)) {
+    if (!known || !unchanging(source)) {
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);

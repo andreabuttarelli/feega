@@ -7,6 +7,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/m
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { EditorMode, editorMode } from '$lib/canvas/editor-mode.svelte';
 import { frameProperties, type NodePlace } from './frame-properties.svelte';
+import { FramePanel } from '$lib/canvas/motion-node';
 import { stackFrame } from '$lib/motion/layout/ops';
 
 const must = (r: OpResult): MotionDoc => {
@@ -322,5 +323,26 @@ describe('export, where Figma puts it', () => {
     frameProperties.clear();
 
     expect(body).toContain('data-testid="export-go"');
+  });
+});
+
+describe('a group on the canvas', () => {
+  const groupBody = () => {
+    frameProperties.place = placeOf({ x: 10, y: 20, w: 160, h: 60 });
+    frameProperties.panel = FramePanel.Group;
+    frameProperties.name = 'Group';
+    const body = render(FrameInspectorPanel, { props: { session: sessionOf([]), tokens: FEEGA_TOKENS } }).body;
+    frameProperties.clear();
+    return body;
+  };
+
+  it('reads as a group: place and size, never a white clipping frame', () => {
+    const body = groupBody();
+
+    expect(body).toContain('data-testid="group-inspector"');
+    expect(body).toContain('data-testid="frame-place-section"');
+    expect(valueOf(body, 'data-testid="frame-width"')).toBe('160');
+    expect(body).not.toContain('data-testid="frame-look"');
+    expect(body).not.toContain('data-testid="frame-preset"');
   });
 });

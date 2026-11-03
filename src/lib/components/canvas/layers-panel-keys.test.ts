@@ -49,7 +49,7 @@ beforeEach(() => {
   vi.stubGlobal('CSS', { escape: (s: string) => s });
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   layersSource.setDocs(new Map([['a', docWith('Hero headline')], ['b', docWith('Hero price')]]));
-  unpublishCanvas = layersSource.publishCanvas({ nodes: frames, selected: ['a'], select: canvasSelect, open: () => {}, rename: () => {}, flag: () => {} });
+  unpublishCanvas = layersSource.publishCanvas({ nodes: frames, selected: ['a'], select: canvasSelect, open: () => {}, rename: () => {}, flag: () => {}, moveInto: () => {} });
   unpublishVideo = layersSource.publishVideo(videoFor('a', 'Hero headline'));
   app = mount(LayersPanel, { target: document.body });
   flushSync();

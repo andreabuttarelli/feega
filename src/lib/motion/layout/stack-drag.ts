@@ -108,6 +108,14 @@ export function dropInStack(doc: MotionDoc, clipId: string, boxes: Record<string
   return { kind: StackDrop.Join, result: join(doc, clipId, target, index), line };
 }
 
+const INCOMING = '';
+
+export function stackLineAt(doc: MotionDoc, at: Pt): DropLine | null {
+  const boxes = guessedBoxes(withAutoLayout(doc));
+  const target = stackUnder(doc, INCOMING, null, boxes, at);
+  return target ? slotOf(doc, target, INCOMING, boxes, at).line : null;
+}
+
 export function joinStackAt(doc: MotionDoc, clipId: string, at: Pt): OpResult {
   const joined = dropInStack(doc, clipId, guessedBoxes(withAutoLayout(doc)), at)?.result;
   return joined?.ok ? joined : { ok: true, doc };
