@@ -32,6 +32,8 @@ jobs:
         run: node scripts/typecheck-runtime.mjs
 
       - name: Type check (svelte-check)
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: cp .env.example .env && npm run check && rm .env
 
       - name: Build
