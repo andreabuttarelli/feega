@@ -1,6 +1,7 @@
 import { Command, SHORTCUTS } from '$lib/motion/shortcuts';
-import { FRAME_VIEW_DEFAULT, FrameView, flipView, shows, type FrameViews } from './frame-view';
+import { FrameView, flipView, shows, type FrameViews } from './frame-view';
 import { flipRulers, rulersPref } from './rulers-pref.svelte';
+import { readFrameViews, writeFrameViews } from '$lib/shell-prefs';
 
 const keysOf = (command: Command): string => SHORTCUTS.find((b) => b.command === command)?.label ?? '';
 
@@ -50,7 +51,7 @@ class ZoomRequest {
 export const zoomRequest = new ZoomRequest();
 
 class FrameViewState {
-  local = $state<FrameViews>(FRAME_VIEW_DEFAULT);
+  local = $state<FrameViews>(readFrameViews());
 
   get all(): FrameViews {
     return { ...this.local, [FrameView.Rulers]: rulersPref.on };
@@ -67,6 +68,7 @@ class FrameViewState {
     }
 
     this.local = flipView(this.local, view);
+    writeFrameViews(this.local);
   }
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { scaleOf, type NodeSize } from '$lib/motion/units';
   import { untrack } from 'svelte';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
@@ -47,6 +48,7 @@
   let {
     dialog,
     nodeId,
+    box,
     projectId,
     canvasId,
     session,
@@ -61,6 +63,7 @@
   }: {
     dialog: FrameDialog;
     nodeId: string;
+    box: NodeSize | null;
     projectId: string;
     canvasId: string;
     session: FrameEditSession;
@@ -194,7 +197,7 @@
 
 <div class="layer">
 {#if dialog === FrameDialog.Export && data && docMode(doc) === DocMode.Still}
-  <StillExport {doc} {editorUrl} fileName={data.node.name ?? 'still'} saved={session.saveState === SaveState.Saved} {onclose} />
+  <StillExport {doc} docScale={scaleOf(doc, box)} {editorUrl} fileName={data.node.name ?? 'still'} saved={session.saveState === SaveState.Saved} {onclose} />
 {:else if dialog === FrameDialog.Export && data && scenesReady}
   <ExportDialog
     doc={played(doc)}

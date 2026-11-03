@@ -27,7 +27,9 @@ export type Frame = { width: number; height: number; scale?: number };
 
 export type NodeSize = { w: number; h: number };
 
-export const spaceOf = (doc: Frame, node: NodeSize | null): Frame => (node ? { width: node.w, height: node.h, scale: node.w / doc.width } : doc);
+export const scaleOf = (doc: Pick<Frame, 'width'>, node: NodeSize | null): number => (node ? node.w / doc.width : 1);
+
+export const spaceOf = (doc: Frame, scale: number): Frame => ({ width: doc.width * scale, height: doc.height * scale, scale });
 
 type Reach = readonly [number, number];
 
@@ -176,6 +178,10 @@ export function toShown(component: Owner, key: string, value: number, frame: Fra
   return rule ? tidy(value * FACTOR[rule.basis](frame)) : value;
 }
 
+const SHOWN_PRECISION = 1000;
+
+export const shownNumber = (component: Owner, key: string, value: number, frame: Frame): number => Math.round(toShown(component, key, value, frame) * SHOWN_PRECISION) / SHOWN_PRECISION;
+
 export function toStored(component: Owner, key: string, value: number, frame: Frame): number {
   return value / factorOf(component, key, frame);
 }
@@ -250,4 +256,4 @@ export function storedOffset(component: Owner, [dx, dy]: Offset, frame: Frame): 
 }
 
 export const UNITS_GUIDE =
-  'Units: x, y, width, height (of clips, masks and particle emitters) in px of the composition; size, strokeWidth, dash, gap and particle sizes in px; z, perspective, blur, feather and expansion in px; scale, scaleX, scaleY and opacity in % (100 = as is); rotations, skews and angles in degrees.';
+  'Units are px of the frame (a frame drawn on the canvas has one px per canvas px). Units: x, y, width, height (of clips, masks and particle emitters) in px of the composition; size, strokeWidth, dash, gap and particle sizes in px; z, perspective, blur, feather and expansion in px; scale, scaleX, scaleY and opacity in % (100 = as is); rotations, skews and angles in degrees.';

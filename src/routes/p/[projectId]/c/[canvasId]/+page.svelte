@@ -685,12 +685,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const ghost = drawnTile(id, drawn);
     if (!ghost) {
       const saved = saveDrawn(id, drawn);
-      void saved.then(() => focusOn([id], undefined, FocusMode.Select));
+      void saved.then(() => focusOn([id], undefined, FocusMode.Drawn));
       return { id, doc: null, saved };
     }
     catalogPosters.set(id, ghost.look);
     nodes = [...nodes, toTile(ghost.node)];
-    focusOn([id], undefined, FocusMode.Select);
+    focusOn([id], undefined, FocusMode.Drawn);
     return { id, doc: ghost.doc, saved: saveDrawn(id, drawn) };
   }
 
@@ -721,7 +721,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     land((res?.undo ?? []) as UndoItem[]);
     nodes = settle(nodes, id, toTile(node));
-    focusOn([id], undefined, FocusMode.Select);
+    focusOn([id], undefined, FocusMode.Drawn);
     return true;
   }
 
@@ -746,7 +746,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function intoFrame(id: string, hold: FrameHold) {
     if (!(await moveFreeInto(id, hold))) {
-      focusOn([id], undefined, FocusMode.Select);
+      focusOn([id], undefined, FocusMode.Drawn);
     }
   }
 
@@ -2912,19 +2912,21 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   type Picture = { width: number; height: number };
 
-  function elementSizeOf(id: string): Picture | null {
+  type Was = { box: Picture; element: boolean };
+
+  function sizeBefore(id: string): Was | null {
     const row = nodes.find((n) => n.id === id);
-    return row && motionOf(row)?.kind === FrameKind.Element ? { width: row.w, height: row.h } : null;
+    return row ? { box: { width: row.w, height: row.h }, element: motionOf(row)?.kind === FrameKind.Element } : null;
   }
 
-  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Picture | null, mode: ResizeMode) => (was ? handResized(doc, was, picture) : fitToNode(doc, picture, mode));
+  const resizedDoc = (doc: MotionDoc, picture: Picture, was: Was | null, mode: ResizeMode) => (was?.element ? handResized(doc, was.box, picture) : fitToNode(doc, picture, mode, was?.box));
 
-  async function sizeFrameDoc(id: string, picture: Picture, was: Picture | null = null) {
+  async function sizeFrameDoc(id: string, picture: Picture, was: Was | null = null) {
     const mode = resizeMode;
     if (frameDocs.edit(id, (doc) => resizedDoc(doc, picture, was, mode), 'Resized the frame')) {
       return;
     }
-    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: was ? ResizeMode.Element : resizeMode });
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height, mode: was?.element ? ResizeMode.Element : resizeMode });
     if (result?.undo) {
       pushGesture({ items: result.undo as UndoItem[] });
     }
@@ -2941,7 +2943,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       return;
     }
     const plan = framePlan(id, width, height);
-    const was = elementSizeOf(id);
+    const was = sizeBefore(id);
     liveResized([]);
     livePreview(id, null);
     const sized = plan?.picture ? sizeFrameDoc(id, plan.picture, was) : null;
@@ -3028,7 +3030,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   function livePreview(id: string, size: { w: number; h: number } | null) {
     const base = frameDocs.doc(id);
     const plan = size && base ? framePlan(id, size.w, size.h) : null;
-    const fitted = base && plan?.picture ? resizedDoc(base, plan.picture, elementSizeOf(id), resizeMode) : null;
+    const fitted = base && plan?.picture ? resizedDoc(base, plan.picture, sizeBefore(id), resizeMode) : null;
     const shown = fitted?.ok ? fitted.doc : null;
     frameDocs.preview(id, shown);
     const open = layersSource.video;
@@ -4473,6 +4475,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onFigmaImages={figmaImagesAnswered}
     onFigmaPaste={figmaPasted}
     onExportElements={(frameId, elementIds) => (exportElements = { frameId, elementIds })}
+    onExportElementRows={(frameId, elementIds, rows) => exportPicked({ frameId, elementIds }, rows)}
     onTemplate={insertTemplate}
     techniques={techniqueShelf.list}
     onTechnique={insertTechnique}

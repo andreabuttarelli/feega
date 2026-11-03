@@ -11,9 +11,13 @@ import { Span, type Vector } from './vector-list';
 
 type Opened = { page: ExportPage; crop: Crop | null; scale: number };
 
+const designOf = (target: DrawTarget) => ({ width: target.doc.width * target.docScale, height: target.doc.height * target.docScale });
+
+const drawnScale = (row: ExportRow, target: DrawTarget) => rowSize(row, designOf(target)).scale * target.docScale;
+
 async function opened<T>(port: ExportPort, compose: (target: DrawTarget) => Promise<string>, target: DrawTarget, row: ExportRow, use: (o: Opened) => Promise<T>): Promise<T> {
   const { doc } = target;
-  const { scale } = rowSize(row, doc);
+  const scale = drawnScale(row, target);
   const page = await port.open({ width: doc.width, height: doc.height, scale });
   try {
     await page.load(await compose(target));
@@ -35,7 +39,7 @@ const clipsUnder = (doc: MotionDoc, elementId: string) => new Set([elementId, ..
 
 async function vectored(vector: VectorPort, target: DrawTarget, row: ExportRow): Promise<Vectored> {
   const { lists: [list], images } = await vector(target, Span.Still);
-  const { scale } = rowSize(row, target.doc);
+  const scale = drawnScale(row, target);
   const crop = target.elementId ? boundsOfClips(list, clipsUnder(target.doc, target.elementId)) : null;
   const box = crop ?? { left: 0, top: 0, width: target.doc.width, height: target.doc.height };
   const { svg, skipped } = svgOf(list, { scale, crop: crop ?? undefined, images });
@@ -52,7 +56,7 @@ async function animated(vector: VectorPort, target: DrawTarget, row: ExportRow):
 }
 
 const DRAW: Record<Drawing, (ports: DrawPorts, targets: DrawTarget[], row: ExportRow) => Promise<Drawn>> = {
-  [Drawing.Raster]: async ({ port, compose }, [target], row) => ({ bytes: await opened(port, compose, target, row, (o) => o.page.shot(FILE[row.format].mime, row.quality ?? FILE[row.format].quality, o.crop)), skipped: [sizeNote(row, target.doc)].filter((note) => note !== null) }),
+  [Drawing.Raster]: async ({ port, compose }, [target], row) => ({ bytes: await opened(port, compose, target, row, (o) => o.page.shot(FILE[row.format].mime, row.quality ?? FILE[row.format].quality, o.crop)), skipped: [sizeNote(row, designOf(target))].filter((note) => note !== null) }),
   [Drawing.Vector]: async ({ vector }, [target], row) => {
     const { svg, skipped } = await vectored(vector, target, row);
     return { bytes: Buffer.from(svg), skipped };

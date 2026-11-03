@@ -1,4 +1,5 @@
 import { localStore } from '$lib/browser-storage';
+import { FRAME_VIEW_DEFAULT, FrameView, type FrameViews } from '$lib/canvas/frame-view';
 /** Persistent shell layout prefs (sidebar). Browser localStorage. */
 
 export const SHELL_PREF_KEYS = {
@@ -8,7 +9,8 @@ export const SHELL_PREF_KEYS = {
   chatPanelPx: 'feega.chatPanelPx',
   chatOpen: 'feega.chatOpen',
   chatTab: 'feega.chatTab',
-  rulers: 'feega.rulers'
+  rulers: 'feega.rulers',
+  frameViews: 'feega.frameViews'
 } as const;
 
 const SHELL_PREF_KEYS_LEGACY = {
@@ -18,7 +20,8 @@ const SHELL_PREF_KEYS_LEGACY = {
   chatPanelPx: 'dazero.chatPanelPx',
   chatOpen: 'dazero.chatOpen',
   chatTab: 'dazero.chatTab',
-  rulers: 'dazero.rulers'
+  rulers: 'dazero.rulers',
+  frameViews: 'dazero.frameViews'
 } as const;
 
 export const CHAT_TABS = ['chat', 'guide', 'properties'] as const;
@@ -173,4 +176,23 @@ export function readRulers(): boolean {
 
 export function writeRulers(on: boolean) {
   writeRaw(SHELL_PREF_KEYS.rulers, on ? 'true' : 'false');
+}
+
+const FRAME_VIEWS = Object.values(FrameView);
+
+function storedViews(raw: string | null): Partial<FrameViews> {
+  try {
+    const parsed = JSON.parse(raw ?? '{}') as Record<string, unknown> | null;
+    return Object.fromEntries(FRAME_VIEWS.filter((view) => typeof parsed?.[view] === 'boolean').map((view) => [view, parsed![view]]));
+  } catch {
+    return {};
+  }
+}
+
+export function readFrameViews(): FrameViews {
+  return { ...FRAME_VIEW_DEFAULT, ...storedViews(readRaw(SHELL_PREF_KEYS.frameViews)) };
+}
+
+export function writeFrameViews(views: FrameViews) {
+  writeRaw(SHELL_PREF_KEYS.frameViews, JSON.stringify(views));
 }

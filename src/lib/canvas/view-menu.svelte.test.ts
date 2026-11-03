@@ -4,6 +4,7 @@ import { Command } from '$lib/motion/shortcuts';
 import { VIEW_ITEMS, ZOOM_ITEMS, frameViews, zoomLevel, zoomPercent } from './view-menu.svelte';
 import { CANVAS_COMMAND_OF, matchCanvasShortcut } from './shortcuts';
 import { rulersPref } from './rulers-pref.svelte';
+import { readFrameViews } from '$lib/shell-prefs';
 
 describe('the header View menu', () => {
   it('lists outlines, pixel grid, guides, rulers and pivot with their unchanged keys', () => {
@@ -16,6 +17,14 @@ describe('the header View menu', () => {
     const before = frameViews.isOn(FrameView.Outlines);
     frameViews.flip(FrameView.Outlines);
     expect(frameViews.isOn(FrameView.Outlines)).toBe(!before);
+  });
+
+  it('the layout grid toggle is remembered for the next visit', () => {
+    const store = new Map<string, string>();
+    (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) };
+    const before = frameViews.isOn(FrameView.Guides);
+    frameViews.flip(FrameView.Guides);
+    expect(readFrameViews()[FrameView.Guides]).toBe(!before);
   });
 
   it('rulers stay a remembered preference', () => {

@@ -22,6 +22,18 @@ describe('a text box that follows its text', () => {
     expect(next.y - next.height / 2).toBeGreaterThanOrEqual(0);
   });
 
+  it('a long auto width text keeps its left edge instead of jumping to the stage edge', () => {
+    const next = fittedTextBox(TextSizing.AutoWidth, { x: 0.15, y: 0.5, width: 0.1, height: 0.1 }, { left: 100, top: 225, width: 1400, height: 50 }, doc)!;
+    expect((next.x - next.width / 2) * doc.width).toBeCloseTo(100);
+    expect(next.width).toBe(1);
+  });
+
+  it('a text grown past the right edge keeps its centre on the stage', () => {
+    const next = fittedTextBox(TextSizing.AutoWidth, { x: 0.95, y: 0.5, width: 0.1, height: 0.1 }, { left: 900, top: 225, width: 300, height: 50 }, doc)!;
+    expect(next.x).toBeLessThanOrEqual(1);
+    expect((next.x - next.width / 2) * doc.width).toBeCloseTo(850);
+  });
+
   it('a fixed box never moves on its own', () => {
     expect(fittedTextBox(TextSizing.Fixed, placed, { left: 0, top: 0, width: 10, height: 10 }, doc)).toBeNull();
   });

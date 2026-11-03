@@ -26,6 +26,26 @@ afterEach(() => {
 });
 
 describe('font picker', () => {
+  it('scrolls its list into the panel when it opens low in the inspector', () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    open();
+    expect(scrolled).toHaveBeenCalledWith({ block: 'nearest' });
+  });
+
+  it('keeps Rename and Delete whole next to a long uploaded family name', () => {
+    const library = { families: [{ family: 'Berkeley Mono Variable', variants: [] }], faceCss: '', missing: [], upload: vi.fn(), rename: vi.fn(), remove: vi.fn() };
+    Element.prototype.scrollIntoView = vi.fn();
+    app = mount(FontPicker, { target: document.body, props: { value: Object.values(BuiltinFont)[0], fonts: [], onpick: vi.fn(), library } });
+    flushSync();
+    document.querySelector<HTMLButtonElement>('.font-picker > button')!.click();
+    flushSync();
+    const rename = document.querySelector('button[aria-label="Rename Berkeley Mono Variable"]')!;
+    const family = rename.previousElementSibling!;
+    expect(rename.className).toContain('shrink-0');
+    expect(family.className).toContain('min-w-0');
+  });
+
   it('the dropdown uses the raised popover tokens', () => {
     open();
     const panel = document.querySelector('[role="dialog"]')!;

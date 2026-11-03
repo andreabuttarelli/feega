@@ -19,7 +19,7 @@ function withText(): MotionDoc {
   return added.doc;
 }
 
-const frameRow = (id: string) => ({ id, org_id: 'org', canvas_id: 'canvas', project_id: 'project', type: 'motion', display_name: 'Frame', x: 0, y: 0, z: 0, width: null, height: null, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null }, version: 1 });
+const frameRow = (id: string, size: { width: number | null; height: number | null } = { width: null, height: null }) => ({ id, org_id: 'org', canvas_id: 'canvas', project_id: 'project', type: 'motion', display_name: 'Frame', x: 0, y: 0, z: 0, ...size, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null }, version: 1 });
 
 const revisionRow = (nodeId: string, version: number, doc: MotionDoc) => ({ org_id: 'org', node_id: nodeId, version, doc, summary: null, actor_kind: 'user' });
 
@@ -61,8 +61,10 @@ const custom = (): MotionDoc => {
 };
 
 describe('frameSize action', () => {
-  it('a custom frame resized on the canvas saves a revision with the exact node size', async () => {
-    const input = event({ node_id: SOURCE, width: '600', height: '300' }, { motion_revisions: [revisionRow(SOURCE, 1, custom())] });
+  const oneToOne = [frameRow(SOURCE, { width: 1920, height: 1080 }), frameRow(TARGET)];
+
+  it('a custom frame drawn one doc px per canvas px saves a revision with the exact node size', async () => {
+    const input = event({ node_id: SOURCE, width: '600', height: '300' }, { nodes: oneToOne, motion_revisions: [revisionRow(SOURCE, 1, custom())] });
 
     const result = await actions.frameSize(input as never);
 
@@ -100,11 +102,19 @@ describe('frameSize action', () => {
   });
 
   it('a preset frame takes the exact size, any ratio', async () => {
-    const input = event({ node_id: SOURCE, width: '600', height: '300' });
+    const input = event({ node_id: SOURCE, width: '600', height: '300' }, { nodes: oneToOne });
 
     await actions.frameSize(input as never);
 
     expect(written(input, SOURCE)[0].doc).toMatchObject({ width: 600, height: 300 });
+  });
+
+  it('a frame held at two doc px per canvas px keeps two', async () => {
+    const input = event({ node_id: SOURCE, width: '600', height: '300' }, { nodes: [frameRow(SOURCE, { width: 960, height: 540 }), frameRow(TARGET)], motion_revisions: [revisionRow(SOURCE, 1, custom())] });
+
+    await actions.frameSize(input as never);
+
+    expect(written(input, SOURCE)[0].doc).toMatchObject({ width: 1200, height: 600 });
   });
 
   it('a missing size is a 400', async () => {

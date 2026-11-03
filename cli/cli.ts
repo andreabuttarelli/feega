@@ -542,7 +542,7 @@ canvas
   .command('export <projectId> <targets...>')
   .description('Export frames, or one element as frameId:elementId: one file, or a zip for several (free, no AI)')
   .option('--format <f>', 'png, jpg, webp, svg, pdf (one file, a page per frame), lottie or dotlottie (the animation)', 'png')
-  .option('--scale <n>', 'Scale 0.5–4')
+  .option('--scale <n>', 'Scale of the frame as big as it is on the canvas, 0.5–4 (default 2)')
   .option('--width <px>', 'Fixed width, keeps the ratio')
   .option('--height <px>', 'Fixed height, keeps the ratio')
   .option('--suffix <s>', 'Added to each file name, e.g. @2x')

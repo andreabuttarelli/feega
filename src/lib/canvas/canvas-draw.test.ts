@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { parsePath, pathData, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
-import { TEXT_CLICK_PX, canvasTextClick, drawnInFrame, drawnOnCanvas } from './canvas-draw';
+import { TEXT_CLICK_PX, canvasTextClick, drawnAnchor, drawnInFrame, drawnOnCanvas } from './canvas-draw';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FEEGA_TOKENS, resolveColor } from '@feega/motion-core/motion/brand';
 import { DEFAULT_COLOUR } from '@feega/motion-core/motion/default-colours';
+import { addClip } from '@feega/motion-core/motion/timeline';
+import { wrapInStack } from '$lib/motion/layout/ops';
 
 const HOST = { left: 100, top: 50, width: 1000, height: 500 };
 const ZOOM_TWO = (p: { x: number; y: number }) => ({ x: (p.x - 100) / 2, y: (p.y - 50) / 2 });
@@ -68,6 +70,26 @@ describe('a shape drawn over a frame lands inside it, on the gesture', () => {
   const sheet = () => ({ ...newMotionDoc(MotionFormat.Landscape), width: 1000, height: 800 });
   const clipOf = (doc: MotionDoc, id: string) => doc.tracks.flatMap((t) => t.clips).find((c) => c.id === id);
 
+  it('a text clicked inside a stack of the frame joins that stack', () => {
+    const shape = (x: number) => ({ component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } }) as const;
+    const withStack = [['a', 0.3], ['b', 0.5]].reduce<MotionDoc>((d, [id, x]) => {
+      const added = addClip(d, shape(x as number), id as string);
+      return added.ok ? added.doc : d;
+    }, sheet());
+    const wrapped = wrapInStack(withStack, ['a', 'b'], 'row', 'lane-row');
+    const stack = wrapped.ok ? wrapped.doc : withStack;
+
+    const made = drawnInFrame(stack, FRAME, { tool: DrawTool.Text, box: { left: 380, top: 290, width: 80, height: 20 } }, 0, 't1');
+
+    expect(made.ok && clipOf(made.doc, 't1')?.parent).toBe('row');
+  });
+
+  it('a text clicked outside any stack stays at the frame root', () => {
+    const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Text, box: { left: 380, top: 290, width: 80, height: 20 } }, 0, 't2');
+
+    expect(made.ok && clipOf(made.doc, 't2')?.parent).toBeFalsy();
+  });
+
   it('a rectangle keeps its place and size in the frame', () => {
     const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Rectangle, box: { left: 300, top: 200, width: 100, height: 40 } }, 0, 'r1');
 
@@ -115,5 +137,15 @@ describe('a click with the text tool on the canvas', () => {
     expect(atTwo.height).toBeCloseTo(16 * leading * 2);
     const atOne = canvasTextClick((p) => p);
     expect(atOne.height).toBeCloseTo(16 * leading);
+  });
+});
+
+describe('the point that decides which frame a drawing lands in', () => {
+  it('a clicked text lands where it was clicked, not where its box ends', () => {
+    expect(drawnAnchor({ tool: DrawTool.Text, box: { left: 100, top: 40, width: 160, height: 20 } })).toEqual({ x: 100, y: 50 });
+  });
+
+  it('a drawn rectangle lands by its centre', () => {
+    expect(drawnAnchor({ tool: DrawTool.Rectangle, box: { left: 100, top: 40, width: 160, height: 20 } })).toEqual({ x: 180, y: 50 });
   });
 });

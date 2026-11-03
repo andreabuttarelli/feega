@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { readChatTab, writeChatTab, readRulers, writeRulers } from './shell-prefs';
+import { readChatTab, writeChatTab, readRulers, writeRulers, readFrameViews, writeFrameViews } from './shell-prefs';
 import { FRAME_VIEW_DEFAULT, FrameView } from './canvas/frame-view';
 
 function fakeLocalStorage() {
@@ -58,5 +58,26 @@ describe('i righelli della tela', () => {
   it('accesi e riletti restano accesi', () => {
     writeRulers(true);
     expect(readRulers()).toBe(true);
+  });
+});
+
+describe('the frame views a user toggled', () => {
+  beforeEach(() => {
+    testLocalStorage = fakeLocalStorage();
+    (globalThis as { localStorage?: unknown }).localStorage = testLocalStorage;
+  });
+
+  it('start from the defaults', () => {
+    expect(readFrameViews()).toEqual(FRAME_VIEW_DEFAULT);
+  });
+
+  it('a layout grid turned off stays off after a reload', () => {
+    writeFrameViews({ ...FRAME_VIEW_DEFAULT, [FrameView.Guides]: false });
+    expect(readFrameViews()[FrameView.Guides]).toBe(false);
+  });
+
+  it('a damaged value falls back to the defaults', () => {
+    testLocalStorage.setItem('feega.frameViews', '{oops');
+    expect(readFrameViews()).toEqual(FRAME_VIEW_DEFAULT);
   });
 });
