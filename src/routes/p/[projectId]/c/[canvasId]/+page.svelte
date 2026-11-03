@@ -1609,6 +1609,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     maxWaitMs: SAVE_MAX_WAIT_MS,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
     onStatus: (status) => { saveStatus = status; keepOutbox(); },
+    reachable: () => navigator.onLine,
     onGaveUp: () => { failed = SAVE_GAVE_UP_NOTICE; refreshSoon(); }
   });
 
@@ -1625,6 +1626,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     send,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
     onStatus: (status) => { placeStatus = status; keepOutbox(); },
+    reachable: () => navigator.onLine,
     announce: { intent: (row) => commits.publish([row]), refused: () => commits.publish([]) }
   });
 

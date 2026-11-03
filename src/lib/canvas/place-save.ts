@@ -9,6 +9,7 @@ type PlaceOptions = {
   backoffMs: (failures: number) => number;
   onStatus?: (status: SaveStatus) => void;
   announce?: { intent: (row: { id: string; x: number; y: number }) => void; refused: (id: string) => void };
+  reachable?: () => boolean;
 };
 
 enum Placement {
@@ -46,6 +47,7 @@ export function createPlaceSaves(options: PlaceOptions) {
       debounceMs: 0,
       maxWaitMs: 0,
       backoffMs: options.backoffMs,
+      reachable: options.reachable,
       onStatus: (status) => announce(kind, status)
     });
   }

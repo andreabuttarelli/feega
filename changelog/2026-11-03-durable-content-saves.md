@@ -25,6 +25,10 @@ status said "Saved".
   from the queued wire. Any write naming a node waits for that node's draw, so a move or fill
   never reaches the server before the shape exists. Server `drawElement`/`drawFrame` answer a
   repeated id with the existing node (`madeBefore`), instead of a duplicate insert.
+- **Offline never gives up.** The node and placement schedulers dropped a change after 8 failed
+  sends, and every `focusout` flush counted as one: offline, the oldest move was dropped within
+  seconds (s2: the first seed's move). Failures now count toward giving up only while
+  `navigator.onLine`; offline they only grow the backoff.
 - **Status.** `pendingWrites` counts patches, placements, lines, draws, content drafts and
   runner ops in flight; `warnUnsent` uses the same count.
 - **Undo.** Move undo no longer awaits the save (it is already in the placement outbox).
