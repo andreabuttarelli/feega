@@ -229,6 +229,15 @@ export function withAutoLayout(doc: MotionDoc, measure: TextMeasure = estimatedT
   return { ...doc, tracks: laidOut(doc.tracks, size, measure, instanceContent({ ...doc, comps }, size, measure)), comps };
 }
 
+export function instanceBoxes(doc: MotionDoc, measure: TextMeasure = estimatedText): ReadonlyMap<string, Box> {
+  const size = { width: doc.width, height: doc.height };
+  const content = instanceContent(doc, size, measure);
+  return new Map(visualClips(doc.tracks).flatMap((c) => {
+    const box = c.component === 'Precomp' && doc.comps[String(c.props.comp)]?.component ? content(c) : null;
+    return box ? [[c.id, box] as const] : [];
+  }));
+}
+
 export function shownBox(doc: MotionDoc, clipId: string, measure: TextMeasure = estimatedText): Box | null {
   const laid = withAutoLayout(doc, measure);
   const clip = visualClips(laid.tracks).find((c) => c.id === clipId);
