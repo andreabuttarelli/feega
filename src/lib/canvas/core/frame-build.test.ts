@@ -10,7 +10,9 @@ import { boxBook } from '$lib/motion/gpu-full/text/test-face';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
-import { buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
+import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
+import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import { builtAnswer, buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -91,6 +93,26 @@ describe('the builder', () => {
     await expect(build('/a', Smoothing.Plain)).rejects.toThrow();
     await expect(build('/b', Smoothing.Plain)).rejects.toThrow();
     expect(spawned).toBe(1);
+  });
+
+  it('the worker sends each item already wired, so the main thread never serialises it', async () => {
+    const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
+    const answer = builtAnswer(7, list);
+
+    expect(answer).toEqual({ id: 7, list, wires: list.items.map((i) => JSON.stringify(i)) });
+  });
+
+  it('the main thread keeps the wires the worker sent with the list', async () => {
+    const item = { kind: 'path', clip: 'card' };
+    const worker = {
+      onerror: null,
+      onmessage: null as BuildWorker['onmessage'],
+      postMessage: (ask: BuildAsk) => queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, list: { width: 1, height: 1, background: null, items: [item], unsupported: [] }, wires: ['"from the worker"'] } } as never))
+    };
+
+    const list = await frameBuilder(() => worker)('/a', Smoothing.Plain);
+
+    expect(itemWire(list!.items[0])).toBe('"from the worker"');
   });
 
   it('says it cannot build when no worker can start', async () => {

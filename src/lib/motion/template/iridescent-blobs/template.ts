@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { BLOBS_COMPONENT, BLOBS_FONTS, BLOBS_PROPS, BLOBS_VAR_PREFIX, blobsComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const BLOBS_TEMPLATE_ID = `${BUILTIN_PREFIX}iridescent-blobs`;
 export const BLOBS_CLIP = 'blobs';
@@ -17,10 +18,9 @@ const BLOBS_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([group
 
 export const IRIDESCENT_BLOBS_TEMPLATE: TemplateEntry = {
   id: BLOBS_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'iridescent-blobs', component: BLOBS_COMPONENT, code: blobsComponent(), props: BLOBS_PROPS, fonts: BLOBS_FONTS, varPrefix: BLOBS_VAR_PREFIX, vars: BLOBS_VARS, clip: BLOBS_CLIP, seconds: 12, fps: 30, groups: BLOBS_GROUPS }), {
     name: 'Iridescent blobs',
     description: 'A soft, pearly fluid mass drifts on black, with a glowing rim, an inner glow, black bubbles and glitter. It loops seamlessly; an optional title enters on its own beat.',
-    keyFields: BLOBS_KEY_FIELDS,
-    doc: customTemplateDoc({ name: 'iridescent-blobs', component: BLOBS_COMPONENT, code: blobsComponent(), props: BLOBS_PROPS, fonts: BLOBS_FONTS, varPrefix: BLOBS_VAR_PREFIX, vars: BLOBS_VARS, clip: BLOBS_CLIP, seconds: 12, fps: 30, groups: BLOBS_GROUPS })
-  }
+    keyFields: BLOBS_KEY_FIELDS
+  })
 };

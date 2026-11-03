@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { STEPS_COMPONENT, STEPS_FONTS, STEPS_PROPS, STEPS_VAR_PREFIX, stepsComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const STEPS_TEMPLATE_ID = `${BUILTIN_PREFIX}steps-list`;
 export const STEPS_CLIP = 'steps';
@@ -16,10 +17,9 @@ const STEPS_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([group
 
 export const STEPS_LIST_TEMPLATE: TemplateEntry = {
   id: STEPS_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'steps-list', component: STEPS_COMPONENT, code: stepsComponent(), props: STEPS_PROPS, fonts: STEPS_FONTS, varPrefix: STEPS_VAR_PREFIX, vars: STEPS_VARS, clip: STEPS_CLIP, seconds: 12, fps: 30, groups: STEPS_GROUPS }), {
     name: 'Steps list',
     description: 'An agent-style progress list: a heading, then steps with line icons that land one by one along a thin rail, the newest one highlighted, and a shimmering status label below.',
-    keyFields: ['heading', 'steps', 'working', 'background', 'pace'],
-    doc: customTemplateDoc({ name: 'steps-list', component: STEPS_COMPONENT, code: stepsComponent(), props: STEPS_PROPS, fonts: STEPS_FONTS, varPrefix: STEPS_VAR_PREFIX, vars: STEPS_VARS, clip: STEPS_CLIP, seconds: 12, fps: 30, groups: STEPS_GROUPS })
-  }
+    keyFields: ['heading', 'steps', 'working', 'background', 'pace']
+  })
 };

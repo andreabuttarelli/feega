@@ -1,17 +1,20 @@
-import type { DisplayList, Item } from '../../motion/gpu-full/display-list';
-
-export type Splice = { head: number; tail: number; items: Item[] };
+import type { DisplayList } from '../../motion/gpu-full/display-list';
+import { itemWire, type Splice } from '../../motion/gpu-full/wire';
 
 type Hashed = { frame: string; items: string[] };
 
 const hashed = new WeakMap<DisplayList, Hashed>();
+
+const facesOf = new WeakMap<object, string>();
+
+const facesWire = (faces: DisplayList['faces']) => (faces ? (facesOf.get(faces) ?? facesOf.set(faces, JSON.stringify(faces)).get(faces)!) : '');
 
 function hashOf(list: DisplayList): Hashed {
   const known = hashed.get(list);
   if (known) {
     return known;
   }
-  const made = { frame: JSON.stringify([list.width, list.height, list.background, list.faces]), items: list.items.map((i) => JSON.stringify(i)) };
+  const made = { frame: `${list.width}|${list.height}|${list.background?.join(',') ?? ''}|${facesWire(list.faces)}`, items: list.items.map(itemWire) };
   hashed.set(list, made);
   return made;
 }
