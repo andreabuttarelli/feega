@@ -319,6 +319,27 @@ describe('holding the save until an upload is done', () => {
   });
 });
 
+describe('a server write the session waits for, then saves on top of', () => {
+  it('an edit made while the server writes is sent at the written version and keeps the server change', async () => {
+    const { session, port } = open();
+    const homed: MotionDoc = { ...base, width: 999 };
+    let land: (head: { version: number; doc: MotionDoc }) => void = () => {};
+
+    const rebased = session.rebaseOn(() => new Promise((resolve) => (land = resolve)));
+    await vi.advanceTimersByTimeAsync(0);
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(port.send).not.toHaveBeenCalled();
+
+    land({ version: 2, doc: homed });
+    await rebased;
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(vi.mocked(port.send).mock.calls[0][1]).toBe(2);
+    expect(vi.mocked(port.send).mock.calls[0][0]).toEqual(outgoing({ version: 2, doc: homed }, { ...homed, durationInFrames: 60 }));
+  });
+});
+
 describe('a move into the frame saved by the canvas, not by this session', () => {
   const moved = addClip(base, { component: 'Image', from: 0, durationInFrames: 30, props: { assetId: 'a1', x: 0.5, y: 0.5 } }, 'img');
   const landedDoc: MotionDoc = moved.ok ? { ...moved.doc, assets: [{ id: 'a1', kind: 'image', name: 'skye.jpg' }] } : base;

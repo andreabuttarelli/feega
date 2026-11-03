@@ -59,7 +59,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import { DrawAction, drawOp, isDraw, keepDrawn } from '$lib/canvas/draw-queue';
   import { draftLog, replayDrafts, type DraftEntry, type DraftLog } from '$lib/canvas/frame-drafts';
   import { postFrameOps, queueResultOf } from '$lib/canvas/frame-ops-send';
-  import type { FrameDraft } from '$lib/motion/frame-sync';
+  import type { FrameDraft, Revision } from '$lib/motion/frame-sync';
   import type { Op } from '$lib/canvas/op-queue';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -670,10 +670,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
-  async function homeComponents(nodeId: string): Promise<Record<string, string> | null> {
+  async function homeComponents(nodeId: string): Promise<Revision | null> {
     const done = await postAtVersion('homeComponents', nodeId, {});
     void invalidate(CANVAS_LIST_DEPENDENCY);
-    return (done?.homes as Record<string, string> | undefined) ?? null;
+    return (done?.head as Revision | null | undefined) ?? null;
   }
 
   function wrapInSection(ids: string[]) {

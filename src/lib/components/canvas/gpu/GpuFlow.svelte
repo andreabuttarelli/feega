@@ -154,7 +154,7 @@
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
   import { ComponentDropOn, componentDropTarget } from '$lib/canvas/component-drop';
   import { fetchComponentSource } from '$lib/canvas/project-components';
-  import { homed, homedAt, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
+  import { homed, mainClipOf, placeInstance } from '$lib/motion/canvas-components';
   import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
@@ -1525,12 +1525,7 @@
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
     if (id === Action.CreateComponent && !onComponentsPage) {
-      await saverOf(nodeId)?.settled();
-      const homes = await props.onComponentMade?.(nodeId);
-      const present = saverOf(nodeId)?.history.present;
-      if (homes && present && Object.keys(homes).length) {
-        commit(nodeId, { ok: true, doc: homedAt(present, homes) }, 'Moved the main to the Components page');
-      }
+      await saverOf(nodeId)?.rebaseOn(async () => (await props.onComponentMade?.(nodeId)) ?? null);
     }
   }
 
