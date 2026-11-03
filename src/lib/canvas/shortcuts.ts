@@ -42,6 +42,9 @@ export type CanvasCommandId =
   | 'comment'
   | 'bring-front'
   | 'send-back'
+  | 'bring-forward'
+  | 'send-backward'
+  | 'rename'
   | 'help'
   | 'toggle-hidden'
   | 'toggle-locked'
@@ -136,6 +139,8 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.SelectNext]: { id: 'select-next' },
   [Command.SelectPrevious]: { id: 'select-previous' },
   [Command.BringToFront]: { id: 'bring-front' },
+  [Command.BringForward]: { id: 'bring-forward' },
+  [Command.SendBackward]: { id: 'send-backward' },
   [Command.SendToBack]: { id: 'send-back' },
   [Command.ToggleHidden]: { id: 'toggle-hidden' },
   [Command.ToggleLocked]: { id: 'toggle-locked' },
@@ -183,7 +188,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.MoveDownMore]: nudgeBy(0, 1, NUDGE_STEP_BIG)
 };
 
-const PASTE_MOD_KEYS:Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
+const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-forward' | 'send-backward' | 'rename'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-forward', '[': 'send-backward', r: 'rename' };
 
 const SHIFT_MOD_KEYS: Record<string, CanvasCommand> = { h: { id: 'toggle-hidden' }, l: { id: 'toggle-locked' } };
 
@@ -204,7 +209,7 @@ const OPACITY_OF_KEY = new Map<string, number>(OPACITY_KEYS.map((o) => [o.key, o
 
 const HELP_KEY = '?';
 const COMMENT_KEY = 'c';
-const MOD_KEY = 'mod';
+const MOD_PREFIX = /^mod ?/;
 
 const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
 
@@ -320,8 +325,11 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', 'F'], label: 'Select, text, box, ellipse, pen, frame' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
-  { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
-  { id: 'send-back', keys: ['mod', '['], label: 'Send to back' },
+  { id: 'bring-forward', keys: ['mod', ']'], label: 'Bring forward' },
+  { id: 'send-backward', keys: ['mod', '['], label: 'Send backward' },
+  { id: 'bring-front', keys: ['⌥', 'mod', ']'], label: 'Bring to front' },
+  { id: 'send-back', keys: ['⌥', 'mod', '['], label: 'Send to back' },
+  { id: 'rename', keys: ['mod', 'R'], label: 'Rename the selection' },
   { id: 'toggle-hidden', keys: ['⇧', 'mod', 'H'], label: 'Hide / show the selection' },
   { id: 'toggle-locked', keys: ['⇧', 'mod', 'L'], label: 'Lock / unlock the selection' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
@@ -374,6 +382,9 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   ungroup: GuideGroup.Edit,
   'bring-front': GuideGroup.Edit,
   'send-back': GuideGroup.Edit,
+  'bring-forward': GuideGroup.Edit,
+  'send-backward': GuideGroup.Edit,
+  rename: GuideGroup.Edit,
   'toggle-hidden': GuideGroup.Edit,
   'toggle-locked': GuideGroup.Edit,
   export: GuideGroup.Edit,
@@ -399,5 +410,5 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
 export const canvasGuide = (mod: string): { group: string; rows: CanvasGuideRow[] }[] =>
   Object.values(GuideGroup).map((group) => ({
     group,
-    rows: CANVAS_SHORTCUTS.flatMap((row, i) => (GUIDE_GROUP[row.id] === group ? [{ id: `${row.id}-${i}`, name: row.label, keys: row.keys.map((k) => (k === MOD_KEY ? mod : k)).join(' '), gesture: '' }] : []))
+    rows: CANVAS_SHORTCUTS.flatMap((row, i) => (GUIDE_GROUP[row.id] === group ? [{ id: `${row.id}-${i}`, name: row.label, keys: row.keys.map((k) => k.replace(MOD_PREFIX, mod)).join(' '), gesture: '' }] : []))
   }));

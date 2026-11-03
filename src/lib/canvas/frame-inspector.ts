@@ -311,12 +311,20 @@ const rootIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips.filter((c)
 
 export enum ElementAction {
   WrapStack = 'wrap-stack',
-  Duplicate = 'duplicate'
+  Duplicate = 'duplicate',
+  BringForward = 'bring-forward',
+  SendBackward = 'send-backward',
+  BringToFront = 'bring-front',
+  SendToBack = 'send-back'
 }
 
 const WHOLE_ELEMENT: Partial<Record<ActionId, ElementAction>> = {
   [Action.WrapStack]: ElementAction.WrapStack,
-  [Action.Duplicate]: ElementAction.Duplicate
+  [Action.Duplicate]: ElementAction.Duplicate,
+  [Command.BringForward]: ElementAction.BringForward,
+  [Command.SendBackward]: ElementAction.SendBackward,
+  [Command.BringToFront]: ElementAction.BringToFront,
+  [Command.SendToBack]: ElementAction.SendToBack
 };
 
 export function wholeElementAction(id: ActionId, doc: MotionDoc, picks: readonly string[]): ElementAction | null {

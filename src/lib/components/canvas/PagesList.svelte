@@ -93,8 +93,11 @@
       return;
     }
     onpick();
-    void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href);
-    void canvasPages.open(next.href);
+    void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href).then((outcome) => {
+      if (outcome === OpOutcome.Landed) {
+        void canvasPages.open(next.href);
+      }
+    });
   }
 
   function startRename() {

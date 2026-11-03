@@ -414,6 +414,16 @@ describe('acting on a whole free element', () => {
     expect(wholeElementAction(Action.Duplicate, doc, ['a', 'b'])).toBe(ElementAction.Duplicate);
     expect(wholeElementAction(Command.Duplicate, doc, ['a'])).toBeNull();
   });
+
+  it('restacks the whole element among the canvas layers, not its clip inside it', () => {
+    const doc = fixture();
+
+    expect(wholeElementAction(Command.BringForward, doc, ['a', 'b'])).toBe(ElementAction.BringForward);
+    expect(wholeElementAction(Command.SendBackward, doc, ['a', 'b'])).toBe(ElementAction.SendBackward);
+    expect(wholeElementAction(Command.BringToFront, doc, ['a', 'b'])).toBe(ElementAction.BringToFront);
+    expect(wholeElementAction(Command.SendToBack, doc, ['a', 'b'])).toBe(ElementAction.SendToBack);
+    expect(wholeElementAction(Command.BringForward, doc, ['a'])).toBeNull();
+  });
 });
 
 describe('the text header', () => {

@@ -29,6 +29,15 @@
   } = $props();
 
   let draft = $state('');
+
+  function leave(e: KeyboardEvent) {
+    if (e.key !== 'Escape') {
+      return;
+    }
+    e.stopPropagation();
+    (document.activeElement as HTMLElement | null)?.blur();
+    onclose();
+  }
   let replies = $state<Record<string, string>>({});
   let showResolved = $state(false);
 
@@ -97,7 +106,7 @@
   {/if}
 {/snippet}
 
-<aside class="cm-panel" aria-label="Comments" data-testid="comments-panel">
+<aside class="cm-panel" aria-label="Comments" data-testid="comments-panel" onkeydown={leave}>
   <header>
     <h3>Comments</h3>
     <button type="button" class="cm-x" aria-label="Close comments" onclick={onclose}>×</button>
