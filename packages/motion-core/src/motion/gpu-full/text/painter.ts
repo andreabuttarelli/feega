@@ -581,7 +581,8 @@ function gapOf(laid: Laid): TextGap | null {
   if (!laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0) {
     return TextGap.Font;
   }
-  return laid.missing ? TextGap.Glyph : null;
+  const drawn = laid.blocks.some((b) => b.lines.some((l) => l.glyphs.length));
+  return laid.missing && !drawn ? TextGap.Glyph : null;
 }
 
 type LineAt = { x: number; top: number; baseline: number };

@@ -93,6 +93,12 @@ describe('paintText', () => {
     expect(paintText(env('Text', { text: 'a' }, { fonts }))).toBe(TextGap.Glyph);
   });
 
+  it('draws the letters it has a font for when another one has none, an emoji whose font failed', () => {
+    const inks = drawn(paintText(env('Text', { text: 'a😀b' }, { fonts: boxBook(new Set(['😀'])) })));
+
+    expect(inks.flatMap((i) => i.contours)).toHaveLength(2);
+  });
+
   it('draws the caption box under the words in the box colour', () => {
     const inks = drawn(paintText(env('Caption', { text: 'a', background: '#ff0000' })));
 
