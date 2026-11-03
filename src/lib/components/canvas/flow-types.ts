@@ -1,3 +1,4 @@
+import type { Tie } from '$lib/canvas/gpu/wire-magnet';
 import type { PlacedChange } from '$lib/canvas/place-many';
 import type { ActionResult } from '@sveltejs/kit';
 import type { Snippet } from 'svelte';
@@ -97,6 +98,7 @@ export type FlowProps = {
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;
   onEdgeModeChange?: (edgeId: string, mode: WireMode) => void;
+  onEdgeTie?: (edgeIds: string[], tie: Tie | null) => void;
   onCreate?: (what: Addable, at: { x: number; y: number }) => void;
   onCreateFilled?: (drag: FilledNodeDrag, at: { x: number; y: number }) => void;
   onDropFeedImage?: (drag: FeedImageDrag, client: PointerPoint) => void;

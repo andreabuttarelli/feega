@@ -106,6 +106,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   scaleGroup: canvas('scale_group'),
   disconnect: canvas('disconnect_nodes'),
   set_edge_mode: canvas('set_edge_mode'),
+  set_edge_tie: canvas('set_edge_tie'),
   remove: canvas('delete_node'),
   duplicate: canvas('duplicate_nodes'),
   paste: canvas('paste_nodes'),

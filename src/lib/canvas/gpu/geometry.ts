@@ -31,7 +31,7 @@ export type Box = { x: number; y: number; w: number; h: number };
 
 export type Curve = { from: Point; c1: Point; c2: Point; to: Point; mid: Point };
 
-const PORT_HIT_PX = 10;
+const PORT_HIT_PX = 14;
 export const PORT_SIZE = 10;
 export const PORT_OFFSET = PORT_SIZE / 2;
 const CORNER_HIT_PX = 8;
