@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UNTYPED_BUBBLE, WIRE_CURSOR, WireAim, Wiring, atRest, bubbleColour, bubbleRadius, crossings, magnetPort, springTo, throughPoint, tieAcross, wireAim, type Spring } from './wire-magnet';
+import { typesMeet, UNTYPED_BUBBLE, WIRE_CURSOR, WireAim, Wiring, atRest, bubbleColour, bubbleRadius, crossings, magnetPort, springTo, throughPoint, tieAcross, wireAim, type Spring } from './wire-magnet';
 import { CONNECTOR_STYLE } from '../connectors';
 import { PortSide, curvePoint, wireCurve, type Port } from './geometry';
 
@@ -101,5 +101,21 @@ describe('wireAim — the cursor tells what a release would do', () => {
     expect(wireAim(Wiring.Dragging, null, null)).toBe(WireAim.None);
     expect(WIRE_CURSOR[WireAim.Drop]).toBe('copy');
     expect(WIRE_CURSOR[WireAim.Refused]).toBe('not-allowed');
+  });
+});
+
+describe('typesMeet — a dragged wire only sees ports of a type it can feed', () => {
+  const typed = (side: PortSide, t: Port['port']): Port => ({ nodeId: 'n', side, handle: t, port: t, x: 0, y: 0 });
+
+  it('refuses an input of another type, whichever end is dragged', () => {
+    expect(typesMeet(typed(PortSide.Out, 'text'), typed(PortSide.In, 'images'))).toBe(false);
+    expect(typesMeet(typed(PortSide.In, 'images'), typed(PortSide.Out, 'text'))).toBe(false);
+    expect(typesMeet(typed(PortSide.Out, 'images'), typed(PortSide.In, 'images'))).toBe(true);
+  });
+
+  it('never attracts to a port of the wrong type, even right under the cursor', () => {
+    const ports = [typed(PortSide.In, 'images')];
+    const from = typed(PortSide.Out, 'text');
+    expect(magnetPort(ports, { x: 0, y: 0 }, 50, (p) => typesMeet(from, p))).toBeNull();
   });
 });

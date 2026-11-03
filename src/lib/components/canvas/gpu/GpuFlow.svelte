@@ -226,7 +226,7 @@
   import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { WIRE_CURSOR, Wiring, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
+  import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
@@ -657,7 +657,7 @@
     return { source: to.nodeId, sourceHandle: to.handle, target: from.nodeId, targetHandle: from.handle };
   }
 
-  const accepts = (from: Port) => (p: Port) => p.side !== from.side && p.nodeId !== from.nodeId && connectionRefusal(placed, edges, lookup, wireTo(from, p)) === null;
+  const accepts = (from: Port) => (p: Port) => p.side !== from.side && p.nodeId !== from.nodeId && typesMeet(from, p) && connectionRefusal(placed, edges, lookup, wireTo(from, p)) === null;
 
   const dimmedPorts = $derived(wiringFrom ? ports.filter((p) => p.side !== wiringFrom!.side && p.nodeId !== wiringFrom!.nodeId && !accepts(wiringFrom!)(p)) : []);
 
@@ -3049,7 +3049,7 @@
         magnet = magnetPort(ports, w, MAGNET_REACH_PX / view.zoom, accepts(a.from));
         underPort = portAt(ports, w, view.zoom);
         bubbleTint = magnet ? bubbleColour(magnet) : bubbleTint;
-        const c = magnet ? wireTo(a.from, magnet) : candidate(a.from, w);
+        const c = magnet ? wireTo(a.from, magnet) : underPort ? null : candidate(a.from, w);
         const why = c ? connectionRefusal(placed, edges, lookup, c) : '';
         refusal = why || null;
         ghost = { from: a.from, at: w, ok: c !== null && why === null };
@@ -3141,7 +3141,7 @@
           return;
         }
         const target = magnetPort(ports, w, MAGNET_REACH_PX / view.zoom, accepts(a.from));
-        const c = target ? wireTo(a.from, target) : candidate(a.from, w);
+        const c = target ? wireTo(a.from, target) : portAt(ports, w, view.zoom) ? null : candidate(a.from, w);
         ghost = null;
         wiringFrom = null;
         magnet = null;

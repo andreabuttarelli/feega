@@ -1,6 +1,6 @@
 import type { Point } from './camera';
-import { curvePoint, type Curve, type Port } from './geometry';
-import { CONNECTOR_STYLE } from '../connectors';
+import { PortSide, curvePoint, type Curve, type Port } from './geometry';
+import { CONNECTOR_STYLE, portAccepts } from '../connectors';
 
 export type Spring = { value: number; velocity: number };
 
@@ -121,4 +121,9 @@ export function wireAim(wiring: Wiring, under: Port | null, magnet: Port | null)
     return WireAim.Drop;
   }
   return under ? WireAim.Refused : WireAim.None;
+}
+
+export function typesMeet(from: Port, to: Port): boolean {
+  const [output, input] = from.side === PortSide.Out ? [from.port, to.port] : [to.port, from.port];
+  return !output || !input || portAccepts(input, output);
 }
