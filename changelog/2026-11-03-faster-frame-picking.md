@@ -21,13 +21,12 @@ From the round-2 perf audit (`~/Documents/feega-videos/audit/round2/perf/`), hot
   0.7 s in jsdom.
 - **Removed.** `src/lib/motion/gpu/{scene,pick,matrix,paint-of}.ts` and tests: the picker was their
   only caller. `pick.test.ts` cases moved to `frame-placements.test.ts`, which needs no DOM.
-- **Hotspot 4, before.** The frame worker fetched each doc to draw it, then `GpuFlow.fetchPickDoc`
-  fetched it again (`no-store`, one at a time behind `quiet()` idle waits): contents of the 30
-  frames became pickable 8–16 s after open; the double-click drill-in missed.
-- **After.** The worker posts the source back with the list (`BuildAnswer.source`), `CoreFrames`
-  calls `onsource`, `GpuFlow.adoptSource` fills `fetched`. A doc the worker leaves to the main
-  thread is built from that source, not refetched. `fetchPickDoc` runs only when the GPU renderer
-  is off.
+- **Hotspot 4.** #1786 (`frame-sources.ts`) already shares one download per source URL between
+  the worker and the picker. What was left: the picker still asked for each doc itself, one at a
+  time behind `quiet()` idle waits, so contents became pickable 8–16 s after open and the
+  double-click drill-in missed. `CoreFrames` now calls `onsource` with the source it drew from and
+  `GpuFlow.adoptSource` fills `fetched` at once; `fetchPickDoc` runs only when the GPU renderer is
+  off.
 - **Not done.** No incremental placement update during a drag: each move prepares the doc once
   (~3 ms at 1× on the heavy landing) and places only what is asked. The drag step is still bound
   by `CoreFrames.rebuildLive` (a full `drawFrame` per move on the main thread), outside this change.
