@@ -13,6 +13,7 @@ const TOO_MANY_RECTS: usize = 32;
 const AA_PX: f64 = 1.0;
 const EPSILON: f64 = 1e-6;
 const ROUGH_SCALE: f64 = 0.5;
+const MAX_STRETCH: f64 = std::f64::consts::SQRT_2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
@@ -296,6 +297,10 @@ impl Retained {
         };
         if held.camera.zoom != c.zoom {
             if gesture && self.full_ms <= LIVE_FULL_MS {
+                return self.full(c, Quality::Sharp);
+            }
+            let stretch = c.zoom / (held.camera.zoom * held.quality.scale());
+            if gesture && stretch > MAX_STRETCH {
                 return self.full(c, Quality::Sharp);
             }
             if gesture && self.covers(c) {
