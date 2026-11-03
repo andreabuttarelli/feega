@@ -182,14 +182,20 @@ describe('a still design frame is not held to the video resolution', () => {
     expect(setCanvas(page(), { size: { width: 1440, height: 16385 } }).ok).toBe(false);
   });
 
-  it('a video keeps the 4K cap', () => {
-    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1440, height: 5000 } }).ok).toBe(false);
-    expect(parseMotionDoc({ ...page(), width: 1440, height: 5000, still: undefined }).ok).toBe(false);
+  it('a video takes a tall page too: its 4K cap waits for the export', () => {
+    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1440, height: 5000 } }).ok).toBe(true);
+    expect(parseMotionDoc({ ...page(), width: 1440, height: 5000, still: undefined }).ok).toBe(true);
   });
 
-  it('a tall design frame cannot turn into a video', () => {
+  it('a tall design frame can be animated', () => {
     const tall = setCanvas(page(), { size: { width: 1440, height: 5000 } });
 
-    expect(tall.ok && setStill(tall.doc, null).ok).toBe(false);
+    expect(tall.ok && setStill(tall.doc, null).ok).toBe(true);
+  });
+
+  it('a 1 px design frame cannot turn into a video, which needs 16 px a side', () => {
+    const dot = setCanvas(page(), { size: { width: 1, height: 1 } });
+
+    expect(dot.ok && setStill(dot.doc, null).ok).toBe(false);
   });
 });

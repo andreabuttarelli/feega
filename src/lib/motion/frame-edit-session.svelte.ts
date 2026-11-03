@@ -13,8 +13,21 @@ import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
 
 const SAVE_DEBOUNCE_MS = 250;
 const COALESCE_MS = 800;
+const RETRY_FIRST_MS = 1_000;
+const RETRY_LONGEST_MS = 30_000;
+const UNREACHABLE = 'Could not reach the server: retrying';
+const RESTORED = 'Restored unsaved edits';
 
-export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string };
+export enum SaveFailure {
+  Transient = 'transient',
+  Refused = 'refused'
+}
+
+export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string; failure: SaveFailure };
+
+export type FrameDraft = { version: number; ops: DocOp[] };
+
+const retryDelay = (failures: number) => Math.min(RETRY_LONGEST_MS, RETRY_FIRST_MS * 2 ** (failures - 1));
 
 export type SessionPort = {
   viewPath: () => string[];
@@ -26,6 +39,9 @@ export type SessionPort = {
   landed: (from: Revision, to: Revision) => void;
   pull: () => Promise<void>;
   send: (ops: DocOp[], version: number, summary: string) => Promise<SendResult>;
+  refused: (error: string) => void;
+  keep: (draft: FrameDraft) => void;
+  release: () => void;
 };
 
 export enum DocAccess {
@@ -53,6 +69,7 @@ export class FrameEditSession {
   private held: Promise<unknown> | null = null;
   private lastEdit = { summary: '', at: 0 };
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private failures = 0;
   private unsavedSummary = '';
   private readonly port: SessionPort;
 
@@ -167,7 +184,15 @@ export class FrameEditSession {
   }
 
   unsaved(): boolean {
-    return this.saveState === SaveState.Pending || this.saveState === SaveState.Saving;
+    return this.saveState !== SaveState.Saved;
+  }
+
+  restore(draft: FrameDraft): boolean {
+    if (draft.version !== this.version || !draft.ops.length) {
+      return false;
+    }
+    this.recordRoot(applyOps(this.history.present, draft.ops), RESTORED);
+    return true;
   }
 
   async flushPending() {
@@ -237,18 +262,21 @@ export class FrameEditSession {
     this.saveState = SaveState.Saving;
     const sent = this.history.present;
     const base = { version: this.version, doc: this.baseDoc };
-    const result = await this.port.send(outgoing(base, sent), this.version, this.unsavedSummary);
+    const ops = outgoing(base, sent);
+    this.port.keep({ version: base.version, ops });
+    const result = await this.port.send(ops, this.version, this.unsavedSummary).catch((): SendResult => ({ ok: false, error: UNREACHABLE, failure: SaveFailure.Transient }));
     this.saving = false;
 
     if (result.ok && result.doc) {
       this.port.landed(base, { version: result.version, doc: result.doc });
     }
     if (result.ok) {
+      this.failures = 0;
       this.follow(landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc }));
       this.saveState = SaveState.Saved;
+      this.port.release();
     } else {
-      this.saveState = SaveState.Failed;
-      this.notice = result.error;
+      this.failed(result.error, result.failure);
     }
     if (this.resave) {
       this.resave = false;
@@ -259,6 +287,19 @@ export class FrameEditSession {
       this.missedRemote = false;
       await this.port.pull();
     }
+  }
+
+  private failed(error: string, failure: SaveFailure) {
+    if (failure === SaveFailure.Transient) {
+      this.failures += 1;
+      this.saveState = SaveState.Pending;
+      this.notice = error;
+      this.saveTimer = setTimeout(() => void this.save(), retryDelay(this.failures));
+      return;
+    }
+    this.saveState = SaveState.Failed;
+    this.notice = error;
+    this.port.refused(error);
   }
 
   private follow(next: Synced) {

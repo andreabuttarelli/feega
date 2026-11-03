@@ -18,4 +18,12 @@ function withContents(clips: readonly MotionClip[], ids: readonly string[]): str
   return [...taken];
 }
 
-export const removeLayers = (doc: MotionDoc, ids: readonly string[]): OpResult => removeClips(doc, withContents(allClips(doc), ids));
+function emptiedDropped(before: MotionDoc, after: MotionDoc): MotionDoc {
+  const heldClips = new Set(before.tracks.filter((t) => t.clips.length).map((t) => t.id));
+  return { ...after, tracks: after.tracks.filter((t) => t.clips.length || !heldClips.has(t.id)) };
+}
+
+export function removeLayers(doc: MotionDoc, ids: readonly string[]): OpResult {
+  const removed = removeClips(doc, withContents(allClips(doc), ids));
+  return removed.ok ? { ok: true, doc: emptiedDropped(doc, removed.doc) } : removed;
+}

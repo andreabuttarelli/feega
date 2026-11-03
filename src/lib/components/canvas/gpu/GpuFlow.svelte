@@ -96,6 +96,8 @@
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
+  import { browserDrafts, refusedNotice, sendResultOf, type FrameDrafts } from '$lib/canvas/frame-save';
+  import type { FrameDraft } from '$lib/motion/frame-edit-session.svelte';
   import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
@@ -1475,9 +1477,11 @@
           form.set('ops', JSON.stringify(ops));
           form.set('version', String(version));
           form.set('summary', summary);
-          const result = await postPageAction(url, 'ops', form);
-          return result.type === 'success' ? { ok: true, version: Number(result.data?.version), doc: result.data?.doc as LiveDoc['doc'] } : { ok: false, error: 'Save failed' };
-        }
+          return sendResultOf(await postPageAction(url, 'ops', form));
+        },
+        refused: (error) => props.onfail?.(refusedNotice(error)),
+        keep: (draft) => void drafts?.keep(nodeId, draft),
+        release: () => void drafts?.release(nodeId)
       }
     );
     session.access = editorMode.spec.access;
@@ -1496,6 +1500,30 @@
       liveDocs.set(nodeId, { ...live, assets: { ...live.assets, ...added } });
     }
   }
+
+  const drafts: FrameDrafts | null = $derived(typeof indexedDB === 'undefined' ? null : browserDrafts(page.params.canvasId ?? ''));
+  const draftsRead = new Set<string>();
+
+  function restoreDraft(nodeId: string, draft: FrameDraft) {
+    const session = saverOf(nodeId);
+    const live = liveOf(nodeId);
+    if (!session || !live || !session.restore(draft)) {
+      void drafts?.release(nodeId);
+      return;
+    }
+    liveDocs.set(nodeId, { ...live, doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) });
+  }
+
+  $effect(() => {
+    const shelf = drafts;
+    for (const frame of coreFrames) {
+      if (draftsRead.has(frame.id) || !liveOf(frame.id)) {
+        continue;
+      }
+      draftsRead.add(frame.id);
+      void shelf?.read(frame.id).then((draft) => draft && untrack(() => restoreDraft(frame.id, draft)));
+    }
+  });
 
   const extras = new Map<string, FrameExtras>();
 

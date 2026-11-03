@@ -4,7 +4,7 @@ import { boundsOfClips, svgOf } from '$lib/motion/export-svg';
 import { dotLottieOf, lottieOf } from '$lib/motion/export-lottie';
 import { ancestorsOf } from '@feega/motion-core/motion/parent';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
-import { stillSeconds } from '@feega/motion-core/motion/still';
+import { shownFrame } from '$lib/motion/poster-time';
 import type { ExportPage, ExportPort } from './server-frames';
 import type { DrawTarget, Drawn } from './selection-export';
 import { Span, type Vector } from './vector-list';
@@ -21,7 +21,7 @@ async function opened<T>(port: ExportPort, compose: (target: DrawTarget) => Prom
   const page = await port.open({ width: doc.width, height: doc.height, scale });
   try {
     await page.load(await compose(target));
-    await page.seek(stillSeconds(doc) ?? 0);
+    await page.seek(shownFrame(doc) / doc.fps);
     const crop = target.elementId ? await page.boxOf(target.elementId) : null;
     return await use({ page, crop, scale });
   } finally {

@@ -158,7 +158,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { NodeFlag, flagHeld, flagsOf, toggledFlags } from '$lib/canvas/node-flags';
   import type { HostBox } from '$lib/motion/element-host';
   import { FORMATS, MotionFormat, formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
-  import { ResizeMode, fitToNode, handResized } from '$lib/motion/custom-size';
+  import { ResizeMode, fitToNode, frameSizeNote, handResized } from '$lib/motion/custom-size';
   import { NodeMode } from '$lib/canvas/inline-motion';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -2923,6 +2923,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   async function sizeFrameDoc(id: string, picture: Picture, was: Was | null = null) {
     const mode = resizeMode;
+    failed = frameSizeNote(picture) ?? failed;
     if (frameDocs.edit(id, (doc) => resizedDoc(doc, picture, was, mode), 'Resized the frame')) {
       return;
     }
@@ -4490,6 +4491,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCodeImport={(at) => (codeImportAt = at)}
     onUndo={() => inTurn(undo)}
     onFrameStep={(step: FrameStep) => undoStack.push({ source: 'frame', step })}
+    onfail={(message: string) => (failed = message)}
     onRedo={() => inTurn(redo)}
     onConnectNew={connectNew}
     {focus}
