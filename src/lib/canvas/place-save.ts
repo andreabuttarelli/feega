@@ -119,3 +119,28 @@ type PendingTile = Boxed & { version: number; data: Record<string, unknown> };
 export function keepPending<T extends PendingTile>(fresh: T[], local: T[], dirtyKeys: (id: string) => string[], placed: (id: string) => boolean): T[] {
   return keepPlaced(keepDirty(fresh, local, dirtyKeys), local, placed);
 }
+
+type Step = { dx: number; dy: number };
+type Landing = { own: Partial<Boxed>; carry: Step };
+
+const STILL: Step = { dx: 0, dy: 0 };
+
+const PLACED: Record<Placement, (owner: Boxed, fields: Record<string, number>) => Landing> = {
+  [Placement.Move]: (_, f) => ({ own: { x: f.x, y: f.y }, carry: STILL }),
+  [Placement.Resize]: (_, f) => ({ own: { w: f.width, h: f.height }, carry: STILL }),
+  [Placement.MoveGroup]: (owner, f) => ({ own: { x: f.x, y: f.y }, carry: { dx: f.x - owner.x, dy: f.y - owner.y } })
+};
+
+export function placedRows<T extends Boxed>(rows: T[], entries: readonly PlaceEntry[], membersOf: (id: string) => ReadonlySet<string>): T[] {
+  return entries.reduce((current, entry) => {
+    const land = PLACED[entry.action as Placement];
+    const owner = current.find((row) => row.id === entry.id);
+    if (!land || !owner) {
+      return current;
+    }
+
+    const { own, carry } = land(owner, entry.fields);
+    const members = membersOf(entry.id);
+    return current.map((row) => (row.id === entry.id ? { ...row, ...own } : members.has(row.id) ? { ...row, x: row.x + carry.dx, y: row.y + carry.dy } : row));
+  }, rows);
+}

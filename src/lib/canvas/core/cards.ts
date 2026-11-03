@@ -57,7 +57,7 @@ function source(x: Ctx): Item[] {
 function frame(x: Ctx): Item[] {
   const { c } = x;
   const stage = { x: 0, y: 0, w: c.w, h: Math.max(1, c.h - MOTION_NODE_BAR_H) };
-  const media = c.face.live ? { url: c.face.live, video: true } : c.face.media;
+  const media = c.face.media;
   if (!media) {
     return panel(x, false);
   }

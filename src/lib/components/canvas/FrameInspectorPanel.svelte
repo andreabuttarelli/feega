@@ -166,7 +166,7 @@
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} onchange={editShown} onalign={alignPicks} />
+      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} bind:fillOpen={frameProperties.editingFill} onchange={editShown} onalign={alignPicks} />
       {#if frameProperties.exportRows}<ExportSection name="selection" onexport={frameProperties.exportRows} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}

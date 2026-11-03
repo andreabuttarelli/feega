@@ -92,7 +92,7 @@
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postPageAction } from '$lib/api/page-action';
@@ -159,7 +159,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
   import { imageSourceTile } from '$lib/canvas/free-image';
-  import { frameRinged } from '$lib/canvas/layers';
+  import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
@@ -447,7 +447,8 @@
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
-      const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
+      const openId = layersSource.video?.nodeId ?? null;
+      const ringed = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
@@ -1933,7 +1934,7 @@
     if (!at) {
       return [];
     }
-    const kind = picks.length > 1 ? SelectionKind.Member : SelectionKind.Element;
+    const kind = selectionKindOf(picks.length, picks.length === 1 ? findClip(at.live.doc, picks[0])?.clip : null);
     const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
@@ -1946,7 +1947,7 @@
   function gradientMark(nodeId: string) {
     const mark = picks.length === 1 && typing?.nodeId !== nodeId ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip) : null;
+    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip, frameProperties.editingFill) : null;
     return mark && target ? { clip: mark.clip, rect: quadBox(mark.quad), index: target.index, fill: target.fill } : null;
   }
 

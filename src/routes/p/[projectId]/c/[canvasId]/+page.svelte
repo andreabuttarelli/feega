@@ -51,7 +51,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
-  import { createPlaceSaves, keepPending } from '$lib/canvas/place-save';
+  import { createPlaceSaves, keepPending, placedRows } from '$lib/canvas/place-save';
   import { LineAction, createOpQueue, keepLines } from '$lib/canvas/op-queue';
   import { idbShelf, openOutbox, type Outbox } from '$lib/canvas/outbox';
   import { syncOf } from '$lib/canvas/sync-status';
@@ -1636,6 +1636,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void outbox?.save({ nodes: saves.unsentPatches(), places: places.unsentEntries() });
   }
 
+  const membersOf = (id: string): Set<string> => new Set(nodes.filter((n) => layoutOf(n.data).groupId === id).map((n) => n.id));
+
   async function reopenOutbox(key: string) {
     const opened = await openOutbox(idbShelf(), key);
     outbox = opened;
@@ -1644,6 +1646,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
         void write(id, patch, SaveTiming.Now);
       }
     }
+    nodes = placedRows(nodes, opened.places, membersOf);
     places.restore(opened.places);
     lines.restore(opened.ops);
     sent = sentLog([...opened.sent, ...sent.all()], (ops) => void outbox?.save({ sent: ops }));
@@ -3252,7 +3255,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
     const motion = motionOf(n);
-    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
+    return motion ? { poster: posterFresh(motion) ? assetUrl(motion.posterAssetId) : null, still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
   }
 
   $effect(() =>

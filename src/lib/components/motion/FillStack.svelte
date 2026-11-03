@@ -12,7 +12,7 @@
   import { Adder } from './stack-adder';
   import { FillField, fillKey } from '@feega/motion-core/motion/fill/keys';
   import { KeyMark } from '$lib/motion/timeline-layers';
-  import { stopCss, swatchOf } from '$lib/motion/fill/swatch';
+  import { solidName, stopCss, swatchOf } from '$lib/motion/fill/swatch';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import MediaPicker from './MediaPicker.svelte';
   import type { MediaUploader } from './media-upload';
@@ -25,7 +25,7 @@
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
   type Keys = { mark: (key: string) => KeyMark; toggle: (key: string) => void };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, palette = NO_COLOURS, keys = null, oncrop = null, onchange }: { palette?: () => readonly string[]; oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, palette = NO_COLOURS, keys = null, oncrop = null, open = $bindable(null), onchange }: { open?: number | null; palette?: () => readonly string[]; oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const setAdjust = (i: number, current: FillOf<FillType.Image>, key: Adjustment, value: number) => patch(i, { adjust: { ...current.adjust, [key]: value / PERCENT } }, 'Image adjustment');
@@ -40,7 +40,6 @@
   const IMAGE_PATCH = (pick: MediaPick | null): FillPatch => ({ assetId: pick?.assetId ?? '', src: pick?.url });
 
   let swatches = $state<readonly string[]>([]);
-  let open = $state<number | null>(null);
 
   $effect(() => {
     void open;
@@ -57,8 +56,7 @@
   const color = (value: string) => resolveColor(value, tokens);
   const swatch = (fill: Fill) => swatchOf(fill, { color, picture: (f) => assets.find((a) => a.id === f.assetId)?.previewUrl ?? f.src });
 
-  const HEX_DIGITS = /^#/;
-  const rowLabel = (f: Fill) => (f.type === FillType.Solid ? colourAlpha(f.color).base.replace(HEX_DIGITS, '').toUpperCase() : TYPE_LABEL[f.type]);
+  const rowLabel = (f: Fill) => (f.type === FillType.Solid ? solidName(f.color) : TYPE_LABEL[f.type]);
 
   const patch = (i: number, p: FillPatch, summary: string) => onchange(setFill(fills, i, p), summary);
   const percentOf = (e: Event) => Math.max(0, Math.min(PERCENT, Number((e.currentTarget as HTMLInputElement).value))) / PERCENT;
