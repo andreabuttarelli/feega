@@ -3966,7 +3966,7 @@
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} typed={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
+          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
