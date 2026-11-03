@@ -110,6 +110,14 @@ describe('/app is the dashboard for a returning user', () => {
     expect(redirected).toMatchObject({ status: 303, location: '/p/p-new/c/c-new' });
   });
 
+  it('a new canvas can land in a project that already exists', async () => {
+    const redirected = await thrown(() => actions.project({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ projectId: 'p1' }) } as never));
+
+    expect(createProject).not.toHaveBeenCalled();
+    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', name: 'Untitled' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new' });
+  });
+
   it('a .feega file opens as a new project named after its canvas', async () => {
     const redirected = await thrown(() => actions.import_canvas_file({ locals, cookies: cookieJar({ 'dz-org': 'org-b' }), request: form({ path: 'org-b/imports/x.feega' }) } as never));
 

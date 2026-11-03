@@ -92,6 +92,12 @@ describe('a shape drawn over a frame lands inside it, on the gesture', () => {
     expect(made.ok && clipOf(made.doc, 'p2')?.props).toMatchObject({ fillKind: 'none', stroke: DEFAULT_COLOUR.ink });
   });
 
+  it('a pen path in a frame is a black 1 px line with no fill, as in Figma', () => {
+    const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Pen, path: 'M 200 100 L 700 500' }, 0, 'p3');
+
+    expect(made.ok && clipOf(made.doc, 'p3')?.props).toMatchObject({ fillKind: 'none', strokeKind: 'solid', stroke: DEFAULT_COLOUR.ink, strokeWidth: 1 / 800 });
+  });
+
   it('a line drawn from the canvas into a white frame stays visible on it', () => {
     const made = drawnInFrame(sheet(), FRAME, { tool: DrawTool.Line, from: { x: 300, y: 200 }, to: { x: 400, y: 300 } }, 0, 'l1');
     const stroke = made.ok ? clipOf(made.doc, 'l1')?.props.stroke : null;

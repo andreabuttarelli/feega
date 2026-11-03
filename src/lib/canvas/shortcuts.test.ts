@@ -117,11 +117,20 @@ describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
     expect(matchCanvasShortcut(ev('F', { shiftKey: true, code: 'KeyF' }))).toEqual({ id: 'tool', tool: DrawTool.Frame });
   });
 
+  it('F draws a frame, as in Figma, in Design and in Motion', () => {
+    expect(matchCanvasShortcut(ev('f', { code: 'KeyF' }), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Frame });
+    expect(matchCanvasShortcut(ev('f', { code: 'KeyF' }), EditMode.Motion)).toEqual({ id: 'tool', tool: DrawTool.Frame });
+  });
+
+  it('the help card names F for the frame tool', () => {
+    expect(CANVAS_SHORTCUTS.find((r) => r.id === 'tool')?.keys).toContain('F');
+  });
+
   it('il tooltip di uno strumento mostra solo i tasti che la tela ascolta', () => {
     expect(canvasToolKeys(Command.ToolText)).toBe('⇧T');
     expect(canvasToolKeys(Command.ToolRectangle)).toBe('⇧R');
     expect(canvasToolKeys(Command.ToolSelect)).toBe('V');
-    expect(canvasToolKeys(Command.ToolFrame)).toBe('⇧F');
+    expect(canvasToolKeys(Command.ToolFrame)).toBe('F ⇧F');
   });
 
   it('⇧L disegna una linea, come gli altri strumenti della tela', () => {

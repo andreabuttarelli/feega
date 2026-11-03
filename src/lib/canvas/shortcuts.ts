@@ -315,7 +315,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Redo' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
-  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', '⇧F'], label: 'Select, text, box, ellipse, pen, frame' },
+  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', 'F'], label: 'Select, text, box, ellipse, pen, frame' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
