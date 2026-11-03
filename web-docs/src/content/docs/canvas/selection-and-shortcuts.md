@@ -26,6 +26,8 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 
 In the Layers panel, Shift-click selects every row between the last picked one and the clicked one; Cmd-click (Ctrl-click on Windows) adds or removes one row. It works on canvas nodes and on the elements inside a frame, and the canvas and the right bar follow.
 
+The Layers panel lists layers in paint order, like Figma: the top row is the frontmost layer, on the canvas and inside each frame. Groups and sections, which paint behind everything, list under the rest.
+
 The Layers panel lists what the canvas has loaded: a page far off screen shows as one row, and its elements appear once the canvas loads it.
 
 ## Align
