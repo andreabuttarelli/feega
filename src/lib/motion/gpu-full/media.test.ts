@@ -86,6 +86,37 @@ describe('createMedia', () => {
     expect(media.pictures(inner)?.size).toEqual({ width: 4, height: 4 });
   });
 
+  it('decodes a still from its bytes, so the decode runs off the main thread', async () => {
+    const bitmap = { width: 8, height: 6 };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(new Blob(['x'])) }));
+    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue(bitmap));
+    vi.stubGlobal('Image', class {});
+    const media = createMedia();
+
+    await media.ready(list('/photo.jpg'));
+
+    expect(media.pictures(picture('/photo.jpg'))).toEqual({ source: bitmap, size: { width: 8, height: 6 } });
+  });
+
+  it('falls back to an image element when the bytes do not decode, as an SVG does not', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, blob: () => Promise.resolve(new Blob(['<svg/>'])) }));
+    vi.stubGlobal('createImageBitmap', vi.fn().mockRejectedValue(new Error('InvalidStateError')));
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = '';
+        naturalWidth = 4;
+        naturalHeight = 4;
+        decode = () => Promise.resolve();
+      }
+    );
+    const media = createMedia();
+
+    await media.ready(list('/logo.svg'));
+
+    expect(media.pictures(picture('/logo.svg'))?.size).toEqual({ width: 4, height: 4 });
+  });
+
   const fakeVideos = () => {
     const made: { preload?: string }[] = [];
     vi.stubGlobal('document', {
