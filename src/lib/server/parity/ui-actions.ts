@@ -332,6 +332,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
 
 export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   duplicate: canvas('duplicate_nodes'),
+  rename: canvas('rename_node'),
   'connect-new': canvas('connect_nodes'),
   'connect-existing': canvas('connect_nodes'),
   'run-workflow': canvas('run_workflow'),
