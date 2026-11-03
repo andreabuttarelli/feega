@@ -8,6 +8,7 @@ import { DocMode } from '@feega/motion-core/motion/still';
 import { NEW_CLIP_START, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
 import { CLIP_NAME_MAX } from '@feega/motion-core/motion/organize';
 import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
+import type { LayerSlot } from './layer-place';
 
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };
@@ -24,7 +25,7 @@ export enum DropOn {
   Canvas = 'canvas'
 }
 
-export type Drop = { on: DropOn.Frame; nodeId: string; at: Point; frame?: number } | { on: DropOn.Canvas; x: number; y: number };
+export type Drop = { on: DropOn.Frame; nodeId: string; at: Point; frame?: number; slot?: LayerSlot } | { on: DropOn.Canvas; x: number; y: number };
 
 export type NewId = () => string;
 

@@ -6,7 +6,7 @@ import { layersSource } from '$lib/canvas/layers-source.svelte';
 const POSTER = '/p/x/c/y/assets/a1';
 
 const canvasWith = (nodes: { id: string; type: string; name: string | null; poster?: string | null; still?: boolean; head?: number; hidden?: boolean; locked?: boolean }[]) =>
-  layersSource.publishCanvas({ nodes, selected: [], select: () => {}, open: () => {}, rename: () => {}, flag: () => {} });
+  layersSource.publishCanvas({ nodes, selected: [], select: () => {}, open: () => {}, rename: () => {}, flag: () => {}, moveInto: () => {} });
 
 let unpublish = () => {};
 

@@ -2,6 +2,7 @@ import type { CanvasNodeRecord, Connection } from '$lib/server/repos/canvas';
 import type { CopyIds, Offset } from './duplicate-plan';
 import { settle as settled } from './optimistic-insert';
 import { DropOn } from '$lib/motion/move-element';
+import type { LayerSlot } from '$lib/motion/layer-place';
 import { SECTION_DEFAULT_FILL } from './node-data';
 import { layoutOf, scaleGroup } from './node-layout';
 import { shownOutput } from './gen-history';
@@ -57,7 +58,7 @@ export enum Refresh {
 }
 
 type Inputs = {
-  [OptimisticAction.MoveFree]: { id: string; frameId: string; at: { x: number; y: number }; ids?: string[] };
+  [OptimisticAction.MoveFree]: { id: string; frameId: string; at: { x: number; y: number }; slot?: LayerSlot; ids?: string[] };
   [OptimisticAction.Stack]: { ids: string[]; id: string };
   [OptimisticAction.Section]: { ids: string[]; id: string };
   [OptimisticAction.Group]: { ids: string[]; id: string };
@@ -181,7 +182,7 @@ function offsetFields(offset: Offset | undefined): Record<string, string> {
 
 const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   [OptimisticAction.MoveFree]: {
-    fields: (i) => ({ source: i.id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: i.frameId, at: i.at }), ...(i.ids ? { ids: JSON.stringify(i.ids) } : {}) }),
+    fields: (i) => ({ source: i.id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: i.frameId, at: i.at, ...(i.slot ? { slot: i.slot } : {}) }), ...(i.ids ? { ids: JSON.stringify(i.ids) } : {}) }),
     apply: (rows, i) => ({ ...rows, nodes: rows.nodes.filter((n) => n.id !== i.id) }),
     touched: (i) => nodesOnly([i.id]),
     landing: Landing.Moved,

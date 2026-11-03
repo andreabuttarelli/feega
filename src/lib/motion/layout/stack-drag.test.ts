@@ -5,7 +5,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { guessedBoxes } from '../move-element';
 import { setAutoLayout, wrapInStack } from './ops';
-import { StackDrop, dragInStack, dropInStack, followCursor } from './stack-drag';
+import { StackDrop, dragInStack, dropInStack, followCursor, stackLineAt } from './stack-drag';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -96,5 +96,16 @@ describe('while a stack child is dragged', () => {
     expect(moved.transform.y).toBeCloseTo(25 / doc.height);
     expect(moved.parent).toBe('row');
     expect(order(shown, 'row')).toEqual(order(doc, 'row'));
+  });
+});
+
+describe('while an element from outside the frame is dragged over it', () => {
+  it('shows the slot it would take in the stack under the cursor', () => {
+    const [x, y] = centreOf('b');
+    expect(stackLineAt(doc, [x - 1, y])).toEqual(dropInStack(doc, 'free', boxes, [x - 1, y])!.line);
+  });
+
+  it('shows nothing where no stack is under the cursor', () => {
+    expect(stackLineAt(doc, [boxes.free.left + 1, boxes.free.top + 1])).toBeNull();
   });
 });

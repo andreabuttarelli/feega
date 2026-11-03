@@ -3,3 +3,5 @@ export enum Place {
   Below = 'below',
   Into = 'into'
 }
+
+export type LayerSlot = { target: string; place: Place };
