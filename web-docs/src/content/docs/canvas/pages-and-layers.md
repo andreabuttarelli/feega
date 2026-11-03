@@ -31,3 +31,5 @@ The chevron of a frame, stack, group or instance folds its row. A fold is kept i
 The top-left of the canvas keeps only the main menu and the project switcher.
 
 Drag a shape, text, frame or stack tile from the add menu onto a Layers row to create it there: above or below the row, or inside a frame or group. Undo removes it.
+
+Dragging a layer onto the middle of a frame, group or stack row puts it inside, even when that frame is empty; the top and bottom edges of the row drop it above or below.

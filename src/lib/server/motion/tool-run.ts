@@ -3,6 +3,7 @@ import { orgFontFamilies } from './font-upload';
 import { asSchema, type Tool } from 'ai';
 import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
+import { showAgentAt } from '$lib/server/canvas/agent-cursor';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { agentActor } from '$lib/server/repos/actor';
 import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
@@ -237,6 +238,10 @@ export function refusalOf(output: unknown): string | null {
 }
 
 export const MAX_BATCH_OPS = 500;
+const BATCH_DOING = 'editing';
+
+const showFrameAgent = (db: Db, scope: ToolRunScope, doing: string) =>
+  showAgentAt({ db, orgId: scope.orgId, userId: scope.userId, agentKey: scope.agentKey ?? TOOL_RUN_AGENT_KEY, sessionId: scope.sessionId }, [scope.nodeId], doing);
 
 export async function runMotionBatch(db: Db, scope: ToolRunScope, ops: BatchOp[], version?: number): Promise<BatchResult> {
   const ready = await prepare(db, scope, version);
@@ -267,7 +272,11 @@ export async function runMotionBatch(db: Db, scope: ToolRunScope, ops: BatchOp[]
     results.push(output);
   }
   const written = await commit(db, ready, `batch of ${ops.length}`);
-  return 'outcome' in written ? written : { outcome: ToolRun.Done, output: { results }, ...written };
+  if ('outcome' in written) {
+    return written;
+  }
+  showFrameAgent(db, scope, BATCH_DOING);
+  return { outcome: ToolRun.Done, output: { results }, ...written };
 }
 
 export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk, turn?: ToolRunTurn): Promise<ToolRunResult> {
@@ -288,5 +297,9 @@ export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk
   const output = await execute(ran, callId);
   const seen = ready.session.frames.get(callId) ?? [];
   const written = await commit(db, ready, ask.tool);
-  return 'outcome' in written ? written : { outcome: ToolRun.Done, output, frames: seen, ...written };
+  if ('outcome' in written) {
+    return written;
+  }
+  showFrameAgent(db, scope, ask.tool);
+  return { outcome: ToolRun.Done, output, frames: seen, ...written };
 }

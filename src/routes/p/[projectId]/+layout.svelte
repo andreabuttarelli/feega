@@ -12,6 +12,7 @@
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
   import { frameProperties } from '$lib/components/canvas/frame-properties.svelte';
+  import { selectionProperties } from '$lib/components/canvas/selection-properties.svelte';
   import { rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { followDocks } from '$lib/canvas/dock-lift';
@@ -79,7 +80,7 @@
     return followDocks(canvasRow, () => (timeline ? [timeline] : []), (px) => (dockLift = px));
   });
 
-  const framePicked = $derived(frameProperties.routed !== null);
+  const framePicked = $derived(frameProperties.routed !== null || !!selectionProperties.panel?.box);
   const shellLeft = $derived(shellLeftOf(leftPanel));
   const shellRight = $derived(chatOpen || framePicked ? `calc(${fitted(rightBar.width)} + 2 * ${EDGE})` : EDGE);
   let mobileView = $state(INITIAL_MOBILE_VIEW);

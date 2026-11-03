@@ -24,7 +24,7 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 A shape drawn over a frame lands inside that frame; drawn on empty canvas it stays free. Either way it shows the moment you release, and saves in the background.
 
-Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. Gradients can be linear, radial, angular or diamond.
+Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. New layers rotate and scale around their centre. Gradients can be linear, radial, angular or diamond.
 
 Colour fields accept hex with or without `#` (`f`, `ff` and `fff` all mean white; 4 and 8 digits carry opacity), `rgb()`/`rgba()`, or bare numbers such as `255, 0, 0` or `255 0 0 50%`. Opacity typed this way sets the fill's opacity. Anything else leaves the colour unchanged.
 
@@ -45,6 +45,10 @@ Every colour in the editor opens the same picker: fill (text included), stroke, 
 
 Colours are still stored as `#rrggbb` (or `#rrggbbaa`) or a brand token, so scripts, the CLI and agents read and write them as before.
 
+## Combining shapes
+
+Select two or more shapes and pick **Union**, **Subtract**, **Intersect** or **Exclude** in Properties. The result is one shape named after the operation, boxed tightly around what is left, without the strokes of the originals. Subtract cuts the shapes in front out of the one at the back. `Cmd+Z` brings the originals back.
+
 ## Editing points
 
 Double-click a selected shape, or press `Enter`, to edit its points. Rectangles, ellipses, polygons, stars and lines become free paths when you do.
@@ -61,7 +65,7 @@ Double-click a selected shape, or press `Enter`, to edit its points. Rectangles,
 | `Delete` | Removes the selected point |
 | `Esc`, `Enter` or click outside | Leaves point editing |
 
-Each change is one undo step. The chat agent edits points the same way with `edit_path_points`.
+Moving a point outside the layer's box grows the box to fit, so X, Y, W and H always match the path. Each change is one undo step. The chat agent edits points the same way with `edit_path_points`.
 
 A shape can morph into any other shape, including hand-drawn paths and shapes with holes.
 

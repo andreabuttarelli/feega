@@ -115,7 +115,7 @@
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '@feega/motion-core/motion/expression/bake';
-  import { Unit, propsOwner, sliderOf, spaceOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
+  import { Unit, propsOwner, shownNumber, sliderOf, spaceOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
@@ -502,7 +502,7 @@
     commit(result, summary);
   }
   const space = $derived(spaceOf(doc, host?.box ?? null));
-  const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, space);
+  const numberShown = (prop: AnimProp) => shownNumber(clip.component, prop.key, Number(shown(prop.key)), space);
   const stored = (key: string, v: number) => toStored(clip.component, key, v, space);
   const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, space));
   const depthRange = $derived(slider({ key: 'depth', ...DEPTH }));
@@ -541,7 +541,7 @@
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
     [Section.Layout]: positioned || fieldsIn(Section.Layout).length > 0,
-    [Section.Stack]: layerExtras && (!!clip.autoLayout || layoutParent(doc, clip) !== null),
+    [Section.Stack]: visual && (!!clip.autoLayout || (layerExtras && layoutParent(doc, clip) !== null)),
     [Section.Align]: positioned && visual,
     [Section.Constraints]: pinnable,
     [Section.Transform]: layoutProps.length > 0,

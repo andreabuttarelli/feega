@@ -52,7 +52,7 @@ import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SHORT_SIDE, MAX_SIDE,
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '@feega/motion-core/motion/junctions';
 import { sceneEdit } from '$lib/motion/scenes';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
-import { ClipEdge, Side, TOP_LEFT_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, duplicateKeyframes, setKeyEase, setLaneMuted, type OpResult } from '@feega/motion-core/motion/timeline';
+import { ClipEdge, Side, NEW_CLIP_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, duplicateKeyframes, setKeyEase, setLaneMuted, type OpResult } from '@feega/motion-core/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '@feega/motion-core/motion/mask';
 import { pathProblem } from '@feega/motion-core/motion/path';
@@ -196,6 +196,7 @@ import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, rem
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { clearTextRuns, listTextRange, styleTextRange } from '$lib/motion/text-run-ops';
 import { ListChange } from '@feega/motion-core/motion/text-lists';
+import { resizeSetMain } from '$lib/motion/component-set';
 import { COMPONENT_ACTIONS, ComponentAction, createComponent, detachInstance, overrideInstance, pushOverrides, resetOverride, resetOverrides } from '$lib/motion/main-component';
 import { addVariant, defineVariantProp, pickVariant, setVariant, swapInstance } from '$lib/motion/variants';
 import { defineProperty, removeProperty, resetProperty, setPreferred, setProperty } from '$lib/motion/component-properties';
@@ -1049,7 +1050,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const result = addClip(
           session.doc,
-          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props), ...TOP_LEFT_START },
+          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props), ...NEW_CLIP_START },
           id
         );
         return created(apply(withEffects(registered(result, input.props?.assetId), [id], input.effects), `added ${input.component}`), id);
@@ -1228,7 +1229,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_transform: tool({
-      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot (origin of rotation and scale, not the frame constraint) inside the clip box (0..1; clips added with add_clip and add_shape start at 0,0 top-left, older ones at 0.5,0.5 centre), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
+      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot (origin of rotation and scale, not the frame constraint) inside the clip box (0..1; default 0.5,0.5 centre), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
       inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
       execute: async (input) => {
         const shrunk = uiShrink(session.doc, input.clip_id, input.transform.scale as number | undefined);
@@ -2087,7 +2088,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const outlined = input.props?.stroke !== undefined && input.props?.strokeKind === undefined ? { strokeKind: StrokeKind.Solid } : {};
         const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}), ...(input.fills ? { fills: input.fills } : {}), ...(input.strokes ? { strokes: input.strokes } : {}) };
-        const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props, ...TOP_LEFT_START }, id);
+        const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props, ...NEW_CLIP_START }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
     }),
@@ -3164,8 +3165,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     component: tool({
-      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop). Variant matrix: define-variant (comp, prop = axis e.g. Size, values e.g. [S,M,L]): adds the axis and fills every Size x State combination; set-variant (clip_id, variant {Size:L,State:hover}): switch an instance on several axes at once, overrides kept. set-preferred (comp, prop = a swap property, preferred = main comp ids): suggested swaps listed first.',
-      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional(), values: z.array(z.string().min(1).max(40)).max(20).optional(), preferred: z.array(z.string()).max(40).optional() }),
+      description: 'Figma components. create (clip_ids, name?, ⌥⌘K): main + one instance (Precomp) in place; duplicate it for more, edit_comp the main to update all. override (clip_id, inner_clip_id, props incl. text, fills, strokes, hidden, effects, transform, assetId): one instance only. reset-prop (clip_id, inner_clip_id, prop). push (clip_id): move its overrides into the main. place (comp): add an instance of a main. reset / detach (clip_id). add-variant (comp, variant e.g. {State:Hover}): copy joined to its set. swap (clip_id, comp | prop+value). Properties: define-prop (comp, prop = name, property {kind boolean|text|swap|nested, target = element id in the main, default?, nested? = the nested instance property it exposes}); remove-prop (comp, prop); set-prop (clip_id, prop, value string|boolean; swap takes a main comp id); reset-prop-value (clip_id, prop). Variant matrix: define-variant (comp, prop = axis e.g. Size, values e.g. [S,M,L]): adds the axis and fills every Size x State combination; set-variant (clip_id, variant {Size:L,State:hover}): switch an instance on several axes at once, overrides kept. set-preferred (comp, prop = a swap property, preferred = main comp ids): suggested swaps listed first. resize-set-main (clip_id = a main on a Components-page set, width, height in frame px): resizes only that main, moves the variants after it and grows the frame to hug them.',
+      inputSchema: z.object({ action: z.enum(COMPONENT_ACTIONS), clip_ids: z.array(z.string()).optional(), clip_id: z.string().optional(), inner_clip_id: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), name: z.string().min(1).max(60).optional(), comp: z.string().optional(), variant: z.record(z.string(), z.string()).optional(), prop: z.string().optional(), value: z.union([z.string(), z.boolean()]).optional(), property: propertyDefSchema.optional(), values: z.array(z.string().min(1).max(40)).max(20).optional(), preferred: z.array(z.string()).max(40).optional(), width: z.number().positive().max(MAX_SIDE).optional(), height: z.number().positive().max(MAX_SIDE).optional() }),
       execute: async (input) => {
         const ids: string[] = [];
         const newId = () => {
@@ -3190,7 +3191,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           [ComponentAction.ResetPropValue]: () => resetProperty(session.doc, id, input.prop ?? ''),
           [ComponentAction.DefineVariant]: () => defineVariantProp(session.doc, input.comp ?? '', input.prop ?? '', input.values ?? [], newId),
           [ComponentAction.SetVariant]: () => setVariant(session.doc, id, input.variant ?? {}),
-          [ComponentAction.SetPreferred]: () => setPreferred(session.doc, input.comp ?? '', input.prop ?? '', input.preferred ?? [])
+          [ComponentAction.SetPreferred]: () => setPreferred(session.doc, input.comp ?? '', input.prop ?? '', input.preferred ?? []),
+          [ComponentAction.ResizeSetMain]: () => (input.width && input.height ? resizeSetMain(session.doc, id, { width: input.width, height: input.height }) : { ok: false, error: 'resize-set-main needs width and height' })
         };
         const out = apply(run[input.action](), `component ${input.action}`);
         if (out.ok && input.action === ComponentAction.Place) {

@@ -5,7 +5,7 @@
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
-  import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
+  import { createMedia, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
@@ -27,7 +27,7 @@
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { withoutViews } from '$lib/canvas/breakpoint-views';
@@ -158,15 +158,16 @@
   async function load(f: FrameAt) {
     const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
     const built = given ? await buildSource(f, given) : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
-    if (!built || (await media.ready(built.list)) === Readiness.Partial) {
+    if (!built) {
       return;
     }
+    const ready = await media.ready(built.list);
     if (built.custom) {
       customPictures.set(keyOf(f), built.custom.picture);
     }
     logGaps(f.id, built.list);
     loaded.set(f.id, keyOf(f));
-    lists = new Map(lists).set(keyOf(f), onStage(built.list, f.kind));
+    lists = new Map(lists).set(keyOf(f), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind));
   }
 
   let liveGroup = $state(new Map<string, string>());
@@ -182,12 +183,16 @@
     const generation = (liveGeneration.get(f.id) ?? 0) + 1;
     liveGeneration.set(f.id, generation);
     const built = await buildSource(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
-    if (!built || liveGeneration.get(f.id) !== generation || (await media.ready(built.list)) === Readiness.Partial || liveGeneration.get(f.id) !== generation) {
+    if (!built || liveGeneration.get(f.id) !== generation) {
+      return;
+    }
+    const ready = await media.ready(built.list);
+    if (liveGeneration.get(f.id) !== generation) {
       return;
     }
     const key = `${f.id}:live${generation}`;
     logGaps(f.id, built.list);
-    lists = new Map(lists).set(key, onStage(built.list, f.kind));
+    lists = new Map(lists).set(key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind));
     liveGroup = new Map(liveGroup).set(f.id, key);
     liveAtRevision.set(f.id, f.revision);
   }

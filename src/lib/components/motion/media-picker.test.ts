@@ -66,13 +66,22 @@ describe('the media picker', () => {
 
   it('picks from the library, with search, only the kinds the slot takes', () => {
     const onpick = show({ accept: MediaAccept.Image });
-    click(byId('media-add'));
+    click(byId('media-more'));
     click(byId('media-tab-library'));
     expect(all('media-library-item')).toHaveLength(2);
     type(byId('media-search'), 'city');
     expect(all('media-library-item')).toHaveLength(1);
     click(all('media-library-item')[0]);
     expect(onpick).toHaveBeenLastCalledWith({ kind: MediaKind.Image, assetId: 'city' });
+  });
+
+  it('opens the file picker straight from the empty state', () => {
+    const opened = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    show({});
+    click(byId('media-add'));
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(opened.mock.contexts[0]).toBe(byId('media-file'));
+    opened.mockRestore();
   });
 
   it('removes the current media', () => {
@@ -84,7 +93,7 @@ describe('the media picker', () => {
   it('validates a link, previews it, then copies it into the project as an asset', async () => {
     const uploader = vi.fn(async () => ({ ok: true as const, asset: { id: 'copied', kind: MediaKind.Image, label: 'a.jpg', previewUrl: '/a/copied' } }));
     const onpick = show({ uploader });
-    click(byId('media-add'));
+    click(byId('media-more'));
     click(byId('media-tab-link'));
     type(byId('media-link'), 'not a link');
     click(byId('media-link-check'));
@@ -107,7 +116,6 @@ describe('the media picker', () => {
       return new Promise<Awaited<ReturnType<MediaUploader>>>((resolve) => (finish = resolve));
     });
     const onpick = show({ uploader });
-    click(byId('media-add'));
     const input = byId<HTMLInputElement>('media-file');
     Object.defineProperty(input, 'files', { value: [new File(['x'], 'red.png', { type: 'image/png' })] });
     input.dispatchEvent(new Event('change', { bubbles: true }));

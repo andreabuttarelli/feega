@@ -1,7 +1,8 @@
 import { withSurface } from '@feega/motion-core/motion/surface';
 import { describe, expect, it } from 'vitest';
 import { layerMenuActions } from './frame-inspector';
-import { wrapInStack } from '$lib/motion/layout/ops';
+import { wrapInFrame, wrapInStack } from '$lib/motion/layout/ops';
+import { setClipFlags } from '@feega/motion-core/motion/organize';
 import { setParent } from '$lib/motion/parent-ops';
 import { LayoutKind } from '@feega/motion-core/motion/layout/stack';
 import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
@@ -753,6 +754,20 @@ describe('dropping a layer on a container row', () => {
     expect(rowDrop(rowOf(framed, 'card'), 0.5)).toBe(Place.Into);
 
     expect(findClip(ok(dropLayer(framed, 'loose', 'card', Place.Into)), 'loose')!.clip.parent).toBe('card');
+  });
+
+  it('an empty frame row takes a drop inside it too', () => {
+    const drawn = ok(setClipFlags(ok(addClip(stacked, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.4, height: 0.4 } }, 'empty')), 'empty', { clipContent: true }));
+    expect(rowDrop(rowOf(drawn, 'empty'), 0.5)).toBe(Place.Into);
+
+    expect(findClip(ok(dropLayer(drawn, 'loose', 'empty', Place.Into)), 'loose')!.clip.parent).toBe('empty');
+  });
+
+  it('a frame made from a selection stays a frame once emptied', () => {
+    const framed = ok(wrapInFrame(stacked, ['loose'], 'wrap', 'lane-wrap'));
+    const emptied = ok(setParent(framed, 'loose', null));
+
+    expect(rowDrop(rowOf(emptied, 'wrap'), 0.5)).toBe(Place.Into);
   });
 });
 

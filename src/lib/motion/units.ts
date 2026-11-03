@@ -176,6 +176,10 @@ export function toShown(component: Owner, key: string, value: number, frame: Fra
   return rule ? tidy(value * FACTOR[rule.basis](frame)) : value;
 }
 
+const SHOWN_PRECISION = 1000;
+
+export const shownNumber = (component: Owner, key: string, value: number, frame: Frame): number => Math.round(toShown(component, key, value, frame) * SHOWN_PRECISION) / SHOWN_PRECISION;
+
 export function toStored(component: Owner, key: string, value: number, frame: Frame): number {
   return value / factorOf(component, key, frame);
 }

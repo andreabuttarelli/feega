@@ -1,6 +1,6 @@
 import { BlendMode } from '../blend';
 import { toneOf, type Tone } from './adjust';
-import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, withAlpha, type Fill, type FillOf, type Stop } from './model';
+import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, linearEnds, withAlpha, type Fill, type FillOf, type Stop } from './model';
 
 export type FillPaint = {
   id: string;
@@ -219,11 +219,8 @@ const stopTags = (stops: Stop[], paint: FillPaint) =>
 type SvgLayer = { def: string; fill: string };
 
 function linear(f: FillOf<FillType.Linear>, paint: FillPaint, i: number): SvgLayer {
-  const { w, h } = paint.size;
-  const a = (f.angle * Math.PI) / 180;
-  const dx = (Math.cos(a) * w) / 2;
-  const dy = (Math.sin(a) * h) / 2;
-  const def = `<linearGradient id="${gradientId(paint.id, i)}" gradientUnits="userSpaceOnUse" x1="${round(w / 2 - dx)}" y1="${round(h / 2 - dy)}" x2="${round(w / 2 + dx)}" y2="${round(h / 2 + dy)}">${stopTags(f.stops, paint)}</linearGradient>`;
+  const [[x1, y1], [x2, y2]] = linearEnds(f.angle, paint.size.w, paint.size.h);
+  const def = `<linearGradient id="${gradientId(paint.id, i)}" gradientUnits="userSpaceOnUse" x1="${round(x1)}" y1="${round(y1)}" x2="${round(x2)}" y2="${round(y2)}">${stopTags(f.stops, paint)}</linearGradient>`;
   return { def, fill: `url(#${gradientId(paint.id, i)})` };
 }
 

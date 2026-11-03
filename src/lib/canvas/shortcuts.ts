@@ -4,6 +4,7 @@ import { Command, OPACITY_KEYS, SHORTCUTS, commandFor } from '$lib/motion/shortc
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
 import { EditMode } from '$lib/motion/edit-mode';
+import { Flip } from '$lib/motion/layer-props';
 
 export const NUDGE_STEP = 1;
 export const NUDGE_STEP_BIG = 10;
@@ -44,6 +45,8 @@ export type CanvasCommandId =
   | 'help'
   | 'toggle-hidden'
   | 'toggle-locked'
+  | 'flip'
+  | 'export'
   | 'view';
 
 export type CanvasCommand =
@@ -52,7 +55,8 @@ export type CanvasCommand =
   | { id: 'tool'; tool: DrawTool }
   | { id: 'align'; edge: Edge }
   | { id: 'view'; view: FrameView }
-  | { id: Exclude<CanvasCommandId, 'opacity' | 'nudge' | 'tool' | 'align' | 'view'> };
+  | { id: 'flip'; flip: Flip }
+  | { id: Exclude<CanvasCommandId, 'opacity' | 'nudge' | 'tool' | 'align' | 'view' | 'flip'> };
 
 const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolSelect]: DrawTool.Select,
@@ -78,13 +82,20 @@ const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
   [Command.TogglePivot]: FrameView.Pivot
 };
 
-function viewFor(e: KeyboardEvent): FrameView | null {
-  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+function viewFor(e: KeyboardEvent, mode: EditMode): FrameView | null {
+  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }, mode);
   return command ? (VIEW_OF_COMMAND[command] ?? null) : null;
 }
 
 function sectionFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.Section;
+}
+
+const FLIP_OF_COMMAND: Partial<Record<Command, Flip>> = { [Command.FlipHorizontal]: Flip.Horizontal, [Command.FlipVertical]: Flip.Vertical };
+
+function flipFor(e: KeyboardEvent): Flip | null {
+  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
+  return command ? (FLIP_OF_COMMAND[command] ?? null) : null;
 }
 
 function stackFor(e: KeyboardEvent): boolean {
@@ -128,6 +139,7 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.SendToBack]: { id: 'send-back' },
   [Command.ToggleHidden]: { id: 'toggle-hidden' },
   [Command.ToggleLocked]: { id: 'toggle-locked' },
+  [Command.Export]: { id: 'export' },
   [Command.PreviewZoomIn]: { id: 'zoom-in' },
   [Command.PreviewZoomOut]: { id: 'zoom-out' },
   [Command.PreviewFit]: { id: 'fit' },
@@ -136,6 +148,8 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.Help]: { id: 'help' },
   [Command.TidyUp]: { id: 'tidy' },
   [Command.WrapStack]: { id: 'wrap-stack' },
+  [Command.FlipHorizontal]: { id: 'flip', flip: Flip.Horizontal },
+  [Command.FlipVertical]: { id: 'flip', flip: Flip.Vertical },
   [Command.ToggleEditMode]: { id: 'edit-mode' },
   [Command.Section]: { id: 'section' },
   [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
@@ -232,7 +246,7 @@ export function matchCanvasShortcut(e: KeyboardEvent, mode: EditMode = EditMode.
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key;
 
-  const view = viewFor(e);
+  const view = viewFor(e, mode);
   if (view) return { id: 'view', view };
   if (codeModeFor(e)) return { id: 'code-mode' };
 
@@ -252,6 +266,8 @@ export function matchCanvasShortcut(e: KeyboardEvent, mode: EditMode = EditMode.
   if (key === COMMENT_KEY) return { id: 'comment' };
 
   if (stackFor(e)) return { id: 'wrap-stack' };
+  const flip = flipFor(e);
+  if (flip) return { id: 'flip', flip };
   if (editModeFor(e)) return { id: 'edit-mode' };
   if (sectionFor(e)) return { id: 'section' };
 
@@ -301,7 +317,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Redo' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
-  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', '⇧F'], label: 'Select, text, box, ellipse, pen, frame' },
+  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', 'F'], label: 'Select, text, box, ellipse, pen, frame' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
@@ -312,7 +328,9 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'paste', keys: ['mod', 'V'], label: 'Paste' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
-  { id: 'wrap-stack', keys: ['⇧A'], label: 'Wrap with stack' },
+  { id: 'wrap-stack', keys: ['⇧A'], label: 'Wrap with stack, or add auto layout to a frame' },
+  { id: 'flip', keys: ['⇧H'], label: 'Flip horizontal' },
+  { id: 'flip', keys: ['⇧V'], label: 'Flip vertical' },
   { id: 'edit-mode', keys: ['E'], label: 'Design or Motion: edit the resting state or key at the playhead' },
   { id: 'timeline', keys: ['mod', 'J'], label: 'Timeline: scrub in Design, key in Motion' },
   { id: 'code-mode', keys: ['⇧D'], label: 'Code: read and export a layer' },
@@ -358,9 +376,11 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   'send-back': GuideGroup.Edit,
   'toggle-hidden': GuideGroup.Edit,
   'toggle-locked': GuideGroup.Edit,
+  export: GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
   'wrap-stack': GuideGroup.Edit,
+  flip: GuideGroup.Edit,
   'edit-mode': GuideGroup.Edit,
   timeline: GuideGroup.Edit,
   'code-mode': GuideGroup.View,

@@ -5,6 +5,8 @@ import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
 import type { Box } from '@feega/motion-core/motion/layout';
 import { KeepWorld, setParent } from '../parent-ops';
+import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { guessedBoxes } from '../move-element';
 import { layoutParent, leaveStack, reorderChild } from './ops';
 
 export const LEAVE_MARGIN_PX = 16;
@@ -104,6 +106,11 @@ export function dropInStack(doc: MotionDoc, clipId: string, boxes: Record<string
   }
   const { index, line } = slotOf(doc, target, clipId, boxes, to);
   return { kind: StackDrop.Join, result: join(doc, clipId, target, index), line };
+}
+
+export function joinStackAt(doc: MotionDoc, clipId: string, at: Pt): OpResult {
+  const joined = dropInStack(doc, clipId, guessedBoxes(withAutoLayout(doc)), at)?.result;
+  return joined?.ok ? joined : { ok: true, doc };
 }
 
 export function followCursor(doc: MotionDoc, clipId: string, [dx, dy]: Pt): OpResult {

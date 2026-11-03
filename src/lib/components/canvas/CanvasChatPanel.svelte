@@ -17,6 +17,7 @@
   import { readChatTab, writeChatTab } from '$lib/shell-prefs';
   import FrameInspectorPanel from './FrameInspectorPanel.svelte';
   import { frameProperties, typingInBar } from './frame-properties.svelte';
+  import { selectionProperties } from './selection-properties.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
   import { answerAgent } from '$lib/canvas/agent-requests';
   import { browserPorts, type AskedFrame } from '$lib/canvas/agent-capture';
@@ -35,8 +36,10 @@
     }
   };
 
+  const placing = $derived(selectionProperties.panel?.box ? 'many' : null);
+
   $effect(() => {
-    if (!frameProperties.routed) {
+    if (!frameProperties.routed && !placing) {
       return;
     }
     untrack(() => {

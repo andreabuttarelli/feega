@@ -35,7 +35,10 @@ A free element behaves like a single object, as in Figma ([ADR 0032](/architectu
 
 With nothing inside the frame selected, the right bar shows the frame's own look, with the same controls as a layer:
 
-- **Frame size** preset, **W** and **H**, and **Layout grid**.
+- **Align**: aligns the frame inside the group or section that holds it; with nothing around it the buttons stay off, as in Figma.
+- **X**, **Y** and **Rotate**, plus **flip horizontal** and **flip vertical** (`⇧H`, `⇧V`). A frame turns from the field or by dragging just outside a corner. Flipping mirrors everything inside it; `⌘Z` undoes the whole flip in one step.
+- **Frame size** preset, **W** and **H**, and **Layout grid**. **W** and **H** size the frame on the canvas too: a frame drawn 300 × 375 set to 1080 × 1350 becomes that big, at the scale it was shown. Each layout grid field is labelled (type, count, gutter, align, margin, colour, opacity, show); `⇧G` shows or hides every grid and the choice is remembered.
+- **Auto layout** `+` (or `⇧A` with the frame selected) turns the frame itself into a stack: its layers line up in a row or column, and the frame keeps its size. The **Stack** section then edits direction, gap and padding. `⇧A` on a frame inside a frame does the same to that frame instead of wrapping it.
 - **Appearance**: opacity (fades the frame and every layer in it; at 0% the canvas shows through) with its slider and the eye that hides the layer, corner radius with its slider (uniform or per corner), blend mode and **Clip content**. Drag a slider, drag a field's label to scrub, or click the value to type.
 - **Fill**: several fills, each a colour, gradient or image.
 - **Stroke**: colour, width, inside/center/outside, per side.
@@ -49,8 +52,9 @@ Scenes, camera, breakpoints, prototype flow, styles and variables sit in the fol
 
 - Right-click on stacked layers lists them so you can pick the one underneath.
 - Right-click a layer to hide (`⇧⌘H`), lock (`⇧⌘L`), copy properties (`⌥⌘C`) or paste them (`⌥⌘V`). A locked layer, and everything inside it, stays put when dragged.
-- The same keys work on whole nodes on the canvas: frames, images and groups. A hidden node is not drawn and cannot be clicked; its row in Layers is dimmed. A locked node cannot be moved, resized or rotated, but you can still select it from Layers. Each node row in Layers has its own eye and lock, and `Cmd+Z` undoes either.
+- The same keys work on whole nodes on the canvas: frames, images and groups. A hidden node is not drawn and cannot be clicked; its row in Layers is dimmed. A locked node cannot be moved, resized or rotated, but you can still select it from Layers. Each node row in Layers has its own eye and lock, the right-click menu has Hide / show and Lock / unlock, and one `Cmd+Z` undoes the toggle for the whole selection.
 - Hold `Alt` while dragging an element inside a frame to drag a copy; the original stays where it was.
+- A group turns and flips as one: rotating it from **Rotate** turns everything in it around the group's centre, and `⇧H`/`⇧V` mirror its contents across its middle.
 - Hold `Cmd`/`Ctrl` and drag across a frame to select elements inside groups, not the groups.
 - `Cmd+F` finds any node by name, text or prompt.
 

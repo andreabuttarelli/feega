@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { coreEvent } from '$lib/server/core-usage';
 import { AgentVia, CoreEvent, landed } from '$lib/core-usage';
 import { SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { Access, CANVAS_OPS, canvasCtx, chatSendsOp, type CanvasCtx, type CanvasDeps, type CanvasOpName } from '$lib/server/canvas/canvas-ops';
+import { Access, CANVAS_OPS, canvasCtx, chatSendsOp, runOp, type CanvasCtx, type CanvasDeps, type CanvasOpName } from '$lib/server/canvas/canvas-ops';
 import { effectStore } from '$lib/server/effects/store';
 import { chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { templateLibrary } from '$lib/server/motion/templates';
@@ -108,7 +108,7 @@ function chatRan(ctx: CanvasCtx, op: CanvasOpName, result: unknown): unknown {
 function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
   const own = Object.entries(CHAT_TOOL_OPS).map(([name, description]) => {
     const op = CANVAS_OPS[name as CanvasOpName];
-    return [name, tool({ description, inputSchema: op.input, execute: async (input: unknown) => shown(name as CanvasOpName, input, chatRan(ctx, name as CanvasOpName, await op.run(ctx, input as never))) })];
+    return [name, tool({ description, inputSchema: op.input, execute: async (input: unknown) => shown(name as CanvasOpName, input, chatRan(ctx, name as CanvasOpName, await runOp(ctx, name as CanvasOpName, input))) })];
   });
 
   const generic = tool({
@@ -119,7 +119,7 @@ function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
       if (!parsed.success) {
         return { error: 'invalid_input', issues: parsed.error.issues };
       }
-      return shown(op, input, chatRan(ctx, op, await CANVAS_OPS[op].run(ctx, parsed.data as never)));
+      return shown(op, input, chatRan(ctx, op, await runOp(ctx, op, parsed.data)));
     }
   });
 

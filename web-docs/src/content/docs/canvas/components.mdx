@@ -17,6 +17,8 @@ Every project keeps its mains on a page named **Components**, made the first tim
 
 On the Components page a variant set has a dashed purple outline, 20 px around and between its variants, and a **+** just below it: click it to add a variant beside the last one. Edit a main there and every instance on every page follows, at the same size.
 
+Drag a handle of a main inside a set to resize that main alone: the variants after it move along and the set grows to hug them, live while you drag. Agents do the same with the `component` tool: `{ "action": "resize-set-main", "clip_id": "<main id>", "width": 240, "height": 64 }` (frame px).
+
 Imports made before this change keep their Components frame and keep working.
 
 - **MCP / API:** `home_components` with a `frameId` moves the mains of that frame to the Components page, the same as the app does after `⌥⌘K`.

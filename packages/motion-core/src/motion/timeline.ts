@@ -88,11 +88,9 @@ export type NewClip = {
   constraints?: Constraints;
 };
 
-export const TOP_LEFT_ANCHOR: Transform = { anchorX: 0, anchorY: 0 };
-
 const NEW_CLIP_CONSTRAINTS: Constraints = { horizontal: Horizontal.Left, vertical: Vertical.Top };
 
-export const TOP_LEFT_START = { transform: TOP_LEFT_ANCHOR, constraints: NEW_CLIP_CONSTRAINTS } satisfies Pick<NewClip, 'transform' | 'constraints'>;
+export const NEW_CLIP_START = { constraints: NEW_CLIP_CONSTRAINTS } satisfies Pick<NewClip, 'constraints'>;
 
 type Span = { from: number; durationInFrames?: number };
 

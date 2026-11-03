@@ -331,6 +331,20 @@ export async function listMainDependents(db: Db, scope: { orgId: string; homeId:
   return (data ?? []).map(toNode);
 }
 
+export type NodeBoxRow = { id: string; canvasId: string; x: number; y: number; w: number; h: number };
+
+export async function nodeBoxes(db: Db, scope: { orgId: string; nodeIds: string[] }): Promise<NodeBoxRow[]> {
+  if (!scope.nodeIds.length) {
+    return [];
+  }
+
+  const { data, error } = await db.from('nodes').select('id, canvas_id, x, y, width, height').eq('org_id', scope.orgId).in('id', scope.nodeIds).is('deleted_at', null);
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map((row) => ({ id: row.id, canvasId: row.canvas_id, x: row.x, y: row.y, w: row.width ?? 0, h: row.height ?? 0 }));
+}
+
 export async function nodeRowExists(db: Db, input: { orgId: string; nodeId: string }): Promise<boolean> {
   const { data, error } = await db.from('nodes').select('id').eq('org_id', input.orgId).eq('id', input.nodeId).maybeSingle();
   if (error) {

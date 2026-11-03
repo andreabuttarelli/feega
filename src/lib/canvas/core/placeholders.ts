@@ -2,6 +2,7 @@ import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
 import { ItemKind, type DisplayList, type ImageItem, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { rgbaOf } from '@feega/motion-core/motion/gpu-full/rgba';
+import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 import type { Box } from './canvas-scene';
 import { line, rect, solid } from './shapes';
 
@@ -58,3 +59,5 @@ const blocked = (items: readonly Item[], look: Look, missing: Missing): Item[] =
   });
 
 export const withoutPictures = (list: DisplayList, look: Look, missing: Missing = ALL): DisplayList => ({ ...list, items: blocked(list.items, look, missing) });
+
+export const drawable = (list: DisplayList, ready: Readiness, look: Look, missing: Missing): DisplayList => (ready === Readiness.Whole ? list : withoutPictures(list, look, missing));

@@ -152,10 +152,13 @@
       <button type="button" class={BUTTON} data-testid="media-remove" onclick={() => choose(null)}>Remove</button>
     </div>
   {:else}
-    <button type="button" class={cn('flex h-12 w-full items-center justify-center rounded-sm border border-dashed border-ui-divider text-ui-label text-ui-text-3 hover:bg-ui-wash', FOCUS_RING)} data-testid="media-add" aria-expanded={open} onclick={reopen}>
+    <button type="button" class={cn('flex h-12 w-full items-center justify-center rounded-sm border border-dashed border-ui-divider text-ui-label text-ui-text-3 hover:bg-ui-wash', FOCUS_RING)} data-testid="media-add" disabled={progress !== null} onclick={() => fileInput?.click()}>
       <span data-testid="media-empty">Add an {NOUN[accept]} — or drop a file here</span>
     </button>
+    <button type="button" class={cn('self-start rounded-sm px-1 text-ui-caption text-ui-text-3 hover:text-ui-text', FOCUS_RING)} data-testid="media-more" aria-expanded={open} onclick={reopen}>Link or library</button>
   {/if}
+
+  <input bind:this={fileInput} class="hidden" type="file" accept={FILE_TYPES[accept]} data-testid="media-file" onchange={picked} />
 
   {#if progress !== null}
     <progress class="h-1 w-full" max="1" value={progress} data-testid="media-progress" aria-label="Uploading"></progress>
@@ -170,7 +173,6 @@
       </div>
 
       {#if tab === PickFrom.Upload}
-        <input bind:this={fileInput} class="hidden" type="file" accept={FILE_TYPES[accept]} data-testid="media-file" onchange={picked} />
         <button type="button" class={cn(BUTTON, 'h-16 border border-dashed border-ui-divider bg-transparent')} disabled={progress !== null} onclick={() => fileInput?.click()}>Choose a file, or drop it here</button>
       {:else if tab === PickFrom.Link}
         <div class="flex gap-1">

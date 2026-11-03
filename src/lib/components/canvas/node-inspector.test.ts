@@ -27,6 +27,22 @@ describe('right bar of a canvas selection', () => {
     expect(html()).toContain('data-testid="align-bar"');
   });
 
+  it('places several free elements: X/Y/W/H/rotation, Mixed where they differ', () => {
+    const items = [
+      { id: 'a', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+      { id: 'b', x: 200, y: 0, w: 100, h: 80, rotation: 0 }
+    ];
+    selectionProperties.publish({ ...panelOf([{ id: 'a', type: 'element', data: {} }, { id: 'b', type: 'element', data: {} }]), box: { items, set: noop } });
+    const body = html();
+
+    expect(body).toContain('data-testid="selection-box-fields"');
+    expect(body).toMatch(/aria-label="X"[^>]*placeholder="Mixed"/);
+    expect(body).toMatch(/aria-label="Y"[^>]*value="0"/);
+    expect(body).toMatch(/aria-label="Width"[^>]*value="100"/);
+    expect(body).toMatch(/aria-label="Height"[^>]*placeholder="Mixed"/);
+    expect(body).toContain('aria-label="Rotation"');
+  });
+
   it('falls back to the hint when nothing is selected', () => {
     expect(html()).toContain('data-testid="properties-empty"');
   });

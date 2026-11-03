@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '@feega/motion-core/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, tileFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, heightFollowsDoc, tileFollowsDoc, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, TileBody, hoverHostOf, HoverHost, newMotionData, storyboardPath, holdsDoc, tileForDoc } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -228,5 +228,19 @@ describe('an element node is its own type, not a frame', () => {
 
   it('holds a doc like a frame does; other types do not', () => {
     expect(['motion', 'element', 'image'].map(holdsDoc)).toEqual([true, true, false]);
+  });
+});
+
+describe('W and H in the frame inspector size the frame on the canvas', () => {
+  it('a frame drawn 300 × 375 set to 1080 × 1350 becomes 1080 × 1350 on the canvas', () => {
+    expect(tileForDoc({ w: 300, h: 375 }, { width: 300, height: 375 }, { width: 1080, height: 1350 })).toEqual({ w: 1080, h: 1350 });
+  });
+
+  it('a frame shown at a third of its size keeps that scale', () => {
+    expect(tileForDoc({ w: 360, h: 640 }, { width: 1080, height: 1920 }, { width: 1080, height: 1080 })).toEqual({ w: 360, h: 360 });
+  });
+
+  it('a size that did not change leaves the tile alone', () => {
+    expect(tileForDoc({ w: 300, h: 375 }, { width: 300, height: 375 }, { width: 300, height: 375 })).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateNewNodeData, validateNodeData } from './node-data';
-import { dragAngle, followGroup, undoTurn, scaleGroup, rotateGroup, translateGroup, layoutOf } from './node-layout';
+import { dragAngle, followGroup, undoTurn, scaleGroup, rotateGroup, translateGroup, layoutOf, mirrorGroup } from './node-layout';
+import { Flip } from '$lib/motion/layer-props';
 
 describe('every node carries its own layout: rotation and group', () => {
   it('keeps rotation and groupId through validation, for any type', () => {
@@ -38,6 +39,35 @@ describe('rotating a group', () => {
 
   it('wraps angles into -180..180', () => {
     expect(rotateGroup({ ...group, rotation: 170 }, [], 30)[0].rotation).toBe(-160);
+  });
+});
+
+describe('flipping a group', () => {
+  const centre = (n: { x: number; y: number; w: number; h: number }) => [n.x + n.w / 2, n.y + n.h / 2];
+
+  it('mirrors each member across the vertical middle of the group and turns it the other way', () => {
+    const [f] = mirrorGroup(group, [{ ...frame, rotation: 30 }], Flip.Horizontal);
+
+    expect(centre(f)[0]).toBeCloseTo(200 - centre(frame)[0], 6);
+    expect(centre(f)[1]).toBeCloseTo(centre(frame)[1], 6);
+    expect(f.rotation).toBeCloseTo(-30, 6);
+  });
+
+  it('mirrors across the horizontal middle when flipped vertically', () => {
+    const [f] = mirrorGroup(group, [frame], Flip.Vertical);
+
+    expect(centre(f)[0]).toBeCloseTo(centre(frame)[0], 6);
+    expect(centre(f)[1]).toBeCloseTo(100 - centre(frame)[1], 6);
+  });
+
+  it('a turned group mirrors across its own axis, so turning it back after lands the world mirror', () => {
+    const turned = { ...group, rotation: 90 };
+    const [f] = mirrorGroup(turned, [frame], Flip.Horizontal);
+    const [, back] = rotateGroup(turned, [f], -180);
+
+    expect(centre(back)[0]).toBeCloseTo(200 - centre(frame)[0], 6);
+    expect(centre(back)[1]).toBeCloseTo(centre(frame)[1], 6);
+    expect(back.rotation).toBeCloseTo(0, 6);
   });
 });
 

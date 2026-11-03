@@ -67,7 +67,8 @@ export enum FocusMode {
   Frame = 'frame',
   Select = 'select',
   Reveal = 'reveal',
-  Pick = 'pick'
+  Pick = 'pick',
+  Drawn = 'drawn'
 }
 
 export enum Placement {
@@ -80,7 +81,8 @@ const FOCUS: Record<FocusMode, { selects: boolean; placement: Placement }> = {
   [FocusMode.Frame]: { selects: false, placement: Placement.Fit },
   [FocusMode.Select]: { selects: true, placement: Placement.Fit },
   [FocusMode.Reveal]: { selects: false, placement: Placement.Slide },
-  [FocusMode.Pick]: { selects: true, placement: Placement.Centre }
+  [FocusMode.Pick]: { selects: true, placement: Placement.Centre },
+  [FocusMode.Drawn]: { selects: true, placement: Placement.Slide }
 };
 
 export const focusSelects = (mode: FocusMode): boolean => FOCUS[mode].selects;
