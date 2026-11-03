@@ -21,7 +21,10 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 - Double-click enters the selected container or component instance and selects its child under the pointer, one level at a time; on text it starts editing, on a shape without children it edits its points.
 - A drag starts only once the pointer has moved a few pixels, so clicks and double-clicks never move anything. An element leaves its frame only when you drag it past the edge of the frame or view you are editing.
 - Once inside a container, hover and click pick among its children. Clicking outside it goes back up.
-- Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it.
+- Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it. With elements already selected, Cmd-click adds or removes the deepest one.
+- Shift-click adds or removes the element a click would select, even before the frame is selected. Shift+Cmd-click does the same with the deepest element.
+- Dragging on the background of a frame that is not selected draws a selection box over its elements; with Cmd/Ctrl held it selects the deepest ones. A frame moves when you drag its title, when it is already selected, or when it is empty.
+- Dropping an element onto a stack, from the same frame, another frame or the free canvas, puts it in the stack at the slot under the pointer.
 - Esc goes up one level.
 
 In the Layers panel, Shift-click selects every row between the last picked one and the clicked one; Cmd-click (Ctrl-click on Windows) adds or removes one row. It works on canvas nodes and on the elements inside a frame, and the canvas and the right bar follow.

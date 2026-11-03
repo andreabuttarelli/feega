@@ -132,3 +132,35 @@ export type Held = { selected: readonly string[]; inside: string | null; picks: 
 const heldWhole = (held: Held, node: string): boolean => held.selected.includes(node) && (held.inside !== node || !held.picks.length);
 
 export const pressOn = (held: Held, node: string, reach: Reach): Press => (reach === Reach.Top && heldWhole(held, node) ? Press.Host : Press.Child);
+
+export enum Extend {
+  None = 'none',
+  Toggle = 'toggle',
+  Band = 'band'
+}
+
+export type ExtendKeys = { shift: boolean; mod: boolean };
+export type ExtendAt = { onClip: boolean; onBody: boolean; held: boolean; entered: boolean; selectedElsewhere: boolean; picks: number; bandable: boolean };
+export type ExtendPlan = { extend: Extend; reach: Reach };
+
+enum Keys {
+  Plain = 'plain',
+  Shift = 'shift',
+  Mod = 'mod',
+  Both = 'both'
+}
+
+const keysOf = ({ shift, mod }: ExtendKeys): Keys => (shift ? (mod ? Keys.Both : Keys.Shift) : mod ? Keys.Mod : Keys.Plain);
+
+const shiftOpen = (at: ExtendAt) => at.entered || !at.selectedElsewhere;
+
+const bandOn = (at: ExtendAt) => (at.onBody ? Extend.Band : Extend.None);
+
+const EXTEND: Record<Keys, (at: ExtendAt) => Extend> = {
+  [Keys.Plain]: (at) => (at.onClip || at.held || !at.bandable ? Extend.None : bandOn(at)),
+  [Keys.Shift]: (at) => (!shiftOpen(at) ? Extend.None : at.onClip ? Extend.Toggle : bandOn(at)),
+  [Keys.Mod]: (at) => (!at.onClip ? bandOn(at) : at.entered && at.picks > 0 ? Extend.Toggle : Extend.None),
+  [Keys.Both]: (at) => (at.onClip ? Extend.Toggle : bandOn(at))
+};
+
+export const extendOf = (keys: ExtendKeys, at: ExtendAt): ExtendPlan => ({ extend: EXTEND[keysOf(keys)](at), reach: keys.mod ? Reach.Deep : Reach.Top });
