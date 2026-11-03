@@ -1334,7 +1334,11 @@
 
   const WHOLE_ELEMENT_RUN: Record<ElementAction, (nodeId: string) => void> = {
     [ElementAction.WrapStack]: (nodeId) => props.onWrapStack?.([nodeId]),
-    [ElementAction.Duplicate]: (nodeId) => duplicateTiles([nodeId])
+    [ElementAction.Duplicate]: (nodeId) => duplicateTiles([nodeId]),
+    [ElementAction.BringForward]: (nodeId) => props.onRestack?.([nodeId], Stack.Forward),
+    [ElementAction.SendBackward]: (nodeId) => props.onRestack?.([nodeId], Stack.Backward),
+    [ElementAction.BringToFront]: (nodeId) => props.onRestack?.([nodeId], Stack.Front),
+    [ElementAction.SendToBack]: (nodeId) => props.onRestack?.([nodeId], Stack.Back)
   };
 
   async function runFrameAction(id: ActionId) {
@@ -3424,6 +3428,9 @@
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
     'send-back': () => props.onRestack?.(selected, Stack.Back),
+    'bring-forward': () => props.onRestack?.(selected, Stack.Forward),
+    'send-backward': () => props.onRestack?.(selected, Stack.Backward),
+    rename: () => layersSource.askRename(),
     'toggle-hidden': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Hidden),
     'toggle-locked': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Locked),
     help: () => (shortcutHelp.open = true),
@@ -3530,7 +3537,7 @@
   let pointer: Point | null = null;
 
   function clipboardTarget(e: ClipboardEvent): boolean {
-    return Boolean(spec.chrome && !frameDialog && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
+    return Boolean(spec.chrome && !frameDialog && !typing && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
   }
 
   const framePicks = (): string[] => (inside && picks.length && frameChrome(kindOfNode(inside.nodeId)).root !== Root.Own ? picks : []);

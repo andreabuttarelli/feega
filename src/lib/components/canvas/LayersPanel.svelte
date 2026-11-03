@@ -158,6 +158,16 @@
   const nodeFlagged = (row: LayerRow) => row.kind === LayerKind.Node && !row.nested && !!canvas && !(row.own && video?.nodeId === row.id);
   const renamable =(row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
+  $effect(() => {
+    if (!layersSource.renameAsked) {
+      return;
+    }
+    untrack(() => {
+      layersSource.takeRename();
+      renaming = shown.find((row) => isPicked(row) && renamable(row))?.id ?? null;
+    });
+  });
+
   function enterRow(row: LayerRow, e: KeyboardEvent) {
     if (isPicked(row) && renamable(row)) {
       renaming = row.id;
