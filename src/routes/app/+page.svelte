@@ -17,14 +17,13 @@
   import { Tool } from '$lib/motion/actions';
   import FeegaFile from '$lib/components/canvas/FeegaFile.svelte';
   import { isFeegaFile } from '$lib/canvas/feega-file';
-  import { DashboardPage, PAGE_PATH } from '$lib/dashboard/pages';
+  import { DashboardPage, EDITOR_PRELOAD, PAGE_PATH } from '$lib/dashboard/pages';
 
   let { data, form } = $props();
 
   const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
   const EXAMPLES_SHOWN = 3;
   const EXAMPLE_TURN_MS = 6000;
-  const EDITOR_ROUTE = '/p/_/c/_/motion/_';
 
   let phase = $state(BriefPhase.Idle);
   const sending = $derived(phase !== BriefPhase.Idle);
@@ -60,7 +59,7 @@
   });
 
   function preloadEditor() {
-    void preloadCode(EDITOR_ROUTE);
+    void preloadCode(EDITOR_PRELOAD);
   }
 
   function fill(text: string) {
