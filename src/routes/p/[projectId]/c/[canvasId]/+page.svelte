@@ -3881,9 +3881,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   afterNavigate(takeStartUrl);
 
-  function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean }) {
+  function siteImported(landed: { nodes: unknown[]; undo: unknown[]; truncated: boolean; skipped: string[] }) {
     landImported(landed);
     void invalidate(CANVAS_LIST_DEPENDENCY);
+    if (landed.skipped.length) {
+      failed = `Imported, with parts left out: ${landed.skipped.join('; ')}`;
+      return;
+    }
     if (startUrl && landed.truncated) {
       failed = `Imported the top of ${startHost(startUrl)}.`;
     }

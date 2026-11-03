@@ -1,4 +1,4 @@
-import { Background, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { Background, parseMotionDoc, type MotionComp, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, editClip } from '@feega/motion-core/motion/timeline';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { Destination } from '$lib/canvas/figma/scene';
@@ -14,7 +14,7 @@ const PAGE_GAP_PX = 120;
 const PAGE_ROW_PX = 2400;
 
 export type Homes = Record<number, Record<string, number>>;
-export type ComponentPages = { sets: PlanItem[]; homes: Homes; setHomes: Homes };
+export type ComponentPages = { sets: PlanItem[]; homes: Homes; setHomes: Homes; dropped: string[] };
 
 type Main = { id: string; comp: MotionComp; box: Box; backdrop: Backdrop | null };
 type SetOf = { name: string; source: PlanItem; mains: Main[] };
@@ -113,12 +113,14 @@ function homesIn(items: readonly PlanItem[], homeOf: Map<string, number>, elsewh
 }
 
 export function componentPages(items: readonly PlanItem[], newId: NewId): ComponentPages {
-  const sets = [...setsOf(items).values()];
-  const made = sets.map((set) => {
-    const doc = setDoc(set, newId);
+  const built = [...setsOf(items).values()].map((set) => ({ set, doc: setDoc(set, newId) }));
+  const saveable = built.filter(({ doc }) => parseMotionDoc(doc).ok);
+  const dropped = built.filter((b) => !saveable.includes(b)).map(({ set }) => `${set.name}: component set left out, its instances sit too far from their components`);
+  const sets = saveable.map(({ set }) => set);
+  const made = saveable.map(({ set, doc }) => {
     const inside = clipIdsIn(doc);
     return { ...set.source, destination: Destination.Free, kind: FrameKind.Element, doc, name: set.name, size: { width: doc.width, height: doc.height }, centre: { x: 0, y: 0 }, images: items.flatMap((i) => i.images).filter((i) => inside.has(i.clipId)) };
   });
   const homeOf = new Map(sets.flatMap((set, at) => set.mains.map((m) => [m.id, at] as const)));
-  return { sets: laidOnPage(made), homes: homesIn(items, homeOf), setHomes: homesIn(made, homeOf, (id, at) => homeOf.get(id) !== at) };
+  return { sets: laidOnPage(made), homes: homesIn(items, homeOf), setHomes: homesIn(made, homeOf, (id, at) => homeOf.get(id) !== at), dropped };
 }
