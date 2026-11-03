@@ -87,7 +87,7 @@ panel on that frame.
 
 When two authors change the same node or frame at once, the later write is refused instead of
 overwriting the first. The refused change is kept and shows in red on the lane of whoever was
-refused, with two choices:
+refused, with two choices. The person refused also sees a notice on the canvas as it happens:
 
 - **Keep mine** applies the refused change on top of what is there now, as a new change.
 - **Keep theirs** leaves it as it is and closes the conflict.

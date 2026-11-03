@@ -82,6 +82,7 @@ import { pasteTargets } from '$lib/canvas/paste-into-frame';
   import CanvasShortcutHelp from '$lib/components/canvas/CanvasShortcutHelp.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
+  import { REFUSED_NOTICE, watchRefusals } from '$lib/realtime/conflict-channel';
   import { afterNavigate, beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
   import { page, updated } from '$app/state';
   import { track } from '$lib/analytics';
@@ -2140,6 +2141,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
    * Il nodo nasce SOLO quando la riga torna, come `create`: niente tile senza riga dietro.
    */
   const supabase = createSupabaseBrowserClient();
+
+  onMount(() => watchRefusals(supabase, data.canvas.id, data.session?.user?.id ?? '', () => { failed = REFUSED_NOTICE; }));
 
   async function uploadFontFile(file: File) {
     const path = `${orgFontPrefix(data.orgId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;

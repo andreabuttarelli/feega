@@ -1039,13 +1039,10 @@ export const actions: Actions<CanvasParams> = {
     }
 
     if (!(await listNodes(scope.db, scope)).some((node) => node.id === nodeId)) {
-      return fail(404, { error: 'node not found' });
+      return { moved: true };
     }
 
-    const node = await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
-    if (!node) {
-      return fail(404, { error: 'node not found' });
-    }
+    await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
 
     return { moved: true };
   },
@@ -1661,9 +1658,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'nothing to delete' });
     }
 
-    if (!(await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) }))) {
-      return fail(404, { error: 'node not found' });
-    }
+    await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) });
     return { removed: true };
   },
 

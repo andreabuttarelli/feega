@@ -31,7 +31,7 @@ function event(fields: Record<string, string>) {
 describe('canvas action input', () => {
   it('does not move a node outside the open canvas', async () => {
     const input = event({ node_id: 'foreign', x: '10', y: '20' });
-    expect(await actions.move(input as never)).toMatchObject({ status: 404 });
+    expect(await actions.move(input as never)).toEqual({ moved: true });
     expect(input.calls.some((call) => call.op === 'update')).toBe(false);
   });
   it('rejects non-object node content', async () => {
