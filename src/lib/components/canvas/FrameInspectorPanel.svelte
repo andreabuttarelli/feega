@@ -100,7 +100,7 @@
     if (!session || !doc) {
       return;
     }
-    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}) });
+    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}), here: frameProperties.nodeId });
     if (!done) {
       return;
     }

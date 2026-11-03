@@ -1364,7 +1364,7 @@
       pickMany(nodeId, at.scene(picked));
       return;
     }
-    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets), layer: elementName(nodeId) });
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets), layer: elementName(nodeId), here: nodeId });
     if (!done) {
       return;
     }
@@ -2476,7 +2476,7 @@
     if (!inScope || holdsLock(inScope.view, inScope.ids)) {
       return;
     }
-    const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8)) : null) ?? { doc: inScope.view, ids: inScope.ids };
+    const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8), nodeId) : null) ?? { doc: inScope.view, ids: inScope.ids };
     const boxes = guessedBoxes(withAutoLayout(work.doc));
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);

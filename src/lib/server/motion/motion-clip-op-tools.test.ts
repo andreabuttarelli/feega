@@ -38,6 +38,16 @@ describe('the editor clip buttons an agent can press too', () => {
     expect(done.clip_ids).toEqual([clips()[1]!.id]);
   });
 
+  it('duplicate_clip in place keeps the copy at the moment of its original, like ⌘D on the canvas', async () => {
+    const { run, clips } = setup();
+    await run('add_clip', { component: 'Title', start: 1, duration: 1, props: { text: 'Hello' } });
+
+    const done = await run('duplicate_clip', { clip_ids: [clips()[0]!.id], place: 'in_place' });
+    const copy = clips().find((c) => c.id === (done.clip_ids as string[])[0]);
+
+    expect(copy?.from).toBe(clips()[0]!.from);
+  });
+
   it('delete_template removes a team template through the same library the editor uses', async () => {
     const remove = vi.fn(async () => true);
     const { run } = setup({ list: vi.fn(), own: vi.fn(), save: vi.fn(), remove } as unknown as TemplateLibrary);
