@@ -29,9 +29,12 @@ Clicking an empty spot flashes the linked areas. **Restart** (or `R`) goes back 
 | Action | In the player |
 |---|---|
 | Navigate to, Scroll to | the target frame replaces the current one |
-| Open overlay | the target frame opens centred over the current one; click outside it to close |
+| Open overlay | the target frame opens at its own size over the current one, centred, at the top, at the bottom or where the link places it, over a dimmed background; a click outside closes it unless the link turns that off |
+| Close overlay | closes the top overlay with the link's transition |
 | Back | closes the top overlay, otherwise returns to the previous frame, with the transition reversed |
 | Change to | the instance around the layer switches to that variant, in place; the rest of the frame reflows around it. While hovering switches back when the pointer leaves |
+
+Where a linked layer sits under another linked layer, the one drawn on top takes the click; a child's own link beats its parent's, and a child without a link lets the click through to its parent.
 
 Element states play too: a layer with a Hover or Pressed state, inside a group or a component instance, changes while the pointer is over it or presses it.
 
@@ -68,4 +71,4 @@ feega motion play <nodeId>
 - Scroll to behaves like Navigate to: it moves to the target frame, it does not scroll inside a frame.
 - Frames are played at their first frame with the animation looping; layers are located where they sit at the start.
 - A public link shows only frames that are published; uncensored projects cannot be shared.
-- Overlays are centred at 80% of the stage; position and background options are not set per link.
+- An overlay bigger than the frame under it shrinks to fit.
