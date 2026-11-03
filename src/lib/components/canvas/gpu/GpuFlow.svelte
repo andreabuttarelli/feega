@@ -163,6 +163,7 @@
   import { imageSourceTile } from '$lib/canvas/free-image';
   import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
   import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
@@ -1177,8 +1178,7 @@
   const pickKey = (f: { id: string; revision: number; linked?: string }) => `${f.id}:${f.revision}:${f.linked ?? ''}`;
 
   async function fetchPickDoc(id: string, revision: number, attempt = 0) {
-    const res = await fetch(`${coreSource(id)}?revision=${revision}`, { cache: 'no-store' }).catch(() => null);
-    const body = res?.ok ? ((await res.json().catch(() => null)) as { doc: LiveDoc['doc']; tokens: LiveDoc['tokens']; assets: LiveDoc['assets'] } | null) : null;
+    const body = await frameSources(`${coreSource(id)}?revision=${revision}`);
     if (body?.doc) {
       fetched = new Map(fetched).set(id, { revision, live: { doc: body.doc, tokens: body.tokens, assets: body.assets ?? {} } });
       return;

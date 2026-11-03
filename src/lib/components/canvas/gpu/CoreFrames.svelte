@@ -25,6 +25,7 @@
   import { readPool } from '$lib/canvas/core/read-pool';
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
+  import { frameSources } from '$lib/canvas/core/frame-sources';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
@@ -88,14 +89,6 @@
   const smoothing = smoothingOf(navigator.userAgent);
   const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null));
 
-  async function buildHere(f: FrameAt, url: string): Promise<{ list: DisplayList; custom: CustomFrame | null } | null> {
-    const res = await fetch(url);
-    if (!res.ok || res.status === HTTP_NO_CONTENT) {
-      return null;
-    }
-    return buildSource(f, (await res.json()) as FrameDoc);
-  }
-
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
     return res.ok && res.status !== HTTP_NO_CONTENT ? ((await res.json()) as FrameDoc) : null;
@@ -136,9 +129,13 @@
   }
 
   async function fetchAndBuild(f: FrameAt) {
-    const url = new URL(`${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`, location.href).href;
-    const away = f.scenes ? null : await buildAway(url, smoothing).catch(() => null);
-    return away ? { list: away, custom: null } : buildHere(f, url);
+    const source = await frameSources(`${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`);
+    if (!source) {
+      return null;
+    }
+
+    const away = f.scenes ? null : await buildAway(source, smoothing).catch(() => null);
+    return away ? { list: away, custom: null } : buildSource(f, source);
   }
 
   const HTTP_NO_CONTENT = 204;
