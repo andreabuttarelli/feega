@@ -51,7 +51,7 @@ export function absoluteDoc() {
   const kit = new DocKit(800, 400);
   kit.frame('poster', { name: 'Poster', box: box(0, 0, 800, 400), fill: '#111827' });
   kit.frame('badge', { name: 'Badge', parent: 'poster', box: box(600, 40, 160, 48), fill: BRAND, radius: 24 });
-  kit.text('caption', 'Limited run', { parent: 'poster', name: 'Caption', size: 18, color: PAPER, box: box(40, 320, 300, 30) });
+  kit.text('caption', 'Limited run', { parent: 'poster', name: 'Caption', size: 18, color: PAPER, box: box(40, 60, 300, 30) });
   return kit.doc();
 }
 

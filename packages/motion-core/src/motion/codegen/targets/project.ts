@@ -15,9 +15,9 @@ function assetLines(page: PageSpec): string[] {
   return [
     '## Assets',
     '',
-    'Images point at the URLs they had when exported. Signed links expire: download each file into the project and update the reference before shipping.',
+    'Images ship inside the project. One that could not be downloaded at export time points at its original link instead.',
     '',
-    ...page.assets.map((a) => `- \`${a.id}\`: ${a.url ?? 'no URL at export time'}`),
+    ...page.assets.map((a) => `- \`${a.ref}\`${a.url ? '' : ': no URL at export time'}`),
     ''
   ];
 }
