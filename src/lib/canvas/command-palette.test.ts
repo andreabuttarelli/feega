@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PALETTE, searchPalette } from './command-palette';
+import { opensCursorChat, togglesPalette } from './command-palette';
 import { Command } from '$lib/motion/shortcuts';
 import { canRunInFrame } from './frame-inspector';
 import { CANVAS_COMMAND_OF } from './shortcuts';
@@ -34,5 +35,20 @@ describe('command palette', () => {
     expect(searchPalette('same fill').map((e) => e.command)).toContain(Command.SelectSameFill);
     expect(searchPalette('xyz nothing')).toEqual([]);
     expect(searchPalette('').length).toBe(PALETTE.length);
+  });
+});
+
+describe('the keys of quick actions and of cursor chat', () => {
+  const key = (k: string, mods: Partial<Record<'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey', boolean>> = {}) => ({ key: k, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...mods });
+
+  it('⌘/ and ⌘K open quick actions, as in Figma', () => {
+    expect(togglesPalette(key('/', { metaKey: true }))).toBe(true);
+    expect(togglesPalette(key('k', { ctrlKey: true }))).toBe(true);
+    expect(togglesPalette(key('/'))).toBe(false);
+  });
+
+  it('/ alone opens cursor chat, ⌘/ never does', () => {
+    expect(opensCursorChat(key('/'))).toBe(true);
+    expect(opensCursorChat(key('/', { metaKey: true }))).toBe(false);
   });
 });

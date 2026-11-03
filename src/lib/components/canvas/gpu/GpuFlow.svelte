@@ -3645,6 +3645,7 @@
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
+    distribute: (c) => c.id === 'distribute' && placeTiles(distributeTiles(placedBoxes(selected), c.axis)),
     'wrap-stack': () => (selected.length === 1 && stackFrameNode(selected[0])) || (shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected)),
     flip: (c) => c.id === 'flip' && flipNodes(selected, c.flip),
     'edit-mode': () => editorMode.toggleMotion(),

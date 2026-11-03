@@ -174,6 +174,7 @@ export const SHORTCUTS: readonly Binding[] = [
   ...OPACITY_BINDINGS,
   { key: 't', mode: EditMode.Design, command: Command.ToolText, label: 'T', does: 'Text tool: drag in the frame', group: ShortcutGroup.Draw },
   { key: 'r', mode: EditMode.Design, command: Command.ToolRectangle, label: 'R', does: 'Rectangle tool', group: ShortcutGroup.Draw },
+  { key: 'a', mode: EditMode.Design, command: Command.ToolFrame, label: 'A', does: 'Frame tool: drag to draw a frame', group: ShortcutGroup.Draw },
   { key: 'o', mode: EditMode.Design, command: Command.ToolEllipse, label: 'O', does: 'Ellipse tool', group: ShortcutGroup.Draw },
   { key: 'l', mode: EditMode.Design, command: Command.ToolLine, label: 'L', does: 'Line tool: drag from end to end', group: ShortcutGroup.Draw },
   { key: 'l', shift: true, mode: EditMode.Design, command: Command.ToolArrow, label: '⇧L', does: 'Arrow tool: drag from tail to head', group: ShortcutGroup.Draw },

@@ -99,7 +99,10 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Shift+0 | Zoom to 100% |
 | R | Rectangle tool (Shift+R in Motion) |
 | Shift+R | Rulers (in Design) |
-| F | Frame tool |
+| F or A | Frame tool (A in Design) |
+| Control+Option/Alt+H / V | Distribute the selection horizontally / vertically |
+| Cmd/Ctrl+/ or Cmd/Ctrl+K | Quick actions: search every command by name |
+| / | Cursor chat: say something next to your cursor |
 | Shift + wheel | Scroll sideways |
 | Space + drag | Pan; the canvas follows the pointer exactly and stops when you let go |
 | + / = | Zoom in |
