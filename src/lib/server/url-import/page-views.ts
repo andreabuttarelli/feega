@@ -3,6 +3,7 @@ import { addBreakpoint, liftEdit, resolveAt } from '@feega/motion-core/motion/br
 import { DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
 import { Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import type { FigmaImage, PlanItem } from '$lib/canvas/figma/figma-doc';
+import { PictureFit } from '$lib/canvas/figma/scene';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { PageTree } from './page-tree';
 
@@ -128,80 +129,71 @@ function clipKeys(item: PlanItem, root: RestNode): Map<string, string> {
 
 const PRECOMP = 'Precomp';
 const LAYOUT_PROPS = new Set(['x', 'y', 'width', 'height', 'size', 'lineHeight', 'letterSpacing', 'axes', 'align', 'sizing', 'textWrap', 'path']);
-const FREE_FIELDS = new Set(['id', 'parent', 'name', 'overrides', 'hidden', 'layoutItem', 'autoLayout', 'constraints', 'locked', 'props']);
-const RELATIVE = 1e-3;
-const ABSOLUTE = 1e-6;
+type Snapshots = (clipId: string) => string[];
 
-function alike(a: unknown, b: unknown): boolean {
-  if (typeof a === 'number' && typeof b === 'number') {
-    return Math.abs(a - b) <= Math.max(ABSOLUTE, RELATIVE * Math.max(Math.abs(a), Math.abs(b)));
-  }
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((v, i) => alike(v, b[i]));
-  }
-  if (a && b && typeof a === 'object' && typeof b === 'object') {
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-    return [...keys].every((k) => alike((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
-  }
-  return a === b;
-}
-
-const painted = (clip: MotionClip): Record<string, unknown> => ({
-  ...Object.fromEntries(Object.entries(clip).filter(([k]) => !FREE_FIELDS.has(k))),
-  props: Object.fromEntries(Object.entries(clip.props).filter(([k]) => !LAYOUT_PROPS.has(k)))
-});
-
-type Pictured = (clipId: string) => Omit<FigmaImage, 'clipId'>[];
-
-const picturedBy = (images: FigmaImage[]): Pictured => {
-  const grouped = Map.groupBy(images, (i) => i.clipId);
-  return (id) => (grouped.get(id) ?? []).map(({ clipId: _id, ...rest }) => rest);
+const snapshotsIn = (images: FigmaImage[]): Snapshots => {
+  const grouped = Map.groupBy(
+    images.filter((i) => i.fit === PictureFit.Stretch),
+    (i) => i.clipId
+  );
+  return (id) => (grouped.get(id) ?? []).map((i) => i.hash);
 };
 
-type Scope = { byId: Map<string, MotionClip>; order: Map<string, number>; kids: Map<string | null, MotionClip[]>; keys: Map<string, string>; pictured: Pictured; page: string | null; surface: string | null };
+type Scope = { byId: Map<string, MotionClip>; order: Map<string, number>; kids: Map<string | null, MotionClip[]>; keys: Map<string, string>; snapshots: Snapshots; page: string | null; surface: string | null };
 
 function scopeOf(doc: MotionDoc, keys: Map<string, string>, images: FigmaImage[], page: string | null): Scope {
   const clips = doc.tracks.flatMap((t) => t.clips) as MotionClip[];
   const byId = new Map(clips.map((c) => [c.id, c]));
   const kids = Map.groupBy(clips, (c) => (c.parent && byId.has(c.parent) ? c.parent : null));
-  return { byId, order: new Map(clips.map((c, i) => [c.id, i])), kids, keys, pictured: picturedBy(images), page, surface: doc.surface ?? null };
+  return { byId, order: new Map(clips.map((c, i) => [c.id, i])), kids, keys, snapshots: snapshotsIn(images), page, surface: doc.surface ?? null };
 }
 
 const kidsOf = (scope: Scope, id: string | null) => scope.kids.get(id) ?? [];
 
-const sameLayer = (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => a.component !== PRECOMP && b.component !== PRECOMP && alike(painted(a), painted(b)) && alike(base.pictured(a.id), read.pictured(b.id));
+const sameSnapshots = (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => base.snapshots(a.id).join() === read.snapshots(b.id).join();
 
-const UNPAIRED = '';
+const wordsOf = (clip: MotionClip) => String(clip.props.text ?? '').replace(/\s+/g, ' ').trim();
 
-const anchors = (scope: Scope, id: string) => scope.keys.has(id) || id === scope.page;
+const sameLayer = (base: Scope, a: MotionClip, read: Scope, b: MotionClip) => a.component !== PRECOMP && b.component === a.component && wordsOf(a) === wordsOf(b) && sameSnapshots(base, a, read, b);
 
-function anchorOf(scope: Scope, id: string): string | null {
+function pairedAbove(scope: Scope, id: string, paired: (id: string) => boolean): string | null {
   const parent = scope.byId.get(id)?.parent;
   if (!parent || !scope.byId.has(parent)) {
     return null;
   }
-  return anchors(scope, parent) ? parent : anchorOf(scope, parent);
+  return paired(parent) ? parent : pairedAbove(scope, parent, paired);
+}
+
+function within(scope: Scope, id: string, ancestor: string | null): boolean {
+  const parent = scope.byId.get(id)?.parent;
+  if (!parent || !scope.byId.has(parent)) {
+    return ancestor === null;
+  }
+  return parent === ancestor || within(scope, parent, ancestor);
 }
 
 function pairsOf(base: Scope, read: Scope): Map<string, string> {
   const byKey = Map.groupBy([...read.keys].map(([id, key]) => ({ id, key })), (e) => e.key);
   const used = new Set<string>();
   const pairs = new Map<string, string>();
-  if (base.page && read.page) {
-    pairs.set(base.page, read.page);
-    used.add(read.page);
-  }
-  const walk = (clip: MotionClip, anchor: string | null) => {
-    const key = base.keys.get(clip.id);
-    const within = anchor === null ? null : (pairs.get(anchor) ?? UNPAIRED);
-    const partner = key && !pairs.has(clip.id) ? (byKey.get(key) ?? []).find((e) => !used.has(e.id) && anchorOf(read, e.id) === within && sameLayer(base, clip, read, read.byId.get(e.id)!)) : undefined;
-    if (partner) {
-      pairs.set(clip.id, partner.id);
-      used.add(partner.id);
-    }
-    kidsOf(base, clip.id).forEach((k) => walk(k, anchors(base, clip.id) ? clip.id : anchor));
+  const pair = (b: string, r: string) => {
+    pairs.set(b, r);
+    used.add(r);
   };
-  kidsOf(base, null).forEach((c) => walk(c, null));
+  if (base.page && read.page) {
+    pair(base.page, read.page);
+  }
+  const walk = (clip: MotionClip) => {
+    const key = base.keys.get(clip.id);
+    const above = pairedAbove(base, clip.id, (id) => pairs.has(id));
+    const host = above === null ? null : pairs.get(above)!;
+    const partner = key && !pairs.has(clip.id) ? (byKey.get(key) ?? []).find((e) => !used.has(e.id) && within(read, e.id, host) && sameLayer(base, clip, read, read.byId.get(e.id)!)) : undefined;
+    if (partner) {
+      pair(clip.id, partner.id);
+    }
+    kidsOf(base, clip.id).forEach(walk);
+  };
+  kidsOf(base, null).forEach(walk);
   return pairs;
 }
 
@@ -232,7 +224,7 @@ function settled(base: Scope, read: Scope, pairs: Map<string, string>): Map<stri
       .filter((b): b is Box => Boolean(b));
     const partner = read.byId.get(pairs.get(clip.id) ?? '');
     const page = clip.id === base.page;
-    const reach = page ? WHOLE : partner ? boxOf(partner) : base.keys.has(clip.id) ? null : unionOf(kids);
+    const reach = page ? WHOLE : partner ? boxOf(partner) : unionOf(kids);
     if (!reach) {
       out.set(clip.id, { ...clip, hidden: true });
       return null;

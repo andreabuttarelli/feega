@@ -20,6 +20,7 @@ import { layoutParent, leaveStack } from '$lib/motion/layout/ops';
 import { setParent } from '$lib/motion/parent-ops';
 import { placeInStack } from '$lib/motion/layout/stack-drag';
 import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
+import { frontToBack } from './paint-order';
 
 const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
 
@@ -52,7 +53,7 @@ export enum NodeIcon {
   Element = 'shape'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean; glyph?: string; hidden?: boolean; locked?: boolean };
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean; glyph?: string; hidden?: boolean; locked?: boolean; behind?: boolean };
 export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]>; mode?: EditMode };
 
 const FRAME_TYPE = 'motion';
@@ -133,19 +134,21 @@ function kidsOf(walk: Walk, clip: Clip): Clip[] {
   return scope.filter((c) => c.parent === clip.id);
 }
 
+const frontFirst = (track: Track): Clip[] => [...track.clips].reverse();
+
 function trackRows(source: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
   const shown = layerTracks(source.doc, tracks);
-  const scope = shown.flatMap((t) => t.clips);
+  const scope = shown.flatMap(frontFirst);
   const held = new Set(scope.map((c) => c.id));
   const walk = { ...source, scope };
-  const topOf = (track: Track) => track.clips.filter((c) => !c.parent || !held.has(c.parent));
+  const topOf = (clips: readonly Clip[]) => clips.filter((c) => !c.parent || !held.has(c.parent));
 
   return shown.flatMap((track, index) => {
     if (!groupsTrack(track, walk.mode)) {
-      return topOf(track).flatMap((clip) => clipRows(walk, clip, depth));
+      return topOf(frontFirst(track)).flatMap((clip) => clipRows(walk, clip, depth));
     }
     const group: LayerRow = { id: track.id, key: `${walk.path}${track.id}`, kind: LayerKind.Track, depth, label: groupLabel(track, index), type: track.kind, nodeId: walk.nodeId, hidden: !!track.hidden, locked: !!track.locked, nested: walk.nested };
-    return [group, ...topOf(track).flatMap((clip) => clipRows(walk, clip, depth + 1))];
+    return [group, ...topOf(track.clips).flatMap((clip) => clipRows(walk, clip, depth + 1))];
   });
 }
 
@@ -247,7 +250,7 @@ function elementRows(row: LayerRow, rows: readonly LayerRow[]): LayerRow[] {
 }
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
-  return nodes.flatMap((node) => {
+  return frontToBack(nodes).flatMap((node) => {
     const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.element ? (node.glyph ?? NodeIcon.Element) : nodeIcon(node), nodeId: node.id, hidden: node.hidden ?? false, locked: node.locked ?? false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
     if (folded.has(node.id)) {
       return [row];
@@ -499,6 +502,8 @@ export type LayerHover = { nodeId: string; id: string } | null;
 export const tileHovered = (hover: LayerHover, nodeId: string, openNodeId: string | null): boolean => !!hover && hover.nodeId === nodeId && (hover.id === nodeId || openNodeId !== nodeId);
 
 export const frameRinged = (hover: LayerHover, nodeId: string, openNodeId: string | null, pointerOn: string | null): boolean => tileHovered(hover, nodeId, openNodeId) && !(pointerOn === nodeId && hover?.id !== nodeId);
+
+export const emptyAreaRinged = (hover: LayerHover, nodeId: string, openNodeId: string | null, pointerOn: string | null): boolean => !hover && pointerOn === nodeId && openNodeId === nodeId;
 
 export const frameHover = (hover: LayerHover, openNodeId: string | null): string | null => (hover && hover.nodeId === openNodeId && hover.id !== openNodeId ? hover.id : null);
 

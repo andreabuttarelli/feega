@@ -3692,6 +3692,14 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 **Signal:** a 1–2 px artefact on a canvas element moves with pan and drag, survives a partial repaint of its rect, and goes away on zoom or reload. **Move:** before touching gpu-core, hide DOM layers one at a time (`motion-node-stage`, `gpu-dom-node`) and re-sample the pixels; hiding `core-canvas` proves nothing, since a canvas-coloured DOM line looks the same either way. The ⌘G seam was the `MotionPreview` outline inside the node's DOM, not a damage rect.
 
+## A strip of canvas background over a frame, above a scrolling panel
+
+**Signal:** a frame on the GPU canvas shows a rectangle of canvas background exactly as wide as a DOM panel above it (the insert menu), from the frame's top down to the panel; hiding the panel removes it, `overflow: hidden` removes it. **Move:** Chromium paints an opaque scroller background into the scrolling contents layer and culls the canvas under that layer's whole bounds. Put the background on a non-scrolling wrapper and scroll an inner, transparent element.
+
+## A reload flashes an older frame for a few seconds
+
+**Signal:** after a reload a frame shows an earlier state (grey shapes, no text) and then the current one; a fresh context may not show it. **Move:** look for any stored picture of the frame drawn before the doc is built: the card face drew the last MP4 render and an unversioned poster. Show a still only with a recorded revision ≥ `docHeadRevision` (`posterFresh`).
+
 ## Agent worktrees
 
 ### The Vite dev server in a worktree serves stale code after an edit

@@ -33,10 +33,10 @@ Each link has three rows in Prototype.
 | Part | Options |
 |---|---|
 | Trigger | On click, While hovering, On drag, After delay (milliseconds) |
-| Action | Navigate to, Open overlay, Back, Scroll to, Change to |
+| Action | Navigate to, Open overlay, Close overlay, Back, Scroll to, Change to |
 | Transition | Instant, Dissolve, Slide in, Push, [Smart animate](/canvas/smart-animate/); slide and push take a direction; every transition but Instant takes an easing and a duration in milliseconds |
 
-Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back needs none. **Change to** works on a layer inside a component (or on an instance) and picks one of the set's variants, such as `State: Open`: in the player the instance around the layer switches to it, as Figma interactive components do. A layer holds up to 16 links. Remove deletes one.
+Navigate to, Open overlay and Scroll to need a target. **Pick** re-aims a link on the canvas; the Target frame list does the same by name. Back and Close overlay need none. **Open overlay** adds three settings: **Position** (Centre, Top, Bottom, or Manual with X and Y in pixels from the frame's top left), **Close when clicking outside**, and **Background**, the colour and opacity that dims the frame behind (black at 45% by default). **Change to** works on a layer inside a component (or on an instance) and picks one of the set's variants, such as `State: Open`: in the player the instance around the layer switches to it, as Figma interactive components do. A layer holds up to 16 links. Remove deletes one.
 
 A new link is On click, Navigate to, Instant.
 
@@ -44,7 +44,7 @@ A new link is On click, Navigate to, Instant.
 
 The motion agent has three tools, also reachable through `motion_tool` in MCP and `feega motion tool`:
 
-- `add_interaction` with `clip_id`, `trigger`, `action` and an optional `transition`; pass `interaction_id` to replace a link.
+- `add_interaction` with `clip_id`, `trigger`, `action` and an optional `transition`; pass `interaction_id` to replace a link. An `open_overlay` action takes `overlay` `{ position, x, y, closeOutside, backdrop }`; `close_overlay` takes nothing.
 - `list_interactions` lists every link of a frame.
 - `remove_interaction` with `clip_id` and `interaction_id`.
 

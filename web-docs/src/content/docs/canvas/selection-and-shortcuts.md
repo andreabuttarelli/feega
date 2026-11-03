@@ -10,7 +10,8 @@ sidebar:
 - Drag the background to draw a marquee.
 - Shift-click or Cmd/Ctrl-click adds or removes a node.
 - Cmd/Ctrl+A selects all nodes (not while typing in a field).
-- Esc clears the selection.
+- Esc puts a drawing tool down and goes back to Select; with Select in hand it clears the selection.
+- Right-click a frame (or its name) for **Rename** and **Duplicate**.
 
 ## Select inside a frame
 
@@ -28,6 +29,8 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 - Esc goes up one level.
 
 In the Layers panel, Shift-click selects every row between the last picked one and the clicked one; Cmd-click (Ctrl-click on Windows) adds or removes one row. It works on canvas nodes and on the elements inside a frame, and the canvas and the right bar follow.
+
+The Layers panel lists layers in paint order, like Figma: the top row is the frontmost layer, on the canvas and inside each frame. Groups and sections, which paint behind everything, list under the rest.
 
 The Layers panel lists what the canvas has loaded: a page far off screen shows as one row, and its elements appear once the canvas loads it.
 
@@ -85,6 +88,7 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
 | Shift+0 | Zoom to 100% |
 | F | Frame tool |
+| Shift + wheel | Scroll sideways |
 | Space + drag | Pan; the canvas follows the pointer exactly and stops when you let go |
 | + / = | Zoom in |
 | - | Zoom out |

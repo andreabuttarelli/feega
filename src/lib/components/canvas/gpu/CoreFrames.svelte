@@ -89,7 +89,7 @@
 
   async function buildHere(f: FrameAt, url: string): Promise<{ list: DisplayList; custom: CustomFrame | null } | null> {
     const res = await fetch(url);
-    if (!res.ok) {
+    if (!res.ok || res.status === HTTP_NO_CONTENT) {
       return null;
     }
     return buildSource(f, (await res.json()) as FrameDoc);
@@ -97,7 +97,7 @@
 
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
-    return res.ok ? ((await res.json()) as FrameDoc) : null;
+    return res.ok && res.status !== HTTP_NO_CONTENT ? ((await res.json()) as FrameDoc) : null;
   }
 
   const fetchedScenes = new Map<string, LoadScene>();
@@ -140,6 +140,7 @@
     return away ? { list: away, custom: null } : buildHere(f, url);
   }
 
+  const HTTP_NO_CONTENT = 204;
   const STEP_WAIT_MS = 300;
   const UNSAVED_SOURCE = { tries: 8, waitMs: 1000 };
   const STEP_POLL_MS = 50;

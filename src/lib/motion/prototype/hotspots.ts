@@ -1,4 +1,4 @@
-import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { clipsOf, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { ActionKind, TriggerKind, type Interaction } from '@feega/motion-core/motion/prototype/model';
 
 export const DRAG_THRESHOLD_PX = 8;
@@ -8,8 +8,29 @@ export type FrameRect = { left: number; top: number; width: number; height: numb
 export type Hotspot = { clip: string; interaction: Interaction; box: FrameRect };
 export type Delayed = { interaction: Interaction; delayMs: number };
 
+const paintedUp = (doc: MotionDoc): MotionClip[] => [...doc.tracks].reverse().flatMap((t) => t.clips as MotionClip[]);
+
+function parentsBeforeChildren(clips: MotionClip[]): MotionClip[] {
+  const byId = new Map(clips.map((c) => [c.id, c]));
+  const placed = new Set<string>();
+  const order: MotionClip[] = [];
+  const place = (clip: MotionClip) => {
+    if (placed.has(clip.id)) {
+      return;
+    }
+    placed.add(clip.id);
+    const parent = clip.parent ? byId.get(clip.parent) : undefined;
+    if (parent) {
+      place(parent);
+    }
+    order.push(clip);
+  };
+  clips.forEach(place);
+  return order;
+}
+
 export function hotspotsOf(doc: MotionDoc, size: FrameSize, rectOf: (clip: string) => FrameRect | null): Hotspot[] {
-  return clipsOf(doc).flatMap((clip) => {
+  return parentsBeforeChildren(paintedUp(doc)).flatMap((clip) => {
     const rect = (clip.interactions ?? []).length ? rectOf(clip.id) : null;
     if (!rect) {
       return [];

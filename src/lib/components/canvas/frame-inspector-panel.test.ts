@@ -76,6 +76,13 @@ describe('a free element reads as one object on the canvas', () => {
     expect(valueOf(body, 'data-testid="position-y"')).toBe('40');
   });
 
+  it('its X and Y keep their decimals, two at most, like Figma', () => {
+    const body = hosted({ x: 30.5, y: 40.257, w: 200, h: 120, rotation: 0 });
+
+    expect(valueOf(body, 'data-testid="position-x"')).toBe('30.5');
+    expect(valueOf(body, 'data-testid="position-y"')).toBe('40.26');
+  });
+
   it('its W and H are canvas px, though its doc holds two px for each', () => {
     const body = hosted();
 

@@ -15,6 +15,17 @@ export function zoomAt(view: Viewport, cursor: Point, factor: number): Viewport 
   return { x: cursor.x - world.x * zoom, y: cursor.y - world.y * zoom, zoom };
 }
 
+type Wheel = { deltaX: number; deltaY: number; shiftKey: boolean };
+
+const back = (d: number): number => (d === 0 ? 0 : -d);
+
+export function wheelPan(e: Wheel): Point {
+  if (e.shiftKey && e.deltaX === 0) {
+    return { x: back(e.deltaY), y: 0 };
+  }
+  return { x: back(e.deltaX), y: back(e.deltaY) };
+}
+
 export const panBy = (view: Viewport, d: Point): Viewport => ({ x: view.x + d.x, y: view.y + d.y, zoom: view.zoom });
 
 const inside = (r: Rect, p: Point) => p.x >= r.x && p.y >= r.y && p.x <= r.x + r.w && p.y <= r.y + r.h;

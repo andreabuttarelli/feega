@@ -114,10 +114,13 @@ const fillsOf = (doc: MotionDoc, clipId: string): Fill[] => {
   return clip ? elementFills(clip.component, clip.props) : [];
 };
 
-export function gradientTarget(doc: MotionDoc, clipId: string): { index: number; fill: Fill } | null {
-  const fills = fillsOf(doc, clipId);
-  const index = fills.findLastIndex((f) => f.visible && GEOMETRY[f.type] !== undefined);
-  return index < 0 ? null : { index, fill: fills[index] };
+export function gradientTarget(doc: MotionDoc, clipId: string, editing: number | null): { index: number; fill: Fill } | null {
+  if (editing === null) {
+    return null;
+  }
+
+  const fill = fillsOf(doc, clipId)[editing];
+  return fill?.visible && GEOMETRY[fill.type] !== undefined ? { index: editing, fill } : null;
 }
 
 export const withFill = (doc: MotionDoc, clipId: string, index: number, fill: Fill): OpResult => setProps(doc, clipId, { fills: fillsOf(doc, clipId).map((f, i) => (i === index ? fill : f)) });

@@ -1,6 +1,7 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { canEditPoints } from '$lib/motion/shape/vector-edit';
+import { lineEnds } from '$lib/motion/shape/line-ends';
 import { EditMode } from '$lib/motion/edit-mode';
 import { positionSpan } from '$lib/motion/motion-trail';
 import { OnionSkin } from './onion-skin.svelte';
@@ -19,7 +20,8 @@ export enum FrameOverlay {
   Outlines = 'outlines',
   Corners = 'corners',
   MotionPath = 'motion-path',
-  Onion = 'onion'
+  Onion = 'onion',
+  LineEnds = 'line-ends'
 }
 
 type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews; mode: EditMode; onion: OnionSkin };
@@ -40,6 +42,7 @@ const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
   [FrameOverlay.Outlines]: (c) => shows(c.views, FrameView.Outlines),
   [FrameOverlay.Corners]: (c) => c.clip?.component === 'Shape' && c.clip.props.shape === 'rect' && c.picks === 1 && c.active,
   [FrameOverlay.MotionPath]: (c) => recording(c) && Boolean(c.clip!.path || positionSpan(c.clip!)),
+  [FrameOverlay.LineEnds]: (c) => c.tool === DrawTool.Select && c.picks === 1 && c.active && !!c.clip && c.clip.id !== c.pointEdit && lineEnds(c.clip) !== null,
   [FrameOverlay.Onion]: (c) => recording(c) && c.onion === OnionSkin.On && Object.values(c.clip!.keyframes).some((track) => track?.length)
 };
 
