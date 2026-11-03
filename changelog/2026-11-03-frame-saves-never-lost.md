@@ -27,3 +27,9 @@ From the landing case study (2026-11-02, canvas f2824d6c).
   doc schema held video frames to 4K. A frame now takes up to 16384 px a side whatever its mode;
   the video limits stay where they belong, in `exportProblem` at export. A size over 16384 is
   scaled to fit and the canvas says so.
+- **#16, paste into another frame landed loose.** With elements copied out of a frame and one
+  other frame selected, ⌘V placed them at the pointer (`pasteElementsAt`), so a pointer outside
+  that frame dropped them on the canvas; only two or more selected frames took the paste.
+  `elementPaste` decides once: the pointer's frame when it is the selected one, otherwise every
+  selected frame. The 404 on the loose copies came from source clips whose save had been refused
+  (B1): the server copy found nothing to copy.

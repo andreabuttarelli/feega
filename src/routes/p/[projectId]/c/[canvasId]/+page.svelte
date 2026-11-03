@@ -23,7 +23,7 @@
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { Pasted, isSvgFile, type ClipboardPayload, type CopiedTiles, type PasteData } from '$lib/canvas/system-clipboard';
   import { svgDrawings } from '$lib/canvas/svg-drawings';
-import { pasteTargets } from '$lib/canvas/paste-into-frame';
+import { ElementPaste, elementPaste, pasteTargets } from '$lib/canvas/paste-into-frame';
   import { DeleteMode, SECTION_TYPE, membershipAfter, withMembers } from '$lib/canvas/section';
   import { Stack } from '$lib/canvas/stacking';
   import type { FrameStep } from '$lib/canvas/frame-multi';
@@ -4008,7 +4008,9 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     const selectedTiles = nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops }));
     if (elementClipboard.kind === Copied.Elements && copied) {
       const frames = pasteTargets(selectedTiles, copied.clipIds);
-      await (frames.length > 1 ? pasteElementsIntoEach(frames, copied) : pasteElementsAt(at, copied));
+      const pointed = pastedDrop(at);
+      const mode = elementPaste(frames, pointed.on === DropOn.Frame ? pointed.nodeId : null);
+      await (mode === ElementPaste.IntoFrames ? pasteElementsIntoEach(frames, copied) : pasteElementsAt(at, copied));
       return;
     }
     if (!clipboard) { return; }
