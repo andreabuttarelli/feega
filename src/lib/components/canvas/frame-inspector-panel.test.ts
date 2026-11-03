@@ -108,7 +108,7 @@ const doubledPanel = (selection: string[]) => {
   frameProperties.place = placeOf({ x: 0, y: 0, w: 700, h: 460 });
   const session = new FrameEditSession(
     { head: { version: 1, doc: doubled }, selection },
-    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }) }
+    { viewPath: () => [], show: () => {}, recorded: () => {}, stepped: () => {}, playhead: () => 0, saved: () => {}, landed: () => {}, pull: async () => {}, send: async () => ({ ok: false, error: 'off' }), draft: () => {} }
   );
   const body = render(FrameInspectorPanel, { props: { session, tokens: FEEGA_TOKENS } }).body;
   frameProperties.clear();

@@ -171,7 +171,7 @@ function canvasMembers(scope: Scope) {
   return nodeMembers(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope) });
 }
 
-async function madeBefore(scope: Scope, id: string | undefined): Promise<Moved | null> {
+async function madeBefore(scope: Scope, id: string | undefined): Promise<Extract<Moved, { outcome: MoveOutcome.Done }> | null> {
   if (!id || !(await nodeRowExists(scope.db, { orgId: scope.orgId, nodeId: id }))) {
     return null;
   }
