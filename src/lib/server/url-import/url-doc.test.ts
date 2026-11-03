@@ -190,4 +190,31 @@ describe('urlPlan', () => {
 
     expect(clip?.props.sizing).not.toBe('auto');
   });
+
+  it('a tall page lands at one doc px per CSS px, so a 64 px heading reads 64 and the frames are 1280 wide', () => {
+    const tree: PageTree = {
+      title: 'Tall',
+      url: 'https://example.com',
+      width: 1280,
+      height: 20000,
+      truncated: false,
+      root: {
+        id: '1',
+        type: 'FRAME',
+        absoluteBoundingBox: { x: 0, y: 0, width: 1280, height: 20000 },
+        fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }],
+        children: [{ id: '2', type: 'TEXT', characters: 'Headline', absoluteBoundingBox: { x: 100, y: 100, width: 600, height: 80 }, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 64, fontWeight: 600 } }]
+      }
+    };
+
+    const { items } = urlPlan(tree, newId)!.plan;
+    const [first] = items;
+    const heading = clipsOf({ plan: { items: [first] } } as never).find((c) => c.props.text === 'Headline')!;
+
+    expect(items.map((item) => [item.size.width, item.doc.width])).toEqual([
+      [1280, 1280],
+      [1280, 1280]
+    ]);
+    expect(Math.round(Number(heading.props.size) * Math.min(first.doc.width, first.doc.height))).toBe(64);
+  });
 });
