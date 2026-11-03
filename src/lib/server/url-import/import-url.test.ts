@@ -45,6 +45,11 @@ function tabOf(tree: unknown, status = 200) {
   } as unknown as AppTab;
 }
 
+const besideOf = (tab: AppTab, next: AppTab[]) => {
+  (tab as unknown as { beside: () => Promise<AppTab> }).beside = vi.fn(async () => next.shift()!);
+  return tab;
+};
+
 function storeOf() {
   const docs = new Map<string, { doc: unknown; version: number; name?: string }>();
   const store = {
@@ -136,8 +141,8 @@ describe('importPageAt', () => {
   it('asked for tablet and phone, the page is read again at each width and the frame gets those breakpoints', async () => {
     const keyedAt = (width: number): PageTree => ({ ...TREE, width, root: { ...TREE.root, absoluteBoundingBox: { ...TREE.root.absoluteBoundingBox!, width }, children: TREE.root.children!.map((c) => ({ ...c, key: c.id })) } });
     const tabs = [tabOf(keyedAt(1280)), tabOf(keyedAt(768)), tabOf(keyedAt(390))];
-    const open = vi.fn();
-    tabs.forEach((tab) => open.mockResolvedValueOnce(tab));
+    besideOf(tabs[1], [tabs[2]]);
+    const open = vi.fn().mockResolvedValueOnce(tabs[0]).mockResolvedValueOnce(tabs[1]);
     const { ask, docs } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
 
     await importPageAt(ask);
@@ -147,25 +152,24 @@ describe('importPageAt', () => {
     expect(doc.breakpoints?.map((b) => b.name)).toEqual(['Tablet', 'Phone']);
   });
 
-  it('reads the breakpoints one at a time alongside the desktop read, two sessions at most (Browserless: a third session at once is refused with 429, and a refused desktop read failed the import)', async () => {
+  it('reads tablet and phone at once in one browser session beside the desktop read: two sessions in all, and neither view waits for the other (Browserless admits two sessions; in turn, the views took 111 + 68 s)', async () => {
     const tabs = [tabOf(TREE), tabOf(TREE), tabOf(TREE)];
+    besideOf(tabs[1], [tabs[2]]);
     let release = () => undefined as void;
     const held = new Promise<void>((done) => (release = done));
     for (const tab of tabs) {
       vi.mocked(tab.goto).mockImplementation(async () => held.then(() => 200));
     }
-    const open = vi.fn();
-    tabs.forEach((tab) => open.mockResolvedValueOnce(tab));
+    const open = vi.fn().mockResolvedValueOnce(tabs[0]).mockResolvedValueOnce(tabs[1]);
     const { ask } = askOf({ open, views: PAGE_VIEWS, shape: PLAIN_SHAPE });
 
     const done = importPageAt(ask);
-    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(open).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(tabs.every((tab) => vi.mocked(tab.goto).mock.calls.length === 1)).toBe(true));
     release();
 
     expect((await done).outcome).toBe(UrlImportOutcome.Ok);
-    expect(open).toHaveBeenCalledTimes(3);
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(tabs.every((tab) => vi.mocked(tab.close).mock.calls.length === 1)).toBe(true);
   });
 
   it('a breakpoint whose browser cannot be opened is left out, the page still comes in', async () => {

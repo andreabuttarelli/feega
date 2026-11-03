@@ -184,7 +184,8 @@ function fenced(tab: AppTab, app: string, confirm: Confirm): AppTab {
         throw new Error(`"${word}" may change, send or pay for something: ask the user to confirm in chat, then call again with confirmed: true`);
       }
       return tab.click(target);
-    }
+    },
+    beside: async () => fenced(await tab.beside(), app, confirm)
   };
 }
 

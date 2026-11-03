@@ -253,20 +253,26 @@ async function readAndLand(ask: PageAsk): Promise<UrlImported> {
     const first = await readWith(Sight.Everything);
     return unreadable(first) ? readWith(Sight.Native) : first;
   };
-  const readView = async (view: PageView): Promise<ViewRead[]> => {
-    const tab = await open();
+  const readView = async (tab: AppTab, view: PageView): Promise<ViewRead[]> => {
     await tab.viewport(view.width).catch(() => undefined);
-    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight);
     return 'outcome' in narrow ? [] : [{ view, tree: narrow }];
   };
-  const readViewsInTurn = async () => {
-    const reads: ViewRead[][] = [];
-    for (const view of ask.views ?? []) {
-      reads.push(await readView(view).catch(() => []));
+  const readViews = async (): Promise<ViewRead[][]> => {
+    const views = ask.views ?? [];
+    if (!views.length) {
+      return [];
     }
-    return reads;
+    const first = await open();
+    const tabs = [first, ...(await Promise.all(views.slice(1).map(() => first.beside().catch(() => null))))];
+    try {
+      return await Promise.all(views.map((view, i) => (tabs[i] ? readView(tabs[i]!, view).catch(() => []) : [])));
+    } finally {
+      await Promise.all(tabs.slice(1).map((tab) => tab?.close()));
+      await first.close();
+    }
   };
-  const [read, narrow] = await Promise.all([readPage(), readViewsInTurn()]);
+  const [read, narrow] = await Promise.all([readPage(), readViews().catch(() => [])]);
   if ('outcome' in read) {
     return read;
   }

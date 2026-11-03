@@ -50,6 +50,7 @@ export type AppTab = Tab & {
   overlay: () => Promise<Overlay | null>;
   press: (key: string) => Promise<void>;
   paint: (html: string, size: { width: number; height: number }) => Promise<Buffer>;
+  beside: () => Promise<AppTab>;
 };
 
 export type OpenBrowser = () => Promise<Tab>;
@@ -484,6 +485,18 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     marks: (names) => page.evaluate(componentMarksOf, { names, limits: MARK_LIMITS, attr: TREE_LIMITS.useAttr }),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
     press: (key) => page.keyboard.press(key as Parameters<Page['keyboard']['press']>[0]),
+    beside: async () => {
+      const next = await page.browser().newPage();
+      await fenced(next);
+      return tabOf(
+        next,
+        async () => {
+          await next.close().catch(() => undefined);
+          return 0;
+        },
+        left
+      );
+    },
     paint: async (html, size) => {
       await page.setContent(html, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
       await page.evaluate(() => document.fonts.ready);
