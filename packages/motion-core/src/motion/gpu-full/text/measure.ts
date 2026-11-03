@@ -9,6 +9,25 @@ const BLACK = () => '#000';
 
 const measures = new WeakMap<Typeset['fonts'], TextMeasure>();
 
+const MEASURES_KEPT = 4096;
+
+function remembered(measure: TextMeasure): TextMeasure {
+  const known = new Map<string, ReturnType<TextMeasure>>();
+  return (component, props, unit, width) => {
+    const key = `${component}\u0000${unit}\u0000${width}\u0000${JSON.stringify(props)}`;
+    const hit = known.get(key);
+    if (hit) {
+      return { ...hit };
+    }
+    const size = measure(component, props, unit, width);
+    if (known.size >= MEASURES_KEPT) {
+      known.delete(known.keys().next().value as string);
+    }
+    known.set(key, size);
+    return { ...size };
+  };
+}
+
 function shaped(fonts: Typeset['fonts'], smoothing: Typeset['smoothing']): TextMeasure {
   return (component, props, unit, width) => {
     if (!SHAPED.has(component)) {
@@ -35,7 +54,7 @@ export function shapedText({ fonts, smoothing }: Typeset): TextMeasure {
   if (known) {
     return known;
   }
-  const made = shaped(fonts, smoothing);
+  const made = remembered(shaped(fonts, smoothing));
   measures.set(fonts, made);
   return made;
 }
