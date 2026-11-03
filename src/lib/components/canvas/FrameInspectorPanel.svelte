@@ -82,7 +82,8 @@
   const doc = $derived(source && session ? inView(source, session.breakpoint) : source);
   const surfaced = $derived(doc ? withSurface(doc, SURFACE_ID) : null);
   const surface = $derived(surfaced ? frameSurface(surfaced) : null);
-  const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const inspected = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const shown = $derived(inspected && { ...inspected, here: frameProperties.nodeId });
   const scale = $derived(source ? scaleOf(source, frameProperties.place) : 1);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session && source && session.edit(liftEdit(source, session.breakpoint, next), summary);
   const editSource = (result: OpResult, summary: string) => session?.apply(result, summary);
@@ -99,7 +100,7 @@
     if (!session || !doc) {
       return;
     }
-    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}) });
+    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}), here: frameProperties.nodeId });
     if (!done) {
       return;
     }

@@ -4,6 +4,7 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { BoxKey, boxValue, layerBoxes, setLayerBox } from './layer-box';
 import { MIXED } from './mixed';
 import { EditMode } from './edit-mode';
+import { createComponent } from './main-component';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -56,5 +57,36 @@ describe('the box of each selected layer', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Adjustment', from: 0 }, 'p'));
     const next = must(setLayerBox(doc, layerBoxes(doc, ['p'], 0), BoxKey.Width, doc.width / 2, 0, EditMode.Design));
     expect(boxValue(layerBoxes(next, ['p'], 0), BoxKey.Width)).toBe(doc.width / 2);
+  });
+});
+
+describe('the box of an instance', () => {
+  const made = () => {
+    let n = 0;
+    const doc = must(createComponent(two(), ['a'], () => `i${++n}`, 'Chip'));
+    return { doc, id: 'i2' };
+  };
+
+  it('reads the box of what the instance shows, not the whole frame', () => {
+    const { doc, id } = made();
+    const [box] = layerBoxes(doc, [id], 0);
+    const width = doc.width * RECT.width;
+
+    expect(box.bounds.right - box.bounds.left).toBeCloseTo(width, 3);
+    expect(box.bounds.left).toBeCloseTo(doc.width * (RECT.x - RECT.width / 2), 3);
+  });
+
+  it('typing W resizes what the instance shows', () => {
+    const { doc, id } = made();
+    const next = must(setLayerBox(doc, layerBoxes(doc, [id], 0), BoxKey.Width, 400, 0, EditMode.Design));
+
+    expect(boxValue(layerBoxes(next, [id], 0), BoxKey.Width)).toBe(400);
+  });
+
+  it('typing X moves the instance there', () => {
+    const { doc, id } = made();
+    const next = must(setLayerBox(doc, layerBoxes(doc, [id], 0), BoxKey.X, 100, 0, EditMode.Design));
+
+    expect(boxValue(layerBoxes(next, [id], 0), BoxKey.X)).toBe(100);
   });
 });

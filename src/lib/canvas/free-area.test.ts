@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOCK_EDGE, Dock, Edge, FocusMode, Placement, centreIn, focusPlacement, focusSelects, frameIn, freeArea, inView, revealIn } from './free-area';
+import { DOCK_EDGE, Dock, Edge, FocusMode, Placement, centreIn, MIN_PICK_PX, focusPlacement, focusSelects, frameIn, freeArea, inView, revealIn } from './free-area';
 
 const SCREEN = { width: 1280, height: 720 };
 
@@ -145,5 +145,12 @@ describe('centring a node', () => {
     expect(view.zoom).toBe(2);
     expect(120 * view.zoom + view.x).toBe(500);
     expect(60 * view.zoom + view.y).toBe(400);
+  });
+
+  it('zooms in on a pick too small to see at the current zoom, then centres it', () => {
+    const view = centreIn({ x: 100, y: 50, width: 120, height: 40 }, { x: 0, y: 0, zoom: 0.02 }, { width: 1000, height: 800 });
+
+    expect(120 * view.zoom).toBeGreaterThanOrEqual(MIN_PICK_PX);
+    expect(160 * view.zoom + view.x).toBeCloseTo(500, 6);
   });
 });

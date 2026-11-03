@@ -119,6 +119,13 @@ describe('barAction', () => {
     expect(done?.doc.tracks.flatMap((t) => t.clips)).toHaveLength(3);
   });
 
+  it('a duplicate on the canvas shows at the same moment as its original', () => {
+    const done = barAction(Action.Duplicate, { doc: fixture(), selection: ['a'], frame: 0, newId: ids });
+    const copy = done?.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === done.selection[0]);
+
+    expect(copy?.from).toBe(done?.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')?.from);
+  });
+
   it('ignores actions the canvas panel does not run', () => {
     expect(barAction(Action.OpenComp, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })).toBeNull();
   });

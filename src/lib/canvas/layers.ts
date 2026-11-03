@@ -6,6 +6,7 @@ import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feeg
 import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
 import { soleFrame } from '$lib/motion/main-component';
+import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 import { CUSTOM_CLIP, PART_SEP, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -84,12 +85,14 @@ export type LayerRow = {
   element?: boolean;
   own?: string;
   instance?: boolean;
+  scene?: string;
 };
 
 type Track = MotionDoc['tracks'][number];
 type Clip = Track['clips'][number];
 
 const NODE_DEPTH = 0;
+const FIRST_LOOP = 0;
 const TRACK_DEPTH = 1;
 
 
@@ -115,7 +118,7 @@ function groupLabel(track: Track, index: number): string {
 }
 
 type Masks = ReadonlyMap<string, readonly string[]>;
-type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string>; folded: ReadonlySet<string>; scope?: readonly Clip[] };
+type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string>; folded: ReadonlySet<string>; scope?: readonly Clip[]; scene?: string };
 
 const NO_MASKS = { masks: new Map(), masked: new Set<string>() };
 
@@ -181,7 +184,8 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     locked: template || !!clip.locked,
     nested,
     ...(clip.clipContent ? { frame: true } : {}),
-    ...(doc.comps[comp]?.component ? { instance: true } : {})
+    ...(doc.comps[comp]?.component ? { instance: true } : {}),
+    ...(walk.scene ? { scene: `${walk.scene}${clip.id}` } : {})
   };
   const nests = comp !== '' && !template;
   const kids = kidsOf(walk, clip);
@@ -190,7 +194,7 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const inside = nests && open ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
   const held = open ? kids.flatMap((kid) => clipRows(walk, kid, depth + 1)) : [];
-  const compRows = trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1);
+  const compRows = trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}`, scene: `${walk.scene ?? ''}${clip.id}${SEPARATOR}${FIRST_LOOP}${SEPARATOR}` }, inside, depth + 1);
   return [row, ...own, ...held, ...withoutFrame(compRows, doc.comps[comp] ? soleFrame(doc.comps[comp]) : null), ...maskedRows(walk, clip.id, depth + 1)];
 }
 
@@ -494,8 +498,10 @@ const wholePicked = (row: LayerRow, video: LayerSelection['video']): boolean => 
 
 const elementPicked = (row: LayerRow, selection: LayerSelection): boolean => (selection.video?.nodeId === row.id || selection.canvas.includes(row.id)) && wholePicked(row, selection.video);
 
+export const pickIdOf = (row: { id: string; scene?: string }): string => row.scene ?? row.id;
+
 export const rowPicked = (row: LayerRow, selection: LayerSelection): boolean =>
-  row.element ? elementPicked(row, selection) : selectedLayers(selection).includes(row.id) && (row.kind === LayerKind.Node || row.nodeId === selection.video?.nodeId);
+  row.element ? elementPicked(row, selection) : selectedLayers(selection).includes(pickIdOf(row)) && (row.kind === LayerKind.Node || row.nodeId === selection.video?.nodeId);
 
 export type LayerHover = { nodeId: string; id: string } | null;
 

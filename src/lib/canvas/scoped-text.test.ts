@@ -3,6 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/mot
 import { apply2d } from '@feega/motion-core/motion/parent';
 import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { createComponent, instanceOf } from '$lib/motion/main-component';
+import { homedAt } from '$lib/motion/canvas-components';
 import { commitScoped, doubledOn, textScope } from './scoped-text';
 
 function must(r: OpResult): MotionDoc {
@@ -18,7 +19,7 @@ function button() {
   let n = 0;
   const main = must(createComponent(label(newMotionDoc(MotionFormat.Landscape), 't', 'Deploy'), ['t'], () => `i${++n}`, 'Button'));
   const host = main.tracks.flatMap((t) => t.clips)[0].id;
-  const doc = must(setTransform(main, host, { x: 100 / main.width }));
+  const doc = homedAt(must(setTransform(main, host, { x: 100 / main.width })), { i1: 'components' });
   return { doc, host, text: `${host}__0__t` };
 }
 
@@ -52,6 +53,14 @@ describe('commitScoped', () => {
 
     expect(instanceOf(typed, host)!.overrides).toEqual({ t: { text: 'Ship' } });
     expect(findClip(typed, host)).not.toBeNull();
+  });
+
+  it('typing in the label of the main itself changes the main', () => {
+    const { doc, host, text } = button();
+    const typed = must(commitScoped(doc, text, 'Ship', [], [], 0, 'components'));
+
+    expect(instanceOf(typed, host)!.overrides).toEqual({});
+    expect(instanceOf(typed, host)!.comp.tracks[0].clips[0].props.text).toBe('Ship');
   });
 });
 

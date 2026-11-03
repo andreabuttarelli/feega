@@ -53,7 +53,8 @@ import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '@feega/motion-core/moti
 import { sceneEdit } from '$lib/motion/scenes';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { ClipEdge, Side, NEW_CLIP_START, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, duplicateKeyframes, setKeyEase, setLaneMuted, type OpResult } from '@feega/motion-core/motion/timeline';
-import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
+import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
+import { altCopies } from '$lib/canvas/alt-copy';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '@feega/motion-core/motion/mask';
 import { pathProblem } from '@feega/motion-core/motion/path';
 import { aabb, quadOf } from '$lib/motion/scene-select';
@@ -69,6 +70,22 @@ const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) =
 const OUTLINE_STROKE = 'outline_stroke';
 const FLATTEN = 'flatten';
 const isBooleanOp = (op: string): op is BooleanOp => (Object.values(BooleanOp) as string[]).includes(op);
+enum DuplicatePlace {
+  After = 'after',
+  InPlace = 'in_place'
+}
+const DUPLICATE_PLACES = Object.values(DuplicatePlace) as [DuplicatePlace, ...DuplicatePlace[]];
+
+function duplicatedInPlace(doc: MotionDoc, ids: readonly string[], newId: () => string): ClipDone {
+  const copied = altCopies(doc, ids, newId);
+  return copied ? { ok: true, doc: copied.doc, summary: 'Duplicated', selection: copied.ids } : { ok: false, error: `could not duplicate ${ids.join(', ')}` };
+}
+
+const DUPLICATE: Record<DuplicatePlace, (doc: MotionDoc, ids: readonly string[], newId: () => string) => ClipDone> = {
+  [DuplicatePlace.After]: (doc, ids, newId) => runClipOp(ClipOp.Duplicate, { doc, selection: ids, frame: 0, parent: null, newId }),
+  [DuplicatePlace.InPlace]: duplicatedInPlace
+};
+
 const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude, OUTLINE_STROKE, FLATTEN] as const;
 
 type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
@@ -1223,10 +1240,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     duplicate_clip: tool({
-      description: 'Duplicate clips, like the editor Duplicate: each copy starts where its original ends, on the same track; a copy of a stack child instead stays at the same time, right after it in the stack. Returns the copy ids.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      description: 'Duplicate clips. place "after" (default, timeline Duplicate): each copy starts where its original ends; a copy of a stack child stays at the same time, right after it in the stack. place "in_place" (canvas ⌘D): the copy starts with its original, carries everything inside it, and a copy of a main component is a new main (a new variant when the main is in a set). Returns the copy ids.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), place: z.enum(DUPLICATE_PLACES).default(DuplicatePlace.After) }),
       execute: async (input) => {
-        const done = runClipOp(ClipOp.Duplicate, { doc: session.doc, selection: input.clip_ids, frame: 0, parent: null, newId: deps.newId });
+        const done = DUPLICATE[input.place ?? DuplicatePlace.After](session.doc, input.clip_ids, deps.newId);
         const applied = apply(done, `duplicated ${input.clip_ids.length} clip(s)`);
         return done.ok && applied.ok ? { ...applied, clip_ids: done.selection } : applied;
       }

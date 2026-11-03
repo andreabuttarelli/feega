@@ -8,16 +8,16 @@ import { commitText } from './frame-text-edit';
 
 export type TextScope = { view: MotionDoc; id: string; merge: (view: MotionDoc) => MotionDoc; place: Affine };
 
-export function textScope(doc: MotionDoc, sceneId: string, frame: number): TextScope | null {
+export function textScope(doc: MotionDoc, sceneId: string, frame: number, here: string | null = null): TextScope | null {
   if (findClip(doc, sceneId)) {
     return { view: doc, id: sceneId, merge: (view) => view, place: IDENTITY };
   }
-  const inside = scoped(doc, [sceneId], frame);
+  const inside = scoped(doc, [sceneId], frame, here);
   return inside ? { view: inside.view, id: inside.ids[0], merge: inside.merge, place: inside.fromView } : null;
 }
 
-export function commitScoped(doc: MotionDoc, sceneId: string, text: string, runs: TextRun[], lists: ListItem[], frame: number): OpResult {
-  const scope = textScope(doc, sceneId, frame);
+export function commitScoped(doc: MotionDoc, sceneId: string, text: string, runs: TextRun[], lists: ListItem[], frame: number, here: string | null = null): OpResult {
+  const scope = textScope(doc, sceneId, frame, here);
   if (!scope) {
     return { ok: false, error: `${sceneId} is not in this frame` };
   }

@@ -119,6 +119,10 @@ export function revealIn(node: Bounds, view: Viewport, screen: Screen, free: Ins
   return { x: view.x + dx, y: view.y + dy, zoom: view.zoom };
 }
 
+export const MIN_PICK_PX = 64;
+
 export function centreIn(node: Bounds, view: Viewport, screen: Screen): Viewport {
-  return { x: screen.width / 2 - (node.x + node.width / 2) * view.zoom, y: screen.height / 2 - (node.y + node.height / 2) * view.zoom, zoom: view.zoom };
+  const side = Math.max(node.width, node.height);
+  const zoom = side > 0 && side * view.zoom < MIN_PICK_PX ? MIN_PICK_PX / side : view.zoom;
+  return { x: screen.width / 2 - (node.x + node.width / 2) * zoom, y: screen.height / 2 - (node.y + node.height / 2) * zoom, zoom };
 }

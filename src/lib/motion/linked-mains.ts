@@ -80,7 +80,11 @@ function followed(doc: MotionDoc, compId: string, home: string, homeDoc: MotionD
       if (id === compId) {
         return [[id, { ...reframed(comp, from, to, shift), component: { ...comp.component!, home } }]];
       }
-      return comp.component && doc.comps[id] ? [] : [[id, reframed(comp, from, to)]];
+      if (doc.comps[id] && comp.component) {
+        return [];
+      }
+      const moved = reframed(comp, from, to);
+      return [[id, comp.component ? { ...moved, component: { ...comp.component, home: comp.component.home ?? home } } : moved]];
     })
   );
   const comps = { ...doc.comps, ...picked };
