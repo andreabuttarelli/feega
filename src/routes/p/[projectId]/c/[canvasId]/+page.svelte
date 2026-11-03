@@ -667,6 +667,13 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void optimistic(OptimisticAction.Group, { ids, id }).then((outcome) => (outcome === OpOutcome.Landed ? after?.(id) : undefined));
   }
 
+  function frameElements(ids: string[]) {
+    if (!ids.length) {
+      return;
+    }
+    void optimistic(OptimisticAction.Frame, { ids, id: crypto.randomUUID() });
+  }
+
   function wrapWithStack(ids: string[]) {
     void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
@@ -4637,6 +4644,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onCloud={openCloud}
     onColourChange={(ids, tag) => ids.forEach((id) => void write(id, withColour(tag), SaveTiming.Now))}
     onGroup={groupElements}
+    onFrame={frameElements}
     onWrapStack={wrapWithStack}
     onComponentMade={homeComponents}
     onNodeSize={(id, w, h) => void storeSize(id, w, h)}

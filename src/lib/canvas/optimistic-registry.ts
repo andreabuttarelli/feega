@@ -7,7 +7,7 @@ import { SECTION_DEFAULT_FILL } from './node-data';
 import { layoutOf, scaleGroup } from './node-layout';
 import { shownOutput } from './gen-history';
 import { cleanNodeName } from './node-name';
-import { groupedLocally, wrappedLocally, ungroupedLocally } from './optimistic-group';
+import { framedLocally, groupedLocally, wrappedLocally, ungroupedLocally } from './optimistic-group';
 import { restoreRows, type OptimisticOp, type Touched } from './optimistic-ops';
 import { SECTION_TYPE, sectionBoxAround } from './section';
 import { stackedLocally, type Stack } from './stacking';
@@ -26,6 +26,7 @@ export enum OptimisticAction {
   Stack = 'stackElements',
   Section = 'wrapSection',
   Group = 'groupElements',
+  Frame = 'frameElements',
   Ungroup = 'ungroupElement',
   Restack = 'restack',
   Rename = 'rename',
@@ -62,6 +63,7 @@ type Inputs = {
   [OptimisticAction.Stack]: { ids: string[]; id: string };
   [OptimisticAction.Section]: { ids: string[]; id: string };
   [OptimisticAction.Group]: { ids: string[]; id: string };
+  [OptimisticAction.Frame]: { ids: string[]; id: string };
   [OptimisticAction.Ungroup]: { id: string };
   [OptimisticAction.Restack]: { ids: string[]; to: Stack };
   [OptimisticAction.Rename]: { id: string; name: string };
@@ -219,6 +221,15 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
     undo: serverUndo,
     refresh: Refresh.AfterIdle,
     notice: 'The group did not save and was undone.'
+  },
+  [OptimisticAction.Frame]: {
+    fields: idsField,
+    apply: (rows, i, ctx) => ({ ...rows, nodes: framedLocally(rows.nodes, i.ids, i.id, ctx.toTile) }),
+    touched: (i) => nodesOnly([...i.ids, i.id]),
+    landing: Landing.Moved,
+    undo: serverUndo,
+    refresh: Refresh.AfterIdle,
+    notice: 'The frame did not save and was undone.'
   },
   [OptimisticAction.Ungroup]: {
     fields: (i) => ({ id: i.id }),

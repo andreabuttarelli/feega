@@ -38,6 +38,7 @@ export type CanvasCommandId =
   | 'redo'
   | 'group'
   | 'ungroup'
+  | 'frame'
   | 'tool'
   | 'comment'
   | 'bring-front'
@@ -215,7 +216,7 @@ const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'>
 
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
-const MOD_ALT_KEYS: Record<string, CanvasCommand> = { KeyT: { id: 'tidy' }, BracketLeft: { id: 'send-back' }, BracketRight: { id: 'bring-front' } };
+const MOD_ALT_KEYS: Record<string, CanvasCommand> = { KeyT: { id: 'tidy' }, KeyG: { id: 'frame' }, BracketLeft: { id: 'send-back' }, BracketRight: { id: 'bring-front' } };
 
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
   if (isTypingTarget(e.target)) return null;
@@ -328,6 +329,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'tool', keys: ['V', 'T', 'R', 'O', 'P', 'F'], label: 'Select, text, box, ellipse, pen, frame' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
+  { id: 'frame', keys: ['⌥', 'mod', 'G'], label: 'Frame the selection' },
   { id: 'bring-forward', keys: ['mod', ']'], label: 'Bring forward' },
   { id: 'send-backward', keys: ['mod', '['], label: 'Send backward' },
   { id: 'bring-front', keys: ['⌥', 'mod', ']'], label: 'Bring to front' },
@@ -383,6 +385,7 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   paste: GuideGroup.Edit,
   group: GuideGroup.Edit,
   ungroup: GuideGroup.Edit,
+  frame: GuideGroup.Edit,
   'bring-front': GuideGroup.Edit,
   'send-back': GuideGroup.Edit,
   'bring-forward': GuideGroup.Edit,

@@ -84,7 +84,7 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Backspace / Delete | Delete the selection |
 | Cmd/Ctrl+G | Group |
 | Shift+Cmd/Ctrl+G | Ungroup |
-| Option/Alt+Cmd/Ctrl+G | Frame the selection |
+| Option/Alt+Cmd/Ctrl+G | Frame the selection: elements inside a frame, or free elements on the canvas (the agent's `frame_elements`) |
 | Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
 | Cmd/Ctrl+] / Cmd/Ctrl+[ | Bring forward / send backward one step |
 | Option/Alt+Cmd/Ctrl+] / Option/Alt+Cmd/Ctrl+[ | Bring to front / send to back |

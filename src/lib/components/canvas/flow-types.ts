@@ -134,6 +134,7 @@ export type FlowProps = {
   onBatch?: (run: () => void) => void;
   onAddBeside?: (id: string) => Drawing | null;
   onGroup?: (ids: string[]) => void;
+  onFrame?: (ids: string[]) => void;
   onWrapStack?: (ids: string[]) => void;
   onComponentMade?: (nodeId: string) => Promise<Revision | null>;
   onNodeSize?: (id: string, w: number, h: number) => void;
