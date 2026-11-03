@@ -16,6 +16,10 @@ From the round-2 text/shortcut audit.
   panel that comment mode opened (`openedByPlacing`).
 - **⌘R** asks `layersSource` for a rename; the project layout opens Layers and the panel takes the
   request once.
+- **Deleting the open canvas** deleted it and left the browser on its URL: the navigation to the
+  next page started before the delete's list re-read, which cancelled it. `deletePage` now opens
+  the next page once the delete lands, as `addPage` already did. Seen in the browser; the fix is
+  not re-verified there (one test canvas per run).
 - **Help card** printed `mod Y`: the modifier is now replaced inside combined keys.
 
 Not in this batch: Enter on a group (a click selects the child, Enter on the group did nothing;
