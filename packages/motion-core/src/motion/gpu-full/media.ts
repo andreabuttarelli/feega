@@ -16,12 +16,23 @@ export enum VideoPreload {
 
 export type Media = { ready: (list: DisplayList) => Promise<Readiness>; pictures: Pictures; dispose: () => void };
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function loadImage(src: string): Promise<Picture> {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.src = src;
-  return img.decode().then(() => img);
+  return img.decode().then(() => ({ source: img, size: { width: img.naturalWidth, height: img.naturalHeight } }));
 }
+
+async function decodeBytes(src: string): Promise<Picture> {
+  const res = await fetch(src);
+  if (!res.ok) {
+    throw new Error(`image ${res.status} ${src}`);
+  }
+  const bitmap = await createImageBitmap(await res.blob());
+  return { source: bitmap, size: { width: bitmap.width, height: bitmap.height } };
+}
+
+const loadStill = (src: string): Promise<Picture> => decodeBytes(src).catch(() => loadImage(src));
 
 function loadVideo(src: string, preload: VideoPreload): Promise<HTMLVideoElement> {
   const video = document.createElement('video');
@@ -61,17 +72,16 @@ export type VideoUse = { src: string; time: number; width: number };
 export const videoUses = (items: Item[]): VideoUse[] => needed(items).filter((i) => i.video).map((i) => ({ src: i.src, time: i.mediaTime, width: Math.ceil(i.size.width) }));
 
 export function createMedia({ videoPreload = VideoPreload.Auto, frames }: Options = {}): Media {
-  const images = new Map<string, Promise<HTMLImageElement>>();
+  const images = new Map<string, Promise<Picture>>();
   const videos = new Map<string, Promise<HTMLVideoElement>>();
   const loaded = new Map<string, Picture>();
 
-  const imageOf = (src: string) => images.get(src) ?? images.set(src, loadImage(src)).get(src)!;
+  const imageOf = (src: string) => images.get(src) ?? images.set(src, loadStill(src)).get(src)!;
   const videoOf = (clip: string, src: string) => videos.get(clip) ?? videos.set(clip, loadVideo(src, videoPreload)).get(clip)!;
 
   async function readyOne(item: ImageItem) {
     if (!item.video) {
-      const img = await imageOf(item.src);
-      loaded.set(item.clip, { source: img, size: { width: img.naturalWidth, height: img.naturalHeight } });
+      loaded.set(item.clip, await imageOf(item.src));
       return;
     }
     const decoded = await frames?.at(item.src, item.mediaTime, Math.ceil(item.size.width));
