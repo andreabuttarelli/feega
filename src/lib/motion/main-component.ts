@@ -104,9 +104,21 @@ function inPlace(before: MotionDoc, after: MotionDoc, clipIds: readonly string[]
   return placed.ok ? reorderChild(placed.doc, parent.id, instance, Math.max(0, at)) : placed;
 }
 
+export function withSubtrees(doc: MotionDoc, clipIds: readonly string[]): string[] {
+  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
+  const taken = new Set(clipIds);
+  let grew = true;
+  while (grew) {
+    const before = taken.size;
+    clips.filter((c) => c.parent && taken.has(c.parent)).forEach((c) => taken.add(c.id));
+    grew = taken.size > before;
+  }
+  return clips.filter((c) => taken.has(c.id)).map((c) => c.id);
+}
+
 export function createComponent(doc: MotionDoc, clipIds: readonly string[], newId: NewId, name: string): OpResult {
   const ids = { comp: newId(), clip: newId() };
-  const made = precompose(doc, clipIds, ids, name);
+  const made = precompose(doc, withSubtrees(doc, clipIds), ids, name);
   if (!made.ok) {
     return made;
   }
