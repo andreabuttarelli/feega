@@ -81,6 +81,13 @@ describe('drawing an export', () => {
     expect(bytes.toString()).toContain(`width="${doc.width / 2}"`);
   });
 
+  it('a raster row of a video is shot at its poster frame, not its first', async () => {
+    const { port, log } = fakePort();
+    await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, poster: { frame: 60 } } }], row({ format: 'png', by: 'scale', value: 1 }));
+
+    expect(log).toContain(`seek ${60 / doc.fps}`);
+  });
+
   it('an SVG row is drawn from the display list: paths, no foreign object, no browser', async () => {
     const { port, log } = fakePort();
     const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: withCard }], row({ format: 'svg', by: 'scale', value: 1 }));

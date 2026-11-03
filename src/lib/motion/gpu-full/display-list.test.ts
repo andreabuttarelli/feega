@@ -224,6 +224,16 @@ describe('displayListAt', () => {
     expect(glyphs.flatMap((i) => i.contours)).toHaveLength(2);
   });
 
+  it('shows a text with no animation fully opaque on its first frame, and fades it up only when its entrance asks', () => {
+    const opacityAt = (props: Record<string, unknown>) => {
+      const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', ...props } }, 'text'));
+      return displayListAt(texted, 0, FEEGA_TOKENS, boxType).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'text')?.opacity ?? 0;
+    };
+
+    expect(opacityAt({})).toBe(1);
+    expect(opacityAt({ entrance: 'fade-up' })).toBeLessThan(0.1);
+  });
+
   it('draws a text bent along a path, one character at a time', () => {
     const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'abc' } }, 'text'));
     const bent = must(setTextPath(texted, 'text', { source: { kind: PathSourceKind.Preset, preset: PathPreset.Circle } }));

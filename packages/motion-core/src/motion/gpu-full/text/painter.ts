@@ -1,7 +1,7 @@
 import { apply2d, mul2d, type Affine } from '../../affine';
 import { NO_RULE, ruled, type Rule } from './rules';
 import { featuresFor, type Decoration, type DecorationStyle } from '../../decoration';
-import { TYPE, type LeadingTrim, type TextAlign, type TextCase, type TextWrap, type VerticalAlign } from '../../components';
+import { TYPE, type LeadingTrim, type TextAlign, type TextCase, type TextEntrance, type TextWrap, type VerticalAlign } from '../../components';
 import { AUTO, leadingOf, trackingOf, type Leading } from '../../type-units';
 import { Ease } from '../../design';
 import { safeBox } from '../../fit';
@@ -124,11 +124,11 @@ type Kind = {
   upper: boolean;
   inset: number;
   frame: (p: Props, box: Box, stage: Size) => Frame;
-  motion: Motion;
+  motion: (p: Props) => Motion;
   area: Area;
 };
 
-type Props = Record<string, unknown> & { text: string; size: number; align: TextAlign; sizing?: TextSizing; easing: Ease; verticalAlign?: VerticalAlign; paragraphSpacing?: number; paragraphIndent?: number; textWrap?: TextWrap; leadingTrim?: LeadingTrim; maxLines?: number };
+type Props = Record<string, unknown> & { text: string; size: number; align: TextAlign; sizing?: TextSizing; easing: Ease; verticalAlign?: VerticalAlign; paragraphSpacing?: number; paragraphIndent?: number; textWrap?: TextWrap; leadingTrim?: LeadingTrim; maxLines?: number; entrance?: TextEntrance };
 
 const ALIGN_SHARE: Record<TextAlign, number> = { left: 0, center: 0.5, right: 1, justify: 0 };
 const JUSTIFY_OF: Record<TextAlign, Justify> = { left: Justify.Off, center: Justify.Off, right: Justify.Off, justify: Justify.On };
@@ -188,11 +188,13 @@ const TEXT_FRAME: Record<TextSizing, Omit<Frame, 'box'>> = {
 
 const sizingOf = (p: Props) => p.sizing ?? TextSizing.Fixed;
 
+const ENTRANCE_MOTION: Record<TextEntrance, Motion> = { none: Motion.None, 'fade-up': Motion.FadeUp };
+
 const KINDS: Record<TextComponent, Kind> = {
-  Title: { size: rounded, paragraphs: lines, flow: () => NORMAL, fits: () => true, upper: false, inset: 0, frame: (_p, box, stage) => ({ box: safeBox(box, stage), anchor: Anchor.Centre, hugs: false }), motion: Motion.LinesRise, area: Area.Block },
-  Text: { size: rounded, paragraphs: lines, flow: (p) => TEXT_FLOW[sizingOf(p)], fits: () => false, upper: false, inset: 0, frame: (p, box) => ({ box, ...TEXT_FRAME[sizingOf(p)] }), motion: Motion.FadeUp, area: Area.Line },
-  Kicker: { size: rounded, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: true, inset: 0, frame: centred, motion: Motion.None, area: Area.Whole },
-  Caption: { size: (p, unit) => p.size * unit, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: false, inset: 0.5, frame: centred, motion: Motion.None, area: Area.Line }
+  Title: { size: rounded, paragraphs: lines, flow: () => NORMAL, fits: () => true, upper: false, inset: 0, frame: (_p, box, stage) => ({ box: safeBox(box, stage), anchor: Anchor.Centre, hugs: false }), motion: () => Motion.LinesRise, area: Area.Block },
+  Text: { size: rounded, paragraphs: lines, flow: (p) => TEXT_FLOW[sizingOf(p)], fits: () => false, upper: false, inset: 0, frame: (p, box) => ({ box, ...TEXT_FRAME[sizingOf(p)] }), motion: (p) => ENTRANCE_MOTION[p.entrance ?? 'none'], area: Area.Line },
+  Kicker: { size: rounded, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: true, inset: 0, frame: centred, motion: () => Motion.None, area: Area.Whole },
+  Caption: { size: (p, unit) => p.size * unit, paragraphs: whole, flow: () => NORMAL, fits: () => true, upper: false, inset: 0.5, frame: centred, motion: () => Motion.None, area: Area.Line }
 };
 
 const WORD_START = /(^|\s)(\S)/gu;
@@ -468,8 +470,8 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
     frame: { left: frame.box.left - env.box.left, top: frame.box.top - env.box.top, width: frame.box.width, height: frame.box.height, anchor: frame.anchor, hugs: frame.hugs },
     align: ALIGN_SHARE[p.align] ?? 0,
     typography: { vertical: VERTICAL_SHARE[p.verticalAlign ?? 'center'], paragraph: paragraphOf(p), clips: truncates(p) && sizingOf(p) === TextSizing.Fixed, rule: ruleOf(p), ruleColour: p.decorationColor ? colour(String(p.decorationColor)) : null, features: featuresFor(p) },
-    fade: kind.motion === Motion.FadeUp ? progress(env, { at: 0, duration: FADE_FRAMES / env.fps }, p.easing) : 1,
-    rises: kind.motion === Motion.LinesRise ? paragraphs.map((_, i) => progress(env, { at: (i * LINE_STAGGER) / env.fps, duration: REVEAL_FRAMES / env.fps }, p.easing)) : null,
+    fade: kind.motion(p) === Motion.FadeUp ? progress(env, { at: 0, duration: FADE_FRAMES / env.fps }, p.easing) : 1,
+    rises: kind.motion(p) === Motion.LinesRise ? paragraphs.map((_, i) => progress(env, { at: (i * LINE_STAGGER) / env.fps, duration: REVEAL_FRAMES / env.fps }, p.easing)) : null,
     area: kind.area,
     backdrop: kind.inset > 0 ? colour(String(p.background)) : null,
     fills,

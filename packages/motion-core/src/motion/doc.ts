@@ -236,6 +236,7 @@ export const motionDocSchema = z
     script: scriptSchema.optional(),
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
+    poster: stillSchema.optional(),
     freeSize: z.boolean().optional(),
     surface: z.string().min(1).optional(),
     breakpoints: breakpointsSchema,
@@ -249,7 +250,8 @@ export const motionDocSchema = z
   })
   .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })
-  .refine((d) => !d.still || d.still.frame < d.durationInFrames, { message: 'the still frame is past the end of the doc', path: ['still'] });
+  .refine((d) => !d.still || d.still.frame < d.durationInFrames, { message: 'the still frame is past the end of the doc', path: ['still'] })
+  .refine((d) => !d.poster || d.poster.frame < d.durationInFrames, { message: 'the poster frame is past the end of the doc', path: ['poster'] });
 
 export type MotionDoc = z.infer<typeof motionDocSchema>;
 export type MotionTrack = MotionDoc['tracks'][number];

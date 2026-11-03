@@ -55,6 +55,13 @@ describe('editor mode', () => {
     expect(new EditorModeState(store).current).toBe(EditorMode.Play);
   });
 
+  it('reopens in Design after leaving the canvas in Motion, so a reload never starts keying edits', () => {
+    const store = new MemoryStore();
+    new EditorModeState(store).set(EditorMode.Motion);
+
+    expect(new EditorModeState(store).current).toBe(EditorMode.Design);
+  });
+
   it('an unknown or unreadable stored mode falls back to Design', () => {
     expect(readEditorMode('nope')).toBe(EditorMode.Design);
     const mode = new EditorModeState({ getItem: blocked, setItem: blocked });

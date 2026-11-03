@@ -3,6 +3,7 @@ import { Resolution } from './render-quote';
 import { BROWSER_SAMPLES, sampleTimes } from '@feega/motion-core/motion/motion-blur';
 import { TrackKind } from '@feega/motion-core/motion/components';
 import { withJunctions } from '@feega/motion-core/motion/junctions';
+import { loopRange } from '@feega/motion-core/motion/organize';
 
 export enum Support {
   Full = 'full',
@@ -14,6 +15,32 @@ export enum AudioMode {
   On = 'on',
   Unavailable = 'unavailable',
   Off = 'off'
+}
+
+export enum ExportRange {
+  WorkArea = 'work-area',
+  Whole = 'whole'
+}
+
+export const RANGE_LABEL: Record<ExportRange, string> = { [ExportRange.WorkArea]: 'Work area', [ExportRange.Whole]: 'Whole video' };
+
+type Ranged = Pick<MotionDoc, 'fps' | 'durationInFrames' | 'workArea'>;
+
+const RANGE_FRAMES: Record<ExportRange, (doc: Ranged) => { from: number; to: number }> = {
+  [ExportRange.WorkArea]: loopRange,
+  [ExportRange.Whole]: (doc) => ({ from: 0, to: doc.durationInFrames })
+};
+
+const looped = (doc: Ranged) => {
+  const area = RANGE_FRAMES[ExportRange.WorkArea](doc);
+  return area.from > 0 || area.to < doc.durationInFrames;
+};
+
+export const exportRanges = (doc: Ranged): ExportRange[] => (looped(doc) ? [ExportRange.WorkArea, ExportRange.Whole] : [ExportRange.Whole]);
+
+export function rangeSeconds(doc: Ranged, range: ExportRange): { from: number; to: number } {
+  const frames = RANGE_FRAMES[range](doc);
+  return { from: frames.from / doc.fps, to: frames.to / doc.fps };
 }
 
 export type Capabilities = { webCodecs: boolean; h264: boolean; h264At720: boolean; aac: boolean };

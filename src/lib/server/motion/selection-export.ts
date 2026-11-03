@@ -39,7 +39,7 @@ export type SelectionPorts = {
   store: (packed: Packed) => Promise<{ asset_id: string; url: string }>;
 };
 
-export type ExportTarget = { nodeId: string; elementId?: string };
+export type ExportTarget = { nodeId: string; elementId?: string; seconds?: number };
 
 export type SelectionAsk = { targets: ExportTarget[]; rows: ExportRow[]; name: string };
 
@@ -47,7 +47,9 @@ export type SelectionExported =
   | { outcome: ExportOutcome.Done; asset_id: string; url: string; name: string; files: string[]; skipped: string[] }
   | { outcome: ExportOutcome.NotFound | ExportOutcome.NoElement; nodeId: string; elementId?: string };
 
-const asDrawn = (doc: MotionDoc, row: ExportRow): MotionDoc => (row.transparent ? { ...doc, background: Background.Transparent } : doc);
+const atTime = (doc: MotionDoc, seconds: number | undefined): MotionDoc => (seconds === undefined ? doc : { ...doc, poster: { frame: Math.min(Math.max(0, Math.round(seconds * doc.fps)), doc.durationInFrames - 1) } });
+
+const asDrawn = (doc: MotionDoc, row: ExportRow, seconds?: number): MotionDoc => atTime(row.transparent ? { ...doc, background: Background.Transparent } : doc, seconds);
 
 const keyOf = (target: ExportTarget) => `${target.nodeId}#${target.elementId ?? ''}`;
 
@@ -85,7 +87,7 @@ export async function exportSelection(ports: SelectionPorts, ask: SelectionAsk):
         file.targets.map((listedTarget) => {
           const target = byKey.get(listedTarget.id)!;
           const frame = frames.get(target.nodeId)!;
-          return { nodeId: target.nodeId, doc: asDrawn(frame.doc, file.row), docScale: frame.docScale, ...(target.elementId ? { elementId: target.elementId } : {}) };
+          return { nodeId: target.nodeId, doc: asDrawn(frame.doc, file.row, target.seconds), docScale: frame.docScale, ...(target.elementId ? { elementId: target.elementId } : {}) };
         }),
         file.row
       );
