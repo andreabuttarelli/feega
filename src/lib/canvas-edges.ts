@@ -12,6 +12,7 @@
  */
 
 import Repeat from '@lucide/svelte/icons/repeat';
+import type { Tie } from './canvas/gpu/wire-magnet';
 
 /** Gli stessi tre valori del check in migrazione: due elenchi divergerebbero al primo verso nuovo. */
 export const CANVAS_EDGE_KINDS = ['derives_from', 'responds_to', 'groups_with'] as const;
@@ -87,6 +88,7 @@ export type FlowEdge = {
    *  arrivato da `toFlowEdges`, che legge `brand_canvas_edges` e non porta `mode`): il menù al
    *  clic tratta l'assenza come `fixed`, lo stesso di riserva del repository server. */
   mode?: WireMode;
+  tie?: Tie | null;
   /** Assente su `groups_with`: stare insieme non ha un verso, e una freccia ne inventerebbe uno. */
   markerEnd?: { type: 'arrowclosed' };
   /** La porta di `target` su cui questo arco atterra (`ConnectorType` di `connectors.ts`). Assente
