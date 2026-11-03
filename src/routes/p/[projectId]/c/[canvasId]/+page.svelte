@@ -669,8 +669,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
-  function homeComponents(nodeId: string) {
-    void post('homeComponents', { node_id: nodeId }).then(() => invalidate(CANVAS_LIST_DEPENDENCY));
+  async function homeComponents(nodeId: string): Promise<Record<string, string> | null> {
+    const done = await post('homeComponents', { node_id: nodeId });
+    void invalidate(CANVAS_LIST_DEPENDENCY);
+    return (done?.homes as Record<string, string> | undefined) ?? null;
   }
 
   function wrapInSection(ids: string[]) {

@@ -52,6 +52,16 @@ describe('a component made by hand moves its main to the Components page', () =>
     expect(frames.get('page')!.doc.comps[compId].component!.home).toBe(setId);
   });
 
+  it('answers where each main went, so the open editor homes its own copy and a later save keeps it', async () => {
+    const doc = designWithButton();
+    const compId = String((doc.tracks.flatMap((t) => t.clips)[0] as MotionClip).props.comp);
+    const { store } = storeWith(doc);
+
+    const done = await homeComponents(store, PAGE, 'page', newId);
+
+    expect(done.homes).toEqual({ [compId]: done.setIds[0] });
+  });
+
   it('the main lands at the size the source shows on the canvas, not at the doc size', async () => {
     const atDocSize = storeWith(designWithButton());
     await homeComponents(atDocSize.store, PAGE, 'page', newId);
@@ -69,7 +79,7 @@ describe('a component made by hand moves its main to the Components page', () =>
   it('does nothing for a frame already on the Components page', async () => {
     const { store } = storeWith(designWithButton());
 
-    expect(await homeComponents(store, async () => ({ place: { projectId: 'p', canvasId: 'design' }, at: { x: 0, y: 0 } }), 'page', newId)).toEqual({ moved: [], setIds: [] });
+    expect(await homeComponents(store, async () => ({ place: { projectId: 'p', canvasId: 'design' }, at: { x: 0, y: 0 } }), 'page', newId)).toEqual({ moved: [], setIds: [], homes: {} });
   });
 });
 
