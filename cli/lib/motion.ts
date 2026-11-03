@@ -36,7 +36,8 @@ export type MotionRevision = { version: number; summary: string | null; actorKin
 
 export const CODE_TARGETS = ['react', 'html', 'svelte'] as const;
 export type CodeTarget = (typeof CODE_TARGETS)[number];
-export type FrameCode = { name: string; target: CodeTarget; files: { path: string; content: string }[]; notes: string[] };
+export type CodeAsset = { path: string; ref: string; url: string };
+export type FrameCode = { name: string; target: CodeTarget; files: { path: string; content: string }[]; assets?: CodeAsset[]; notes: string[] };
 
 export type VideoBudget = { ok: true; spent_usd: number; cap_usd: number; raise_usd: number };
 

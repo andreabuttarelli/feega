@@ -46,6 +46,7 @@
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
   import { inDoc, libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { scaleOf, spaceOf } from '$lib/motion/units';
   import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
@@ -878,6 +879,10 @@
     })
   );
   const hitIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => [r.body, ...r.labels])));
+  const viewLabelIndex = $derived.by(() => {
+    const glyphs = coreType?.glyphs ?? NO_GLYPHS;
+    return new SpatialIndex(bpViews.flatMap((v) => nodeHitRects({ id: v.frame.id, x: v.frame.box.x, y: v.frame.box.y, width: v.frame.box.w, height: v.frame.box.h, inputs: [], outputs: [], label: `${v.name} ${v.width}`, icon: null, tag: null, zoom: labelZoom }, glyphs).slice(1)));
+  });
   const labelIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => r.labels)));
 
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
@@ -1556,14 +1561,20 @@
   onMount(lockOverscroll);
 
   $effect(() => {
-    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
+    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => placedDoc(f.id))));
   });
+
+  const placedDoc = (id: string) => {
+    const doc = liveOf(id)?.doc;
+    return doc ? [{ doc, scale: scaleOf(doc, byId.get(id) ?? null) }] : [];
+  };
 
   function syncStyle(name: string, style: Style) {
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && !sameValue(present.styles?.[name], inDoc(style, present)) ? syncedDoc(present, name, style) : null;
+      const scale = present ? scaleOf(present, byId.get(frame.id) ?? null) : 1;
+      const synced = present && !sameValue(present.styles?.[name], inDoc(style, spaceOf(present, scale))) ? syncedDoc(present, name, style, scale) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -1921,7 +1932,7 @@
     const live = nodeId ? liveOf(nodeId) : null;
     const mode = nodeId && live ? frameMode : EditMode.Design;
     const access = nodeId ? frameTimeline(editorMode.timeline, frameChrome(kindOfNode(nodeId)).timeline, mode) : TimelineAccess.Hidden;
-    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), frame: frameOfLive(live), access } : null;
+    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), scale: scaleOf(live.doc, byId.get(nodeId) ?? null), frame: frameOfLive(live), access } : null;
   });
 
   const TIMELINE_CHANGE: Record<TimelineAccess, (nodeId: string) => (doc: LiveDoc['doc'], summary: string) => void> = {
@@ -3274,9 +3285,18 @@
     menuAt = at;
   }
 
+  const VIEW_MENU_IDS: ReadonlySet<SelectionActionId> = new Set(['export']);
+  let viewMenu = $state<{ at: Point; id: string } | null>(null);
+
   function openMenuAt(at: Point) {
     const e = { clientX: at.x, clientY: at.y };
     if (suppressMenu || !spec.chrome || openElementMenu(e)) {
+      return;
+    }
+    const world = toWorld(view, local(e));
+    const viewId = viewLabelIndex.topAt(world) ?? viewAt(bpViews, world)?.frame.id;
+    if (viewId) {
+      viewMenu = { at, id: viewId };
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
@@ -3968,6 +3988,7 @@
         ram={ramNode === nodeId ? ramRuns : []}
         onram={() => cacheRam(nodeId, timeline!.doc)}
         {assetUrl}
+        scale={timeline.scale}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={TIMELINE_CHANGE[timeline.access](nodeId)}
       />
@@ -4264,6 +4285,10 @@
 
   {#if spec.chrome}
     <CommandPalette onrun={runPaletteCommand} />
+  {/if}
+
+  {#if viewMenu && spec.chrome}
+    <CanvasContextMenu at={viewMenu.at} summaries={(props.nodeSummaries ?? []).filter((n) => n.id === baseNodeId(viewMenu!.id))} available={VIEW_MENU_IDS} onpick={() => props.onExport?.([viewMenu!.id])} onclose={() => (viewMenu = null)} />
   {/if}
 
   {#if menuAt && spec.chrome}

@@ -25,7 +25,7 @@
   import { cameraEditAt, cameraLanes, cameraValueAt } from '@feega/motion-core/motion/camera-ops';
   import { animProp, ValueKind } from '@feega/motion-core/motion/keyframes';
   import { editAt, parseDecimal, valueAt } from '$lib/motion/inspector';
-  import { sliderOf, toShown, toStored, type Owner } from '$lib/motion/units';
+  import { sliderOf, spaceOf, toShown, toStored, type Owner } from '$lib/motion/units';
   import { formatValue, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
   import { ancestorsOf } from '@feega/motion-core/motion/parent';
   import { setParent } from '$lib/motion/parent-ops';
@@ -63,6 +63,7 @@
     assetUrls = {},
     reveal = Reveal.Animated,
     pick = PickMode.One,
+    scale = 1,
     onchange,
     onopen,
     onmenu
@@ -80,6 +81,7 @@
     assetUrls?: Record<string, string>;
     reveal?: Reveal;
     pick?: PickMode;
+    scale?: number;
     onchange: (doc: MotionDoc, summary: string) => void;
     onopen?: (comp: string) => void;
     onmenu?: (clipId: string, at: Point) => void;
@@ -188,14 +190,16 @@
     return unitEdit(CAMERA_LANE, { key, ...CAMERA[key] }, cameraValueAt(shown, key, frame), (stored) => cameraEditAt(doc, key, Math.min(CAMERA[key].max, Math.max(CAMERA[key].min, stored)), frame));
   }
 
+  const space = $derived(spaceOf(doc, scale));
+
   function unitEdit(owner: Owner, prop: Range & { key: string }, stored: number, write: (stored: number) => OpResult): PropEdit {
-    const slider = sliderOf(owner, prop, doc);
+    const slider = sliderOf(owner, prop, space);
     return {
-      shown: toShown(owner, prop.key, stored, doc),
+      shown: toShown(owner, prop.key, stored, space),
       range: slider,
       unit: slider.unit ?? '',
       set: (v) => {
-        const result = write(toStored(owner, prop.key, v, doc));
+        const result = write(toStored(owner, prop.key, v, space));
         if (result.ok) {
           onchange(result.doc, `Edited ${prop.key}`);
         }

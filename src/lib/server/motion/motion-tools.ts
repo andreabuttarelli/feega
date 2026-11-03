@@ -268,7 +268,8 @@ import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { outlineUrl } from '@feega/motion-core/motion/fonts/outline';
 import { pivotBox } from '@feega/motion-core/motion/parent';
 import { propsFromPx, pxRead, strokesFromPx, PX_FIELDS_GUIDE } from '$lib/motion/px-fields';
-import { UNITS_GUIDE, unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
+import { DOC_PX, toolSpace } from './tool-space';
+import { UNITS_GUIDE, unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Frame as UnitFrame, type Owner } from '$lib/motion/units';
 
 const GUIDE_AXES = ['vertical', 'horizontal'] as const;
 const AXIS_OF: Record<(typeof GUIDE_AXES)[number], GuideAxis> = { vertical: GuideAxis.Vertical, horizontal: GuideAxis.Horizontal };
@@ -328,6 +329,7 @@ export type MotionToolDeps = {
   storyboard?: StoryboardPort;
   copywrite?: (script: LaunchScript) => Promise<LaunchScript>;
   exportStill?: (doc: MotionDoc, spec: StillExport) => Promise<StillMade>;
+  scale?: number;
   moveOut?: (element: Element, target: FrameTarget) => Promise<Moved>;
   fonts?: () => Promise<FontFamily[]>;
 };
@@ -400,8 +402,6 @@ function validPattern(pattern: string): boolean {
   }
 }
 
-const IN_DOC_PX = 1;
-
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
 const AVOIDED_REF = { ok: false as const, error: 'the user marked this reference as avoid: never use it as a target' };
@@ -419,20 +419,22 @@ const fieldSpec = (f: ExposedField) => ({ key: f.key, label: f.label, type: f.ty
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
 const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
 
-export function docSummary(doc: MotionDoc, selection: string[]) {
+export function docSummary(doc: MotionDoc, selection: string[], scale = DOC_PX) {
+  const space = toolSpace(doc, scale);
+  const { frame } = space;
   const secs = (f: number) => secondsAt(f, doc.fps);
   const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
   const inSeconds = (keyframes: Record<string, Keyframe[] | undefined>) =>
     Object.fromEntries(Object.entries(keyframes).map(([prop, track]) => [prop, (track ?? []).map(({ frame, ...rest }) => ({ time: secs(frame), ...rest }))]));
   const cameraSummary = (camera: Camera | null) =>
-    camera ? { values: shownRecord(CAMERA_LANE, camera.base, doc), dof: camera.dof, keyframes: inSeconds(shownKeyframes(CAMERA_LANE, camera.keyframes, doc)), expressions: camera.expressions } : null;
+    camera ? { values: shownRecord(CAMERA_LANE, camera.base, frame), dof: camera.dof, keyframes: inSeconds(shownKeyframes(CAMERA_LANE, camera.keyframes, frame)), expressions: camera.expressions } : null;
   const lookSummary = (look: Look | null) => (look ? { ...look, lights: look.lights.map((l) => ({ ...l, keyframes: inSeconds(l.keyframes) })) } : null);
   const posterParts = staticParts(doc);
 
   return {
     format: formatOf(doc),
-    width: doc.width,
-    height: doc.height,
+    width: frame.width,
+    height: frame.height,
     fps: doc.fps,
     background: doc.background,
     surface: doc.surface ?? null,
@@ -454,24 +456,24 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         start: secs(c.from),
         duration: secs(c.durationInFrames),
         trimStart: secs(c.trimStart),
-        props: shownRecord(propsOwner(c.component), c.props, doc),
-        ...pxRead(c.props, doc),
+        props: shownRecord(propsOwner(c.component), c.props, frame),
+        ...pxRead(c.props, frame),
         in: edgeSummary(c.transitionIn),
         out: edgeSummary(c.transitionOut),
         junction: c.junction ? { kind: c.junction.kind, duration: secs(c.junction.durationInFrames), from: junctionPairs(doc).find((p) => p.incoming === c.id)?.outgoing ?? null } : null,
-        transform: shownRecord(c.component, c.transform, doc),
-        mask: c.mask && shownMask(c.component, c.mask, doc),
-        maskStack: c.maskStack.map((m) => shownMask(c.component, m, doc)),
+        transform: shownRecord(c.component, c.transform, frame),
+        mask: c.mask && shownMask(c.component, c.mask, frame),
+        maskStack: c.maskStack.map((m) => shownMask(c.component, m, frame)),
         matte: c.matte,
         matteFrom: c.matteFrom ?? null,
-        keyframes: inSeconds(shownKeyframes(c.component, c.keyframes, doc)),
+        keyframes: inSeconds(shownKeyframes(c.component, c.keyframes, frame)),
         depth: c.depth,
         space: c.space,
         acceptsLights: c.acceptsLights ?? true,
         parent: c.parent,
         parentOpacity: c.parentOpacity,
-        autoLayout: c.autoLayout ?? null,
-        layoutItem: c.layoutItem ?? null,
+        autoLayout: c.autoLayout ? space.layoutOut(c.autoLayout) : null,
+        layoutItem: c.layoutItem ? space.itemOut(c.layoutItem) : null,
         constraints: c.constraints ?? null,
         overrides: c.overrides ?? null,
         interactions: c.interactions ?? [],
@@ -497,8 +499,8 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         clipContent: c.clipContent ?? false,
         group: c.group ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
-        physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
-        path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, doc), out: shownOffset(c.component, t.out, doc) })), problem: pathProblem(c) } : null
+        physics: c.physics ? shownRecord(c.component, c.physics, frame) : null,
+        path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, frame), out: shownOffset(c.component, t.out, frame) })), problem: pathProblem(c) } : null
       }))
     })),
     assets: doc.assets,
@@ -506,7 +508,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     referenceLook: doc.referenceLook ?? null,
     layoutGuides: doc.layoutGuides ?? [],
     breakpoints: doc.breakpoints ?? [],
-    userGuides: doc.userGuides ?? [],
+    userGuides: (doc.userGuides ?? []).map((g) => ({ ...g, at: space.toCanvas(g.at) })),
     fonts: doc.fonts,
     styles: stylesOf(doc),
     variables: doc.variables ?? {},
@@ -612,16 +614,16 @@ function customSummary(name: string, c: CustomComponent) {
   };
 }
 
-function componentCatalogue(doc: MotionDoc) {
+function componentCatalogue(doc: MotionDoc, frame: UnitFrame) {
   return {
-    library: libraryCatalogue(doc),
+    library: libraryCatalogue(frame),
     custom: Object.entries(doc.components).map(([name, c]) => customSummary(name, c)),
     note: 'A custom component is used with add_clip component "Custom" and props { name, ...its props }.'
   };
 }
 
-function libraryCatalogue(doc: MotionDoc) {
-  const range = (id: ComponentId, key: string, min: number, max: number) => `${toShown(propsOwner(id), key, min, doc)}..${toShown(propsOwner(id), key, max, doc)}`;
+function libraryCatalogue(frame: UnitFrame) {
+  const range = (id: ComponentId, key: string, min: number, max: number) => `${toShown(propsOwner(id), key, min, frame)}..${toShown(propsOwner(id), key, max, frame)}`;
   return COMPONENT_IDS.map((id) => ({
     id,
     track: COMPONENTS[id].track,
@@ -631,14 +633,14 @@ function libraryCatalogue(doc: MotionDoc) {
   }));
 }
 
-function shownProblem(doc: MotionDoc, component: ComponentId, props: Record<string, unknown> = {}): string | null {
+function shownProblem(frame: UnitFrame, component: ComponentId, props: Record<string, unknown> = {}): string | null {
   const owner = propsOwner(component);
   const out = fieldsOf(component).flatMap((f) => {
     const value = props[f.key];
     if (typeof value !== 'number' || f.min === undefined || f.max === undefined || !unitOf(owner, f.key)) {
       return [];
     }
-    const [min, max] = [toShown(owner, f.key, f.min, doc), toShown(owner, f.key, f.max, doc)];
+    const [min, max] = [toShown(owner, f.key, f.min, frame), toShown(owner, f.key, f.max, frame)];
     return value < min || value > max ? [`${f.key} ${value} is outside ${min}..${max} ${unitOf(owner, f.key)}`] : [];
   });
   return out.length ? `${component}: ${out.join('; ')}` : null;
@@ -728,6 +730,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   };
 
   const { session } = deps;
+  const scale = deps.scale ?? DOC_PX;
+  const space = () => toolSpace(session.doc, scale);
+  const shownIn = () => space().frame;
+  const docPx = (px: number | undefined) => (px === undefined ? undefined : space().toDoc(px));
+  const docSize = (size: { width: number; height: number }) => ({ width: Math.round(space().toDoc(size.width)), height: Math.round(space().toDoc(size.height)) });
   const frames = (s: number) => framesAt(s, session.doc.fps);
   const asKey = (k: KeyInput): Keyframe => shaped({ frame: frames(k.time), value: k.value, ease: k.ease, ...(k.intensity === undefined ? {} : { intensity: k.intensity }) }, { in: k.in, out: k.out, roving: k.roving });
   const ownerOf = (clipId: string): Owner => findClip(session.doc, clipId)?.clip.component ?? null;
@@ -735,18 +742,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     const owner = ownerOf(clipId);
     return owner && owner !== CAMERA_LANE ? propsOwner(owner) : null;
   };
-  const propsIn = (component: ComponentId, props: Record<string, unknown> = {}) => storedRecord(propsOwner(component), props, session.doc);
-  const newFromPx = (component: ComponentId, props: Record<string, unknown> = {}) => propsFromPx(props, shownRecord(propsOwner(component), defaultProps(component), session.doc), session.doc);
+  const propsIn = (component: ComponentId, props: Record<string, unknown> = {}) => storedRecord(propsOwner(component), props, shownIn());
+  const newFromPx = (component: ComponentId, props: Record<string, unknown> = {}) => propsFromPx(props, shownRecord(propsOwner(component), defaultProps(component), shownIn()), shownIn());
   const ownPropsOf = (clipId: string): ReadonlySet<string> => {
     const clip = findClip(session.doc, clipId)?.clip;
     const custom = clip?.component === 'Custom' ? session.doc.components[String(clip.props.name)] : undefined;
     return new Set(Object.keys(custom?.propsSchema.properties ?? {}));
   };
-  const editFromPx = (clipId: string, props: Record<string, unknown>) => propsFromPx(props, shownRecord(propsOf(clipId), findClip(session.doc, clipId)?.clip.props ?? {}, session.doc), session.doc, ownPropsOf(clipId));
+  const editFromPx = (clipId: string, props: Record<string, unknown>) => propsFromPx(props, shownRecord(propsOf(clipId), findClip(session.doc, clipId)?.clip.props ?? {}, shownIn()), shownIn(), ownPropsOf(clipId));
   const keyIn =
     (owner: Owner, prop: string) =>
     (k: KeyInput): Keyframe =>
-      asKey(typeof k.value === 'number' ? { ...k, value: toStored(owner, prop, k.value, session.doc) } : k);
+      asKey(typeof k.value === 'number' ? { ...k, value: toStored(owner, prop, k.value, shownIn()) } : k);
 
   const logoUrls = new Set<string>();
   const brandLogos = new Set<string>();
@@ -986,7 +993,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     get_motion_doc: tool({
       description: `Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected. ${UNITS_GUIDE} ${PX_FIELDS_GUIDE}`,
       inputSchema: z.object({}).strict(),
-      execute: async () => docSummary(session.doc, session.selection)
+      execute: async () => docSummary(session.doc, session.selection, scale)
     }),
 
     measure_text: tool({
@@ -997,12 +1004,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!clip || !isText(clip.component)) {
           return { ok: false, error: `${input.clip_id} is not a text clip` };
         }
-        const shown = shownRecord(propsOwner(clip.component), clip.props, session.doc);
+        const shown = shownRecord(propsOwner(clip.component), clip.props, shownIn());
         const look = textLook(clip.component, shown);
         const family = String(shown.font ?? BuiltinFont.Sans);
         const url = outlineUrl(family, Number(shown.weight ?? REGULAR_WEIGHT), session.doc.fonts, {});
         const exact = url && deps.fontAdvance ? await deps.fontAdvance(url) : null;
-        const box = pivotBox(clip.props, session.doc);
+        const box = pivotBox(clip.props, shownIn());
         const measured = measureText(look, box, exact ?? guessedAdvance(look.capitals));
         const { lines, ...rect } = measured;
         return { ok: true, approximate: !exact, box: rect, lines };
@@ -1024,7 +1031,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     list_components: tool({
       description: 'Every component a clip can use: the library (its track and props, ranges in the units of the prompt for this video size) and the custom components written in code for this video.',
       inputSchema: z.object({}).strict(),
-      execute: async () => componentCatalogue(session.doc)
+      execute: async () => componentCatalogue(session.doc, shownIn())
     }),
 
     list_assets: tool({
@@ -1047,7 +1054,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!assetKnown(input.props?.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
-        const outside = shownProblem(session.doc, input.component, input.props);
+        const outside = shownProblem(shownIn(), input.component, input.props);
         if (outside) {
           return { ok: false, error: outside };
         }
@@ -1081,11 +1088,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: placed };
         }
         const component = findClip(session.doc, input.clip_id)?.clip.component;
-        const outside = component ? shownProblem(session.doc, component, input.props) : null;
+        const outside = component ? shownProblem(shownIn(), component, input.props) : null;
         if (outside) {
           return { ok: false, error: outside };
         }
-        const result = placeLayer(session.doc, input.clip_id, storedRecord(propsOf(input.clip_id), input.props, session.doc));
+        const result = placeLayer(session.doc, input.clip_id, storedRecord(propsOf(input.clip_id), input.props, shownIn()));
         if (!result.ok) {
           return { ok: false, error: propsError(session.doc, input.clip_id, input.props, result.error) };
         }
@@ -1201,7 +1208,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal, or with spacing (px) puts exactly that gap between each (2+ clips, the first stays); tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box; scale_group (factor, optional factor_y for a different vertical factor) and rotate_group (degrees) transform the clips together around the centre of their joint box, like dragging the selection handles. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), degrees: z.number().optional(), factor_y: z.number().positive().optional(), spacing: z.number().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
       execute: async (input) =>
-        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor, factorY: input.factor_y, degrees: input.degrees, spacing: input.spacing }), `${input.op} ${input.clip_ids.length} clip(s)`)
+        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [space().toDoc(input.dx ?? 0), space().toDoc(input.dy ?? 0)], mode: input.mode ?? EditMode.Design, factor: input.factor, factorY: input.factor_y, degrees: input.degrees, spacing: docPx(input.spacing) }), `${input.op} ${input.clip_ids.length} clip(s)`)
     }),
 
     remove_clip: tool({
@@ -1240,7 +1247,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (shrunk) {
           return { ok: false, error: shrunk };
         }
-        return apply(setTransform(session.doc, input.clip_id, storedRecord(ownerOf(input.clip_id), input.transform, session.doc)), `transformed ${input.clip_id}`);
+        return apply(setTransform(session.doc, input.clip_id, storedRecord(ownerOf(input.clip_id), input.transform, shownIn())), `transformed ${input.clip_id}`);
       }
     }),
 
@@ -1266,7 +1273,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }),
       execute: async (input) => {
         const owner = ownerOf(input.clip_id);
-        const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, session.doc) : value]));
+        const targets = Object.fromEntries(Object.entries(input.to).map(([prop, value]) => [prop, typeof value === 'number' ? toStored(owner, prop, value, shownIn()) : value]));
         return apply(animateTo(session.doc, input.clip_id, targets, { start: frames(input.start), duration: Math.max(1, frames(input.duration)), ease: input.ease }, (c) => c), `animated ${input.clip_id} to ${Object.keys(input.to).join(', ')}`);
       }
     }),
@@ -1283,7 +1290,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (clip?.component === 'Video' && !src) {
           return { ok: false, error: `${input.clip_id} has no video asset with a file yet` };
         }
-        const { width, height } = session.doc;
+        const { width, height } = shownIn();
         const request = {
           clipId: input.clip_id,
           frame: frames(input.time),
@@ -1312,7 +1319,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!track) {
           return { ok: false, error: `no track ${input.track_id}: run track_point first` };
         }
-        return apply(applyTrack(session.doc, track, { targetClipId: input.target_clip_id, mode: input.mode, offset: { x: input.offset_x, y: input.offset_y } }), `${input.mode} track on ${input.target_clip_id}`);
+        return apply(applyTrack(session.doc, track, { targetClipId: input.target_clip_id, mode: input.mode, offset: { x: space().toDoc(input.offset_x), y: space().toDoc(input.offset_y) } }), `${input.mode} track on ${input.target_clip_id}`);
       }
     }),
 
@@ -1387,7 +1394,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const [a, b] = [track[at], track[at + 1]];
         const h = easeHandles(a, b, session.doc.fps);
         const percent = (n: number | undefined, fallback: number) => (n === undefined ? fallback : n / 100);
-        const speed = (n: number | undefined, fallback: number) => (n === undefined ? fallback : toStored(ownerOf(input.clip_id), input.prop, n, session.doc));
+        const speed = (n: number | undefined, fallback: number) => (n === undefined ? fallback : toStored(ownerOf(input.clip_id), input.prop, n, shownIn()));
         const ease = withHandles(
           { outInfluence: percent(input.out_influence, h.outInfluence), outSpeed: speed(input.out_speed, h.outSpeed), inInfluence: percent(input.in_influence, h.inInfluence), inSpeed: speed(input.in_speed, h.inSpeed) },
           a,
@@ -1415,7 +1422,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       inputSchema: z.object({ clip_id: z.string(), time: z.number().min(0), in: z.tuple([z.number(), z.number()]).optional(), out: z.tuple([z.number(), z.number()]).optional() }),
       execute: async (input) => {
         const owner = ownerOf(input.clip_id);
-        const offset = (o: [number, number] = [0, 0]) => storedOffset(owner, o, session.doc);
+        const offset = (o: [number, number] = [0, 0]) => storedOffset(owner, o, shownIn());
         return apply(setPathTangent(session.doc, input.clip_id, { frame: frames(input.time), in: offset(input.in), out: offset(input.out) }), `bent the path of ${input.clip_id}`);
       }
     }),
@@ -1500,7 +1507,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!assetKnown(input.mask.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
-        return apply(registered(setMask(session.doc, input.clip_id, storedMask(ownerOf(input.clip_id), input.mask, session.doc)), input.mask.assetId), `masked ${input.clip_id}`);
+        return apply(registered(setMask(session.doc, input.clip_id, storedMask(ownerOf(input.clip_id), input.mask, shownIn())), input.mask.assetId), `masked ${input.clip_id}`);
       }
     }),
 
@@ -1512,7 +1519,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!ids.every(assetKnown)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
-        return apply(ids.reduce((r, id) => registered(r, id), setMaskStack(session.doc, input.clip_id, input.masks.map((m) => storedMask(ownerOf(input.clip_id), m, session.doc)))), `stacked ${input.masks.length} masks on ${input.clip_id}`);
+        return apply(ids.reduce((r, id) => registered(r, id), setMaskStack(session.doc, input.clip_id, input.masks.map((m) => storedMask(ownerOf(input.clip_id), m, shownIn())))), `stacked ${input.masks.length} masks on ${input.clip_id}`);
       }
     }),
 
@@ -1553,7 +1560,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (input.enabled === false) {
           return apply(removeCamera(session.doc), 'removed the camera');
         }
-        const base = input.values && storedRecord(CAMERA_LANE, input.values, session.doc);
+        const base = input.values && storedRecord(CAMERA_LANE, input.values, shownIn());
         return apply(setCamera(session.doc, { base: base as Partial<Record<(typeof CAMERA_KEYS)[number], number>>, dof: input.dof }), 'set the camera');
       }
     }),
@@ -1627,7 +1634,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const given = { centerX: input.x, centerY: input.y, diameter: input.diameter, refraction: input.refraction, frost: input.frost, rim: input.rim, tint: input.tint, tintAmount: input.tint_amount, wobble: input.wobble, wobbleSpeed: input.wobble_speed };
         const props = propsIn('LiquidGlass', Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)));
-        const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / session.doc.width, y: s.y / session.doc.height }));
+        const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / shownIn().width, y: s.y / shownIn().height }));
         const id = deps.newId();
         const glass = { from: frames(input.start), durationInFrames: frames(input.duration), props, path, spring: { ...SPRINGS[input.spring ?? 'soft'], ...(input.stiffness ? { stiffness: input.stiffness } : {}), ...(input.damping ? { damping: input.damping } : {}) }, fadeIn: frames(input.fade_in ?? 0), fadeOut: frames(input.fade_out ?? 0) };
         return created(apply(addLens(session.doc, Lens.Glass, glass, { clip: id, track: deps.newId() }), 'added liquid glass'), id);
@@ -1671,7 +1678,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const given = Object.fromEntries(Object.entries(BLOB_INPUT).map(([arg, key]) => [key, input[arg as keyof typeof BLOB_INPUT]]));
         const props = propsIn('LiquidBlob', Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)));
-        const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / session.doc.width, y: s.y / session.doc.height }));
+        const path = (input.path ?? []).map((s) => ({ time: s.time, x: s.x / shownIn().width, y: s.y / shownIn().height }));
         const id = deps.newId();
         const blob = { from: frames(input.start), durationInFrames: frames(input.duration), props, path, spring: { ...SPRINGS[input.spring ?? 'soft'], ...(input.stiffness ? { stiffness: input.stiffness } : {}), ...(input.damping ? { damping: input.damping } : {}) }, fadeIn: frames(input.fade_in ?? 0), fadeOut: frames(input.fade_out ?? 0) };
         return created(apply(addLens(session.doc, Lens.Blob, blob, { clip: id, track: deps.newId() }), 'added liquid blob'), id);
@@ -1793,7 +1800,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_physics: tool({
-      description: `Give a visual clip physics: it falls with gravity and bounces, simulated at a fixed step and baked per frame, so every seek and render shows the same motion. ${PHYSICS_KEYS.map((k) => `${k} ${toShown('Shape', k, PHYSICS[k].min, session.doc)}..${toShown('Shape', k, PHYSICS[k].max, session.doc)} ${unitOf('Shape', k) ?? ''}`.trim()).join('; ')} (restitution is the bounce, 100% keeps all the speed). bounds: ${BOUNDS.join(', ')} (floor bounces on the bottom of the frame, box on all four edges). collide true makes it bump into the other clips with collide on (AABB, mass decides who moves). The motion starts from where the clip is at its start and adds to its x/y. Values not given are kept; physics null turns it off.`,
+      description: `Give a visual clip physics: it falls with gravity and bounces, simulated at a fixed step and baked per frame, so every seek and render shows the same motion. ${PHYSICS_KEYS.map((k) => `${k} ${toShown('Shape', k, PHYSICS[k].min, shownIn())}..${toShown('Shape', k, PHYSICS[k].max, shownIn())} ${unitOf('Shape', k) ?? ''}`.trim()).join('; ')} (restitution is the bounce, 100% keeps all the speed). bounds: ${BOUNDS.join(', ')} (floor bounces on the bottom of the frame, box on all four edges). collide true makes it bump into the other clips with collide on (AABB, mass decides who moves). The motion starts from where the clip is at its start and adds to its x/y. Values not given are kept; physics null turns it off.`,
       inputSchema: z.object({
         clip_id: z.string(),
         physics: z
@@ -1801,7 +1808,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           .partial()
           .nullable()
       }),
-      execute: async (input) => apply(setPhysics(session.doc, input.clip_id, input.physics && storedRecord(ownerOf(input.clip_id), input.physics, session.doc)), input.physics ? `physics on ${input.clip_id}` : `physics off on ${input.clip_id}`)
+      execute: async (input) => apply(setPhysics(session.doc, input.clip_id, input.physics && storedRecord(ownerOf(input.clip_id), input.physics, shownIn())), input.physics ? `physics on ${input.clip_id}` : `physics off on ${input.clip_id}`)
     }),
 
     apply_physics_preset: tool({
@@ -1814,7 +1821,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Place a clip in the camera world: depth in pixels behind the focus plane 0 (negative comes forward; a far background 1500–4000, a foreground card -200..0). It keeps its size at rest and shows parallax when the camera moves. space "screen" keeps a caption or overlay flat on top, ignoring the camera. Works for every visual clip: text, shapes, images, video and custom components.',
       inputSchema: z.object({ clip_id: z.string(), depth: z.number().optional(), space: z.enum(SPACES).optional(), accepts_lights: z.boolean().optional() }),
       execute: async (input) => {
-        const placed = setClipDepth(session.doc, input.clip_id, { depth: input.depth, space: input.space });
+        const placed = setClipDepth(session.doc, input.clip_id, { depth: docPx(input.depth), space: input.space });
         const lit = placed.ok && input.accepts_lights !== undefined ? setAcceptsLights(placed.doc, input.clip_id, input.accepts_lights) : placed;
         return apply(lit, `placed ${input.clip_id} in depth`);
       }
@@ -1844,22 +1851,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return apply({ ok: false, error: 'lights shade the camera world: turn the camera on first (set_camera)' }, 'added a light');
         }
         const props = Object.fromEntries(
-          Object.entries({ kind: input.kind, [STAGE_LIGHT_COLOUR.key]: input.color, intensity: input.intensity, falloff: input.falloff, coneAngle: input.cone_angle, coneFeather: input.cone_feather }).filter(([, v]) => v !== undefined)
+          Object.entries({ kind: input.kind, [STAGE_LIGHT_COLOUR.key]: input.color, intensity: input.intensity, falloff: docPx(input.falloff), coneAngle: input.cone_angle, coneFeather: input.cone_feather }).filter(([, v]) => v !== undefined)
         );
         const transform = Object.fromEntries(
           Object.entries({
-            x: input.x === undefined ? undefined : toStored('Light', 'x', input.x, session.doc),
-            y: input.y === undefined ? undefined : toStored('Light', 'y', input.y, session.doc),
+            x: input.x === undefined ? undefined : toStored('Light', 'x', input.x, shownIn()),
+            y: input.y === undefined ? undefined : toStored('Light', 'y', input.y, shownIn()),
             rotateX: input.aim_x,
             rotateY: input.aim_y
           }).filter(([, v]) => v !== undefined)
         );
         if (input.clip_id) {
-          return apply(setStageLight(session.doc, input.clip_id, { props, transform, depth: input.depth }), `changed light ${input.clip_id}`);
+          return apply(setStageLight(session.doc, input.clip_id, { props, transform, depth: docPx(input.depth) }), `changed light ${input.clip_id}`);
         }
         const id = deps.newId();
         const added = addStageLight(session.doc, { kind: input.kind ?? 'point', from: frames(input.start ?? 0), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), trackId: input.track_id, props, transform }, id);
-        const placed = added.ok && input.depth !== undefined ? setStageLight(added.doc, id, { depth: input.depth }) : added;
+        const placed = added.ok && input.depth !== undefined ? setStageLight(added.doc, id, { depth: docPx(input.depth) }) : added;
         return created(apply(placed, 'added a light'), id);
       }
     }),
@@ -1869,7 +1876,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       inputSchema: z.object({ start: z.number().min(0), duration: z.number().positive().optional(), x: z.number().optional(), y: z.number().optional(), ...PLACED }),
       execute: async (input) => {
         const id = deps.newId();
-        return created(apply(addNull(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), x: input.x === undefined ? undefined : toStored('Null', 'x', input.x, session.doc), y: input.y === undefined ? undefined : toStored('Null', 'y', input.y, session.doc), trackId: input.track_id }, id), 'added a null'), id);
+        return created(apply(addNull(session.doc, { from: frames(input.start), durationInFrames: input.duration === undefined ? undefined : frames(input.duration), x: input.x === undefined ? undefined : toStored('Null', 'x', input.x, shownIn()), y: input.y === undefined ? undefined : toStored('Null', 'y', input.y, shownIn()), trackId: input.track_id }, id), 'added a null'), id);
       }
     }),
 
@@ -1914,7 +1921,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return apply(styled(setAutoLayout(session.doc, clip_id, {}), clip_id, style), `auto layout on ${clip_id}`);
         }
         const ids = children?.map((c) => c.clip_id) ?? clip_ids ?? [];
-        const sized = (children ?? []).reduce<OpResult>((r, { clip_id: child, ...item }) => (r.ok ? setLayoutItem(r.doc, child, item) : r), { ok: true, doc: session.doc });
+        const sized = (children ?? []).reduce<OpResult>((r, { clip_id: child, ...item }) => (r.ok ? setLayoutItem(r.doc, child, space().itemIn(item)) : r), { ok: true, doc: session.doc });
         const id = deps.newId();
         const out = apply(styled(sized.ok ? wrapInStack(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in a stack`);
         return out.ok ? { ...out, container_id: id } : out;
@@ -1941,7 +1948,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     set_stack: tool({
       description: 'Change a Stack (an auto layout container): direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell; columnTracks/rowTracks [{type fixed|flex|hug, value}] size each column/row: fixed px, flex fr share of the free space, hug its content; empty columnTracks = columns equal flex columns, empty rowTracks = hug rows; flex is refused on an axis where the grid hugs; autoFlow row|column fills rows or columns first), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, negative overlaps the children, padding {top,right,bottom,left} px, justify start|center|end|space-between|space-around|space-evenly on the main axis, align start|center|end|baseline|stretch on the cross axis (baseline: horizontal rows line up text baselines, a box sits on its bottom edge; stretch: children that hug the cross axis take the whole line, fixed ones keep their size), order (child ids, first to last), alignContent auto|space-between (wrap: space-between spreads the lines over the container height, needs a fixed cross size), firstOnTop true draws the first child of the order above the others (visual only, default false keeps the track order), strokesIncluded true (default on a new container) counts the inside strokes of the container as padding so children sit inside them. Only the fields given change. off true turns the layout off and keeps the container (children keep their parent and the boxes the layout gave them); remove_stack unwraps instead.',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
-      execute: async ({ clip_id, off, ...patch }) => apply(off ? freezeLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
+      execute: async ({ clip_id, off, ...patch }) => apply(off ? freezeLayout(session.doc, clip_id) : setAutoLayout(session.doc, clip_id, space().layoutIn(patch)), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
 
     set_layout_item: tool({
@@ -1949,7 +1956,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string(), constraints: z.object({ horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }).optional() }),
       execute: async ({ clip_id, constraints, ...patch }) => {
         const pinned = constraints ? setConstraints(session.doc, [clip_id], constraints) : ({ ok: true, doc: session.doc } as OpResult);
-        const sized = pinned.ok && Object.keys(patch).length ? setLayoutItem(pinned.doc, clip_id, patch) : pinned;
+        const sized = pinned.ok && Object.keys(patch).length ? setLayoutItem(pinned.doc, clip_id, space().itemIn(patch)) : pinned;
         return apply(sized, `sized ${clip_id} in its layout`);
       }
     }),
@@ -2086,7 +2093,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     add_shape: tool({
       description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with radius (px) or roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness), and smoothing 0..1 softens them toward a squircle (0 = circular); set_props changes them later. Fill: fills is a stack of layers painted bottom to top (first = bottom), each {type: solid {color} | linear-gradient {stops [{color, pos 0..1}], angle} | radial-gradient {stops, center {x,y} 0..1, radius (1 = half the long side)} | image {assetId, fit cover/contain/fill/tile, focus {x,y} 0..1, scale}, opacity 0..1, visible, blend (css blend mode)}; e.g. a photo with a dark overlay is [{type: image, assetId}, {type: solid, color: #000000, opacity: 0.4}]. fills replaces the older fillKind/fill/fill2/gradientAngle (still read when fills is absent); set_props {fills} changes the whole stack. Stroke: strokes is a stack painted bottom to top over the fills, each {paint (a fills layer, never image), width, dash, gap (all fractions of the frame's short side, 0..0.2; dash 0 = solid), align inside/center/outside, sides [top, right, bottom, left] widths (rect only), cap butt/round/square, join miter/round/bevel, visible}; e.g. a 4px outside ring is [{paint: {type: solid, color: #ffffff}, width_px: 4, align: outside}] (same as width: 0.0037 on a 1080 frame). strokes replaces the older strokeKind/stroke/strokeWidth/dash/gap/cap/join (still read when strokes is absent; set_props {strokes} changes the whole stack). Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PX_FIELDS_GUIDE} ${PLACEMENT_HELP} Returns the clip id.`,
-      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), fills: fillsSchema.optional(), strokes: z.preprocess((v) => strokesFromPx(v, session.doc), strokesSchema).optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
+      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), fills: fillsSchema.optional(), strokes: z.preprocess((v) => strokesFromPx(v, shownIn()), strokesSchema).optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (raw) => {
         const input = { ...raw, props: newFromPx('Shape', raw.props) };
         const id = deps.newId();
@@ -2677,7 +2684,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const early = typeof input.still === 'number' ? designStill(session.doc, input.still) : ({ ok: true, doc: session.doc } as OpResult);
         const animated = !early.ok || input.still !== false ? early : animateStill(early.doc, input.duration);
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
-        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.preset ? PRESET_SIZE[input.preset] : input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
+        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.preset ? docSize(PRESET_SIZE[input.preset]) : input.width && input.height ? docSize({ width: input.width, height: input.height }) : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         const postered = pinned.ok && input.poster !== undefined ? setPoster(pinned.doc, input.poster === false ? null : framesAt(input.poster, pinned.doc.fps)) : pinned;
         const guided = postered.ok && input.layout_guides ? setLayoutGuides(postered.doc, input.layout_guides) : postered;
@@ -2689,7 +2696,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     add_guide: tool({
       description: `Pull a guide onto the frame, as the rulers do in the editor: a vertical guide at x px from the left edge or a horizontal one at y px from the top, inside the frame. Layers snap to it while they move; it is drawn in the editor, never in the export. Up to ${MAX_USER_GUIDES} per frame. remove_guide takes it away.`,
       inputSchema: z.object({ axis: z.enum(GUIDE_AXES), at: z.number().describe('px from the left edge (vertical) or the top edge (horizontal)') }),
-      execute: async (input) => apply(addGuide(session.doc, { axis: AXIS_OF[input.axis], at: input.at }), `added a ${input.axis} guide at ${Math.round(input.at)}`)
+      execute: async (input) => apply(addGuide(session.doc, { axis: AXIS_OF[input.axis], at: space().toDoc(input.at) }), `added a ${input.axis} guide at ${Math.round(input.at)}`)
     }),
 
     remove_guide: tool({
@@ -2700,7 +2707,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           const { userGuides: _, ...rest } = session.doc;
           return apply({ ok: true, doc: rest }, 'cleared the guides');
         }
-        return apply(removeGuide(session.doc, { axis: AXIS_OF[input.axis], at: input.at }), `removed the ${input.axis} guide at ${Math.round(input.at)}`);
+        return apply(removeGuide(session.doc, { axis: AXIS_OF[input.axis], at: space().toDoc(input.at) }), `removed the ${input.axis} guide at ${Math.round(input.at)}`);
       }
     }),
 
@@ -2736,7 +2743,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!pinned.ok) {
           return pinned;
         }
-        return deps.exportStill(pinned.doc, stillExport(input.format ?? ImageFormat.Png, input.scale ?? ImageScale.One, IN_DOC_PX));
+        return deps.exportStill(pinned.doc, stillExport(input.format ?? ImageFormat.Png, input.scale ?? ImageScale.One, scale));
       }
     }),
 
@@ -3240,10 +3247,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           for (const [index, call] of input.calls.entries()) {
             const out = await nestedCall(call.tool, call.input, options);
             if (out.ok === false) {
-              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: docSummary(session.doc, []) };
+              return { ok: false, failed: index, error: `${call.tool}: ${out.error}`, doc: docSummary(session.doc, [], scale) };
             }
           }
-          return { ok: true, doc: docSummary(session.doc, []) };
+          return { ok: true, doc: docSummary(session.doc, [], scale) };
         } finally {
           session.doc = mergeView(root, [input.comp], session.doc);
         }
@@ -3376,7 +3383,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         session.doc = doc;
         session.edits.push(`restored version ${input.version}`);
-        return { ok: true, edit: `restored version ${input.version}`, doc: docSummary(session.doc, []) };
+        return { ok: true, edit: `restored version ${input.version}`, doc: docSummary(session.doc, [], scale) };
       }
     }),
 

@@ -111,6 +111,7 @@ import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
+import { viewOf } from '$lib/canvas/breakpoint-views';
 import { ExportOutcome, exportSelection, noteImageExport } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -1287,7 +1288,7 @@ export const actions: Actions<CanvasParams> = {
     const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
     const shownAt = Number(fd.get('seconds'));
     const seconds = fd.has('seconds') && Number.isFinite(shownAt) && shownAt >= 0 ? shownAt : undefined;
-    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ nodeId: String(id), seconds })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ ...(viewOf(String(id)) ?? { nodeId: String(id) }), seconds })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
     if (out instanceof Error) {
       return fail(502, { error: `the images could not be drawn: ${out.message}` });
     }

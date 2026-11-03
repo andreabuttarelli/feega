@@ -13,7 +13,8 @@ import { drawTargets } from './selection-draw';
 import { vectorOf, type Span } from './vector-list';
 import { libsOrigin } from './libs-origin';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
-import { assetUrls, docScaleOf, motionAssets, motionTokens } from './editor';
+import { assetUrls, motionAssets, motionTokens } from './editor';
+import { docScaleOf } from './doc-scale';
 import type { DrawTarget, SelectionPorts } from './selection-export';
 
 export type SelectionScope = { db: Db; orgId: string; projectId: string; brandId: string | null; actor: Actor };

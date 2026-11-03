@@ -146,3 +146,21 @@ describe('the canvas styles library over MCP', () => {
     expect(findClip(store.docs.a, 't')!.clip.styleRef).toBeUndefined();
   });
 });
+
+describe('a project text style on a frame drawn at two doc px per canvas px', () => {
+  const BODY = { kind: StyleKind.Text, sizePx: 16, weight: 400 } as const;
+  const halfStage = (doc: MotionDoc) => ({ width: doc.width / 2, height: doc.height / 2 });
+  const canvasPx = (doc: MotionDoc) => (Number(findClip(doc, 't')!.clip.props.size) * Math.min(doc.width, doc.height)) / 2;
+
+  it('applies at the px it says, measured on the canvas', async () => {
+    const store = frames({ b: textDoc() }, { Body: BODY });
+    const read = store.read;
+    store.read = async (id) => {
+      const found = await read(id);
+      return found && { ...found, stage: halfStage(found.doc) };
+    };
+
+    expect(await canvasStyle(store, { name: 'Body', ids: ['b:t'] })).toMatchObject({ ok: true });
+    expect(canvasPx(store.docs.b)).toBeCloseTo(16, 3);
+  });
+});

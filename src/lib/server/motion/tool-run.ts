@@ -13,6 +13,7 @@ import { savedMotionWith } from './agent-embed';
 import { embedAction } from './embed';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { assetUrls, motionAssets, motionTokens, type MotionAsset } from './editor';
+import { docScaleOf } from './doc-scale';
 import { OpsOutcome, commitDoc } from './frame-ops';
 import { templateLibrary } from './templates';
 import { exportStill } from './still-export';
@@ -156,6 +157,7 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
   const frames: MotionToolDeps['frames'] = turn ? (callId, times) => firstFrames([async () => (editor ? editor(callId, times, session.doc) : null), () => server(times)]) : noFrames;
   const tools = toolsFor({
     session,
+    scale: docScaleOf(saved.record, saved.doc),
     assets,
     templates: templateLibrary(db, { orgId: scope.orgId, actor }),
     revisions: { list: () => namedRevisions(db, nodeScope), read: async (v) => (await readRevision(db, { ...nodeScope, version: v }))?.doc ?? null, name: async (v, name) => (await nameVersion(db, { ...nodeScope, version: v, name, actor })).named },

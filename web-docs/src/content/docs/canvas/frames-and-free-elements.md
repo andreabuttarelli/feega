@@ -39,7 +39,8 @@ A frame works in design units, as in Figma ([ADR 0033](/architecture/adr/0033-a-
 - Resizing a frame, by its handle or by typing W and H, keeps every layer, type size and corner radius at its size and moves layers by their constraints.
 - A text style is a pixel size: 16 px is 16 px in every frame that uses it.
 - Typing W on an auto-width text makes it fixed width; wrapping a text in a stack keeps how it sizes.
-- Frames made before this change keep their content untouched; their numbers read in canvas pixels too.
+- Frames made before this change keep their content untouched; their numbers read in canvas pixels too, in the inspector, the timeline value fields, the motion agent and the MCP motion tools.
+- The motion agent and `motion_tool` speak the same canvas pixels: `get_motion_doc` reports the frame as big as it is on the canvas, and positions, sizes, strokes, gaps, padding, guides and `set_canvas` sizes are canvas pixels. `export_image` scale 1 is one image pixel per canvas pixel.
 - The resolution of a file is picked when you export it: see [Export](/motion/export/).
 
 ## Styling the frame
