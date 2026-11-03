@@ -59,7 +59,7 @@ import { ElementPaste, elementPaste, pasteTargets } from '$lib/canvas/paste-into
   import { DrawAction, drawOp, isDraw, keepDrawn } from '$lib/canvas/draw-queue';
   import { draftLog, replayDrafts, type DraftEntry, type DraftLog } from '$lib/canvas/frame-drafts';
   import { postFrameOps, queueResultOf } from '$lib/canvas/frame-ops-send';
-  import type { FrameDraft } from '$lib/motion/frame-sync';
+  import type { FrameDraft, Revision } from '$lib/motion/frame-sync';
   import type { Op } from '$lib/canvas/op-queue';
   import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -452,7 +452,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       mainPick = { nodeId: frameId, compId, key: (mainPick?.key ?? 0) + 1 };
       return;
     }
-    mainNav.canvases = await fetchProjectComponents(data.projectId);
+    await mainNav.refresh();
     const location = mainNav.where({ compId, home: frameId });
     if (location) {
       await goto(mainHref(data.projectId, location, frameId, compId));
@@ -460,8 +460,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   onMount(() => {
-    void fetchProjectComponents(data.projectId).then((found) => (mainNav.canvases = found));
-    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null) });
+    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null), load: () => fetchProjectComponents(data.projectId) });
   });
 
   afterNavigate(() => {
@@ -672,10 +671,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
-  async function homeComponents(nodeId: string): Promise<Record<string, string> | null> {
+  async function homeComponents(nodeId: string): Promise<Revision | null> {
     const done = await postAtVersion('homeComponents', nodeId, {});
     void invalidate(CANVAS_LIST_DEPENDENCY);
-    return (done?.homes as Record<string, string> | undefined) ?? null;
+    return (done?.head as Revision | null | undefined) ?? null;
   }
 
   function wrapInSection(ids: string[]) {

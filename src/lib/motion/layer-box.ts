@@ -4,6 +4,7 @@ import { aabb, quadOf, type Bounds } from './scene-select';
 import { placeBox } from './selection-props';
 import { propBoxes } from './space';
 import { toStored } from './units';
+import { resizeInstance } from './instance-resize';
 import { MIXED, shared, type Shared } from './mixed';
 import type { EditMode } from './edit-mode';
 
@@ -50,8 +51,13 @@ function unionOf(placed: readonly LayerBox[]): Bounds {
 export const boxValue = (placed: readonly LayerBox[], key: BoxKey): Shared<number> => (placed.length ? Math.round(READ[key](unionOf(placed)) * HUNDREDTHS) / HUNDREDTHS : MIXED);
 
 function placeOne(doc: MotionDoc, clip: MotionClip, at: LayerBox, key: BoxKey, value: number, frame: number, mode: EditMode): OpResult {
-  if (!MOVES.has(key) && typeof clip.props[key] === 'number' && !doc.comps[String(clip.props.comp)]?.component) {
+  const instance = !!doc.comps[String(clip.props.comp)]?.component;
+  if (!MOVES.has(key) && typeof clip.props[key] === 'number' && !instance) {
     return setProps(doc, clip.id, { [key]: toStored(clip.component, key, value, doc) });
+  }
+  const resized = instance && !MOVES.has(key) ? resizeInstance(doc, clip.id, { width: READ[BoxKey.Width](at.bounds), height: READ[BoxKey.Height](at.bounds) }, { [key]: value }) : null;
+  if (resized) {
+    return resized;
   }
   return placeBox(doc, [clip.id], frame, at.bounds, { [key]: value }, mode);
 }

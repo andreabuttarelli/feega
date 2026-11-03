@@ -42,7 +42,7 @@
   import { CANVAS_DRAG_TOOL } from '$lib/canvas/new-node';
   import type { DrawTool } from '$lib/motion/draw-tool';
   import { highlightStyle, rowHighlight } from '$lib/canvas/highlight';
-  import { LayerAction, LayerKind, NodeIcon, Pick, Place, dropLayers, dropTool, freeLanding, rowDrop, frameRows, layerEdit, pickIdOf, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, childIds, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, Place, DROP_BOX, dropLayers, dropTool, freeLanding, landsInMain, rowDrop, frameRows, layerEdit, pickIdOf, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, childIds, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -170,7 +170,7 @@
       return;
     }
     const tool = e.dataTransfer?.types.includes(CANVAS_DRAG_TOOL);
-    if ((!dragged && !tool) || !editable(row) || block.includes(row.id)) {
+    if ((!dragged && !tool) || !landable(row) || block.includes(row.id)) {
       landing = null;
       return;
     }
@@ -190,6 +190,7 @@
   const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: rowStep, overscan: OVERSCAN }));
   const visible = $derived(shown.slice(span.start, span.end));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
+  const landable = (row: LayerRow) => editable(row) || (!!video && !!row.scene && landsInMain(video.doc, row.scene, video.nodeId));
   const flagTarget = (row: LayerRow): string | null => (editable(row) ? row.id : row.own && video?.nodeId === row.id ? row.own : null);
   const nodeFlagged = (row: LayerRow) => row.kind === LayerKind.Node && !row.nested && !!canvas && !(row.own && video?.nodeId === row.id);
   const renamable =(row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
@@ -290,7 +291,7 @@
   }
 
   function dropFromMenu(row: LayerRow, tool: DrawTool, place: Place) {
-    const result = dropTool(video!.doc, tool, row.id, place, crypto.randomUUID().slice(0, 8));
+    const result = dropTool(video!.doc, tool, row.scene ?? row.id, place, crypto.randomUUID().slice(0, 8), DROP_BOX, video!.nodeId);
     video!.edit(result, 'Added a layer');
   }
 
@@ -320,7 +321,7 @@
     if (!video || !from || !place || moving.includes(row.id)) {
       return;
     }
-    video.edit(dropLayers(video.doc, moving, row.id, place, frameRows(video.doc, video.nodeId).map((r) => r.id)), moving.length > 1 ? `Moved ${moving.length} layers` : 'Moved a layer');
+    video.edit(dropLayers(video.doc, moving, row.scene ?? row.id, place, frameRows(video.doc, video.nodeId).map((r) => r.id), video.nodeId), moving.length > 1 ? `Moved ${moving.length} layers` : 'Moved a layer');
   }
 
   let menu = $state<{ x: number; y: number } | null>(null);

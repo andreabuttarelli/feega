@@ -32,7 +32,7 @@ export function mainUnder(doc: MotionDoc, [x, y]: Pt, here: string | null, skip:
   return hits.sort((a, b) => a.area - b.area)[0]?.id ?? null;
 }
 
-function adopted(doc: MotionDoc, ids: readonly string[], host: MotionClip): MotionDoc {
+export function adopted(doc: MotionDoc, ids: readonly string[], host: MotionClip): MotionDoc {
   const taken = new Set(ids);
   const compId = compOf(host)!;
   const comp = doc.comps[compId];

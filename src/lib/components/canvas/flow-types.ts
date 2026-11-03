@@ -1,3 +1,4 @@
+import type { Revision } from '$lib/motion/frame-sync';
 import type { Tie } from '$lib/canvas/gpu/wire-magnet';
 import type { PlacedChange } from '$lib/canvas/place-many';
 import type { ActionResult } from '@sveltejs/kit';
@@ -134,7 +135,7 @@ export type FlowProps = {
   onAddBeside?: (id: string) => Drawing | null;
   onGroup?: (ids: string[]) => void;
   onWrapStack?: (ids: string[]) => void;
-  onComponentMade?: (nodeId: string) => Promise<Readonly<Record<string, string>> | null>;
+  onComponentMade?: (nodeId: string) => Promise<Revision | null>;
   onNodeSize?: (id: string, w: number, h: number) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;
