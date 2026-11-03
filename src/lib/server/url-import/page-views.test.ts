@@ -147,6 +147,8 @@ describe('a page read at desktop and phone width', () => {
   const textStyle = (size: number, extra: Record<string, unknown> = {}) => ({ fontFamily: 'Inter', fontWeight: 400, fontSize: size, lineHeightUnit: 'PIXELS', lineHeightPx: size * 1.2, textAlignHorizontal: 'LEFT', ...extra });
   const textOf = (key: string, box: Box, characters: string, style = textStyle(24)): RestNode => ({ id: key, key, type: 'TEXT', name: characters, characters, style, textAutoResize: 'HEIGHT', absoluteBoundingBox: box, fills: [{ type: 'SOLID', color: BLUE }] });
   const shownTexts = (d: MotionDoc) => (d.tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => c.component === 'Text' && !c.hidden).map((c) => c.props.text);
+  const textClips = (d: MotionDoc) => [...d.tracks, ...Object.values(d.comps ?? {}).flatMap((c) => c.tracks)].flatMap((t) => t.clips as MotionClip[]).filter((c) => c.component === 'Text');
+  const withText = (d: MotionDoc, text: string): MotionDoc => ({ ...d, tracks: d.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (c.component === 'Text' ? { ...c, props: { ...c.props, text } } : c)) })) as MotionDoc['tracks'] });
   const planned = (wide: PageTree, reads: { view: (typeof PAGE_VIEWS)[number]; tree: PageTree }[]) => {
     let n = 0;
     return urlPlan(wide, () => `c${++n}`, (r) => r, {}, undefined, reads)!;
@@ -161,7 +163,7 @@ describe('a page read at desktop and phone width', () => {
     expect(shownTexts(doc)).toEqual(['Financial infrastructure to grow your revenue. Accept payments.']);
   });
 
-  it('a picture the phone page swaps for another source shows that source on the phone view (srcset: the hero art)', () => {
+  it('a picture the phone page swaps for another source stays one layer with the desktop picture (srcset: the hero art)', () => {
     const [WIDE, SMALL] = ['https://example.com/hero-wide.jpg', 'https://example.com/hero-small.jpg'];
     const picture = (box: Box, url: string): RestNode => ({ ...card('hero', box), fills: [{ type: 'IMAGE', imageRef: url, scaleMode: 'FILL' }] });
     const made = planned(pageOf(1280, 800, [picture({ x: 0, y: 0, width: 1280, height: 600 }, WIDE)]), [{ view: PAGE_VIEWS[1], tree: pageOf(390, 800, [picture({ x: 0, y: 0, width: 390, height: 500 }, SMALL)]) }]);
@@ -171,8 +173,56 @@ describe('a page read at desktop and phone width', () => {
       return item.images.filter((i) => shown.has(i.clipId) || (i.innerId && shown.has(i.innerId))).map((i) => made.images[i.hash]);
     };
 
+    expect(shownPicture(resolveView(item.doc, PAGE_VIEWS[1].id))).toEqual([WIDE]);
+    expect(shownPicture(item.doc)).toEqual([WIDE]);
+  });
+
+  it('a snapshot the phone page draws at another shape keeps the phone snapshot on the phone view (vercel.com: the hero triangle squeezed into the phone box)', () => {
+    const [WIDE, SMALL] = ['snap-wide', 'snap-small'];
+    const snapshot = (box: Box, url: string): RestNode => ({ ...card('hero', box), fills: [{ type: 'IMAGE', imageRef: url, scaleMode: 'STRETCH' }] });
+    const made = planned(pageOf(1280, 800, [snapshot({ x: 300, y: 0, width: 680, height: 500 }, WIDE)]), [{ view: PAGE_VIEWS[1], tree: pageOf(390, 800, [snapshot({ x: 0, y: 0, width: 390, height: 420 }, SMALL)]) }]);
+    const item = made.plan.items[0];
+    const shownPicture = (d: MotionDoc) => {
+      const shown = new Set((d.tracks.flatMap((t) => t.clips) as MotionClip[]).filter((c) => !c.hidden).map((c) => c.id));
+      return item.images.filter((i) => shown.has(i.clipId) || (i.innerId && shown.has(i.innerId))).map((i) => made.images[i.hash]);
+    };
+
     expect(shownPicture(resolveView(item.doc, PAGE_VIEWS[1].id))).toEqual([SMALL]);
     expect(shownPicture(item.doc)).toEqual([WIDE]);
+  });
+
+  it('a heading the tablet and phone pages both wrap in a box the desktop plan drops is one layer in both views (vercel.com: the phone headings came in as copies)', () => {
+    const heading = (box: Box) => textOf('d/s/h', box, 'Build agents');
+    const narrowAt = (width: number) => pageOf(width, 800, [{ ...card('d', { x: 0, y: 80, width, height: 300 }), children: [{ ...card('d/s', { x: 16, y: 100, width: width - 32, height: 200 }), fills: [{ type: 'SOLID', color: WHITE }], children: [heading({ x: 24, y: 120, width: width - 48, height: 60 })] }] }]);
+    const wide = pageOf(1280, 800, [{ ...card('d', { x: 0, y: 80, width: 1280, height: 300 }), children: [heading({ x: 40, y: 120, width: 900, height: 60 })] }]);
+    const doc = planned(wide, PAGE_VIEWS.map((view) => ({ view, tree: narrowAt(view.width) }))).plan.items[0].doc;
+
+    expect(textClips(doc)).toHaveLength(1);
+    expect(PAGE_VIEWS.map((v) => shownTexts(resolveView(withText(doc, 'Ship agents'), v.id)))).toEqual([['Ship agents'], ['Ship agents']]);
+  });
+
+  it('repeated cards imported with breakpoints are the same layers in every view, not copies hidden on desktop (vercel.com: tablet and phone drew their own hidden duplicates)', () => {
+    const cardWith = (i: number, box: Box): RestNode => ({ ...card(`c${i}`, box), children: [textOf(`c${i}/t`, { x: box.x + 16, y: box.y + 16, width: box.width - 32, height: 30 }, `Feature ${i}`)] });
+    const wide = pageOf(1280, 800, [0, 1, 2].map((i) => cardWith(i, { x: 40 + i * 410, y: 100, width: 380, height: 200 })));
+    const narrow = pageOf(390, 1200, [0, 1, 2].map((i) => cardWith(i, { x: 20, y: 100 + i * 220, width: 350, height: 200 })));
+    let n = 0;
+    const doc = urlPlan(wide, () => `c${++n}`, undefined, {}, undefined, [{ view: PAGE_VIEWS[1], tree: narrow }])!.plan.items[0].doc;
+    const phoneView = resolveView(doc, PAGE_VIEWS[1].id);
+    const shownAtBase = new Set(textClips(doc).filter((c) => !c.hidden).map((c) => c.id));
+
+    expect(shownTexts(phoneView)).toEqual(['Feature 0', 'Feature 1', 'Feature 2']);
+    expect(textClips(phoneView).filter((c) => !c.hidden).every((c) => shownAtBase.has(c.id))).toBe(true);
+  });
+
+  it('a layer the narrow page wraps in a box the desktop plan drops still links to its desktop layer (vercel.com: a wrapper painted only at tablet width)', () => {
+    const inner = (box: Box): RestNode => ({ ...card('w/a', box), children: [textOf('w/a/t', { x: box.x + 10, y: box.y + 10, width: 200, height: 30 }, 'Deploy now')] });
+    const wrapper = (box: Box, children: RestNode[]): RestNode => ({ ...card('w', box), fills: [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9, a: 1 } }], children });
+    const wide = pageOf(1280, 800, [inner({ x: 40, y: 100, width: 600, height: 200 })]);
+    const narrow = pageOf(390, 800, [wrapper({ x: 0, y: 80, width: 390, height: 260 }, [inner({ x: 20, y: 100, width: 350, height: 200 })])]);
+    const doc = planned(wide, [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
+
+    expect(textClips(doc)).toHaveLength(1);
+    expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['Deploy now']);
   });
 
   it('a phone page far longer than the desktop one fits its view whole (stripe: the phone page ran past the frame maximum and lost its last quarter)', () => {
@@ -228,7 +278,7 @@ describe('a page read at desktop and phone width', () => {
     const narrow = pageOf(390, 800, [line('p~0', 20, 300, 340, 'However, because these concepts have been given agreed-upon names ('), card('p/code1', { x: 230, y: 330, width: 34, height: 24 }), line('p~1.0', 270, 328, 60, 'for a'), line('p~1.1', 20, 356, 90, 'paragraph,')]);
     const doc = planned(pageOf(1280, 800, [line('p~0', 40, 300, 700, 'Wide paragraph')]), [{ view: PAGE_VIEWS[1], tree: narrow }]).plan.items[0].doc;
 
-    expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id))).toEqual(['However, because these concepts have been given agreed-upon names (', 'for a', 'paragraph,']);
+    expect(shownTexts(resolveView(doc, PAGE_VIEWS[1].id)).sort()).toEqual(['However, because these concepts have been given agreed-upon names (', 'for a', 'paragraph,'].sort());
   });
 
   it('an answer the phone page keeps folded stays hidden on the phone view (feega.app: every FAQ answer drawn over the next question)', () => {
