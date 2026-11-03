@@ -11,7 +11,6 @@ import { docNodeSize, frameChrome, motionOf, type MotionNode } from '$lib/canvas
 import { Root } from '$lib/canvas/frame-select';
 import { settleElement, unsettled, type HostBox, type Settled } from '$lib/motion/element-host';
 import { formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { scaleOf } from '$lib/motion/units';
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '@feega/motion-core/motion/brand';
 import { mainHomesOf } from '$lib/motion/linked-mains';
@@ -169,11 +168,6 @@ export async function saveMotionDoc(
   }
   await nudgeInstances(db, { orgId: input.orgId, nodeId: input.nodeId, doc: write.head.doc as MotionDoc, actor: input.actor });
   return write;
-}
-
-export function docScaleOf(record: Pick<CanvasNodeRecord, 'size'> | null, doc: Pick<MotionDoc, 'width'>): number {
-  const { width, height } = record?.size ?? {};
-  return scaleOf(doc, width && height ? { w: width, h: height } : null);
 }
 
 function hostBoxOf(record: CanvasNodeRecord): HostBox | null {

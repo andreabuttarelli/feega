@@ -46,6 +46,7 @@
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
   import { inDoc, libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { scaleOf, spaceOf } from '$lib/motion/units';
   import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
@@ -1556,14 +1557,20 @@
   onMount(lockOverscroll);
 
   $effect(() => {
-    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
+    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => placedDoc(f.id))));
   });
+
+  const placedDoc = (id: string) => {
+    const doc = liveOf(id)?.doc;
+    return doc ? [{ doc, scale: scaleOf(doc, byId.get(id) ?? null) }] : [];
+  };
 
   function syncStyle(name: string, style: Style) {
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && !sameValue(present.styles?.[name], inDoc(style, present)) ? syncedDoc(present, name, style) : null;
+      const scale = present ? scaleOf(present, byId.get(frame.id) ?? null) : 1;
+      const synced = present && !sameValue(present.styles?.[name], inDoc(style, spaceOf(present, scale))) ? syncedDoc(present, name, style, scale) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -1921,7 +1928,7 @@
     const live = nodeId ? liveOf(nodeId) : null;
     const mode = nodeId && live ? frameMode : EditMode.Design;
     const access = nodeId ? frameTimeline(editorMode.timeline, frameChrome(kindOfNode(nodeId)).timeline, mode) : TimelineAccess.Hidden;
-    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), frame: frameOfLive(live), access } : null;
+    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), scale: scaleOf(live.doc, byId.get(nodeId) ?? null), frame: frameOfLive(live), access } : null;
   });
 
   const TIMELINE_CHANGE: Record<TimelineAccess, (nodeId: string) => (doc: LiveDoc['doc'], summary: string) => void> = {
@@ -3968,6 +3975,7 @@
         ram={ramNode === nodeId ? ramRuns : []}
         onram={() => cacheRam(nodeId, timeline!.doc)}
         {assetUrl}
+        scale={timeline.scale}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={TIMELINE_CHANGE[timeline.access](nodeId)}
       />

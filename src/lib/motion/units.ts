@@ -256,4 +256,4 @@ export function storedOffset(component: Owner, [dx, dy]: Offset, frame: Frame): 
 }
 
 export const UNITS_GUIDE =
-  'Units are px of the frame (a frame drawn on the canvas has one px per canvas px). Units: x, y, width, height (of clips, masks and particle emitters) in px of the composition; size, strokeWidth, dash, gap and particle sizes in px; z, perspective, blur, feather and expansion in px; scale, scaleX, scaleY and opacity in % (100 = as is); rotations, skews and angles in degrees.';
+  'Units are canvas px: the frame as big as it is on the canvas, whatever resolution it exports at. Units: x, y, width, height (of clips, masks and particle emitters) in px of the composition; size, strokeWidth, dash, gap and particle sizes in px; z, perspective, blur, feather and expansion in px; scale, scaleX, scaleY and opacity in % (100 = as is); rotations, skews and angles in degrees.';

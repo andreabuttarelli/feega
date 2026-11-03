@@ -9,7 +9,7 @@
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { overridesOf, resetOverride } from '$lib/motion/style-overrides';
 
-  let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, scale = 1, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; commit: (result: OpResult, summary: string) => void } = $props();
 
   const NONE = '';
 
@@ -20,7 +20,7 @@
     { kind: StyleKind.Effect, label: 'Effect style', offered: (c) => c.effects.length > 0 }
   ];
 
-  const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles));
+  const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles, scale));
   const offeredIn = (slot: StyleSlot) => offered.filter((s) => slotOf(s.style.kind) === slot);
   const linkedStyles = $derived([clip.styleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
   const overridden = $derived(overridesOf(doc, clip.id));

@@ -5,6 +5,7 @@ import { adoptStyle, libraryOf, syncedDoc, type Library } from '$lib/motion/styl
 import { styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import { LibraryOp, type LibraryPort } from '$lib/motion/project-library-ops';
+import { scaleOf } from '$lib/motion/units';
 
 const ELEMENT_SEP = ':';
 
@@ -20,7 +21,7 @@ export const canvasStyleInput = z.object({
 export type StyleFrames = {
   project: LibraryPort;
   ids: () => Promise<string[]>;
-  read: (id: string) => Promise<{ version: number; doc: MotionDoc } | null>;
+  read: (id: string) => Promise<{ version: number; doc: MotionDoc; stage?: Stage } | null>;
   write: (id: string, version: number, doc: MotionDoc, summary: string) => Promise<RevisionWrite>;
 };
 
@@ -36,11 +37,13 @@ export type StyleAsk = { name?: string; to?: string; style?: Style; ids?: string
 
 export type StyleAnswer = { ok: true; styles?: Library; frames?: string[] } | { ok: false; error: string };
 
-type Frame = { id: string; version: number; doc: MotionDoc };
+type Stage = { width: number; height: number };
+
+type Frame = { id: string; version: number; doc: MotionDoc; scale: number };
 
 async function framesOf(store: StyleFrames): Promise<Frame[]> {
   const ids = await store.ids();
-  return (await Promise.all(ids.map(async (id) => ({ id, head: await store.read(id) })))).flatMap((f) => (f.head ? [{ id: f.id, ...f.head }] : []));
+  return (await Promise.all(ids.map(async (id) => ({ id, head: await store.read(id) })))).flatMap((f) => (f.head ? [{ id: f.id, version: f.head.version, doc: f.head.doc, scale: scaleOf(f.head.doc, f.head.stage ? { w: f.head.stage.width, h: f.head.stage.height } : null) }] : []));
 }
 
 const written = (w: RevisionWrite) => w.outcome === RevisionOutcome.Written;
@@ -61,7 +64,7 @@ async function saved(store: StyleFrames, frame: Frame, doc: MotionDoc | null, su
 
 async function projectLibrary(store: StyleFrames, frames: readonly Frame[]): Promise<Library> {
   const held = (await store.project.load()) as Library;
-  const found = libraryOf(frames.map((f) => f.doc));
+  const found = libraryOf(frames);
   const fresh = Object.fromEntries(Object.entries(found).filter(([name]) => !held[name]));
   if (Object.keys(fresh).length) {
     await store.project.run({ op: LibraryOp.Adopt, entries: fresh });
@@ -69,8 +72,8 @@ async function projectLibrary(store: StyleFrames, frames: readonly Frame[]): Pro
   return { ...held, ...fresh };
 }
 
-async function inFrames(store: StyleFrames, frames: readonly Frame[], change: (doc: MotionDoc) => MotionDoc | null, summary: string): Promise<string[]> {
-  return (await Promise.all(frames.map((f) => saved(store, f, change(f.doc), summary)))).flat();
+async function inFrames(store: StyleFrames, frames: readonly Frame[], change: (doc: MotionDoc, scale: number) => MotionDoc | null, summary: string): Promise<string[]> {
+  return (await Promise.all(frames.map((f) => saved(store, f, change(f.doc, f.scale), summary)))).flat();
 }
 
 const ASKS: [(ask: StyleAsk) => boolean, CanvasStyleAction][] = [
@@ -93,7 +96,7 @@ const ACTIONS: Record<CanvasStyleAction, (store: StyleFrames, ask: StyleAsk) => 
       return stored;
     }
     const frames = await framesOf(store);
-    return { ok: true, frames: await inFrames(store, frames, (doc) => syncedDoc(doc, ask.name!, ask.style!), `Updated the ${ask.name} style`) };
+    return { ok: true, frames: await inFrames(store, frames, (doc, scale) => syncedDoc(doc, ask.name!, ask.style!, scale), `Updated the ${ask.name} style`) };
   },
   [CanvasStyleAction.Rename]: async (store, ask) => {
     const frames = await framesOf(store);
@@ -139,7 +142,7 @@ const ACTIONS: Record<CanvasStyleAction, (store: StyleFrames, ask: StyleAsk) => 
     const changed: string[] = [];
     for (const [frameId, elements] of byFrame(ask.ids ?? [])) {
       const frame = frames.find((f) => f.id === frameId);
-      const adopted = frame ? adoptStyle(frame.doc, elements, ask.name, style) : null;
+      const adopted = frame ? adoptStyle(frame.doc, elements, ask.name, style, frame.scale) : null;
       if (!frame || !adopted?.ok) {
         return { ok: false, error: adopted && !adopted.ok ? adopted.error : `no frame ${frameId} on this canvas` };
       }
