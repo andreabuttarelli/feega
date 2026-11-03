@@ -160,6 +160,8 @@
   const renamable =(row: LayerRow) => (row.kind === LayerKind.Node ? !!canvas && !row.nested : editable(row) && row.kind !== LayerKind.Part);
 
   function enterRow(row: LayerRow, e: KeyboardEvent) {
+    e.preventDefault();
+    e.stopPropagation();
     const children = childIds(rows, row);
     if (video?.nodeId === row.nodeId && children.length) {
       video.select(children);

@@ -87,6 +87,16 @@ describe('Enter on a layer row', () => {
     expect(videoSelect).toHaveBeenCalledWith(['hero']);
     expect(document.querySelector('[data-testid="layer-rename"]')).toBeNull();
   });
+
+  it('stays in the panel, so the canvas does not start typing in the child it selected (vercel.com: Enter on Link opened the button label for editing)', () => {
+    const reached = vi.fn();
+    window.addEventListener('keydown', reached);
+    const frame = document.querySelector<HTMLElement>('[data-layer="a"]')!;
+    frame.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    window.removeEventListener('keydown', reached);
+
+    expect(reached).not.toHaveBeenCalled();
+  });
 });
 
 describe('picking a layer of another frame', () => {
