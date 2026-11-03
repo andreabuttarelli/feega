@@ -10,6 +10,7 @@ import { MEDIA_UUID_RE } from '$lib/media-url';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
+const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
 
 export const GET: RequestHandler = async ({ locals, params }) => {
@@ -29,9 +30,12 @@ export const GET: RequestHandler = async ({ locals, params }) => {
   }
 
   const motion = await findMotionNode(db, { orgId: found.orgId, nodeId: params.nodeId, place: { canvasId: found.canvas.id } });
-  const source = motion ? await motionSource({ db, orgId: found.orgId, projectId: params.projectId, canvasId: found.canvas.id, nodeId: params.nodeId }) : null;
-  if (!source) {
+  if (!motion) {
     throw error(HTTP_NOT_FOUND, 'This motion editor has nothing to show');
+  }
+  const source = await motionSource({ db, orgId: found.orgId, projectId: params.projectId, canvasId: found.canvas.id, nodeId: params.nodeId });
+  if (!source) {
+    return new Response(null, { status: HTTP_NO_CONTENT });
   }
   const brandId = (await listProjects(db, found.orgId)).find((p) => p.id === params.projectId)?.brandId ?? null;
   return json({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) });
