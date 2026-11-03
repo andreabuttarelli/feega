@@ -3,7 +3,6 @@ import { MotionFormat, newMotionDoc, findClip, type MotionDoc } from './doc';
 import { maxFrames } from './design';
 import {
   ClipEdge,
-  TOP_LEFT_ANCHOR,
   addClip,
   addTrack,
   duplicateClip,
@@ -40,7 +39,7 @@ describe('timeline operations', () => {
   });
 
   it('a clip added with the top-left anchor pivots from its corner', () => {
-    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, transform: TOP_LEFT_ANCHOR }, 't1'));
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, transform: { anchorX: 0, anchorY: 0 } }, 't1'));
 
     expect(findClip(doc, 't1')?.clip.transform).toEqual({ anchorX: 0, anchorY: 0 });
   });

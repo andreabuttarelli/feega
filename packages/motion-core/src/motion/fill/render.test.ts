@@ -51,6 +51,11 @@ describe('fill stack in svg', () => {
     expect(body).toContain('fill:resolved(brand.accent);fill-rule:evenodd;stroke:none');
   });
 
+  it('a linear layer on a wide box turns by its true angle, like the css gradient', () => {
+    const { defs } = svgFills(stack([{ type: 'linear-gradient', angle: 45, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }]), paint, PATHS, 'nonzero');
+    expect(defs).toContain('x1="25" y1="-25" x2="175" y2="125"');
+  });
+
   it('a linear layer defines its stops along its angle', () => {
     const { defs, body } = svgFills(
       stack([

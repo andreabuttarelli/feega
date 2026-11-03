@@ -308,3 +308,14 @@ export function retypeFill(fills: readonly Fill[], i: number, type: FillType): F
       : f
   );
 }
+
+const DEGREE = Math.PI / 180;
+
+export function linearEnds(angle: number, w: number, h: number): [[number, number], [number, number]] {
+  const [dx, dy] = [Math.cos(angle * DEGREE), Math.sin(angle * DEGREE)];
+  const reach = (Math.abs(w * dx) + Math.abs(h * dy)) / 2;
+  return [
+    [w / 2 - dx * reach, h / 2 - dy * reach],
+    [w / 2 + dx * reach, h / 2 + dy * reach]
+  ];
+}

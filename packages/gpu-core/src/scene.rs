@@ -36,14 +36,12 @@ fn draw<C: Canvas>(scene: &mut C, item: &PathItem, frame: Rect) {
         let rule = if within.outside { Fill::EvenOdd } else { Fill::NonZero };
         scene.push_clip(rule, transform, &region);
     }
-    if item.rule == FillRule::Union {
-        for contour in &item.contours {
-            scene.fill(Fill::NonZero, transform, &item.paint, &polygon(contour));
-        }
-    } else {
-        let rule = if item.rule == FillRule::EvenOdd { Fill::EvenOdd } else { Fill::NonZero };
-        scene.fill(rule, transform, &item.paint, &joined(&item.contours));
-    }
+    let (rule, shape) = match item.rule {
+        FillRule::Union => (Fill::NonZero, wound_alike(&item.contours)),
+        FillRule::EvenOdd => (Fill::EvenOdd, joined(&item.contours)),
+        FillRule::NonZero => (Fill::NonZero, joined(&item.contours)),
+    };
+    scene.fill(rule, transform, &item.paint, &shape);
     if item.within.is_some() {
         scene.pop();
     }
@@ -112,6 +110,15 @@ fn joined(contours: &[Vec<f64>]) -> BezPath {
     let mut path = BezPath::new();
     for contour in contours {
         path.extend(polygon(contour));
+    }
+    path
+}
+
+fn wound_alike(contours: &[Vec<f64>]) -> BezPath {
+    let mut path = BezPath::new();
+    for contour in contours {
+        let outline = polygon(contour);
+        path.extend(if outline.area() < 0.0 { outline.reverse_subpaths() } else { outline });
     }
     path
 }

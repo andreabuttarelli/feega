@@ -95,6 +95,15 @@ export function saveBanner(action: string, result: ActionAnswer): string | null 
   return saveMessage(failureOf(result), dataOf(result));
 }
 
+export enum NodePresence {
+  Shown = 'shown',
+  Removed = 'removed'
+}
+
+export function quietGone(reason: SaveFailure, presence: NodePresence): boolean {
+  return reason === SaveFailure.Gone && presence === NodePresence.Removed;
+}
+
 export function saveMessage(reason: SaveFailure, data: { message?: string } = {}): string {
   if (reason === SaveFailure.Credits && data.message) {
     return data.message;

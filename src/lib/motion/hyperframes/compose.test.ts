@@ -4,7 +4,7 @@ import { TransitionKind } from '@feega/motion-core/motion/design';
 import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { installEngine, testTimeline } from '../engine/testing';
 import { engineScript } from '@feega/motion-core/motion/engine/engine';
-import { TOP_LEFT_ANCHOR, addClip, setJunction, setKeyframes, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, setJunction, setKeyframes, setTransform, setTransition, Side, type OpResult } from '@feega/motion-core/motion/timeline';
 import { JunctionKind } from '@feega/motion-core/motion/junctions';
 import { LIBRARY_IDS } from '@feega/motion-core/motion/components';
 import { Ease } from '@feega/motion-core/motion/design';
@@ -343,7 +343,7 @@ describe('background of the frame', () => {
 
 describe('keyframes and 3D transforms', () => {
   const card = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 30, durationInFrames: 120, props: { shape: 'rect', x: 0.25, y: 0.5, width: 0.2, height: 0.4 } }, 'card'));
-  const cornerCard = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 30, durationInFrames: 120, transform: TOP_LEFT_ANCHOR, props: { shape: 'rect', x: 0.25, y: 0.5, width: 0.2, height: 0.4 } }, 'card'));
+  const cornerCard = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 30, durationInFrames: 120, transform: { anchorX: 0, anchorY: 0 }, props: { shape: 'rect', x: 0.25, y: 0.5, width: 0.2, height: 0.4 } }, 'card'));
   const spun = must(
     setKeyframes(
       must(setTransform(must(setTransition(card, 'card', Side.In, { kind: TransitionKind.Fade, durationInFrames: 10 })), 'card', { perspective: 900, anchorX: 0, rotateX: 15 })),

@@ -13,7 +13,7 @@ import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout'
 import { setAutoLayout, setLayoutItem } from './layout/ops';
 import { EditMode } from './edit-mode';
 import { DocMode, docMode, setStill, settledStill } from '@feega/motion-core/motion/still';
-import { TOP_LEFT_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { NEW_CLIP_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame | DrawTool.Stack;
 
@@ -71,7 +71,7 @@ export const drawStart = (mode: EditMode, playhead: number): number => DRAW_STAR
 const fail = (error: string): OpResult => ({ ok: false, error });
 
 function place(doc: MotionDoc, component: ComponentId, props: Record<string, unknown>, frame: number, id: string): OpResult {
-  return addClip(doc, { component, props, ...TOP_LEFT_START, ...SPAN[docMode(doc)](doc, frame, component) }, id);
+  return addClip(doc, { component, props, ...NEW_CLIP_START, ...SPAN[docMode(doc)](doc, frame, component) }, id);
 }
 
 const TEXT_TYPE = COMPONENTS.Text.schema.parse({});

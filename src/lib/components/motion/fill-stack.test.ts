@@ -195,7 +195,7 @@ describe('the fill stack in Properties', () => {
   it('an image layer picks a picture and a fit', () => {
     const onchange = show(stack([{ type: 'image' }]));
     click(rows()[0]);
-    click(byId('media-add'));
+    click(byId('media-more'));
     click(byId('media-tab-library'));
     click(byId('media-library-item'));
     expect(sent(onchange)[0]).toMatchObject({ type: 'image', assetId: 'pic' });

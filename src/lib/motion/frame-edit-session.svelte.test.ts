@@ -318,6 +318,44 @@ describe('holding the save until an upload is done', () => {
   });
 });
 
+describe('a move into the frame saved by the canvas, not by this session', () => {
+  const moved = addClip(base, { component: 'Image', from: 0, durationInFrames: 30, props: { assetId: 'a1', x: 0.5, y: 0.5 } }, 'img');
+  const landedDoc: MotionDoc = moved.ok ? { ...moved.doc, assets: [{ id: 'a1', kind: 'image', name: 'skye.jpg' }] } : base;
+  const asSaved = (): MotionDoc => ({ ...structuredClone(landedDoc), assets: [{ id: 'a1', kind: 'image', name: 'skye.jpg', width: 400 } as never] });
+
+  it('its undo leaves no trace of the moved element', () => {
+    const { session } = open();
+
+    session.adoptSaved(landedDoc);
+    session.takeRemote({ version: 2, doc: asSaved() });
+    session.takeRemote({ version: 3, doc: base });
+
+    expect(session.history.present.tracks.flatMap((t) => t.clips)).toEqual([]);
+    expect(session.history.present.assets).toEqual([]);
+  });
+
+  it('is not sent again by the next save', async () => {
+    const { session, port } = open();
+
+    session.adoptSaved(landedDoc);
+    session.takeRemote({ version: 2, doc: asSaved() });
+    session.apply({ ok: true, doc: { ...session.history.present, durationInFrames: 60 } }, 'Longer');
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(vi.mocked(port.send).mock.calls[0][0]).toEqual([{ kind: OpKind.DocSet, field: 'durationInFrames', value: 60 }]);
+  });
+
+  it('keeps an edit made just before the move as this session’s own, still to save', async () => {
+    const { session, port } = open();
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+
+    session.adoptSaved({ ...landedDoc, durationInFrames: 60 });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(vi.mocked(port.send).mock.calls[0][0]).toEqual([{ kind: OpKind.DocSet, field: 'durationInFrames', value: 60 }]);
+  });
+});
+
 describe('a scrub saves once', () => {
   it('a slow scrub of many ticks under a live gesture sends one save, after release', async () => {
     const { session, port } = open();

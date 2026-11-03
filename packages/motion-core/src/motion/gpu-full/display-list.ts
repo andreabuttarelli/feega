@@ -22,7 +22,7 @@ import { MASK_KEYS, MaskMode } from '../mask';
 import { clipRadii, frameFadeAt } from '../surface';
 import { mattePairs, MATTE_READ } from '../matte';
 import { CoverKind, maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
-import { FillType, cropOf, fillsOf, type Fill, type FillOf } from '../fill/model';
+import { FillType, cropOf, fillsOf, linearEnds, type Fill, type FillOf } from '../fill/model';
 import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
@@ -154,9 +154,8 @@ function stopsOf(stops: { color: string; pos: number }[], colour: (v: string) =>
 const PAINTS: Partial<Record<FillType, (f: never, w: number, h: number, colour: (v: string) => Rgba) => Paint>> = {
   [FillType.Solid]: (f: FillOf<FillType.Solid>, _w, _h, colour) => ({ kind: PaintKind.Solid, color: colour(f.color) }),
   [FillType.Linear]: (f: FillOf<FillType.Linear>, w, h, colour) => {
-    const dx = (Math.cos(f.angle * DEG) * w) / 2;
-    const dy = (Math.sin(f.angle * DEG) * h) / 2;
-    return { kind: PaintKind.Linear, from: [w / 2 - dx, h / 2 - dy], to: [w / 2 + dx, h / 2 + dy], stops: stopsOf(f.stops, colour) };
+    const [from, to] = linearEnds(f.angle, w, h);
+    return { kind: PaintKind.Linear, from, to, stops: stopsOf(f.stops, colour) };
   },
   [FillType.Radial]: (f: FillOf<FillType.Radial>, w, h, colour) => ({ kind: PaintKind.Radial, center: [f.center.x * w, f.center.y * h], radius: (f.radius * Math.max(w, h)) / 2, stops: stopsOf(f.stops, colour) }),
   [FillType.Angular]: (f: FillOf<FillType.Angular>, w, h, colour) => ({ kind: PaintKind.Sweep, center: [f.center.x * w, f.center.y * h], start: (f.angle - CSS_TURN) * DEG, stops: stopsOf(f.stops, colour) }),
@@ -609,7 +608,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
 
   type Drawn = { chain: string[]; items: Item[] };
 
-  const maskedChain = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).filter((id) => byId.get(id)?.mask);
+  const isolates = (group: MotionClip | undefined) => Boolean(group?.mask) || (group?.blend ?? BlendMode.Normal) !== BlendMode.Normal;
+  const isolatingChain = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).filter((id) => isolates(byId.get(id)));
 
   function nested(drawn: Drawn[], depth: number): Item[] {
     const out: Item[] = [];
@@ -626,9 +626,10 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
         end++;
       }
       const inner = nested(drawn.slice(at, end), depth + 1);
-      const masks = maskLayers(byId.get(id)!, frame, size, worldAt(doc, id, frame, size), asset);
+      const group = byId.get(id)!;
+      const masks = maskLayers(group, frame, size, worldAt(doc, id, frame, size), asset);
       if (masks) {
-        out.push({ kind: ItemKind.Group, clip: id, items: inner, opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal, masks });
+        out.push({ kind: ItemKind.Group, clip: id, items: inner, opacity: 1, matrix: IDENTITY, blur: 0, blend: group.blend ?? BlendMode.Normal, ...(masks.length ? { masks } : {}) });
       } else {
         unsupported.push({ clip: id, component: GROUP_COMPONENT, reason: Unsupported.Mask });
         out.push(...inner);
@@ -642,7 +643,7 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   for (const clip of drawable) {
     const own = clipItems(clip);
     if (Array.isArray(own)) {
-      drawn.push({ chain: maskedChain(clip), items: own });
+      drawn.push({ chain: isolatingChain(clip), items: own });
       continue;
     }
     unsupported.push({ clip: clip.id, component: clip.component, reason: own });
