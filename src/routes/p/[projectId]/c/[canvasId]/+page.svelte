@@ -451,7 +451,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       mainPick = { nodeId: frameId, compId, key: (mainPick?.key ?? 0) + 1 };
       return;
     }
-    mainNav.canvases = await fetchProjectComponents(data.projectId);
+    await mainNav.refresh();
     const location = mainNav.where({ compId, home: frameId });
     if (location) {
       await goto(mainHref(data.projectId, location, frameId, compId));
@@ -459,8 +459,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   }
 
   onMount(() => {
-    void fetchProjectComponents(data.projectId).then((found) => (mainNav.canvases = found));
-    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null) });
+    return mainNav.serve({ navigate: (frameId, compId) => void showMain(frameId, compId), here: () => (selectedIds.length === 1 ? selectedIds[0] : null), load: () => fetchProjectComponents(data.projectId) });
   });
 
   afterNavigate(() => {

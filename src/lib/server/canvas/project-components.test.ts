@@ -70,10 +70,22 @@ describe('components across the canvases of a project', () => {
     reads.one = [];
     reads.batches = 0;
 
-    await listProjectComponents(db, scope);
+    await listProjectComponents(db, { ...scope, orgId: 'fresh' });
 
     expect(reads.batches).toBe(1);
     expect(reads.one).not.toContain('f1');
+  });
+
+  it('a second listing with the same revisions reads no doc again (every canvas open read 25 MB of docs)', async () => {
+    await listProjectComponents(db, scope);
+    reads.one = [];
+    reads.batches = 0;
+
+    const again = await listProjectComponents(db, scope);
+
+    expect(reads.batches).toBe(0);
+    expect(reads.one).not.toContain('f1');
+    expect(again[0].components[0]).toMatchObject({ frameId: 'f1', name: 'Button' });
   });
 
   it('hands over the main alone, ready to place on another canvas', async () => {

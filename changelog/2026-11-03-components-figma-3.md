@@ -33,3 +33,9 @@ node row knows (`docHeadRevision`) are read with `readHeads` in batches of 40; t
 back to `readHead`. The panel mounts 24 tiles and adds a page when the sentinel scrolls in
 (`firstTiles`). Previews were already lazy (IntersectionObserver) and kept in IndexedDB.
 The list was already project scoped.
+
+Every canvas open also called `/components` for Go to main (25 MB of docs parsed on
+f077fd4e, during a production DB overload). `mainNav` now loads the list only the first time
+a location is asked (`where`), and `showMain` refreshes it. On the server, each frame's mains
+(`comps` with `component` only) are kept in memory per `org:node` at the head revision the row
+knows; a listing with unchanged revisions reads no doc (5000 frames kept per instance).
