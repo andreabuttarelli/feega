@@ -18,6 +18,7 @@ import { maskMembers, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
 import { CUSTOM_CLIP } from '@feega/motion-core/motion/poster-parts';
 import { createComponent } from '$lib/motion/main-component';
+import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
 const NODES = [
@@ -864,5 +865,46 @@ describe('Layers list the frontmost layer first, as painted', () => {
     const rows = layerRows([{ id: 'a', type: 'motion', name: 'A' }, { id: 'g', type: 'motion', name: 'Group', behind: true }, { id: 'b', type: 'motion', name: 'B' }], null);
 
     expect(rows.map((r) => r.id)).toEqual(['b', 'a', 'g']);
+  });
+});
+
+describe('a layer dragged into a main in the layers panel goes inside the main', () => {
+  const mustOk = (r: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc => {
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r.doc;
+  };
+  const counter = (prefix: string) => {
+    let n = 0;
+    return () => `${prefix}${++n}`;
+  };
+  const textAt = (doc: MotionDoc, id: string, x: number, y: number) => mustOk(addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: id, x, y, width: 0.1, height: 0.05 } }, id));
+  const card = () => textAt(mustOk(createComponent(mustOk(wrapInStack(textAt(newMotionDoc(MotionFormat.Landscape), 'title', 0.3, 0.3), ['title'], 'card', 'lane')), ['card'], counter('m'), 'Card')), 'subtitle', 0.8, 0.8);
+  const inside = (doc: MotionDoc) => doc.comps.m1.tracks.flatMap((t) => t.clips);
+  const order = (doc: MotionDoc) => (inside(doc).find((c) => c.id === 'card') as { autoLayout?: { order?: string[] } }).autoLayout?.order;
+
+  it('dropped into the main row, it joins the main and its stack', () => {
+    const done = mustOk(dropLayers(card(), ['subtitle'], 'm2', Place.Into, ['m2', 'subtitle'], 'here'));
+
+    expect(done.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual(['m2']);
+    expect(inside(done).find((c) => c.id === 'subtitle')?.parent).toBe('card');
+    expect(order(done)).toEqual(['title', 'subtitle']);
+  });
+
+  it('dropped above a layer inside the main, it lands in the main stack before it', () => {
+    const done = mustOk(dropLayers(card(), ['subtitle'], `m2${SEPARATOR}0${SEPARATOR}title`, Place.Above, ['m2', 'subtitle'], 'here'));
+
+    expect(done.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual(['m2']);
+    expect(order(done)).toEqual(['subtitle', 'title']);
+  });
+
+  it('an instance is never a place to drop layers into', () => {
+    const doc = card();
+    const homed = { ...doc, comps: { ...doc.comps, m1: { ...doc.comps.m1, component: { ...doc.comps.m1.component!, home: 'components' } } } };
+
+    const done = dropLayers(homed, ['subtitle'], 'm2', Place.Into, ['m2', 'subtitle'], 'screen');
+
+    expect(done.ok && inside(done.doc).some((c) => c.id === 'subtitle')).toBe(false);
   });
 });
