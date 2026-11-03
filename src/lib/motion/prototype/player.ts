@@ -62,11 +62,14 @@ export function act(state: PlayerState, action: Action, transition: Transition, 
     [ActionKind.OpenOverlay]: () => (action.kind === ActionKind.OpenOverlay ? open(state, action.target, action.overlay ?? DEFAULT_OVERLAY, transition, known) : stay(state)),
     [ActionKind.CloseOverlay]: () => closeOverlay(state, transition),
     [ActionKind.Back]: () => back(state, transition),
-    [ActionKind.ChangeTo]: () => stay(state)
+    [ActionKind.ChangeTo]: () => stay(state),
+    [ActionKind.OpenUrl]: () => stay(state)
   };
   return runs[action.kind]();
 }
 
 const closeOverlay = (state: PlayerState, transition: Transition): Step => (state.overlays.length ? back(state, transition) : stay(state));
+
+export const linkOf = (action: Action): string | null => ('url' in action ? action.url : null);
 
 export const closeTopOverlay = (state: PlayerState): Step => closeOverlay(state, { kind: TransitionKind.Instant });

@@ -74,4 +74,13 @@ describe('interactionSchema', () => {
     expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.CloseOverlay } }).success).toBe(true);
     expect(needsTarget(ActionKind.CloseOverlay)).toBe(false);
   });
+
+  it('open url keeps an http link and refuses any other scheme', () => {
+    const parsed = parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenUrl, url: 'https://feega.app/pricing' } });
+
+    expect(parsed.success && parsed.data.action).toEqual({ kind: ActionKind.OpenUrl, url: 'https://feega.app/pricing' });
+    expect(needsTarget(ActionKind.OpenUrl)).toBe(false);
+    expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenUrl, url: 'javascript:alert(1)' } }).success).toBe(false);
+    expect(parse({ id: 'i1', trigger: { kind: TriggerKind.Click }, action: { kind: ActionKind.OpenUrl, url: 'not a url' } }).success).toBe(false);
+  });
 });

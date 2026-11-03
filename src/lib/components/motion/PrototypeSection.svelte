@@ -27,7 +27,7 @@
   import SmartAnimatePreview from './SmartAnimatePreview.svelte';
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { putInteraction, removeInteraction } from '$lib/motion/prototype/ops';
-  import { TRANSITION_FIELDS, backdropOf, backdropParts, reoverlaid, retimed, retriggered, retargeted } from '$lib/motion/prototype/edit';
+  import { TRANSITION_FIELDS, backdropOf, freshInteraction, relinked, backdropParts, reoverlaid, retimed, retriggered, retargeted } from '$lib/motion/prototype/edit';
   import { variantChoices } from '$lib/motion/prototype/variant-change';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
@@ -42,12 +42,14 @@
   const put = (next: Interaction, summary: string) => commit(putInteraction(doc, clip.id, next), summary);
   const overlayOf = (i: Interaction): Overlay | null => (i.action.kind === ActionKind.OpenOverlay ? i.action.overlay : null);
   const px = (text: string, fallback: number) => (Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : fallback);
+  const add = () => put(freshInteraction(crypto.randomUUID().slice(0, 8), prototypeLink.targets[0]?.id ?? null), 'Added an interaction');
   const ms = (text: string, fallback: number) => (Number.isFinite(Number(text)) && text.trim() !== '' ? Math.round(Number(text)) : fallback);
 </script>
 
 <section class="prototype" data-testid="prototype-section" aria-label="Prototype">
   <header>
     <h3>Prototype</h3>
+    <button type="button" class="link" data-testid="prototype-add" onclick={add}>Add interaction</button>
     <button type="button" class="link" data-testid="prototype-link" aria-pressed={aiming} onclick={() => (aiming ? prototypeLink.stop() : prototypeLink.aim({ clipId: clip.id, interactionId: null }))}>
       {aiming ? 'Cancel' : 'Link to frame'}
     </button>
@@ -75,6 +77,9 @@
             {#if !choices.some((c) => choiceLabel(c) === choiceOf(interaction))}<option value={choiceOf(interaction)}>{choiceOf(interaction)}</option>{/if}
             {#each choices as choice (choiceLabel(choice))}<option value={choiceLabel(choice)}>{choiceLabel(choice)}</option>{/each}
           </select>
+        {/if}
+        {#if 'url' in interaction.action}
+          <input type="url" class="url" aria-label="Link URL" placeholder="https://" value={interaction.action.url} onchange={(e) => put(relinked(interaction, e.currentTarget.value), 'Changed the link')} />
         {/if}
         {#if needsTarget(interaction.action.kind)}
           <select aria-label="Target frame" value={targetOf(interaction)} onchange={(e) => put(retargeted(interaction, interaction.action.kind, e.currentTarget.value), 'Changed the target frame')}>
@@ -149,10 +154,12 @@
   header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--ui-space-1);
   }
 
+
   h3 {
+    flex: 1;
     margin: 0;
     font-size: var(--ui-type-caption);
     font-weight: 600;
@@ -194,6 +201,10 @@
     padding: 0;
     border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius-xs);
+  }
+
+  input.url {
+    max-width: none;
   }
 
   .hint,
