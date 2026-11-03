@@ -1355,7 +1355,7 @@
       WHOLE_ELEMENT_RUN[whole](nodeId);
       return;
     }
-    const at = scoped(live.doc, picks, frameOfLive(live));
+    const at = scoped(live.doc, picks, frameOfLive(live), nodeId);
     if (!at) {
       return;
     }
@@ -2076,7 +2076,7 @@
   function deletePicks(): boolean {
     const nodeId = inside?.nodeId;
     const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
-    const at = tools ? scoped(tools.doc, picks, tools.frame) : null;
+    const at = tools ? scoped(tools.doc, picks, tools.frame, nodeId) : null;
     const done = at ? barAction(Action.Delete, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8) }) : null;
     if (!nodeId || !at || !done) {
       return false;
@@ -2119,7 +2119,7 @@
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
-    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live)) : null;
+    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live), nodeId) : null;
     const found = scope ? findClip(scope.view, scope.id)?.clip : null;
     const size = at?.picker.frameSize();
     if (editedView(nodeId) || !saver || !at || !doc || !scope || !found || !size || !editsText(scope.view, scope.id)) {
@@ -2249,7 +2249,7 @@
     if (!open || !saver) {
       return;
     }
-    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }));
+    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }), open.nodeId);
     liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
     if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs) || JSON.stringify(lists) !== JSON.stringify(open.lists))) {
       commit(open.nodeId, result, 'Edited text');
@@ -2472,7 +2472,7 @@
     const shownView = editedView(nodeId);
     const start = shownView ? at.live.doc : source;
     const lifted = (doc: MotionDoc) => (shownView ? liftViewEdit(source, shownView.breakpointId, start, doc) : doc);
-    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }));
+    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }), nodeId);
     if (!inScope || holdsLock(inScope.view, inScope.ids)) {
       return;
     }
@@ -3362,7 +3362,7 @@
     if (!nodeId || !tools) {
       return false;
     }
-    const at = scoped(tools.doc, picks, tools.frame);
+    const at = scoped(tools.doc, picks, tools.frame, nodeId);
     const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
@@ -3376,7 +3376,7 @@
     if (!nodeId || !tools) {
       return false;
     }
-    const at = scoped(tools.doc, picks, tools.frame);
+    const at = scoped(tools.doc, picks, tools.frame, nodeId);
     const result = at ? alignSpace(at.view, at.ids, at.frame, propBoxes(at.view), edge, savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, `Aligned ${edge}`);

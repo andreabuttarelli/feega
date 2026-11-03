@@ -3,6 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/mot
 import { addClip, setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { groupClips } from '$lib/motion/group';
 import { createComponent, innerClips, instanceOf } from '$lib/motion/main-component';
+import { homedAt } from '$lib/motion/canvas-components';
 import { Reach } from './frame-select';
 import { pickTarget, enteredFrom, parentPick, scopeOf, scoped } from './frame-scope';
 
@@ -72,7 +73,7 @@ describe('scoped', () => {
 describe('scoped inside an instance', () => {
   function instance() {
     let n = 0;
-    const doc = must(createComponent(shape(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2), 'b', 0.4), ['a', 'b'], () => `i${++n}`, 'Card'));
+    const doc = homedAt(must(createComponent(shape(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2), 'b', 0.4), ['a', 'b'], () => `i${++n}`, 'Card')), { i1: 'components' });
     const host = doc.tracks.flatMap((t) => t.clips)[0].id;
     return { doc, host, member: (id: string) => `${host}__0__${id}` };
   }
@@ -120,6 +121,43 @@ describe('scoped inside an instance', () => {
 
     expect(findClip(merged, group)!.clip.props.overrides).toBeUndefined();
     expect(xOf(scoped(merged, [member('a')], 0)!.view, 'a')).toBe(0.9);
+  });
+});
+
+describe('scoped inside a main', () => {
+  function main(home?: string) {
+    let n = 0;
+    const made = must(createComponent(shape(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2), 'b', 0.4), ['a', 'b'], () => `m${++n}`, 'Card'));
+    const doc = home ? homedAt(made, { m1: home }) : made;
+    const host = doc.tracks.flatMap((t) => t.clips)[0].id;
+    return { doc, host, member: (id: string) => `${host}__0__${id}` };
+  }
+  const mainX = (doc: MotionDoc, host: string) => innerClips(instanceOf(doc, host)!.comp).find((c) => c.id === 'a')!.props.x;
+
+  it('an edit inside a main not yet homed changes the main itself', () => {
+    const { doc, host, member } = main();
+    const s = scoped(doc, [member('a')], 0, 'frame')!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+
+    expect(mainX(merged, host)).toBe(0.9);
+    expect(instanceOf(merged, host)!.clip.props.overrides).toBeUndefined();
+  });
+
+  it('an edit inside the main in its home frame changes the main itself', () => {
+    const { doc, host, member } = main('components');
+    const s = scoped(doc, [member('a')], 0, 'components')!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+
+    expect(mainX(merged, host)).toBe(0.9);
+  });
+
+  it('the same comp seen from another frame is an instance', () => {
+    const { doc, host, member } = main('components');
+    const s = scoped(doc, [member('a')], 0, 'screen')!;
+    const merged = s.merge(must(setProps(s.view, 'a', { x: 0.9 })));
+
+    expect(mainX(merged, host)).toBe(0.2);
+    expect(instanceOf(merged, host)!.overrides).toEqual({ a: { x: 0.9 } });
   });
 });
 

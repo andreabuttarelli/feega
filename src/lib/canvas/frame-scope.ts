@@ -47,18 +47,19 @@ function descend(doc: MotionDoc, scope: Scope, frame: number) {
   return { frame: at, toView: (p: Pt) => worlds.reduce<Pt>((q, w) => apply2d(invert2d(w), q) as Pt, p), fromView: worlds.reduce<Affine>((m, w) => mul2d(m, w), IDENTITY) };
 }
 
-export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: number): Scoped | null {
+export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: number, here: string | null = null): Scoped | null {
   const read = sceneIds.map((id) => scopeOf(doc, id));
   const scope = read[0]?.scope;
   if (!scope || read.some((r) => r?.scope.prefix !== scope.prefix)) {
     return null;
   }
   const inside = descend(doc, scope, frame);
+  const hosted = { ...scope, here };
   return {
-    view: scopeView(doc, scope),
+    view: scopeView(doc, hosted),
     ids: read.map((r) => r!.id),
     frame: inside.frame,
-    merge: (view) => mergeScope(doc, scope, view),
+    merge: (view) => mergeScope(doc, hosted, view),
     scene: (ids) => ids.map((id) => `${scope.prefix}${id}`),
     toView: inside.toView,
     fromView: inside.fromView
