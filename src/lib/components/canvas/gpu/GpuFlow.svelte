@@ -144,11 +144,10 @@
   import { missingAssets } from '$lib/canvas/live-assets';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
-  import { instanceOf } from '$lib/motion/main-component';
-  import { appendVariant } from '$lib/motion/variants';
+  import { ComponentRole, roleOf } from '$lib/motion/main-component';
   import VariantPlus from '../VariantPlus.svelte';
   import ComponentSetOutline from '../ComponentSetOutline.svelte';
-  import { addSetVariant, mainDragged, setMainOf } from '$lib/motion/component-set';
+  import { addSetVariant, addVariantBeside, mainDragged, setMainOf } from '$lib/motion/component-set';
   import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
@@ -1746,14 +1745,14 @@
   function variantMark(nodeId: string) {
     const mark = picks.length === 1 && !typing && !isComponentSet(nodeId) ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const instance = mark && saver ? instanceOf(saver.history.present, mark.clip) : null;
-    return mark && instance ? { rect: quadBox(mark.quad), compId: instance.compId } : null;
+    const main = mark && saver ? roleOf(saver.history.present, mark.clip, nodeId) === ComponentRole.Main : false;
+    return mark && main ? { rect: quadBox(mark.quad), hostId: mark.clip } : null;
   }
 
-  function addVariantAt(nodeId: string, compId: string) {
+  function addVariantAt(nodeId: string, hostId: string) {
     const saver = saverOf(nodeId);
     if (saver) {
-      commit(nodeId, appendVariant(saver.history.present, compId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+      commit(nodeId, addVariantBeside(saver.history.present, hostId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
     }
   }
 
@@ -4071,7 +4070,7 @@
         {/if}
         {@const plus = variantMark(frame.id)}
         {#if plus}
-          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.compId)} />
+          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.hostId)} />
         {/if}
         {@const crop = cropMark(frame.id)}
         {#if crop}
