@@ -16,7 +16,7 @@ import { figmaPlan, type FigmaImage, type FigmaPlan, type PlanItem } from '$lib/
 import { Destination } from '$lib/canvas/figma/scene';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
-import { Place } from '$lib/motion/layer-place';
+import { Place as SlotPlace } from '$lib/motion/layer-place';
 import { commitOnto } from './frame-ops';
 import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { DropOn, OutputKind, linkOutput, mediaElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
@@ -31,7 +31,7 @@ export { DropOn, type Drop };
 const fraction = z.number().min(0).max(1);
 
 export const dropSchema = z.discriminatedUnion('on', [
-  z.object({ on: z.literal(DropOn.Frame), nodeId: z.string().min(1), at: z.object({ x: fraction, y: fraction }), frame: z.number().int().min(0).optional(), slot: z.object({ target: z.string().min(1), place: z.nativeEnum(Place) }).strict().optional() }).strict(),
+  z.object({ on: z.literal(DropOn.Frame), nodeId: z.string().min(1), at: z.object({ x: fraction, y: fraction }), frame: z.number().int().min(0).optional(), slot: z.object({ target: z.string().min(1), place: z.nativeEnum(SlotPlace) }).strict().optional() }).strict(),
   z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict()
 ]);
 
