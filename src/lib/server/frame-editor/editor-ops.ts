@@ -8,7 +8,7 @@ import { batchView, renderView } from '$lib/server/motion/render-run';
 import type { MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { saveExport } from '$lib/server/motion/export';
 import { deleteFontFamily, orgFontFamilies, renameFontFamily, saveFontUpload, type FontChange } from '$lib/server/motion/font-upload';
-import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
+import { assetUrls, docScaleOf, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { withTemplateSounds } from '$lib/server/motion/template-sounds';
@@ -364,7 +364,7 @@ export const EDITOR_OPS = {
         motionTokens(ctx.db, { orgId: ctx.orgId, brandId: ctx.projectBrandId }),
         motionAssets(placeOf(ctx), SIGNED_URL_TTL_S.render)
       ]);
-      const made = await exportStill(ctx.db, { orgId: ctx.orgId, projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id }, head.doc, stillExport(ask.data.format, ask.data.scale), { tokens, assets });
+      const made = await exportStill(ctx.db, { orgId: ctx.orgId, projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id }, head.doc, stillExport(ask.data.format, ask.data.scale, docScaleOf(ctx.motion.record, head.doc)), { tokens, assets });
       return made.ok ? ok(made) : refused(HTTP_UNAVAILABLE, { error: made.error });
     }
   }),

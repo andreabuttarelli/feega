@@ -9,6 +9,7 @@
   import { smoothStroke, straightStroke } from '$lib/motion/shape/pencil';
   import { Handle, Mirror, addPoint, dragHandle, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { joinStackAt } from '$lib/motion/layout/stack-drag';
 
   let {
     doc,
@@ -137,7 +138,8 @@
     }
     held = box;
     const id = newId();
-    create(drawClip(doc, tool, unit(box), frame, id, dragged ? DRAGGED_TEXT_SIZING : NEW_TEXT_SIZING), id);
+    const made = drawClip(doc, tool, unit(box), frame, id, dragged ? DRAGGED_TEXT_SIZING : NEW_TEXT_SIZING);
+    create(made.ok ? joinStackAt(made.doc, id, [dragged ? box.x : box.x - box.width / 2, box.y]) : made, id);
   }
 
   function drawLine(from: DragPoint, to: DragPoint) {

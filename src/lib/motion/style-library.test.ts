@@ -65,6 +65,28 @@ describe('the styles library shared by the frames of a canvas', () => {
   });
 });
 
+describe('a text style is the same px in every frame, as in Figma', () => {
+  const sized = (width: number, height: number) => must(addClip({ ...newMotionDoc(MotionFormat.Landscape), width, height, freeSize: true }, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'a' } }, 't'));
+  const sizeOf = (doc: MotionDoc) => Number(findClip(doc, 't')!.clip.props.size) * Math.min(doc.width, doc.height);
+  const body = { kind: StyleKind.Text, size: 16 / 390, weight: 400 } as const;
+
+  it('the library holds the px the style has in its frame', () => {
+    expect(libraryOf([must(defineStyle(sized(390, 844), 'Body', body))]).Body).toEqual({ kind: StyleKind.Text, sizePx: 16, weight: 400 });
+  });
+
+  it('a 16 px style applied in a 342×52 button is 16 px there', () => {
+    const library = libraryOf([must(defineStyle(sized(390, 844), 'Body', body))]);
+
+    expect(sizeOf(must(adoptStyle(sized(342, 52), ['t'], 'Body', library.Body)))).toBeCloseTo(16, 3);
+  });
+
+  it('editing the size in the library restyles every frame to the same px', () => {
+    const small = must(adoptStyle(sized(342, 52), ['t'], 'Body', { kind: StyleKind.Text, sizePx: 16 }));
+
+    expect(sizeOf(syncedDoc(small, 'Body', { kind: StyleKind.Text, sizePx: 20 })!)).toBeCloseTo(20, 3);
+  });
+});
+
 describe('a style name with /', () => {
   it('splits into the group it sits in and the name shown in it', () => {
     expect(folderOf('Brand / Primary')).toEqual({ group: 'Brand', leaf: 'Primary' });

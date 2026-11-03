@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ResizeMode, customSize, fitElementToNode, fitToNode, handResized } from './custom-size';
 import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import { MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, formatOf, newMotionDoc, motionDocSchema, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { setCanvas } from '@feega/motion-core/motion/timeline';
+import { addClip, setCanvas } from '@feega/motion-core/motion/timeline';
 
 const ratio = (s: { width: number; height: number }) => s.width / s.height;
 
@@ -166,5 +166,54 @@ describe('resizing a still frame', () => {
     expect(Number(clip(doc, 'title').props.size) * Math.min(doc.width, doc.height)).toBeCloseTo(40);
     expect(Number(clip(doc, 'card').props.width) * doc.width).toBeCloseTo(320);
     expect(Number(clip(doc, 'row').props.width) * doc.width).toBeCloseTo(768);
+  });
+});
+
+describe('resizing a frame keeps what is inside it, as in Figma', () => {
+  const ok = (r: ReturnType<typeof fitToNode>): MotionDoc => {
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r.doc;
+  };
+  const pinned = { horizontal: Horizontal.Left, vertical: Vertical.Top };
+  const screen = (width: number, height: number, still = true): MotionDoc => {
+    const base = { ...newMotionDoc(MotionFormat.Custom), width, height, freeSize: true, ...(still ? { still: { frame: 0 } } : {}) } as MotionDoc;
+    const card = ok(addClip(base, { component: 'Shape', from: 0, props: { shape: 'rect', x: 0.5, y: 0.25, width: 0.5, height: 0.1, roundness: 0.2 }, constraints: pinned }, 'card'));
+    return ok(addClip(card, { component: 'Title', from: 0, props: { text: 'Hi', x: 0.5, y: 0.5, size: 0.04 }, constraints: pinned }, 'title'));
+  };
+  const clip = (doc: MotionDoc, id: string) => doc.tracks.flatMap((t) => t.clips).find((c) => c.id === id)!.props as Record<string, number>;
+  const pxBox = (doc: MotionDoc, id: string) => ({ w: clip(doc, id).width * doc.width, h: clip(doc, id).height * doc.height });
+  const radiusPx = (doc: MotionDoc, id: string) => clip(doc, id).roundness * Math.min(pxBox(doc, id).w, pxBox(doc, id).h);
+
+  it('a frame held at two doc px per canvas px stays at two: 390×844 on canvas to 390×1100', () => {
+    const doc = screen(780, 1688);
+    const sized = ok(fitToNode(doc, { width: 390, height: 1100 }, ResizeMode.Constrained, { width: 390, height: 844 }));
+
+    expect([sized.width, sized.height]).toEqual([780, 2200]);
+  });
+
+  it('a taller frame keeps its layers in px: box, type size and radius', () => {
+    const doc = screen(390, 844);
+    const sized = ok(fitToNode(doc, { width: 390, height: 1100 }, ResizeMode.Constrained, { width: 390, height: 844 }));
+
+    expect(pxBox(sized, 'card').h).toBeCloseTo(pxBox(doc, 'card').h, 3);
+    expect(clip(sized, 'title').size * Math.min(sized.width, sized.height)).toBeCloseTo(clip(doc, 'title').size * 390, 3);
+    expect(radiusPx(sized, 'card')).toBeCloseTo(radiusPx(doc, 'card'), 3);
+  });
+
+  it('a stretched layer keeps its radius in px', () => {
+    const doc = screen(342, 52);
+    const wide = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'card' ? { ...c, props: { ...c.props, x: 0.5, y: 0.5, width: 1, height: 1, roundness: 12 / 52 }, constraints: { horizontal: Horizontal.LeftRight, vertical: Vertical.TopBottom } } : c)) })) } as MotionDoc;
+    const sized = ok(fitToNode(wide, { width: 400, height: 900 }, ResizeMode.Constrained, { width: 342, height: 52 }));
+
+    expect(radiusPx(sized, 'card')).toBeCloseTo(12, 3);
+  });
+
+  it('a video frame keeps its type size in px too', () => {
+    const doc = screen(1000, 600, false);
+    const sized = ok(fitToNode(doc, { width: 1000, height: 400 }, ResizeMode.Constrained, { width: 1000, height: 600 }));
+
+    expect(clip(sized, 'title').size * Math.min(sized.width, sized.height)).toBeCloseTo(0.04 * 600, 3);
   });
 });

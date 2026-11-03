@@ -222,11 +222,12 @@ describe('Properties for several clips', () => {
     return doc;
   };
 
-  it('places the selection with X, Y, W and H, Mixed where the layers differ', () => {
+  it('places the selection with X, Y, W and H of its combined bounds, never Mixed', () => {
     const html = render(MultiInspector, { props: { doc: several(), ids: ['a', 'c'], frame: 0, onchange: () => {} } }).body;
 
     for (const name of ['X', 'Y', 'Width', 'Height']) {
-      expect(html).toMatch(new RegExp(`aria-label="${name}"[^>]*placeholder="Mixed"`));
+      expect(html).toMatch(new RegExp(`aria-label="${name}"[^>]*value="\\d+(\\.\\d+)?"`));
+      expect(html).not.toMatch(new RegExp(`aria-label="${name}"[^>]*placeholder="Mixed"`));
     }
   });
 

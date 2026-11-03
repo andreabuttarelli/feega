@@ -53,6 +53,7 @@
   import { frameSurface, withSurface } from '@feega/motion-core/motion/surface';
   import { EditMode } from '$lib/motion/edit-mode';
   import { alignSpace, distributeSpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
+  import { scaleOf } from '$lib/motion/units';
 
   const FIRST_FRAME = 0;
   const SURFACE_ID = 'frame-surface';
@@ -82,6 +83,7 @@
   const surfaced = $derived(doc ? withSurface(doc, SURFACE_ID) : null);
   const surface = $derived(surfaced ? frameSurface(surfaced) : null);
   const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const scale = $derived(source ? scaleOf(source, frameProperties.place) : 1);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session && source && session.edit(liftEdit(source, session.breakpoint, next), summary);
   const editSource = (result: OpResult, summary: string) => session?.apply(result, summary);
   const pickView = (breakpointId: string) => session && (session.breakpoint = breakpointId);
@@ -110,7 +112,7 @@
 
 {#snippet frameLead()}
   {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} />{/if}
-  {#if doc}<FramePresetSection {doc} onchange={editGuides} />{/if}
+  {#if frameProperties.place}<FramePresetSection place={frameProperties.place} />{/if}
   {#if surfaced && !surface?.autoLayout}<FrameAutoLayoutEntry onadd={() => surfaced && editGuides(stackFrame(surfaced, SURFACE_ID), 'Added auto layout')} />{/if}
 {/snippet}
 
@@ -134,16 +136,17 @@
     {#if editorMode.spec.sounds === SoundEntries.Shown && frameProperties.runAction}<SoundSection onrun={frameProperties.runAction} />{/if}
     {#if surfaced && surface}
       <div class="frame-look" data-testid="frame-look">
-        <MotionInspector as={PropertiesView.Frame} lead={frameLead} title={frameProperties.name} onrename={frameProperties.rename} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} onchange={edit} />
+        <MotionInspector as={PropertiesView.Frame} lead={frameLead} title={frameProperties.name} onrename={frameProperties.rename} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} {scale} onchange={edit} />
       </div>
     {/if}
     <LayoutGuidesSection {doc} onchange={editGuides} />
+    {#if frameProperties.exportRows}<ExportSection name={frameProperties.name} onexport={frameProperties.exportRows} />{/if}
     <details class="frame-settings" data-testid="frame-settings">
       <summary>Frame settings</summary>
       <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
       <ScenesSection {doc} onchange={editGuides} />
       <FrameColoursSection {doc} onchange={editGuides} />
-      <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
+      <CameraInspector {doc} frame={FIRST_FRAME} {scale} onchange={edit} />
       <BreakpointsSection doc={source!} active={session.breakpoint} onchange={editSource} onpick={pickView} />
       <FlowSection {doc} onchange={editGuides} />
       <StyleLibrarySection {tokens} unit={Math.min(doc.width, doc.height)} />
@@ -155,7 +158,7 @@
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <AlignBar count={session.selection.length} onalign={alignPicks} ondistribute={distributePicks} />
-      <MultiInspector gesture={session.live} {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
+      <MultiInspector gesture={session.live} {doc} ids={session.selection} frame={session.playhead} mode={session.mode} {scale} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}
       <TemplateInspector actions={headerBar} gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
@@ -163,8 +166,8 @@
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} onchange={editShown} onalign={alignPicks} />
-      {#if frameProperties.exportPicks}<ExportSection onexport={frameProperties.exportPicks} />{/if}
+      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} onchange={editShown} onalign={alignPicks} />
+      {#if frameProperties.exportRows}<ExportSection name="selection" onexport={frameProperties.exportRows} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}
         <StatesSection doc={shownDoc!} clip={shown.clip} current={statePreview.stateOf(nodeId, shown.clip.id)} commit={commitShown} onpreview={(next) => statePreview.pick(nodeId, shown.clip.id, next)} />

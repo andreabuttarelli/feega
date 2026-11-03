@@ -1,6 +1,6 @@
 <script lang="ts">
   import { attachmentUrl } from '@feega/motion-core/motion/still-model';
-  import { EXPORT_PRESETS, FILE, FILE_FORMATS, FileFormat, LOSSY, MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
+  import { EXPORT_PRESETS, FILE, FIRST_SCALE, FILE_FORMATS, FileFormat, LOSSY, MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
 
   type Made = { url: string; name: string; files: string[]; skipped?: string[] };
 
@@ -9,7 +9,7 @@
   const DEFAULT_QUALITY = 90;
   const SIZE_LABEL: Record<SizeBy, string> = { [SizeBy.Scale]: '×', [SizeBy.Width]: 'w', [SizeBy.Height]: 'h' };
 
-  const fresh = (): ExportRow => ({ format: FileFormat.Png, by: SizeBy.Scale, value: 1, suffix: '', transparent: false });
+  const fresh = (): ExportRow => ({ format: FileFormat.Png, by: SizeBy.Scale, value: FIRST_SCALE, suffix: '', transparent: false });
 
   let rows = $state<ExportRow[]>([fresh()]);
   let working = $state(false);
@@ -50,7 +50,7 @@
   {#each rows as row, i (i)}
     <div class="fx-line" data-testid="export-row">
       <input type="number" aria-label="Size" min={row.by === SizeBy.Scale ? MIN_SCALE : 1} max={row.by === SizeBy.Scale ? MAX_SCALE : undefined} step={row.by === SizeBy.Scale ? 0.5 : 1} value={row.value} onchange={(e) => patch(i, { value: Number(e.currentTarget.value) })} />
-      <select aria-label="Size by" value={row.by} onchange={(e) => patch(i, { by: e.currentTarget.value as SizeBy, value: e.currentTarget.value === SizeBy.Scale ? 1 : 1080 })}>
+      <select aria-label="Size by" value={row.by} onchange={(e) => patch(i, { by: e.currentTarget.value as SizeBy, value: e.currentTarget.value === SizeBy.Scale ? FIRST_SCALE : 1080 })}>
         {#each Object.values(SizeBy) as by (by)}<option value={by}>{SIZE_LABEL[by]}</option>{/each}
       </select>
       <input type="text" aria-label="Suffix" placeholder="Suffix" value={row.suffix} onchange={(e) => patch(i, { suffix: e.currentTarget.value })} />

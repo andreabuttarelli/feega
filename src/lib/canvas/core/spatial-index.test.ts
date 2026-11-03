@@ -17,6 +17,12 @@ describe('spatial index', () => {
     expect(index.topAt({ x: 4000, y: 4000 })).toBeNull();
   });
 
+  it('every item under a point comes back, topmost first', () => {
+    const index = new SpatialIndex(items.slice(0, 3));
+    expect(index.allAt({ x: 75, y: 75 })).toEqual(['b', 'a']);
+    expect(index.allAt({ x: 4000, y: 4000 })).toEqual([]);
+  });
+
   it('a big item spanning many cells is found and returned once', () => {
     const index = new SpatialIndex(items);
     expect(index.within({ x: -100, y: -100, w: 50, h: 50 })).toEqual(['d']);

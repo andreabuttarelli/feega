@@ -5,7 +5,7 @@
   import { fontPreviewHref } from '$lib/design/font-preview';
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { StyleKind, styleSchema, type Style } from '@feega/motion-core/motion/styles-model';
-  import { folderOf, foldered, styleLabel } from '$lib/motion/style-library';
+  import { folderOf, foldered, inDoc, inLibrary, styleLabel } from '$lib/motion/style-library';
   import { swatchOf } from '$lib/motion/fill/swatch';
   import { textFace, textMetrics } from '$lib/motion/type-px';
   import { resolveColor, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -15,9 +15,16 @@
 
   let { tokens, unit = DEFAULT_UNIT }: { tokens: BrandTokens; unit?: number } = $props();
 
+  const NEW_STYLE_PX = 16;
+  const square = $derived({ width: unit, height: unit });
+  const pxOfStyle = (style: Style) => {
+    const held = inLibrary(style, square);
+    return held.kind === StyleKind.Text ? Math.round(held.sizePx ?? 0) : 0;
+  };
+
   type Group = { title: string; kinds: StyleKind[]; create?: { prefix: string; style: Style } };
   const GROUPS: Group[] = [
-    { title: 'Text', kinds: [StyleKind.Text], create: { prefix: 'Text style', style: { kind: StyleKind.Text, size: 0.08, weight: 600 } } },
+    { title: 'Text', kinds: [StyleKind.Text], create: { prefix: 'Text style', style: { kind: StyleKind.Text, sizePx: NEW_STYLE_PX, weight: 600 } } },
     { title: 'Colour', kinds: [StyleKind.Colour, StyleKind.Paint], create: { prefix: 'Colour', style: { kind: StyleKind.Colour, color: '#111111' } } },
     { title: 'Effect', kinds: [StyleKind.Effect] }
   ];
@@ -33,7 +40,7 @@
   };
   const meta = (style: Style) => {
     if (style.kind === StyleKind.Text) {
-      return { face: textFace(style), metrics: textMetrics(style, unit) };
+      return { face: textFace(style), metrics: textMetrics(inDoc(style, square), unit) };
     }
     return { face: '', metrics: style.kind === StyleKind.Colour ? color(style.color) : styleLabel(style) };
   };
@@ -135,7 +142,7 @@
               <span class="trail">{#if style.kind === StyleKind.Text && chip}<span class="dot" style:background={chip}></span>{/if}</span>
             </Popover.Trigger>
             <Popover.Content side="left" class="style-editor w-64 gap-2 p-3" onkeydown={closeOnEnter}>
-              <StyleEditor {name} {style} swatch={chip} {tokens} {unit} onrename={(to) => rename(name, to)} onremove={() => remove(name)} onedit={(patch) => edit(name, style, patch)} />
+              <StyleEditor {name} {style} swatch={chip} {tokens} sizePx={pxOfStyle(style)} onrename={(to) => rename(name, to)} onremove={() => remove(name)} onedit={(patch) => edit(name, style, patch)} onsize={(px) => edit(name, inLibrary(style, square), { sizePx: px })} />
             </Popover.Content>
           </Popover.Root>
         {:else}

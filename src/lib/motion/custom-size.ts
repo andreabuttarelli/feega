@@ -33,23 +33,48 @@ const STAYS_PUT = { horizontal: Horizontal.Left, vertical: Vertical.Top };
 
 const withConstraintsOf = (doc: MotionDoc, constraintsOf: (clip: MotionClip) => MotionClip['constraints']): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, constraints: constraintsOf(c as MotionClip) })) })) });
 
+const MAX_ROUNDNESS = 0.5;
+
+const shortSide = (props: Record<string, unknown>, doc: CanvasSize) => Math.min(Number(props.width) * doc.width, Number(props.height) * doc.height);
+
+function radiusHeld(clip: MotionClip, before: MotionClip | undefined, from: CanvasSize, to: CanvasSize): MotionClip {
+  const props = clip.props as Record<string, unknown>;
+  if (!before || clip.parent || typeof props.width !== 'number' || typeof props.height !== 'number') {
+    return clip;
+  }
+  const ratio = shortSide(before.props, from) / shortSide(props, to);
+  if (!Number.isFinite(ratio) || ratio === 1) {
+    return clip;
+  }
+  const held = (r: number) => Math.min(MAX_ROUNDNESS, r * ratio);
+  const roundness = typeof props.roundness === 'number' ? { roundness: held(props.roundness) } : {};
+  const corners = Array.isArray(props.corners) ? { corners: (props.corners as number[]).map(held) } : {};
+  return { ...clip, props: { ...props, ...roundness, ...corners } };
+}
+
+function heldRadii(doc: MotionDoc, before: MotionDoc): MotionDoc {
+  const was = new Map(before.tracks.flatMap((t) => t.clips.map((c) => [c.id, c as MotionClip] as const)));
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => radiusHeld(c as MotionClip, was.get(c.id), before, doc)) })) };
+}
+
+const kept = (sized: OpResult, before: MotionDoc): OpResult => (sized.ok ? { ok: true, doc: heldRadii(heldPixels(sized.doc, before), before) } : sized);
+
 const fittedWith = (doc: MotionDoc, node: CanvasSize, pinning: MotionClip['constraints']): OpResult => {
   const own = new Map(doc.tracks.flatMap((t) => t.clips.map((c) => [c.id, (c as MotionClip).constraints] as const)));
   const sized = resizeFrame(withConstraintsOf(doc, () => pinning), customSize(node, doc));
   return sized.ok ? { ok: true, doc: withConstraintsOf(sized.doc, (c) => own.get(c.id)) } : sized;
 };
 
-const constrainedFit = (doc: MotionDoc, node: CanvasSize): OpResult => {
-  const sized = resizeFrame(doc, customSize(node, doc));
-  return sized.ok && doc.still ? { ok: true, doc: heldPixels(sized.doc, doc) } : sized;
-};
+const constrainedFit = (doc: MotionDoc, node: CanvasSize): OpResult => kept(resizeFrame(doc, customSize(node, doc)), doc);
+
+const densityKept = (doc: MotionDoc, node: CanvasSize, was?: CanvasSize): CanvasSize => (was?.width && was.height ? { width: (node.width * doc.width) / was.width, height: (node.height * doc.height) / was.height } : node);
 
 const elementStage = (doc: MotionDoc, node: CanvasSize, was?: CanvasSize): CanvasSize =>
   customSize(was ? { width: (doc.width * node.width) / was.width, height: (doc.height * node.height) / was.height } : node, doc);
 
 const FIT_BY_MODE: Record<ResizeMode, (doc: MotionDoc, node: CanvasSize, was?: CanvasSize) => OpResult> = {
-  [ResizeMode.Constrained]: constrainedFit,
-  [ResizeMode.Ignored]: (doc, node) => fittedWith(doc, node, STAYS_PUT),
+  [ResizeMode.Constrained]: (doc, node, was) => constrainedFit(doc, densityKept(doc, node, was)),
+  [ResizeMode.Ignored]: (doc, node, was) => kept(fittedWith(doc, densityKept(doc, node, was), STAYS_PUT), doc),
   [ResizeMode.Element]: (doc, node, was) => fitElementToNode(keepTextSize(doc, doc, elementStage(doc, node, was)), node, was)
 };
 

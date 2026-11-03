@@ -110,6 +110,10 @@
     }
   }
 
+  function revealRow(row: HTMLElement) {
+    row.scrollIntoView({ block: 'nearest' });
+  }
+
   function askDelete() {
     if (lastCanvas) {
       return;
@@ -151,7 +155,7 @@
   <ul class="pages-list" hidden={collapsed} style:max-height={density === Density.Pointer ? `${listHeight}px` : undefined}>
     {#each rows as canvas (canvas.id)}
       {@const isCurrent = canvas.id === currentId}
-      <li class="page-row" class:is-current={isCurrent} data-testid={isCurrent ? 'canvas-row-current' : undefined}>
+      <li class="page-row" class:is-current={isCurrent} data-testid={isCurrent ? 'canvas-row-current' : undefined} {@attach isCurrent ? revealRow : undefined}>
         {#if isCurrent && renaming}
           <form class="rename-form" onsubmit={saveRename}>
             <input

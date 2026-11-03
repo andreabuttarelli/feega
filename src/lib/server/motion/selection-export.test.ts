@@ -33,7 +33,7 @@ function ports() {
   const drawn: { targets: DrawTarget[]; format: string }[] = [];
   const stored: { name: string; mime: string }[] = [];
   const base: SelectionPorts = {
-    read: async (nodeId) => (nodeId === 'gone' ? null : { name: `Frame ${nodeId}`, doc: withTitle }),
+    read: async (nodeId) => (nodeId === 'gone' ? null : { name: `Frame ${nodeId}`, doc: withTitle, docScale: 0.5 }),
     draw: async (targets, row) => {
       drawn.push({ targets, format: row.format });
       return { bytes: Buffer.from('x'), skipped: row.format === 'svg' ? ['t1: blend mode multiply'] : [] };
@@ -47,6 +47,13 @@ function ports() {
 }
 
 describe('exporting a selection', () => {
+  it('draws each frame with the size it has on the canvas', async () => {
+    const { base, drawn } = ports();
+    await exportSelection(base, { targets: [{ nodeId: 'a' }], rows: exportRowsSchema.parse([{ format: 'png', by: 'scale', value: 1 }]), name: 'Canvas' });
+
+    expect(drawn[0].targets[0].docScale).toBe(0.5);
+  });
+
   it('draws every frame for every row, transparent when asked, and stores one zip', async () => {
     const { base, drawn, stored } = ports();
     const two = exportRowsSchema.parse([{ format: 'png', by: 'scale', value: 2, transparent: true }, { format: 'jpg', by: 'width', value: 540, quality: 70 }]);

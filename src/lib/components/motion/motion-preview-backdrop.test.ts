@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
+import { compile } from 'svelte/compiler';
 import MotionPreview from './MotionPreview.svelte';
 import { Background, MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
@@ -10,6 +12,14 @@ const body = (background?: Background) => render(MotionPreview, { props: { html:
 describe('the player behind a see-through picture', () => {
   it('lets the canvas show through a transparent doc, instead of painting black behind it', () => {
     expect(body(Background.Transparent)).toContain('data-backdrop="transparent"');
+  });
+
+  it('draws no outline around a transparent doc, which on the canvas reads as a seam inside the element', () => {
+    const source = readFileSync(new URL('./MotionPreview.svelte', import.meta.url), 'utf8');
+    const css = compile(source, { css: 'external', filename: 'MotionPreview.svelte' }).css?.code ?? '';
+    const seeThrough = css.match(/\.stage[^{,]*\[data-backdrop='transparent'\][^{,]*\{([^}]*)\}/)?.[1] ?? '';
+
+    expect(seeThrough).toMatch(/outline:\s*none/);
   });
 
   it('keeps its dark backdrop for a branded doc', () => {
