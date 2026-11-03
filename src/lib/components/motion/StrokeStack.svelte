@@ -6,7 +6,8 @@
   import { CAPS, JOINS } from '@feega/motion-core/motion/shape/schema';
   import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, type Stroke, type StrokePatch } from '@feega/motion-core/motion/stroke/model';
   import { ARROW_CAPS } from '@feega/motion-core/motion/stroke/arrows';
-  import ColorField from './ColorField.svelte';
+  import ColorPicker from './ColorPicker.svelte';
+  import { untrack } from 'svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
@@ -36,6 +37,12 @@
   };
 
   let open = $state<number | null>(null);
+  let swatches = $state<readonly string[]>([]);
+
+  $effect(() => {
+    void open;
+    swatches = untrack(palette);
+  });
   let dragged = $state<number | null>(null);
   let root = $state<HTMLDivElement | null>(null);
   let rowEls = $state<HTMLElement[]>([]);
@@ -86,7 +93,7 @@
 
 {#snippet colour(name: string, value: string, write: (next: string) => void)}
   {@const { base, alpha } = colourAlpha(value)}
-  <ColorField {name} {gesture} {palette} value={base} {tokens} {alpha} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} onalpha={(next) => write(recolour(base, next))} />
+  <ColorPicker {name} {gesture} value={base} {alpha} {tokens} {swatches} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} />
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="stroke-stack" bind:this={root}>

@@ -8,7 +8,7 @@
   import { onMount, tick } from 'svelte';
   import PlayerFrameView from './PlayerFrameView.svelte';
   import { portalInto } from '$lib/components/brand-agent/right-bar-host.svelte';
-  import { MoveKind, act, closeTopOverlay, startPlayer, type Move, type PlayerState, type Step } from '$lib/motion/prototype/player';
+  import { MoveKind, act, closeTopOverlay, linkOf, startPlayer, type Move, type PlayerState, type Step } from '$lib/motion/prototype/player';
   import { delayed, type Hotspot } from '$lib/motion/prototype/hotspots';
   import { flowsOf } from '$lib/motion/prototype/flows';
   import { transitionPlan } from '$lib/motion/prototype/transition-plan';
@@ -135,6 +135,11 @@
   }
 
   function fire(spot: Hotspot) {
+    const link = linkOf(spot.interaction.action);
+    if (link) {
+      window.open(link, '_blank', 'noopener,noreferrer');
+      return;
+    }
     const fired = apply(act(at, spot.interaction.action, spot.interaction.transition, known));
     hoverUndo = fired && spot.interaction.trigger.kind === TriggerKind.Hover ? spot.interaction.id : null;
   }

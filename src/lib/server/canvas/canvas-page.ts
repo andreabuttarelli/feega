@@ -18,6 +18,7 @@ import type { Db } from '$lib/server/db/client';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import type { Canvas } from '$lib/server/repos/canvas';
+import { tieOf } from '$lib/canvas/gpu/wire-magnet';
 import {
   createConnection,
   createNode,
@@ -28,6 +29,7 @@ import {
   moveNode,
   nodeRowExists,
   setConnectionMode,
+  setConnectionTie,
   patchNodeData,
   DataCheck,
   type PatchWrite
@@ -1642,6 +1644,20 @@ export const actions: Actions<CanvasParams> = {
     }
 
     return { connection };
+  },
+
+  set_edge_tie: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const connectionIds = String(fd.get('connection_ids') ?? '').split(',').filter(Boolean);
+    const raw = jsonField(fd, 'tie');
+    const tie = tieOf(raw);
+    if (!connectionIds.length || (raw !== undefined && !tie)) {
+      return fail(400, { error: 'invalid tie' });
+    }
+
+    return { connections: await setConnectionTie(scope.db, { orgId: scope.orgId, connectionIds, tie }) };
   },
 
   /**

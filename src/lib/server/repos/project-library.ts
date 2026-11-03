@@ -10,6 +10,8 @@ export type LibraryScope = { orgId: string; projectId: string; kind: LibraryKind
 
 const rowOf = (scope: LibraryScope, name: string, value: unknown) => ({ project_id: scope.projectId, kind: scope.kind, name, value: value as Json });
 
+const madeFirst = (a: { created_at: string; name: string }, b: { created_at: string; name: string }) => a.created_at.localeCompare(b.created_at) || a.name.localeCompare(b.name);
+
 function fail(error: { message: string } | null) {
   if (error) {
     throw new Error(error.message);
@@ -17,12 +19,12 @@ function fail(error: { message: string } | null) {
 }
 
 export async function listEntries(db: Db, scope: LibraryScope): Promise<LibraryEntries> {
-  const { data, error } = await db.from(TABLE).select('name, value').eq('org_id', scope.orgId).eq('project_id', scope.projectId).eq('kind', scope.kind);
+  const { data, error } = await db.from(TABLE).select('name, value, created_at').eq('org_id', scope.orgId).eq('project_id', scope.projectId).eq('kind', scope.kind);
   if (error && MISSING_TABLE_CODES.has(error.code)) {
     return {};
   }
   fail(error);
-  return Object.fromEntries((data ?? []).map((row) => [row.name, row.value]));
+  return Object.fromEntries([...(data ?? [])].sort(madeFirst).map((row) => [row.name, row.value]));
 }
 
 export async function saveEntry(db: Db, scope: LibraryScope, name: string, value: unknown): Promise<void> {

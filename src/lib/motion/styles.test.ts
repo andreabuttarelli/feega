@@ -51,6 +51,14 @@ describe('named styles', () => {
     expect(parseMotionDoc(doc).ok).toBe(true);
   });
 
+  it('a text style in a Google font brings the font into a frame that never used it', () => {
+    const doc = ok(applyStyle(ok(defineStyle(docWith(), 'Display', { ...HEADLINE, font: 'Fraunces' })), ['t2'], 'Display'));
+
+    expect(findClip(doc, 't2')!.clip.props.font).toBe('Fraunces');
+    expect(doc.fonts.map((f) => f.family)).toContain('Fraunces');
+    expect(parseMotionDoc(doc).ok).toBe(true);
+  });
+
   it('editing a style updates every clip using it', () => {
     const styled = ok(applyStyle(ok(defineStyle(docWith(), 'Headline', HEADLINE)), ['t1', 't2'], 'Headline'));
     const edited = ok(defineStyle(styled, 'Headline', { ...HEADLINE, size: 0.3 }));
@@ -134,6 +142,15 @@ describe('named styles', () => {
       expect([clip.styleRef, clip.effectStyleRef]).toEqual(['Headline', 'Lifted']);
     });
 
+    it('a colour style and a text style sit on the same text', () => {
+      const text = ok(applyStyle(ok(defineStyle(docWith(), 'Headline', HEADLINE)), ['t1'], 'Headline'));
+      const both = ok(applyStyle(ok(defineStyle(text, 'Ink', { kind: StyleKind.Colour, color: '#111111' })), ['t1'], 'Ink'));
+      const clip = findClip(both, 't1')!.clip;
+
+      expect([clip.styleRef, clip.paintStyleRef]).toEqual(['Headline', 'Ink']);
+      expect(clip.props.color).toBe('#111111');
+    });
+
     it('detaching the effect slot leaves the text style linked', () => {
       const both = ok(applyStyle(ok(defineStyle(ok(applyStyle(ok(defineStyle(docWith(), 'Headline', HEADLINE)), ['t1'], 'Headline')), 'Lifted', SHADOW)), ['t1'], 'Lifted'));
       const clip = findClip(ok(detachStyle(both, ['t1'], StyleSlot.Effect)), 't1')!.clip;
@@ -146,7 +163,7 @@ describe('named styles', () => {
       const edited = ok(defineStyle(painted, 'Sunset', { ...SUNSET, fills: [{ ...(SUNSET as { fills: Fill[] }).fills[0], angle: 90 } as Fill] }));
 
       expect(findClip(painted, 's1')!.clip.props.fills).toMatchObject([{ type: 'linear-gradient', angle: 45 }]);
-      expect(findClip(painted, 's1')!.clip.styleRef).toBe('Sunset');
+      expect(findClip(painted, 's1')!.clip.paintStyleRef).toBe('Sunset');
       expect(findClip(edited, 's1')!.clip.props.fills).toMatchObject([{ angle: 90 }]);
     });
 
@@ -189,7 +206,7 @@ describe('named styles', () => {
       const renamed = ok(renameStyle(painted, 'Sunset', 'Dusk'));
 
       expect(renamed.styles).toEqual({ Dusk: SUNSET });
-      expect(findClip(renamed, 's1')!.clip.styleRef).toBe('Dusk');
+      expect(findClip(renamed, 's1')!.clip.paintStyleRef).toBe('Dusk');
     });
 
     it('a title is offered effect and paint styles, audio none', () => {

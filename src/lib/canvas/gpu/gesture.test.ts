@@ -3,11 +3,18 @@ import { Corner } from './geometry';
 import { GestureKind, HitKind, Pointer, clicked, glidesAfterPan, gestureFor, marqueeBox, marqueePick, movedBy, resized, resizedAt, rotateZoneAt } from './gesture';
 import { CanvasMode } from '../canvas-mode';
 
-const mouse = { pointer: Pointer.Mouse, button: 0, shift: false, space: false, mode: CanvasMode.Edit };
+const mouse = { pointer: Pointer.Mouse, button: 0, shift: false, alt: false, space: false, mode: CanvasMode.Edit };
 
 const NO_KEYS = { shift: false, alt: false };
 
 describe('gestureFor — one row per way a press can start', () => {
+  it('alt on empty canvas or on a wire draws a cable tie stroke; alt on a node still drags', () => {
+    const alt = { ...mouse, alt: true };
+    expect(gestureFor({ kind: HitKind.Empty }, alt)).toBe(GestureKind.Tie);
+    expect(gestureFor({ kind: HitKind.Edge, edgeId: 'e' }, alt)).toBe(GestureKind.Tie);
+    expect(gestureFor({ kind: HitKind.Node, nodeId: 'a' }, alt)).toBe(GestureKind.Drag);
+  });
+
   it('a press on a port starts a wire, on a corner a resize, on a node a drag', () => {
     expect(gestureFor({ kind: HitKind.Port, nodeId: 'a', handle: 'text' }, mouse)).toBe(GestureKind.Connect);
     expect(gestureFor({ kind: HitKind.Corner, nodeId: 'a', unit: [1, 1] }, mouse)).toBe(GestureKind.Resize);

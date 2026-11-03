@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
 import ColorPicker from './ColorPicker.svelte';
+import { StyleKind } from '@feega/motion-core/motion/styles-model';
+import { styleLibrary } from '$lib/canvas/style-library.svelte';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const { flushSync, mount, unmount } = (await import(join(dir, '../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
@@ -157,6 +159,18 @@ describe('colour picker', () => {
     document.querySelector<HTMLButtonElement>('button[aria-label="00FF00"]')!.click();
 
     expect(onchange).toHaveBeenCalledWith('#00ff00', undefined);
+  });
+
+  it('lists the colour styles of the document first, by name, and applies one', () => {
+    styleLibrary.styles = { Ink: { kind: StyleKind.Colour, color: '#111111' }, Body: { kind: StyleKind.Text, size: 0.05 }, Primary: { kind: StyleKind.Colour, color: '#5b4cf5' } };
+    const { onchange } = show({ swatches: ['#00ff00'] });
+
+    expect([...document.querySelectorAll('.row-head')].map((h) => h.textContent)[0]).toBe('Styles');
+    expect([...document.querySelectorAll<HTMLButtonElement>('.row')[0].querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Ink', 'Primary']);
+    document.querySelector<HTMLButtonElement>('button[aria-label="Primary"]')!.click();
+    styleLibrary.styles = {};
+
+    expect(onchange).toHaveBeenCalledWith('#5b4cf5', undefined);
   });
 
   it('keeps the hue when a grey is picked on the square', () => {

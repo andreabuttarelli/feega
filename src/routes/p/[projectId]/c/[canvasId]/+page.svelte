@@ -140,6 +140,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { OpOutcome, createOptimistic, type OptimisticPort } from '$lib/canvas/optimistic-ops';
   import { CommentAction, commentOp, restoreThreads, runnable } from '$lib/canvas/comment-ops';
   import { OptimisticAction, Refresh, optimisticOp, refreshOf, requestOf, restoreCanvas, type CanvasRows } from '$lib/canvas/optimistic-registry';
+  import type { Tie } from '$lib/canvas/gpu/wire-magnet';
   import { replaySent, sentLog, type SentLog } from '$lib/canvas/sent-ops';
   import { fileHolding, frameHolding, groupHolding, type FrameHold } from '$lib/canvas/frame-holding';
   import { besideBox, defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, pendingPicture, placedFrame, settle, copiedNodes, CopyShown, type Drawing, type Duplication } from '$lib/canvas/optimistic-insert';
@@ -669,8 +670,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     void optimistic(OptimisticAction.Stack, { ids, id: crypto.randomUUID() });
   }
 
-  function homeComponents(nodeId: string) {
-    void post('homeComponents', { node_id: nodeId }).then(() => invalidate(CANVAS_LIST_DEPENDENCY));
+  async function homeComponents(nodeId: string): Promise<Record<string, string> | null> {
+    const done = await postAtVersion('homeComponents', nodeId, {});
+    void invalidate(CANVAS_LIST_DEPENDENCY);
+    return (done?.homes as Record<string, string> | undefined) ?? null;
   }
 
   function wrapInSection(ids: string[]) {
@@ -922,6 +925,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
       ...(isOutputHandle(connection.sourceHandle) ? { sourceHandle: connection.sourceHandle } : {}),
       kind,
       mode: connection.mode,
+      tie: connection.tie,
       ...(kind === 'groups_with' ? {} : { markerEnd: { type: 'arrowclosed' as const } })
     };
   }
@@ -3776,6 +3780,10 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 
   /** Fisso o iterate — ottimista come ogni altro campo della linea: subito sullo schermo, e
    *  ripristinato se il server rifiuta (l'arco è caduto nel frattempo, o non è più di quest'org). */
+  async function tieEdges(connectionIds: string[], tie: Tie | null) {
+    await optimistic(OptimisticAction.EdgeTie, { connectionIds, tie });
+  }
+
   async function setEdgeMode(connectionId: string, mode: WireMode) {
     await optimistic(OptimisticAction.EdgeMode, { connectionId, mode });
   }
@@ -4572,6 +4580,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     onExportRows={exportFrames}
     onEdgeDelete={disconnect}
     onEdgeModeChange={setEdgeMode}
+    onEdgeTie={tieEdges}
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}

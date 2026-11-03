@@ -71,8 +71,8 @@ describe('the builder', () => {
   it('answers each request with its own list', async () => {
     const worker = echo();
     const build = frameBuilder(() => worker);
-    const [a, b] = await Promise.all([build('/a', Smoothing.Plain), build('/b', Smoothing.Plain)]);
-    expect(worker.asked.map((a) => a.url)).toEqual(['/a', '/b']);
+    const [a, b] = await Promise.all([build(source(shapeDoc), Smoothing.Plain), build(source(customDoc), Smoothing.Plain)]);
+    expect(worker.asked.map((a) => a.source.doc)).toEqual([shapeDoc, customDoc]);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
   });
@@ -80,7 +80,7 @@ describe('the builder', () => {
   it('hands the worker the local font files it cannot see from its own thread', async () => {
     keepLocalFiles('Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]);
     const worker = echo();
-    await frameBuilder(() => worker)('/a', Smoothing.Plain);
+    await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
     forgetLocalFiles();
 
     expect(worker.asked[0].locals).toEqual([['Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]]]);
@@ -90,8 +90,8 @@ describe('the builder', () => {
     const dead = { onmessage: null, onerror: null as BuildWorker['onerror'], postMessage: () => queueMicrotask(() => dead.onerror?.(new Event('error') as never)) };
     let spawned = 0;
     const build = frameBuilder(() => (spawned++, dead));
-    await expect(build('/a', Smoothing.Plain)).rejects.toThrow();
-    await expect(build('/b', Smoothing.Plain)).rejects.toThrow();
+    await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
+    await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
     expect(spawned).toBe(1);
   });
 
@@ -110,14 +110,14 @@ describe('the builder', () => {
       postMessage: (ask: BuildAsk) => queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, list: { width: 1, height: 1, background: null, items: [item], unsupported: [] }, wires: ['"from the worker"'] } } as never))
     };
 
-    const list = await frameBuilder(() => worker)('/a', Smoothing.Plain);
+    const list = await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
 
     expect(itemWire(list!.items[0])).toBe('"from the worker"');
   });
 
   it('says it cannot build when no worker can start', async () => {
     const build = frameBuilder(() => null);
-    await expect(build('/a', Smoothing.Plain)).rejects.toThrow();
+    await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
   });
 });
 

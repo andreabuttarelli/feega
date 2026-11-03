@@ -7,6 +7,8 @@
   import type { LiveGesture } from '$lib/motion/live-edit';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
+  import { styleLibrary } from '$lib/canvas/style-library.svelte';
+  import { colourStyles } from '$lib/motion/style-library';
 
   let {
     value,
@@ -227,12 +229,15 @@
 
   const live = $derived(hexOfHsb(hsb));
   const pure = $derived(hexOfHsb({ h: hsb.h, s: HUNDRED, b: HUNDRED }));
+  type Swatch = { colour: string; label: string };
+  const named = (colours: readonly string[]): Swatch[] => colours.map((colour) => ({ colour, label: swatchName(colour) }));
   const rows = $derived(
     [
-      { head: 'Document', colours: swatches },
-      { head: 'Brand', colours: BRAND },
-      { head: 'Recent', colours: recent }
-    ].filter((r) => r.colours.length)
+      { head: 'Styles', swatches: colourStyles(styleLibrary.styles).map((s) => ({ colour: s.color, label: s.name })) },
+      { head: 'Document', swatches: named(swatches) },
+      { head: 'Brand', swatches: named(BRAND) },
+      { head: 'Recent', swatches: named(recent) }
+    ].filter((r) => r.swatches.length)
   );
 </script>
 
@@ -287,8 +292,8 @@
   {#each rows as row (row.head)}
     <span class="row-head">{row.head}</span>
     <div class="row">
-      {#each row.colours as colour (colour)}
-        <button type="button" class="swatch" class:on={value.toLowerCase() === colour.toLowerCase()} style={`--c: ${resolveColor(colour, tokens)};`} title={swatchName(colour)} aria-label={swatchName(colour)} onclick={() => commit(colour)}></button>
+      {#each row.swatches as { colour, label } (label)}
+        <button type="button" class="swatch" class:on={value.toLowerCase() === colour.toLowerCase()} style={`--c: ${resolveColor(colour, tokens)};`} title={label} aria-label={label} onclick={() => commit(colour)}></button>
       {/each}
     </div>
   {/each}

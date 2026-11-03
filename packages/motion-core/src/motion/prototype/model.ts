@@ -14,7 +14,8 @@ export enum ActionKind {
   CloseOverlay = 'close_overlay',
   Back = 'back',
   ScrollTo = 'scroll_to',
-  ChangeTo = 'change_to'
+  ChangeTo = 'change_to',
+  OpenUrl = 'open_url'
 }
 
 export enum TransitionKind {
@@ -68,6 +69,10 @@ export type Overlay = z.infer<typeof overlaySchema>;
 export const DEFAULT_OVERLAY: Overlay = overlaySchema.parse({});
 
 export const MAX_VARIANT_PART = 80;
+export const MAX_URL = 2048;
+
+const WEB_SCHEMES = /^https?:\/\//i;
+const url = z.string().max(MAX_URL).url().regex(WEB_SCHEMES, 'only http and https links');
 
 const variantPart = z.string().min(1).max(MAX_VARIANT_PART);
 const variant = z.record(variantPart, variantPart).refine((picked) => Object.keys(picked).length > 0, 'pick at least one variant property');
@@ -85,7 +90,8 @@ export const actionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(ActionKind.CloseOverlay) }),
   z.object({ kind: z.literal(ActionKind.Back) }),
   z.object({ kind: z.literal(ActionKind.ScrollTo), target }),
-  z.object({ kind: z.literal(ActionKind.ChangeTo), variant })
+  z.object({ kind: z.literal(ActionKind.ChangeTo), variant }),
+  z.object({ kind: z.literal(ActionKind.OpenUrl), url })
 ]);
 
 const timing = { easing: z.enum(EASE_IDS).default(Ease.Standard), durationMs: z.number().int().min(1).max(MAX_DURATION_MS).default(DEFAULT_DURATION_MS) };
@@ -119,7 +125,8 @@ const TARGETED: Record<ActionKind, boolean> = {
   [ActionKind.CloseOverlay]: false,
   [ActionKind.Back]: false,
   [ActionKind.ScrollTo]: true,
-  [ActionKind.ChangeTo]: false
+  [ActionKind.ChangeTo]: false,
+  [ActionKind.OpenUrl]: false
 };
 
 export const needsTarget = (kind: ActionKind): boolean => TARGETED[kind];
@@ -137,7 +144,8 @@ export const ACTION_LABEL: Record<ActionKind, string> = {
   [ActionKind.CloseOverlay]: 'Close overlay',
   [ActionKind.Back]: 'Back',
   [ActionKind.ScrollTo]: 'Scroll to',
-  [ActionKind.ChangeTo]: 'Change to'
+  [ActionKind.ChangeTo]: 'Change to',
+  [ActionKind.OpenUrl]: 'Open URL'
 };
 
 export const TRANSITION_LABEL: Record<TransitionKind, string> = {

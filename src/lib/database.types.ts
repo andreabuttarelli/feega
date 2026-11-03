@@ -2769,6 +2769,7 @@ export type Database = {
           source_node_id: string
           target_handle: string | null
           target_node_id: string
+          tie: Json | null
         }
         Insert: {
           actor_id?: string | null
@@ -2783,6 +2784,7 @@ export type Database = {
           source_node_id: string
           target_handle?: string | null
           target_node_id: string
+          tie?: Json | null
         }
         Update: {
           actor_id?: string | null
@@ -2797,6 +2799,7 @@ export type Database = {
           source_node_id?: string
           target_handle?: string | null
           target_node_id?: string
+          tie?: Json | null
         }
         Relationships: [
           {
