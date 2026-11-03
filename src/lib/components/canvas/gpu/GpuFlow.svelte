@@ -3596,7 +3596,7 @@
   function clipOfSelection(): ClipboardPayload | null {
     const tools = inside && framePicks().length ? toolsOf(inside.nodeId) : null;
     if (inside && tools) {
-      const elements = copyElements(tools.doc, picks);
+      const elements = copyElements(homed(tools.doc, inside.nodeId), picks);
       elementClipboard.copyElements(inside.nodeId, [...picks], elements);
       return { elements: elementClipboard.elements! };
     }

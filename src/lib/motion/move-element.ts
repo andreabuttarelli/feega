@@ -3,6 +3,7 @@ import { MAX_SHORT_SIDE, MAX_SIDE, MAX_TRACKS, MotionFormat, cloneDoc, compsOf, 
 import { FPS, maxFrames } from '@feega/motion-core/motion/design';
 import { fieldsOf } from './inspector';
 import { retimer } from './frame-rate';
+import { reframed } from './comp-frame';
 import { DocMode } from '@feega/motion-core/motion/still';
 import { NEW_CLIP_START, removeClips, type OpResult } from '@feega/motion-core/motion/timeline';
 import { CLIP_NAME_MAX } from '@feega/motion-core/motion/organize';
@@ -235,7 +236,7 @@ function freshTrackId(doc: MotionDoc, newId: NewId): string {
 
 function merged(doc: MotionDoc, carried: Carried, element: Element): Pick<MotionDoc, 'assets' | 'fonts' | 'components' | 'comps'> {
   const retime = retimer(element.fps, doc.fps);
-  const comps = Object.fromEntries(Object.entries(carried.comps).filter(([id]) => !doc.comps[id]).map(([id, comp]) => [id, retime.comp(comp)]));
+  const comps = Object.fromEntries(Object.entries(carried.comps).filter(([id]) => !doc.comps[id]).map(([id, comp]) => [id, retime.comp(reframed(comp, element.size, doc))]));
   return {
     assets: [...doc.assets, ...carried.assets.filter((a) => !doc.assets.some((b) => b.id === a.id))],
     fonts: [...doc.fonts, ...carried.fonts.filter((f) => !doc.fonts.some((g) => g.family === f.family))],
