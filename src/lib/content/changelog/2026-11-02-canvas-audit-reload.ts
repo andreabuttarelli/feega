@@ -5,6 +5,7 @@ export default {
   title: 'Steadier reloads, finer inspector',
   items: [
     'Reloading a canvas no longer flashes an older version of a frame before the current one',
+    'Moves made offline stay where you left them after a reload, instead of jumping back first',
     'X and Y keep decimals, up to two, like Figma',
     'A selected line shows its two end handles; drag one to move that end, Shift snaps to 45°',
     'A transparent fill reads None over a checkerboard',

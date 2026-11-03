@@ -11,6 +11,11 @@ From the canvas audit (2026-11-02, `~/Documents/feega-videos/audit/verify/`).
   tile re-shoots one). The layers thumbnail (`frameLook`) uses the same check. The outbox, sent-op
   log and service worker were checked and are not a source: the service worker caches only the
   shell, and nothing stores frame docs locally.
+- **Offline moves jumped after a reload.** Durability audit (`round2/durability/s2-reload-results.json`):
+  for ~2.3 s after a reload the server's old positions showed, then nodes jumped once the outbox
+  replay landed. `places.restore` only re-sent the entries; `placedRows` (`place-save.ts`) now
+  applies them to the local rows (group moves carry their members) as soon as the outbox opens,
+  and the dirty queues keep them over snapshots until they land.
 - **X/Y rounded to whole pixels.** `PositionSection` rounded the shown value. `NumberField` takes
   `shows` (`FieldText.Step` default, `FieldText.Precise` up to two decimals, trailing zeros
   dropped); X and Y use it. Scrubbing still steps by whole pixels.
