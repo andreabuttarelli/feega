@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BlendMode } from '@feega/motion-core/motion/blend';
-import { Stand, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Stand, drawable, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
 const box = (x: number) => ({ x, y: 0, w: 200, h: 100 });
@@ -54,6 +55,12 @@ describe('pictures not there', () => {
     const kinds = (items: Item[]): string[] => items.flatMap((i) => (i.kind === ItemKind.Group ? kinds((i as { items: Item[] }).items) : [i.kind]));
     expect(kinds(shown.items)).toEqual([ItemKind.Path, ItemKind.Path]);
     expect(shown.items[0].matrix).toEqual([1, 0, 0, 1, 5, 6]);
+  });
+
+  it('a frame whose picture failed still draws, with the failed picture blocked, so it is never blank or stale', () => {
+    const list = listOf([picture('ok'), picture('gone')]);
+    expect(drawable(list, Readiness.Partial, LOOK, (i) => i.clip === 'gone').items.map((i) => i.kind)).toEqual([ItemKind.Image, ItemKind.Path]);
+    expect(drawable(list, Readiness.Whole, LOOK, () => true)).toBe(list);
   });
 
   it('keeps the pictures that loaded and blocks only the ones that failed', () => {
