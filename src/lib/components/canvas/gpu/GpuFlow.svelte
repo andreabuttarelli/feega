@@ -245,6 +245,7 @@
   import { dragAngle, followGroup, mirrorGroup, type Placed } from '$lib/canvas/node-layout';
   import { Flip, flipStage } from '$lib/motion/layer-props';
   import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
+  import { backToFront } from '$lib/canvas/paint-order';
 
   let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
 
@@ -326,7 +327,7 @@
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
+  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));

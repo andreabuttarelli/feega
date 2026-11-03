@@ -61,14 +61,14 @@ describe('layer rows', () => {
     expect(rows.find((r) => r.id === 'm1')?.instance).toBeUndefined();
   });
 
-  it('list every canvas node at the top level, named, and only the open video unfolds into its clips', () => {
+  it('list every canvas node at the top level, frontmost first, named, and only the open video unfolds into its clips', () => {
     const doc = video();
     const rows = layerRows(NODES, { nodeId: 'm1', doc });
 
     expect(rows.filter((r) => r.depth === 0).map((r) => [r.id, r.kind, r.label])).toEqual([
-      ['n1', LayerKind.Node, 'Hook'],
+      ['m2', LayerKind.Node, 'Frame'],
       ['m1', LayerKind.Node, 'Teaser'],
-      ['m2', LayerKind.Node, 'Frame']
+      ['n1', LayerKind.Node, 'Hook']
     ]);
     expect(rows.filter((r) => r.nodeId === 'm1' && r.depth > 0).map((r) => [r.id, r.kind])).toEqual([['t1', LayerKind.Clip]]);
     expect(rows.find((r) => r.id === 't1')).toMatchObject({ depth: 1, label: 'Better marketing' });
@@ -99,7 +99,7 @@ describe('layer rows', () => {
     const glyphs = ['ellipse', 'Text', 'Image'];
     const rows = layerRows(glyphs.map((glyph, i) => ({ id: `e${i}`, type: 'motion', name: null, element: true, glyph })), null);
 
-    expect(rows.map((r) => r.type)).toEqual(glyphs);
+    expect(rows.map((r) => r.type)).toEqual([...glyphs].reverse());
   });
 
   it('names an element glyph from its clip: the shape for a shape, the component otherwise', () => {
@@ -417,10 +417,10 @@ describe('a frame lists elements, not timeline tracks', () => {
     expect(layerRows(NODES, { nodeId: 'm1', doc: video() }).some((r) => r.kind === LayerKind.Track)).toBe(false);
   });
 
-  it('lists clips straight under the frame, top track first', () => {
+  it('lists clips straight under the frame, top track first, the later clip of a track above', () => {
     expect(inside(layerRows(NODES, { nodeId: 'm1', doc: sequence(), mode: EditMode.Design }))).toEqual([
-      ['a', LayerKind.Clip, 1],
       ['b', LayerKind.Clip, 1],
+      ['a', LayerKind.Clip, 1],
       ['c', LayerKind.Clip, 1]
     ]);
   });
@@ -775,5 +775,41 @@ describe('node rows carry hide and lock', () => {
   it('a hidden or locked node shows so in Layers', () => {
     const rows = layerRows([{ id: 'n', type: 'image', name: 'Shot', hidden: true, locked: true }], null);
     expect(rows[0]).toMatchObject({ hidden: true, locked: true });
+  });
+});
+
+describe('Layers list the frontmost layer first, as painted', () => {
+  const shape = (doc: MotionDoc, id: string, trackId: string, kind: string) => ok(addClip(doc, { component: 'Shape', from: 0, trackId, props: { shape: kind } }, id));
+  const parented = (doc: MotionDoc, parent: string, ids: readonly string[]): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (ids.includes(c.id) ? { ...c, parent } : c)) })) });
+  const toFront = (doc: MotionDoc, trackId: string): MotionDoc => ({ ...doc, tracks: [doc.tracks.find((t) => t.id === trackId)!, ...doc.tracks.filter((t) => t.id !== trackId)] });
+  const ids = (doc: MotionDoc) => frameRows(doc, 'm1').map((r) => r.id);
+  const backTrack = (doc: MotionDoc) => doc.tracks.find((t) => t.kind === TrackKind.Visual)!.id;
+
+  it('a clip drawn later on the same track sits above the one under it', () => {
+    const doc = newMotionDoc(MotionFormat.Landscape);
+    const drawn = shape(shape(doc, 'box', backTrack(doc), 'rect'), 'disc', backTrack(doc), 'ellipse');
+
+    expect(ids(drawn)).toEqual(['disc', 'box']);
+  });
+
+  it('children of a frame follow the same order, across and within tracks', () => {
+    const doc = newMotionDoc(MotionFormat.Landscape);
+    const back = backTrack(doc);
+    const drawn = shape(shape(shape(doc, 'card', back, 'rect'), 'box', back, 'rect'), 'disc', back, 'ellipse');
+    const ringed = toFront(shape(ok(addTrack(drawn, TrackKind.Visual, 'front')), 'ring', 'front', 'ellipse'), 'front');
+
+    expect(ids(parented(ringed, 'card', ['box', 'disc', 'ring']))).toEqual(['card', 'ring', 'disc', 'box']);
+  });
+
+  it('a canvas element made later sits above the earlier one', () => {
+    const rows = layerRows([{ id: 'disc', type: 'motion', name: 'Ellipse', element: true }, { id: 'box', type: 'motion', name: 'Box', element: true }], null);
+
+    expect(rows.map((r) => r.id)).toEqual(['box', 'disc']);
+  });
+
+  it('a group painted behind lists under every node in front of it', () => {
+    const rows = layerRows([{ id: 'a', type: 'motion', name: 'A' }, { id: 'g', type: 'motion', name: 'Group', behind: true }, { id: 'b', type: 'motion', name: 'B' }], null);
+
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a', 'g']);
   });
 });
