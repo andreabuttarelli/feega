@@ -86,8 +86,6 @@ const SCROLL_PAUSES = 8;
 const NETWORK_IDLE_MS = 6_000;
 const HTTP_ERROR = 400;
 const WEB_SCHEMES = ['http:', 'https:'];
-const FILLED_SUMMARY = 'Filled page images';
-const HOMED_SUMMARY = 'Linked components to their sheet';
 
 const BOX_SHAPE = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
 
@@ -199,52 +197,39 @@ export async function fontsFor(ask: LandAsk, tree: PageTree): Promise<FontAssets
 
 type PlacedSets = { frameIds: string[]; undo: UndoItem[]; skipped: string[] };
 
-async function placedSet(ask: LandAsk, place: Place, at: { x: number; y: number }, set: UrlPlan['sets'][number]): Promise<PlacedSets> {
+const NO_SETS: PlacedSets = { frameIds: [], undo: [], skipped: [] };
+
+async function placedSet(ask: LandAsk, page: ComponentsPage, set: UrlPlan['sets'][number], id: string): Promise<PlacedSets> {
   try {
-    const placed = await placeFigmaPlan(ask.store, place, { items: [set], skipped: [], fileKey: null }, at);
+    const placed = await placeFigmaPlan(ask.store, page.place, { items: [set], skipped: [], fileKey: null }, page.at, [id]);
     return { frameIds: placed.frameIds.slice(0, 1), undo: placed.undo, skipped: [] };
   } catch (e) {
     if (!(e instanceof DocRejected)) {
       throw e;
     }
-    return { frameIds: [''], undo: [], skipped: [`${set.name}: component set left out, ${e.message}`] };
+    return { frameIds: [], undo: [], skipped: [`${set.name}: component set left out, ${e.message}`] };
   }
 }
 
-async function placedSets(ask: LandAsk, sets: UrlPlan['sets']): Promise<PlacedSets> {
+async function placedSets(ask: LandAsk, sets: UrlPlan['sets'], ids: string[], landed: string[]): Promise<PlacedSets> {
   if (!sets.length || !ask.components) {
-    return { frameIds: [], undo: [], skipped: [] };
+    return NO_SETS;
   }
   const page = await ask.components();
   const placed: PlacedSets[] = [];
-  for (const set of sets) {
-    placed.push(await placedSet(ask, page.place, page.at, set));
+  for (const [i, set] of sets.entries()) {
+    const one = await placedSet(ask, page, set, ids[i]);
+    landed.push(...one.frameIds);
+    placed.push(one);
   }
   return { frameIds: placed.flatMap((p) => p.frameIds), undo: placed.flatMap((p) => p.undo), skipped: placed.flatMap((p) => p.skipped) };
 }
 
-async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: Homes): Promise<void> {
-  for (const [page, comps] of Object.entries(homes)) {
-    const pageId = frameIds[Number(page)];
-    const frame = pageId ? await store.read(pageId) : null;
-    const byComp = Object.fromEntries(Object.entries(comps).flatMap(([compId, set]) => (setIds[set] ? [[compId, setIds[set]]] : [])));
-    if (frame && Object.keys(byComp).length) {
-      await store.write(pageId, frame.version, homedAt(frame.doc, byComp), HOMED_SUMMARY);
-    }
-  }
-}
-
-async function filled(ask: LandAsk, frameIds: string[], items: UrlPlan['sets'], assets: ImageAssets): Promise<void> {
-  for (const [i, frameId] of frameIds.entries()) {
-    if (!frameId) {
-      continue;
-    }
-    const frame = await ask.store.read(frameId);
-    const images = items[i]?.images ?? [];
-    if (frame && images.length && Object.keys(assets).length) {
-      await ask.store.write(frameId, frame.version, imagesFilled(frame.doc, images, assets), FILLED_SUMMARY);
-    }
-  }
+function homedItems(items: UrlPlan['sets'], homes: Homes, setIds: readonly string[], assets: ImageAssets): UrlPlan['sets'] {
+  return items.map((item, i) => {
+    const byComp = Object.fromEntries(Object.entries(homes[i] ?? {}).flatMap(([compId, set]) => (setIds[set] ? [[compId, setIds[set]]] : [])));
+    return { ...item, doc: imagesFilled(homedAt(item.doc, byComp), item.images, assets) };
+  });
 }
 
 async function readAndLand(ask: PageAsk): Promise<UrlImported> {
@@ -315,16 +300,14 @@ export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: bo
     return refused(UrlImportOutcome.Rejected, refusal);
   }
 
-  const placed = await placeFigmaPlan(ask.store, ask.place, made.plan, ask.at);
-  const landed = [...placed.frameIds];
+  const assets = await imported(ask, made.images);
+  const setIds = made.sets.map(() => crypto.randomUUID());
+  const landed: string[] = [];
   try {
-    const sets = await placedSets(ask, made.sets);
-    landed.push(...sets.frameIds.filter(Boolean));
-    await homedOnSets(ask.store, placed.frameIds, sets.frameIds, made.homes);
-    await homedOnSets(ask.store, sets.frameIds, sets.frameIds, made.setHomes);
-    const assets = await imported(ask, made.images);
-    await filled(ask, placed.frameIds, made.plan.items, assets);
-    await filled(ask, sets.frameIds, made.sets, assets);
+    const sets = await placedSets(ask, homedItems(made.sets, made.setHomes, setIds, assets), setIds, landed);
+    const kept = setIds.map((id) => (landed.includes(id) ? id : ''));
+    const placed = await placeFigmaPlan(ask.store, ask.place, { ...made.plan, items: homedItems(made.plan.items, made.homes, kept, assets) }, ask.at);
+    landed.push(...placed.frameIds);
     return { outcome: UrlImportOutcome.Ok, frameId: placed.frameIds[0], name: made.name, undo: [...placed.undo, ...sets.undo], skipped: [...placed.skipped, ...sets.skipped], truncated };
   } catch (e) {
     await Promise.all(landed.map((id) => ask.store.remove(id).catch(() => undefined)));

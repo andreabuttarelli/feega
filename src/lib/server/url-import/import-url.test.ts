@@ -48,8 +48,8 @@ function tabOf(tree: unknown, status = 200) {
 function storeOf() {
   const docs = new Map<string, { doc: unknown; version: number; name?: string }>();
   const store = {
-    create: vi.fn(async (_at: unknown, doc: unknown, node: { displayName?: string }) => {
-      const id = `frame-${docs.size + 1}`;
+    create: vi.fn(async (at: { id?: string }, doc: unknown, node: { displayName?: string }) => {
+      const id = at.id ?? `frame-${docs.size + 1}`;
       docs.set(id, { doc, version: 1, name: node.displayName });
       return id;
     }),
@@ -252,16 +252,21 @@ describe('importPageAt', () => {
     expect(docs.size).toBe(0);
   });
 
-  it('a write that fails after the page frame landed takes every frame already placed with it', async () => {
+  it('a page frame that fails after the component sets landed takes every frame already placed with it', async () => {
     const button = (id: string, x: number) => ({ id, type: 'FRAME', name: 'button', absoluteBoundingBox: { x, y: 600, width: 140, height: 44 }, fills: [{ type: 'SOLID', color: { r: 0.37, g: 0.42, b: 0.82, a: 1 } }], children: [{ id: `${id}t`, type: 'TEXT', characters: 'Go', absoluteBoundingBox: { x: x + 20, y: 612, width: 90, height: 20 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 15, fontWeight: 500 } }] });
     const tree = { ...TREE, root: { ...TREE.root, children: [...TREE.root.children!, button('b1', 100), button('b2', 300)] } };
     const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
     const { ask, docs } = askOf({ open: async () => tabOf(tree), shape: FULL_SHAPE, components });
-    ask.store.write = vi.fn(async () => {
-      throw new Error('connection reset');
+    const create = ask.store.create;
+    ask.store.create = vi.fn(async (...args: Parameters<FrameStore['create']>) => {
+      if (args[0].canvasId === 'c') {
+        throw new Error('connection reset');
+      }
+      return create(...args);
     });
 
     await expect(importPageAt(ask)).rejects.toThrow('connection reset');
+    expect(components).toHaveBeenCalled();
     expect(docs.size).toBe(0);
   });
 
@@ -283,6 +288,22 @@ describe('importPageAt', () => {
     expect(done.outcome === UrlImportOutcome.Ok ? '' : done.error).toContain('transform.y');
     expect(docs.size).toBe(0);
     expect(components).not.toHaveBeenCalled();
+  });
+
+  it('each frame is written once, already holding its pictures and the homes of its mains', async () => {
+    const button = (id: string, x: number) => ({ id, type: 'FRAME', name: 'button', absoluteBoundingBox: { x, y: 600, width: 140, height: 44 }, fills: [{ type: 'SOLID', color: { r: 0.37, g: 0.42, b: 0.82, a: 1 } }], children: [{ id: `${id}t`, type: 'TEXT', characters: 'Go', absoluteBoundingBox: { x: x + 20, y: 612, width: 90, height: 20 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], style: { fontFamily: 'Inter', fontSize: 15, fontWeight: 500 } }] });
+    const tree = { ...TREE, root: { ...TREE.root, children: [...TREE.root.children!, button('b1', 100), button('b2', 300)] } };
+    const components = vi.fn(async () => ({ place: { projectId: 'p1', canvasId: 'components' }, at: { x: 0, y: 0 } }));
+    const { ask, docs } = askOf({ open: async () => tabOf(tree), shape: FULL_SHAPE, components });
+
+    const done = await importPageAt(ask);
+
+    const page = docs.get(done.outcome === UrlImportOutcome.Ok ? done.frameId : '')!.doc as MotionDoc;
+    const homes = Object.values(page.comps).flatMap((c) => (c.component ? [c.component.home] : []));
+    expect(ask.store.write).not.toHaveBeenCalled();
+    expect(JSON.stringify(page)).toContain('asset-1');
+    expect(homes.length).toBeGreaterThan(0);
+    expect(homes.every((home) => home && docs.has(home))).toBe(true);
   });
 
   it('le immagini della pagina vengono importate e messe nel frame', async () => {
@@ -365,13 +386,14 @@ describe('importPageAt', () => {
 
     const done = await importPageAt(ask);
 
-    const page = docs.get('frame-1')!.doc as MotionDoc;
+    const pageId = done.outcome === UrlImportOutcome.Ok ? done.frameId : '';
+    const page = docs.get(pageId)!.doc as MotionDoc;
     const homes = Object.values(page.comps).flatMap((c) => (c.component ? [c.component.home] : []));
-    const sets = [...docs].filter(([id]) => id !== 'frame-1').map(([id]) => id);
+    const sets = [...docs].filter(([id]) => id !== pageId).map(([id]) => id);
     expect(components).toHaveBeenCalledOnce();
     expect(homes.length).toBeGreaterThan(0);
     expect(homes.every((home) => home && sets.includes(home))).toBe(true);
-    expect('undo' in done ? done.undo.map((u) => (u as { nodeId: string }).nodeId).sort() : []).toEqual(['frame-1', ...sets].sort());
+    expect('undo' in done ? done.undo.map((u) => (u as { nodeId: string }).nodeId).sort() : []).toEqual([pageId, ...sets].sort());
   });
 
   it('a component set the schema rejects is left out, the page still lands and says what was dropped', async () => {
