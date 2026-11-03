@@ -6,7 +6,6 @@ use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, R
 use crate::world::{OverlayPart, Patch, World};
 use crate::Skipped;
 
-const ROUGH_SCALE: f64 = 0.5;
 const RENDER_TILE_PX: u32 = 1024;
 
 pub fn render_tile(max_texture: u32) -> (u32, u32) {
@@ -41,13 +40,6 @@ pub struct Compositor {
     world: World,
     retained: Retained,
     pending: bool,
-}
-
-fn scale_of(quality: Quality) -> f64 {
-    match quality {
-        Quality::Rough => ROUGH_SCALE,
-        Quality::Sharp => 1.0,
-    }
 }
 
 impl Compositor {
@@ -88,7 +80,7 @@ impl Compositor {
     }
 
     fn region<P: Painter>(&mut self, painter: &mut P, library: &mut Library, raster: &Raster, rect: Rect, limits: Limits) -> Result<(Vec<Skipped>, usize), P::Error> {
-        let q = scale_of(raster.quality);
+        let q = raster.quality.scale();
         let o = self.retained.overscan() as f64;
         let to_region = Matrix::scale(q) * Matrix::translate((o - rect.x0, o - rect.y0)) * Matrix::new(raster.camera.matrix());
         let (w, h) = ((rect.width() * q).ceil() as u32, (rect.height() * q).ceil() as u32);
@@ -115,7 +107,7 @@ impl Compositor {
                 if let Some(by) = raster.shift {
                     painter.shift(by)?;
                 }
-                let q = scale_of(raster.quality);
+                let q = raster.quality.scale();
                 let (tw, th) = painter.tile();
                 let parts: Vec<Rect> = raster.rects.iter().flat_map(|r| tiles(*r, (tw as f64 / q) as u32, (th as f64 / q) as u32)).collect();
                 let mut limits = painter.limits();

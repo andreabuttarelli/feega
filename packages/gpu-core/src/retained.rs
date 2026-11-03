@@ -12,6 +12,7 @@ const MAX_RECTS: usize = 8;
 const TOO_MANY_RECTS: usize = 32;
 const AA_PX: f64 = 1.0;
 const EPSILON: f64 = 1e-6;
+const ROUGH_SCALE: f64 = 0.5;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
@@ -51,6 +52,15 @@ impl Outcome {
 pub enum Quality {
     Rough,
     Sharp,
+}
+
+impl Quality {
+    pub fn scale(self) -> f64 {
+        match self {
+            Quality::Rough => ROUGH_SCALE,
+            Quality::Sharp => 1.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
