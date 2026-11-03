@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { FrameKind, enteredClips } from './motion-node';
-import { Extend, Reach, Root, clickTarget, extendOf, frameLevel, grabbedInstead, leaveLevel, ownClipToPick, siblingsOf, stepInside, videoSide, Press, pressOn } from './frame-select';
+import { Extend, Reach, Root, clickTarget, picksOwnKeys, extendOf, frameLevel, grabbedInstead, leaveLevel, ownClipToPick, siblingsOf, stepInside, videoSide, Press, pressOn } from './frame-select';
 
 const FRAME = frameLevel();
 const clipLevel = (clip: string) => ({ depth: Depth.Clip, clip, part: null });
@@ -216,5 +216,16 @@ describe('extendOf', () => {
 
   it('a plain press extends nothing', () => {
     expect(extendOf({ shift: false, mod: false }, { ...at, entered: true, picks: 2 }).extend).toBe(Extend.None);
+  });
+});
+
+describe('picksOwnKeys', () => {
+  it('a layer just drawn in a frame takes the frame keys, so ⇧A wraps it and not the whole frame', () => {
+    expect(picksOwnKeys({ nodeId: 'frame', level: frameLevel() }, ['box'])).toBe(true);
+  });
+
+  it('with nothing picked the keys stay on the canvas', () => {
+    expect(picksOwnKeys({ nodeId: 'frame', level: frameLevel() }, [])).toBe(false);
+    expect(picksOwnKeys(null, ['box'])).toBe(false);
   });
 });

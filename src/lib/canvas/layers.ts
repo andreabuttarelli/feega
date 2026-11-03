@@ -1,12 +1,13 @@
-import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { compOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
 import { layerTracks } from '@feega/motion-core/motion/surface';
 import { COMPONENTS, type ComponentId } from '@feega/motion-core/motion/components';
 import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '@feega/motion-core/motion/timeline';
 import { renameClip, setClipFlags, setTrackFlags } from '@feega/motion-core/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
-import { soleFrame } from '$lib/motion/main-component';
-import { SEPARATOR } from '@feega/motion-core/motion/precomp';
+import { ComponentRole, roleOf, soleFrame, withSubtrees } from '$lib/motion/main-component';
+import { adopted } from '$lib/motion/into-main';
+import { SEPARATOR, mergeView, viewOf } from '@feega/motion-core/motion/precomp';
 import { CUSTOM_CLIP, PART_SEP, partIcon, partLabel } from '@feega/motion-core/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
 import { TrackKind } from '@feega/motion-core/motion/components';
@@ -22,8 +23,9 @@ import { setParent } from '$lib/motion/parent-ops';
 import { placeInStack } from '$lib/motion/layout/stack-drag';
 import type { DrawTool, DrawBox } from '$lib/motion/draw-tool';
 import { frontToBack } from './paint-order';
+import { Place, type LayerSlot } from '$lib/motion/layer-place';
 
-const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
+export const DROP_BOX: DrawBox = { x: 0.5, y: 0.5, width: 0.2, height: 0.2 };
 
 export enum LayerKind {
   Node = 'node',
@@ -280,11 +282,7 @@ function moveClipAlong(doc: MotionDoc, clipId: string, step: typeof ABOVE | type
   return next ? moveClip(doc, clipId, { from: found.clip.from, trackId: next.id }) : fail('no track of the same kind that way');
 }
 
-export enum Place {
-  Above = 'above',
-  Below = 'below',
-  Into = 'into'
-}
+export { Place };
 
 type NewId = () => string;
 
@@ -356,6 +354,18 @@ const holdsLayers = (row: DropRow): boolean => row.kind === LayerKind.Clip && (L
 
 export const rowDrop = (row: DropRow, at: number): Place => (holdsLayers(row) ? GROUP_DROP(at) : dropPlace(row.kind, at));
 
+export type FreeLanding = { frameId: string; slot?: LayerSlot };
+
+export function freeLanding(row: LayerRow, place: Place, frames: ReadonlySet<string>): FreeLanding | null {
+  if (row.kind === LayerKind.Node) {
+    return frames.has(row.id) ? { frameId: row.id } : null;
+  }
+  if (row.nested || row.kind === LayerKind.Part || !frames.has(row.nodeId)) {
+    return null;
+  }
+  return { frameId: row.nodeId, slot: { target: row.id, place } };
+}
+
 function intoContainer(doc: MotionDoc, dragged: string, target: string): OpResult | null {
   const container = findClip(doc, target)?.clip as MotionClip | undefined;
   const moving = findClip(doc, dragged)?.clip as MotionClip | undefined;
@@ -380,7 +390,39 @@ function intoStack(doc: MotionDoc, dragged: string, target: string, place: Place
   return placeInStack(doc, dragged, stack, siblings.indexOf(target) + (place === Place.Below ? 1 : 0));
 }
 
-export function dropLayer(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId): OpResult {
+function rootHolder(view: MotionDoc, dragged: string): string | null {
+  const roots = view.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => !c.parent && c.id !== dragged);
+  const [root] = roots;
+  return roots.length === 1 && (root.autoLayout || root.clipContent) ? root.id : null;
+}
+
+const MAIN_CHILD_PARTS = 3;
+
+export function landsInMain(doc: MotionDoc, scene: string, here: string | null): boolean {
+  const parts = scene.split(SEPARATOR);
+  return parts.length === MAIN_CHILD_PARTS && roleOf(doc, parts[0], here) === ComponentRole.Main;
+}
+
+function intoMain(doc: MotionDoc, dragged: string, target: string, place: Place, here: string | null, newId: NewId): OpResult | null {
+  const [hostId, , inner] = target.split(SEPARATOR);
+  const host = findClip(doc, hostId)?.clip as MotionClip | undefined;
+  const reachable = inner === undefined ? place === Place.Into : landsInMain(doc, target, here);
+  if (!host || hostId === dragged || !reachable || roleOf(doc, hostId, here) !== ComponentRole.Main) {
+    return null;
+  }
+  const inside = adopted(doc, withSubtrees(doc, [dragged]), host);
+  const path = [compOf(host)!];
+  const view = viewOf(inside, path);
+  const holder = inner ?? rootHolder(view, dragged);
+  const placed = holder ? dropLayer(view, dragged, holder, inner === undefined ? Place.Into : place, newId) : { ok: true as const, doc: view };
+  return placed.ok ? { ok: true, doc: mergeView(inside, path, placed.doc) } : placed;
+}
+
+export function dropLayer(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId, here: string | null = null): OpResult {
+  const main = intoMain(doc, dragged, target, place, here, newId);
+  if (main) {
+    return main;
+  }
   const stacked = intoStack(doc, dragged, target, place);
   if (stacked) {
     return stacked;
@@ -398,15 +440,15 @@ export function dropLayer(doc: MotionDoc, dragged: string, target: string, place
   return mask && mask !== dragged ? joinMask(moved.doc, dragged, mask) : leaveMask(moved.doc, dragged);
 }
 
-export function dropTool(doc: MotionDoc, tool: DrawTool, target: string, place: Place, id: string, box: DrawBox = DROP_BOX): OpResult {
+export function dropTool(doc: MotionDoc, tool: DrawTool, target: string, place: Place, id: string, box: DrawBox = DROP_BOX, here: string | null = null): OpResult {
   const drawn = drawClip(doc, tool, box, 0, id);
-  return drawn.ok ? dropLayer(drawn.doc, id, target, place) : drawn;
+  return drawn.ok ? dropLayer(drawn.doc, id, target, place, newTrackId, here) : drawn;
 }
 
-export function dropLayers(doc: MotionDoc, dragged: readonly string[], target: string, place: Place, topFirst: readonly string[], newId: NewId = newTrackId): OpResult {
+export function dropLayers(doc: MotionDoc, dragged: readonly string[], target: string, place: Place, topFirst: readonly string[], here: string | null = null, newId: NewId = newTrackId): OpResult {
   const block = topFirst.filter((id) => dragged.includes(id) && id !== target);
   const sequence = place === Place.Below ? [...block].reverse() : block;
-  return sequence.reduce<OpResult>((result, id) => (result.ok ? dropLayer(result.doc, id, target, place, newId) : result), { ok: true, doc });
+  return sequence.reduce<OpResult>((result, id) => (result.ok ? dropLayer(result.doc, id, target, place, newId, here) : result), { ok: true, doc });
 }
 
 const TRACK_EDIT: Record<LayerAction, (doc: MotionDoc, track: Track, index: number, name?: string) => OpResult> = {

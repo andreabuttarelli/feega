@@ -28,14 +28,23 @@ vi.mock('$lib/server/repos/canvas', () => ({
     { id: 'c3', projectId: 'p', name: 'Components', viewport: null }
   ],
   listMotionNodes: async () => [
-    { id: 'f1', canvasId: 'c1', data: { posterAssetId: 'a1' } },
+    { id: 'f1', canvasId: 'c1', data: { posterAssetId: 'a1', docHeadRevision: 1 } },
     { id: 'f2', canvasId: 'c2', data: {} }
   ],
   listNodes: async (_db: Db, scope: { canvasId: string }) => (scope.canvasId === 'c3' ? [{ id: 'set', canvasId: 'c3', type: 'element', data: {} }, { id: 'note', canvasId: 'c3', type: 'text', data: {} }] : [])
 }));
 
+const reads = vi.hoisted(() => ({ one: [] as string[], batches: 0 }));
+
 vi.mock('$lib/server/repos/motion-revisions', () => ({
-  readHead: async (_db: Db, input: { nodeId: string }) => ({ version: 1, doc: docs[input.nodeId], summary: null, actorKind: 'user' })
+  readHead: async (_db: Db, input: { nodeId: string }) => {
+    reads.one.push(input.nodeId);
+    return { version: 1, doc: docs[input.nodeId], summary: null, actorKind: 'user' };
+  },
+  readHeads: async (_db: Db, input: { heads: { nodeId: string; version: number }[] }) => {
+    reads.batches += 1;
+    return new Map(input.heads.map((h) => [h.nodeId, { version: h.version, doc: docs[h.nodeId], summary: null, actorKind: 'user' }]));
+  }
 }));
 
 const { listProjectComponents, readComponentSource } = await import('./project-components');
@@ -55,6 +64,28 @@ describe('components across the canvases of a project', () => {
     const found = await listProjectComponents(db, scope);
 
     expect(found.find((c) => c.canvasName === 'Components')?.components[0]).toMatchObject({ frameId: 'set', name: 'Button' });
+  });
+
+  it('reads the frames whose head it knows in one batch, not one query per frame (Components panel took 20 s with 180 sets)', async () => {
+    reads.one = [];
+    reads.batches = 0;
+
+    await listProjectComponents(db, { ...scope, orgId: 'fresh' });
+
+    expect(reads.batches).toBe(1);
+    expect(reads.one).not.toContain('f1');
+  });
+
+  it('a second listing with the same revisions reads no doc again (every canvas open read 25 MB of docs)', async () => {
+    await listProjectComponents(db, scope);
+    reads.one = [];
+    reads.batches = 0;
+
+    const again = await listProjectComponents(db, scope);
+
+    expect(reads.batches).toBe(0);
+    expect(reads.one).not.toContain('f1');
+    expect(again[0].components[0]).toMatchObject({ frameId: 'f1', name: 'Button' });
   });
 
   it('hands over the main alone, ready to place on another canvas', async () => {

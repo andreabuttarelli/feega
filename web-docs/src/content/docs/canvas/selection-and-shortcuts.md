@@ -25,7 +25,7 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 - Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it. With elements already selected, Cmd-click adds or removes the deepest one.
 - Shift-click adds or removes the element a click would select, even before the frame is selected. Shift+Cmd-click does the same with the deepest element.
 - Dragging on the background of a frame that is not selected draws a selection box over its elements; with Cmd/Ctrl held it selects the deepest ones. A frame moves when you drag its title, when it is already selected, or when it is empty.
-- Dropping an element onto a stack, from the same frame, another frame or the free canvas, puts it in the stack at the slot under the pointer.
+- Dropping an element onto a stack, from the same frame, another frame or the free canvas, puts it in the stack at the slot under the pointer. While a free element is dragged over a frame, a line shows the slot it would take in the stack under the pointer.
 - Esc goes up one level. On a free text or shape, Esc clears the selection: there is no frame around it to select.
 
 ## Groups on the canvas

@@ -30,6 +30,7 @@ A free element behaves like a single object, as in Figma ([ADR 0032](/architectu
 - Hold `Cmd`/`Ctrl` while resizing a frame to leave its layers at their size and place.
 - New layers are pinned left and top, so resizing a frame keeps their size and distance from the edges.
 - `Resize to fit` (`⌥⇧⌘R`) fits a frame to its contents.
+- A frame takes up to 16 384 px a side and up to 1000 layers; a bigger size is scaled to fit, and the canvas says so.
 
 ## A frame's numbers are canvas pixels
 
