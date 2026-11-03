@@ -149,6 +149,7 @@ async function fenced(page: Page): Promise<void> {
   page.on('request', (request) => void gate(request));
   const cdp = await page.createCDPSession();
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' }).catch(() => undefined);
+  await cdp.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => undefined);
 }
 
 const locator = (target: Target) => target.selector ?? `::-p-text(${target.text ?? ''})`;
