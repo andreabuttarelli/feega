@@ -8,6 +8,7 @@ import { boxFace } from '$lib/motion/gpu-full/text/test-face';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM } from '@feega/motion-core/motion/layout/model';
 import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { addClip } from '@feega/motion-core/motion/timeline';
+import type { ComponentId } from '@feega/motion-core/motion/components';
 import type { MotionClip } from '@feega/motion-core/motion/doc';
 import { framePicker } from './frame-pick';
 import { FramePlacements } from './frame-placements';
@@ -19,7 +20,7 @@ const loaded = async () => ({ fonts, smoothing: Smoothing.Plain });
 
 const WORDS = { a: 'Ciao', b: 'mondo', c: 'bello' };
 
-function added(doc: MotionDoc, component: string, props: Record<string, unknown>, id: string): MotionDoc {
+function added(doc: MotionDoc, component: ComponentId, props: Record<string, unknown>, id: string): MotionDoc {
   const result = addClip(doc, { component, from: 0, durationInFrames: 150, props }, id);
   if (!result.ok) {
     throw new Error(result.error);
