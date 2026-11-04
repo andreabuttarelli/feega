@@ -18,6 +18,3 @@ The report showed `Rectangle` next to Start/Sweep/Ratio. Not reproduced: an elli
 `~/Documents/feega-videos/fixes/shape-switch/`). The mismatch was a control disagreeing with
 the fields beside it; removing the control removes the case. A transparent stack over a shape
 takes the click (panel title `Stack`), which can make the selected layer a different one.
-
-Also fixed: the canvas page re-ran its outbox restore in a loop (`$effect` writing `nodes`
-without `untrack`), which froze the page when a frame was present.
