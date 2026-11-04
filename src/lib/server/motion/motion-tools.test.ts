@@ -54,6 +54,16 @@ describe('motion agent tools at another frame rate', () => {
     expect(((await run('get_motion_doc', {})) as { background: string }).background).toBe('transparent');
   });
 
+  it('set_props refuses to change the kind of a shape', async () => {
+    const { session, run } = setup();
+    const added = (await run('add_shape', { kind: 'rect' })) as { clip_id: string };
+
+    const out = await run('set_props', { clip_id: added.clip_id, props: { shape: 'ellipse' } });
+
+    expect(out.ok).toBe(false);
+    expect(findClip(session.doc, added.clip_id)?.clip.props.shape).toBe('rect');
+  });
+
   it('set_canvas gives the frame its own surface the agent then styles like a layer', async () => {
     const { session, run } = setup();
 
