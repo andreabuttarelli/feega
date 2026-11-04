@@ -28,6 +28,21 @@ describe('frame properties handed to the right bar', () => {
     expect(props.name).toBe('Frame');
   });
 
+  it('keeps the fill editor open while the same frame is republished after an edit', () => {
+    const props = new FrameProperties();
+    const session = { selection: [] } as never;
+
+    props.publish('n1', session, {} as never, null);
+    props.editingFill = 0;
+    props.clear();
+    props.publish('n1', session, {} as never, null);
+    expect(props.editingFill).toBe(0);
+
+    props.clear();
+    props.publish('n2', session, {} as never, null);
+    expect(props.editingFill).toBeNull();
+  });
+
   it('tells the chat agent which frame is open, so it can ask this tab to draw it', () => {
     const props = new FrameProperties();
     const session = { selection: ['c1'], history: { present: { still: null } } } as never;
