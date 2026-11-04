@@ -62,6 +62,7 @@
   import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
+  import { layerHoverMark } from '$lib/canvas/layer-hover-mark';
   import { HostLedger, settleElement, type ElementHost, type HostBox } from '$lib/motion/element-host';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
@@ -1322,6 +1323,12 @@
     }
     const outward: [number, number] = [hit.unit[0] * 2 - 1, hit.unit[1] * 2 - 1];
     handleCursor = hit.kind === HitKind.Corner ? resizeCursor(outward, box.rotation ?? 0) : rotateCursor(outward, box.rotation ?? 0);
+  }
+
+  function layerMark(nodeId: string) {
+    const at = pickHover ? null : pickerOf(nodeId);
+    const mark = at ? layerHoverMark(layersSource.hovered, inside?.nodeId ?? null, { nodeId, picker: at.picker, space: at.space }) : null;
+    return mark && at ? { ...mark, highlight: highlightOf(at.live.doc, mark.clip) } : null;
   }
 
   function dropHover() {
@@ -4301,6 +4308,10 @@
         {/if}
         {#if pickHover?.at === frame.id}
           <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {/if}
+        {@const layered = layerMark(frame.id)}
+        {#if layered}
+          <div class="pick-outline" data-testid="frame-layer-hover-box" data-hovered={layered.clip} style={highlightStyle(layered.highlight) + ';' + quadStyle(layered.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
         {@const live = peering ? liveOf(frame.id) : null}
         {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
