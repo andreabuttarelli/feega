@@ -6,6 +6,7 @@ const insertAsset = vi.fn();
 const shots: { viewport: unknown; mime: string; seek: number }[] = [];
 const pinned = setStill(newMotionDoc(MotionFormat.Poster), 1);
 
+vi.mock('$lib/server/export-watermark', () => ({ watermarked: async (_db: unknown, _org: string, doc: unknown) => doc }));
 vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), insertAsset }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 const lookupFound = () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null });
