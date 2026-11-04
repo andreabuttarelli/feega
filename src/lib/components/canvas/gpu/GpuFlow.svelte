@@ -9,7 +9,8 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { FrameFit, FramePickers, Reuse, type WorldRect } from '$lib/canvas/frame-pick';
+  import { FrameFit, FramePickers, Reuse, shaped, type WorldRect } from '$lib/canvas/frame-pick';
+  import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { PickerSettle } from '$lib/canvas/picker-settle.svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
   import { lockOverscroll } from './overscroll-lock';
@@ -1169,7 +1170,11 @@
     glider.invalidate();
   }
 
-  const pickers = new FramePickers();
+  let typesetLanded = $state(0);
+  const pickers = new FramePickers(
+    (live) => shaped(smoothingOf(navigator.userAgent))(live),
+    () => (typesetLanded += 1)
+  );
   let fetched = $state.raw(new Map<string, { revision: number; live: LiveDoc }>());
   const asked = new Set<string>();
 
@@ -2023,6 +2028,7 @@
   }
 
   function pickerOf(nodeId: string) {
+    typesetLanded;
     const frame = coreFrames.find((f) => f.id === nodeId);
     const live = liveOf(nodeId);
     if (!frame || !live) {
