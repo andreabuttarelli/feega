@@ -158,6 +158,11 @@ describe('which fields a layer shows', () => {
     expect(fieldShown('morph', { ...leaf, morphTargets: 0 })).toBe(false);
   });
 
+  it('never offers a switcher for the kind of a shape', () => {
+    expect(fieldShown('shape', { ...leaf, shape: ShapeKind.Rect })).toBe(false);
+    expect(fieldShown('shape', { ...leaf, shape: ShapeKind.Ellipse })).toBe(false);
+  });
+
   it('fill rule only on a free path', () => {
     expect(fieldShown('fillRule', { ...leaf, shape: ShapeKind.Rect })).toBe(false);
     expect(fieldShown('fillRule', { ...leaf, shape: ShapeKind.Path })).toBe(true);
