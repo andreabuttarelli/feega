@@ -7,5 +7,9 @@
 - **Fix.** `layerHoverMark` turns the hovered row into a quad from the frame picker — the same
   typeset placements selection uses — and `GpuFlow` draws it as `frame-layer-hover-box`.
 - **Test.** `layer-hover-mark.test.ts`.
+- **Auto-width text.** A canvas click on an auto-width text drew the stored width (260 px around
+  ~120 px of glyphs) until an edit re-fitted the doc: `FramePlacements` placed every clip at its
+  props box. It now places a hugging text at its laid caret (`textCaretAt`), so picks, selection
+  and hover share the drawn box. Test: `frame-pick-hug.test.ts`.
 - **Not fixed here.** Stack resize clipping, text clipped at a stale stack edge and the
   drop-indicator offset did not reproduce locally on a seeded frame or canvas Stack.
