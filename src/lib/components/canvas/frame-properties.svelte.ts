@@ -34,8 +34,13 @@ export class FrameProperties {
   host = $state.raw<ElementHost | null>(null);
   editingFill = $state<number | null>(null);
   panel = $state(FramePanel.Frame);
+  #fillOwner: string | null = null;
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
+    if (nodeId !== this.#fillOwner) {
+      this.editingFill = null;
+      this.#fillOwner = nodeId;
+    }
     this.nodeId = nodeId;
     this.session = session;
     this.tokens = tokens;
@@ -68,7 +73,6 @@ export class FrameProperties {
     this.exportRows = null;
     this.runAction = null;
     this.place = null;
-    this.editingFill = null;
     this.rename = null;
     this.host = null;
     this.panel = FramePanel.Frame;
