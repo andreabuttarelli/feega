@@ -8,7 +8,7 @@ import { addClip, duplicateClip, moveClip, removeClips, setProps, type OpResult 
 import type { SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
 import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
 import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, TEXT_ITEM, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
-import { NEW_TEXT_SIZING, type TextSizing } from '@feega/motion-core/motion/text-sizing';
+import { NEW_TEXT_SIZING, TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { childrenInOrder, shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { estimatedText, isText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
@@ -397,5 +397,25 @@ export function sizeStackAround(doc: MotionDoc, stackId: string, anchor: readonl
     ...c,
     props: { ...c.props, x: (Math.min(left, left + box.width * fx) + width / 2) / doc.width, y: (Math.min(top, top + box.height * fy) + height / 2) / doc.height, width: width / doc.width, height: height / doc.height }
   }));
-  return setLayoutItem(sized, stackId, { ...fixed('width', fx), ...fixed('height', fy) });
+  const stack = setLayoutItem(sized, stackId, { ...fixed('width', fx), ...fixed('height', fy) });
+  if (!stack.ok || Math.abs(fx - 1) <= UNCHANGED || laid.autoLayout.direction !== Direction.Vertical) {
+    return stack;
+  }
+  return { ok: true, doc: textWrapsInColumn(stack.doc, stackId, laid.autoLayout.align) };
+}
+
+const WRAPPING_TEXT: Partial<LayoutItem> = { width: Sizing.Fill, height: Sizing.Hug };
+
+const TEXT_ALIGN_OF: Record<Align, string> = {
+  [Align.Start]: 'left',
+  [Align.Center]: 'center',
+  [Align.End]: 'right',
+  [Align.Baseline]: 'left',
+  [Align.Stretch]: 'left'
+};
+
+function textWrapsInColumn(doc: MotionDoc, stackId: string, align: Align): MotionDoc {
+  const hugsWidth = (c: MotionClip) => c.parent === stackId && isText(c.component) && (c.layoutItem ?? DEFAULT_LAYOUT_ITEM).width === Sizing.Hug;
+  const wraps = (c: MotionClip): MotionClip => ({ ...c, layoutItem: { ...(c.layoutItem ?? DEFAULT_LAYOUT_ITEM), ...WRAPPING_TEXT }, props: { ...c.props, sizing: TextSizing.AutoHeight, align: TEXT_ALIGN_OF[align] } });
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (hugsWidth(c as MotionClip) ? wraps(c as MotionClip) : c)) })) };
 }
