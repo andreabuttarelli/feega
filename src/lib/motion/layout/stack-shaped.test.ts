@@ -8,7 +8,8 @@ import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
 import { faceBook, type FaceRule, type Source } from '@feega/motion-core/motion/gpu-full/text/fonts';
 import { fontkitSource } from '@feega/motion-core/motion/gpu-full/text/fontkit-face';
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
-import { sizeStackAround, wrapInStack } from './ops';
+import { setAutoLayout, sizeStackAround, wrapInStack } from './ops';
+import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 import { stackLineAt } from './stack-drag';
 import { StripKind, layoutStrips } from './guides';
 
@@ -68,5 +69,37 @@ describe('the padding handles of a wrapped stack sit on the drawn edges', () => 
     const right = layoutStrips(wrapped, 's', measure).find((s) => s.kind === StripKind.Padding && s.side === 'right')!;
 
     expect(right.box.left + right.box.width).toBeCloseTo(stack.left + stack.width, 0);
+  });
+});
+
+describe('shrinking a wrapped column of text wraps the text', () => {
+  const box = drawn(wrapped, 's');
+  const shrunk = must(sizeStackAround(wrapped, 's', [box.left, box.top], 0.5, 1, measure));
+  const stack = drawn(shrunk, 's');
+
+  it.each(['a', 'b'])('text %s stays inside the narrower stack', (id) => {
+    const kid = drawn(shrunk, id);
+
+    expect(kid.left).toBeGreaterThanOrEqual(stack.left - 0.5);
+    expect(kid.left + kid.width).toBeLessThanOrEqual(stack.left + stack.width + 0.5);
+  });
+
+  it('the long line breaks, and the stack grows down to hold it', () => {
+    expect(drawn(shrunk, 'b').height).toBeGreaterThan(drawn(wrapped, 'b').height * 1.5);
+    expect(stack.top + stack.height).toBeGreaterThanOrEqual(drawn(shrunk, 'b').top + drawn(shrunk, 'b').height - 0.5);
+  });
+
+  it('the wrapped lines start where the stack lines its children up', () => {
+    const kid = shrunk.tracks.flatMap((t) => t.clips).find((c) => c.id === 'b')!;
+
+    expect(kid.props.align).toBe('left');
+  });
+
+  it('a row of text keeps its single lines', () => {
+    const row = must(setAutoLayout(wrapped, 's', { direction: Direction.Horizontal }));
+    const rowBox = drawn(row, 's');
+    const narrowed = must(sizeStackAround(row, 's', [rowBox.left, rowBox.top], 0.5, 1, measure));
+
+    expect(drawn(narrowed, 'b').height).toBeCloseTo(drawn(row, 'b').height, 0);
   });
 });
