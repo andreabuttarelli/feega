@@ -292,7 +292,7 @@
   {#each rows as row (row.head)}
     <span class="row-head">{row.head}</span>
     <div class="row">
-      {#each row.swatches as { colour, label } (label)}
+      {#each row.swatches as { colour, label }, at (at)}
         <button type="button" class="swatch" class:on={value.toLowerCase() === colour.toLowerCase()} style={`--c: ${resolveColor(colour, tokens)};`} title={label} aria-label={label} onclick={() => commit(colour)}></button>
       {/each}
     </div>
