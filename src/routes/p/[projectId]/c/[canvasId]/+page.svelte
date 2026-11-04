@@ -1817,7 +1817,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
     }
     const kept = untrack(() => data.outbox);
     if (kept) {
-      void reopenOutbox(kept);
+      untrack(() => void reopenOutbox(kept));
     }
   });
 
