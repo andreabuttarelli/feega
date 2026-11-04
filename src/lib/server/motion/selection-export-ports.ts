@@ -12,6 +12,7 @@ import { chromiumExport } from './chromium-frames';
 import { drawTargets } from './selection-draw';
 import { vectorOf, type Span } from './vector-list';
 import { libsOrigin } from './libs-origin';
+import { watermarked } from '$lib/server/export-watermark';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
 import { docScaleOf } from './doc-scale';
@@ -37,9 +38,11 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
 
   const urlsOf = async (target: DrawTarget) => assetUrls(await motionAssets({ db, orgId, projectId, canvasId: canvasOf.get(target.nodeId)! }, SIGNED_URL_TTL_S.render));
 
-  const compose = async (target: DrawTarget) => composeHtml({ doc: target.doc, tokens: await tokens, assets: await urlsOf(target), origin: libsOrigin() });
+  const shown = (target: DrawTarget) => watermarked(db, orgId, target.doc);
 
-  const vector = async (target: DrawTarget, span: Span) => vectorOf({ doc: target.doc, tokens: await tokens, assets: await urlsOf(target) }, span);
+  const compose = async (target: DrawTarget) => composeHtml({ doc: await shown(target), tokens: await tokens, assets: await urlsOf(target), origin: libsOrigin() });
+
+  const vector = async (target: DrawTarget, span: Span) => vectorOf({ doc: await shown(target), tokens: await tokens, assets: await urlsOf(target) }, span);
 
   return {
     read: async (nodeId) => {

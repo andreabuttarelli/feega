@@ -7,6 +7,7 @@ import { composeHtml, type ComposeInput } from '@feega/motion-core/motion/hyperf
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { insertAsset } from '$lib/server/repos/assets';
 import { signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
+import { watermarked } from '$lib/server/export-watermark';
 import { libsOrigin } from './libs-origin';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { StillPort } from './server-frames';
@@ -33,7 +34,8 @@ export async function exportStill(db: Db, scope: StillScope, doc: MotionDoc, spe
   if (!serverFramesOpen()) {
     return { ok: false, error: 'image export needs the server renderer, which is not available here' };
   }
-  const drawn = await drawStill(port, { doc, tokens: sources.tokens, assets: assetUrls(sources.assets) }, spec).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+  const shown = await watermarked(db, scope.orgId, doc);
+  const drawn = await drawStill(port, { doc: shown, tokens: sources.tokens, assets: assetUrls(sources.assets) }, spec).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
   if (drawn instanceof Error) {
     return { ok: false, error: `the image could not be drawn: ${drawn.message}` };
   }

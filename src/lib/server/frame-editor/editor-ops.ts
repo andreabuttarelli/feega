@@ -30,6 +30,7 @@ import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { startFarmRender } from '$lib/server/motion/render-start';
 import { exportStill } from '$lib/server/motion/still-export';
+import { watermarked } from '$lib/server/export-watermark';
 import { stillAskSchema, stillExport } from '@feega/motion-core/motion/still-model';
 import { splitTags } from '$lib/gallery/model';
 import { publishStatus } from '$lib/server/gallery/http';
@@ -269,7 +270,7 @@ export const EDITOR_OPS = {
       }
 
       const [assets, tokens] = await Promise.all([motionAssets(placeOf(ctx), SIGNED_URL_TTL_S.render), motionTokens(ctx.db, { orgId: ctx.orgId, brandId: ctx.projectBrandId })]);
-      const rows = rowRequests(head, rowsIn.rows, { tokens, assets: assetUrls(assets) }, settings.settings);
+      const rows = rowRequests({ version: head.version, doc: await watermarked(ctx.db, ctx.orgId, head.doc) }, rowsIn.rows, { tokens, assets: assetUrls(assets) }, settings.settings);
       if (!rows.ok) {
         return refused(HTTP_BAD_REQUEST, { error: 'invalid_row', detail: rows.error });
       }

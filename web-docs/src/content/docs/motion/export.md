@@ -5,6 +5,10 @@ sidebar:
   order: 6
 ---
 
+## Watermark on the free plan
+
+Every video, image, SVG, PDF and batch export from an account without a subscription carries a small, semi-transparent "Made with Feega" mark in the bottom-right corner, sized to the frame. It is drawn when the file is made, not stored in the frame, so editing the frame cannot remove it. Paid plans export clean. Exporting a single element or layer crops to that element, so the mark falls outside the crop.
+
 ## Video and animation
 
 The formats come from the exporter code: see the generated table in [Export formats](/reference/generated/export-formats/).

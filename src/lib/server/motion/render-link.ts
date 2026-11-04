@@ -12,6 +12,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { assetUrls, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { analyzeSounds, storageAnalysis } from './audio-analysis';
 import { saveExport } from './export';
+import { watermarked } from '$lib/server/export-watermark';
 import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { exportPath } from '$lib/motion/export-plan';
 import { LinkRefusal, RENDER_LINK_OPEN_MS } from '$lib/motion/render-link';
@@ -161,7 +162,7 @@ export async function linkPayload(db: Db, run: NodeRun): Promise<LinkPayload | n
   ]);
   const soundIds = clipsOf(head.doc).map((c) => String(c.props.assetId ?? ''));
   const analyses = await analyzeSounds(storageAnalysis(db), { orgId: run.orgId, projectId: project.id }, assets, soundIds);
-  return { name: place.record.displayName ?? 'motion', revision, quality: linkQuality(run), range: linkOf(run).range ?? null, doc: head.doc, tokens, assetUrls: assetUrls(assets), analyses };
+  return { name: place.record.displayName ?? 'motion', revision, quality: linkQuality(run), range: linkOf(run).range ?? null, doc: await watermarked(db, run.orgId, head.doc), tokens, assetUrls: assetUrls(assets), analyses };
 }
 
 export async function uploadSlot(db: Db, run: NodeRun): Promise<{ path: string; token: string } | null> {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
 import { setStill } from '@feega/motion-core/motion/still';
 import { ImageFormat, ImageScale, stillExport } from '@feega/motion-core/motion/still-model';
+import { fakeDb } from '$lib/server/db/fake-db';
 import { drawStill, exportStill } from './still-export';
 import type { StillPort, Viewport } from './server-frames';
 
@@ -36,7 +37,7 @@ describe('exportStill', () => {
     vi.stubEnv('CHROMIUM_PATH', '/chrome');
     const port: StillPort = { open: async () => Promise.reject(new Error('Session closed')) };
 
-    const made = await exportStill({} as never, { orgId: 'o', projectId: 'p', nodeId: 'n' }, newMotionDoc(MotionFormat.Square), stillExport(ImageFormat.Png, ImageScale.One, 1), { tokens: TOKENS, assets: [] }, port);
+    const made = await exportStill(fakeDb({ orgs: [] }, { filter: true }).db, { orgId: 'o', projectId: 'p', nodeId: 'n' }, newMotionDoc(MotionFormat.Square), stillExport(ImageFormat.Png, ImageScale.One, 1), { tokens: TOKENS, assets: [] }, port);
 
     expect(made).toEqual({ ok: false, error: expect.stringContaining('Session closed') });
     vi.unstubAllEnvs();
