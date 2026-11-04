@@ -6,6 +6,7 @@ import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '@feega/motion-core/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 import { FramePress } from '$lib/motion/drill';
+import { Root, rootLayersOf } from './frame-select';
 import { grantedPath } from './asset-url';
 
 export enum FrameKind {
@@ -14,12 +15,33 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; selectsOwnClip: boolean };
+export enum ResizePaint {
+  Relaid = 'relaid',
+  Held = 'held'
+}
+
+export enum FramePanel {
+  Frame = 'frame',
+  Group = 'group'
+}
+
+export enum EnterTo {
+  Frame = 'frame',
+  Children = 'children',
+  Own = 'own'
+}
+
+export enum ClickTo {
+  Clip = 'clip',
+  Host = 'host'
+}
+
+type Chrome = { bar: boolean; dragsHost: boolean; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress; timeline: boolean; root: Root; resize: ResizePaint; panel: FramePanel; enter: EnterTo; click: ClickTo };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, selectsOwnClip: false },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, selectsOwnClip: true },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, selectsOwnClip: false }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move, timeline: true, root: Root.Page, resize: ResizePaint.Held, panel: FramePanel.Frame, enter: EnterTo.Frame, click: ClickTo.Clip },
+  [FrameKind.Element]: { bar: false, dragsHost: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick, timeline: false, root: Root.Own, resize: ResizePaint.Relaid, panel: FramePanel.Frame, enter: EnterTo.Own, click: ClickTo.Clip },
+  [FrameKind.Group]: { bar: false, dragsHost: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick, timeline: true, root: Root.Page, resize: ResizePaint.Held, panel: FramePanel.Group, enter: EnterTo.Children, click: ClickTo.Host }
 };
 
 export enum TileBody {
@@ -40,6 +62,16 @@ const HOVER_HOST: Record<TileBody, HoverHost> = {
 export const hoverHostOf = (body: TileBody): HoverHost => HOVER_HOST[body];
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
+
+const ENTERED: Record<EnterTo, (doc: MotionDoc) => string[]> = {
+  [EnterTo.Frame]: () => [],
+  [EnterTo.Own]: () => [],
+  [EnterTo.Children]: rootLayersOf
+};
+
+export const clickReachesClip = (kind: FrameKind, pickedInside: readonly string[]): boolean => CHROME[kind].click === ClickTo.Clip || pickedInside.length > 0;
+
+export const enteredClips = (kind: FrameKind, doc: MotionDoc): string[] => ENTERED[CHROME[kind].enter](doc);
 
 export const leftEmpty = (kind: FrameKind, doc: { tracks: { clips: unknown[] }[] }): boolean => !CHROME[kind].takesDrops && doc.tracks.every((t) => t.clips.length === 0);
 
@@ -279,6 +311,8 @@ export function frameDefaultSize(data: Record<string, unknown>, type: DocNodeTyp
   return DEFAULT_SIZE[node.kind](node);
 }
 
+export const frameMinSize = (): { w: number; h: number } => ELEMENT_MIN_SIZE;
+
 const OPENING_SELECTION: Record<FrameKind, (clipIds: string[]) => string[]> = {
   [FrameKind.Frame]: () => [],
   [FrameKind.Element]: (clipIds) => clipIds,
@@ -294,6 +328,6 @@ export function freshText(kind: FrameKind, version: number, clips: { id: string;
 
 export const ghostShown = (node: { docHeadRevision: number }): boolean => node.docHeadRevision <= FIRST_REVISION;
 
-export const posterFresh = (node: { docHeadRevision: number; posterRevision?: number }): boolean => node.posterRevision === undefined || node.posterRevision === node.docHeadRevision;
+export const posterFresh = (node: { docHeadRevision: number; posterRevision?: number }): boolean => node.posterRevision !== undefined && node.posterRevision >= node.docHeadRevision;
 
 export const openingFor = (row: { id: string; type: string; data: Record<string, unknown> }, opening: Opening): Opening => tileChromeOf(row).opening ?? opening;

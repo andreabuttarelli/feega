@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Axis, Edge } from '$lib/motion/space';
-import { STACK_GAP, alignTiles, distributeTiles, stackTiles } from './align';
+import { STACK_GAP, alignTiles, alignWithin, distributeTiles, stackTiles } from './align';
 
 const tiles = [
   { id: 'a', x: 0, y: 0, width: 100, height: 50 },
@@ -27,6 +27,14 @@ describe('aligning canvas tiles', () => {
 
   it('a single tile has nothing to align to', () => {
     expect(alignTiles([tiles[0]], Edge.Left)).toEqual([]);
+  });
+
+  it('a single tile inside a group or section aligns to its holder', () => {
+    const holder = { id: 'g', x: -100, y: -100, width: 400, height: 400 };
+
+    expect(alignWithin(tiles[0], holder, Edge.Right)).toEqual([{ id: 'a', x: 200, y: 0 }]);
+    expect(alignWithin(tiles[0], holder, Edge.Middle)).toEqual([{ id: 'a', x: 0, y: 75 }]);
+    expect(alignWithin({ ...tiles[0], x: -100 }, holder, Edge.Left)).toEqual([]);
   });
 });
 

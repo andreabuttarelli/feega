@@ -1,5 +1,6 @@
 <script lang="ts">
   import { localStore } from '$lib/browser-storage';
+  import { fieldKeys } from '$lib/motion/field-keys';
   import { setMotionPath } from '$lib/motion/path-ops';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
@@ -27,27 +28,40 @@
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
   import { DIAL_KEYS, Part, fieldLabel, optionLabel, emptyManaged, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, TextTier, textTier, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
-  import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
-  import { clipName as layerName, renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
+  import { PropertiesView, ShapePart, fieldShown as fieldVisible, fieldShownFor, sectionsFor, shapePartShown, sizeShown, transformShown } from '$lib/motion/properties-view';
+  import { renameClip, setClipFlags } from '@feega/motion-core/motion/organize';
   import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
   import PositionSection from '$lib/components/motion/PositionSection.svelte';
+  import CheckRow from './CheckRow.svelte';
+  import BoxFields from './BoxFields.svelte';
+  import { layerKind, layerLabel } from '$lib/motion/element-name';
+  import { ComponentRole, componentOf, roleOf } from '$lib/motion/main-component';
+  import { Ratio, resizedSide, sideOf, type ElementHost } from '$lib/motion/element-host';
+  import { liveEdits } from '$lib/motion/live-edit';
+  import { DESIGN_MAX_SIDE } from '@feega/motion-core/motion/doc';
   import { PositionPart } from '$lib/motion/position-part';
   import type { Edge as AlignEdge } from '$lib/motion/space';
   import ColorField from './ColorField.svelte';
-  import { documentColours } from '$lib/motion/selection-colours';
+  import { clipColours, documentColours, recolourClip } from '$lib/motion/selection-colours';
+  import ColourRow from './ColourRow.svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import Plus from '@lucide/svelte/icons/plus';
   import Settings2 from '@lucide/svelte/icons/settings-2';
   import SquareDashed from '@lucide/svelte/icons/square-dashed';
+  import Droplet from '@lucide/svelte/icons/droplet';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import { IconButton as ShellIconButton, Menu, MenuContent, MenuItem, MenuTrigger } from '$lib/components/ui/shell';
   import { hasSegments, segmentsOf } from '$lib/motion/segments';
+  import { SIZE_PRESETS } from '$lib/motion/size-presets';
+  import { AxisMode, TextSizing, axisModes } from '@feega/motion-core/motion/text-sizing';
   import SegmentedField from './SegmentedField.svelte';
   import { snappedValue, steppedRange } from '$lib/motion/weight-steps';
+  import { percentShown, percentSlider, percentStored } from '$lib/motion/type-percent';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import FamilyIcon from './FamilyIcon.svelte';
-  import { CLIP_FAMILIES, familyOf } from '$lib/motion/track-style';
+  import { CLIP_FAMILIES, clipFamily } from '$lib/motion/track-style';
+  import { placeLayer } from '$lib/motion/light-group';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
@@ -55,14 +69,13 @@
   import FillStack from './FillStack.svelte';
   import { cropRequest } from '$lib/canvas/crop-request.svelte';
   import { FILLED, elementFills } from '@feega/motion-core/motion/fill/elements';
-  import { FILL_LABEL, FILL_TYPES, addFill, type Fill } from '@feega/motion-core/motion/fill/model';
+  import { FILL_LABEL, FILL_TYPES, FillHolder, addFill, type Fill } from '@feega/motion-core/motion/fill/model';
   import { applyFillKeys, fillOfKey, splitFillEdit } from '@feega/motion-core/motion/fill/keys';
   import { Adder } from './stack-adder';
   import StrokeStack from './StrokeStack.svelte';
   import { STROKED, elementStrokes } from '@feega/motion-core/motion/stroke/elements';
   import { addStroke, sidesShown } from '@feega/motion-core/motion/stroke/model';
   import { MarkedField, markedField } from '@feega/motion-core/motion/poster-lines';
-  import { componentLabel } from '@feega/motion-core/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
   import TextCounterSection from './TextCounterSection.svelte';
@@ -71,9 +84,9 @@
   import TextPathSection from './TextPathSection.svelte';
   import TextPresetGallery from './TextPresetGallery.svelte';
   import StackSection from './StackSection.svelte';
-  import { laidClip, layoutParent, removeStack } from '$lib/motion/layout/ops';
-  import { LAYOUT_KIND_LABEL, layoutKind, placementOf } from '@feega/motion-core/motion/layout/stack';
-  import Minus from '@lucide/svelte/icons/minus';
+  import StackSettings from './StackSettings.svelte';
+  import { laidClip, layoutParent } from '$lib/motion/layout/ops';
+  import { placementOf } from '@feega/motion-core/motion/layout/stack';
   import StyleSection from './StyleSection.svelte';
   import VariablesSection from './VariablesSection.svelte';
   import BindChip from './BindChip.svelte';
@@ -86,22 +99,24 @@
   import { withParams } from '@feega/motion-core/motion/custom/params';
   import type { CustomSource } from '@feega/motion-core/motion/custom/component';
   import { expressionToKeys, setExpression } from '@feega/motion-core/motion/expression/ops';
-  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, editedParams, type EffectKind } from '@feega/motion-core/motion/effects/registry';
+  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, EFFECT_SEED, editedParams, isFlag, type EffectKind } from '@feega/motion-core/motion/effects/registry';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
-  import { effectKey } from '@feega/motion-core/motion/effects/model';
+  import { effectKey, effectOfKey } from '@feega/motion-core/motion/effects/model';
   import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '@feega/motion-core/motion/shape/modifiers';
   import { addModifier, morphHere, morphToClip, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
   import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
   import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '@feega/motion-core/motion/shape/schema';
   import { cornerRadii, withCorner } from '@feega/motion-core/motion/shape/geometry';
+  import { radiusRange, radiusShown, radiusStored } from '$lib/motion/radius-px';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '@feega/motion-core/motion/text-animators/model';
   import { TEXT_COMPONENTS, removeAnimator, setAnimator } from '@feega/motion-core/motion/text-animators/ops';
   import { BLEND_MODES, blendLabel, type BlendMode } from '@feega/motion-core/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '@feega/motion-core/motion/expression/bake';
-  import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
+  import { Unit, propsOwner, shownNumber, sliderOf, spaceOf, toShown, toStored, type Ranged, type Slider } from '$lib/motion/units';
+  import { resizedTexts } from '$lib/motion/text-fit';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '@feega/motion-core/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
   import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
@@ -135,7 +150,13 @@
     actions,
     mode = EditMode.Motion,
     as = null,
-    onalign
+    host = null,
+    scale = 1,
+    title = null,
+    here = null,
+    onrename = null,
+    onalign,
+    fillOpen = $bindable(null)
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -159,7 +180,13 @@
     actions?: Snippet;
     mode?: EditMode;
     as?: PropertiesView | null;
+    host?: ElementHost | null;
+    scale?: number;
+    title?: string | null;
+    here?: string | null;
+    onrename?: ((name: string) => void) | null;
     onalign?: (edge: AlignEdge) => void;
+    fillOpen?: number | null;
   } = $props();
 
   function leaveOnEscape(e: KeyboardEvent) {
@@ -170,14 +197,12 @@
 
   const CORNER_NAMES = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'] as const;
   const CORNER_SHORT = ['TL', 'TR', 'BR', 'BL'] as const;
-  const PERCENT = 100;
-  const CORNER_PERCENT_MAX = 50;
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
   const MARK: Record<(typeof KEY_STATE)[keyof typeof KEY_STATE], KeyMark> = { [KEY_STATE.On]: KeyMark.Here, [KEY_STATE.Lane]: KeyMark.Animated, [KEY_STATE.None]: KeyMark.None };
   const EDGE_GLYPH: Record<Side, string> = { [Side.In]: '↗', [Side.Out]: '↘' };
   const DEFAULT_EDGE_FRAMES = 12;
 
-  const family = $derived(familyOf(clip.component));
+  const family = $derived(clipFamily(clip));
   let sections = $state<SectionState>({});
 
   onMount(() => {
@@ -196,6 +221,7 @@
 
   let error = $state('');
   const palette = () => documentColours(doc);
+  const colours = $derived(clipColours(doc, clip.id));
   const voices = $derived(voicesOver(doc, clip.id));
   const pulsable = $derived(PULSE_PROPS.filter((p) => isAnimatable(clip.component, p)));
   let voice = $state('');
@@ -208,13 +234,15 @@
 
   const transformKeys = $derived(new Set(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform).map((p) => p.key)));
   const typed = $derived(clipFieldGroups(doc, clip).some((g) => g.fields.some((f) => f.control === Control.Font)) ? Typed.Yes : Typed.No);
+  const fieldContext = $derived({ mode, shape: clip.component === 'Shape' ? (clip.props.shape as ShapeKind) : null, morphTargets: Array.isArray(clip.props.morphs) ? clip.props.morphs.length : 0, instance: componentOf(doc, clip) !== null });
   const fields = $derived(
     clipFieldGroups(doc, clip)
       .flatMap((g) => g.fields)
-      .filter((f) => !uiHidden(f.key))
+      .filter((f) => !uiHidden(f.key) && fieldShownFor(family, f.key))
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
       .filter((f) => !emptyManaged(f.control, (clip.props as Record<string, unknown>)[f.key]))
+      .filter((f) => fieldVisible(f.key, fieldContext))
       .map((f) => ({ ...f, label: fieldLabel(f.key, f.label) }))
   );
   const sharedFields = $derived(
@@ -225,13 +253,17 @@
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
-  const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
+  const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && transformShown(p.key)));
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Transform));
   const positioned = $derived(transformProps.length > 0);
-  const pinnable = $derived(positioned && typeof clip.props.x === 'number' && typeof clip.props.y === 'number' && !clip.parent);
+  const ownBox = $derived(typeof clip.props.x === 'number' && typeof clip.props.y === 'number');
+  const own = $derived(host?.clipId === clip.id ? host : null);
+  const shownByContent = $derived(!own && componentOf(doc, clip) !== null);
+  const pinnable = $derived(positioned && ownBox && !clip.parent && !own);
   const stackParent = $derived(layoutParent(doc, clip));
   const placement = $derived(placementOf(clip, stackParent));
-  const PLACED_KEYS: ReadonlySet<string> = new Set(['x', 'y']);
+  const SIZE_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
+  const PLACED_SIZE_KEYS: ReadonlySet<string> = new Set(['x', 'y', ...SIZE_KEYS]);
   const NO_SKIP: ReadonlySet<string> = new Set();
   const RADIUS_KEYS: ReadonlySet<string> = new Set(['roundness', 'corners']);
   const threeDProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.ThreeD));
@@ -239,9 +271,7 @@
   const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
   const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
-  const headTitle = $derived(customName ? componentLabel(customName) : layerName(clip));
-  const stackKind = $derived(layoutKind(clip));
-  const headKind = $derived(customName ? 'Component' : stackKind ? LAYOUT_KIND_LABEL[stackKind] : spec.label);
+  const headTitle = $derived(title ?? layerLabel(clip, doc.comps));
   let advancedRow = $state<HTMLElement | null>(null);
   let advancedOpen = $state(false);
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
@@ -257,13 +287,24 @@
   const resolve = (v: string) => resolveColor(v, tokens);
   const managedSummary = (v: unknown) => `${Array.isArray(v) ? v.length : Object.keys(v ?? {}).length} set`;
 
+  function rename(name: string) {
+    if (!name) {
+      return;
+    }
+    if (onrename) {
+      onrename(name);
+      return;
+    }
+    commit(renameClip(doc, clip.id, name), 'Renamed the layer');
+  }
+
   function commit(result: OpResult, summary: string) {
     if (!result.ok) {
       error = result.error;
       return;
     }
     error = '';
-    onchange(result.doc, summary);
+    onchange(resizedTexts(doc, result.doc), summary);
   }
 
   function setProp(field: Field, value: unknown) {
@@ -271,7 +312,7 @@
       animate(field.key, value as KeyValue);
       return;
     }
-    commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
+    commit(placeLayer(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
   }
 
   let replacing = $state(false);
@@ -366,8 +407,8 @@
   let draggedEffect = $state<string | null>(null);
   const effectParams = (effectId: string) => animated.params.filter((p) => p.source === Source.Effect && p.key.startsWith(`${effectKey(effectId, '')}`));
   const alphaKeyOf = (effect: { id: string; kind: EffectKind }) => (EFFECT_ALPHA[effect.kind] ? effectKey(effect.id, EFFECT_ALPHA[effect.kind]!.alpha) : null);
-  const effectRows = (effect: { id: string; kind: EffectKind }) => {
-    const edited = new Set(editedParams(effect.kind).map((p) => effectKey(effect.id, p.key)));
+  const effectRows = (effect: { id: string; kind: EffectKind; params: Record<string, number | string> }) => {
+    const edited = new Set(editedParams(effect.kind, effect.params).map((p) => effectKey(effect.id, p.key)));
     return effectParams(effect.id).filter((p) => edited.has(p.key));
   };
   let openEffect = $state<string | null>(null);
@@ -376,7 +417,7 @@
 
   const animatorRows = (id: string) => animated.params.filter((p) => p.source === Source.Animator && p.key.startsWith(animatorKey(id, '')));
 
-  const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
+  const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8), EFFECT_SEED[kind]), `Added ${EFFECTS[kind].label.toLowerCase()}`);
 
   const shapeModifiers = $derived(clip.component === 'Shape' ? ((clip.props.modifiers as Modifier[]) ?? []) : []);
   const shapeMorphs = $derived(clip.component === 'Shape' ? ((clip.props.morphs as string[]) ?? []) : []);
@@ -466,16 +507,32 @@
     }
     commit(result, summary);
   }
-  const numberShown = (prop: AnimProp) => toShown(clip.component, prop.key, Math.round(Number(shown(prop.key)) * 1000) / 1000, doc);
-  const stored = (key: string, v: number) => toStored(clip.component, key, v, doc);
-  const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, doc));
+  const space = $derived(spaceOf(doc, scale));
+  const numberShown = (prop: AnimProp) => shownNumber(clip.component, prop.key, Number(shown(prop.key)), space);
+  const stored = (key: string, v: number) => toStored(clip.component, key, v, space);
+  const slider = (p: Ranged) => steppedRange(p.key, sliderOf(clip.component, p, space));
   const depthRange = $derived(slider({ key: 'depth', ...DEPTH }));
   const fieldRange = (field: Field): Ranged => ({ key: field.key, min: field.min ?? 0, max: field.max ?? 0, step: field.step ?? 1 });
-  const fieldShown = (field: Field) => toShown(propsOwner(clip.component), field.key, Number(value(field)), doc);
-  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, v, doc);
-  const fieldSlider = (field: Field) => steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), doc));
+  const fieldShown = (field: Field) => percentShown(field.key, toShown(propsOwner(clip.component), field.key, Number(value(field)), space));
+  const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, percentStored(field.key, v), space);
+  const fieldSlider = (field: Field) => percentSlider(field.key, steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), space)));
   const LAID_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
   const laid = $derived(stackParent || clip.autoLayout ? (laidClip(doc, clip.id) ?? clip) : clip);
+  const radiusBox = $derived({ width: Number(laid.props.width ?? 0) * space.width, height: Number(laid.props.height ?? 0) * space.height });
+  type FieldScale = { shown: number; range: Slider; stored: (v: number) => number; commit?: (v: number) => void; gesture?: LiveGesture };
+  const unitScale = (field: Field): FieldScale => ({ shown: fieldShown(field), range: fieldSlider(field), stored: (v) => fieldStored(field, v) });
+  const hostEdit = liveEdits<() => void>({ show: () => {}, record: (run) => run() });
+  const HOST_SIDE: Slider = { unit: Unit.Px, min: 1, max: DESIGN_MAX_SIDE, step: 1 };
+  const hostScale = (on: ElementHost, field: Field): FieldScale => {
+    const side = sideOf(field.key);
+    const resize = (v: number) => {
+      const size = resizedSide(on.box, side, v, clip.lockRatio ? Ratio.Locked : Ratio.Free);
+      on.resize(size.w, size.h);
+    };
+    return { shown: Math.round(on.box[side]), range: HOST_SIDE, stored: (v) => v, commit: (v) => hostEdit.edit(() => resize(v), `Resized the ${field.key}`), gesture: hostEdit };
+  };
+  const sizeScale = (field: Field): FieldScale => (own ? hostScale(own, field) : unitScale(field));
+  const radiusScale = (): FieldScale => ({ shown: radiusShown(Number(clip.props.roundness ?? 0), radiusBox), range: { ...radiusRange(radiusBox), unit: Unit.Px }, stored: (v) => radiusStored(v, radiusBox) });
   const resolved = (key: string) => ((LAID_KEYS.has(key) ? laid : clip).props as Record<string, unknown>)[key];
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : resolved(field.key));
 
@@ -483,11 +540,14 @@
   const visual = $derived(spec.track === TrackKind.Visual);
 
   const view = $derived(as ?? (focus ? PropertiesView.Part : PropertiesView.Clip));
+  const FRAME_KIND = 'Frame';
+  const headKind = $derived(view === PropertiesView.Frame ? FRAME_KIND : layerKind(clip, doc.comps, roleOf(doc, clip.id, here) ?? ComponentRole.Instance));
+  const clipsOwnContent = $derived(!clip.autoLayout && fieldShownFor(family, 'clipContent') && (hasChildren || view === PropertiesView.Frame));
   const layerExtras = $derived(visual && view !== PropertiesView.Frame);
   const has: Record<Section, boolean> = $derived({
     [Section.Content]: fieldsIn(Section.Content).length > 0,
     [Section.Layout]: positioned || fieldsIn(Section.Layout).length > 0,
-    [Section.Stack]: layerExtras && (!!clip.autoLayout || layoutParent(doc, clip) !== null),
+    [Section.Stack]: visual && (!!clip.autoLayout || (layerExtras && layoutParent(doc, clip) !== null)),
     [Section.Align]: positioned && visual,
     [Section.Constraints]: pinnable,
     [Section.Transform]: layoutProps.length > 0,
@@ -496,14 +556,15 @@
     [Section.Stroke]: fieldsIn(Section.Stroke).length > 0,
     [Section.Text]: fieldsIn(Section.Text).length > 0,
     [Section.Timing]: true,
-    [Section.Shape]: clip.component === 'Shape',
+    [Section.Shape]: clip.component === 'Shape' && !clip.autoLayout && !hasChildren,
     [Section.Animate]: visual || TEXT_COMPONENTS.has(clip.component) || pulseShown || (voices.length > 0 && shows(Part.Ducking, family)) || fieldsIn(Section.Animate).length > 0 || !!(clip.keyframes.x?.length && clip.keyframes.y?.length),
     [Section.Effects]: visual && clip.component !== 'Null',
+    [Section.Colours]: layerExtras && hasChildren && colours.length > 0,
     [Section.ThreeD]: threeDProps.length > 0 || sceneProps.length > 0 || fieldsIn(Section.ThreeD).length > 0 || visual,
     [Section.Parent]: visual || maskProps.length > 0
   });
 
-  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(clip.autoLayout ? { [Section.Stack]: removeStackButton } : {}), ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
+  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(clip.autoLayout ? { [Section.Stack]: stackSettings } : {}), ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
 
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
@@ -520,6 +581,7 @@
     [Section.Shape]: shapeBody,
     [Section.Animate]: animateBody,
     [Section.Effects]: effectsBody,
+    [Section.Colours]: coloursBody,
     [Section.ThreeD]: threeDBody,
     [Section.Parent]: parentBody
   });
@@ -528,7 +590,7 @@
 <div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
-    <input class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} onchange={(e) => e.currentTarget.value.trim() && commit(renameClip(doc, clip.id, e.currentTarget.value.trim()), 'Renamed the layer')} />
+    <input {@attach fieldKeys} class="name" aria-label="Layer name" value={headTitle} data-testid="layer-name" onchange={(e) => rename(e.currentTarget.value.trim())} />
     {#if headKind !== headTitle}<span class="kind">{headKind}</span>{/if}
     {@render actions?.()}
   </header>
@@ -557,7 +619,7 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
-    {#if layerExtras}<StyleSection {doc} {clip} {commit} />{/if}
+    {#if layerExtras}<StyleSection {doc} {clip} {scale} {commit} />{/if}
     {#if layerExtras}<VariablesSection {doc} {clip} {commit} />{/if}
   {/if}
 
@@ -616,24 +678,25 @@
   {/each}
 {/snippet}
 
-{#snippet rangeField(field: Field)}
+{#snippet rangeField(field: Field, trailing?: Snippet, scale: FieldScale = unitScale(field))}
   {@const keyed = keyedField(clip.component, field.key, animated.params)}
   {@const look = fieldLook(field.key)}
-  {@const range = fieldSlider(field)}
+  {@const range = scale.range}
   <NumberField
-    {gesture}
+    gesture={scale.gesture ?? gesture}
     label={look.short ?? field.label}
     kind={look.short ? FieldKind.Glyph : FieldKind.Named}
     name={field.label}
-    value={fieldShown(field)}
+    value={scale.shown}
     {range}
     unit={range.unit ?? look.unit}
     fill={look.fill}
     mark={keyed ? MARK[keyState(field.key)] : null}
     expression={clip.expressions[field.key] !== undefined}
-    onchange={(v) => setProp(field, fieldStored(field, snappedValue(field.key, v)))}
+    onchange={(v) => (scale.commit ? scale.commit(v) : setProp(field, scale.stored(snappedValue(field.key, v))))}
     onkey={() => toggle(field.key)}
     onexpression={keyed ? () => toggleExpression(field.key) : undefined}
+    {trailing}
   />
 {/snippet}
 
@@ -648,12 +711,12 @@
     {@const fillBind = fillTarget(clip)}
     <div class="stack bindable" data-prop={field.key}>
       {#if fillBind && clip.bind?.[fillBind]}<BindChip {doc} {clip} target={fillBind} {commit} />{:else}
-        <FillStack {gesture} {palette} keys={fillKeys} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
+        <FillStack {gesture} {palette} keys={fillKeys} bind:open={fillOpen} fills={fillsShown} adder={Adder.Section} {assets} {tokens} {upload} oncrop={() => cropRequest.ask()} onchange={commitFills} />
         {#if fillBind}<BindChip {doc} {clip} target={fillBind} {commit} />{/if}
       {/if}
     </div>
   {:else if field.control === Control.Strokes}
-    <div class="stack" data-prop={field.key}><StrokeStack {gesture} {palette} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><StrokeStack {gesture} {palette} strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(space.width, space.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
@@ -671,7 +734,7 @@
         {#if clip.bind?.[field.key]}
           <BindChip {doc} {clip} target={field.key} {commit} />
         {:else if field.control === Control.Text}
-          <input id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
+          <input {@attach fieldKeys} id={`f-${field.key}`} type="text" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} />
         {:else if field.control === Control.Select}
           <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>
             {#each field.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
@@ -706,7 +769,7 @@
           {#if split}
             <div class="corners" data-testid="corners">
               {#each CORNER_NAMES as name, i (name)}
-                <input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} />
+                <input {@attach fieldKeys} type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} />
               {/each}
             </div>
           {/if}
@@ -726,7 +789,7 @@
   {@const radii = cornerRadii(Number(clip.props.roundness ?? 0), corners)}
   {@const split = corners.length > 0}
   <div class="radius" data-testid="radius">
-    <div class="radius-main bindable">{#if clip.bind?.[round.key]}<BindChip {doc} {clip} target={round.key} {commit} />{:else}{@render rangeField(round)}<BindChip {doc} {clip} target={round.key} {commit} />{/if}</div>
+    <div class="radius-main bindable">{#if clip.bind?.[round.key]}<BindChip {doc} {clip} target={round.key} {commit} />{:else}{@render rangeField(round, undefined, radiusScale())}<BindChip {doc} {clip} target={round.key} {commit} />{/if}</div>
     {#if cornersField}
       <button type="button" class="radius-split" class:on={split} data-testid="radius-per-corner" aria-pressed={split} aria-label="Per-corner radius" title="Per-corner radius" onclick={() => setProp(cornersField, split ? [] : radii)}><SquareDashed size={15} /></button>
     {/if}
@@ -734,7 +797,7 @@
   {#if cornersField && split}
     <div class="corners" data-testid="corners">
       {#each CORNER_NAMES as name, i (name)}
-        <label class="corner" title={name}><span>{CORNER_SHORT[i]}</span><input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(cornersField, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} /></label>
+        <label class="corner" title={name}><span>{CORNER_SHORT[i]}</span><input {@attach fieldKeys} type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={radiusRange(radiusBox).max} step="1" value={radiusShown(radii[i], radiusBox)} onchange={(e) => setProp(cornersField, withCorner(Number(clip.props.roundness ?? 0), radii, i, radiusStored(Number(e.currentTarget.value), radiusBox)))} /></label>
       {/each}
     </div>
   {/if}
@@ -780,6 +843,24 @@
   {/if}
 {/snippet}
 
+{#snippet sizePresets()}
+  {@const size = textField('size')}
+  {#if size}
+    <select class="trail" aria-label="Size presets" data-testid="size-presets" value="" onchange={(e) => e.currentTarget.value && setProp(size, fieldStored(size, Number(e.currentTarget.value)))}>
+      <option value="" disabled hidden></option>
+      {#each SIZE_PRESETS as preset (preset)}<option value={String(preset)}>{preset}</option>{/each}
+    </select>
+  {/if}
+{/snippet}
+
+{#snippet modeTag(mode: AxisMode)}
+  <span class="mode-tag" data-mode={mode}>{mode}</span>
+{/snippet}
+
+{#snippet advancedToggle()}
+  <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={15} /></button>
+{/snippet}
+
 {#snippet contentBody()}
   {@render groupFields(Section.Content)}
 {/snippet}
@@ -795,15 +876,16 @@
 
 {#snippet textBody()}
   {@const font = textField('font')}
+  {@const size = textField('size')}
   {@const aligns = ['align', 'verticalAlign'].map(textField).filter((f) => f !== undefined)}
   {@const italic = textField('italic')}
   {@const casing = textField('textCase')}
   {@const advanced = textFields.filter((f) => textTier(f.key, decorationNow) === TextTier.Advanced)}
   <div class="text-primary">
-    {#if font}{@render fieldRow(font)}{/if}
-    <div class="grid2">{@render pair(['weight', 'fontWeight', 'size'])}</div>
+    {#if font}<div class="font-row">{@render fieldRow(font)}</div>{/if}
+    <div class="grid2">{@render pair(['weight', 'fontWeight'])}{#if size}<div class="grid-cell" data-prop="size">{@render rangeField(size, sizePresets)}</div>{/if}</div>
     <div class="grid2">{@render pair(['leading', 'tracking'])}</div>
-    {#if aligns.length}<div class="grid2">{#each aligns as field (field.key)}{@render alignCell(field)}{/each}</div>{/if}
+    {#if aligns.length}<div class="align-row" data-testid="text-aligns"><div class="grid2">{#each aligns as field (field.key)}{@render alignCell(field)}{/each}</div>{@render advancedToggle()}</div>{/if}
     <div class="tgl-row" data-testid="text-styles" bind:this={advancedRow}>
       {#if italic}<button type="button" class="tgl" class:on={value(italic) === true} data-testid="text-italic" aria-label="Italic" title="Italic" aria-pressed={value(italic) === true} onclick={() => setProp(italic, value(italic) !== true)}><i>I</i></button>{/if}
       {@render lineToggle('Underline', 'U', 'underline')}
@@ -813,7 +895,7 @@
           {#each casing.options ?? [] as option (option)}<option value={option}>{optionLabel(option)}</option>{/each}
         </select>
       {/if}
-      <button type="button" class="tgl" class:on={advancedOpen} data-testid="advanced-type-toggle" aria-label="Advanced type" title="Advanced type" aria-pressed={advancedOpen} onclick={() => (advancedOpen = !advancedOpen)}><Settings2 size={14} /></button>
+      {#if !aligns.length}{@render advancedToggle()}{/if}
     </div>
   </div>
   {#if advancedOpen && advancedRow && advanced.length}
@@ -824,9 +906,24 @@
 {/snippet}
 
 {#snippet layoutBody()}
-  {#if positioned}<PositionSection {doc} {clip} {placement} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
-  {@render groupFields(Section.Layout, positioned ? PLACED_KEYS : NO_SKIP)}
-  {#if positioned}<PositionSection {doc} {clip} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned}<PositionSection {doc} {clip} {placement} host={own} {space} within={stackParent} part={PositionPart.Position} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
+  {#if positioned && !ownBox}<BoxFields {doc} ids={[clip.id]} {frame} {mode} {gesture} {onchange} />{/if}
+  {@const sizeFields = clip.autoLayout || !sizeShown(placement) ? [] : fieldsIn(Section.Layout).filter((f) => SIZE_KEYS.has(f.key))}
+  {@const sizing = textField('sizing')}
+  {@const modes = sizing ? axisModes(value(sizing) as TextSizing) : null}
+  {#if sizing}
+    <div class="stack" data-testid="text-resizing" data-prop="sizing">
+      <SegmentedField name={sizing.label} options={segmentsOf(sizing.key, sizing.options ?? [])} value={String(value(sizing))} onchange={(v) => setProp(sizing, v)} />
+    </div>
+  {/if}
+  {#if sizeFields.length}
+    <div class="size-row" data-testid="size-row">
+      <div class="grid2">{#each sizeFields as field (field.key)}{@const mode = modes?.[field.key as 'width' | 'height']}<div class="grid-cell" data-prop={field.key}>{#if mode}{#snippet tag()}{@render modeTag(mode)}{/snippet}{@render rangeField(field, tag, sizeScale(field))}{:else}{@render rangeField(field, undefined, sizeScale(field))}{/if}</div>{/each}</div>
+      <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={16} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={() => commit(setClipFlags(doc, clip.id, { lockRatio: !clip.lockRatio }), clip.lockRatio ? 'Unlocked the aspect ratio' : 'Locked the aspect ratio')} />
+    </div>
+  {/if}
+  {@render groupFields(Section.Layout, positioned || clip.autoLayout ? PLACED_SIZE_KEYS : SIZE_KEYS)}
+  {#if positioned}<PositionSection {doc} {clip} host={own} {space} part={PositionPart.Rotation} onchange={commit} onalign={(edge) => onalign?.(edge)} />{/if}
 {/snippet}
 
 {#snippet alignBody()}
@@ -842,24 +939,26 @@
 {/snippet}
 
 {#snippet layerBody()}
+  {#if visual && !focus && opacityProp}
+    <div class="appear" data-prop="opacity" data-testid="opacity-field">
+      <div class="appear-main">{@render animField(opacityProp)}</div>
+      <IconButton action={clip.hidden ? Action.ShowLayer : Action.HideLayer} size={16} data-testid="layer-visibility" onclick={() => commit(setClipFlags(doc, clip.id, { hidden: !clip.hidden }), clip.hidden ? 'Showed the layer' : 'Hid the layer')} />
+    </div>
+  {/if}
+  {#if roundnessField}{@render radiusControl(roundnessField)}{/if}
   {#if visual && !focus}
-    <div class="line" data-testid="layer-look">
-      <label for="blend-mode">Blend</label>
-      <select id="blend-mode" class="wide-select" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
+    <label class="blend" data-testid="layer-look">
+      <span class="blend-icon" aria-hidden="true"><Droplet size={15} /></span>
+      <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
         {#each BLEND_MODES as mode (mode)}<option value={mode}>{blendLabel(mode)}</option>{/each}
       </select>
-    </div>
-    {#if opacityProp}<div class="stack" data-prop="opacity" data-testid="opacity-field">{@render animField(opacityProp, true)}</div>{/if}
+    </label>
   {/if}
   {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{#each layerProps as prop (prop.key)}<div class="stack" data-prop={prop.key}>{@render animField(prop, true)}</div>{/each}</div>{/if}
-  {#if roundnessField}{@render radiusControl(roundnessField)}{/if}
   {@render groupFields(Section.Layer, roundnessField ? RADIUS_KEYS : NO_SKIP)}
   {#if visual && !focus}
-    {#if hasChildren || view === PropertiesView.Frame}
-      <div class="line" data-prop="clipContent">
-        <span class="label">Clip content</span>
-        <SegmentedField name="Clip content" options={YES_NO} value={answerOf(clip.clipContent)} onchange={(v) => commit(setClipFlags(doc, clip.id, { clipContent: v === Answer.Yes }), 'Changed clip content')} />
-      </div>
+    {#if clipsOwnContent}
+      <div data-prop="clipContent"><CheckRow label="Clip content" checked={!!clip.clipContent} testid="clip-content" onchange={(on) => commit(setClipFlags(doc, clip.id, { clipContent: on }), 'Changed clip content')} /></div>
     {/if}
     {#if doc.motionBlur.enabled}
       <div class="line" data-testid="clip-blur-section">
@@ -870,10 +969,18 @@
   {/if}
 {/snippet}
 
+{#snippet coloursBody()}
+  <div data-testid="clip-colours">
+    {#each colours as { colour, count } (colour)}
+      <ColourRow {colour} {count} {palette} onchange={(to) => commit(recolourClip(doc, clip.id, colour, to), `Recoloured ${colour} to ${to}`)} />
+    {/each}
+  </div>
+{/snippet}
+
 {#snippet timingBody()}
   <div class="grid2">
-    <label class="clock"><span>In</span><input type="text" aria-label="Start" value={clockText(clip.from, doc.fps)} onchange={(e) => setClock('from', e.currentTarget.value)} /></label>
-    <label class="clock"><span>Dur</span><input type="text" aria-label="Length" value={clockText(clip.durationInFrames, doc.fps)} onchange={(e) => setClock('durationInFrames', e.currentTarget.value)} /></label>
+    <label class="clock"><span>In</span><input {@attach fieldKeys} type="text" aria-label="Start" value={clockText(clip.from, doc.fps)} onchange={(e) => setClock('from', e.currentTarget.value)} /></label>
+    <label class="clock"><span>Dur</span><input {@attach fieldKeys} type="text" aria-label="Length" value={clockText(clip.durationInFrames, doc.fps)} onchange={(e) => setClock('durationInFrames', e.currentTarget.value)} /></label>
   </div>
   {#if shows(Part.Transitions, family)}
     {#each [Side.In, Side.Out] as side (side)}
@@ -885,7 +992,7 @@
             {#each TRANSITION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
           </select>
         </label>
-        <label class="clock"><span>Dur</span><input type="text" aria-label={`Transition ${side} duration`} value={clockText(edge.durationInFrames, doc.fps)} onchange={(e) => setEdgeClock(side, e.currentTarget.value)} /></label>
+        <label class="clock"><span>Dur</span><input {@attach fieldKeys} type="text" aria-label={`Transition ${side} duration`} value={clockText(edge.durationInFrames, doc.fps)} onchange={(e) => setEdgeClock(side, e.currentTarget.value)} /></label>
       </div>
     {/each}
   {/if}
@@ -901,6 +1008,7 @@
         <span class="managed">Edit points on the preview with the pen tool.</span>
       {/if}
     </div>
+    {#if shapePartShown(ShapePart.Morph, mode)}
     {#each shapeMorphs as _target, i (i)}
       <div class="line">
         <span class="label">Morph {i + 1}</span>
@@ -917,10 +1025,13 @@
         {#each morphSources as other (other.id)}<option value={other.id}>{clipName(other.id)}</option>{/each}
       </select>
     {/if}
+    {/if}
+    {#if shapePartShown(ShapePart.Liquid, mode)}
     <select class="add" aria-label="Liquid preset" data-testid="shape-preset" value="" onchange={(e) => applyShapePresetOf(e.currentTarget)}>
       <option value="">Liquid preset…</option>
       {#each SHAPE_PRESETS as preset (preset)}<option value={preset} title={SHAPE_PRESET[preset].about}>{SHAPE_PRESET[preset].label}</option>{/each}
     </select>
+    {/if}
     {#each shapeModifiers as modifier, i (modifier.id)}
       <div class="effect" class:off={!modifier.enabled} data-modifier={modifier.id}>
         <div class="effect-head">
@@ -942,7 +1053,7 @@
 {#snippet animateBody()}
   {#if visual && clip.component !== 'Null'}
     <InOutPresetsSection {doc} {clip} {frame} {commit} />
-    <AnimateToSection {doc} {clip} {frame} {commit} />
+    <AnimateToSection {doc} {clip} {frame} {space} {commit} />
   {/if}
   {#if TEXT_COMPONENTS.has(clip.component)}
     <div class="stackable" data-testid="text-animators-section">
@@ -1029,21 +1140,22 @@
       {/snippet}
     </MenuTrigger>
     <MenuContent align="end">
-      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type) }), 'Add fill')} />{/each}
+      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type, clip.autoLayout || hasChildren ? FillHolder.Container : FillHolder.Layer) }), 'Add fill')} />{/each}
     </MenuContent>
   </Menu>
 {/snippet}
 
-{#snippet stackBody()}
-  <StackSection {doc} {clip} {commit} />
+{#snippet stackSettings()}
+  {#if clip.autoLayout}<StackSettings {doc} clip={{ ...clip, autoLayout: clip.autoLayout }} {commit} />{/if}
 {/snippet}
 
-{#snippet removeStackButton()}
-  <ShellIconButton label="Remove stack" shortcut="⌥⇧A" data-testid="auto-layout-remove" onclick={() => commit(removeStack(doc, clip.id), 'Removed the stack')}><Minus /></ShellIconButton>
+{#snippet stackBody()}
+  <StackSection {doc} {clip} scale={space.scale ?? 1} {commit} />
 {/snippet}
+
 
 {#snippet addStrokeButton()}
-  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props)) }), 'Add stroke')}><Plus /></ShellIconButton>
+  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props), Math.min(space.width, space.height)) }), 'Add stroke')}><Plus /></ShellIconButton>
 {/snippet}
 
 {#snippet addEffectMenu()}
@@ -1081,6 +1193,8 @@
                     <div class="control"><ColorField {gesture} {palette} name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
                     {@render diamond(prop.key)}
                   </div>
+                {:else if isFlag(effect.kind, effectOfKey(prop.key)?.param ?? '')}
+                  <div data-prop={prop.key}><CheckRow label={afterDot(prop)} checked={Number(shown(prop.key)) === 1} testid="effect-flag" onchange={(on) => animate(prop.key, on ? 1 : 0)} /></div>
                 {:else}
                   {@render animList([prop], afterDot)}
                 {/if}
@@ -1158,7 +1272,7 @@
         {@const mask = clip.mask}
         <label class="check"><input type="checkbox" checked={mask.invert} onchange={(e) => editMask(mask, { invert: e.currentTarget.checked })} />Invert</label>
         {#if MASK_KINDS[mask.kind].needs === Needs.Text}
-          <div class="line"><label class="label" for="mask-text">Text</label><input id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
+          <div class="line"><label class="label" for="mask-text">Text</label><input {@attach fieldKeys} id="mask-text" type="text" value={mask.text} onchange={(e) => editMask(mask, { text: e.currentTarget.value })} /></div>
         {:else if MASK_KINDS[mask.kind].needs === Needs.Asset}
           <div class="assets">
             {#each pictures as asset (asset.id)}
@@ -1190,7 +1304,7 @@
     gap: 8px;
     height: var(--ui-header-h);
     flex-shrink: 0;
-    padding: 0 12px;
+    padding: 0 var(--ui-space-2) 0 var(--ui-space-4);
     border-bottom: 1px solid var(--ui-divider);
   }
 
@@ -1216,7 +1330,7 @@
   .name {
     flex: 1;
     min-width: 0;
-    height: 28px;
+    height: var(--ui-row);
     padding: 0 6px;
     margin-left: -6px;
     border: 0;
@@ -1228,7 +1342,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: var(--ui-weight-semibold);
-    font-size: var(--ui-type-title);
+    font-size: var(--ui-text-lg);
     letter-spacing: var(--ui-tracking-title);
   }
 
@@ -1269,34 +1383,62 @@
   .adv {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .tgl-row {
     display: flex;
-    gap: 4px;
+    gap: var(--ui-space-2);
     align-items: center;
   }
 
   .tgl {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--ui-radius-sm);
-    border: 1px solid var(--ui-line);
-    background: transparent;
-    color: var(--ui-ink-2);
-    font-size: 12px;
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: var(--ui-row);
+    height: var(--ui-row);
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
     cursor: pointer;
   }
 
-  .tgl.on {
-    background: var(--ui-surface-3, var(--ui-line));
+  .tgl:hover {
+    background: var(--ui-input-hover);
     color: var(--ui-text);
+  }
+
+  .tgl.on {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent-text, var(--ui-accent));
   }
 
   .case {
     flex: 1;
     min-width: 0;
+  }
+
+  .align-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .align-row > .grid2 {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .font-row :global(.line > label) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .adv {
@@ -1312,16 +1454,49 @@
     width: 100%;
   }
 
+  .mode-tag {
+    flex-shrink: 0;
+    padding-right: 6px;
+    color: var(--ui-ink-2);
+    font-size: 11px;
+  }
+
+  .trail {
+    flex-shrink: 0;
+    width: 18px;
+    height: 100%;
+    border: 0;
+    background-color: transparent;
+    color: var(--ui-ink-2);
+    cursor: pointer;
+  }
+
+  .size-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .size-row .grid2 {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .size-row > :global(.ib) {
+    flex: 0 0 var(--ui-row);
+    height: var(--ui-row);
+  }
+
   .grid2 {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .bindable {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .bindable > :global(:first-child) {
@@ -1332,7 +1507,7 @@
   .stackable {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .dials {
@@ -1357,15 +1532,16 @@
   .line {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 28px;
+    gap: var(--ui-space-2);
+    min-height: var(--ui-row);
   }
 
   .line > label,
   .line > .label {
     flex-shrink: 0;
     width: 88px;
-    color: var(--ui-ink-2);
+    font-size: var(--ui-text-sm);
+    color: var(--ui-text-2);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1382,7 +1558,7 @@
     display: flex;
     align-items: center;
     height: var(--ui-row);
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
     border: 1px solid transparent;
   }
@@ -1406,9 +1582,10 @@
     flex: 1;
     min-width: 0;
     height: 100%;
-    padding: 0 2px;
+    padding: 0 16px 0 2px;
     border: 0;
-    background: transparent;
+    background-color: transparent;
+    background-position: right 2px center;
     font: inherit;
     font-variant-numeric: tabular-nums;
   }
@@ -1423,13 +1600,66 @@
   select {
     box-sizing: border-box;
     width: 100%;
-    height: 28px;
-    padding: 0 8px;
+    height: var(--ui-row);
+    padding: 0 10px;
     border: 1px solid transparent;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
+    border-radius: var(--ui-radius-md);
+    background-color: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
+    letter-spacing: normal;
+    font-size: var(--ui-text-sm);
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
+  }
+
+  select {
+    padding-right: 26px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4l2.5 2.5L7.5 4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px 10px;
+  }
+
+  input[type='text']:hover,
+  textarea:hover,
+  select:hover {
+    background-color: var(--ui-input-hover);
+  }
+
+  .appear {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+  }
+
+  .appear-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .blend {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .blend-icon {
+    position: absolute;
+    left: 10px;
+    display: inline-flex;
+    color: var(--ui-text-2);
+    pointer-events: none;
+  }
+
+  .blend select {
+    padding-left: 32px;
+    border-color: var(--ui-divider-strong);
+    background-color: transparent;
+  }
+
+  .blend select:hover {
+    background-color: var(--ui-wash);
   }
 
   textarea {
@@ -1618,7 +1848,7 @@
   .radius {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
     min-width: 0;
   }
   .radius-main {
@@ -1628,14 +1858,19 @@
   .radius-split {
     display: grid;
     place-items: center;
-    flex: 0 0 28px;
-    height: 28px;
+    flex: 0 0 var(--ui-row);
+    height: var(--ui-row);
     padding: 0;
     border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
-    color: var(--ui-ink-2);
+    border-radius: var(--ui-radius-md);
+    background: none;
+    color: var(--ui-text-2);
     cursor: pointer;
+  }
+
+  .radius-split:hover {
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
   .radius-split.on {
     background: var(--ui-selected, var(--ui-accent-wash));
@@ -1646,11 +1881,11 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
-    height: 28px;
-    padding: 0 6px;
-    border-radius: var(--ui-radius-sm);
+    height: var(--ui-row);
+    padding: 0 8px;
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
-    font-size: var(--ui-text-xs);
+    font-size: var(--ui-text-sm);
     color: var(--ui-ink-2);
   }
   .corner input {
@@ -1660,6 +1895,7 @@
     background: none;
     color: var(--ui-ink);
     font: inherit;
+    letter-spacing: normal;
   }
   .split {
     border: 0;

@@ -5,6 +5,7 @@ import { DEFAULT_LAYOUT_ITEM, type AutoLayout, type LayoutItem, type Padding } f
 import { Horizontal, Vertical, type Constraints } from '../constraints/model';
 import type { Rule } from './ir';
 import type { TokenBook } from './tokens';
+import { BOUNDS, LIMIT_AXES, LimitUnit, limitOf } from '../layout/limits';
 
 const DIGITS = 100;
 const FLUID_FROM = 320;
@@ -21,8 +22,6 @@ const AXES: readonly Axis[] = ['width', 'height'];
 
 const MAIN_AXIS: Record<Direction, Axis | null> = { [Direction.Horizontal]: 'width', [Direction.Vertical]: 'height', [Direction.Grid]: null };
 
-const MIN_KEY: Record<Axis, keyof LayoutItem> = { width: 'minWidth', height: 'minHeight' };
-const MAX_KEY: Record<Axis, keyof LayoutItem> = { width: 'maxWidth', height: 'maxHeight' };
 
 const JUSTIFY_CSS: Record<Justify, string | null> = {
   [Justify.Start]: null,
@@ -36,6 +35,8 @@ const JUSTIFY_CSS: Record<Justify, string | null> = {
 const ALIGN_CSS: Record<Align, string> = { [Align.Start]: 'flex-start', [Align.Center]: 'center', [Align.End]: 'flex-end', [Align.Baseline]: 'baseline', [Align.Stretch]: 'stretch' };
 
 const GRID_ALIGN_CSS: Record<Align, string> = { [Align.Start]: 'start', [Align.Center]: 'center', [Align.End]: 'end', [Align.Baseline]: 'baseline', [Align.Stretch]: 'stretch' };
+
+export const fluidWidth = (size: number): Rule[] => (size >= FLUID_FROM ? [['width', '100%'], ['max-width', px(size)]] : [['width', px(size)]]);
 
 export enum Shape {
   Text = 'text',
@@ -57,7 +58,7 @@ function fixedRules(axis: Axis, size: number, main: Axis | null, shape: Shape): 
     return [[axis, px(size)], ['flex-shrink', '0']];
   }
   if (axis === 'width') {
-    return size >= FLUID_FROM ? [['width', '100%'], ['max-width', px(size)]] : [['width', px(size)]];
+    return fluidWidth(size);
   }
   if (shape === Shape.Text) {
     return [];
@@ -107,12 +108,15 @@ function gridItem(placed: Placed, item: LayoutItem): Rule[] {
   return [...gridCell(item), ...height];
 }
 
+const LIMIT_CSS: Record<LimitUnit, (value: number) => string> = { [LimitUnit.Px]: px, [LimitUnit.Percent]: (value) => `${round(value)}%` };
+
 function limits(item: LayoutItem): Rule[] {
-  return AXES.flatMap((axis) => {
-    const min = item[MIN_KEY[axis]] as number | undefined;
-    const max = item[MAX_KEY[axis]] as number | undefined;
-    return [...(min !== undefined ? [[`min-${axis}`, px(min)] as Rule] : []), ...(max !== undefined ? [[`max-${axis}`, px(max)] as Rule] : [])];
-  });
+  return LIMIT_AXES.flatMap((axis) =>
+    BOUNDS.flatMap((bound) => {
+      const limit = limitOf(item, axis, bound);
+      return limit ? [[`${bound}-${axis}`, LIMIT_CSS[limit.unit](limit.value)] as Rule] : [];
+    })
+  );
 }
 
 export function flowItemRules(placed: Placed, flow: AutoLayout): Rule[] {
@@ -161,8 +165,42 @@ const DEFAULT_CONSTRAINTS: Constraints = { horizontal: Horizontal.Left, vertical
 export function absoluteRules(placed: Placed, parent: Box): Rule[] {
   const box = placed.box;
   const pinned = placed.clip.constraints ?? DEFAULT_CONSTRAINTS;
+  const horizontal = box.width >= FLUID_FROM && pinned.horizontal === Horizontal.Left ? Horizontal.Scale : pinned.horizontal;
   const vertical = VERTICAL[pinned.vertical](box, parent).filter(([p]) => placed.shape !== Shape.Text || p !== 'height');
-  return [['position', 'absolute'], ...HORIZONTAL[pinned.horizontal](box, parent), ...vertical];
+  return [['position', 'absolute'], ...HORIZONTAL[horizontal](box, parent), ...vertical];
+}
+
+const OVERLAP_TOLERANCE = 0.5;
+
+const STACKABLE_HORIZONTAL: ReadonlySet<Horizontal> = new Set([Horizontal.Left, Horizontal.LeftRight]);
+
+const stackable = (clip: MotionClip) => {
+  const pinned = clip.constraints ?? DEFAULT_CONSTRAINTS;
+  return pinned.vertical === Vertical.Top && STACKABLE_HORIZONTAL.has(pinned.horizontal);
+};
+
+export function stackOrder(kids: readonly MotionClip[], boxOf: (clip: MotionClip) => Box): MotionClip[] | null {
+  if (kids.length < 2 || !kids.every(stackable)) {
+    return null;
+  }
+  const order = [...kids].sort((a, b) => boxOf(a).top - boxOf(b).top);
+  const overlaps = order.some((clip, i) => {
+    const prev = i ? boxOf(order[i - 1]) : null;
+    return prev !== null && boxOf(clip).top < prev.top + prev.height - OVERLAP_TOLERANCE;
+  });
+  return overlaps ? null : order;
+}
+
+export const STACK_RULES: Rule[] = [['display', 'flex'], ['flex-direction', 'column'], ['align-items', 'flex-start']];
+
+export function stackItemRules(placed: Placed, above: number, parent: Box): Rule[] {
+  const box = placed.box;
+  const gap = round(box.top - above);
+  const inset = round(box.left - parent.left);
+  const width: Rule[] = box.width >= FLUID_FROM ? [['align-self', 'stretch'], ['max-width', px(box.width)]] : [['width', px(box.width)]];
+  const height: Rule[] = placed.shape === Shape.Leaf ? [['height', px(box.height)]] : [];
+  const margins: Rule[] = [...(gap > 0 ? [['margin-top', px(gap)] as Rule] : []), ...(inset > 0 ? [['margin-left', px(inset)] as Rule] : [])];
+  return [...width, ...height, ['flex-shrink', '0'], ...margins];
 }
 
 function padding(p: Padding, tokens: TokenBook): Rule[] {

@@ -1,4 +1,4 @@
-import { ActionKind, TransitionKind, type Action, type Transition } from '@feega/motion-core/motion/prototype/model';
+import { ActionKind, DEFAULT_OVERLAY, TransitionKind, type Action, type Overlay, type Transition } from '@feega/motion-core/motion/prototype/model';
 
 export enum MoveKind {
   Enter = 'enter',
@@ -8,7 +8,7 @@ export enum MoveKind {
 
 export type Visit = { frame: string; transition: Transition };
 export type PlayerState = { current: string; history: Visit[]; overlays: string[] };
-export type Move = { kind: MoveKind; from: string; to: string; transition: Transition; reverse: boolean };
+export type Move = { kind: MoveKind; from: string; to: string; transition: Transition; reverse: boolean; overlay?: Overlay };
 export type Step = { state: PlayerState; move: Move | null };
 
 export const startPlayer = (start: string): PlayerState => ({ current: start, history: [], overlays: [] });
@@ -27,13 +27,13 @@ function enter(state: PlayerState, target: string, transition: Transition, known
   };
 }
 
-function open(state: PlayerState, target: string, transition: Transition, known: ReadonlySet<string>): Step {
+function open(state: PlayerState, target: string, overlay: Overlay, transition: Transition, known: ReadonlySet<string>): Step {
   if (!known.has(target)) {
     return stay(state);
   }
   return {
     state: { ...state, overlays: [...state.overlays, target] },
-    move: { kind: MoveKind.Open, from: topOf(state), to: target, transition, reverse: false }
+    move: { kind: MoveKind.Open, from: topOf(state), to: target, transition, reverse: false, overlay }
   };
 }
 
@@ -59,13 +59,17 @@ export function act(state: PlayerState, action: Action, transition: Transition, 
   const runs: Record<ActionKind, () => Step> = {
     [ActionKind.Navigate]: () => enter(state, 'target' in action ? action.target : '', transition, known),
     [ActionKind.ScrollTo]: () => enter(state, 'target' in action ? action.target : '', transition, known),
-    [ActionKind.OpenOverlay]: () => open(state, 'target' in action ? action.target : '', transition, known),
+    [ActionKind.OpenOverlay]: () => (action.kind === ActionKind.OpenOverlay ? open(state, action.target, action.overlay ?? DEFAULT_OVERLAY, transition, known) : stay(state)),
+    [ActionKind.CloseOverlay]: () => closeOverlay(state, transition),
     [ActionKind.Back]: () => back(state, transition),
-    [ActionKind.ChangeTo]: () => stay(state)
+    [ActionKind.ChangeTo]: () => stay(state),
+    [ActionKind.OpenUrl]: () => stay(state)
   };
   return runs[action.kind]();
 }
 
-export function closeTopOverlay(state: PlayerState): Step {
-  return state.overlays.length ? back(state, { kind: TransitionKind.Instant }) : stay(state);
-}
+const closeOverlay = (state: PlayerState, transition: Transition): Step => (state.overlays.length ? back(state, transition) : stay(state));
+
+export const linkOf = (action: Action): string | null => ('url' in action ? action.url : null);
+
+export const closeTopOverlay = (state: PlayerState): Step => closeOverlay(state, { kind: TransitionKind.Instant });

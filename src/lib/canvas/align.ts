@@ -28,6 +28,12 @@ export function alignTiles(tiles: readonly TileBox[], edge: Edge): TileMove[] {
   return tiles.map((t) => ({ id: t.id, ...PLACE[edge](t, bounds) })).filter((m, i) => m.x !== tiles[i].x || m.y !== tiles[i].y);
 }
 
+export function alignWithin(tile: TileBox, holder: TileBox, edge: Edge): TileMove[] {
+  const bounds: Bounds = { left: holder.x, top: holder.y, right: holder.x + holder.width, bottom: holder.y + holder.height };
+  const to = PLACE[edge](tile, bounds);
+  return to.x === tile.x && to.y === tile.y ? [] : [{ id: tile.id, ...to }];
+}
+
 export function tidyTiles(tiles: readonly TileBox[]): TileMove[] {
   const at = new Map(tiles.map((t) => [t.id, t]));
   return tidyMoves(tiles.map((t) => ({ id: t.id, left: t.x, top: t.y, width: t.width, height: t.height }))).map((m) => ({ id: m.id, x: at.get(m.id)!.x + m.dx, y: at.get(m.id)!.y + m.dy }));

@@ -647,12 +647,30 @@ export function motionEngine(win: Window & Record<string, unknown>): MotionEngin
     }
   };
 
+  const NAMED_PART = /^\s*([#.])([^\s>+~[\]()*,]+)\s*$/;
+
+  function byName(part: RegExpMatchArray): Target[] {
+    if (part[1] === '#') {
+      const el = doc.getElementById(part[2]);
+      return el ? [el as unknown as Target] : [];
+    }
+    return Array.from(doc.getElementsByClassName(part[2])) as unknown as Target[];
+  }
+
+  function selected(selector: string): Target[] {
+    const parts = selector.split(',').map((part) => part.match(NAMED_PART));
+    if (parts.every((part): part is RegExpMatchArray => part !== null)) {
+      return parts.flatMap(byName);
+    }
+    return Array.from(doc.querySelectorAll(selector)) as unknown as Target[];
+  }
+
   function resolveTargets(targets: unknown): Target[] {
     if (targets == null) {
       return [];
     }
     if (typeof targets === 'string') {
-      return Array.from(doc.querySelectorAll(targets)) as unknown as Target[];
+      return selected(targets);
     }
     if (Array.isArray(targets)) {
       return targets.flatMap(resolveTargets);

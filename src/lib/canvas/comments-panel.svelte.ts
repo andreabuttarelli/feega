@@ -3,6 +3,7 @@ import type { CommentPlacement } from '$lib/canvas/comment-placement';
 let open = $state(false);
 let active = $state<string | null>(null);
 let placing = $state(false);
+let openedByPlacing = false;
 let pending = $state<CommentPlacement | null>(null);
 let unseen = $state(false);
 
@@ -30,6 +31,7 @@ export const commentsPanel = {
   },
   hide() {
     open = false;
+    openedByPlacing = false;
     active = null;
     placing = false;
     pending = null;
@@ -39,11 +41,14 @@ export const commentsPanel = {
     open = open || threadId !== null;
   },
   place(on: boolean) {
+    openedByPlacing = on ? openedByPlacing || !open : openedByPlacing;
     placing = on;
     pending = on ? pending : null;
-    open = open || on;
+    open = on ? true : open && !openedByPlacing;
+    openedByPlacing = on && openedByPlacing;
   },
   drop(at: CommentPlacement) {
+    openedByPlacing = false;
     pending = at;
     active = null;
     open = true;

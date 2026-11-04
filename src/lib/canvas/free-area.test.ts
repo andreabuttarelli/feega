@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOCK_EDGE, Dock, Edge, frameIn, freeArea, inView, revealIn } from './free-area';
+import { DOCK_EDGE, Dock, Edge, FocusMode, Placement, centreIn, MIN_PICK_PX, focusPlacement, focusSelects, frameIn, freeArea, inView, revealIn } from './free-area';
 
 const SCREEN = { width: 1280, height: 720 };
 
@@ -113,5 +113,44 @@ describe('revealing a node behind a panel', () => {
   it('leaves a visible node where it is', () => {
     const view = { x: 0, y: 0, zoom: 1 };
     expect(revealIn({ x: 100, y: 100, width: 200, height: 50 }, view, screen, panels)).toBe(view);
+  });
+});
+
+describe('what each focus request does to the selection and the view', () => {
+  it('Go to main selects the main and centres it at the zoom the user had', () => {
+    expect(focusSelects(FocusMode.Pick)).toBe(true);
+    expect(focusPlacement(FocusMode.Pick)).toBe(Placement.Centre);
+  });
+
+  it('a plain select still frames what it selects', () => {
+    expect(focusSelects(FocusMode.Select)).toBe(true);
+    expect(focusPlacement(FocusMode.Select)).toBe(Placement.Fit);
+  });
+
+  it('a shape just drawn is selected and never zooms the view out', () => {
+    expect(focusSelects(FocusMode.Drawn)).toBe(true);
+    expect(focusPlacement(FocusMode.Drawn)).toBe(Placement.Slide);
+  });
+
+  it('a reveal slides the view without selecting', () => {
+    expect(focusSelects(FocusMode.Reveal)).toBe(false);
+    expect(focusPlacement(FocusMode.Reveal)).toBe(Placement.Slide);
+  });
+});
+
+describe('centring a node', () => {
+  it('puts its centre in the middle of the screen and keeps the zoom', () => {
+    const view = centreIn({ x: 100, y: 50, width: 40, height: 20 }, { x: 7, y: 9, zoom: 2 }, { width: 1000, height: 800 });
+
+    expect(view.zoom).toBe(2);
+    expect(120 * view.zoom + view.x).toBe(500);
+    expect(60 * view.zoom + view.y).toBe(400);
+  });
+
+  it('zooms in on a pick too small to see at the current zoom, then centres it', () => {
+    const view = centreIn({ x: 100, y: 50, width: 120, height: 40 }, { x: 0, y: 0, zoom: 0.02 }, { width: 1000, height: 800 });
+
+    expect(120 * view.zoom).toBeGreaterThanOrEqual(MIN_PICK_PX);
+    expect(160 * view.zoom + view.x).toBeCloseTo(500, 6);
   });
 });

@@ -41,11 +41,24 @@ function runner(answer: Record<string, unknown> | null) {
 }
 
 describe('optimistic registry: every action says how it looks before the server answers', () => {
-  it('wrap with stack shows a container holding the picked tiles', () => {
+  it('wrap with stack shows the stack picked, hugging the tiles where they sit, the tiles left as they are', () => {
     const op = optimisticOp(OptimisticAction.Stack, { ids: ['a', 'b'], id: 's' }, start(), ctx, async () => null);
     const shown = op.apply(start());
-    expect(shown.nodes.map((n) => n.id)).toEqual(['s', 'a', 'b']);
-    expect(shown.nodes.filter((n) => n.id !== 's').every((n) => layoutOf(n.data).groupId === 's')).toBe(true);
+
+    expect(shown.nodes.map((n) => [n.id, n.select ?? false])).toEqual([['a', false], ['b', false], ['s', true]]);
+    expect(shown.nodes[2]).toMatchObject({ displayName: 'Stack', type: 'element', x: 0, y: 0, w: 300, h: 100 });
+    expect(shown.nodes.slice(0, 2).every((n) => layoutOf(n.data).groupId === undefined || layoutOf(n.data).groupId === null)).toBe(true);
+  });
+
+  it('wrap with stack on one tile picks the new stack too', () => {
+    const shown = optimisticOp(OptimisticAction.Stack, { ids: ['a'], id: 's' }, start(), ctx, async () => null).apply(start());
+    expect(shown.nodes.find((n) => n.id === 's')).toMatchObject({ select: true, w: 100, h: 100 });
+  });
+
+  it('the wrapped tiles stay drawn until the canvas reloads them, so the stack never shows empty', async () => {
+    const { run, rows, post } = runner({ outcome: 'done', frameId: 's', undo: [] });
+    await run(optimisticOp(OptimisticAction.Stack, { ids: ['a', 'b'], id: 's' }, start(), ctx, post));
+    expect(rows().nodes.map((n) => n.id)).toEqual(['a', 'b', 's']);
   });
 
   it('wrap in a section puts a section behind the picked tiles', () => {
@@ -63,6 +76,13 @@ describe('optimistic registry: every action says how it looks before the server 
     expect(optimisticOp(OptimisticAction.Restack, { ids: ['a'], to: Stack.Front }, start(), ctx, async () => null).apply(start()).nodes.map((n) => n.id)).toEqual(['b', 'a']);
     expect(optimisticOp(OptimisticAction.Rename, { id: 'a', name: '  Hero ' }, start(), ctx, async () => null).apply(start()).nodes[0].displayName).toBe('Hero');
     expect(optimisticOp(OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }, start(), ctx, async () => null).apply(start()).edges[0].mode).toBe('iterate');
+  });
+
+  it('a cable tie lands on every wire it bundles, and untying clears it', () => {
+    const tie = { id: 't', x: 1, y: 2 };
+    const tied = optimisticOp(OptimisticAction.EdgeTie, { connectionIds: ['e'], tie }, start(), ctx, async () => null).apply(start());
+    expect(tied.edges[0].tie).toEqual(tie);
+    expect(optimisticOp(OptimisticAction.EdgeTie, { connectionIds: ['e'], tie: null }, tied, ctx, async () => null).apply(tied).edges[0].tie).toBeNull();
   });
 
   it('duplicate shows the copies, picked, under the ids the server will give them', () => {
@@ -126,6 +146,7 @@ describe('optimistic registry: a refusal puts the canvas back', () => {
     [OptimisticAction.Restack, { ids: ['a'], to: Stack.Front }],
     [OptimisticAction.Rename, { id: 'a', name: 'x' }],
     [OptimisticAction.EdgeMode, { connectionId: 'e', mode: 'iterate' }],
+    [OptimisticAction.EdgeTie, { connectionIds: ['e'], tie: null }],
     [OptimisticAction.Remove, { nodeIds: ['a'], edgeIds: ['e'] }],
     [OptimisticAction.Duplicate, duplicated],
     [OptimisticAction.MoveElement, carried],

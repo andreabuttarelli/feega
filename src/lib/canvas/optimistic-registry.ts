@@ -2,18 +2,20 @@ import type { CanvasNodeRecord, Connection } from '$lib/server/repos/canvas';
 import type { CopyIds, Offset } from './duplicate-plan';
 import { settle as settled } from './optimistic-insert';
 import { DropOn } from '$lib/motion/move-element';
+import type { LayerSlot } from '$lib/motion/layer-place';
 import { SECTION_DEFAULT_FILL } from './node-data';
 import { layoutOf, scaleGroup } from './node-layout';
 import { shownOutput } from './gen-history';
 import { cleanNodeName } from './node-name';
-import { groupedLocally, ungroupedLocally } from './optimistic-group';
+import { framedLocally, groupedLocally, wrappedLocally, ungroupedLocally } from './optimistic-group';
 import { restoreRows, type OptimisticOp, type Touched } from './optimistic-ops';
 import { SECTION_TYPE, sectionBoxAround } from './section';
 import { stackedLocally, type Stack } from './stacking';
 import type { UndoItem } from './undo-plan';
+import type { Tie } from './gpu/wire-magnet';
 
 export type OptTile = { id: string; type: string; displayName: string | null; x: number; y: number; w: number; h: number; data: Record<string, unknown>; version: number; select?: boolean; userHeight?: number | null };
-export type OptEdge = { id: string; source: string; target: string; mode?: string };
+export type OptEdge = { id: string; source: string; target: string; mode?: string; tie?: Tie | null };
 export type CanvasRows<N extends OptTile, E extends OptEdge> = { nodes: N[]; edges: E[] };
 export type RowContext<N, E = OptEdge> = { toTile: (record: CanvasNodeRecord) => N; toEdge?: (connection: Connection) => E };
 export type Answer = Record<string, unknown>;
@@ -24,10 +26,12 @@ export enum OptimisticAction {
   Stack = 'stackElements',
   Section = 'wrapSection',
   Group = 'groupElements',
+  Frame = 'frameElements',
   Ungroup = 'ungroupElement',
   Restack = 'restack',
   Rename = 'rename',
   EdgeMode = 'set_edge_mode',
+  EdgeTie = 'set_edge_tie',
   Remove = 'remove',
   Duplicate = 'duplicate',
   ScaleGroup = 'scaleGroup',
@@ -55,14 +59,16 @@ export enum Refresh {
 }
 
 type Inputs = {
-  [OptimisticAction.MoveFree]: { id: string; frameId: string; at: { x: number; y: number }; ids?: string[] };
+  [OptimisticAction.MoveFree]: { id: string; frameId: string; at: { x: number; y: number }; slot?: LayerSlot; ids?: string[] };
   [OptimisticAction.Stack]: { ids: string[]; id: string };
   [OptimisticAction.Section]: { ids: string[]; id: string };
   [OptimisticAction.Group]: { ids: string[]; id: string };
+  [OptimisticAction.Frame]: { ids: string[]; id: string };
   [OptimisticAction.Ungroup]: { id: string };
   [OptimisticAction.Restack]: { ids: string[]; to: Stack };
   [OptimisticAction.Rename]: { id: string; name: string };
   [OptimisticAction.EdgeMode]: { connectionId: string; mode: string };
+  [OptimisticAction.EdgeTie]: { connectionIds: string[]; tie: Tie | null };
   [OptimisticAction.Remove]: { nodeIds: string[]; edgeIds: string[] };
   [OptimisticAction.Duplicate]: { ids: string[]; copies: CanvasNodeRecord[]; copyIds: CopyIds; offset?: Offset };
   [OptimisticAction.ScaleGroup]: { id: string; width: number; height: number };
@@ -178,7 +184,7 @@ function offsetFields(offset: Offset | undefined): Record<string, string> {
 
 const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   [OptimisticAction.MoveFree]: {
-    fields: (i) => ({ source: i.id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: i.frameId, at: i.at }), ...(i.ids ? { ids: JSON.stringify(i.ids) } : {}) }),
+    fields: (i) => ({ source: i.id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: i.frameId, at: i.at, ...(i.slot ? { slot: i.slot } : {}) }), ...(i.ids ? { ids: JSON.stringify(i.ids) } : {}) }),
     apply: (rows, i) => ({ ...rows, nodes: rows.nodes.filter((n) => n.id !== i.id) }),
     touched: (i) => nodesOnly([i.id]),
     landing: Landing.Moved,
@@ -188,7 +194,7 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
   },
   [OptimisticAction.Stack]: {
     fields: idsField,
-    apply: (rows, i, ctx) => ({ ...rows, nodes: groupedLocally(rows.nodes, i.ids, i.id, ctx.toTile) }),
+    apply: (rows, i, ctx) => ({ ...rows, nodes: wrappedLocally(rows.nodes, i.ids, i.id, ctx.toTile) }),
     touched: (i) => nodesOnly([...i.ids, i.id]),
     landing: Landing.Moved,
     undo: serverUndo,
@@ -215,6 +221,15 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
     undo: serverUndo,
     refresh: Refresh.AfterIdle,
     notice: 'The group did not save and was undone.'
+  },
+  [OptimisticAction.Frame]: {
+    fields: idsField,
+    apply: (rows, i, ctx) => ({ ...rows, nodes: framedLocally(rows.nodes, i.ids, i.id, ctx.toTile) }),
+    touched: (i) => nodesOnly([...i.ids, i.id]),
+    landing: Landing.Moved,
+    undo: serverUndo,
+    refresh: Refresh.AfterIdle,
+    notice: 'The frame did not save and was undone.'
   },
   [OptimisticAction.Ungroup]: {
     fields: (i) => ({ id: i.id }),
@@ -251,6 +266,15 @@ const REGISTRY: { [K in OptimisticAction]: Row<Inputs[K]> } = {
     undo: noUndo,
     refresh: Refresh.None,
     notice: 'The wire mode did not save and was undone.'
+  },
+  [OptimisticAction.EdgeTie]: {
+    fields: (i) => ({ connection_ids: i.connectionIds.join(','), ...(i.tie ? { tie: JSON.stringify(i.tie) } : {}) }),
+    apply: (rows, i) => ({ ...rows, edges: rows.edges.map((e) => (i.connectionIds.includes(e.id) ? ({ ...e, tie: i.tie } as typeof e) : e)) }),
+    touched: (i) => ({ nodes: [], edges: i.connectionIds }),
+    landing: Landing.Answered,
+    undo: noUndo,
+    refresh: Refresh.None,
+    notice: 'The cable tie did not save and was undone.'
   },
   [OptimisticAction.Remove]: {
     fields: (i) => ({ node_ids: i.nodeIds.join(','), connection_ids: i.edgeIds.join(',') }),

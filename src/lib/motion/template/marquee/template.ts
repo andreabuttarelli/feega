@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { MARQUEE_COMPONENT, MARQUEE_FONTS, MARQUEE_PROPS, MARQUEE_VAR_PREFIX, marqueeComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const MARQUEE_TEMPLATE_ID = `${BUILTIN_PREFIX}marquee`;
 export const MARQUEE_CLIP = 'marquee';
@@ -17,10 +18,9 @@ const MARQUEE_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([gro
 
 export const MARQUEE_TEMPLATE: TemplateEntry = {
   id: MARQUEE_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'marquee', component: MARQUEE_COMPONENT, code: marqueeComponent(), props: MARQUEE_PROPS, fonts: MARQUEE_FONTS, varPrefix: MARQUEE_VAR_PREFIX, vars: MARQUEE_VARS, clip: MARQUEE_CLIP, seconds: 24, fps: 30, groups: MARQUEE_GROUPS }), {
     name: 'Marquee',
     description: 'Rows of logos, testimonials or images scroll on their own, sideways or up and down; in an embed, grab a row to scrub it and let go to send it gliding back to speed.',
-    keyFields: ['media', 'quotes', 'direction', 'speed', 'background'],
-    doc: customTemplateDoc({ name: 'marquee', component: MARQUEE_COMPONENT, code: marqueeComponent(), props: MARQUEE_PROPS, fonts: MARQUEE_FONTS, varPrefix: MARQUEE_VAR_PREFIX, vars: MARQUEE_VARS, clip: MARQUEE_CLIP, seconds: 24, fps: 30, groups: MARQUEE_GROUPS })
-  }
+    keyFields: ['media', 'quotes', 'direction', 'speed', 'background']
+  })
 };

@@ -2,6 +2,7 @@ import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
 import { POSTER_GLASS_COMPONENT, POSTER_GLASS_FONTS, POSTER_GLASS_PROPS, POSTER_GLASS_VAR_PREFIX, posterGlassComponent } from './component';
+import { lazyTemplate } from '../lazy';
 
 export const POSTER_GLASS_TEMPLATE_ID = `${BUILTIN_PREFIX}poster-liquid-glass`;
 export const POSTER_GLASS_CLIP = 'poster';
@@ -16,10 +17,9 @@ const POSTER_GLASS_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(
 
 export const POSTER_LIQUID_GLASS_TEMPLATE: TemplateEntry = {
   id: POSTER_GLASS_TEMPLATE_ID,
-  template: {
+  template: lazyTemplate(() => customTemplateDoc({ name: 'poster-liquid-glass', component: POSTER_GLASS_COMPONENT, code: posterGlassComponent(), props: POSTER_GLASS_PROPS, fonts: POSTER_GLASS_FONTS, varPrefix: POSTER_GLASS_VAR_PREFIX, vars: POSTER_GLASS_VARS, clip: POSTER_GLASS_CLIP, seconds: 10, fps: 30, groups: POSTER_GLASS_GROUPS }), {
     name: 'Poster liquid glass',
     description: 'A Swiss typographic poster on a grey wall: one huge word over an asymmetric grid of dates and places, with clear liquid glass flowing over it, drops breaking away and melting back, bending the type underneath.',
-    keyFields: POSTER_GLASS_KEY_FIELDS,
-    doc: customTemplateDoc({ name: 'poster-liquid-glass', component: POSTER_GLASS_COMPONENT, code: posterGlassComponent(), props: POSTER_GLASS_PROPS, fonts: POSTER_GLASS_FONTS, varPrefix: POSTER_GLASS_VAR_PREFIX, vars: POSTER_GLASS_VARS, clip: POSTER_GLASS_CLIP, seconds: 10, fps: 30, groups: POSTER_GLASS_GROUPS })
-  }
+    keyFields: POSTER_GLASS_KEY_FIELDS
+  })
 };

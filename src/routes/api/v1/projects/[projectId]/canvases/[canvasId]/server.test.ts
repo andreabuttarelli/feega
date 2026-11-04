@@ -112,7 +112,8 @@ const CASES: { name: string; action: string; fields: Record<string, string>; sta
   { name: 'upload without a path answers 400', action: 'upload', fields: {}, status: 400 },
   { name: 'create places a node', action: 'create', fields: { type: 'text', x: '10', y: '20', data: JSON.stringify({ prompt: 'hi' }) }, status: 200 },
   { name: 'move moves a node', action: 'move', fields: { node_id: NODE, x: '5', y: '6' }, status: 200 },
-  { name: 'move on a missing node answers 404', action: 'move', fields: { node_id: 'missing', x: '5', y: '6' }, status: 404 },
+  { name: 'move on a node already gone is a success', action: 'move', fields: { node_id: 'missing', x: '5', y: '6' }, status: 200 },
+  { name: 'remove on a node already gone is a success', action: 'remove', fields: { node_ids: 'missing' }, status: 200 },
   { name: 'connect draws a line', action: 'connect', fields: { source_node_id: NODE, target_node_id: OTHER, kind: 'derives_from' }, status: 200 },
   { name: 'connect refuses a loop on itself', action: 'connect', fields: { source_node_id: NODE, target_node_id: NODE, kind: 'derives_from' }, status: 400 },
   { name: 'run stops at the credit gate', action: 'run', fields: { node_id: NODE, medium: 'text', prompt: 'x', version: '2' }, status: 402 },
@@ -163,6 +164,42 @@ describe('the canvas page action and its /api/v1 canvas endpoint answer the same
 
   it('no valid bearer answers 401', async () => {
     expect((await viaEndpoint('move', {}, 'forged')).status).toBe(401);
+  });
+});
+
+describe('a draw sent again after a lost answer', () => {
+  const DRAWN_ID = '66666666-6666-6666-6666-666666666666';
+
+  async function twice(action: string, fields: Record<string, string>) {
+    current.db = seed();
+    const event = {
+      request: { formData: async () => formOf({ ...fields, node_id: DRAWN_ID }) },
+      params: { projectId: PROJECT, canvasId: CANVAS },
+      setHeaders: () => {},
+      locals: { safeGetSession: async () => ({ session: {}, user: USER }), db: async () => current.db }
+    };
+    const run = actions[action] as (e: unknown) => Promise<{ outcome?: string; node?: { id: string } | null }>;
+    const first = await run(event);
+    const again = await run(event);
+    const { data } = await (current.db as Db).from('nodes').select('id').eq('id', DRAWN_ID);
+    return { first, again, rows: (data ?? []).length };
+  }
+
+  it('drawElement lands one node and answers the second send with it', async () => {
+    const { first, again, rows } = await twice('drawElement', { drawn: JSON.stringify(DRAWN) });
+
+    expect(first.outcome).toBe('done');
+    expect(again.outcome).toBe('done');
+    expect(again.node?.id).toBe(DRAWN_ID);
+    expect(rows).toBe(1);
+  });
+
+  it('drawFrame lands one frame and answers the second send with it', async () => {
+    const { again, rows } = await twice('drawFrame', { box: JSON.stringify(DRAWN.box) });
+
+    expect(again.outcome).toBe('done');
+    expect(again.node?.id).toBe(DRAWN_ID);
+    expect(rows).toBe(1);
   });
 });
 

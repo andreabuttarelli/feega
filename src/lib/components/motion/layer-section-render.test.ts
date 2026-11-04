@@ -22,14 +22,24 @@ function inspect(component: ComponentId, props: Record<string, unknown> = {}, do
 const layer = (html: string) => html.slice(html.indexOf('data-section="layer"'), html.indexOf('</section>', html.indexOf('data-section="layer"')));
 
 describe('the Layer section', () => {
-  it('gives blend its own labelled row and opacity one control, never a slider plus a duplicate field', () => {
+  it('opacity is one chip carrying its own slider, the eye beside it, never a duplicate field', () => {
     const html = layer(inspect('Title'));
-    const look = html.split('data-testid="layer-look"')[1]?.split('</div>')[0] ?? '';
-    expect(look).toContain('>Blend</label>');
-    expect(look).toContain('data-testid="blend-select"');
-    expect(html).toContain('data-testid="opacity-field"');
+    expect(html).toMatch(/data-testid="opacity-field"[\s\S]*?data-slider[\s\S]*?data-testid="layer-visibility"/);
     expect(html).not.toContain('data-testid="opacity-slider"');
     expect(html).not.toMatch(/type="range"/);
+  });
+
+  it('blend is a full-width select led by its icon, after opacity', () => {
+    const html = layer(inspect('Title'));
+    const look = html.split('data-testid="layer-look"')[1]?.split('</label>')[0] ?? '';
+    expect(look).toContain('class="blend-icon');
+    expect(look).toContain('data-testid="blend-select"');
+    expect(html.indexOf('data-testid="layer-look"')).toBeGreaterThan(html.indexOf('data-testid="opacity-field"'));
+  });
+
+  it('radius pairs its value with a slider in one chip', () => {
+    const html = layer(inspect('Shape', { shape: 'rect', roundness: 0.1 }));
+    expect(html).toMatch(/data-testid="radius"[\s\S]*?data-slider[\s\S]*?data-testid="radius-per-corner"/);
   });
 
   it('flips a layer horizontally and vertically', () => {
@@ -50,12 +60,13 @@ describe('the Layer section', () => {
     expect(layer(inspect('Shape', { shape: 'rect', corners: [0.1, 0, 0, 0] }))).toContain('data-testid="corners"');
   });
 
-  it('a layer with children can clip them, as a Yes / No', () => {
+  it('a layer with children can clip them, with the same checkbox a stack uses', () => {
     let doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, props: { shape: 'rect' } }, 'c1'));
     doc = must(addClip(doc, { component: 'Title', from: 0 }, 'kid'));
     doc = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'kid' ? { ...c, parent: 'c1' } : c)) })) };
-    expect(layer(inspect('Shape', {}, doc))).toMatch(/data-segmented="Clip content"[\s\S]*?>Yes<[\s\S]*?>No</);
-    expect(layer(inspect('Shape', { shape: 'rect' }))).not.toContain('data-segmented="Clip content"');
+    expect(layer(inspect('Shape', {}, doc))).toMatch(/type="checkbox"[^>]*data-testid="clip-content"[\s\S]*?Clip content/);
+    expect(layer(inspect('Shape', {}, doc))).not.toContain('data-segmented="Clip content"');
+    expect(layer(inspect('Shape', { shape: 'rect' }))).not.toContain('data-testid="clip-content"');
   });
 });
 

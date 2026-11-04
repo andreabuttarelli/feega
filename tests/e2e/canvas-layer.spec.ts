@@ -66,7 +66,7 @@ test.describe('layer section @real', () => {
     const layer = page.getByTestId('motion-inspector').locator('[data-section="layer"]');
     await expect(layer.getByTestId('layer-look')).toBeVisible();
 
-    await layer.locator('[data-segmented="Clip content"]').getByRole('radio', { name: 'Yes' }).click();
+    await layer.getByTestId('clip-content').check();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'card')?.clipContent, { timeout: 10_000 }).toBe(true);
 
     await page.getByTestId('motion-inspector').getByTestId('flip-horizontal').click();

@@ -93,8 +93,11 @@
       return;
     }
     onpick();
-    void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href);
-    void canvasPages.open(next.href);
+    void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href).then((outcome) => {
+      if (outcome === OpOutcome.Landed) {
+        void canvasPages.open(next.href);
+      }
+    });
   }
 
   function startRename() {
@@ -102,12 +105,29 @@
     renaming = true;
   }
 
-  function saveRename(event: SubmitEvent) {
+  let arriving = $state<string | null>(null);
+
+  function renameOnArrival(id: string) {
+    arriving = id;
+  }
+
+  $effect(() => {
+    if (arriving && arriving === currentId && current) {
+      arriving = null;
+      startRename();
+    }
+  });
+
+    function saveRename(event: SubmitEvent) {
     event.preventDefault();
     renaming = false;
     if (current) {
       void canvasPages.run(PageAction.Rename, { id: current.id, name: draftName }, canvases, current.href);
     }
+  }
+
+  function revealRow(row: HTMLElement) {
+    row.scrollIntoView({ block: 'nearest' });
   }
 
   function askDelete() {
@@ -151,7 +171,7 @@
   <ul class="pages-list" hidden={collapsed} style:max-height={density === Density.Pointer ? `${listHeight}px` : undefined}>
     {#each rows as canvas (canvas.id)}
       {@const isCurrent = canvas.id === currentId}
-      <li class="page-row" class:is-current={isCurrent} data-testid={isCurrent ? 'canvas-row-current' : undefined}>
+      <li class="page-row" class:is-current={isCurrent} data-testid={isCurrent ? 'canvas-row-current' : undefined} {@attach isCurrent ? revealRow : undefined}>
         {#if isCurrent && renaming}
           <form class="rename-form" onsubmit={saveRename}>
             <input
@@ -163,7 +183,7 @@
             />
           </form>
         {:else}
-          <a class="page-link" href={canvas.href} title={canvas.name} aria-current={isCurrent ? 'page' : undefined} onclick={onpick} ondblclick={isCurrent ? startRename : undefined}>
+          <a class="page-link" href={canvas.href} title={canvas.name} aria-current={isCurrent ? 'page' : undefined} onclick={onpick} ondblclick={() => renameOnArrival(canvas.id)}>
             {#if isCurrent}<span class="current-dot" data-testid="current-dot" aria-hidden="true"></span>{/if}
             <span class="page-name">{canvas.name}</span>
             {#if isCurrent && commentsUnseen}<span class="unseen-dot" data-testid="comments-unseen" role="img" aria-label="Unread mention"></span>{/if}
@@ -288,6 +308,8 @@
     padding: 0;
     list-style: none;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 
   .page-row {

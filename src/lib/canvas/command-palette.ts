@@ -30,3 +30,14 @@ export function searchPalette(query: string): PaletteEntry[] {
     return words.every((w) => text.includes(w));
   });
 }
+
+type Press = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey'>;
+
+const PALETTE_KEYS = new Set(['k', '/']);
+const CURSOR_CHAT_KEY = '/';
+
+const modOnly = (e: Press) => (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey;
+
+export const togglesPalette = (e: Press): boolean => modOnly(e) && PALETTE_KEYS.has(e.key.toLowerCase());
+
+export const opensCursorChat = (e: Press): boolean => e.key === CURSOR_CHAT_KEY && !e.metaKey && !e.ctrlKey && !e.altKey;

@@ -1,26 +1,34 @@
 <script lang="ts">
-  import Maximize2 from '@lucide/svelte/icons/maximize-2';
-  import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import { genPropertiesOf } from '$lib/canvas/gen-properties';
-  import { panelActionsFor } from '$lib/canvas/selection-actions';
-  import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import ModelMenu from './ModelMenu.svelte';
   import NodeSettings from './NodeSettings.svelte';
   import type { SelectionPanel } from './selection-properties.svelte';
+  import NumberField from '$lib/components/motion/NumberField.svelte';
+  import { FieldKind } from '$lib/motion/number-field';
+  import { SELECTION_FIELDS, fieldValue } from '$lib/canvas/selection-box';
 
   const MIN_ALIGNED = 2;
+  const BOX_RANGE = { min: -100000, max: 100000, step: 1 };
 
   let { panel }: { panel: SelectionPanel } = $props();
 
   const gen = $derived(genPropertiesOf(panel.summaries, panel.choicesFor));
-  const actions = $derived(panelActionsFor(panel.summaries));
-  const only = $derived(panel.summaries.length === 1 ? panel.summaries[0] : null);
-  const viewable = $derived(!!only && only.type in OUTPUT_KIND_OF && typeof only.data.refId === 'string');
 </script>
 
 <aside class="node-inspector" data-testid="node-inspector" aria-label="Properties">
+  {#if panel.box}
+    {@const box = panel.box}
+    <section class="block" aria-label="Selection">
+      <h3>Selection</h3>
+      <div class="fields" data-testid="selection-box-fields">
+        {#each SELECTION_FIELDS as f (f.field)}
+          <NumberField label={f.label} kind={FieldKind.Glyph} name={f.name} value={fieldValue(box.items, f.field)} range={BOX_RANGE} unit={f.unit} onchange={(v) => box.set(f.field, v)} />
+        {/each}
+      </div>
+    </section>
+  {/if}
   {#if gen.properties.type}
     <section class="block" aria-label="Model">
       <h3>Model</h3>
@@ -45,19 +53,6 @@
       <AlignBar count={panel.summaries.length} onalign={panel.onalign} ondistribute={(axis) => panel.ondistribute(axis)} />
     </section>
   {/if}
-
-  {#if actions.length || viewable}
-    <section class="block" aria-label="Actions">
-      <h3>Actions</h3>
-      {#if viewable}
-        <button type="button" class="row" data-testid="panel-view-output" onclick={() => panel.onview()}><Maximize2 size={14} />View output</button>
-      {/if}
-      {#each actions as action (action.id)}
-        {@const Icon = SELECTION_ACTION_ICON[action.id]}
-        <button type="button" class="row" data-testid={`panel-${action.id}`} onclick={() => panel.onaction(action.id)}><Icon size={14} />{action.label}</button>
-      {/each}
-    </section>
-  {/if}
 </aside>
 
 <style>
@@ -74,6 +69,12 @@
     gap: var(--ui-space-1);
     padding: var(--ui-space-3) var(--ui-space-4);
     border-bottom: 1px solid var(--ui-line);
+  }
+
+  .fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
   }
 
   h3 {

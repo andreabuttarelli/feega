@@ -1,4 +1,6 @@
 import { componentsPage, homeComponents } from '$lib/server/canvas/components-page';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, FigmaSource, TemplateKind } from '$lib/core-usage';
 import { exportCodeNode, isExportMode } from '$lib/server/canvas/code-export-node';
 import { musicEnabled } from '$lib/server/elevenlabs-music';
 import { ExportMode } from '$lib/canvas/code-frame';
@@ -16,6 +18,7 @@ import type { Db } from '$lib/server/db/client';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import type { Canvas } from '$lib/server/repos/canvas';
+import { tieOf } from '$lib/canvas/gpu/wire-magnet';
 import {
   createConnection,
   createNode,
@@ -24,7 +27,9 @@ import {
   listConnections,
   listNodes,
   moveNode,
+  nodeRowExists,
   setConnectionMode,
+  setConnectionTie,
   patchNodeData,
   DataCheck,
   type PatchWrite
@@ -96,7 +101,7 @@ import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
-import { groupAskSchema, groupElements, stackAskSchema, stackElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { frameAskSchema, frameElements, groupAskSchema, groupElements, stackAskSchema, stackElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { INSERT_STATUS, InsertOutcome, insertAskSchema, insertScene } from '$lib/server/motion/insert-scene';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
@@ -108,11 +113,12 @@ import { VIDEO_REFRAME_DEPS, startVideoReframe } from '$lib/server/canvas/video-
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { COMBINE_STATUS, CombineOutcome, combineAskSchema, combineScenes } from '$lib/server/motion/combine-scenes';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
-import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { viewOf } from '$lib/canvas/breakpoint-views';
+import { ExportOutcome, exportSelection, noteImageExport } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { importLottieAt } from '$lib/server/motion/lottie-at';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, componentAskSchema, copyElement, placeComponent, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, componentAskSchema, copyElement, placeComponent, drawElement, drawFrameAt, pasteFigmaAt, dropSchema, pastedSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeFreeMedia, placeMedia, placeOutput, type Moved } from '$lib/server/motion/move-element';
 import { DropOn, OutputKind } from '$lib/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -166,6 +172,13 @@ function canvasFrames(scope: Scope) {
 
 function canvasMembers(scope: Scope) {
   return nodeMembers(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope) });
+}
+
+async function madeBefore(scope: Scope, id: string | undefined): Promise<Extract<Moved, { outcome: MoveOutcome.Done }> | null> {
+  if (!id || !(await nodeRowExists(scope.db, { orgId: scope.orgId, nodeId: id }))) {
+    return null;
+  }
+  return { outcome: MoveOutcome.Done, frameId: id, clipId: '', created: false, versions: {}, undo: [] };
 }
 
 function movedAnswer(moved: Moved) {
@@ -270,6 +283,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
+  coreEvent(userId, CoreEvent.CanvasOpened, { canvas_id: canvasId });
   return {
     handoff,
     canvas,
@@ -553,17 +567,21 @@ export const actions: Actions<CanvasParams> = {
     try {
       const drop = fd.has('drop') ? dropSchema.safeParse(jsonField(fd, 'drop')) : null;
       if (drop) {
-        if (!drop.success || drop.data.on !== DropOn.Frame) {
+        if (!drop.success) {
           return fail(400, { error: 'invalid drop' });
         }
         const { asset, kind } = await registerUploadedAsset(scope.db, {
           orgId: scope.orgId, projectId: scope.canvas.projectId, path, fileName, mimeType, bytes
         });
         if (kind !== OutputKind.Image) {
-          return fail(400, { error: 'only pictures land inside a frame' });
+          return fail(400, { error: 'only pictures land as image elements' });
         }
-        const size = { width: coord(fd.get('width')), height: coord(fd.get('height')) };
-        return movedAnswer(await placeMedia(canvasFrames(scope), { kind: OutputKind.Image, assetId: asset.id, name: fileName, width: size.width, height: size.height }, drop.data));
+        const picture = { kind: OutputKind.Image, assetId: asset.id, name: fileName, width: coord(fd.get('width')), height: coord(fd.get('height')) } as const;
+        const frames = canvasFrames(scope);
+        const placed = drop.data.on === DropOn.Frame
+          ? await placeMedia(frames, picture, drop.data)
+          : await placeFreeMedia(frames, { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id: chosenNode(fd) }, picture, drop.data);
+        return movedAnswer(placed);
       }
 
       if (fd.get('into') === 'library') {
@@ -953,7 +971,7 @@ export const actions: Actions<CanvasParams> = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
     const mode = fd.get('mode');
-    const out = await exportCodeNode(scope.db, { orgId: scope.orgId, nodeId: String(fd.get('node_id') ?? ''), mode: isExportMode(mode) ? mode : ExportMode.Inline });
+    const out = await exportCodeNode(scope.db, { orgId: scope.orgId, userId: scope.userId, nodeId: String(fd.get('node_id') ?? ''), mode: isExportMode(mode) ? mode : ExportMode.Inline });
     return out.ok ? { folder: out.folder, files: out.files } : fail(400, { error: out.error });
   },
 
@@ -1024,24 +1042,14 @@ export const actions: Actions<CanvasParams> = {
     }
 
     if (!(await listNodes(scope.db, scope)).some((node) => node.id === nodeId)) {
-      return fail(404, { error: 'node not found' });
+      return { moved: true };
     }
 
-    const node = await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
-    if (!node) {
-      return fail(404, { error: 'node not found' });
-    }
+    await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
 
     return { moved: true };
   },
 
-  /**
-   * RIDIMENSIONARE: STESSA DOTTRINA DI `move` — last-write-wins, nessun `canvas_events` (il
-   * commento in cima a `canvas.ts` lo dice esplicitamente), una scrittura sola a fine gesto, non
-   * per fotogramma. Il minimo non è un numero a caso qui: è quello del TIPO del nodo
-   * (`nodeSize`), lo stesso che decide la misura di un nodo appena creato — un nodo non può
-   * restringersi sotto la taglia in cui nasce.
-   */
   resize: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
@@ -1280,11 +1288,18 @@ export const actions: Actions<CanvasParams> = {
       return fail(503, { error: 'image export needs the server renderer, which is not available here' });
     }
     const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
-    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ nodeId: String(id) })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    const shownAt = Number(fd.get('seconds'));
+    const seconds = fd.has('seconds') && Number.isFinite(shownAt) && shownAt >= 0 ? shownAt : undefined;
+    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ ...(viewOf(String(id)) ?? { nodeId: String(id) }), seconds })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
     if (out instanceof Error) {
       return fail(502, { error: `the images could not be drawn: ${out.message}` });
     }
-    return out.outcome === ExportOutcome.Done ? out : fail(404, { error: out.outcome });
+    if (out.outcome !== ExportOutcome.Done) {
+      return fail(404, { error: out.outcome });
+    }
+
+    noteImageExport(scope.userId, rows.data);
+    return out;
   },
 
   imageTool: async ({ request, params, locals }) => {
@@ -1430,7 +1445,7 @@ export const actions: Actions<CanvasParams> = {
     if (!ask.success) {
       return fail(400, { error: 'invalid group' });
     }
-    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
+    return movedAnswer((await madeBefore(scope, ask.data.id)) ?? (await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id)));
   },
 
   stackElements: async ({ request, params, locals }) => {
@@ -1440,7 +1455,17 @@ export const actions: Actions<CanvasParams> = {
     if (!ask.success) {
       return fail(400, { error: 'invalid stack' });
     }
-    return movedAnswer(await stackElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
+    return movedAnswer((await madeBefore(scope, ask.data.id)) ?? (await stackElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id)));
+  },
+
+  frameElements: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const form = await request.formData();
+    const ask = frameAskSchema.safeParse({ ids: jsonField(form, 'ids'), id: String(form.get('node_id') ?? '') || undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid frame' });
+    }
+    return movedAnswer((await madeBefore(scope, ask.data.id)) ?? (await frameElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id)));
   },
 
   wrapSection: async ({ request, params, locals }) => {
@@ -1526,7 +1551,7 @@ export const actions: Actions<CanvasParams> = {
     if (!ask.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid drawing' });
     }
-    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data);
+    const drawn = (await madeBefore(scope, id)) ?? (await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data));
     if (drawn.outcome !== MoveOutcome.Done) {
       return movedAnswer(drawn);
     }
@@ -1541,7 +1566,7 @@ export const actions: Actions<CanvasParams> = {
     if (!box.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid frame' });
     }
-    const drawn = await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data);
+    const drawn = (await madeBefore(scope, id)) ?? (await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data));
     return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
   },
 
@@ -1556,6 +1581,8 @@ export const actions: Actions<CanvasParams> = {
     if (!pasted) {
       return fail(400, { error: 'no Figma layers in this paste' });
     }
+
+    coreEvent(scope.userId, CoreEvent.FigmaPasted, { source: FigmaSource.Paste });
     const nodes = await Promise.all(pasted.frameIds.map((nodeId) => findNode(scope.db, { orgId: scope.orgId, nodeId })));
     return { outcome: pasted.outcome, nodes: nodes.filter((n) => n !== null), undo: pasted.undo, skipped: pasted.skipped, fills: pasted.fills, fileKey: pasted.fileKey };
   },
@@ -1629,6 +1656,20 @@ export const actions: Actions<CanvasParams> = {
     return { connection };
   },
 
+  set_edge_tie: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const connectionIds = String(fd.get('connection_ids') ?? '').split(',').filter(Boolean);
+    const raw = jsonField(fd, 'tie');
+    const tie = tieOf(raw);
+    if (!connectionIds.length || (raw !== undefined && !tie)) {
+      return fail(400, { error: 'invalid tie' });
+    }
+
+    return { connections: await setConnectionTie(scope.db, { orgId: scope.orgId, connectionIds, tie }) };
+  },
+
   /**
    * CANCELLARE È MORBIDO, e le linee cadono con i nodi: `nodes_connections` non ha un cascade su
    * un `deleted_at`, quindi una linea verso un nodo sparito resterebbe nel database e tornerebbe
@@ -1646,9 +1687,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'nothing to delete' });
     }
 
-    if (!(await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) }))) {
-      return fail(404, { error: 'node not found' });
-    }
+    await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) });
     return { removed: true };
   },
 
@@ -1884,6 +1923,7 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'unknown template' });
     }
 
+    coreEvent(scope.userId, CoreEvent.TemplateInserted, { kind: TemplateKind.Canvas, template_id: String(fd.get('template_id')) });
     return out;
   },
 

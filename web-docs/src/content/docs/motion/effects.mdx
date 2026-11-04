@@ -18,6 +18,8 @@ An effect is a filter on a layer. Layers hold a stack of up to 12, applied top t
 3. Press the effect's row to open its parameters. Type a value, or drag the field.
 4. The eye on the row hides the effect without losing its settings. The cross removes it. **Order** moves it up or down the stack.
 
+A drop shadow added from the inspector starts at X 0, Y 4, Blur 4, Spread 0, black at 25%, and is edited as X, Y, Blur, Spread and colour, with **Show behind** as a toggle. Distance and Angle rows appear only on a shadow that uses them (one made by an agent or a style).
+
 Every parameter can be keyframed: in Animate mode, a change is keyed at the playhead, and the key is named `fx.<effect id>.<parameter>`. See [Keyframes and easing](/motion/keyframes-and-easing/).
 
 Bulge, twirl, radial blur and lens blur warp pixels, so they draw on the GPU canvas and in the exports made from it; an SVG filter in a browser ignores them.
@@ -52,8 +54,8 @@ Bulge, twirl, radial blur and lens blur warp pixels, so they draw on the GPU can
 
 | Effect | Kind | What it does | Parameters |
 |---|---|---|---|
-| Drop shadow | `drop-shadow` | Shadow at distance px and angle degrees, blur px, colour and opacity. | Distance (`distance`, 0 to 300, default 16)<br />Angle (`angle`, -180 to 180, default 135)<br />X (`x`, -300 to 300, default 0)<br />Y (`y`, -300 to 300, default 0)<br />Softness (`blur`, 0 to 200, default 24)<br />Spread (`spread`, -100 to 100, default 0)<br />Colour (`color`, a colour, default #000000)<br />Opacity (`opacity`, 0 to 1, default 0.5)<br />Show behind (`behind`, 0 to 1, default 1) |
-| Inner shadow | `inner-shadow` | Shadow inside the layer edge at distance px and angle degrees, blur px, colour and opacity. | Distance (`distance`, 0 to 300, default 4)<br />Angle (`angle`, -180 to 180, default 90)<br />Softness (`blur`, 0 to 200, default 8)<br />Colour (`color`, a colour, default #000000)<br />Opacity (`opacity`, 0 to 1, default 0.25) |
+| Drop shadow | `drop-shadow` | Shadow at distance px and angle degrees, blur px, colour and opacity. | Distance (`distance`, 0 to 300, default 16)<br />Angle (`angle`, -180 to 180, default 135)<br />X (`x`, -300 to 300, default 0)<br />Y (`y`, -300 to 300, default 0)<br />Blur (`blur`, 0 to 200, default 24)<br />Spread (`spread`, -100 to 100, default 0)<br />Colour (`color`, a colour, default #000000)<br />Opacity (`opacity`, 0 to 1, default 0.5)<br />Show behind (`behind`, a toggle, default on) |
+| Inner shadow | `inner-shadow` | Shadow inside the layer edge at distance px and angle degrees, blur px, colour and opacity. | Distance (`distance`, 0 to 300, default 4)<br />Angle (`angle`, -180 to 180, default 90)<br />Blur (`blur`, 0 to 200, default 8)<br />Colour (`color`, a colour, default #000000)<br />Opacity (`opacity`, 0 to 1, default 0.25) |
 | Glow | `glow` | Soft light around the layer: radius px, colour, intensity 0..1. | Radius (`radius`, 0 to 200, default 24)<br />Colour (`color`, a colour, default #ffffff)<br />Intensity (`intensity`, 0 to 1, default 0.8) |
 | Stroke | `stroke` | Outline around the layer alpha: width px and colour. | Width (`width`, 0 to 60, default 4)<br />Colour (`color`, a colour, default #ffffff) |
 | Noise & grain | `noise` | Film grain: amount 0..1, grain size px, evolve 0 = still, 1 = new grain every frame. | Amount (`amount`, 0 to 1, default 0.2)<br />Size (`size`, 0.5 to 8, default 1.5)<br />Evolve (`evolve`, 0 to 1, default 1) |

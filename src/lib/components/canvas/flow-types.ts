@@ -1,3 +1,6 @@
+import type { Revision } from '$lib/motion/frame-sync';
+import type { Tie } from '$lib/canvas/gpu/wire-magnet';
+import type { PlacedChange } from '$lib/canvas/place-many';
 import type { ActionResult } from '@sveltejs/kit';
 import type { Snippet } from 'svelte';
 import type { Offset } from '$lib/canvas/duplicate-plan';
@@ -12,6 +15,7 @@ import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
 import type { BarContext } from '$lib/canvas/bottom-bar';
 import type { NameTag } from '$lib/canvas/node-label';
 import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
+import type { HostBox } from '$lib/motion/element-host';
 import type { CopyShown, Drawing, Duplication } from '$lib/canvas/optimistic-insert';
 import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
 import type { FilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -27,10 +31,13 @@ import type { VariantInto } from '$lib/canvas/variants';
 import type { HistoryItem } from '$lib/canvas/gen-history';
 import type { GraphScope } from '$lib/canvas/run-graph';
 import type { ImageTool } from '$lib/image-tools';
-import type { DragPhase, DropVerdict, ElementOut, PointerPoint } from '$lib/canvas/canvas-drop';
+import type { DragPhase, DropVerdict, ElementOut, FrameTarget, PointerPoint } from '$lib/canvas/canvas-drop';
 import type { Stack } from '$lib/canvas/stacking';
+import type { NodeFlag } from '$lib/canvas/node-flags';
 import type { DeleteMode } from '$lib/canvas/section';
 import type { SceneDrop } from '$lib/canvas/scene-drop';
+
+export type TileBox = { x: number; y: number; w: number; h: number };
 
 export type Tile = {
   id: string;
@@ -56,6 +63,7 @@ export type Tile = {
   select?: boolean;
   settings?: boolean;
   poster?: Poster;
+  locked?: boolean;
 };
 
 export type FlowProps = {
@@ -64,7 +72,7 @@ export type FlowProps = {
   edges?: FlowEdge[];
   onMove?: (id: string, x: number, y: number) => void;
   onMoveEnd?: (moves: { id: string; x: number; y: number }[]) => void;
-  onTileDragOver?: (ids: string[], at: PointerPoint) => void;
+  onTileDragOver?: (ids: string[], at: PointerPoint) => FrameTarget | null;
   onTileDrop?: (ids: string[], at: PointerPoint) => DropVerdict;
   onElementOut?: (frameId: string, out: ElementOut, phase: DragPhase) => void;
   onConnect?: (
@@ -91,6 +99,7 @@ export type FlowProps = {
   onEdgeDelete?: (edgeId: string) => void;
   onEdgeRetype?: (edgeId: string, kind: CanvasEdgeKind) => void;
   onEdgeModeChange?: (edgeId: string, mode: WireMode) => void;
+  onEdgeTie?: (edgeIds: string[], tie: Tie | null) => void;
   onCreate?: (what: Addable, at: { x: number; y: number }) => void;
   onCreateFilled?: (drag: FilledNodeDrag, at: { x: number; y: number }) => void;
   onDropFeedImage?: (drag: FeedImageDrag, client: PointerPoint) => void;
@@ -122,13 +131,16 @@ export type FlowProps = {
     target: { box: CanvasBox } | { at: { x: number; y: number } },
   ) => Drawing;
   onRotate?: (id: string, degrees: number) => void;
+  onBatch?: (run: () => void) => void;
   onAddBeside?: (id: string) => Drawing | null;
   onGroup?: (ids: string[]) => void;
+  onFrame?: (ids: string[]) => void;
   onWrapStack?: (ids: string[]) => void;
-  onComponentMade?: (nodeId: string) => void;
+  onComponentMade?: (nodeId: string) => Promise<Revision | null>;
   onNodeSize?: (id: string, w: number, h: number) => void;
   onUngroup?: (ids: string[]) => void;
   onRestack?: (ids: string[], to: Stack) => void;
+  onToggleFlag?: (ids: string[], flag: NodeFlag) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   onConnectNew?: (ids: string[], medium: GenMedium, prompt?: string) => void;
@@ -174,7 +186,10 @@ export type FlowProps = {
     },
   ) => void;
   onResize?: (id: string, w: number, h: number) => void;
+  onResizeEnd?: (id: string, before: TileBox, after: TileBox) => void;
+  onPlaceMany?: (changes: PlacedChange[]) => void;
   onPlace?: (id: string, w: number, h: number) => void;
+  onSettle?: (id: string, box: HostBox) => void;
   peers?: CanvasPeer[];
   onPointer?: (at: { x: number; y: number } | null) => void;
   onLive?: (boxes: LiveBox[]) => void;

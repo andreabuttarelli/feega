@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import Eye from '@lucide/svelte/icons/eye';
-  import { VIEW_ITEMS, ZOOM_ITEMS, frameViews, zoomRequest } from '$lib/canvas/view-menu.svelte';
+  import { VIEW_ITEMS, ZOOM_ITEMS, frameViews, zoomLevel, zoomRequest } from '$lib/canvas/view-menu.svelte';
 </script>
 
 <DropdownMenu.Root>
@@ -17,6 +17,10 @@
       </DropdownMenu.CheckboxItem>
     {/each}
     <DropdownMenu.Separator />
+    <DropdownMenu.Label class="zoom-readout" data-testid="zoom-readout">
+      <span class="view-label">Zoom</span>
+      <span class="view-keys">{zoomLevel.label}</span>
+    </DropdownMenu.Label>
     {#each ZOOM_ITEMS as item (item.command)}
       <DropdownMenu.Item data-testid="zoom-{item.command}" onSelect={() => zoomRequest.ask(item.command)}>
         <span class="view-label">{item.label}</span>
@@ -43,6 +47,11 @@
   :global(.view-trigger:hover) {
     background: var(--ui-wash);
     color: var(--ui-text);
+  }
+
+  :global(.zoom-readout) {
+    display: flex;
+    align-items: center;
   }
 
   .view-label {

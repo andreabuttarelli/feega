@@ -449,3 +449,20 @@ describe('the chat draws what the canvas draws', () => {
     expect(out).toMatchObject({ outcome: 'done', new_frame: true, element_id: expect.any(String) });
   });
 });
+
+describe('agent_action via chat', () => {
+  it('a canvas op the chat lands counts, one the schema refuses does not', async () => {
+    const { useCoreSink } = await import('$lib/server/core-usage');
+    const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
+    const rows = { nodes: [{ ...nodeRow, data: { ...nodeRow.data } }], canvas_events: [{}] };
+    const tools = createProjectTools({ db: fakeDb(rows, { filter: true, mutate: true }).db, orgId: ORG, projectId: PROJECT, userId: USER });
+    useCoreSink((b) => sent.push(b));
+
+    await run(tools.update_node, { nodeId: NODE, data: { prompt: 42 } });
+    await run(tools.list_nodes, { canvasId: CANVAS });
+    await run(tools.update_node, { nodeId: NODE, data: { prompt: 'x' } });
+    useCoreSink(null);
+
+    expect(sent).toMatchObject([{ event: 'agent_action', distinct_id: USER, properties: { via: 'chat', op: 'update_node' } }]);
+  });
+});

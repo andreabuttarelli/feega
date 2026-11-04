@@ -1,4 +1,5 @@
-import { findClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { lineEnds } from '$lib/motion/shape/line-ends';
 import type { EditMode } from '$lib/motion/edit-mode';
 import { groupDrag, lockedTo, type Keys } from '$lib/motion/element-gesture';
 import { guideSnapBounds } from '$lib/motion/layout-guides/guides';
@@ -12,8 +13,17 @@ import { arrowStep, stackPlaced, stepInStack } from '$lib/motion/layout/ops';
 export enum SelectionKind {
   Element = 'element',
   Member = 'member',
-  Group = 'group'
+  Group = 'group',
+  Many = 'many',
+  Line = 'line'
 }
+
+export const selectionKindOf = (picks: number, clip: Pick<MotionClip, 'component' | 'props'> | null | undefined): SelectionKind => {
+  if (picks > 1) {
+    return SelectionKind.Member;
+  }
+  return clip && lineEnds(clip) ? SelectionKind.Line : SelectionKind.Element;
+};
 
 export const GRIP_SUMMARY: Record<Grip, string> = {
   [Grip.Move]: 'Moved an element',

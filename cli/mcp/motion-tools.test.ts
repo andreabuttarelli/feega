@@ -218,6 +218,11 @@ describe('the motion agent over MCP', () => {
     expect(calls[0].body).toEqual({ mode: 'server', settings: { format: 'mp4-h265', quality: 'standard', fps: 60 } });
   });
 
+  test('render_video renders one stretch when from/to are given', async () => {
+    await callTool('render_video', { node_id: NODE, from: 3, to: 3.04 });
+    expect(calls[0].body).toEqual({ mode: 'browser', range: { from: 3, to: 3.04 } });
+  });
+
   test('list_motion_videos lists the videos, narrowed to a project', async () => {
     const result = await callTool('list_motion_videos', { project_id: 'p-1' });
     expect(calls[0]).toEqual({ method: 'GET', path: '/api/v1/motion?project=p-1', body: null });

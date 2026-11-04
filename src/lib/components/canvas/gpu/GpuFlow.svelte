@@ -23,19 +23,17 @@
   import { prototypeLink } from '$lib/canvas/prototype-link.svelte';
   import { prototypeLinks } from '$lib/motion/prototype/links';
   import { linkToFrame } from '$lib/motion/prototype/link-draft';
-  import { AlignSide, alignSide } from '$lib/canvas/frame-tools';
   import { HighlightKind, highlightOf, highlightStyle } from '$lib/canvas/highlight';
-  import { canRunInFrame, barAction, barActionLater, elementMenuIds, elementToolbarActions, frameKeyAction, frameMenuAction, picksFor, stacksWholeElement } from '$lib/canvas/frame-inspector';
+  import { tileFaded } from '$lib/canvas/tile-opacity';
+  import { canRunInFrame, barAction, barActionLater, elementMenuIds, frameKeyAction, frameMenuAction, picksFor, wholeElementAction, ElementAction } from '$lib/canvas/frame-inspector';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { letteringOf } from '$lib/motion/text-outline-run';
   import { frameLayers, frameMenuRun, frameSummaries } from '$lib/motion/frame-menu';
-  import { followDocks } from '$lib/canvas/dock-lift';
-  import { frameScreenRect } from '$lib/canvas/frame-screen';
   import FrameSelection from '../FrameSelection.svelte';
   import FrameGuides from '../FrameGuides.svelte';
   import FrameTools from '../FrameTools.svelte';
   import { FrameView, contentViews } from '$lib/canvas/frame-view';
-  import { frameViews, zoomRequest } from '$lib/canvas/view-menu.svelte';
+  import { frameViews, zoomLevel, zoomRequest } from '$lib/canvas/view-menu.svelte';
   import type { Boxes } from '$lib/motion/scene-select';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { findClip, type MotionClip } from '@feega/motion-core/motion/doc';
@@ -47,7 +45,8 @@
   import { sameValue } from '$lib/canvas/node-patch';
   import { projectLibraryStore } from '$lib/canvas/project-library-store';
   import { LibraryKind } from '$lib/motion/project-library-ops';
-  import { libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { inDoc, libraryOf, syncedDoc } from '$lib/motion/style-library';
+  import { scaleOf, spaceOf } from '$lib/motion/units';
   import { removeStyle, renameStyle } from '$lib/motion/styles';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
   import { syncedCollection, variableLibraryOf } from '$lib/motion/variable-library';
@@ -63,10 +62,11 @@
   import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
+  import { HostLedger, settleElement, type ElementHost, type HostBox } from '$lib/motion/element-host';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
   import type { ListItem } from '@feega/motion-core/motion/text-lists';
-  import { frameProperties, UNNAMED_FRAME } from '../frame-properties.svelte';
+  import { frameProperties, UNNAMED_FRAME, type NodePlace } from '../frame-properties.svelte';
   import { selectionProperties } from '../selection-properties.svelte';
   import { trailerFrom } from '$lib/motion/trailer';
   import FrameDialogs from '../FrameDialogs.svelte';
@@ -82,8 +82,10 @@
   import { FRAME_DIALOG_ACTIONS, FRAME_MODE_ACTIONS, FrameDialog, isFrameDialogAction, isFrameModeAction } from '$lib/canvas/frame-dialogs';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import type { ExportRow } from '$lib/motion/export-rows';
-  import { Press, Reach, childBelow, pressOn, frameLevel, grabbedInstead, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
-  import { pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
+  import { Extend, Press, Reach, Root, childBelow, extendOf, framePage, pressOn, frameLevel, picksOwnKeys, grabbedInstead, leaveLevel, ownClipOf, ownClipToPick, stepInside, videoSide, type Inside } from '$lib/canvas/frame-select';
+  import { holdsLock, ownLocked } from '$lib/canvas/locks';
+  import { altCopies } from '$lib/canvas/alt-copy';
+  import { clickPick, pickTarget, reachOf, enteredFrom, parentPick, scopeOf, scoped } from '$lib/canvas/frame-scope';
   import { pastedInFrame, type FramePaste } from '$lib/canvas/frame-paste';
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
@@ -91,21 +93,22 @@
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
-  import { postPageAction } from '$lib/api/page-action';
+  import { postFrameOps } from '$lib/canvas/frame-ops-send';
+  import type { FrameDraft } from '$lib/motion/frame-sync';
   import { Grip, handlesOf, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-  import { stackPlaced } from '$lib/motion/layout/ops';
-  import { dragInStack, type DropLine } from '$lib/motion/layout/stack-drag';
+  import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
+  import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
   import { commitScoped, doubledOn, textScope } from '$lib/canvas/scoped-text';
   import { mul2d } from '@feega/motion-core/motion/parent';
-  import { EditMode, startMode } from '$lib/motion/edit-mode';
-  import { CanvasLines, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
+  import { EditMode, readMode, timelineDoc } from '$lib/motion/edit-mode';
+  import { CanvasLines, EditorMode, ModeInspector, TimelineAccess, editorMode, frameTimeline } from '$lib/canvas/editor-mode.svelte';
   import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import { elementKey } from '$lib/canvas/prototype-arrows';
   import type { PrototypeLink } from '$lib/motion/prototype/links';
@@ -114,7 +117,9 @@
   import FrameTimeline from '../FrameTimeline.svelte';
   import type { FlowProps, Tile } from '../flow-types';
   import { CopyShown, type Drawing } from '$lib/canvas/optimistic-insert';
-  import { drawnCentre, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { docPoint, drawnAnchor, drawnInFrame } from '$lib/canvas/canvas-draw';
+  import { dropIntoMain, landInside, landedScene, mainUnder } from '$lib/motion/into-main';
+  import { TypeAhead } from '$lib/canvas/type-ahead';
   import { DRAW_SUMMARY, drawStart, type DrawnWire } from '$lib/motion/draw-create';
   import { FEEGA_TOKENS } from '@feega/motion-core/motion/brand';
   import { frameDocs, type FrameDocEdit, type HeldDoc } from '$lib/canvas/frame-docs';
@@ -136,13 +141,14 @@
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
+  import type { FrameDoc } from '$lib/canvas/core/frame-build';
+  import { missingAssets } from '$lib/canvas/live-assets';
   import { statePreview } from '$lib/canvas/state-preview.svelte';
   import { previewDoc } from '$lib/motion/states/preview';
-  import { instanceOf } from '$lib/motion/main-component';
-  import { appendVariant } from '$lib/motion/variants';
+  import { ComponentRole, roleOf } from '$lib/motion/main-component';
   import VariantPlus from '../VariantPlus.svelte';
   import ComponentSetOutline from '../ComponentSetOutline.svelte';
-  import { addSetVariant, setMainOf } from '$lib/motion/component-set';
+  import { addSetVariant, addVariantBeside, mainDragged, setMainOf } from '$lib/motion/component-set';
   import { COMPONENTS_PAGE } from '$lib/canvas/components-page';
   import { canvasComponents } from '$lib/canvas/canvas-components.svelte';
   import { CANVAS_DRAG_COMPONENT, parseComponentClip, parseComponentDrag, type ComponentDrag } from '$lib/canvas/component-drag';
@@ -156,8 +162,9 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
   import { imageSourceTile } from '$lib/canvas/free-image';
-  import { frameRinged } from '$lib/canvas/layers';
-  import { framesOnCanvas, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
+  import { fetchKey, framesOnCanvas, pickedToFetch, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
   import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
@@ -167,28 +174,27 @@
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
-  import { isSvgFile } from '$lib/canvas/system-clipboard';
-  import { isLottieFile } from '$lib/canvas/lottie-file';
   import { setTileLive } from '$lib/canvas/tile-live-context';
-  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, frameChrome, holdsDoc, leftEmpty } from '$lib/canvas/motion-node';
+  import { FrameKind, MOTION_NODE_BAR_H, TileBody, docKindOf, clickReachesClip, enteredClips, frameChrome, holdsDoc, ResizePaint, leftEmpty } from '$lib/canvas/motion-node';
   import { barContextFor } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
-  import { FocusMode, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
+  import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { shortcutHelp } from '$lib/canvas/shortcut-help.svelte';
-  import { CANVAS_COMMAND_OF, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
+  import { CANVAS_COMMAND_OF, CANVAS_TILE_ATTR, climbsUp, matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Command } from '$lib/motion/shortcuts';
   import { HTML_MIME, Pasted, TEXT_MIME, clipboardHtml, readPaste, type ClipboardPayload, type PasteData, type PasteSource } from '$lib/canvas/system-clipboard';
   import { eventSource, systemSource, writeSystem } from '$lib/canvas/system-clipboard-browser';
   import { elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { isTypingTarget } from '$lib/shortcuts';
   import { Stack } from '$lib/canvas/stacking';
-  import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { NodeFlag } from '$lib/canvas/node-flags';
+  import { Carry, DragPhase, DropVerdict, carryOf, frameUnderPointer, pastSlop, pointOf, type ElementOut, type FrameTarget } from '$lib/canvas/canvas-drop';
   import { sceneDrop } from '$lib/canvas/scene-drop';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
   import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag } from '$lib/canvas/drag-payload';
@@ -200,9 +206,9 @@
   import { focusEdges } from '$lib/canvas/edge-focus';
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
-  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, shownFor, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, enabledFor, isCanvasAction, shownFor, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
   import { DeleteMode, SECTION_TYPE } from '$lib/canvas/section';
-  import { STACK_GAP, alignTiles, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { STACK_GAP, alignTiles, alignWithin, distributeTiles, stackTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, snapResize, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
@@ -221,10 +227,11 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { commentPlacement, type CommentPlacement } from '$lib/canvas/comment-placement';
-  import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { panBy, toWorld, wheelPan, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { isLiveCode } from '$lib/canvas/code-frame';
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeHandleAt, wireCurve, type Box, type Port } from '$lib/canvas/gpu/geometry';
-  import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
+  import { WIRE_CURSOR, Wiring, typesMeet, atRest, bubbleColour, bubbleRadius, magnetPort, springTo, wireAim, throughPoint, tieAcross, type Spring, type Tie } from '$lib/canvas/gpu/wire-magnet';
+  import { GestureKind, HitKind, Pointer, clicked, gestureFor, glidesAfterPan, marqueeBox, marqueePick, movedBy, resizedAt, rotateZoneAt, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
@@ -241,9 +248,12 @@
   import { engineOf } from '@feega/motion-core/motion/engine';
   import { track } from '$lib/analytics';
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
-  import { dragAngle, followGroup } from '$lib/canvas/node-layout';
+  import { dragAngle, followGroup, mirrorGroup, type Placed } from '$lib/canvas/node-layout';
+  import { Flip, flipStage } from '$lib/motion/layer-props';
+  import { scaledTo, selectionBox, turnedAbout, withField } from '$lib/canvas/selection-box';
+  import { backToFront } from '$lib/canvas/paint-order';
 
-  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void } = $props();
+  let props: FlowProps & { viewOf?: (id: string) => NodeView | null; genViewFor?: (id: string) => GenTileView | null; onRename?: (id: string, name: string) => void; onExportRows?: (frameIds: string[], rows: ExportRow[], seconds?: number) => Promise<{ url: string; name: string; files: string[] } | string>; tileOver?: import('svelte').Snippet<[{ id: string; body: TileBody }]>; canvasOver?: import('svelte').Snippet; onClip?: (ids: string[]) => ClipboardPayload | null; onPasteData?: (data: PasteData<File>, at: Point) => void; viewerId?: string; canvasId?: string; figmaJobs?: FigmaJob[]; onFigmaImages?: (answer: ImagesAnswer) => void; onFigmaPaste?: (paste: { skipped: string[]; images: number; loading: boolean }) => void; onfail?: (message: string) => void; onExportElements?: (frameId: string, elementIds: string[]) => void; onExportElementRows?: (frameId: string, elementIds: string[], rows: ExportRow[]) => Promise<{ url: string; name: string; files: string[] } | string>; onFrameStep?: (step: FrameStep) => void; commenting?: boolean; onCommenting?: (on: boolean) => void; onComment?: (at: CommentPlacement) => void; commentMarks?: (nodeId: string, fps: number) => CommentMark[]; onMark?: (id: string) => void; onPinAtPlayhead?: (nodeId: string, timeMs: number) => void; onFrameDraft?: (id: string, nodeId: string, draft: FrameDraft | null) => void } = $props();
 
   const DOM_CAP = 6;
   const HALF = 2;
@@ -283,14 +293,6 @@
     }
   });
   let area = $state({ width: 0, height: 0 });
-  let docked = $state(0);
-  $effect(() => {
-    void picks;
-    if (!surface) {
-      return;
-    }
-    return followDocks(surface, () => [...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')], (px) => (docked = px));
-  });
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
@@ -313,6 +315,12 @@
   let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
   let ghost = $state<{ from: Port; at: Point; ok: boolean } | null>(null);
+  let wiringFrom = $state<Port | null>(null);
+  let magnet = $state<Port | null>(null);
+  let hoverPort = $state<Port | null>(null);
+  let hoverWire = $state<string | null>(null);
+  let tieMove = $state<Tie | null>(null);
+  let tieStroke = $state<{ from: Point; to: Point } | null>(null);
   let refusal = $state<string | null>(null);
   let menuAt = $state<Point | null>(null);
   let picked = $state<{ edge: FlowEdge; screen: Point } | null>(null);
@@ -329,8 +337,9 @@
   const tier = $derived(assetTier(view.zoom));
   const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
 
-  let turning = $state<{ id: string; degrees: number } | null>(null);
-  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning?.id === t.id ? { rotation: turning.degrees } : {}) }, liveOf(t.id)?.doc ?? null)));
+  let turning = $state<ReadonlyMap<string, number>>(new Map());
+  let spin = $state<{ box: Box; degrees: number } | null>(null);
+  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -450,7 +459,8 @@
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
-      const ringed = !on && frameRinged(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null, hovered);
+      const openId = layersSource.video?.nodeId ?? null;
+      const ringed = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
       if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
         return [];
@@ -603,19 +613,171 @@
       return;
     }
     modeShown = mode;
-    untrack(() => rightBar.select(BarTab.Properties));
+    untrack(() => {
+      rightBar.select(BarTab.Properties);
+      if (mode === EditorMode.Motion && selected.length === 0 && coreFrames[0]) {
+        select([coreFrames[0].id]);
+      }
+    });
   });
   const curves = $derived(
     (showsPrototype ? [] : edges).flatMap((e) => {
       const from = portFor(e.source, PortSide.Out, e.sourceHandle);
       const to = portFor(e.target, PortSide.In, e.targetHandle);
-      return from && to ? [{ edge: e, curve: wireCurve({ x: from.x + PORT_OFFSET, y: from.y }, { x: to.x - PORT_OFFSET, y: to.y }) }] : [];
+      if (!from || !to) {
+        return [];
+      }
+      const curve = wireCurve({ x: from.x + PORT_OFFSET, y: from.y }, { x: to.x - PORT_OFFSET, y: to.y });
+      return [{ edge: e, curve: e.tie ? throughPoint(curve, tieAt(e.tie)) : curve }];
     })
   );
 
+  const MAGNET_REACH_PX = 56;
+  const BUBBLE_REST_PX = 7;
+  const BUBBLE_FULL_PX = 20;
+  const WIRE_END_PX = 6;
+  const HOVER_BUBBLE_PX = 9;
+  const CUT_REACH_PX = 16;
+
+  function tieAt(t: Tie): Tie {
+    return tieMove?.id === t.id ? tieMove : t;
+  }
+
+  let underPort = $state<Port | null>(null);
+  const wireCursor = $derived(WIRE_CURSOR[wireAim(ghost ? Wiring.Dragging : Wiring.Idle, ghost ? underPort : hoverPort, magnet)]);
+  let bubbleTint = $state<string>('');
+
+  const ties = $derived(
+    [...new Set(edges.flatMap((e) => (e.tie ? [e.tie.id] : [])))].flatMap((id) => {
+      const tied = edges.filter((e) => e.tie?.id === id);
+      return [{ tie: tieAt(tied[0].tie!), ids: tied.map((e) => e.id) }];
+    })
+  );
+
+  function wireTo(from: Port, to: Port): Connection {
+    if (from.side === PortSide.Out) {
+      return { source: from.nodeId, sourceHandle: from.handle, target: to.nodeId, targetHandle: to.handle };
+    }
+    return { source: to.nodeId, sourceHandle: to.handle, target: from.nodeId, targetHandle: from.handle };
+  }
+
+  const accepts = (from: Port) => (p: Port) => p.side !== from.side && p.nodeId !== from.nodeId && typesMeet(from, p) && connectionRefusal(placed, edges, lookup, wireTo(from, p)) === null;
+
+  const dimmedPorts = $derived(wiringFrom ? ports.filter((p) => p.side !== wiringFrom!.side && p.nodeId !== wiringFrom!.nodeId && !accepts(wiringFrom!)(p)) : []);
+
+  type Bubble = { x: number; y: number; r: number; ex: number; ey: number; er: number };
+  const BUBBLE_KEYS = ['x', 'y', 'r', 'ex', 'ey', 'er'] as const;
+
+  const bubbleTarget = $derived.by((): Bubble | null => {
+    if (magnet && ghost) {
+      const distance = Math.hypot(ghost.at.x - magnet.x, ghost.at.y - magnet.y) * view.zoom;
+      return { x: magnet.x, y: magnet.y, r: bubbleRadius(distance, MAGNET_REACH_PX, BUBBLE_REST_PX, BUBBLE_FULL_PX) / view.zoom, ex: ghost.at.x, ey: ghost.at.y, er: WIRE_END_PX / view.zoom };
+    }
+    if (hoverPort && !ghost) {
+      return { x: hoverPort.x, y: hoverPort.y, r: HOVER_BUBBLE_PX / view.zoom, ex: hoverPort.x, ey: hoverPort.y, er: 0 };
+    }
+    return null;
+  });
+
+  const restingSprings = (): Record<(typeof BUBBLE_KEYS)[number], Spring> => ({ x: { value: 0, velocity: 0 }, y: { value: 0, velocity: 0 }, r: { value: 0, velocity: 0 }, ex: { value: 0, velocity: 0 }, ey: { value: 0, velocity: 0 }, er: { value: 0, velocity: 0 } });
+  let springs = restingSprings();
+  let bubble = $state<Bubble | null>(null);
+
+  function stepBubble(dt: number): boolean {
+    const target = bubbleTarget ?? { x: springs.x.value, y: springs.y.value, r: 0, ex: springs.ex.value, ey: springs.ey.value, er: 0 };
+    if (springs.r.value * view.zoom < 0.5 && bubbleTarget) {
+      springs = { ...springs, x: { value: target.x, velocity: 0 }, y: { value: target.y, velocity: 0 }, ex: { value: target.ex, velocity: 0 }, ey: { value: target.ey, velocity: 0 } };
+    }
+    for (const k of BUBBLE_KEYS) {
+      springs[k] = springTo(springs[k], target[k], dt);
+    }
+    const done = BUBBLE_KEYS.every((k) => atRest(springs[k], target[k]));
+    bubble = !bubbleTarget && done ? null : { x: springs.x.value, y: springs.y.value, r: Math.max(0, springs.r.value), ex: springs.ex.value, ey: springs.ey.value, er: Math.max(0, springs.er.value) };
+    return done;
+  }
+
+  $effect(() => {
+    void bubbleTarget;
+    let frame = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      const dt = last ? Math.min((now - last) / 1000, 0.1) : 1 / 60;
+      last = now;
+      frame = untrack(() => stepBubble(dt)) ? 0 : requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  });
+
+  function grabTie(e: PointerEvent, tie: Tie, ids: string[]) {
+    if (e.button !== PRIMARY_BUTTON || !props.onEdgeTie) {
+      return;
+    }
+    e.stopPropagation();
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const start = toWorld(view, local(e));
+    const move = (m: PointerEvent) => {
+      const w = toWorld(view, local(m));
+      tieMove = { id: tie.id, x: tie.x + w.x - start.x, y: tie.y + w.y - start.y };
+    };
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      if (tieMove) {
+        props.onEdgeTie?.(ids, tieMove);
+      }
+      tieMove = null;
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  }
+
+  function hoverWires(w: Point) {
+    if (!connectable || !props.onEdgeDelete || hovered) {
+      hoverWire = null;
+      return;
+    }
+    const kept = hoverWire ? curves.find((c) => c.edge.id === hoverWire) : null;
+    if (kept && Math.hypot(kept.curve.mid.x - w.x, kept.curve.mid.y - w.y) * view.zoom <= CUT_REACH_PX) {
+      return;
+    }
+    hoverWire = edgeAt(curves.map((c) => ({ id: c.edge.id, curve: c.curve })), w, view.zoom);
+  }
+
+  function cutWire(id: string) {
+    hoverWire = null;
+    props.onEdgeDelete?.(id);
+  }
+
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
-  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && editable ? selectedBoxes[0] : null);
-  const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && editable);
+  const rotatable = $derived(props.onRotate && selectedBoxes.length === 1 && selectedBoxes[0].rotatable && !selectedBoxes[0].locked && editable ? selectedBoxes[0] : null);
+  const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && !selectedBoxes[0].locked && editable);
+  const transformable = (t: (typeof placed)[number]) => t.minW != null && t.minH != null && !t.locked;
+  const placedOf = (t: (typeof placed)[number]): Placed => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 });
+  const many = $derived(editable && selectedBoxes.length > 1 && selectedBoxes.every(transformable) ? selectedBoxes.map(placedOf) : []);
+  const manyBox = $derived(many.length ? selectionBox(many) : null);
+  const manyQuad = $derived.by(() => {
+    const box = spin?.box ?? manyBox;
+    if (!box) {
+      return null;
+    }
+    const centre = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    const r = ((spin?.degrees ?? 0) * Math.PI) / 180;
+    return [
+      [box.x, box.y],
+      [box.x + box.w, box.y],
+      [box.x + box.w, box.y + box.h],
+      [box.x, box.y + box.h]
+    ].map(([x, y]) => {
+      const dx = x - centre.x;
+      const dy = y - centre.y;
+      return [view.x + (centre.x + dx * Math.cos(r) - dy * Math.sin(r)) * view.zoom, view.y + (centre.y + dx * Math.sin(r) + dy * Math.cos(r)) * view.zoom] as const;
+    });
+  });
 
   const heldCanvas = $derived(props.canvasId ?? page.params.canvasId ?? '');
 
@@ -721,6 +883,16 @@
     }
   }
 
+  function centreSelection() {
+    const rects = pickedRects();
+    const b = boundsOf(rects.length ? rects : selectedBoxes);
+    if (!b) {
+      return;
+    }
+    const s = screenSize();
+    animateTo(centreIn(b, view, { width: s.width, height: s.height }));
+  }
+
   let tween = 0;
 
   function takeCamera() {
@@ -765,28 +937,40 @@
     if (!ids?.length) {
       return;
     }
-    if (f?.mode === FocusMode.Select) {
+    const mode = f?.mode ?? FocusMode.Frame;
+    if (focusSelects(mode)) {
       untrack(() => select([...ids]));
     }
     if (f?.mode !== FocusMode.Frame) {
       const b = untrack(() => boundsOf(ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []))));
       const s = untrack(() => screenSize());
-      if (b && untrack(() => inView(b, view, { width: s.width, height: s.height }, f?.free))) {
+      const screen = { width: s.width, height: s.height };
+      const placement = focusPlacement(mode);
+      if (b && placement === Placement.Centre) {
+        untrack(() => animateTo(centreIn(b, view, screen)));
         return;
       }
-      if (b && f?.mode === FocusMode.Reveal) {
-        untrack(() => animateTo(revealIn(b, view, { width: s.width, height: s.height }, f?.free)));
+      if (b && untrack(() => inView(b, view, screen, f?.free))) {
+        return;
+      }
+      if (b && placement === Placement.Slide) {
+        untrack(() => animateTo(revealIn(b, view, screen, f?.free)));
         return;
       }
     }
-    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null, focusPlacement(mode)))));
     return () => cancelAnimationFrame(frame);
   });
 
-  function focusOn(ids: readonly string[], free: Insets | null) {
+  function focusOn(ids: readonly string[], free: Insets | null, placement: Placement) {
     const boxes = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
     const b = boundsOf(boxes);
     if (!b) {
+      return;
+    }
+    if (placement === Placement.Slide) {
+      const s = screenSize();
+      animateTo(revealIn(b, view, { width: s.width, height: s.height }, free ?? undefined));
       return;
     }
     if (free) {
@@ -800,10 +984,13 @@
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
     | { kind: GestureKind.Drag; id: string; start: Point; origins: Map<string, Point>; moved: boolean; toggle: boolean }
-    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number } }
+    | { kind: GestureKind.Resize; id: string; unit: [number, number]; rotation: number; start: Point; box: Box; min: { w: number; h: number }; main?: string; dragged?: Box }
     | { kind: GestureKind.Rotate; id: string; centre: Point; start: Point; base: number; degrees: number }
+    | { kind: GestureKind.ResizeMany; unit: [number, number]; start: Point; box: Box; items: Placed[] }
+    | { kind: GestureKind.TurnMany; centre: Point; start: Point; box: Box; items: Placed[] }
     | { kind: GestureKind.Marquee; start: Point; base: string[]; additive: boolean; moved: boolean }
     | { kind: GestureKind.Connect; from: Port }
+    | { kind: GestureKind.Tie; start: Point }
     | { kind: GestureKind.PickEdge; edgeId: string };
 
   let active: Active | null = null;
@@ -828,20 +1015,22 @@
     })
   );
   const hitIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => [r.body, ...r.labels])));
+  const viewLabelIndex = $derived.by(() => {
+    const glyphs = coreType?.glyphs ?? NO_GLYPHS;
+    return new SpatialIndex(bpViews.flatMap((v) => nodeHitRects({ id: v.frame.id, x: v.frame.box.x, y: v.frame.box.y, width: v.frame.box.w, height: v.frame.box.h, inputs: [], outputs: [], label: `${v.name} ${v.width}`, icon: null, tag: null, zoom: labelZoom }, glyphs).slice(1)));
+  });
   const labelIndex = $derived(new SpatialIndex(hitRects.flatMap((r) => r.labels)));
 
   const topNodeAt = (w: Point): string | null => hitIndex.topAt(w);
 
   function hitAt(w: Point): Hit {
+    const unit = resizable ? resizeHandleAt(selectedBoxes[0], w, view.zoom) : null;
+    if (unit) {
+      return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
+    }
     const port = connectable ? portAt(ports, w, view.zoom) : null;
     if (port) {
       return { kind: HitKind.Port, nodeId: port.nodeId, handle: port.handle };
-    }
-    if (resizable) {
-      const unit = resizeHandleAt(selectedBoxes[0], w, view.zoom);
-      if (unit) {
-        return { kind: HitKind.Corner, nodeId: selectedBoxes[0].id, unit };
-      }
     }
     const turnUnit = rotatable ? rotateZoneAt(rotatable, rotatable.rotation ?? 0, w, view.zoom) : null;
     if (rotatable && turnUnit) {
@@ -990,8 +1179,7 @@
   const pickKey = (f: { id: string; revision: number; linked?: string }) => `${f.id}:${f.revision}:${f.linked ?? ''}`;
 
   async function fetchPickDoc(id: string, revision: number, attempt = 0) {
-    const res = await fetch(`${coreSource(id)}?revision=${revision}`, { cache: 'no-store' }).catch(() => null);
-    const body = res?.ok ? ((await res.json().catch(() => null)) as { doc: LiveDoc['doc']; tokens: LiveDoc['tokens']; assets: LiveDoc['assets'] } | null) : null;
+    const body = await frameSources(`${coreSource(id)}?revision=${revision}`);
     if (body?.doc) {
       fetched = new Map(fetched).set(id, { revision, live: { doc: body.doc, tokens: body.tokens, assets: body.assets ?? {} } });
       return;
@@ -1051,7 +1239,17 @@
     }
   });
 
+  function adoptSource(id: string, source: FrameDoc) {
+    if ((fetched.get(id)?.revision ?? 0) >= source.revision) {
+      return;
+    }
+    fetched = new Map(fetched).set(id, { revision: source.revision, live: { doc: source.doc, tokens: source.tokens, assets: source.assets ?? {} } });
+  }
+
   $effect(() => {
+    if (!failed) {
+      return;
+    }
     const due = toFetch(coreFrames.filter((f) => fetched.get(f.id)?.revision !== f.revision), pickKey, asked, liveDocs.map);
     if (!due.length) {
       return;
@@ -1065,6 +1263,16 @@
         }
       }
     })();
+  });
+
+  const rushed = new Set<string>();
+
+  $effect(() => {
+    const due = pickedToFetch(coreFrames, selected, new Map([...fetched].map(([id, held]) => [id, held.revision])), rushed).filter((f) => !liveDocs.map.has(f.id));
+    for (const f of due) {
+      rushed.add(fetchKey(f));
+      void fetchPickDoc(f.id, f.revision);
+    }
   });
 
   function viewPickAt(w: Point, picked: readonly string[]) {
@@ -1097,7 +1305,7 @@
   }
 
   function hoverElement(w: Point, reach: Reach) {
-    const hit = elementAt(w, reach);
+    const hit = elementAt(w, reach, clickPick);
     const quad = hit ? hit.picker.outlineQuad(hit.clip, hit.space) : null;
     pickHover = hit && quad ? { nodeId: hit.nodeId, clip: hit.clip, quad, at: hit.frame.id, highlight: highlightOf(liveOf(hit.nodeId)!.doc, hit.clip) } : null;
     layersSource.hover(pickHover ? { nodeId: pickHover.nodeId, id: pickHover.clip } : null);
@@ -1135,8 +1343,13 @@
       open.forEach((s) => void s.flushPending());
       event.preventDefault();
     };
+    const backOnline = () => [...savers.values()].forEach((s) => void s.flushPending());
     window.addEventListener('beforeunload', warnUnsaved);
-    return () => window.removeEventListener('beforeunload', warnUnsaved);
+    window.addEventListener('online', backOnline);
+    return () => {
+      window.removeEventListener('beforeunload', warnUnsaved);
+      window.removeEventListener('online', backOnline);
+    };
   });
   const insideLevel = (nodeId: string) => (inside?.nodeId === nodeId ? inside.level : frameLevel());
   const liveOf = (id: string) => liveDocs.map.get(id) ?? fetched.get(id)?.live ?? null;
@@ -1155,6 +1368,7 @@
   };
   const resolveViews = heldViews();
   const bpViews = $derived(resolveViews(coreFrames, viewDocOf));
+  const heldInResize = $derived(new Set([...resizing].filter((id) => frameChrome(kindOfNode(id)).resize === ResizePaint.Held)));
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;
     const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
@@ -1202,19 +1416,34 @@
   }
 
   function extendPick(e: PointerEvent, w: Point): boolean {
-    const deep = (e.metaKey || e.ctrlKey) && !e.shiftKey;
-    const hit = (e.shiftKey || deep) && e.button === 0 && e.pointerType === 'mouse' ? framePickAt(w) : null;
-    if (!hit || inside?.nodeId !== hit.nodeId) {
+    const keys = { shift: e.shiftKey, mod: e.metaKey || e.ctrlKey };
+    const hit = e.button === 0 && e.pointerType === 'mouse' && mode !== CanvasMode.View && !space ? framePickAt(w) : null;
+    const doc = hit ? liveOf(hit.nodeId)?.doc : null;
+    if (!hit || !doc || frameChrome(kindOfNode(hit.nodeId)).dragsHost) {
       return false;
     }
-    if (hit.clip && deep) {
+    const entered = inside?.nodeId === hit.nodeId;
+    const { box } = hit.frame;
+    const onBody = w.x >= box.x && w.y >= box.y && w.x <= box.x + box.w && w.y <= box.y + box.h;
+    const page = framePage(doc, frameChrome(kindOfNode(hit.nodeId)).root);
+    const clips = doc.tracks.flatMap((t) => (t.clips as MotionClip[]).filter((c) => c.id !== page && (c.parent ?? null) === page).map((c) => c.id));
+    const bandable = kindOfNode(hit.nodeId) === FrameKind.Frame && clips.length > 0;
+    const plan = extendOf(keys, { onClip: !!hit.clip, onBody, held: selected.includes(hit.nodeId), entered, selectedElsewhere: selected.some((id) => id !== hit.nodeId), picks: entered ? picks.length : 0, bandable });
+    if (plan.extend === Extend.None) {
       return false;
     }
-    if (hit.clip) {
-      pickMany(hit.nodeId, toggleId(picks, hit.clip));
+    if (!entered) {
+      select([hit.nodeId]);
+      pickMany(hit.nodeId, []);
+    }
+    if (plan.extend === Extend.Toggle) {
+      const clip = elementAt(w, plan.reach)?.clip ?? hit.clip;
+      if (clip) {
+        pickMany(hit.nodeId, toggleId(picks, clip));
+      }
       return true;
     }
-    const clips = liveOf(hit.nodeId)?.doc.tracks.flatMap((t) => t.clips.map((c) => c.id)) ?? [];
+    const deep = plan.reach === Reach.Deep;
     const from = w;
     const move = (ev: PointerEvent) => {
       bandDrag = { nodeId: hit.nodeId, from, to: toWorld(view, local(ev)) };
@@ -1238,25 +1467,25 @@
     return true;
   }
 
-  function elementAt(w: Point, reach: Reach) {
+  function elementAt(w: Point, reach: Reach, choose: typeof pickTarget = pickTarget) {
     const hit = framePickAt(w);
     const doc = hit?.clip && !frameChrome(kindOfNode(hit.nodeId)).dragsHost ? liveOf(hit.nodeId)?.doc : null;
     if (!hit?.clip || !doc) {
       return null;
     }
-    const clip = pickTarget(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
+    const clip = choose(doc, hit.picker.chain(w, hit.space), inside?.nodeId === hit.nodeId ? picks : [], reach);
     return clip ? { ...hit, clip } : null;
   }
 
   function groupOfPick(nodeId: string): string | null {
     const live = liveOf(nodeId);
-    return live ? parentPick(live.doc, picks[0]) : null;
+    return live ? parentPick(live.doc, picks[0], frameChrome(kindOfNode(nodeId)).root) : null;
   }
 
   function pickElement(e: PointerEvent, w: Point): boolean {
     const reach = reachOf(e);
     const hit = e.button === 0 && !e.shiftKey && e.pointerType === 'mouse' ? elementAt(w, reach) : null;
-    if (!hit) {
+    if (!hit || (reach !== Reach.Deep && !clickReachesClip(kindOfNode(hit.nodeId), inside?.nodeId === hit.nodeId ? picks : []))) {
       return false;
     }
     select([hit.nodeId]);
@@ -1268,17 +1497,29 @@
     return true;
   }
 
+  const elementName = (nodeId: string): string | undefined => (frameChrome(kindOfNode(nodeId)).root === Root.Own ? (byId.get(nodeId)?.displayName ?? undefined) : undefined);
+
+  const WHOLE_ELEMENT_RUN: Record<ElementAction, (nodeId: string) => void> = {
+    [ElementAction.WrapStack]: (nodeId) => props.onWrapStack?.([nodeId]),
+    [ElementAction.Duplicate]: (nodeId) => duplicateTiles([nodeId]),
+    [ElementAction.BringForward]: (nodeId) => props.onRestack?.([nodeId], Stack.Forward),
+    [ElementAction.SendBackward]: (nodeId) => props.onRestack?.([nodeId], Stack.Backward),
+    [ElementAction.BringToFront]: (nodeId) => props.onRestack?.([nodeId], Stack.Front),
+    [ElementAction.SendToBack]: (nodeId) => props.onRestack?.([nodeId], Stack.Back)
+  };
+
   async function runFrameAction(id: ActionId) {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
     if (!nodeId || !live || !picks.length) {
       return;
     }
-    if (frameChrome(kindOfNode(nodeId)).selectsOwnClip && stacksWholeElement(id, live.doc, picks)) {
-      props.onWrapStack?.([nodeId]);
+    const whole = frameChrome(kindOfNode(nodeId)).root === Root.Own ? wholeElementAction(id, live.doc, picks) : null;
+    if (whole) {
+      WHOLE_ELEMENT_RUN[whole](nodeId);
       return;
     }
-    const at = scoped(live.doc, picks, frameOfLive(live));
+    const at = scoped(live.doc, picks, frameOfLive(live), nodeId);
     if (!at) {
       return;
     }
@@ -1287,15 +1528,14 @@
       pickMany(nodeId, at.scene(picked));
       return;
     }
-    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets) });
+    const done = await barActionLater(id, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(live.tokens, live.assets), layer: elementName(nodeId), here: nodeId });
     if (!done) {
       return;
     }
     commit(nodeId, { ok: true, doc: at.merge(done.doc) }, done.summary);
     pickMany(nodeId, at.scene(done.selection));
     if (id === Action.CreateComponent && !onComponentsPage) {
-      await saverOf(nodeId)?.flushScheduled();
-      props.onComponentMade?.(nodeId);
+      await saverOf(nodeId)?.rebaseOn(async () => (await props.onComponentMade?.(nodeId)) ?? null);
     }
   }
 
@@ -1333,6 +1573,11 @@
 
   let ownPicked: string | null = null;
 
+  function ownOf(nodeId: string): string | null {
+    const doc = liveOf(nodeId)?.doc;
+    return doc && frameChrome(kindOfNode(nodeId)).root === Root.Own ? ownClipOf(doc) : null;
+  }
+
   $effect(() => {
     const only = selected.length === 1 ? selected[0] : null;
     if (only && coreFrames.some((f) => f.id === only)) {
@@ -1340,7 +1585,7 @@
         inside = { nodeId: only, level: frameLevel() };
         picks = [];
       }
-      const own = ownClipToPick(ownPicked, only, frameChrome(kindOfNode(only)).selectsOwnClip ? liveOf(only)?.doc.tracks[0]?.clips[0]?.id : null);
+      const own = ownClipToPick(ownPicked, only, ownOf(only));
       if (own) {
         ownPicked = only;
         untrack(() => goInside(only, Gesture.Click, own));
@@ -1352,12 +1597,12 @@
     picks = [];
   });
 
-  const frameMode = (doc: LiveDoc['doc']): EditMode => startMode(doc, editorMode.spec.edit);
+  const frameMode = $derived(readMode(editorMode.spec.edit));
 
   $effect(() => {
     const edit = editorMode.spec.edit;
     for (const session of savers.values()) {
-      session.mode = startMode(session.history.present, edit);
+      session.mode = readMode(edit);
       session.access = editorMode.spec.access;
     }
   });
@@ -1369,19 +1614,26 @@
     if (held || !live || !frame) {
       return held ?? null;
     }
-    const url = `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${nodeId}`;
+    const place = { projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId };
+    const draftId = crypto.randomUUID();
     const session: FrameEditSession = new FrameEditSession(
-      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: frameMode(live.doc) },
+      { head: { version: frame.revision, doc: live.doc }, selection: [], mode: frameMode },
       {
         viewPath: () => [],
         playhead: () => frameOfLive(liveOf(nodeId) ?? live),
         show: (doc) => doc && liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(doc, statePreview.picksOf(nodeId)) }),
         recorded: () => {
           settle.edited(nodeId);
+          queueMicrotask(() => adoptAssets(nodeId));
+          leaveHost(nodeId, session.history.present);
+          queueMicrotask(() => settleHost(nodeId));
           autosize(nodeId);
         },
         stepped: () => props.onFrameStep?.({ back: () => stepFrame(nodeId, Step.Back), forward: () => stepFrame(nodeId, Step.Forward) }),
-        saved: () => liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) }),
+        saved: () => {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? live), doc: previewDoc(session.history.present, statePreview.picksOf(nodeId)) });
+          adoptAssets(nodeId);
+        },
         landed: (from, to) => {
           const step = stepOf(nodeId, from, to);
           if (step) {
@@ -1389,14 +1641,8 @@
           }
         },
         pull: async () => {},
-        send: async (ops, version, summary) => {
-          const form = new FormData();
-          form.set('ops', JSON.stringify(ops));
-          form.set('version', String(version));
-          form.set('summary', summary);
-          const result = await postPageAction(url, 'ops', form);
-          return result.type === 'success' ? { ok: true, version: Number(result.data?.version), doc: result.data?.doc as LiveDoc['doc'] } : { ok: false, error: 'Save failed' };
-        }
+        send: (ops, version, summary) => postFrameOps(place, { ops, version, summary }),
+        draft: (draft) => props.onFrameDraft?.(draftId, nodeId, draft)
       }
     );
     session.access = editorMode.spec.access;
@@ -1406,6 +1652,14 @@
     }
     savers.set(nodeId, session);
     return session;
+  }
+
+  function adoptAssets(nodeId: string) {
+    const live = liveOf(nodeId);
+    const added = live ? missingAssets(live.doc, live.assets, assetUrl) : null;
+    if (live && added) {
+      liveDocs.set(nodeId, { ...live, assets: { ...live.assets, ...added } });
+    }
   }
 
   const extras = new Map<string, FrameExtras>();
@@ -1465,14 +1719,20 @@
   onMount(lockOverscroll);
 
   $effect(() => {
-    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => liveOf(f.id)?.doc ?? [])));
+    styleLibrary.found(libraryOf(coreFrames.flatMap((f) => placedDoc(f.id))));
   });
+
+  const placedDoc = (id: string) => {
+    const doc = liveOf(id)?.doc;
+    return doc ? [{ doc, scale: scaleOf(doc, byId.get(id) ?? null) }] : [];
+  };
 
   function syncStyle(name: string, style: Style) {
     for (const frame of coreFrames.filter((f) => liveOf(f.id)?.doc.styles?.[name])) {
       const saver = saverOf(frame.id);
       const present = saver?.history.present;
-      const synced = present && !sameValue(present.styles?.[name], style) ? syncedDoc(present, name, style) : null;
+      const scale = present ? scaleOf(present, byId.get(frame.id) ?? null) : 1;
+      const synced = present && !sameValue(present.styles?.[name], inDoc(style, spaceOf(present, scale))) ? syncedDoc(present, name, style, scale) : null;
       if (synced) {
         commit(frame.id, { ok: true, doc: synced }, `Updated the ${name} style`);
       }
@@ -1555,7 +1815,7 @@
   }
 
   $effect(() => {
-    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).selectsOwnClip ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
+    layersSource.setGlyphs(new Map(coreFrames.flatMap((f) => (frameChrome(kindOfNode(f.id)).root === Root.Own ? [[f.id, elementGlyph(liveOf(f.id)?.doc.tracks.flatMap((t) => t.clips).find((c) => !c.parent))] as const] : []))));
     layersSource.setDocs(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   });
 
@@ -1571,7 +1831,12 @@
     frameProperties.name = placed.find((t) => t.id === panelNodeId)?.displayName?.trim() || UNNAMED_FRAME;
     frameProperties.part = pickedPart;
     frameProperties.exportPicks = () => props.onExportElements?.(panelNodeId, picks);
+    frameProperties.exportRows = (rows) => (picks.length ? props.onExportElementRows?.(panelNodeId, picks, rows) : props.onExportRows?.([panelNodeId], rows)) ?? Promise.resolve('Export failed');
     frameProperties.runAction = runSelectionAction;
+    frameProperties.place = nodePlaceOf(panelNodeId);
+    frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
+    frameProperties.host = hostOf(panelNodeId);
+    frameProperties.panel = frameChrome(kindOfNode(panelNodeId)).panel;
     return () => frameProperties.clear();
   });
 
@@ -1584,11 +1849,10 @@
       summaries: selectedSummaries,
       choicesFor: props.modelChoicesFor,
       runQuote: props.runQuoteFor?.(ids) ?? null,
-      onaction: runSelectionAction,
       onpropertychange: (patch) => props.onPropertyChange?.(ids, patch),
-      onview: () => props.onViewOutput?.(ids[0]),
       onalign: (edge) => alignSelection(ids, edge),
-      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis))
+      ondistribute: (axis) => placeTiles(distributeTiles(placedBoxes(ids), axis)),
+      box: many.length ? { items: many, set: (field, value) => placeAll(many, withField(many, field, value)) } : null
     });
     return () => selectionProperties.clear();
   });
@@ -1601,11 +1865,13 @@
     if (!session) {
       return;
     }
+    leaveHost(nodeId, session.history.present);
     if (step === Step.Back) {
       session.undo();
     } else {
       session.redo();
     }
+    arriveHost(nodeId, session.history.present);
     liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? { tokens: {} as LiveDoc['tokens'], assets: {} }), doc: session.history.present });
     if (inside?.nodeId === nodeId) {
       picks = picks.filter((id) => scopeOf(session.history.present, id));
@@ -1631,16 +1897,16 @@
   });
 
   function variantMark(nodeId: string) {
-    const mark = picks.length === 1 && !typing ? selectionMarks(nodeId)[0] : null;
+    const mark = picks.length === 1 && !typing && !isComponentSet(nodeId) ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const instance = mark && saver ? instanceOf(saver.history.present, mark.clip) : null;
-    return mark && instance ? { rect: quadBox(mark.quad), compId: instance.compId } : null;
+    const main = mark && saver ? roleOf(saver.history.present, mark.clip, nodeId) === ComponentRole.Main : false;
+    return mark && main ? { rect: quadBox(mark.quad), hostId: mark.clip } : null;
   }
 
-  function addVariantAt(nodeId: string, compId: string) {
+  function addVariantAt(nodeId: string, hostId: string) {
     const saver = saverOf(nodeId);
     if (saver) {
-      commit(nodeId, appendVariant(saver.history.present, compId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+      commit(nodeId, addVariantBeside(saver.history.present, hostId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
     }
   }
 
@@ -1665,6 +1931,45 @@
     }
   }
 
+  function setMainPicked(nodeId: string, clip: string | null): string | undefined {
+    const doc = clip && isComponentSet(nodeId) ? saverOf(nodeId)?.history.present : null;
+    const main = doc ? doc.tracks.flatMap((t) => t.clips).find((c) => c.id === clip) : null;
+    return main?.component === 'Precomp' ? main.id : undefined;
+  }
+
+  function mainResizedTo(nodeId: string, clip: string, was: Box, to: Box) {
+    const before = saverOf(nodeId)?.history.present;
+    return before ? mainDragged(before, clip, { w: to.w - was.w, h: to.h - was.h }, was) : null;
+  }
+
+  function showMainResized(nodeId: string, clip: string, was: Box, to: Box) {
+    const dragged = mainResizedTo(nodeId, clip, was, to);
+    const live = liveOf(nodeId);
+    if (!dragged?.result.ok || !live) {
+      return;
+    }
+    liveDocs.set(nodeId, { ...live, doc: dragged.result.doc });
+    overrides = new Map([[nodeId, { x: was.x, y: was.y, ...dragged.node }]]);
+  }
+
+  function unshowMainResized(nodeId: string) {
+    const live = liveOf(nodeId);
+    const present = saverOf(nodeId)?.history.present;
+    if (live && present) {
+      liveDocs.set(nodeId, { ...live, doc: present });
+    }
+  }
+
+  function resizeSetMainBy(nodeId: string, clip: string, was: Box, to: Box) {
+    const dragged = mainResizedTo(nodeId, clip, was, to);
+    if (!dragged?.result.ok) {
+      unshowMainResized(nodeId);
+      return;
+    }
+    commit(nodeId, dragged.result, 'Resized the main component');
+    props.onNodeSize?.(nodeId, dragged.node.w, dragged.node.h);
+  }
+
   function editFrameDoc(nodeId: string, change: FrameDocEdit, summary: string): boolean {
     const live = liveOf(nodeId);
     if (!live || !saverOf(nodeId)) {
@@ -1682,24 +1987,34 @@
     if (!live) {
       const like = liveOf(held.like);
       holdLive(held.nodeId, { doc: held.doc, tokens: like?.tokens ?? heldTokens() ?? FEEGA_TOKENS, assets: like?.assets ?? {} }, saved);
+      adoptAssets(held.nodeId);
       return;
     }
     const session = saverOf(held.nodeId);
     const before = frameDocOf(held.nodeId) ?? live.doc;
-    session?.settleHeld(held.doc);
+    session?.adoptSaved(held.doc);
     session?.holdSave(saved);
-    liveDocs.set(held.nodeId, { ...live, doc: held.doc });
+    liveDocs.set(held.nodeId, { ...live, doc: held.doc, assets: { ...liveOf(held.like)?.assets, ...live.assets } });
+    adoptAssets(held.nodeId);
     void saved.then((landed) => {
       const now = liveOf(held.nodeId);
       if (landed || !now) {
         return;
       }
-      session?.settleHeld(before);
+      session?.adoptSaved(before);
       liveDocs.set(held.nodeId, { ...now, doc: before });
     });
   }
 
-  onMount(() => frameDocs.publish({ edit: editFrameDoc, doc: frameDocOf, hold: holdFrameDoc }));
+  function previewFrameDoc(nodeId: string, doc: MotionDoc | null) {
+    const live = liveOf(nodeId);
+    const shown = doc ?? frameDocOf(nodeId);
+    if (live && shown && frameChrome(kindOfNode(nodeId)).resize === ResizePaint.Relaid) {
+      liveDocs.set(nodeId, { ...live, doc: previewDoc(shown, statePreview.picksOf(nodeId)) });
+    }
+  }
+
+  onMount(() => frameDocs.publish({ edit: editFrameDoc, doc: frameDocOf, hold: holdFrameDoc, preview: previewFrameDoc }));
 
   function startTrailer() {
     if (panelNodeId) {
@@ -1774,9 +2089,9 @@
   const timeline = $derived.by(() => {
     const nodeId = inside?.nodeId;
     const live = nodeId ? liveOf(nodeId) : null;
-    const mode = nodeId && live ? frameMode(live.doc) : EditMode.Design;
+    const mode = nodeId && live ? frameMode : EditMode.Design;
     const access = nodeId ? frameTimeline(editorMode.timeline, frameChrome(kindOfNode(nodeId)).timeline, mode) : TimelineAccess.Hidden;
-    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: live.doc, frame: frameOfLive(live), access } : null;
+    return nodeId && live && access !== TimelineAccess.Hidden ? { nodeId, doc: timelineDoc(live.doc), scale: scaleOf(live.doc, byId.get(nodeId) ?? null), frame: frameOfLive(live), access } : null;
   });
 
   const TIMELINE_CHANGE: Record<TimelineAccess, (nodeId: string) => (doc: LiveDoc['doc'], summary: string) => void> = {
@@ -1790,7 +2105,7 @@
     if (!at) {
       return [];
     }
-    const kind = picks.length > 1 ? SelectionKind.Member : SelectionKind.Element;
+    const kind = selectionKindOf(picks.length, picks.length === 1 ? findClip(at.live.doc, picks[0])?.clip : null);
     const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
@@ -1803,7 +2118,7 @@
   function gradientMark(nodeId: string) {
     const mark = picks.length === 1 && typing?.nodeId !== nodeId ? selectionMarks(nodeId)[0] : null;
     const saver = mark ? saverOf(nodeId) : null;
-    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip) : null;
+    const target = mark && saver ? gradientTarget(liveOf(nodeId)?.doc ?? saver.history.present, mark.clip, frameProperties.editingFill) : null;
     return mark && target ? { clip: mark.clip, rect: quadBox(mark.quad), index: target.index, fill: target.fill } : null;
   }
 
@@ -1920,7 +2235,7 @@
   function deletePicks(): boolean {
     const nodeId = inside?.nodeId;
     const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
-    const at = tools ? scoped(tools.doc, picks, tools.frame) : null;
+    const at = tools ? scoped(tools.doc, picks, tools.frame, nodeId) : null;
     const done = at ? barAction(Action.Delete, { doc: at.view, selection: at.ids, frame: at.frame, newId: () => crypto.randomUUID().slice(0, 8) }) : null;
     if (!nodeId || !at || !done) {
       return false;
@@ -1941,8 +2256,14 @@
   }
 
   function drawnInside(nodeId: string, id: string) {
-    picks = [id];
-    typeOnArrival = frameBar.tool === DrawTool.Text ? { nodeId, clip: id } : null;
+    const doc = saverOf(nodeId)?.history.present;
+    const inMain = doc ? dropIntoMain(doc, id, nodeId) : null;
+    if (inMain?.ok) {
+      commit(nodeId, inMain, 'Added to the main component');
+    }
+    const scene = inMain?.ok ? (landedScene(inMain.doc, id) ?? id) : id;
+    picks = [scene];
+    arrive(frameBar.tool === DrawTool.Text ? { nodeId, clip: scene } : null);
     frameBar.tool = DrawTool.Select;
   }
 
@@ -1956,30 +2277,40 @@
     return { left: (r.left - frame.box.x) * view.zoom, top: (r.top - frame.box.y) * view.zoom, width: r.width * view.zoom, height: r.height * view.zoom };
   }
 
-  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody };
+  type Typing = { nodeId: string; clip: string; text: string; runs: TextRun[]; lists: ListItem[]; styled: boolean; base: RunStyle; caret: TextCaret; look: TextEditStyle; body: EditBody; typed: () => string };
   let typing = $state<Typing | null>(null);
 
-  async function startTyping(nodeId: string, clip: string) {
+  async function startTyping(nodeId: string, clip: string, ahead?: TypeAhead) {
     const saver = saverOf(nodeId);
     const at = pickerOf(nodeId);
     const doc = saver?.history.present;
-    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live)) : null;
+    const scope = doc && at ? textScope(doc, clip, frameOfLive(at.live), nodeId) : null;
     const found = scope ? findClip(scope.view, scope.id)?.clip : null;
     const size = at?.picker.frameSize();
     if (editedView(nodeId) || !saver || !at || !doc || !scope || !found || !size || !editsText(scope.view, scope.id)) {
+      ahead?.release();
       return;
     }
     const laid = await caretSource(() => at.live.tokens, () => at.live.assets)(scope.view, scope.id);
     if (!laid || saver.history.present !== doc) {
+      ahead?.release();
       return;
     }
     const caret = { ...laid, matrix: mul2d(scope.place, laid.matrix) };
     const look = textEditStyle({ clip: found as MotionClip, doc: scope.view, tokens: at.live.tokens, frame: size, scale: 1 });
-    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens) };
+    typing = { nodeId, clip, caret, look, text: String((found.props as { text?: unknown }).text ?? ''), runs: runsOfClip(found), lists: listsOfClip(found), styled: styledKind(found), base: baseStyle(found), body: editBody(found, scope.view, at.live.tokens), typed: () => ahead?.release() ?? '' };
     liveDocs.set(nodeId, { ...at.live, doc: scope.merge(hideText(scope.view, scope.id)) });
   }
 
   let typeOnArrival = $state<{ nodeId: string; clip: string | null } | null>(null);
+  const typeAhead = new TypeAhead();
+
+  function arrive(next: { nodeId: string; clip: string | null } | null) {
+    typeOnArrival = next;
+    if (next) {
+      typeAhead.hold(performance.now());
+    }
+  }
 
   const drawSaves = new Map<string, Promise<boolean>>();
 
@@ -2029,11 +2360,19 @@
   }
 
   function frameUnderDrawing(drawn: DrawnWire) {
-    const centre = drawnCentre(drawn);
-    const id = centre ? topNodeAt(centre) : null;
-    const frame = id && !domIds.has(id) && kindOfNode(id) === FrameKind.Frame && !byId.get(id)?.rotation ? coreFrames.find((f) => f.id === id && !f.linked) : null;
+    const anchor = drawnAnchor(drawn);
+    const takes = (id: string) => kindOfNode(id) === FrameKind.Frame || (kindOfNode(id) === FrameKind.Element && anchor !== null && holdsMainAt(id, anchor));
+    const hosts = (id: string) => !domIds.has(id) && takes(id) && !byId.get(id)?.rotation && coreFrames.some((f) => f.id === id && !f.linked);
+    const id = anchor ? hitIndex.allAt(anchor).find(hosts) : null;
+    const frame = id ? coreFrames.find((f) => f.id === id) : null;
     const live = frame ? liveOf(frame.id) : null;
     return frame && live && saverOf(frame.id) ? { frame, live } : null;
+  }
+
+  function holdsMainAt(id: string, at: Point): boolean {
+    const frame = coreFrames.find((f) => f.id === id);
+    const doc = liveOf(id)?.doc;
+    return !!frame && !!doc && mainUnder(doc, docPoint(doc, frame.box, at), id) !== null;
   }
 
   function drawIntoFrame(drawn: DrawnWire): boolean {
@@ -2043,14 +2382,17 @@
     }
     const { frame, live } = under;
     const clip = crypto.randomUUID().slice(0, 8);
-    const made = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode(live.doc), frameOfLive(live)), clip);
-    if (!made.ok) {
+    const drawnHere = drawnInFrame(live.doc, frame.box, drawn, drawStart(frameMode, frameOfLive(live)), clip);
+    const anchor = drawnAnchor(drawn);
+    const made = drawnHere.ok ? landInside(drawnHere.doc, clip, frame.id, anchor ? docPoint(drawnHere.doc, frame.box, anchor) : undefined) : drawnHere;
+    const scene = made.ok ? landedScene(made.doc, clip) : null;
+    if (!made.ok || !scene) {
       return false;
     }
     commit(frame.id, made, DRAW_SUMMARY[drawn.tool]);
     select([frame.id]);
-    goInside(frame.id, Gesture.Click, clip);
-    typeOnArrival = drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip } : null;
+    goInside(frame.id, Gesture.Click, scene);
+    arrive(drawn.tool === DrawTool.Text ? { nodeId: frame.id, clip: scene } : null);
     return true;
   }
 
@@ -2061,18 +2403,19 @@
     }
     const drawing = props.onDraw?.(drawn);
     seed(drawing);
-    typeOnArrival = drawn.tool === DrawTool.Text && drawing ? { nodeId: drawing.id, clip: null } : null;
+    arrive(drawn.tool === DrawTool.Text && drawing ? { nodeId: drawing.id, clip: null } : null);
   }
 
   $effect(() => {
     const wanted = typeOnArrival;
     const saver = wanted ? saverOf(wanted.nodeId) : null;
-    const clip = saver?.history.present.tracks.flatMap((t) => t.clips).find((c) => (wanted?.clip ? c.id === wanted.clip : c.component === 'Text'));
+    const present = saver?.history.present;
+    const clip = wanted?.clip ? (present && scopeOf(present, wanted.clip) ? wanted.clip : null) : present?.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Text')?.id;
     if (!wanted || !clip || !pickerOf(wanted.nodeId)) {
       return;
     }
     typeOnArrival = null;
-    untrack(() => void startTyping(wanted.nodeId, clip.id));
+    untrack(() => void startTyping(wanted.nodeId, clip, typeAhead));
   });
 
   function stopTyping(text: string, runs: TextRun[], lists: ListItem[]) {
@@ -2082,7 +2425,7 @@
     if (!open || !saver) {
       return;
     }
-    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }));
+    const result = commitScoped(saver.history.present, open.clip, text, runs, lists, frameOfLive({ doc: saver.history.present, playhead: liveOf(open.nodeId)?.playhead }), open.nodeId);
     liveDocs.set(open.nodeId, { ...(liveOf(open.nodeId) as LiveDoc), doc: saver.history.present });
     if (result.ok && (text !== open.text || JSON.stringify(runs) !== JSON.stringify(open.runs) || JSON.stringify(lists) !== JSON.stringify(open.lists))) {
       commit(open.nodeId, result, 'Edited text');
@@ -2098,7 +2441,59 @@
     const z = view.zoom;
     const stage = at.space.toWorld({ left: 0, top: 0, width: 1, height: 1 });
     const screen: [number, number, number, number, number, number] = [stage.w * z, 0, 0, stage.w * z, (stage.x - at.frame.box.x) * z, (stage.y - at.frame.box.y) * z];
-    return { text: open.text, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+    return { text: open.text, typed: open.typed, runs: open.runs, lists: open.lists, styled: open.styled, base: open.base, clip: open.clip, layout: editLayout(open.caret, screen), look: open.look, body: open.body };
+  }
+
+  function nodePlaceOf(nodeId: string): NodePlace | null {
+    const tile = byId.get(nodeId);
+    if (!tile) {
+      return null;
+    }
+    return { x: tile.x, y: tile.y, w: tile.w, h: tile.h, rotation: tile.rotation ?? 0, set: (x, y) => props.onMove?.(nodeId, x, y), resize: (w, h) => props.onResize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - (tile.rotation ?? 0)), flip: (flip) => flipNodes([nodeId], flip), align: alignInHolder(nodeId) };
+  }
+
+  const hostLedger = new HostLedger();
+
+  function hostBoxOf(nodeId: string): HostBox | null {
+    const t = byId.get(nodeId);
+    return t && frameChrome(kindOfNode(nodeId)).root === Root.Own ? { x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 } : null;
+  }
+
+  function hostOf(nodeId: string): ElementHost | null {
+    const clipId = ownOf(nodeId);
+    const box = hostBoxOf(nodeId);
+    if (!clipId || !box) {
+      return null;
+    }
+    return { clipId, box, move: (x, y) => placeTiles([{ id: nodeId, x, y }]), resize: (w, h) => props.onResize?.(nodeId, w, h), turn: (degrees) => props.onRotate?.(nodeId, degrees - box.rotation) };
+  }
+
+  function leaveHost(nodeId: string, doc: MotionDoc) {
+    const box = hostBoxOf(nodeId);
+    if (box) {
+      hostLedger.leave(doc, box);
+    }
+  }
+
+  function arriveHost(nodeId: string, doc: MotionDoc) {
+    const box = hostBoxOf(nodeId);
+    const back = box ? hostLedger.arrive(doc, box) : null;
+    if (back) {
+      props.onSettle?.(nodeId, back);
+    }
+  }
+
+  function settleHost(nodeId: string) {
+    const saver = savers.get(nodeId);
+    const live = liveOf(nodeId);
+    const box = hostBoxOf(nodeId);
+    const settled = saver && live && box ? settleElement(saver.history.present, box) : null;
+    if (!saver || !live || !settled) {
+      return;
+    }
+    saver.amendRoot(settled.doc, 'Placed the element');
+    liveDocs.set(nodeId, { ...live, doc: previewDoc(settled.doc, statePreview.picksOf(nodeId)) });
+    props.onSettle?.(nodeId, settled.box);
   }
 
   const autosizing = new Map<string, ReturnType<typeof setTimeout>>();
@@ -2138,9 +2533,9 @@
     [0, 1]
   ];
 
-  function resizeOf(nodeId: string, unit: [number, number], start: Point): Active {
+  function resizeOf(nodeId: string, unit: [number, number], start: Point, main?: string): Active {
     const t = byId.get(nodeId)!;
-    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 } };
+    return { kind: GestureKind.Resize, id: t.id, unit, rotation: t.rotation ?? 0, start, box: { x: t.x, y: t.y, w: t.w, h: t.h }, min: { w: t.minW ?? 1, h: t.minH ?? 1 }, main };
   }
 
   function rotateOf(nodeId: string, start: Point): Active {
@@ -2158,26 +2553,80 @@
     gesturing = true;
   }
 
-  function resizeHost(nodeId: string, handle: number, e: PointerEvent) {
+  const MANY_MIN = { w: 1, h: 1 };
+
+  function grabMany(grip: Grip, handle: number, e: PointerEvent) {
+    const turns = grip === Grip.Rotate && selectedBoxes.every((t) => t.rotatable);
+    if (!manyBox || e.button !== PRIMARY_BUTTON || (grip !== Grip.Scale && !turns)) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     downAt = local(e);
     captureId = e.pointerId;
     holdSelection(true);
-    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)));
+    const start = toWorld(view, local(e));
+    const centre = { x: manyBox.x + manyBox.w / 2, y: manyBox.y + manyBox.h / 2 };
+    active = turns ? { kind: GestureKind.TurnMany, centre, start, box: manyBox, items: many } : { kind: GestureKind.ResizeMany, unit: handlesOf(UNIT_SQUARE)[handle].unit, start, box: manyBox, items: many };
     gesturing = true;
+  }
+
+  function placeAll(before: Placed[], after: Placed[]) {
+    props.onPlaceMany?.(before.map((b, i) => ({ before: b, after: after[i] })));
+  }
+
+  function showMany(next: Placed[]) {
+    overrides = new Map(next.map((n) => [n.id, { x: n.x, y: n.y, w: n.w, h: n.h }]));
+    turning = new Map(next.map((n) => [n.id, n.rotation]));
+    props.onLive?.(next.map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h })));
+  }
+
+  function endMany(items: Placed[]) {
+    props.onLive?.([]);
+    const changes = items.flatMap((before) => {
+      const box = overrides.get(before.id);
+      return box ? [{ before, after: { ...before, ...box, rotation: turning.get(before.id) ?? before.rotation } }] : [];
+    });
+    if (changes.length) {
+      props.onPlaceMany?.(changes);
+    }
+    spin = null;
+    turning = new Map();
+    settleOverrides();
+  }
+
+  function resizeHost(nodeId: string, handle: number, e: PointerEvent, main?: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    downAt = local(e);
+    captureId = e.pointerId;
+    holdSelection(true);
+    active = resizeOf(nodeId, handlesOf(UNIT_SQUARE)[handle].unit, toWorld(view, local(e)), main);
+    gesturing = true;
+  }
+
+  function pickOnRelease(nodeId: string, grip: Grip, e: PointerEvent) {
+    const w = toWorld(view, local(e));
+    const hit = grip === Grip.Move ? (e.shiftKey ? elementAt(w, Reach.Top) : elementAt(w, Reach.Top, clickPick)) : null;
+    if (hit?.nodeId !== nodeId) {
+      return;
+    }
+    const next = e.shiftKey ? toggleId(picks, hit.clip) : [hit.clip];
+    if (next.join() !== picks.join()) {
+      pickMany(nodeId, next);
+    }
   }
 
   function grab(nodeId: string, clip: string | null, grip: Grip, handle: number, e: PointerEvent) {
     if (grip === Grip.Scale && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.has(nodeId)) {
-      resizeHost(nodeId, handle, e);
+      resizeHost(nodeId, handle, e, setMainPicked(nodeId, clip));
       return;
     }
     if (grip === Grip.Rotate && e.button === PRIMARY_BUTTON && frameChrome(kindOfNode(nodeId)).dragsHost && byId.get(nodeId)?.rotatable) {
       rotateHost(nodeId, e);
       return;
     }
-    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && pickElement(e, toWorld(view, local(e)))) {
+    if (grip === Grip.Move && (e.metaKey || e.ctrlKey) && (extendPick(e, toWorld(view, local(e))) || pickElement(e, toWorld(view, local(e))))) {
       e.stopPropagation();
       return;
     }
@@ -2199,11 +2648,12 @@
     const shownView = editedView(nodeId);
     const start = shownView ? at.live.doc : source;
     const lifted = (doc: MotionDoc) => (shownView ? liftViewEdit(source, shownView.breakpointId, start, doc) : doc);
-    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }));
-    if (!inScope) {
+    const inScope = scoped(start, clip && !picks.includes(clip) ? [clip] : picks, frameOfLive({ doc: start, playhead: at.live.playhead }), nodeId);
+    if (!inScope || holdsLock(inScope.view, inScope.ids)) {
       return;
     }
-    const boxes = guessedBoxes(withAutoLayout(inScope.view));
+    const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8), nodeId) : null) ?? { doc: inScope.view, ids: inScope.ids };
+    const boxes = guessedBoxes(withAutoLayout(work.doc));
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
@@ -2216,15 +2666,16 @@
     const edited = { left: box.x, top: box.y, width: box.w, height: box.h };
 
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
-    const stackChild = grip === Grip.Move && inScope.ids.length === 1 && stackPlaced(inScope.view, inScope.ids[0]) ? inScope.ids[0] : null;
+    const stackChild = grip === Grip.Move && work.ids.length === 1 && stackPlaced(work.doc, work.ids[0]) ? work.ids[0] : null;
+    const joinable = grip === Grip.Move && work.ids.length === 1 && !stackChild;
 
     const leaving = (ev: PointerEvent, now: Carry): ElementOut | null => {
-      const [clipId] = inScope.ids;
-      if (now !== Carry.Out || grip !== Grip.Move || inScope.ids.length !== 1) {
+      const [clipId] = work.ids;
+      if (now !== Carry.Out || grip !== Grip.Move || work.ids.length !== 1 || work.doc !== inScope.view) {
         return null;
       }
       const b = boxes[clipId];
-      const { width, height } = inScope.view;
+      const { width, height } = work.doc;
       return { clipId, client: { x: ev.clientX, y: ev.clientY }, box: b ? { left: b.left / width, top: b.top / height, width: b.width / width, height: b.height / height } : null };
     };
 
@@ -2240,16 +2691,23 @@
         carried = !!out;
       }
       if (stackChild) {
-        const dropped = dragInStack(inScope.view, stackChild, boxes, framePt(ev));
+        const to = framePt(ev);
+        const dropped = dragInStack(work.doc, stackChild, boxes, to);
         result = dropped.result.ok ? { ok: true, doc: lifted(inScope.merge(dropped.result.doc)) } : dropped.result;
         frameGuides = { nodeId, guides: [], gaps: [], drop: dropped.line };
+        const followed = followCursor(work.doc, stackChild, [to[0] - from[0], to[1] - from[1]]);
+        if (followed.ok) {
+          liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: lifted(inScope.merge(followed.doc)) });
+        }
         return;
       }
-      const dragged = dragClips({ doc: inScope.view, ids: inScope.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
-      result = dragged.result.ok ? { ok: true, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
-      frameGuides = { nodeId, guides: dragged.guides, gaps: dragged.gaps };
-      if (result.ok) {
-        liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: result.doc });
+      const dragged = dragClips({ doc: work.doc, ids: work.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
+      const shown = dragged.result.ok ? { ok: true as const, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
+      const into = joinable ? dropInStack(work.doc, work.ids[0], boxes, framePt(ev)) : null;
+      result = into?.result.ok ? { ok: true, doc: lifted(inScope.merge(into.result.doc)) } : shown;
+      frameGuides = into?.result.ok ? { nodeId, guides: [], gaps: [], drop: into.line } : { nodeId, guides: dragged.guides, gaps: dragged.gaps };
+      if (shown.ok) {
+        liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: shown.doc });
       }
     };
     const up = (ev: PointerEvent) => {
@@ -2257,6 +2715,7 @@
       window.removeEventListener('pointerup', up);
       frameGuides = null;
       if (!started) {
+        pickOnRelease(nodeId, grip, ev);
         return;
       }
       const out = leaving(ev, carry(ev));
@@ -2265,8 +2724,21 @@
         props.onElementOut?.(nodeId, out, DragPhase.Drop);
         return;
       }
-      if (result?.ok) {
-        commit(nodeId, result, GRIP_SUMMARY[grip]);
+      if (!result?.ok) {
+        liveDocs.set(nodeId, at.live);
+        return;
+      }
+      const [only] = work.ids;
+      const atRoot = grip === Grip.Move && work.ids.length === 1 && inScope.scene(work.ids)[0] === only;
+      const adopted = atRoot ? dropIntoMain(result.doc, only, nodeId) : null;
+      if (adopted?.ok) {
+        commit(nodeId, adopted, GRIP_SUMMARY[grip]);
+        pickMany(nodeId, [landedScene(adopted.doc, only) ?? only]);
+        return;
+      }
+      commit(nodeId, result, GRIP_SUMMARY[grip]);
+      if (work.doc !== inScope.view) {
+        pickMany(nodeId, inScope.scene(work.ids));
       }
     };
     window.addEventListener('pointermove', move);
@@ -2415,7 +2887,7 @@
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
       return;
     }
-    const kind = gestureFor(hit, { pointer: pointerOf(e), button: e.button, shift: e.shiftKey, space, mode });
+    const kind = gestureFor(hit, { pointer: pointerOf(e), button: e.button, shift: e.shiftKey, alt: e.altKey, space, mode });
     downAt = p;
     suppressMenu = false;
     captureId = e.pointerId;
@@ -2423,6 +2895,14 @@
     menuAt = null;
     picked = null;
     startGesture(kind, hit, w, e);
+  }
+
+  function nodeHeld(nodeId: string): boolean {
+    if (byId.get(nodeId)?.locked) {
+      return true;
+    }
+    const live = liveOf(nodeId);
+    return !!live &&frameChrome(kindOfNode(nodeId)).root === Root.Own && ownLocked(live.doc);
   }
 
   function startGesture(kind: GestureKind, hit: Hit, w: Point, e: PointerEvent) {
@@ -2437,17 +2917,17 @@
           return null;
         }
         const ids = selected.includes(hit.nodeId) && !e.shiftKey ? selected : clicked(selected, hit.nodeId, e.shiftKey || e.metaKey || e.ctrlKey);
-        const origins = new Map(ids.flatMap((id) => (byId.get(id) ? [[id, { x: byId.get(id)!.x, y: byId.get(id)!.y }] as const] : [])));
+        const origins = new Map(ids.flatMap((id) => (byId.get(id) && !nodeHeld(id) ? [[id, { x: byId.get(id)!.x, y: byId.get(id)!.y }] as const] : [])));
         return { kind: GestureKind.Drag, id: hit.nodeId, start: w, origins, moved: false, toggle: e.shiftKey || e.metaKey || e.ctrlKey };
       },
       [GestureKind.Resize]: () => {
-        if (hit.kind !== HitKind.Corner) {
+        if (hit.kind !== HitKind.Corner || nodeHeld(hit.nodeId)) {
           return null;
         }
         return resizeOf(hit.nodeId, hit.unit, w);
       },
       [GestureKind.Rotate]: () => {
-        if (hit.kind !== HitKind.Rotate) {
+        if (hit.kind !== HitKind.Rotate || nodeHeld(hit.nodeId)) {
           return null;
         }
         return rotateOf(hit.nodeId, w);
@@ -2462,9 +2942,20 @@
           return null;
         }
         ghost = { from, at: w, ok: false };
+        wiringFrom = from;
+        hoverPort = null;
         return { kind: GestureKind.Connect, from };
       },
-      [GestureKind.PickEdge]: () => (hit.kind === HitKind.Edge ? { kind: GestureKind.PickEdge, edgeId: hit.edgeId } : null)
+      [GestureKind.Tie]: () => {
+        if (!connectable || !props.onEdgeTie) {
+          return null;
+        }
+        tieStroke = { from: w, to: w };
+        return { kind: GestureKind.Tie, start: w };
+      },
+      [GestureKind.PickEdge]: () => (hit.kind === HitKind.Edge ? { kind: GestureKind.PickEdge, edgeId: hit.edgeId } : null),
+      [GestureKind.ResizeMany]: () => null,
+      [GestureKind.TurnMany]: () => null
     };
     active = START[kind]();
     gesturing = active !== null;
@@ -2510,6 +3001,11 @@
       if (e.pointerType === 'mouse' && !e.buttons) {
         hoverElement(w, reachOf(e));
         hoverHandle(w);
+      }
+      hoverPort = e.pointerType === 'mouse' && connectable ? portAt(ports, w, view.zoom) : null;
+      bubbleTint = hoverPort ? bubbleColour(hoverPort) : bubbleTint;
+      if (e.pointerType === 'mouse') {
+        hoverWires(w);
       }
       return;
     }
@@ -2559,15 +3055,20 @@
           copies = new Map();
         }
         props.onLive?.(moved.map((m) => ({ id: m.id, x: m.x, y: m.y })));
-        props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
+        showStackLine(props.onTileDragOver?.([...a.origins.keys()], pointOf(e)) ?? null);
       },
       [GestureKind.Resize]: (a) => {
-        if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id))) {
+        if (a.kind !== GestureKind.Resize || (!far && !resizing.has(a.id) && !overrides.has(a.id))) {
+          return;
+        }
+        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
+        const box = snapResized(a, free, e.shiftKey, e.altKey);
+        if (a.main) {
+          a.dragged = box;
+          showMainResized(a.id, a.main, a.box, box);
           return;
         }
         resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
-        const free = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min, { shift: e.shiftKey, alt: e.altKey }, a.rotation);
-        const box = snapResized(a, free, e.shiftKey, e.altKey);
         overrides = new Map([[a.id, box]]);
         props.onLive?.([{ id: a.id, x: box.x, y: box.y, w: box.w, h: box.h }]);
       },
@@ -2577,7 +3078,23 @@
         }
         const target = a.base + dragAngle(a.centre, a.start, w);
         a.degrees = e.shiftKey ? Math.round(target / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : target;
-        turning = byId.get(a.id)?.members?.length ? null : { id: a.id, degrees: a.degrees };
+        turning = byId.get(a.id)?.members?.length ? new Map() : new Map([[a.id, a.degrees]]);
+      },
+      [GestureKind.ResizeMany]: (a) => {
+        if (a.kind !== GestureKind.ResizeMany || (!far && !overrides.size)) {
+          return;
+        }
+        const to = resizedAt(a.box, a.unit, { x: w.x - a.start.x, y: w.y - a.start.y }, MANY_MIN, { shift: e.shiftKey, alt: e.altKey }, 0);
+        showMany(scaledTo(a.items, a.box, to));
+      },
+      [GestureKind.TurnMany]: (a) => {
+        if (a.kind !== GestureKind.TurnMany || (!far && !spin)) {
+          return;
+        }
+        const swept = dragAngle(a.centre, a.start, w);
+        const degrees = e.shiftKey ? Math.round(swept / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG : swept;
+        spin = { box: a.box, degrees };
+        showMany(turnedAbout(a.items, a.centre, degrees));
       },
       [GestureKind.Marquee]: (a) => {
         if (a.kind !== GestureKind.Marquee || (!far && !a.moved)) {
@@ -2591,10 +3108,18 @@
         if (a.kind !== GestureKind.Connect) {
           return;
         }
-        const c = candidate(a.from, w);
+        magnet = magnetPort(ports, w, MAGNET_REACH_PX / view.zoom, accepts(a.from));
+        underPort = portAt(ports, w, view.zoom);
+        bubbleTint = magnet ? bubbleColour(magnet) : bubbleTint;
+        const c = magnet ? wireTo(a.from, magnet) : underPort ? null : candidate(a.from, w);
         const why = c ? connectionRefusal(placed, edges, lookup, c) : '';
         refusal = why || null;
         ghost = { from: a.from, at: w, ok: c !== null && why === null };
+      },
+      [GestureKind.Tie]: (a) => {
+        if (a.kind === GestureKind.Tie) {
+          tieStroke = { from: a.start, to: w };
+        }
       },
       [GestureKind.PickEdge]: () => {}
     };
@@ -2628,7 +3153,7 @@
         if (a.kind === GestureKind.Pan && !a.moved && e.button === 0) {
           clearSelection();
         }
-        if (a.kind === GestureKind.Pan && a.moved) {
+        if (a.kind === GestureKind.Pan && a.moved && glidesAfterPan(pointerOf(e))) {
           startGlide();
         }
       },
@@ -2654,16 +3179,15 @@
         props.onLive?.([]);
         snapGuides = [];
         const box = overrides.get(a.id);
-        if (box && (box.x !== a.box.x || box.y !== a.box.y)) {
-          props.onMove?.(a.id, box.x, box.y);
-        }
-        if (box) {
-          props.onResize?.(a.id, box.w, box.h);
+        if (a.main && a.dragged) {
+          resizeSetMainBy(a.id, a.main, a.box, a.dragged);
+        } else if (box) {
+          props.onResizeEnd?.(a.id, a.box, { x: box.x, y: box.y, w: box.w, h: box.h });
         }
         settleOverrides();
       },
       [GestureKind.Rotate]: () => {
-        turning = null;
+        turning = new Map();
         if (a.kind === GestureKind.Rotate && a.degrees !== a.base) {
           props.onRotate?.(a.id, a.degrees - a.base);
         }
@@ -2678,8 +3202,12 @@
         if (a.kind !== GestureKind.Connect) {
           return;
         }
-        const c = candidate(a.from, w);
+        const target = magnetPort(ports, w, MAGNET_REACH_PX / view.zoom, accepts(a.from));
+        const c = target ? wireTo(a.from, target) : portAt(ports, w, view.zoom) ? null : candidate(a.from, w);
         ghost = null;
+        wiringFrom = null;
+        magnet = null;
+        underPort = null;
         refusal = null;
         if (!c || connectionRefusal(placed, edges, lookup, c) !== null) {
           return;
@@ -2689,6 +3217,15 @@
           props.onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
         }
       },
+      [GestureKind.Tie]: () => {
+        tieStroke = null;
+        const tie = a.kind === GestureKind.Tie ? tieAcross(curves.map((c) => ({ id: c.edge.id, curve: c.curve })), a.start, w) : null;
+        if (tie) {
+          props.onEdgeTie?.(tie.ids, { id: crypto.randomUUID(), ...tie.at });
+        }
+      },
+      [GestureKind.ResizeMany]: () => a.kind === GestureKind.ResizeMany && endMany(a.items),
+      [GestureKind.TurnMany]: () => a.kind === GestureKind.TurnMany && endMany(a.items),
       [GestureKind.PickEdge]: () => {
         if (a.kind !== GestureKind.PickEdge) {
           return;
@@ -2705,12 +3242,19 @@
   }
 
   function cancelGesture() {
+    if (active?.kind === GestureKind.Resize && active.main) {
+      unshowMainResized(active.id);
+    }
     active = null;
-    turning = null;
+    turning = new Map();
+    spin = null;
     gesturing = false;
     resizing = new Set();
     marquee = null;
     ghost = null;
+    wiringFrom = null;
+    magnet = null;
+    tieStroke = null;
     refusal = null;
     settleOverrides();
   }
@@ -2739,7 +3283,14 @@
     select(clicked(selected, id, toggle));
   }
 
+  function showStackLine(over: FrameTarget | null) {
+    const doc = over ? liveOf(over.frameId)?.doc : null;
+    const drop = over && doc ? stackLineAt(doc, [over.at.x * doc.width, over.at.y * doc.height]) : null;
+    frameGuides = over && drop ? { nodeId: over.frameId, guides: [], gaps: [], drop } : null;
+  }
+
   function endDrag(ids: string[], e: PointerEvent) {
+    frameGuides = null;
     snapGuides = [];
     snapSpacing = [];
     props.onLive?.([]);
@@ -2799,7 +3350,7 @@
       view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
-    view = panBy(view, { x: -e.deltaX, y: -e.deltaY });
+    view = panBy(view, wheelPan(e));
   }
 
 
@@ -2872,6 +3423,71 @@
   }
 
   const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+
+  const holderOf = (id: string) => placed.find((t) => t.members?.includes(id)) ?? null;
+
+  function alignInHolder(id: string): ((edge: Edge) => void) | null {
+    const holder = holderOf(id);
+    const [tile] = placedBoxes([id]);
+    return holder && tile ? (edge) => placeTiles(alignWithin(tile, { id: holder.id, x: holder.x, y: holder.y, width: holder.w, height: holder.h }, edge)) : null;
+  }
+
+  const FLIP_SUMMARY: Record<Flip, string> = { [Flip.Horizontal]: 'Flipped horizontally', [Flip.Vertical]: 'Flipped vertically' };
+
+  const nodeBox = (id: string): Placed | null => {
+    const t = byId.get(id);
+    return t ? { id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 } : null;
+  };
+
+  function flipOwn(id: string, flip: Flip, rotation: number) {
+    const box = nodeBox(id);
+    const session = saverOf(id);
+    if (!box) {
+      return;
+    }
+    mirrorAround(byId.get(id)?.members ?? [], box, flip);
+    if (session) {
+      commit(id, { ok: true, doc: flipStage(session.history.present, flip) }, FLIP_SUMMARY[flip]);
+    }
+    if (rotation !== box.rotation) {
+      props.onRotate?.(id, rotation - box.rotation);
+    }
+  }
+
+  function mirrorAround(ids: readonly string[], about: Placed, flip: Flip) {
+    const boxes = ids.flatMap((id) => nodeBox(id) ?? []);
+    const mirrored = mirrorGroup(about, boxes, flip);
+    placeTiles(mirrored.filter((m, i) => m.x !== boxes[i].x || m.y !== boxes[i].y).map(({ id, x, y }) => ({ id, x, y })));
+    for (const m of mirrored) {
+      flipOwn(m.id, flip, m.rotation);
+    }
+  }
+
+  function flipNodes(ids: readonly string[], flip: Flip) {
+    const flippable = ids.filter((id) => holdsDoc(summaries.get(id)?.type ?? '') && !byId.get(id)?.locked);
+    const boxes = flippable.flatMap((id) => nodeBox(id) ?? []);
+    if (!boxes.length) {
+      return;
+    }
+    const [left, top] = [Math.min(...boxes.map((b) => b.x)), Math.min(...boxes.map((b) => b.y))];
+    const about: Placed = boxes.length === 1 ? boxes[0] : { id: '', x: left, y: top, w: Math.max(...boxes.map((b) => b.x + b.w)) - left, h: Math.max(...boxes.map((b) => b.y + b.h)) - top, rotation: 0 };
+    const run = () => mirrorAround(flippable, about, flip);
+    if (props.onBatch) {
+      props.onBatch(run);
+      return;
+    }
+    run();
+  }
+
+  function stackFrameNode(id: string): boolean {
+    const session = kindOfNode(id) === FrameKind.Frame ? saverOf(id) : null;
+    const result = session ? stackFrame(session.history.present, crypto.randomUUID().slice(0, 8)) : null;
+    if (!result?.ok) {
+      return false;
+    }
+    commit(id, result, 'Added auto layout');
+    return true;
+  }
   const alignRun = (id: AlignActionId) => (ids: string[]) => alignHere(ids, ALIGN_EDGE[id]);
 
   function selectSibling(direction: Direction) {
@@ -2896,9 +3512,18 @@
     menuAt = at;
   }
 
+  const VIEW_MENU_IDS: ReadonlySet<SelectionActionId> = new Set(['export']);
+  let viewMenu = $state<{ at: Point; id: string } | null>(null);
+
   function openMenuAt(at: Point) {
     const e = { clientX: at.x, clientY: at.y };
     if (suppressMenu || !spec.chrome || openElementMenu(e)) {
+      return;
+    }
+    const world = toWorld(view, local(e));
+    const viewId = viewLabelIndex.topAt(world) ?? viewAt(bpViews, world)?.frame.id;
+    if (viewId) {
+      viewMenu = { at, id: viewId };
       return;
     }
     const node = topNodeAt(toWorld(view, local(e)));
@@ -2947,13 +3572,24 @@
     scaleBy: (factor) => zoomStep(factor)
   };
 
+  function pickedHost(): HostBox & { id: string } | null {
+    const nodeId = inside?.nodeId;
+    const box = nodeId && picks.length === 1 && picks[0] === ownOf(nodeId) ? hostBoxOf(nodeId) : null;
+    return box && nodeId ? { ...box, id: nodeId } : null;
+  }
+
   function nudgePicks(dx: number, dy: number): boolean {
+    const host = pickedHost();
+    if (host) {
+      placeTiles([{ id: host.id, x: host.x + dx, y: host.y + dy }]);
+      return true;
+    }
     const nodeId = inside?.nodeId;
     const tools = nodeId && picks.length ? toolsOf(nodeId) : null;
     if (!nodeId || !tools) {
       return false;
     }
-    const at = scoped(tools.doc, picks, tools.frame);
+    const at = scoped(tools.doc, picks, tools.frame, nodeId);
     const result = at ? nudgeClips(at.view, at.ids, at.frame, [dx, dy], savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, GRIP_SUMMARY[Grip.Move]);
@@ -2967,7 +3603,7 @@
     if (!nodeId || !tools) {
       return false;
     }
-    const at = scoped(tools.doc, picks, tools.frame);
+    const at = scoped(tools.doc, picks, tools.frame, nodeId);
     const result = at ? alignSpace(at.view, at.ids, at.frame, propBoxes(at.view), edge, savers.get(nodeId)?.mode ?? EditMode.Design) : null;
     if (at && result?.ok) {
       commit(nodeId, { ok: true, doc: at.merge(result.doc) }, `Aligned ${edge}`);
@@ -2987,22 +3623,35 @@
     }
     for (const id of selected) {
       const t = byId.get(id);
-      if (t) {
+      if (t && !t.locked) {
         props.onMove?.(id, t.x + dx, t.y + dy);
       }
     }
   }
 
+  function enterNode() {
+    const only = selected.length === 1 ? selected[0] : null;
+    const doc = only ? liveOf(only)?.doc : null;
+    const children = only && doc ? enteredClips(kindOfNode(only), doc) : [];
+    if (only && children.length) {
+      pickMany(only, children);
+      return;
+    }
+    enterSelected(selected, summaries);
+  }
+
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
-    add: (c) => c.id === 'add' && addAtCentre(c.what),
+    opacity: (c) => c.id === 'opacity' && fadeTiles(selected, c.opacity),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
     align: (c) => c.id === 'align' && alignHere(selected, c.edge),
     tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
-    'wrap-stack': () => shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected),
+    distribute: (c) => c.id === 'distribute' && placeTiles(distributeTiles(placedBoxes(selected), c.axis)),
+    'wrap-stack': () => (selected.length === 1 && stackFrameNode(selected[0])) || (shownFor('wrap-stack', selectedSummaries) && props.onWrapStack?.(selected)),
+    flip: (c) => c.id === 'flip' && flipNodes(selected, c.flip),
     'edit-mode': () => editorMode.toggleMotion(),
     'code-mode': () => editorMode.toggleCode(),
     timeline: () => editorMode.toggleTimeline(),
-    enter: () => enterSelected(selected, summaries),
+    enter: () => enterNode(),
     'select-next': () => selectSibling(Direction.Next),
     'select-previous': () => selectSibling(Direction.Previous),
     tool: (c) => {
@@ -3033,10 +3682,17 @@
     undo: () => props.onUndo?.(),
     redo: () => props.onRedo?.(),
     group: () => props.onGroup?.(selected),
+    frame: () => props.onFrame?.(selected),
     ungroup: () => props.onUngroup?.(selected),
     'bring-front': () => props.onRestack?.(selected, Stack.Front),
     'send-back': () => props.onRestack?.(selected, Stack.Back),
+    'bring-forward': () => props.onRestack?.(selected, Stack.Forward),
+    'send-backward': () => props.onRestack?.(selected, Stack.Backward),
+    rename: () => layersSource.askRename(),
+    'toggle-hidden': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Hidden),
+    'toggle-locked': () => selected.length && props.onToggleFlag?.(selected, NodeFlag.Locked),
     help: () => (shortcutHelp.open = true),
+    export: () => selected.length && SELECTION_RUN.export(selected),
     view: (c) => {
       if (c.id === 'view') {
         frameViews.flip(c.view);
@@ -3045,14 +3701,27 @@
   };
 
   $effect(() => {
+    zoomLevel.show(view.zoom);
+  });
+
+  $effect(() => {
     const asked = zoomRequest.current;
     if (asked) {
       untrack(() => runPaletteCommand(asked.command));
     }
   });
 
+  function fadeTiles(ids: readonly string[], opacity: number) {
+    for (const id of ids) {
+      const session = saverOf(id);
+      if (session) {
+        commit(id, tileFaded(session.history.present, opacity), `Opacity ${Math.round(opacity * 100)}%`);
+      }
+    }
+  }
+
   function runPaletteCommand(command: Command) {
-    if (inside?.level.clip && picks.length && canRunInFrame(command)) {
+    if (picksOwnKeys(inside, picks) && canRunInFrame(command)) {
       void runFrameAction(command);
       return;
     }
@@ -3066,6 +3735,10 @@
     if (frameDialog) {
       return;
     }
+    if (!isTypingTarget(e.target) && typeAhead.take(e, performance.now())) {
+      e.preventDefault();
+      return;
+    }
     markBusy();
     altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
@@ -3076,12 +3749,20 @@
       endCrop(e.key === 'Enter');
       return;
     }
-    const group = e.key === 'Escape' && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
+    if (e.key === 'Escape' && !typing && !isTypingTarget(e.target) && frameBar.disarm()) {
+      return;
+    }
+    const up = climbsUp(e);
+    const group = up && inside && picks.length === 1 ? groupOfPick(inside.nodeId) : null;
     if (inside && group) {
       pickMany(inside.nodeId, [group]);
       return;
     }
-    if (e.key === 'Escape' && inside?.level.clip) {
+    if (up && inside?.level.clip && !leaveLevel(frameChrome(kindOfNode(inside.nodeId)).root, inside.level)) {
+      select([]);
+      return;
+    }
+    if (up && inside?.level.clip) {
       goInside(inside.nodeId, Gesture.Leave, null);
       return;
     }
@@ -3101,13 +3782,13 @@
     if (!spec.chrome || keyRegion.current !== Region.Canvas) {
       return;
     }
-    const frameAction = inside?.level.clip && picks.length && !typing ? frameKeyAction(e) : null;
+    const frameAction = picksOwnKeys(inside, picks) && !typing ? frameKeyAction(e) : null;
     if (frameAction) {
       e.preventDefault();
       void runFrameAction(frameAction);
       return;
     }
-    const command = matchCanvasShortcut(e);
+    const command = matchCanvasShortcut(e, frameMode);
     if (!command) {
       return;
     }
@@ -3121,15 +3802,15 @@
   let pointer: Point | null = null;
 
   function clipboardTarget(e: ClipboardEvent): boolean {
-    return Boolean(spec.chrome && !frameDialog && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
+    return Boolean(spec.chrome && !frameDialog && !typing && keyRegion.current === Region.Canvas && e.clipboardData && !isTypingTarget(e.target));
   }
 
-  const framePicks = (): string[] => (inside && picks.length && !frameChrome(kindOfNode(inside.nodeId)).selectsOwnClip ? picks : []);
+  const framePicks = (): string[] => (inside && picks.length && frameChrome(kindOfNode(inside.nodeId)).root !== Root.Own ? picks : []);
 
   function clipOfSelection(): ClipboardPayload | null {
     const tools = inside && framePicks().length ? toolsOf(inside.nodeId) : null;
     if (inside && tools) {
-      const elements = copyElements(tools.doc, picks);
+      const elements = copyElements(homed(tools.doc, inside.nodeId), picks);
       elementClipboard.copyElements(inside.nodeId, [...picks], elements);
       return { elements: elementClipboard.elements! };
     }
@@ -3303,6 +3984,12 @@
     'section-selection': (ids) => props.onSection?.(ids),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => duplicateTiles(ids),
+    rename: (ids) => {
+      const tile = byId.get(ids[0]);
+      if (tile) {
+        startNaming(tile);
+      }
+    },
     'connect-new': () => {
       if (selection.box) {
         connectPickerAt = { x: selection.box.x + selection.box.width + 24, y: selection.box.y };
@@ -3328,6 +4015,8 @@
     paste: () => menuAt && void pasteSystem(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
+    hide: (ids) => props.onToggleFlag?.(ids, NodeFlag.Hidden),
+    lock: (ids) => props.onToggleFlag?.(ids, NodeFlag.Locked),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     'combine-video': (ids) => props.onCombineScenes?.(ids),
     'remove-background': (ids) => props.onImageTool?.(ids[0], ImageTool.RemoveBackground),
@@ -3337,16 +4026,12 @@
     reframe: (ids) => props.onReframe?.(ids[0]),
     'split-layers': (ids) => props.onImageTool?.(ids[0], ImageTool.SplitLayers),
     'layers-to-frame': (ids) => props.onLayersToFrame?.(ids[0]),
-    export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && !frameChrome(kindOfNode(ids[0])).selectsOwnClip ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
+    export: (ids) => (inside && framePicks().length ? props.onExportElements?.(inside.nodeId, framePicks()) : coreFrames.some((f) => f.id === ids[0]) && ids.length === 1 && frameChrome(kindOfNode(ids[0])).root !== Root.Own ? (frameDialog = { nodeId: ids[0], dialog: FrameDialog.Export }) : props.onExport?.(ids)),
     'frame-history': (ids) => historyPanel.show(ids[0]),
     delete: (ids) => props.onDelete?.(ids)
   };
 
   function runSelectionAction(id: SelectionActionId) {
-    if (pickedToolbarActions.includes(id)) {
-      runElementMenu(id);
-      return;
-    }
     if (selected.length === 1 && isFrameModeAction(id)) {
       editorMode.set(FRAME_MODE_ACTIONS[id]);
       return;
@@ -3361,11 +4046,8 @@
   }
 
   const selectedSummaries = $derived((props.nodeSummaries ?? []).filter((n) => selected.includes(n.id)));
-  const pickedToolbarActions = $derived.by(() => {
-    const doc = inside && picks.length ? liveOf(inside.nodeId)?.doc : null;
-    return doc ? elementToolbarActions(doc, picks) : [];
-  });
   const selectionEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
+  const selectionMenuIds = $derived(new Set([...canvasMenuIds()].filter((id) => (id !== 'copy-link' || props.onCopyLink) && enabledFor(id, selectedSummaries, selectionEdges, props.stale ?? []).enabled)));
   const selectionMedium = $derived(
     selectedSummaries.length && selectedSummaries.every((n) => n.type === selectedSummaries[0].type) ? (selectedSummaries[0].type as GenPropertyType) : null
   );
@@ -3424,7 +4106,7 @@
     untrack(() => {
       select([pick.nodeId]);
       goInside(pick.nodeId, Gesture.Click, clip);
-      requestAnimationFrame(zoomToSelection);
+      requestAnimationFrame(centreSelection);
     });
   });
 
@@ -3460,7 +4142,7 @@
     const files = [...(e.dataTransfer?.files ?? [])];
     if (files.length && props.onUpload) {
       e.preventDefault();
-      files.forEach((file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? toFlow(at) : undefined));
+      files.forEach((file) => props.onUpload?.(file, toFlow(at)));
       return;
     }
     const feedImage = parseFeedImageDrag(e.dataTransfer?.getData(CANVAS_DRAG_FEED_IMAGE) ?? '');
@@ -3543,7 +4225,7 @@
         doc={timeline.doc}
         frame={timeline.frame}
         selection={picks.length > 1 ? picks : inside?.level.clip ? [inside.level.clip] : []}
-        mode={frameMode(timeline.doc)}
+        mode={frameMode}
         onmode={() => editorMode.toggleMotion()}
         onframe={(f) => scrubTo(nodeId, f)}
         onselect={(ids) => (ids.length > 1 ? pickMany(nodeId, ids) : goInside(nodeId, Gesture.Click, ids[0] ?? null))}
@@ -3553,6 +4235,7 @@
         ram={ramNode === nodeId ? ramRuns : []}
         onram={() => cacheRam(nodeId, timeline!.doc)}
         {assetUrl}
+        scale={timeline.scale}
         onpin={props.onPinAtPlayhead ? () => props.onPinAtPlayhead?.(nodeId, msOfFrame(timeline?.frame ?? 0, timeline?.doc.fps ?? 1)) : undefined}
         onchange={TIMELINE_CHANGE[timeline.access](nodeId)}
       />
@@ -3575,19 +4258,19 @@
       pickHover = null;
     }}
     class:panning={space}
-    style:cursor={handleCursor}
+    style:cursor={wireCursor ?? handleCursor}
     data-owns-pinch
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={resizing} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
-          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
+          <CoreTextEdit layout={edit.layout} look={edit.look} text={edit.text} typedAhead={edit.typed} runs={edit.runs} lists={edit.lists} styled={edit.styled} base={edit.base} body={edit.body} clipId={edit.clip} oncommit={stopTyping} />
         {/if}
         {#each typing?.nodeId === frame.id || cropping?.nodeId === frame.id ? [] : marksIn(frame.id) as mark (mark.clip)}
           <FrameSelection clip={mark.clip} quad={mark.quad} kind={mark.kind} highlight={mark.highlight} pivot={frameViews.isOn(FrameView.Pivot) && picks.length === 1 ? mark.pivot : null} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, mark.clip, grip, handle, e)} />
@@ -3601,7 +4284,7 @@
         {/if}
         {@const plus = variantMark(frame.id)}
         {#if plus}
-          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.compId)} />
+          <VariantPlus rect={plus.rect} onadd={() => addVariantAt(frame.id, plus.hostId)} />
         {/if}
         {@const crop = cropMark(frame.id)}
         {#if crop}
@@ -3611,7 +4294,7 @@
         {#if group}
           <FrameSelection clip="" quad={group} kind={SelectionKind.Group} turn={frame.rotation} ongrab={(grip, handle, e) => grab(frame.id, null, grip, handle, e)} />
         {/if}
-        {@const guideArea = inside?.nodeId === frame.id ? frameArea(frame.id) : null}
+        {@const guideArea = inside?.nodeId === frame.id || frameGuides?.nodeId === frame.id ? frameArea(frame.id) : null}
         {@const measuredGapsIn = measuredIn(frame.id)}
         {#if guideArea && ((frameGuides?.nodeId === frame.id && (frameGuides.guides.length || frameGuides.gaps.length || frameGuides.drop)) || measuredGapsIn.length)}
           <FrameGuides area={guideArea.rect} size={guideArea.size} guides={frameGuides?.nodeId === frame.id ? frameGuides.guides : []} gaps={frameGuides?.nodeId === frame.id ? frameGuides.gaps : []} drop={frameGuides?.nodeId === frame.id ? (frameGuides.drop ?? null) : null} measured={measuredGapsIn} />
@@ -3626,7 +4309,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode(tools.doc)} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} side={alignSide(frameScreenRect(view, frame), { width: area.width, bottom: area.height - docked })} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
@@ -3645,10 +4328,13 @@
         {/if}
         {@const viewLive = inside?.nodeId === nodeId ? viewLives.get(frame.id) : null}
         {#if viewLive}
-          <FrameTools doc={viewLive.doc} frame={frameOfLive(viewLive)} views={contentViews(frameViews.all)} boxes={outlineBoxes(frame.id, viewLive.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} picks={[]} tool={DrawTool.Select} side={AlignSide.Below} apply={() => {}} ondrawn={() => {}} onleave={() => {}} />
+          <FrameTools doc={viewLive.doc} frame={frameOfLive(viewLive)} views={contentViews(frameViews.all)} boxes={outlineBoxes(frame.id, viewLive.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} picks={[]} tool={DrawTool.Select} apply={() => {}} ondrawn={() => {}} onleave={() => {}} />
         {/if}
       {/snippet}
     </FrameOverlays>
+    {#if manyQuad}
+      <FrameSelection clip="" quad={manyQuad} kind={SelectionKind.Many} ongrab={grabMany} />
+    {/if}
     <PrototypePlayerHost frames={playerFrames} />
     {#if showsPrototype}
       <PrototypeArrows {view} frames={overlayFrames} links={arrowLinks} elements={linkElements()} handle={pickedHandle()} aimingFrom={prototypeLink.draft ? (inside?.nodeId ?? null) : null} onpick={openLink} ondrag={dragLink} />
@@ -3667,6 +4353,41 @@
           </g>
         {/each}
       </svg>
+      <svg class="wire-magnet" aria-hidden="true">
+        <defs>
+          <filter id="wire-goo" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation={4 / view.zoom} />
+            <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" />
+          </filter>
+        </defs>
+        {#each dimmedPorts as p (`${p.nodeId}:${p.side}:${p.handle}`)}
+          <circle class="port-dim" cx={p.x} cy={p.y} r={7 / view.zoom} />
+        {/each}
+        {#if bubble && bubble.r > 0}
+          <g class="goo" class:snapping={magnet !== null} style:--bubble={bubbleTint} filter="url(#wire-goo)" data-testid="wire-magnet-bubble" data-target={magnet ? `${magnet.nodeId}:${magnet.handle ?? ''}` : ''}>
+            <circle cx={bubble.x} cy={bubble.y} r={bubble.r} />
+            {#if bubble.er > 0}
+              <circle cx={bubble.ex} cy={bubble.ey} r={bubble.er} />
+            {/if}
+          </g>
+          <circle class="goo-rim" style:--bubble={bubbleTint} cx={bubble.x} cy={bubble.y} r={bubble.r} stroke-width={1 / view.zoom} />
+        {/if}
+        {#if tieStroke}
+          <line class="tie-stroke" data-testid="tie-stroke" x1={tieStroke.from.x} y1={tieStroke.from.y} x2={tieStroke.to.x} y2={tieStroke.to.y} stroke-width={1.5 / view.zoom} />
+        {/if}
+      </svg>
+      {#each ties as t (t.tie.id)}
+        <div class="wire-tie" data-testid="wire-tie" data-tie={t.tie.id} data-wires={t.ids.length} style={`transform: translate(${t.tie.x}px, ${t.tie.y}px) scale(${1 / view.zoom})`}>
+          <button type="button" class="wire-tie-clip" aria-label="Move cable tie" onpointerdown={(e) => grabTie(e, t.tie, t.ids)}></button>
+          <button type="button" class="wire-tie-cut" aria-label="Remove cable tie" data-testid="wire-tie-remove" onpointerdown={(e) => e.stopPropagation()} onclick={() => props.onEdgeTie?.(t.ids, null)}>×</button>
+        </div>
+      {/each}
+      {#if hoverWire && !ghost}
+        {@const c = curves.find((x) => x.edge.id === hoverWire)}
+        {#if c}
+          <button type="button" class="wire-cut" data-testid="wire-cut" aria-label="Cut wire" style={`transform: translate(${c.curve.mid.x}px, ${c.curve.mid.y}px) scale(${1 / view.zoom})`} onpointerdown={(e) => e.stopPropagation()} onclick={() => cutWire(c.edge.id)}>×</button>
+        {/if}
+      {/if}
       {#each [...copies] as [id, c] (id)}
         <div class="gpu-copy-ghost" data-testid="gpu-copy-ghost" style={`transform: translate(${c.x}px, ${c.y}px);width:${c.w}px;height:${c.h}px`}></div>
       {/each}
@@ -3681,6 +4402,7 @@
           aria-label={t.displayName || t.kind || 'node'}
           aria-pressed={on}
           data-testid="gpu-node"
+          {...{ [CANVAS_TILE_ATTR]: '' }}
           data-id={t.id}
           data-kind={t.kind}
           data-core={coreDrawn.has(t.id) || undefined}
@@ -3745,7 +4467,7 @@
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
   {/if}
 
-  {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder && !inside}
+  {#if props.onDraw && frameBar.tool !== DrawTool.Select && frameBar.tool !== DrawTool.ShapeBuilder}
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
@@ -3762,7 +4484,7 @@
       onpick={addAtCentre}
       models={hotTiles((medium) => props.modelChoicesFor?.(medium) ?? [])}
       onmodel={(model) => props.onCreateFilled?.(hotDrag(model), viewCentre())}
-      onupload={props.onUpload ? (file) => props.onUpload?.(file, isSvgFile(file) || isLottieFile(file) ? viewCentre() : undefined) : undefined}
+      onupload={props.onUpload ? (file) => props.onUpload?.(file, viewCentre()) : undefined}
       oncloud={props.onCloud && !isOff(LocalOff.CloudImport) ? () => props.onCloud?.('google_drive', CloudMode.Import, null, viewCentre()) : undefined}
       ontemplate={props.onTemplate ? (id) => props.onTemplate?.(id, viewCentre()) : undefined}
       techniques={props.techniques}
@@ -3795,16 +4517,12 @@
       choicesFor={props.modelChoicesFor}
       catalogueSynced={selectionMedium && props.catalogueSyncedFor ? props.catalogueSyncedFor(selectionMedium) : true}
       runQuote={props.runQuoteFor?.(selected) ?? null}
-      frameTools
-      musicEnabled={props.musicEnabled}
-      withheld={props.onCopyLink ? [] : ['copy-link']}
       onrun={() => props.onRunNode?.(selected[0])}
       variantsInFlight={selected.length === 1 ? (props.variantsInFlightFor?.(selected[0]) ?? 0) : 0}
       oncancelvariants={() => props.onCancelVariants?.(selected[0])}
       history={selected.length === 1 ? (props.historyFor?.(selected[0]) ?? null) : null}
       onstop={() => props.onCancelRun?.(selected[0])}
       onaction={runSelectionAction}
-      elementActions={pickedToolbarActions}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
       onsectionchange={(id, patch) => props.onSectionChange?.(id, patch)}
       oncolourchange={(tag) => props.onColourChange?.(selected, tag)}
@@ -3828,6 +4546,7 @@
     <FrameDialogs
       dialog={frameDialog.dialog}
       {nodeId}
+      box={byId.get(nodeId) ?? null}
       projectId={page.params.projectId ?? ''}
       canvasId={page.params.canvasId ?? ''}
       session={dialogSession}
@@ -3836,7 +4555,7 @@
       frame={frameOfLive(liveOf(nodeId)!)}
       onedit={(result, summary) => commit(nodeId, result, summary)}
       onswitch={(next) => (frameDialog = { nodeId, dialog: next })}
-      onimages={(rows) => props.onExportRows?.([nodeId], rows) ?? Promise.resolve('Export failed')}
+      onimages={(rows) => props.onExportRows?.([nodeId], rows, frameOfLive(liveOf(nodeId)!) / liveOf(nodeId)!.doc.fps) ?? Promise.resolve('Export failed')}
       onpreview={(doc) => showDialogDoc(nodeId, doc)}
       onclose={() => closeDialog(nodeId)}
     />
@@ -3851,8 +4570,12 @@
     <CommandPalette onrun={runPaletteCommand} />
   {/if}
 
+  {#if viewMenu && spec.chrome}
+    <CanvasContextMenu at={viewMenu.at} summaries={(props.nodeSummaries ?? []).filter((n) => n.id === baseNodeId(viewMenu!.id))} available={VIEW_MENU_IDS} onpick={() => props.onExport?.([viewMenu!.id])} onclose={() => (viewMenu = null)} />
+  {/if}
+
   {#if menuAt && spec.chrome}
-    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={canvasMenuIds(selected.length)} layers={menuLayers} onpick={runSelectionAction} onlayer={(id) => select([id])} onclose={() => (menuAt = null)} />
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={selectionMenuIds} layers={menuLayers} onpick={runSelectionAction} onlayer={(id) => select([id])} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}
@@ -4019,6 +4742,88 @@
 
   .gpu-edges.core {
     visibility: hidden;
+  }
+
+  .wire-magnet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .wire-magnet .goo {
+    fill: var(--bubble, var(--ui-accent));
+    opacity: 0.18;
+  }
+
+  .wire-magnet .goo.snapping {
+    opacity: 0.25;
+  }
+
+  .wire-magnet .goo-rim {
+    fill: none;
+    stroke: var(--bubble, var(--ui-accent));
+    opacity: 0.5;
+  }
+
+  .wire-magnet .port-dim {
+    fill: var(--paper, #fff);
+    opacity: 0.7;
+  }
+
+  .wire-magnet .tie-stroke {
+    stroke: var(--ui-accent, #0a84ff);
+    stroke-dasharray: 4 3;
+  }
+
+  .wire-tie,
+  .wire-cut {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    pointer-events: auto;
+  }
+
+  .wire-tie-clip {
+    position: absolute;
+    left: -6px;
+    top: -12px;
+    width: 12px;
+    height: 24px;
+    border-radius: var(--ui-radius-full, 999px);
+    background: var(--ui-panel-raised, #fff);
+    border: 1px solid var(--ink-soft, #6e6e73);
+    cursor: grab;
+  }
+
+  .wire-tie-cut,
+  .wire-cut {
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border-radius: var(--ui-radius-full, 999px);
+    background: var(--ui-panel-raised, #fff);
+    border: 1px solid var(--ink-soft, #6e6e73);
+    color: var(--ink, #1d1d1f);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .wire-tie-cut {
+    position: absolute;
+    left: 18px;
+    top: -14px;
+    margin: 0;
+    opacity: 0;
+  }
+
+  .wire-tie:hover .wire-tie-cut {
+    opacity: 1;
   }
 
   .wire-iterate-badge circle {

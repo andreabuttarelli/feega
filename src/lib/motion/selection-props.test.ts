@@ -98,7 +98,7 @@ describe('fields shared by a selection', () => {
   it('are the style fields every selected kind declares', () => {
     const keys = keysOf(texts, ['t1', 't2']);
 
-    expect(keys).toEqual(expect.arrayContaining(['color', 'font', 'size', 'weight']));
+    expect(keys).toEqual(expect.arrayContaining(['font', 'size', 'weight']));
     expect(keys).not.toContain('text');
   });
 
@@ -110,11 +110,20 @@ describe('fields shared by a selection', () => {
     expect(keys).not.toContain('stroke');
   });
 
+  it('never offer the legacy paint fields the fill and stroke stacks replaced', () => {
+    const two = shape(shape(newMotionDoc(MotionFormat.Landscape), 'a', 0.2, '#ff0000'), 'b', 0.6, '#00ff00');
+    const keys = keysOf(two, ['a', 'b']);
+
+    for (const legacy of ['fillKind', 'fill', 'fill2', 'gradientAngle', 'strokeKind', 'stroke', 'strokeWidth']) {
+      expect(keys).not.toContain(legacy);
+    }
+  });
+
   it('show a shared value, and Mixed where the clips differ', () => {
     const fields = sharedFields(['t1', 't2'].map((id) => findClip(texts, id)!.clip));
     const valueOf = (key: string) => fields.find((f) => f.field.key === key)!.value;
 
-    expect(valueOf('color')).toBe('#ffffff');
+    expect(valueOf('weight')).not.toBe(MIXED);
     expect(valueOf('size')).toBe(MIXED);
   });
 

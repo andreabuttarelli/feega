@@ -114,7 +114,11 @@ export function strokesOf(props: LegacyStroke): Stroke[] {
 
 export const newStroke = (color = DEFAULT_COLOR): Stroke => strokeSchema.parse({ paint: { type: FillType.Solid, color } });
 
-export const addStroke = (strokes: readonly Stroke[]): Stroke[] => [...strokes, newStroke()].slice(0, MAX_STROKES);
+const ONE_PX = 1;
+
+const hairline = (short: number): number => Math.min(MAX_STROKE_WIDTH, ONE_PX / short);
+
+export const addStroke = (strokes: readonly Stroke[], short: number): Stroke[] => [...strokes, { ...newStroke(), width: hairline(short) }].slice(0, MAX_STROKES);
 
 export const removeStroke = (strokes: readonly Stroke[], i: number): Stroke[] => strokes.filter((_, at) => at !== i);
 

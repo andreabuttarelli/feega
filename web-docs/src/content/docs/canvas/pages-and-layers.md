@@ -13,7 +13,8 @@ Every canvas of the project is a page.
 
 - **Switch** by clicking a page. It opens on its own content, where you last left it or fitted to it.
 - **New page** with **+**.
-- **Rename** with a double click on the current page, or from its **…** menu.
+- **Rename** with a double click on any page (it opens, then its name turns editable), or from its **…** menu.
+- A long list scrolls inside the panel; drag the handle under it to show more rows.
 - **Versions** and **Comments** of the current page are in its **…** menu (shown on hover).
 - **Collapse** Pages with its chevron; drag the line below the list to resize it.
 - **Delete** from the same menu, after a confirmation. The last page cannot be deleted.
@@ -31,3 +32,7 @@ The chevron of a frame, stack, group or instance folds its row. A fold is kept i
 The top-left of the canvas keeps only the main menu and the project switcher.
 
 Drag a shape, text, frame or stack tile from the add menu onto a Layers row to create it there: above or below the row, or inside a frame or group. Undo removes it.
+
+Dragging a layer onto the middle of a frame, group or stack row puts it inside, even when that frame is empty; the top and bottom edges of the row drop it above or below.
+
+A free element row drags into a frame too: drop it on the frame row to put it inside, or on a layer of the open frame to land above, below or inside that layer, a stack included. The row under the pointer shows where it lands.

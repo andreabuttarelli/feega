@@ -77,6 +77,8 @@ export type Item = {
   sizing: { width: Sizing; height: Sizing };
   min?: Partial<Size>;
   max?: Partial<Size>;
+  minPercent?: Partial<Size>;
+  maxPercent?: Partial<Size>;
   absolute?: boolean;
   grow?: Partial<Size>;
   percent?: Partial<Size>;
@@ -161,6 +163,12 @@ function baselineLine(heights: number[], baselines: number[]): { baseline: numbe
   const baseline = Math.max(0, ...baselines);
   return { baseline, height: baseline + Math.max(0, ...heights.map((h, i) => h - baselines[i])) };
 }
+
+const shareOf = (part: Partial<Size> | undefined, room: Size): Partial<Size> => Object.fromEntries(DIMS.flatMap((d) => (part?.[d] === undefined ? [] : [[d, (room[d] * part[d]!) / 100]])));
+
+const limited = (k: Item, room: Size): Item => (k.minPercent || k.maxPercent ? { ...k, min: { ...k.min, ...shareOf(k.minPercent, room) }, max: { ...k.max, ...shareOf(k.maxPercent, room) } } : k);
+
+const limitedKids = (item: Item, room: Size): Item => ({ ...item, children: item.children?.map((k) => limited(k, room)) });
 
 function clamp(item: Item, dim: Dim, value: number): number {
   const max = item.max?.[dim] ?? Infinity;
@@ -431,10 +439,10 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
   const { main: m, cross: c } = ax;
   const inner = { left: at.left + flow.padding.left, top: at.top + flow.padding.top, width: at.width - PAD.width(flow.padding), height: at.height - PAD.height(flow.padding) };
   if (flow.direction === Direction.Grid) {
-    placeGrid(item, flow, inner, out);
+    placeGrid(limitedKids(item, inner), flow, inner, out);
     return;
   }
-  const kids = flowing(item);
+  const kids = flowing(limitedKids(item, inner));
   const given = new Map(kids.map((k) => [k, { ...fitted(k, flow, inner[c]), ...percented(k, inner) }]));
   const natural = new Map(kids.map((k) => [k, measure(k, given.get(k))[m]]));
   const rows = flow.wrap ? lines(kids, (k) => natural.get(k)!, inner[m], flow.gap) : [kids];

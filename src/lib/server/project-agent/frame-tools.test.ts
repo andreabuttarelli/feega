@@ -16,6 +16,8 @@ vi.mock('$lib/server/repos/motion-templates', () => ({ listOrgTemplates: async (
 vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/assets')>()), listFontAssets: async () => [], listProjectAssets: async () => [] }));
 vi.mock('$lib/server/canvas/sign-media', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/canvas/sign-media')>()), signAssetPaths: async () => new Map(), createAssetSigningDb: () => ({}) }));
 vi.mock('$lib/server/repos/projects', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/projects')>()), findProjectById: async () => ({ id: PROJECT, brandId: null, mode: 'standard' }) }));
+vi.mock('$lib/server/motion/music', () => ({ layMusic: async () => ({ ok: true, assetId: 'a-music', seconds: 30, url: null, source: 'library', track: 'drive' }) }));
+vi.mock('$lib/server/motion/audio-analysis', () => ({ storageAnalysis: () => ({}), analyzeSounds: async (_d: unknown, _s: unknown, _a: unknown, ids: string[]) => Object.fromEntries(ids.map((id) => [id, { version: 1, fps: 100, duration: 30, amp: [], onsets: [], bpm: 120, beats: [0.5, 1, 1.5], speech: [] }])) }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()),
@@ -52,6 +54,23 @@ describe('the canvas chat edits a frame with the same tools as the frame editor'
     expect(JSON.stringify((await head()).tracks)).toContain('Said in the canvas chat');
     const [latest] = await listRevisions(state.db as never, { orgId: ORG, nodeId: NODE });
     expect(latest).toMatchObject({ version: 2, actorKind: 'agent' });
+  });
+
+  it('add_music lays a track from the canvas chat and MCP, not only from the editor turn', async () => {
+    const out = await call(tools()[FRAME_TOOL], { tool: 'add_music', input: { mood: 'energetic' } });
+
+    expect(out).toMatchObject({ saved: true, output: { ok: true, track: 'drive' } });
+    expect(JSON.stringify((await head()).tracks)).toContain('a-music');
+    expect(JSON.stringify((await head()).markers)).toContain('beat 1');
+  });
+
+  it('through MCP a component is read by numbered lines and edited by line range', async () => {
+    const t = tools()[FRAME_TOOL];
+    await call(t, { tool: 'write_component', input: { name: 'Card', html: '<div class="c"></div>', css: '.c{inset:0}\n.c{opacity:1}', js: 'tl.from(root,{opacity:0,duration:0.5});', props_schema: { type: 'object', properties: {} } } });
+
+    expect(await call(t, { tool: 'read_component', input: { name: 'Card', file: 'css', offset: 2 } })).toMatchObject({ output: { text: '2\t.c{opacity:1}' } });
+    expect(await call(t, { tool: 'update_components', input: { component: 'Card', edits: [{ file: 'css', lines: [2, 2] }] } })).toMatchObject({ output: { ok: true } });
+    expect((await head()).components.Card.source.css).toBe('.c{inset:0}');
   });
 
   it('node_id addresses a frame that is not open', async () => {

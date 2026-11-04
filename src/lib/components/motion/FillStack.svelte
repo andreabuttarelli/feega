@@ -12,18 +12,20 @@
   import { Adder } from './stack-adder';
   import { FillField, fillKey } from '@feega/motion-core/motion/fill/keys';
   import { KeyMark } from '$lib/motion/timeline-layers';
-  import { stopCss, swatchOf } from '$lib/motion/fill/swatch';
+  import { solidName, stopCss, swatchOf } from '$lib/motion/fill/swatch';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import MediaPicker from './MediaPicker.svelte';
   import type { MediaUploader } from './media-upload';
   import { MediaKind, type MediaPick } from '$lib/motion/media/pick';
+  import { PAINT_GRIP, PAINT_INLINE_INPUT, PAINT_META, PAINT_NAME, PAINT_ROW, PAINT_SWATCH, PAINT_TEXT } from './paint-row';
+  import MinusGlyph from './MinusGlyph.svelte';
 
   const NO_COLOURS = () => [];
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
   type Keys = { mark: (key: string) => KeyMark; toggle: (key: string) => void };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, palette = NO_COLOURS, keys = null, oncrop = null, onchange }: { palette?: () => readonly string[]; oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, gesture = null, palette = NO_COLOURS, keys = null, oncrop = null, open = $bindable(null), onchange }: { open?: number | null; palette?: () => readonly string[]; oncrop?: (() => void) | null; keys?: Keys | null; gesture?: LiveGesture | null; fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const setAdjust = (i: number, current: FillOf<FillType.Image>, key: Adjustment, value: number) => patch(i, { adjust: { ...current.adjust, [key]: value / PERCENT } }, 'Image adjustment');
@@ -38,7 +40,6 @@
   const IMAGE_PATCH = (pick: MediaPick | null): FillPatch => ({ assetId: pick?.assetId ?? '', src: pick?.url });
 
   let swatches = $state<readonly string[]>([]);
-  let open = $state<number | null>(null);
 
   $effect(() => {
     void open;
@@ -55,8 +56,7 @@
   const color = (value: string) => resolveColor(value, tokens);
   const swatch = (fill: Fill) => swatchOf(fill, { color, picture: (f) => assets.find((a) => a.id === f.assetId)?.previewUrl ?? f.src });
 
-  const HEX_DIGITS = /^#/;
-  const rowLabel = (f: Fill) => (f.type === FillType.Solid ? colourAlpha(f.color).base.replace(HEX_DIGITS, '').toUpperCase() : TYPE_LABEL[f.type]);
+  const rowLabel = (f: Fill) => (f.type === FillType.Solid ? solidName(f.color) : TYPE_LABEL[f.type]);
 
   const patch = (i: number, p: FillPatch, summary: string) => onchange(setFill(fills, i, p), summary);
   const percentOf = (e: Event) => Math.max(0, Math.min(PERCENT, Number((e.currentTarget as HTMLInputElement).value))) / PERCENT;
@@ -156,7 +156,7 @@
   {#each topFirst as { fill, index } (index)}
     <div
       bind:this={rowEls[index]}
-      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_56px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !fill.visible && '[&>.dim]:opacity-40')}
+      class={cn(PAINT_ROW, open === index && 'bg-ui-selected', !fill.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
@@ -172,10 +172,10 @@
         drop(index);
       }}
     >
-      <span class="cursor-grab text-ui-text-3 select-none" aria-hidden="true">⋮</span>
+      <span class={PAINT_GRIP} aria-hidden="true">⋮</span>
       <button
         type="button"
-        class={cn('dim size-[18px] rounded-xs border border-ui-divider p-0', FOCUS_RING)}
+        class={PAINT_SWATCH}
         data-testid="fill-swatch"
         aria-label={`Edit ${TYPE_LABEL[fill.type].toLowerCase()} fill`}
         aria-expanded={open === index}
@@ -185,8 +185,12 @@
           toggle(index);
         }}
       ></button>
-      <span class={cn(LABEL, 'dim truncate')} data-testid="fill-label">{rowLabel(fill)}</span>
-      <input class={cn(FIELD_INPUT, 'dim')} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />
+      <span class={PAINT_TEXT}>
+        <span class={PAINT_NAME} data-testid="fill-label">{rowLabel(fill)}</span>
+        <span class={PAINT_META} data-testid="fill-meta">
+          <input class={PAINT_INLINE_INPUT} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />% · {TYPE_LABEL[fill.type]}
+        </span>
+      </span>
       <button
         type="button"
         class={ICON}
@@ -205,7 +209,7 @@
         onclick={(e) => {
           e.stopPropagation();
           remove(index);
-        }}>−</button
+        }}><MinusGlyph /></button
       >
     </div>
 

@@ -100,5 +100,21 @@ describe('loadFonts', () => {
     await fontLoader(read)(ticked, {}, FEEGA_TOKENS);
     expect(asked.find((url) => url.includes('Symbols'))).toContain(`text=${encodeURIComponent('✓')}`);
   });
-});
 
+  it('asks the fallback fonts for the letters a font lacks past Latin, Greek in a mono title', async () => {
+    const asked: string[] = [];
+    const greek = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'αβ', font: 'mono' } }, 'greek'));
+    await fontLoader({ text: async (url: string) => (asked.push(url), CSS), bytes: async () => new Uint8Array() })(greek, {}, FEEGA_TOKENS);
+
+    expect(asked.find((url) => url.includes('family=Noto+Sans&'))).toContain(`text=${encodeURIComponent('αβ')}`);
+  });
+  it('asks a colourless emoji font for the emoji and a CJK font for the ideographs, never the symbol fonts that cannot cover them', async () => {
+    const asked: string[] = [];
+    const mixed = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: '你好 😀 ✓' } }, 'mixed'));
+    await fontLoader({ text: async (url: string) => (asked.push(url), CSS), bytes: async () => new Uint8Array() })(mixed, {}, FEEGA_TOKENS);
+
+    expect(asked.find((url) => url.includes('family=Noto+Emoji'))).toContain(`text=${encodeURIComponent('😀')}`);
+    expect(asked.find((url) => url.includes('family=Noto+Sans+SC'))).toContain(`text=${encodeURIComponent('你好')}`);
+    expect(asked.find((url) => url.includes('Symbols'))).toContain(`text=${encodeURIComponent('✓')}&`);
+  });
+});

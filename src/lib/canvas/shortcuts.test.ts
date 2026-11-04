@@ -1,27 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CANVAS_TILE_ATTR,
   CANVAS_SHORTCUTS,
   canvasGuide,
   NUDGE_STEP,
   preventable,
   NUDGE_STEP_BIG,
-  addableOf,
   matchCanvasShortcut,
+  climbsUp,
   canvasToolKeys,
   nudgeOf,
   type CanvasCommand
 } from './shortcuts';
-import { CANVAS_ADD_BAR } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Command } from '$lib/motion/shortcuts';
 import { Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
+import { Axis } from '$lib/motion/space';
+import { EditMode } from '$lib/motion/edit-mode';
+import { Flip } from '$lib/motion/layer-props';
 
 describe('frame view shortcuts', () => {
   it('toggles the rulers with alt+shift+R even where alt rewrites the key', () => {
     const at = { tagName: 'DIV', isContentEditable: false };
 
     expect(matchCanvasShortcut({ key: 'Â', code: 'KeyR', shiftKey: true, metaKey: false, ctrlKey: false, altKey: true, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'view', view: FrameView.Rulers });
+  });
+
+  it('toggles the rulers with shift+R in Design, as in Figma, not the rectangle tool', () => {
+    expect(matchCanvasShortcut(ev('R', { shiftKey: true }), EditMode.Design)).toEqual({ id: 'view', view: FrameView.Rulers });
+  });
+
+  it('toggles the layout grid with shift+G in Design', () => {
+    expect(matchCanvasShortcut(ev('G', { shiftKey: true }), EditMode.Design)).toEqual({ id: 'view', view: FrameView.Guides });
   });
 
   it('toggles the pixel grid, the guides and the outlines', () => {
@@ -102,15 +113,41 @@ describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
     expect(matchCanvasShortcut(ev('v'))).toEqual({ id: 'tool', tool: DrawTool.Select });
   });
 
+  it('R and O arm the rectangle and the ellipse in Design, as in Figma', () => {
+    expect(matchCanvasShortcut(ev('r'), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Rectangle });
+    expect(matchCanvasShortcut(ev('o'), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Ellipse });
+  });
+
+  it('R and O stay the timeline keys in Motion', () => {
+    expect(matchCanvasShortcut(ev('r'), EditMode.Motion)).toBeNull();
+    expect(matchCanvasShortcut(ev('o'), EditMode.Motion)).toBeNull();
+  });
+
   it('⇧F disegna un frame, come gli altri strumenti della tela', () => {
     expect(matchCanvasShortcut(ev('F', { shiftKey: true, code: 'KeyF' }))).toEqual({ id: 'tool', tool: DrawTool.Frame });
+  });
+
+  it('F draws a frame, as in Figma, in Design and in Motion', () => {
+    expect(matchCanvasShortcut(ev('f', { code: 'KeyF' }), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Frame });
+    expect(matchCanvasShortcut(ev('f', { code: 'KeyF' }), EditMode.Motion)).toEqual({ id: 'tool', tool: DrawTool.Frame });
+  });
+
+  it('the help card names F for the frame tool', () => {
+    expect(CANVAS_SHORTCUTS.find((r) => r.id === 'tool')?.keys).toContain('F');
+  });
+
+  it('in Design R is the rectangle and ⇧R the rulers, as in Figma, and the tooltip says R', () => {
+    expect(matchCanvasShortcut(ev('R', { shiftKey: true }), EditMode.Design)).toEqual({ id: 'view', view: FrameView.Rulers });
+    expect(canvasToolKeys(Command.ToolRectangle, EditMode.Design)).toBe('R');
+    expect(canvasToolKeys(Command.ToolText, EditMode.Design)).toBe('T ⇧T');
+    expect(CANVAS_SHORTCUTS.find((r) => r.id === 'tool')?.keys).toEqual(['V', 'T', 'R', 'O', 'P', 'F']);
   });
 
   it('il tooltip di uno strumento mostra solo i tasti che la tela ascolta', () => {
     expect(canvasToolKeys(Command.ToolText)).toBe('⇧T');
     expect(canvasToolKeys(Command.ToolRectangle)).toBe('⇧R');
     expect(canvasToolKeys(Command.ToolSelect)).toBe('V');
-    expect(canvasToolKeys(Command.ToolFrame)).toBe('⇧F');
+    expect(canvasToolKeys(Command.ToolFrame)).toBe('F ⇧F');
   });
 
   it('⇧L disegna una linea, come gli altri strumenti della tela', () => {
@@ -175,20 +212,21 @@ describe('quello che i tasti fanno sulla tela', () => {
     expect(matchCanvasShortcut(ev('A', { ctrlKey: true }))?.id).toBe('select-all');
   });
 
-  it('i numeri aggiungono, nello stesso ordine della barra', () => {
-    CANVAS_ADD_BAR.forEach((what, i) => {
-      const m = matchCanvasShortcut(ev(String(i + 1)));
-      expect(m?.id).toBe('add');
-      expect(addableOf(m as CanvasCommand)).toBe(what);
-    });
+  it('le cifre danno l’opacità come in Figma: 1 = 10%, 9 = 90%, 0 = 100%', () => {
+    for (let digit = 1; digit <= 9; digit++) {
+      expect(matchCanvasShortcut(ev(String(digit)))).toEqual({ id: 'opacity', opacity: digit / 10 });
+    }
+    expect(matchCanvasShortcut(ev('0'))).toEqual({ id: 'opacity', opacity: 1 });
   });
 
-  it('un numero oltre l’elenco non aggiunge niente', () => {
-    expect(matchCanvasShortcut(ev(String(CANVAS_ADD_BAR.length + 1)))).toBeNull();
+  it('una cifra non inserisce mai un nodo', () => {
+    for (let digit = 0; digit <= 9; digit++) {
+      expect(matchCanvasShortcut(ev(String(digit)))?.id).not.toBe('add');
+    }
   });
 
-  it('la vista: 0 inquadra tutto, + e - la scala', () => {
-    expect(matchCanvasShortcut(ev('0'))?.id).toBe('fit');
+  it('la vista: ⇧1 inquadra tutto, + e - la scala', () => {
+    expect(matchCanvasShortcut(ev('!', { shiftKey: true, code: 'Digit1' }))?.id).toBe('fit');
     expect(matchCanvasShortcut(ev('+'))?.id).toBe('zoom-in');
     expect(matchCanvasShortcut(ev('='))?.id).toBe('zoom-in');
     expect(matchCanvasShortcut(ev('-'))?.id).toBe('zoom-out');
@@ -234,6 +272,13 @@ describe('the help card', () => {
     expect(rows).toHaveLength(CANVAS_SHORTCUTS.length);
     expect(rows.some((r) => r.keys === '?')).toBe(true);
     expect(rows.find((r) => r.name === 'Undo')?.keys).toBe('⌘ Z');
+  });
+
+  it('the card spells the platform modifier inside a combined key, ⌘Y not mod Y', () => {
+    const keys = canvasGuide('⌘').flatMap((s) => s.rows).map((r) => r.keys);
+
+    expect(keys.some((k) => k.includes('mod'))).toBe(false);
+    expect(keys.some((k) => k.includes('⌘Y'))).toBe(true);
   });
 });
 
@@ -297,7 +342,7 @@ describe('la scheda che le elenca', () => {
     // divergere è sempre quella che l'utente legge.
     const listed = new Set(CANVAS_SHORTCUTS.map((s) => s.id));
     for (const id of [
-      'delete', 'deselect', 'select-all', 'add', 'fit', 'zoom-in', 'zoom-out', 'nudge',
+      'delete', 'deselect', 'select-all', 'opacity', 'fit', 'zoom-in', 'zoom-out', 'nudge',
       'duplicate', 'copy', 'paste', 'undo', 'redo'
     ]) {
       expect(listed).toContain(id);
@@ -313,9 +358,20 @@ describe('la scheda che le elenca', () => {
 });
 
 describe('stacking order', () => {
-  it('⌘] brings the selection to the front and ⌘[ sends it to the back', () => {
-    expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-front' });
-    expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-back' });
+  it('⌘] brings the selection one step forward and ⌘[ sends it one step backward', () => {
+    expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-forward' });
+    expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-backward' });
+  });
+
+  it('⌘R renames the selection instead of reloading the page', () => {
+    expect(matchCanvasShortcut(ev('r', { metaKey: true }))).toEqual({ id: 'rename' });
+  });
+
+  it('the card names ⌘] bring forward and ⌥⌘] bring to front', () => {
+    const rows = canvasGuide('⌘').flatMap((s) => s.rows);
+
+    expect(rows.find((r) => r.name === 'Bring forward')?.keys).toBe('⌘ ]');
+    expect(rows.find((r) => r.name === 'Bring to front')?.keys).toBe('⌥ ⌘ ]');
   });
 
   it('Enter goes into the selected frame, Tab and ⇧Tab walk the tiles', () => {
@@ -329,6 +385,20 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('ß', { altKey: true, code: 'KeyS' }))).toEqual({ id: 'align', edge: Edge.Bottom });
     expect(matchCanvasShortcut(ev('†', { altKey: true, ctrlKey: true, code: 'KeyT' }))).toEqual({ id: 'tidy' });
     expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
+  });
+
+  it('⌃⌥H and ⌃⌥V distribute the selected tiles, as in Figma', () => {
+    expect(matchCanvasShortcut(ev('˙', { altKey: true, ctrlKey: true, code: 'KeyH' }))).toEqual({ id: 'distribute', axis: Axis.X });
+    expect(matchCanvasShortcut(ev('√', { altKey: true, ctrlKey: true, code: 'KeyV' }))).toEqual({ id: 'distribute', axis: Axis.Y });
+  });
+
+  it('A arms the frame tool in Design, as in Figma', () => {
+    expect(matchCanvasShortcut(ev('a'), EditMode.Design)).toEqual({ id: 'tool', tool: DrawTool.Frame });
+  });
+
+  it('⌥⌘G frames the selected tiles, as Figma frames a selection', () => {
+    expect(matchCanvasShortcut(ev('©', { altKey: true, metaKey: true, code: 'KeyG' }))).toEqual({ id: 'frame' });
+    expect(CANVAS_SHORTCUTS.find((r) => r.id === 'frame')?.keys).toEqual(['⌥', 'mod', 'G']);
   });
 
   it('⇧A wraps the selection with a stack', () => {
@@ -381,5 +451,41 @@ describe('a focused control keeps its own activation keys', () => {
   it('other shortcuts still work with a button focused, and Enter on the canvas still enters', () => {
     expect(press('Delete', { tagName: 'BUTTON' })).toEqual({ id: 'delete' });
     expect(press('Enter', { tagName: 'DIV', isContentEditable: false })).toEqual({ id: 'enter' });
+  });
+
+  it('Enter on a clicked canvas tile enters it: the tile is the canvas, not a control', () => {
+    const tile = { tagName: 'DIV', getAttribute: (n: string) => ({ role: 'button', [CANVAS_TILE_ATTR]: '' })[n] ?? null };
+
+    expect(press('Enter', tile)).toEqual({ id: 'enter' });
+  });
+});
+
+describe('climbing to the parent', () => {
+  it('Esc and ⇧↵ climb to the parent', () => {
+    expect(climbsUp(ev('Escape'))).toBe(true);
+    expect(climbsUp(ev('Enter', { shiftKey: true }))).toBe(true);
+  });
+
+  it('↵ alone goes inside, and ⇧↵ in a field writes a newline', () => {
+    expect(climbsUp(ev('Enter'))).toBe(false);
+    expect(climbsUp(ev('Enter', { shiftKey: true, target: TEXTAREA }))).toBe(false);
+  });
+});
+
+describe('node hide and lock keys', () => {
+  const at = { tagName: 'DIV' } as unknown as EventTarget;
+  it('⇧⌘H hides and ⇧⌘L locks the selected nodes', () => {
+    expect(matchCanvasShortcut({ key: 'h', shiftKey: true, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'toggle-hidden' });
+    expect(matchCanvasShortcut({ key: 'L', shiftKey: true, metaKey: true, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent)).toEqual({ id: 'toggle-locked' });
+  });
+});
+
+describe('flipping nodes on the canvas', () => {
+  const at = { tagName: 'DIV' } as unknown as EventTarget;
+  const press = (key: string) => matchCanvasShortcut({ key, shiftKey: true, metaKey: false, ctrlKey: false, altKey: false, target: at } as unknown as KeyboardEvent);
+
+  it('⇧H and ⇧V flip the selected frames and groups', () => {
+    expect(press('H')).toEqual({ id: 'flip', flip: Flip.Horizontal });
+    expect(press('V')).toEqual({ id: 'flip', flip: Flip.Vertical });
   });
 });

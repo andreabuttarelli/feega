@@ -3,36 +3,52 @@
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import WrapText from '@lucide/svelte/icons/wrap-text';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-  import StretchVertical from '@lucide/svelte/icons/stretch-vertical';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import LogOut from '@lucide/svelte/icons/log-out';
-  import SpaceBetween from '@lucide/svelte/icons/align-horizontal-space-between';
-  import Baseline from '@lucide/svelte/icons/baseline';
-  import SpaceAround from '@lucide/svelte/icons/align-horizontal-space-around';
-  import SpaceEvenly from '@lucide/svelte/icons/align-horizontal-distribute-center';
-  import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
+  import Ungroup from '@lucide/svelte/icons/ungroup';
+  import Scan from '@lucide/svelte/icons/scan';
+  import X from '@lucide/svelte/icons/x';
+  import FoldHorizontal from '@lucide/svelte/icons/fold-horizontal';
+  import FoldVertical from '@lucide/svelte/icons/fold-vertical';
+  import PanelLeft from '@lucide/svelte/icons/panel-left';
+  import PanelTop from '@lucide/svelte/icons/panel-top';
+  import PanelRight from '@lucide/svelte/icons/panel-right';
+  import PanelBottom from '@lucide/svelte/icons/panel-bottom';
+  import SplitHorizontal from '@lucide/svelte/icons/square-split-horizontal';
+  import SplitVertical from '@lucide/svelte/icons/square-split-vertical';
+  import Columns from '@lucide/svelte/icons/columns-3';
+  import type { Component } from 'svelte';
+  import { FOCUS_RING, IconButton, IconSize, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { Align, AlignContent, AutoFlow, Direction, Justify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
-  import { formatPadding, parsePadding } from '$lib/motion/layout/padding-text';
-  import { formatTracks, parseTracks } from '$lib/motion/layout/tracks-text';
-  import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '@feega/motion-core/motion/layout/model';
-  import { layoutParent, leaveStack, reorderChild, setAutoLayout, setChildSize, setLayoutItem } from '$lib/motion/layout/ops';
-  import { MAX_PERCENT, formatSize, parseSize, type SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
+  import { Align, Direction, Justify, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
+  import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, MAX_LAYOUT_PX, type AutoLayout, type LayoutItem, type Padding } from '@feega/motion-core/motion/layout/model';
+  import { BOUNDS, LIMIT_AXES, formatLimit, limitOf, limitPatch, type Bound, type LimitAxis } from '@feega/motion-core/motion/layout/limits';
+  import { layoutParent, leaveStack, removeStack, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
+  import { PaddingView, SIDE_ORDER, axisPatch, paddingView, togglePadding, type PaddingAxis } from '$lib/motion/layout/padding-mode';
+  import { setClipFlags } from '@feega/motion-core/motion/organize';
   import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
-  import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
-  import SegmentedField from './SegmentedField.svelte';
+  import CheckRow from './CheckRow.svelte';
+  import NumberField from './NumberField.svelte';
+  import { FieldKind } from '$lib/motion/number-field';
+  import StackSizeChip from './StackSizeChip.svelte';
 
-  let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, scale = 1, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; commit: (result: OpResult, summary: string) => void } = $props();
+
+  const GapMode = { Fixed: 'fixed', Auto: 'auto' } as const;
+  type GapMode = (typeof GapMode)[keyof typeof GapMode];
+
+  const GAP_MODES = Object.values(GapMode);
+  const GAP_MODE_LABEL: Record<GapMode, string> = { [GapMode.Fixed]: 'Fixed', [GapMode.Auto]: 'Auto' };
 
   const Flow = { Row: 'row', Column: 'column', Wrap: 'wrap', Grid: 'grid' } as const;
   type Flow = (typeof Flow)[keyof typeof Flow];
 
   const FLOWS: SegmentOption[] = [
-    { value: Flow.Row, label: 'Horizontal', icon: ArrowRight },
     { value: Flow.Column, label: 'Vertical', icon: ArrowDown },
+    { value: Flow.Row, label: 'Horizontal', icon: ArrowRight },
     { value: Flow.Wrap, label: 'Wrap', icon: WrapText },
     { value: Flow.Grid, label: 'Grid', icon: LayoutGrid }
   ];
@@ -44,218 +60,194 @@
     [Flow.Grid]: { direction: Direction.Grid, wrap: false }
   };
 
-  const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'px', [Sizing.Hug]: 'Hug', [Sizing.Fill]: 'Fill', [Sizing.Percent]: '%' };
-  const AXES = [
-    { axis: 'width', label: 'Width', grow: 'widthGrow', percent: 'widthPercent' },
-    { axis: 'height', label: 'Height', grow: 'heightGrow', percent: 'heightPercent' }
-  ] as const;
-  type AxisRow = (typeof AXES)[number];
+  const GAP_ICON: Record<Direction, Component> = { [Direction.Horizontal]: SplitHorizontal, [Direction.Vertical]: SplitVertical, [Direction.Grid]: SplitHorizontal };
+  const CROSS_GAP_ICON: Record<Direction, Component> = { [Direction.Horizontal]: SplitVertical, [Direction.Vertical]: SplitHorizontal, [Direction.Grid]: SplitVertical };
+  const PADDING_AXES: { axis: PaddingAxis; label: string; icon: Component; first: keyof Padding }[] = [
+    { axis: 'horizontal', label: 'Horizontal padding', icon: FoldHorizontal, first: 'left' },
+    { axis: 'vertical', label: 'Vertical padding', icon: FoldVertical, first: 'top' }
+  ];
+  const SIDE_ICON: Record<keyof Padding, Component> = { left: PanelLeft, top: PanelTop, right: PanelRight, bottom: PanelBottom };
+  const SIDE_NAME: Record<keyof Padding, string> = { left: 'Left', top: 'Top', right: 'Right', bottom: 'Bottom' };
+  const LIMIT_NAME: Record<LimitAxis, Record<Bound, string>> = { width: { min: 'Min W', max: 'Max W' }, height: { min: 'Min H', max: 'Max H' } };
+
   const SELF_ALIGNS = ['', Align.Start, Align.Center, Align.End, Align.Stretch] as const;
   const SELF_ALIGN_LABEL: Record<(typeof SELF_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End', [Align.Stretch]: 'Stretch' };
-  const SIDES: (keyof Padding)[] = ['top', 'right', 'bottom', 'left'];
-  const SIDE_LABEL: Record<keyof Padding, string> = { top: 'T', right: 'R', bottom: 'B', left: 'L' };
   const SPOTS = [Align.Start, Align.Center, Align.End] as const;
-  const SPREADS = [
-    { justify: Justify.SpaceBetween, label: 'Space between', testid: 'auto-layout-space-between', icon: SpaceBetween },
-    { justify: Justify.SpaceAround, label: 'Space around', testid: 'auto-layout-space-around', icon: SpaceAround },
-    { justify: Justify.SpaceEvenly, label: 'Space evenly', testid: 'auto-layout-space-evenly', icon: SpaceEvenly }
-  ];
-  const AUTO_FLOWS: SegmentOption[] = [
-    { value: AutoFlow.Row, label: 'Rows first' },
-    { value: AutoFlow.Column, label: 'Columns first' }
-  ];
-  const LINE_SPREADS: SegmentOption[] = [
-    { value: AlignContent.Auto, label: 'Packed' },
-    { value: AlignContent.SpaceBetween, label: 'Space between' }
-  ];
   const CELL_ALIGNS = ['', Align.Start, Align.Center, Align.End] as const;
   const CELL_ALIGN_LABEL: Record<(typeof CELL_ALIGNS)[number], string> = { '': 'Auto', [Align.Start]: 'Start', [Align.Center]: 'Center', [Align.End]: 'End' };
   const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End, [Align.Baseline]: Justify.Start, [Align.Stretch]: Justify.Start };
+  const FLOW_OF: Record<Direction, Flow> = { [Direction.Horizontal]: Flow.Row, [Direction.Vertical]: Flow.Column, [Direction.Grid]: Flow.Grid };
+  const PX_RANGE = { min: 0, max: MAX_LAYOUT_PX, step: 1 };
+  const GAP_RANGE = { min: -MAX_LAYOUT_PX, max: MAX_LAYOUT_PX, step: 1 };
+  const COLUMN_RANGE = { min: 1, max: MAX_GRID_COLUMNS, step: 1 };
 
   const layout = $derived(clip.autoLayout ?? null);
-  let splitPadding = $state(false);
-  const evenPadding = $derived(!!layout && SIDES.every((side) => layout.padding[side] === layout.padding.top));
-  const perSide = $derived(splitPadding || !evenPadding);
+  let split = $state(false);
+  const padView = $derived(layout ? paddingView(layout.padding, split) : PaddingView.Axes);
+  const gapMode = $derived(layout?.justify === Justify.SpaceBetween ? GapMode.Auto : GapMode.Fixed);
   const parent = $derived(layoutParent(doc, clip));
   const inGrid = $derived(parent?.autoLayout?.direction === Direction.Grid);
   const item = $derived(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM);
-  const FLOW_OF: Record<Direction, Flow> = { [Direction.Horizontal]: Flow.Row, [Direction.Vertical]: Flow.Column, [Direction.Grid]: Flow.Grid };
   const flow = $derived(layout?.wrap ? Flow.Wrap : FLOW_OF[layout?.direction ?? Direction.Horizontal]);
   const lined = $derived(!!layout && (layout.wrap || layout.direction === Direction.Grid));
   const siblings = $derived(parent ? childrenInOrder(doc.tracks.flatMap((t) => t.clips as MotionClip[]), parent).map((c) => c.id) : []);
   const place = $derived(siblings.indexOf(clip.id));
-  const sizings = $derived(parent ? [Sizing.Fixed, Sizing.Percent, Sizing.Fill, Sizing.Hug] : [Sizing.Fixed, Sizing.Hug]);
-  const pixels = (row: AxisRow) => Number(clip.props[row.axis] ?? 0) * doc[row.axis];
-  const VALUE_OF: Record<Sizing, (row: AxisRow) => number | undefined> = {
-    [Sizing.Fixed]: (row) => pixels(row),
-    [Sizing.Hug]: () => undefined,
-    [Sizing.Fill]: (row) => item[row.grow] ?? 1,
-    [Sizing.Percent]: (row) => item[row.percent] ?? MAX_PERCENT
-  };
-  const entryOf = (row: AxisRow): SizeEntry => ({ sizing: item[row.axis], value: VALUE_OF[item[row.axis]](row) });
-
-  function typeSize(row: AxisRow, text: string) {
-    const entry = parseSize(text);
-    if (entry && sizings.includes(entry.sizing)) {
-      commit(setChildSize(doc, clip.id, row.axis, entry), `Changed the ${row.axis}`);
-    }
-  }
-
-  const pickUnit = (row: AxisRow, sizing: Sizing) => commit(setChildSize(doc, clip.id, row.axis, { sizing, value: sizing === Sizing.Fixed ? pixels(row) : undefined }), `Changed the ${row.axis} sizing`);
+  const sizings = $derived(parent ? [Sizing.Fixed, Sizing.Hug, Sizing.Fill, Sizing.Percent] : [Sizing.Fixed, Sizing.Hug]);
+  const limits = $derived(LIMIT_AXES.flatMap((axis) => BOUNDS.flatMap((bound) => { const limit = limitOf(item, axis, bound); return limit ? [{ axis, bound, limit }] : []; })));
 
   const set = (patch: Partial<AutoLayout>, summary: string) => commit(setAutoLayout(doc, clip.id, patch), summary);
   const size = (patch: Partial<LayoutItem>, summary: string) => commit(setLayoutItem(doc, clip.id, patch), summary);
-  const px = (value: string) => Math.max(0, Math.round(Number(value) || 0));
-  const signedPx = (value: string) => Math.round(Number(value) || 0);
+  const whole = (value: number) => Math.max(0, Math.round(value));
+  const shown = (px: number) => Math.round(px * scale * 100) / 100;
+  const kept = (value: number) => value / scale;
   const span = (value: string) => Math.max(1, Math.round(Number(value) || 1));
   const cellAlign = (value: string) => (value === '' ? undefined : (value as Align));
+  const typeGap = (value: number) => set({ gap: Math.round(kept(value)), ...(gapMode === GapMode.Auto ? { justify: Justify.Start } : {}) }, 'Changed the gap');
+  const pickGapMode = (mode: GapMode) => set({ justify: mode === GapMode.Auto ? Justify.SpaceBetween : Justify.Start }, 'Changed the gap');
 
-  function setPadding(text: string) {
-    const padding = parsePadding(text);
-    if (padding) {
-      set({ padding }, 'Changed the padding');
+  function toggleSides(padding: Padding, view: PaddingView) {
+    const next = togglePadding(padding, view);
+    split = next.split;
+    if (next.padding) {
+      set({ padding: next.padding }, 'Changed the padding');
     }
   }
-
-  function setTracks(key: 'columnTracks' | 'rowTracks', text: string, summary: string) {
-    const tracks = parseTracks(text);
-    if (tracks) {
-      set({ [key]: tracks }, summary);
-    }
-  }
-
-  const optionalPx = (value: string) => (value.trim() === '' ? undefined : px(value));
 
   function spotPressed(layout: AutoLayout, column: Align, row: Align): boolean {
     const [main, cross] = layout.direction === Direction.Horizontal ? [column, row] : [row, column];
-    return layout.justify === AS_JUSTIFY[main] && layout.align === cross;
+    return (layout.justify === AS_JUSTIFY[main] || layout.justify === Justify.SpaceBetween) && layout.align === cross;
   }
 
   function pickSpot(layout: AutoLayout, column: Align, row: Align) {
     const [main, cross] = layout.direction === Direction.Horizontal ? [column, row] : [row, column];
-    set({ justify: AS_JUSTIFY[main], align: cross }, 'Aligned the stack');
+    set({ justify: layout.justify === Justify.SpaceBetween ? Justify.SpaceBetween : AS_JUSTIFY[main], align: cross }, 'Aligned the stack');
   }
 
   const SPOT = cn('size-4 rounded-full bg-ui-input transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover aria-pressed:bg-ui-accent-solid', FOCUS_RING);
+  const TRAIL = cn('h-full max-w-16 shrink-0 cursor-pointer appearance-none rounded-sm bg-transparent pr-2 pl-1 text-right text-ui-label text-ui-text-2 outline-none hover:text-ui-text', FOCUS_RING);
+  const SELECT_CHIP = 'flex h-7 min-w-0 items-center gap-1 rounded-md bg-ui-input pl-2 text-ui-label';
+  const CHIP_SELECT = cn('h-full min-w-0 flex-1 cursor-pointer appearance-none rounded-sm bg-transparent pr-2 text-right text-ui-label outline-none', FOCUS_RING);
+  const SPAN_RANGE = { min: 1, max: MAX_GRID_COLUMNS, step: 1 };
+  const LIMIT_CHIP = 'flex h-7 items-center gap-1 rounded-md bg-ui-input pl-2 text-ui-label';
 </script>
 
-<div data-testid="stack-section">
-    {#if layout}
-      <Field label="Direction">
-        <SegmentedControl label="Direction" options={FLOWS} value={flow} onchange={(v) => set(FLOW_PATCH[v as Flow], 'Changed the direction')} />
-      </Field>
-      {#if layout.direction === Direction.Grid}
-        <Field label="Columns" id="auto-layout-columns">
-          <input id="auto-layout-columns" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" max={MAX_GRID_COLUMNS} value={layout.columns} data-testid="auto-layout-columns" onchange={(e) => set({ columns: Math.min(MAX_GRID_COLUMNS, Math.max(1, px(e.currentTarget.value))) }, 'Changed the columns')} />
-        </Field>
-        <Field label="Column sizes" id="auto-layout-column-tracks">
-          <input id="auto-layout-column-tracks" class={cn(FIELD_INPUT, 'w-full')} placeholder="1fr 120 hug" value={formatTracks(layout.columnTracks)} data-testid="auto-layout-column-tracks" onchange={(e) => setTracks('columnTracks', e.currentTarget.value, 'Changed the column sizes')} />
-        </Field>
-        <Field label="Row sizes" id="auto-layout-row-tracks">
-          <input id="auto-layout-row-tracks" class={cn(FIELD_INPUT, 'w-full')} placeholder="hug" value={formatTracks(layout.rowTracks)} data-testid="auto-layout-row-tracks" onchange={(e) => setTracks('rowTracks', e.currentTarget.value, 'Changed the row sizes')} />
-        </Field>
-        <Field label="Fill order">
-          <div class="flex min-w-0 flex-1" data-testid="auto-layout-auto-flow"><SegmentedControl label="Fill order" options={AUTO_FLOWS} value={layout.autoFlow} onchange={(v) => set({ autoFlow: v as AutoFlow }, 'Changed the fill order')} /></div>
-        </Field>
-      {/if}
-      <Field label="Align">
-        <div class="grid shrink-0 grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
-          {#each SPOTS as row (row)}
-            {#each SPOTS as column (column)}
-              <button type="button" class={SPOT} aria-label={`Align ${row} ${column}`} aria-pressed={spotPressed(layout, column, row)} onclick={() => pickSpot(layout, column, row)}></button>
-            {/each}
+{#snippet gapTrail()}
+  <select aria-label="Gap mode" class={TRAIL} value={gapMode} data-testid="auto-layout-gap-mode" onchange={(e) => pickGapMode(e.currentTarget.value as GapMode)}>
+    {#each GAP_MODES as mode (mode)}<option value={mode} selected={mode === gapMode}>{GAP_MODE_LABEL[mode]}</option>{/each}
+  </select>
+{/snippet}
+
+<div class="flex flex-col gap-1.5" data-testid="stack-section">
+  {#if layout}
+    <div class="flex items-center gap-1.5">
+      <div class="flex min-w-0 flex-1" data-testid="auto-layout-direction"><SegmentedControl label="Direction" options={FLOWS} value={flow} onchange={(v) => set(FLOW_PATCH[v as Flow], 'Changed the direction')} /></div>
+      <IconButton label="Remove stack" size={IconSize.Sm} data-testid="auto-layout-remove" onclick={() => commit(removeStack(doc, clip.id), 'Removed the stack')}><Ungroup /></IconButton>
+    </div>
+  {/if}
+
+  {#if layout || parent}
+    <div class="grid grid-cols-2 gap-1.5">
+      {#each LIMIT_AXES as axis (axis)}<StackSizeChip {doc} {clip} {axis} {sizings} {commit} />{/each}
+    </div>
+    {#if limits.length}
+      <div class="flex flex-wrap gap-1.5" data-testid="stack-limits">
+        {#each limits as { axis, bound, limit } (`${bound}-${axis}`)}
+          <span class={LIMIT_CHIP} data-testid={`stack-limit-${bound}-${axis}`}>
+            <span class="text-ui-text-2">{LIMIT_NAME[axis][bound]}</span>{formatLimit(limit)}
+            <IconButton label={`Clear ${LIMIT_NAME[axis][bound]}`} size={IconSize.Sm} data-testid={`stack-limit-clear-${bound}-${axis}`} onclick={() => size(limitPatch(axis, bound, null), `Cleared the ${bound} ${axis}`)}><X /></IconButton>
+          </span>
+        {/each}
+      </div>
+    {/if}
+  {/if}
+
+  {#if layout}
+    {#if layout.direction === Direction.Grid}
+      <div class="grid grid-cols-2 gap-1.5" data-testid="auto-layout-columns">
+        <NumberField label="Columns" name="Columns" icon={Columns} value={layout.columns} range={COLUMN_RANGE} onchange={(v) => set({ columns: Math.round(v) }, 'Changed the columns')} />
+      </div>
+    {/if}
+
+    <div class="flex items-start gap-1.5">
+      <div class="grid shrink-0 grid-cols-3 gap-1 rounded-md bg-ui-input p-2" role="group" aria-label="Alignment" data-testid="auto-layout-align">
+        {#each SPOTS as row (row)}
+          {#each SPOTS as column (column)}
+            <button type="button" class={SPOT} aria-label={`Align ${row} ${column}`} aria-pressed={spotPressed(layout, column, row)} onclick={() => pickSpot(layout, column, row)}></button>
+          {/each}
+        {/each}
+      </div>
+      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div data-testid="auto-layout-gap" data-mode={gapMode}>
+          <NumberField label="Gap" name="Gap" icon={GAP_ICON[layout.direction]} value={shown(layout.gap)} blank={gapMode === GapMode.Auto ? GAP_MODE_LABEL[GapMode.Auto] : null} range={GAP_RANGE} trailing={gapTrail} onchange={typeGap} />
+        </div>
+        {#if lined}
+          <div data-testid="auto-layout-cross-gap">
+            <NumberField label="Line gap" name="Gap between lines" icon={CROSS_GAP_ICON[layout.direction]} value={shown(layout.crossGap)} range={GAP_RANGE} onchange={(v) => set({ crossGap: Math.round(kept(v)) }, 'Changed the gap between lines')} />
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5" data-testid="auto-layout-padding" data-view={padView}>
+      {#if padView === PaddingView.Sides}
+        <div class="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+          {#each SIDE_ORDER as side (side)}
+            <div data-testid={`auto-layout-padding-${side}`}>
+              <NumberField label={SIDE_NAME[side]} name={`${SIDE_NAME[side]} padding`} icon={SIDE_ICON[side]} value={shown(layout.padding[side])} range={PX_RANGE} onchange={(v) => set({ padding: { ...layout.padding, [side]: whole(kept(v)) } }, 'Changed the padding')} />
+            </div>
           {/each}
         </div>
-      </Field>
-      <Field label="Distribute">
-        <IconButton label="Stretch children" size={IconSize.Sm} pressed={layout.align === Align.Stretch} data-testid="auto-layout-stretch" onclick={() => set({ align: layout.align === Align.Stretch ? Align.Start : Align.Stretch }, 'Changed the alignment')}><StretchVertical /></IconButton>
-        {#if layout.direction === Direction.Horizontal}
-          <IconButton label="Align baselines" size={IconSize.Sm} pressed={layout.align === Align.Baseline} data-testid="auto-layout-baseline" onclick={() => set({ align: layout.align === Align.Baseline ? Align.Start : Align.Baseline }, 'Changed the alignment')}><Baseline /></IconButton>
-        {/if}
-        {#each SPREADS as spread (spread.justify)}
-          <IconButton label={spread.label} size={IconSize.Sm} pressed={layout.justify === spread.justify} data-testid={spread.testid} onclick={() => set({ justify: layout.justify === spread.justify ? Justify.Start : spread.justify }, 'Changed the spacing')}><spread.icon /></IconButton>
-        {/each}
-      </Field>
-      <Field label="Gap" id="auto-layout-gap">
-        <input id="auto-layout-gap" class={cn(FIELD_INPUT, 'w-full')} type="number" value={layout.gap} data-testid="auto-layout-gap" onchange={(e) => set({ gap: signedPx(e.currentTarget.value) }, 'Changed the gap')} />
-        {#if lined}
-          <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" value={layout.crossGap} onchange={(e) => set({ crossGap: signedPx(e.currentTarget.value) }, 'Changed the gap between lines')} />
-        {/if}
-      </Field>
-      {#if layout.wrap}
-        <Field label="Lines">
-          <div class="flex min-w-0 flex-1" data-testid="auto-layout-align-content"><SegmentedControl label="Lines" options={LINE_SPREADS} value={layout.alignContent} onchange={(v) => set({ alignContent: v as AlignContent }, 'Changed how the lines spread')} /></div>
-        </Field>
-      {/if}
-      <Field label="Padding">
-        {#if perSide}
-          {#each SIDES as side (side)}
-            <input aria-label={`Padding ${side}`} title={SIDE_LABEL[side]} class={cn(FIELD_INPUT, 'w-full px-1')} type="number" min="0" value={layout.padding[side]} data-testid={`auto-layout-padding-${side}`} onchange={(e) => set({ padding: { ...layout.padding, [side]: px(e.currentTarget.value) } }, 'Changed the padding')} />
+      {:else}
+        <div class="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+          {#each PADDING_AXES as pad (pad.axis)}
+            <div data-testid={`auto-layout-padding-${pad.axis === 'horizontal' ? 'x' : 'y'}`}>
+              <NumberField label={pad.label} name={pad.label} icon={pad.icon} value={shown(layout.padding[pad.first])} range={PX_RANGE} onchange={(v) => set({ padding: axisPatch(layout.padding, pad.axis, whole(kept(v))) }, 'Changed the padding')} />
+            </div>
           {/each}
-        {:else}
-          <input aria-label="Padding" placeholder="8 16" title="One to four values, like CSS: 8 · 8 16 · 8 16 24 · 8 16 24 32" class={cn(FIELD_INPUT, 'w-full')} value={formatPadding(layout.padding)} data-testid="auto-layout-padding" onchange={(e) => setPadding(e.currentTarget.value)} />
-          <button type="button" class={cn('shrink-0 rounded-sm px-1.5 text-ui-label text-ui-text-2 hover:bg-ui-wash', FOCUS_RING)} data-testid="auto-layout-padding-sides" onclick={() => (splitPadding = true)}>Per side</button>
-        {/if}
-      </Field>
-    {/if}
+        </div>
+      {/if}
+      <IconButton label={padView === PaddingView.Sides ? 'Padding as horizontal and vertical' : 'Padding per side'} size={IconSize.Sm} pressed={padView === PaddingView.Sides} data-testid="auto-layout-padding-sides" onclick={() => toggleSides(layout.padding, padView)}><Scan /></IconButton>
+    </div>
 
-    {#if layout}
-      <Field label="First on top">
-        <div class="flex min-w-0 flex-1" data-testid="auto-layout-first-on-top"><SegmentedField name="First on top" options={YES_NO} value={answerOf(layout.firstOnTop)} onchange={(v) => set({ firstOnTop: v === Answer.Yes }, 'Changed the stacking')} /></div>
-      </Field>
-      <Field label="Strokes included">
-        <div class="flex min-w-0 flex-1" data-testid="auto-layout-strokes-included"><SegmentedField name="Strokes included" options={YES_NO} value={answerOf(layout.strokesIncluded)} onchange={(v) => set({ strokesIncluded: v === Answer.Yes }, 'Changed the strokes in layout')} /></div>
-      </Field>
-    {/if}
+    <CheckRow label="Clip content" checked={!!clip.clipContent} testid="stack-clip-content" onchange={(on) => commit(setClipFlags(doc, clip.id, { clipContent: on }), 'Changed clip content')} />
+  {/if}
 
-    {#if layout || parent}
-      {#each AXES as row (row.axis)}
-        <Field label={row.label} id={`stack-size-${row.axis}`}>
-          <input id={`stack-size-${row.axis}`} class={cn(FIELD_INPUT, 'w-full')} placeholder="120 · 50% · 2fr · hug" value={formatSize(entryOf(row))} data-testid={`stack-size-${row.axis}`} onchange={(e) => typeSize(row, e.currentTarget.value)} />
-          <select aria-label={`${row.label} unit`} class={cn(FIELD_INPUT, 'w-16 shrink-0')} value={item[row.axis]} data-testid={`stack-unit-${row.axis}`} onchange={(e) => pickUnit(row, e.currentTarget.value as Sizing)}>
-            {#each sizings as value (value)}<option {value}>{SIZING_LABEL[value]}</option>{/each}
-          </select>
-        </Field>
-      {/each}
-      <Field label="Min / max W">
-        <input aria-label="Min width" placeholder="min" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.minWidth ?? ''} onchange={(e) => size({ minWidth: optionalPx(e.currentTarget.value) }, 'Changed the min width')} />
-        <input aria-label="Max width" placeholder="max" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.maxWidth ?? ''} onchange={(e) => size({ maxWidth: optionalPx(e.currentTarget.value) }, 'Changed the max width')} />
-      </Field>
-      <Field label="Min / max H">
-        <input aria-label="Min height" placeholder="min" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.minHeight ?? ''} onchange={(e) => size({ minHeight: optionalPx(e.currentTarget.value) }, 'Changed the min height')} />
-        <input aria-label="Max height" placeholder="max" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.maxHeight ?? ''} onchange={(e) => size({ maxHeight: optionalPx(e.currentTarget.value) }, 'Changed the max height')} />
-      </Field>
-    {/if}
-
-    {#if inGrid}
-      <Field label="Span">
-        <input aria-label="Column span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.columnSpan} data-testid="auto-layout-column-span" onchange={(e) => size({ columnSpan: span(e.currentTarget.value) }, 'Changed the column span')} />
-        <input aria-label="Row span" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" value={item.rowSpan} data-testid="auto-layout-row-span" onchange={(e) => size({ rowSpan: span(e.currentTarget.value) }, 'Changed the row span')} />
-      </Field>
-      <Field label="In cell">
-        <select aria-label="Horizontal in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellX ?? ''} data-testid="auto-layout-cell-x" onchange={(e) => size({ cellX: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+  {#if inGrid}
+    <div class="grid grid-cols-2 gap-1.5" data-testid="auto-layout-span">
+      <div data-testid="auto-layout-column-span"><NumberField label="Cols" kind={FieldKind.Named} name="Column span" value={item.columnSpan} range={SPAN_RANGE} onchange={(v) => size({ columnSpan: span(String(v)) }, 'Changed the column span')} /></div>
+      <div data-testid="auto-layout-row-span"><NumberField label="Rows" kind={FieldKind.Named} name="Row span" value={item.rowSpan} range={SPAN_RANGE} onchange={(v) => size({ rowSpan: span(String(v)) }, 'Changed the row span')} /></div>
+    </div>
+    <div class="grid grid-cols-2 gap-1.5">
+      <label class={SELECT_CHIP}>
+        <span class="text-ui-text-2">X</span>
+        <select aria-label="Horizontal in cell" class={CHIP_SELECT} value={item.cellX ?? ''} data-testid="auto-layout-cell-x" onchange={(e) => size({ cellX: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
           {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
         </select>
-        <select aria-label="Vertical in cell" class={cn(FIELD_INPUT, 'w-full')} value={item.cellY ?? ''} data-testid="auto-layout-cell-y" onchange={(e) => size({ cellY: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
+      </label>
+      <label class={SELECT_CHIP}>
+        <span class="text-ui-text-2">Y</span>
+        <select aria-label="Vertical in cell" class={CHIP_SELECT} value={item.cellY ?? ''} data-testid="auto-layout-cell-y" onchange={(e) => size({ cellY: cellAlign(e.currentTarget.value) }, 'Aligned in the cell')}>
           {#each CELL_ALIGNS as value (value)}<option {value}>{CELL_ALIGN_LABEL[value]}</option>{/each}
         </select>
-      </Field>
-    {/if}
+      </label>
+    </div>
+  {/if}
 
-    {#if parent && !inGrid && !item.absolute}
-      <Field label="Align self">
-        <select aria-label="Align self" class={cn(FIELD_INPUT, 'w-full')} value={item.alignSelf ?? ''} data-testid="stack-align-self" onchange={(e) => size({ alignSelf: cellAlign(e.currentTarget.value) }, 'Aligned in the stack')}>
-          {#each SELF_ALIGNS as value (value)}<option {value}>{SELF_ALIGN_LABEL[value]}</option>{/each}
-        </select>
-      </Field>
-    {/if}
+  {#if parent && !inGrid && !item.absolute}
+    <label class={SELECT_CHIP}>
+      <span class="text-ui-text-2">Align</span>
+      <select aria-label="Align self" class={CHIP_SELECT} value={item.alignSelf ?? ''} data-testid="stack-align-self" onchange={(e) => size({ alignSelf: cellAlign(e.currentTarget.value) }, 'Aligned in the stack')}>
+        {#each SELF_ALIGNS as value (value)}<option {value}>{SELF_ALIGN_LABEL[value]}</option>{/each}
+      </select>
+    </label>
+  {/if}
 
-    {#if parent}
-      <Field label="In layout">
-        <div class="flex min-w-0 flex-1" data-testid="auto-layout-absolute"><SegmentedField name="Absolute position" options={YES_NO} value={answerOf(item.absolute)} onchange={(v) => size({ absolute: v === Answer.Yes }, 'Changed absolute position')} /></div>
-        <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the stack')}><ChevronUp /></IconButton>
-        <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the stack')}><ChevronDown /></IconButton>
-        <IconButton label="Take out of the stack" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the stack')}><LogOut /></IconButton>
-      </Field>
-    {/if}
+  {#if parent}
+    <div class="flex items-center gap-1.5">
+      <div class="flex min-w-0 flex-1"><CheckRow label="Ignore auto layout" checked={!!item.absolute} testid="auto-layout-absolute" onchange={(on) => size({ absolute: on }, 'Changed absolute position')} /></div>
+      <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the stack')}><ChevronUp /></IconButton>
+      <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the stack')}><ChevronDown /></IconButton>
+      <IconButton label="Take out of the stack" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveStack(doc, clip.id), 'Took the clip out of the stack')}><LogOut /></IconButton>
+    </div>
+  {/if}
 </div>

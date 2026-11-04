@@ -1,9 +1,9 @@
 <script lang="ts">
   import { CHAT_MAX } from '$lib/realtime/canvas-presence';
+  import { opensCursorChat } from '$lib/canvas/command-palette';
 
   let { onchat }: { onchat: (text: string | null) => void } = $props();
 
-  const OPEN_KEY = '/';
   const CLOSE_KEYS = new Set(['Escape', 'Enter']);
   const OFFSET_PX = 16;
 
@@ -16,7 +16,7 @@
     target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
   function open(e: KeyboardEvent) {
-    if (e.key !== OPEN_KEY || at || editing(e.target)) {
+    if (!opensCursorChat(e) || at || editing(e.target)) {
       return;
     }
     e.preventDefault();

@@ -4,6 +4,8 @@ import type { OpResult } from "@feega/motion-core/motion/timeline";
 import type { CanvasLayer, LayerHover } from "./layers";
 import type { HeldDocs } from "./frame-outlines";
 import type { ActionId } from "$lib/motion/actions";
+import type { NodeFlag } from "./node-flags";
+import type { LayerSlot } from "$lib/motion/layer-place";
 
 export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
@@ -11,6 +13,8 @@ export type CanvasSide = {
   select(ids: string[]): void;
   open(nodeId: string): void;
   rename(nodeId: string, name: string): void;
+  flag(ids: string[], flag: NodeFlag): void;
+  moveInto(id: string, frameId: string, slot?: LayerSlot): void;
 };
 
 export type VideoSide = {
@@ -32,6 +36,7 @@ let video = $state.raw<VideoSide | null>(null);
 let hovered = $state.raw<LayerHover>(null);
 let docs = $state.raw<HeldDocs>(new Map());
 let glyphs = $state.raw<ReadonlyMap<string, string | undefined>>(new Map());
+let renameAsked = $state(false);
 
 function publisher<T>(set: (side: T | null) => void, current: () => T | null) {
   return (side: T) => {
@@ -56,6 +61,17 @@ export const layersSource = {
   },
   get glyphs() {
     return glyphs;
+  },
+  get renameAsked() {
+    return renameAsked;
+  },
+  askRename() {
+    renameAsked = true;
+  },
+  takeRename(): boolean {
+    const asked = renameAsked;
+    renameAsked = false;
+    return asked;
   },
   get docs() {
     return docs;

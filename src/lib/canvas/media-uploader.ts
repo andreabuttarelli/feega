@@ -4,6 +4,7 @@ import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
 import { postCanvasAction } from '$lib/canvas/canvas-api';
 import { MediaKind, kindOfFile } from '$lib/motion/media/pick';
 import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
+import { uploadName } from '$lib/motion/asset-name';
 
 const BUCKET = 'canvas-assets';
 const UNSAFE_NAME = /[^\w.-]+/g;
@@ -71,9 +72,7 @@ export function canvasMediaUploader(supabase: SupabaseClient, at: At): MediaUplo
 type AssetRow = { id: string; type: string; url: string | null; signedUrl: string | null; durationS: number | null; source: string | null };
 
 const MEDIA_TYPES = new Set(['image', 'video']);
-const UPLOAD_NAME = /^[0-9a-f-]{36}-/i;
-
-const labelOf = (row: AssetRow) => (row.url?.split('/').pop() ?? '').replace(UPLOAD_NAME, '') || (row.source === 'generated' ? `Generated ${row.type}` : row.type);
+const labelOf = (row: AssetRow) => uploadName(row.url) || (row.source === 'generated' ? `Generated ${row.type}` : row.type);
 
 export async function projectMedia(at: { projectId: string; canvasId: string }): Promise<LibraryMedia[]> {
   const res = await fetch(`/api/v1/projects/${at.projectId}/agent/assets`).catch(() => null);

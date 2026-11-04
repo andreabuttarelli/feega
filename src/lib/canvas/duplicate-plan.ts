@@ -18,10 +18,10 @@ import { docNodeCopy, holdsDoc } from './motion-node';
  */
 
 export type DuplicateNode = { id: string; type: string; data: Record<string, unknown>; x: number; y: number };
-export type CopiedNode = DuplicateNode & { width?: number | null; height?: number | null };
+export type CopiedNode = DuplicateNode & { width?: number | null; height?: number | null; displayName?: string | null };
 export type DuplicateEdge = { id: string; source: string; target: string; sourceHandle: string | null; targetHandle: string | null };
 
-export type DuplicatedNode = { id?: string; sourceIndex: number; type: string; data: Record<string, unknown>; x: number; y: number; width?: number; height?: number };
+export type DuplicatedNode = { id?: string; sourceIndex: number; type: string; data: Record<string, unknown>; x: number; y: number; width?: number; height?: number; displayName?: string | null };
 export type DuplicatedEdge = {
   sourceIndex: number;
   targetIndex: number;
@@ -82,10 +82,18 @@ export type CopyIds = Readonly<Record<string, string>>;
 
 const withId = (planned: DuplicatedNode, id: string | undefined): DuplicatedNode => (id ? { ...planned, id } : planned);
 
+const named = (planned: DuplicatedNode, source: CopiedNode): DuplicatedNode => (source.displayName ? { ...planned, displayName: source.displayName } : planned);
+
 export function copyPlan(input: { ids: string[]; nodes: CopiedNode[]; edges: DuplicateEdge[]; offset: { dx: number; dy: number }; copyIds?: CopyIds }): DuplicatePlan {
   const plan = planDuplicate(input);
   const chosen = input.nodes.filter((n) => input.ids.includes(n.id));
-  return { ...plan, nodes: plan.nodes.map((planned) => withId(docCopy(planned, chosen[planned.sourceIndex]), input.copyIds?.[chosen[planned.sourceIndex].id])) };
+  return {
+    ...plan,
+    nodes: plan.nodes.map((planned) => {
+      const source = chosen[planned.sourceIndex];
+      return withId(named(docCopy(planned, source), source), input.copyIds?.[source.id]);
+    })
+  };
 }
 
 /** Il passo di ogni duplicato successivo: visibile accanto all'originale, non sopra di lui. */

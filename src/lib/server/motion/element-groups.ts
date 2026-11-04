@@ -1,22 +1,27 @@
 import { z } from 'zod';
-import { FrameKind, elementNodeOf, frameChrome } from '$lib/canvas/motion-node';
+import { FrameKind, drawnFrameNodeOf, elementNodeOf, frameChrome } from '$lib/canvas/motion-node';
 import { rotateGroup, scaleGroup, translateGroup, type Placed } from '$lib/canvas/node-layout';
-import { Background, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { blankElement, type CanvasBox } from '$lib/motion/draw-create';
-import { clipCentre, elementBox, frameOf, liftElement, placeElement, type Element } from '$lib/motion/move-element';
+import { Background, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { TrackKind } from '@feega/motion-core/motion/components';
+import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
+import { blankElement, drawnFrame, type CanvasBox } from '$lib/motion/draw-create';
+import { clipCentre, elementBox, frameOf, liftElement, rehomedClip } from '$lib/motion/move-element';
 import { docMode } from '@feega/motion-core/motion/still';
 import { elementName } from '$lib/motion/element-name';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 import { wrapWithStack } from '$lib/motion/layout/ops';
-import { freeStackFit } from '$lib/motion/layout/stack-fit';
+import { freeStackFit, laidOutAsShown } from '$lib/motion/layout/stack-fit';
 import { MoveOutcome, created, deleted, refused, type FrameStore, type Moved, type Place, type StoredFrame } from './move-element';
 
 export const groupAskSchema = z.object({ ids: z.array(z.string().min(1)).min(2).max(50), id: z.string().uuid().optional() }).strict();
 
 export const stackAskSchema = groupAskSchema.extend({ ids: z.array(z.string().min(1)).min(1).max(50) });
 
+export const frameAskSchema = stackAskSchema;
+
 const GROUP_NAME = 'Group';
 const STACK_NAME = 'Stack';
+const FRAME_NAME = 'Frame';
 
 const newId = () => crypto.randomUUID().slice(0, 8);
 
@@ -40,29 +45,65 @@ async function readFree(store: FrameStore, ids: readonly string[]): Promise<Free
   return free.every((f) => f !== null) ? (free as Free[]) : null;
 }
 
-function seenIn(element: Element, from: CanvasBox, sheet: MotionDoc, to: CanvasBox): Element {
-  return { ...element, size: { width: (sheet.width * from.width) / to.width, height: (sheet.height * from.height) / to.height } };
+const seenSize = (sheet: MotionDoc, from: CanvasBox, to: CanvasBox) => ({ width: (sheet.width * from.width) / to.width, height: (sheet.height * from.height) / to.height });
+
+const pxScale = (source: Free, sheet: MotionDoc, to: CanvasBox) => sheet.width / to.width / (source.doc.width / source.box.width);
+
+function scaledLayout(layout: AutoLayout, factor: number, rename: (id: string) => string): AutoLayout {
+  const { padding } = layout;
+  return {
+    ...layout,
+    gap: layout.gap * factor,
+    crossGap: layout.crossGap * factor,
+    padding: { top: padding.top * factor, right: padding.right * factor, bottom: padding.bottom * factor, left: padding.left * factor },
+    order: layout.order.map(rename)
+  };
 }
 
-function placeAll(sheet: MotionDoc, sources: readonly Free[], to: CanvasBox): MotionDoc | string {
-  let doc = sheet;
-  for (const source of sources) {
-    for (const clip of topClips(source.doc)) {
-      const lifted = liftElement(source.doc, clip.id);
-      if (!lifted.ok) {
-        return lifted.error;
-      }
+function renamer(sheet: MotionDoc, source: MotionDoc): (id: string) => string {
+  const taken = new Set(topClips(sheet).map((c) => c.id));
+  const names = new Map(topClips(source).map((c) => [c.id, taken.has(c.id) ? newId() : c.id]));
+  return (id) => names.get(id) ?? id;
+}
+
+function carried(source: Free, sheet: MotionDoc, to: CanvasBox): MotionTrack[] {
+  const rename = renamer(sheet, source.doc);
+  const seen = seenSize(sheet, source.box, to);
+  const stage = { width: sheet.width, height: sheet.height };
+  const factor = pxScale(source, sheet, to);
+  const visual = source.doc.tracks.filter((t) => t.kind === TrackKind.Visual && t.clips.length);
+  return visual.map((track) => ({
+    ...track,
+    id: newId(),
+    clips: (track.clips as MotionClip[]).map((clip) => {
       const centre = clipCentre(clip);
       const at = { x: (source.box.left + centre.x * source.box.width - to.left) / to.width, y: (source.box.top + centre.y * source.box.height - to.top) / to.height };
-      const placed = placeElement(doc, seenIn(lifted.element, source.box, doc, to), { at, frame: 0 }, newId);
-      if (!placed.ok) {
-        return placed.error;
-      }
-      doc = placed.doc;
-    }
-  }
-  return doc;
+      const moved = rehomedClip(clip, seen, stage, at);
+      return { ...moved, id: rename(clip.id), parent: clip.parent ? rename(clip.parent) : null, ...(clip.autoLayout ? { autoLayout: scaledLayout(clip.autoLayout, factor, rename) } : {}) };
+    })
+  }));
 }
+
+function unionOf<T>(items: readonly T[], extra: readonly T[], key: (item: T) => string): T[] {
+  const seen = new Set(items.map(key));
+  return [...items, ...extra.filter((item) => !seen.has(key(item)))];
+}
+
+function placeAll(sheet: MotionDoc, sources: readonly Free[], to: CanvasBox): MotionDoc {
+  return sources.reduce(
+    (doc, source) => ({
+      ...doc,
+      tracks: [...carried(source, doc, to), ...doc.tracks],
+      assets: unionOf(doc.assets, source.doc.assets, (a) => a.id),
+      fonts: unionOf(doc.fonts, source.doc.fonts, (f) => f.family),
+      components: { ...source.doc.components, ...doc.components },
+      comps: { ...source.doc.comps, ...doc.comps }
+    }),
+    sheet
+  );
+}
+
+const rootIds = (doc: MotionDoc) => doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips.filter((c) => !c.parent).map((c) => c.id));
 
 export type Member = { id: string; box: CanvasBox; rotation: number; groupId: string | null; version: number; data: Record<string, unknown> };
 
@@ -94,9 +135,6 @@ export async function groupElements(store: FrameStore, members: Members, place: 
     return refused(MoveOutcome.Invalid, sheet.error);
   }
   const doc = placeAll(sheet.doc, sources, bounds);
-  if (typeof doc === 'string') {
-    return refused(MoveOutcome.Invalid, doc);
-  }
 
   const shaped = elementNodeOf(bounds, FrameKind.Group);
   const at = { x: bounds.left, y: bounds.top };
@@ -116,23 +154,38 @@ export async function stackElements(store: FrameStore, place: Place, ids: readon
   }
   const bounds = union(sources.map((s) => s.box));
   const sheet = blankElement(bounds);
-  const placed = sheet.ok ? placeAll(sheet.doc, sources, bounds) : sheet.error;
-  if (typeof placed === 'string') {
-    return refused(MoveOutcome.Invalid, placed);
+  if (!sheet.ok) {
+    return refused(MoveOutcome.Invalid, sheet.error);
   }
-  const { result } = wrapWithStack(placed, topClips(placed).map((c) => c.id), newId);
+  const placed = placeAll(sheet.doc, sources, bounds);
+  const { result } = wrapWithStack(placed, rootIds(placed), newId);
   if (!result.ok) {
     return refused(MoveOutcome.Invalid, result.error);
   }
 
   const fit = freeStackFit(result.doc);
-  const doc = fit?.doc ?? result.doc;
+  const doc = laidOutAsShown(fit?.doc ?? result.doc);
   const box = { ...bounds, width: bounds.width * (fit?.share.width ?? 1), height: bounds.height * (fit?.share.height ?? 1) };
   const shaped = elementNodeOf(box);
   const at = { x: box.left, y: box.top };
   const stackId = await store.create({ ...place, ...at, id }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: STACK_NAME });
   await Promise.all(sources.map((s) => store.remove(s.nodeId)));
   return { outcome: MoveOutcome.Done, frameId: stackId, clipId: '', created: true, versions: { [stackId]: 1 }, undo: [created(stackId, at), ...sources.map(deleted)] };
+}
+
+export async function frameElements(store: FrameStore, place: Place, ids: readonly string[], id?: string): Promise<Moved> {
+  const sources = await readFree(store, ids);
+  if (!sources) {
+    return refused(MoveOutcome.Invalid, 'pick free elements on the canvas to frame; a frame goes inside another by dropping it');
+  }
+  const bounds = union(sources.map((s) => s.box));
+  const doc = placeAll(drawnFrame(bounds), sources, bounds);
+
+  const shaped = drawnFrameNodeOf(bounds);
+  const at = { x: bounds.left, y: bounds.top };
+  const frameId = await store.create({ ...place, ...at, id }, doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: FRAME_NAME });
+  await Promise.all(sources.map((s) => store.remove(s.nodeId)));
+  return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at), ...sources.map(deleted)] };
 }
 
 export async function ungroupElement(store: FrameStore, members: Members, place: Place, id: string): Promise<Moved> {
@@ -165,7 +218,7 @@ export async function ungroupElement(store: FrameStore, members: Members, place:
 
 export async function rotateNodeGroup(store: FrameStore, members: Members, id: string, degrees: number): Promise<Moved> {
   const [group] = await members.read([id]);
-  if (!group || !frameChrome((await store.read(id))?.kind ?? FrameKind.Frame).turns) {
+  if (!group || !(await store.read(id))) {
     return refused(MoveOutcome.NotFound, `nothing to turn at ${id}`);
   }
   const inside = await members.inGroup(id);

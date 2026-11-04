@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FillType, ImageFit, addFill, cropOf, addStop, colourAlpha, removeStop, withAlpha, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill, type FillOf } from './model';
+import { FillHolder, FillType, ImageFit, addFill, cropOf, addStop, colourAlpha, removeStop, withAlpha, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill, type FillOf } from './model';
 
 const solid = (color: string, extra: Record<string, unknown> = {}) => fillsSchema.parse([{ type: FillType.Solid, color, ...extra }])[0];
 const colors = (stack: Fill[]) => stack.map((f) => (f as { color: string }).color);
@@ -114,6 +114,11 @@ describe('fill stack model', () => {
     expect(two).toHaveLength(2);
     expect(two[0]).toEqual(solid('#111111'));
     expect(removeFill(two, 0)).toEqual([two[1]]);
+  });
+
+  it('a fill added to a stack or a frame starts white, on any other layer black', () => {
+    expect(addFill([], FillType.Solid, FillHolder.Container)).toEqual([solid('#ffffff')]);
+    expect(addFill([], FillType.Solid, FillHolder.Layer)).toEqual([solid('#000000')]);
   });
 
   it('move reorders and clamps into the stack', () => {

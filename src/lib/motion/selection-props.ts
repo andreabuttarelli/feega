@@ -1,3 +1,5 @@
+import { fillReplaces } from '@feega/motion-core/motion/fill/elements';
+import { strokeReplaces } from '@feega/motion-core/motion/stroke/elements';
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { EditMode } from './edit-mode';
 import { scaleAround } from './group-transform';
@@ -15,13 +17,15 @@ const declares = (clip: MotionClip, field: Field) => fieldsOf(clip.component).so
 
 export type SharedField = { field: Field; value: Shared<unknown> };
 
+const replaced = (component: string, key: string) => fillReplaces(component, key) || strokeReplaces(component, key);
+
 export function sharedFields(clips: readonly MotionClip[]): SharedField[] {
   const [first, ...rest] = clips;
   if (!first) {
     return [];
   }
   return fieldsOf(first.component)
-    .filter((field) => field.group === Group.Style && SIMPLE_CONTROLS.has(field.control) && rest.every((clip) => declares(clip, field)))
+    .filter((field) => field.group === Group.Style && SIMPLE_CONTROLS.has(field.control) && !replaced(first.component, field.key) && rest.every((clip) => declares(clip, field)))
     .map((field) => ({ field, value: shared(clips.map((clip) => clip.props[field.key] ?? field.fallback)) }));
 }
 

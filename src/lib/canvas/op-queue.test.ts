@@ -73,6 +73,56 @@ describe('op queue: line operations land in order, once, and survive a reload', 
   });
 });
 
+describe('op queue: an op still waiting can be taken back before it is sent', () => {
+  it('takes back a waiting op, stores the rest and never sends it', async () => {
+    let answer: (result: SendResult) => void = () => {};
+    const sent: Op[] = [];
+    const saved: Op[][] = [];
+    const queue = createOpQueue({
+      send: (sending) => { sent.push(sending); return new Promise((resolve) => (answer = resolve)); },
+      store: { save: (ops) => { saved.push(ops); } },
+      backoffMs: () => 0,
+      onDropped: () => {}
+    });
+
+    queue.push(op('1'));
+    queue.push(op('2'));
+
+    expect(queue.takeBack('1')).toBe(false);
+    expect(queue.takeBack('2')).toBe(true);
+    expect(saved.at(-1)?.map((o) => o.opId)).toEqual(['1']);
+
+    answer(SendResult.Saved);
+    await queue.drain();
+    expect(sent.map((o) => o.opId)).toEqual(['1']);
+    expect(queue.takeBack('missing')).toBe(false);
+  });
+
+  it('takes back the first op while it waits to retry offline, and sends the next one', async () => {
+    const sent: Op[] = [];
+    const saved: Op[][] = [];
+    const dropped: Op[] = [];
+    const answers = [SendResult.Retry];
+    const queue = createOpQueue({
+      send: async (sending) => { sent.push(sending); return answers.shift() ?? SendResult.Saved; },
+      store: { save: (ops) => { saved.push(ops); } },
+      backoffMs: () => 50,
+      onDropped: (refused) => dropped.push(refused)
+    });
+
+    queue.push(op('1'));
+    queue.push(op('2'));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(queue.takeBack('1')).toBe(true);
+    await queue.drain();
+
+    expect(sent.map((o) => o.opId)).toEqual(['1', '2']);
+    expect(saved.at(-1)).toEqual([]);
+    expect(dropped).toEqual([]);
+  });
+});
+
 describe('keepLines: a resync shows lines as the user left them', () => {
   const fresh = [{ id: 'kept' }, { id: 'unlinked' }];
   const local = [{ id: 'kept' }, { id: 'new' }];

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseMotionDoc } from '@feega/motion-core/motion/doc';
 import { imagesFilled, type ImageAssets } from '$lib/canvas/figma/images';
 import { DocRejected, placeFigmaPlan, type FrameStore, type Place } from '$lib/server/motion/move-element';
 import type { UndoItem } from '$lib/canvas/undo-plan';
@@ -85,8 +86,6 @@ const SCROLL_PAUSES = 8;
 const NETWORK_IDLE_MS = 6_000;
 const HTTP_ERROR = 400;
 const WEB_SCHEMES = ['http:', 'https:'];
-const FILLED_SUMMARY = 'Filled page images';
-const HOMED_SUMMARY = 'Linked components to their sheet';
 
 const BOX_SHAPE = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
 
@@ -196,34 +195,41 @@ export async function fontsFor(ask: LandAsk, tree: PageTree): Promise<FontAssets
   return Object.fromEntries(entries.filter((e): e is readonly [string, string] => Boolean(e[1])));
 }
 
-async function placedSets(ask: LandAsk, sets: UrlPlan['sets']): Promise<{ frameIds: string[]; undo: UndoItem[] }> {
+type PlacedSets = { frameIds: string[]; undo: UndoItem[]; skipped: string[] };
+
+const NO_SETS: PlacedSets = { frameIds: [], undo: [], skipped: [] };
+
+async function placedSet(ask: LandAsk, page: ComponentsPage, set: UrlPlan['sets'][number], id: string): Promise<PlacedSets> {
+  try {
+    const placed = await placeFigmaPlan(ask.store, page.place, { items: [set], skipped: [], fileKey: null }, page.at, [id]);
+    return { frameIds: placed.frameIds.slice(0, 1), undo: placed.undo, skipped: [] };
+  } catch (e) {
+    if (!(e instanceof DocRejected)) {
+      throw e;
+    }
+    return { frameIds: [], undo: [], skipped: [`${set.name}: component set left out, ${e.message}`] };
+  }
+}
+
+async function placedSets(ask: LandAsk, sets: UrlPlan['sets'], ids: string[], landed: string[]): Promise<PlacedSets> {
   if (!sets.length || !ask.components) {
-    return { frameIds: [], undo: [] };
+    return NO_SETS;
   }
   const page = await ask.components();
-  const placed = await placeFigmaPlan(ask.store, page.place, { items: sets, skipped: [], fileKey: null }, page.at);
-  return { frameIds: placed.frameIds, undo: placed.undo };
+  const placed: PlacedSets[] = [];
+  for (const [i, set] of sets.entries()) {
+    const one = await placedSet(ask, page, set, ids[i]);
+    landed.push(...one.frameIds);
+    placed.push(one);
+  }
+  return { frameIds: placed.flatMap((p) => p.frameIds), undo: placed.flatMap((p) => p.undo), skipped: placed.flatMap((p) => p.skipped) };
 }
 
-async function homedOnSets(store: FrameStore, frameIds: string[], setIds: string[], homes: Homes): Promise<void> {
-  for (const [page, comps] of Object.entries(homes)) {
-    const pageId = frameIds[Number(page)];
-    const frame = pageId ? await store.read(pageId) : null;
-    const byComp = Object.fromEntries(Object.entries(comps).flatMap(([compId, set]) => (setIds[set] ? [[compId, setIds[set]]] : [])));
-    if (frame && Object.keys(byComp).length) {
-      await store.write(pageId, frame.version, homedAt(frame.doc, byComp), HOMED_SUMMARY);
-    }
-  }
-}
-
-async function filled(ask: LandAsk, frameIds: string[], items: UrlPlan['sets'], assets: ImageAssets): Promise<void> {
-  for (const [i, frameId] of frameIds.entries()) {
-    const frame = await ask.store.read(frameId);
-    const images = items[i]?.images ?? [];
-    if (frame && images.length && Object.keys(assets).length) {
-      await ask.store.write(frameId, frame.version, imagesFilled(frame.doc, images, assets), FILLED_SUMMARY);
-    }
-  }
+function homedItems(items: UrlPlan['sets'], homes: Homes, setIds: readonly string[], assets: ImageAssets): UrlPlan['sets'] {
+  return items.map((item, i) => {
+    const byComp = Object.fromEntries(Object.entries(homes[i] ?? {}).flatMap(([compId, set]) => (setIds[set] ? [[compId, setIds[set]]] : [])));
+    return { ...item, doc: imagesFilled(homedAt(item.doc, byComp), item.images, assets) };
+  });
 }
 
 async function readAndLand(ask: PageAsk): Promise<UrlImported> {
@@ -247,20 +253,26 @@ async function readAndLand(ask: PageAsk): Promise<UrlImported> {
     const first = await readWith(Sight.Everything);
     return unreadable(first) ? readWith(Sight.Native) : first;
   };
-  const readView = async (view: PageView): Promise<ViewRead[]> => {
-    const tab = await open();
+  const readView = async (tab: AppTab, view: PageView): Promise<ViewRead[]> => {
     await tab.viewport(view.width).catch(() => undefined);
-    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight).finally(() => tab.close());
+    const narrow = await pageTreeAt(tab, url, ask.settleMs ?? SETTLE_MS, planner, ask.maxHeight);
     return 'outcome' in narrow ? [] : [{ view, tree: narrow }];
   };
-  const readViewsInTurn = async () => {
-    const reads: ViewRead[][] = [];
-    for (const view of ask.views ?? []) {
-      reads.push(await readView(view).catch(() => []));
+  const readViews = async (): Promise<ViewRead[][]> => {
+    const views = ask.views ?? [];
+    if (!views.length) {
+      return [];
     }
-    return reads;
+    const first = await open();
+    const tabs = [first, ...(await Promise.all(views.slice(1).map(() => first.beside().catch(() => null))))];
+    try {
+      return await Promise.all(views.map((view, i) => (tabs[i] ? readView(tabs[i]!, view).catch(() => []) : [])));
+    } finally {
+      await Promise.all(tabs.slice(1).map((tab) => tab?.close()));
+      await first.close();
+    }
   };
-  const [read, narrow] = await Promise.all([readPage(), readViewsInTurn()]);
+  const [read, narrow] = await Promise.all([readPage(), readViews().catch(() => [])]);
   if ('outcome' in read) {
     return read;
   }
@@ -270,11 +282,15 @@ async function readAndLand(ask: PageAsk): Promise<UrlImported> {
   return landPlan(ask, planner.plan(tree, ask.newId, await fontsFor(ask, tree), ask.shape ?? FULL_SHAPE, views), tree.truncated);
 }
 
+const STATEMENT_TIMEOUT = '57014';
+
+const timedOut = (e: unknown) => typeof e === 'object' && e !== null && (e as { code?: unknown }).code === STATEMENT_TIMEOUT;
+
 export async function importPageAt(ask: PageAsk): Promise<UrlImported> {
   try {
     return await readAndLand(ask);
   } catch (e) {
-    if (e instanceof BrowserBusy) {
+    if (e instanceof BrowserBusy || timedOut(e)) {
       return refused(UrlImportOutcome.Busy);
     }
     if (e instanceof DocRejected) {
@@ -289,13 +305,32 @@ export async function landPlan(ask: LandAsk, made: UrlPlan | null, truncated: bo
     return refused(UrlImportOutcome.Unreadable);
   }
 
-  const placed = await placeFigmaPlan(ask.store, ask.place, made.plan, ask.at);
-  const sets = await placedSets(ask, made.sets);
-  await homedOnSets(ask.store, placed.frameIds, sets.frameIds, made.homes);
-  await homedOnSets(ask.store, sets.frameIds, sets.frameIds, made.setHomes);
+  const refusal = refusalOf(made.plan.items);
+  if (refusal) {
+    return refused(UrlImportOutcome.Rejected, refusal);
+  }
+
   const assets = await imported(ask, made.images);
-  await filled(ask, placed.frameIds, made.plan.items, assets);
-  await filled(ask, sets.frameIds, made.sets, assets);
-  const frameId = placed.frameIds[0];
-  return { outcome: UrlImportOutcome.Ok, frameId, name: made.name, undo: [...placed.undo, ...sets.undo], skipped: placed.skipped, truncated };
+  const setIds = made.sets.map(() => crypto.randomUUID());
+  const landed: string[] = [];
+  try {
+    const sets = await placedSets(ask, homedItems(made.sets, made.setHomes, setIds, assets), setIds, landed);
+    const kept = setIds.map((id) => (landed.includes(id) ? id : ''));
+    const placed = await placeFigmaPlan(ask.store, ask.place, { ...made.plan, items: homedItems(made.plan.items, made.homes, kept, assets) }, ask.at);
+    landed.push(...placed.frameIds);
+    return { outcome: UrlImportOutcome.Ok, frameId: placed.frameIds[0], name: made.name, undo: [...placed.undo, ...sets.undo], skipped: [...placed.skipped, ...sets.skipped], truncated };
+  } catch (e) {
+    await Promise.all(landed.map((id) => ask.store.remove(id).catch(() => undefined)));
+    throw e;
+  }
+}
+
+function refusalOf(items: UrlPlan['plan']['items']): string | null {
+  for (const item of items) {
+    const verdict = parseMotionDoc(item.doc);
+    if (!verdict.ok) {
+      return `${item.name}: ${verdict.error}`;
+    }
+  }
+  return null;
 }

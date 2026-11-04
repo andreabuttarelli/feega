@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { keepAwake, visibleGate, type Page } from './stay-awake';
+import { keepAwake, type Page } from './stay-awake';
 
 function fakePage(hidden = false) {
   const listeners = new Set<() => void>();
@@ -16,26 +16,6 @@ function fakePage(hidden = false) {
   };
   return page;
 }
-
-describe('visibleGate', () => {
-  it('passa subito con la tab in primo piano', async () => {
-    const pauses: boolean[] = [];
-    await visibleGate(fakePage(false), (p) => pauses.push(p))();
-    expect(pauses).toEqual([]);
-  });
-
-  it('con la tab in background aspetta che torni visibile, e lo dice', async () => {
-    const page = fakePage(true);
-    const pauses: boolean[] = [];
-    let passed = false;
-    const waiting = visibleGate(page, (p) => pauses.push(p))().then(() => (passed = true));
-    await Promise.resolve();
-    expect(passed).toBe(false);
-    page.flip(false);
-    await waiting;
-    expect(pauses).toEqual([true, false]);
-  });
-});
 
 describe('keepAwake', () => {
   it('prende il wake lock, lo riprende al ritorno in primo piano e lo rilascia', async () => {

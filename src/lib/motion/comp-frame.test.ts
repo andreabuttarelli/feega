@@ -37,4 +37,13 @@ describe('a main keeps its pixels when it moves between frames of different size
     const comp = buttonComp();
     expect(reframed(comp, PAGE, PAGE)).toBe(comp);
   });
+
+  it('carries an instance placed inside one of its shapes', () => {
+    const card = buttonComp();
+    const icon = { ...(card.tracks[0].clips[0] as MotionClip), id: 'icon', component: 'Precomp', parent: 'pill', props: { comp: 'other' }, transform: { x: 0.1, y: 0.7 } } as MotionClip;
+    const moved = reframed({ ...card, tracks: [{ ...card.tracks[0], clips: [...card.tracks[0].clips, icon] }] }, PAGE, SET, { x: 48 - 400, y: 48 - 1450 });
+    const placed = moved.tracks[0].clips.find((c) => c.id === 'icon')!;
+
+    expect(rounded([placed.transform.x, placed.transform.y])).toEqual(rounded([(100 + 48 - 400) / 400, (1400 + 48 - 1450) / 200]));
+  });
 });

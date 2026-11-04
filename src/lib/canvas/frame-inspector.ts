@@ -1,10 +1,11 @@
 import { compOf, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { Action, type ActionId } from '$lib/motion/actions';
 import { mainNav } from './main-nav.svelte';
 import { ClipOp, runClipOp, type ClipDone } from '$lib/motion/clip-ops';
 import { ungroupClip } from '$lib/motion/group';
 import { groupLight, ungroupLight } from '$lib/motion/light-group';
-import { removeStack, resizeToFit, wrapInFrame, wrapWithStack } from '$lib/motion/layout/ops';
+import { addAutoLayout, removeStack, resizeToFit, wrapInFrame, wrapWithStack } from '$lib/motion/layout/ops';
 import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
 import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
@@ -13,16 +14,17 @@ import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { copyStyle, pasteStyle } from '$lib/motion/style-copy';
 import { pasteOverElements, replaceElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
+import { altCopies } from './alt-copy';
 import { setClipFlags } from '@feega/motion-core/motion/organize';
-import { BooleanOp, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
-import { bakeBooleanGroup, isBooleanGroup, liveCombine } from '$lib/motion/shape/boolean-group';
+import { BooleanOp, combineShapes, flattenShapes } from '@feega/motion-core/motion/shape/boolean';
+import { bakeBooleanGroup, isBooleanGroup } from '$lib/motion/shape/boolean-group';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { outlineTexts, type LetteringLoader } from '$lib/motion/text-outline-run';
 import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Command, OPACITY_KEYS, commandFor, isTyping } from '$lib/motion/shortcuts';
 import { Same, matchingLayers, sameLayers } from '$lib/motion/select-matching';
 import { FRAME_MENU_IDS, frameMenuRun } from '$lib/motion/frame-menu';
-import { ALIGN_ACTIONS, type SelectionActionId } from './selection-actions';
+import type { SelectionActionId } from './selection-actions';
 import { siblingsOf } from './frame-select';
 import { EditMode } from '$lib/motion/edit-mode';
 import { propBoxes, tidySpace } from '$lib/motion/space';
@@ -50,7 +52,7 @@ export function inspectorOf(doc: MotionDoc, selection: readonly string[]): Inspe
   return { view: template ? PropertiesView.Template : PropertiesView.Clip, clip: found.clip, path, hosts };
 }
 
-type BarCtx = { doc: MotionDoc; selection: readonly string[]; frame: number; newId: () => string };
+type BarCtx = { doc: MotionDoc; selection: readonly string[]; frame: number; newId: () => string; layer?: string; here?: string | null };
 type Done = Extract<ClipDone, { ok: true }>;
 type BarOp = { shown: (doc: MotionDoc, selection: readonly string[]) => boolean; run: (ctx: BarCtx) => Done | null };
 
@@ -104,7 +106,16 @@ function framed(ctx: BarCtx): Done | null {
   return done(wrapInFrame(ctx.doc, ctx.selection, container, ctx.newId()), 'Framed the selection', [container]);
 }
 
+const loneFrame = (doc: MotionDoc, selection: readonly string[]): MotionClip | null => {
+  const [clip] = selection.length === 1 ? clipsOf(doc, selection) : [];
+  return clip?.clipContent && !clip.autoLayout ? clip : null;
+};
+
 function wrapStack(ctx: BarCtx): Done | null {
+  const frame = loneFrame(ctx.doc, ctx.selection);
+  if (frame) {
+    return done(addAutoLayout(ctx.doc, frame.id), 'Added auto layout', [frame.id]);
+  }
   const { result, containerId } = wrapWithStack(ctx.doc, ctx.selection, ctx.newId);
   return done(result, 'Wrapped with a stack', [containerId]);
 }
@@ -117,6 +128,11 @@ const loneStack = (doc: MotionDoc, selection: readonly string[]): (MotionClip & 
 function unwrapStack(ctx: BarCtx): Done | null {
   const stack = loneStack(ctx.doc, ctx.selection);
   return stack ? done(removeStack(ctx.doc, stack.id), 'Removed the stack', childrenInOrder(clipsOf(ctx.doc, topIds(ctx.doc)), stack).map((c) => c.id)) : null;
+}
+
+function duplicated(ctx: BarCtx): Done | null {
+  const copied = altCopies(ctx.doc, ctx.selection, ctx.newId, ctx.here ?? null);
+  return copied ? { ok: true, doc: copied.doc, summary: 'Duplicated', selection: copied.ids } : null;
 }
 
 const clipOp = (op: ClipOp): BarOp => ({ shown: any, run: (ctx) => {
@@ -136,7 +152,7 @@ const combine = (op: BooleanOp): BarOp => ({
     if (group) {
       return kept(ctx, setProps(ctx.doc, group.id, { boolean: op }), `Changed boolean to ${op}`);
     }
-    return regrouped(ctx, liveCombine(ctx.doc, ctx.selection, op, ctx.newId), `Combined shapes: ${op}`);
+    return kept(ctx, combineShapes(ctx.doc, ctx.selection, op, ctx.frame), `Combined shapes: ${op}`);
   }
 });
 
@@ -168,7 +184,13 @@ function goToMain(doc: MotionDoc, clipId: string): null {
 }
 
 const COMPONENT_NAME = 'Component';
-const componentName = (doc: MotionDoc) => `${COMPONENT_NAME} ${Object.values(doc.comps).filter((c) => c.component).length + 1}`;
+const numberedName = (doc: MotionDoc) => `${COMPONENT_NAME} ${Object.values(doc.comps).filter((c) => c.component).length + 1}`;
+
+function componentName(ctx: BarCtx): string {
+  const [only] = ctx.selection.length === 1 ? ctx.selection : [];
+  const clip = only ? (findClip(ctx.doc, only)?.clip as MotionClip | undefined) : undefined;
+  return ctx.layer || clip?.name || (clip ? COMPONENTS[clip.component].label : numberedName(ctx.doc));
+}
 
 type Flag = 'hidden' | 'locked';
 
@@ -216,13 +238,13 @@ const BAR_OPS: Partial<Record<ActionId, BarOp>> = {
   [Command.SendBackward]: arrangeOp(Arrange.Backward, 'Sent backward'),
   [Command.SendToBack]: arrangeOp(Arrange.Back, 'Sent to back'),
   [Action.TidyUp]: { shown: several, run: (ctx) => kept(ctx, tidySpace(ctx.doc, ctx.selection, ctx.frame, propBoxes(ctx.doc), EditMode.Design), 'Tidied up') },
-  [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx.doc)), 'Created a component') },
+  [Action.CreateComponent]: { shown: any, run: (ctx) => regrouped(ctx, createComponent(ctx.doc, ctx.selection, ctx.newId, componentName(ctx)), 'Created a component') },
   [Action.GoToMain]: { shown: oneInstance, run: (ctx) => goToMain(ctx.doc, ctx.selection[0]) },
   [Action.DetachInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, detachInstance(ctx.doc, ctx.selection[0], ctx.newId), 'Detached the instance') },
   [Action.PushInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, pushOverrides(ctx.doc, ctx.selection[0]), 'Pushed overrides to the main component') },
   [Action.ResetInstance]: { shown: oneInstance, run: (ctx) => kept(ctx, resetOverrides(ctx.doc, ctx.selection[0]), 'Reset all overrides') },
   [Action.Split]: clipOp(ClipOp.Split),
-  [Action.Duplicate]: clipOp(ClipOp.Duplicate),
+  [Action.Duplicate]: { shown: any, run: duplicated },
   [Action.Delete]: clipOp(ClipOp.Delete),
   [Action.Group]: { shown: several, run: (ctx) => (ctx.selection.length >= MIN_COMBINED ? regrouped(ctx, groupLight(ctx.doc, ctx.selection, ctx.newId(), ctx.newId()), 'Grouped') : null) },
   [Action.Ungroup]: { shown: oneGroup, run: ungrouped },
@@ -293,7 +315,28 @@ export const canRunInFrame = runs;
 
 const rootIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips.filter((c) => !c.parent).map((c) => c.id));
 
-export const stacksWholeElement = (id: ActionId, doc: MotionDoc, picks: readonly string[]): boolean => id === Action.WrapStack && rootIds(doc).every((root) => picks.includes(root));
+export enum ElementAction {
+  WrapStack = 'wrap-stack',
+  Duplicate = 'duplicate',
+  BringForward = 'bring-forward',
+  SendBackward = 'send-backward',
+  BringToFront = 'bring-front',
+  SendToBack = 'send-back'
+}
+
+const WHOLE_ELEMENT: Partial<Record<ActionId, ElementAction>> = {
+  [Action.WrapStack]: ElementAction.WrapStack,
+  [Action.Duplicate]: ElementAction.Duplicate,
+  [Command.BringForward]: ElementAction.BringForward,
+  [Command.SendBackward]: ElementAction.SendBackward,
+  [Command.BringToFront]: ElementAction.BringToFront,
+  [Command.SendToBack]: ElementAction.SendToBack
+};
+
+export function wholeElementAction(id: ActionId, doc: MotionDoc, picks: readonly string[]): ElementAction | null {
+  const action = WHOLE_ELEMENT[id];
+  return action && rootIds(doc).every((root) => picks.includes(root)) ? action : null;
+}
 
 export const frameMenuAction = (id: SelectionActionId): ActionId | null => {
   const run = frameMenuRun(id);
@@ -320,14 +363,7 @@ export function frameKeyAction(e: KeyboardEvent): ActionId | null {
 const shownIn = (id: ActionId, doc: MotionDoc, selection: readonly string[]) => (BAR_OPS[id] ?? LATER_OPS[id])?.shown(doc, selection) ?? runs(id);
 
 export const elementMenuIds = (doc: MotionDoc, picks: readonly string[]): ReadonlySet<SelectionActionId> =>
-  new Set([...[...FRAME_ELEMENT_MENU].filter((id) => shownIn(frameMenuAction(id)!, doc, picks)), ...(picks.length ? ALIGN_ACTIONS : [])]);
-
-const TOOLBAR_ELEMENT_ACTIONS: readonly SelectionActionId[] = ['wrap-stack', 'remove-stack', 'go-to-main'];
-
-export const elementToolbarActions = (doc: MotionDoc, picks: readonly string[]): SelectionActionId[] => {
-  const shown = elementMenuIds(doc, picks);
-  return picks.length ? TOOLBAR_ELEMENT_ACTIONS.filter((id) => shown.has(id)) : [];
-};
+  new Set([...FRAME_ELEMENT_MENU].filter((id) => shownIn(frameMenuAction(id)!, doc, picks)));
 
 const LAYER_ACTIONS: readonly ActionId[] = [Action.WrapStack, Action.RemoveStack, Action.CreateComponent, Action.GoToMain, Command.UseAsMask, Command.RemoveMask, Action.ToggleHidden, Action.ToggleLocked, Action.Delete];
 

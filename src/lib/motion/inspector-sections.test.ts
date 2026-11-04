@@ -11,10 +11,10 @@ function memory() {
 }
 
 describe('inspector sections', () => {
-  it('orders by importance: layout, alignment, constraints, content, appearance, effects, text, then transform', () => {
-    const order = [Section.Layout, Section.Align, Section.Constraints, Section.Content, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text, Section.Transform, Section.Animate];
+  it('orders by importance: alignment, layout, constraints, content, appearance, effects, text, then transform', () => {
+    const order = [Section.Align, Section.Layout, Section.Constraints, Section.Content, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text, Section.Transform, Section.Animate];
     expect(SECTION_ORDER.filter((s) => order.includes(s))).toEqual(order);
-    expect(SECTION_ORDER[0]).toBe(Section.Layout);
+    expect(SECTION_ORDER[0]).toBe(Section.Align);
     expect(SECTION_ORDER.indexOf(Section.Animate)).toBeGreaterThan(SECTION_ORDER.indexOf(Section.Effects));
     expect(SECTION_ORDER.indexOf(Section.ThreeD)).toBeGreaterThan(SECTION_ORDER.indexOf(Section.Effects));
   });
@@ -36,6 +36,7 @@ describe('inspector sections', () => {
 
   it('names the look section Appearance', () => {
     expect(SECTION_TITLE[Section.Layer]).toBe('Appearance');
+    expect(SECTION_TITLE[Section.Text]).toBe('Typography');
   });
 
   it('sums a closed section up in one line', () => {
@@ -81,12 +82,18 @@ describe('inspector sections', () => {
 
   it('labels each value in English with its unit, and fills only where the range means something', () => {
     expect(fieldLook('rotateZ')).toEqual({ short: 'Rotate', unit: '°', fill: FieldFill.None });
-    expect(fieldLook('tracking')).toMatchObject({ short: 'Spacing', unit: 'em' });
-    expect(fieldLook('leading')).toMatchObject({ short: 'Line', unit: '×' });
+    expect(fieldLook('tracking')).toMatchObject({ short: 'Spacing', unit: '%' });
+    expect(fieldLook('leading')).toMatchObject({ short: 'Line', unit: '%' });
     expect(fieldLook('opacity').fill).toBe(FieldFill.Range);
     expect(fieldLook('lineHeight').short).toBeNull();
     expect(fieldLook('x', Source.Transform).short).toBe('Offset X');
     expect(fieldLook('x').short).toBe('X');
+  });
+
+  it('an ellipse arc reads start in degrees, sweep and ratio in percent', () => {
+    expect(fieldLook('arcStart')).toMatchObject({ short: 'Start', unit: '°' });
+    expect(fieldLook('arcSweep')).toMatchObject({ short: 'Sweep', unit: '%' });
+    expect(fieldLook('arcRatio')).toMatchObject({ short: 'Ratio', unit: '%' });
   });
 
   it('files every field under the section a designer looks for it in', () => {

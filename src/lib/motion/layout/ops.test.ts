@@ -3,9 +3,10 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { Align, Direction, Sizing, TrackType } from '@feega/motion-core/motion/layout/auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '@feega/motion-core/motion/layout/model';
-import { laidClip, setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame } from './ops';
+import { laidClip, setChildSize, stepInStack, wrapWithStack, leaveStack, reorderChild, freezeLayout, removeStack, setAutoLayout, setLayoutItem, resizeToFit, wrapInStack, wrapInFrame, addAutoLayout, stackFrame } from './ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { layerOrder } from '../siblings';
+import { ClipOp, runClipOp } from '../clip-ops';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -232,6 +233,37 @@ describe('wrapInFrame', () => {
     expect(clip(framed, 'a').props.x).toBe(0.2);
     expect(clip(framed, 'b').layoutItem).toBeFalsy();
   });
+
+  it('is called Frame, not the box it is drawn with', () => {
+    expect(clip(framed, 'box').name).toBe('Frame');
+  });
+
+  it('clips its content, as a frame does', () => {
+    expect(clip(framed, 'box').clipContent).toBe(true);
+  });
+});
+
+describe('auto layout added to a frame', () => {
+  it('a frame inside a frame lays out the children it already holds', () => {
+    const stacked = must(addAutoLayout(must(wrapInFrame(row, ['a', 'b'], 'box', 'lane')), 'box'));
+
+    expect(clip(stacked, 'box').autoLayout?.order).toEqual(['a', 'b']);
+    expect(clip(stacked, 'box').autoLayout?.direction).toBe(Direction.Horizontal);
+  });
+
+  it('a frame on the canvas lays out every layer on its own surface, keeping its size', () => {
+    const stacked = must(stackFrame(row, 'surface'));
+    const surface = clip(stacked, stacked.surface!);
+
+    expect(['a', 'b', 'k'].map((id) => clip(stacked, id).parent)).toEqual([surface.id, surface.id, surface.id]);
+    expect(surface.autoLayout?.order).toEqual(['a', 'b', 'k']);
+    expect(surface.layoutItem?.width ?? Sizing.Fixed).toBe(Sizing.Fixed);
+    expect(clip(withAutoLayout(stacked), 'b').props.x).not.toBe(0.5);
+  });
+
+  it('refuses a container with nothing to lay out', () => {
+    expect(addAutoLayout(row, 'a').ok).toBe(false);
+  });
 });
 
 describe('resizeToFit', () => {
@@ -360,5 +392,26 @@ describe('a stack child as a flex item', () => {
     const later = must(stepInStack(stacked, 'a', 1));
     expect(clip(later, 'box').autoLayout?.order).toEqual(['b', 'a']);
     expect(stepInStack(later, 'a', 1).ok).toBe(false);
+  });
+});
+
+describe('duplicating a stack child', () => {
+  const stacked = must(wrapInStack(row, ['a', 'b'], 'box', 'lane'));
+  const duplicated = runClipOp(ClipOp.Duplicate, { doc: stacked, selection: ['a'], frame: 0, parent: null, newId: () => 'a2' });
+  const doc = duplicated.ok ? duplicated.doc : stacked;
+  const laid = withAutoLayout(doc);
+
+  it('shows the copy at the same time, right after the original in the stack', () => {
+    expect(clip(doc, 'a2').from).toBe(clip(doc, 'a').from);
+    expect(clip(doc, 'box').autoLayout?.order).toEqual(['a', 'a2', 'b']);
+  });
+
+  it('lays the copy out and grows the hugging stack', () => {
+    expect(clip(laid, 'a2').props.x).not.toBe(clip(laid, 'a').props.x);
+    expect(Number(clip(laid, 'box').props.width)).toBeGreaterThan(Number(clip(withAutoLayout(stacked), 'box').props.width));
+  });
+
+  it('keeps the video length', () => {
+    expect(doc.durationInFrames).toBe(stacked.durationInFrames);
   });
 });

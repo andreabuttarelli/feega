@@ -8,12 +8,14 @@
   import { audioPlan } from '$lib/motion/audio-plan';
   import { BROWSER_RESOLUTIONS, eta, exportSize, type Capabilities } from '$lib/motion/export-plan';
   import { capabilities } from '$lib/motion/export/encode';
-  import { BrowserStage, renderInBrowser } from '$lib/motion/export/browser-render';
+  import { BrowserStage, framesOf, renderInBrowser } from '$lib/motion/export/browser-render';
   import { cancelLink, saveToLink } from '$lib/motion/export/link-upload';
   import { RenderPlace, renderPlace, thisDevice, type Device, type PlaceVerdict } from '$lib/motion/render-place';
   import { Preset, settingsOf } from '$lib/motion/export-formats';
   import { REFUSAL_TEXT, autostarts } from '$lib/motion/render-link';
   import { profileOf } from '$lib/motion/export/capture-profile';
+  import { PREVIEW_EVERY_MS, drawOn, tapFrames } from '$lib/motion/export/preview-tap';
+  import ExternalLink from '@lucide/svelte/icons/external-link';
   import type { Resolution } from '$lib/motion/render-quote';
 
   let { data } = $props();
@@ -34,11 +36,14 @@
   const html = render ? composeHtml({ doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses }) : '';
   const fullDoc = render ? { doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses } : null;
   const readsOf = render ? (only?: ReadonlySet<string>) => composeHtml({ doc: render.doc, tokens: render.tokens, assets: render.assetUrls, analyses: render.analyses, only }) : null;
-  const total = render?.doc.durationInFrames ?? 0;
-  const seconds = render ? render.doc.durationInFrames / render.doc.fps : 0;
+  const span = render ? framesOf(render.doc, render.range) : { from: 0, to: 0 };
+  const total = span.to - span.from;
+  const seconds = render ? total / render.doc.fps : 0;
   const hasAudio = render ? audioPlan(render.doc, render.assetUrls).length > 0 : false;
 
   let preview = $state<MotionPreview | null>(null);
+  let live = $state<HTMLCanvasElement | null>(null);
+  let showing = $state(false);
   let phase = $state<Phase>(Phase.Checking);
   let caps = $state<Capabilities | null>(null);
   let device = $state<Device | null>(null);
@@ -47,12 +52,12 @@
   let done = $state(0);
   let startedAt = $state(0);
   let now = $state(0);
-  let paused = $state(false);
   let error = $state('');
   let file = $state<File | null>(null);
   let downloadUrl = $state('');
   let controller: AbortController | null = null;
 
+  const percent = $derived(Math.floor((done / Math.max(1, total)) * 100));
   const busy = $derived(phase === Phase.Mixing || phase === Phase.Rendering || phase === Phase.Saving);
   const remaining = $derived(eta({ done, total, elapsedMs: now - startedAt }));
   const canShare = $derived(file !== null && typeof navigator !== 'undefined' && Boolean(navigator.canShare?.({ files: [file] })));
@@ -112,6 +117,7 @@
     controller = new AbortController();
     error = '';
     done = 0;
+    showing = false;
     const size = exportSize(render.doc, resolution);
     try {
       const blob = await renderInBrowser({
@@ -120,7 +126,15 @@
         size,
         quality: render.quality,
         withAudio: Boolean(caps?.aac),
-        frames: (times, s, onFrame, signal) => preview!.render(times, s, onFrame, signal, html, profileOf(page.url.searchParams.get(CAPTURE_PARAM))),
+        range: render.range,
+        frames: tapFrames(
+          (times, s, onFrame, signal) => preview!.render(times, s, onFrame, signal, html, profileOf(page.url.searchParams.get(CAPTURE_PARAM))),
+          (bitmap) => {
+            drawOn(live)(bitmap);
+            showing = true;
+          },
+          { everyMs: PREVIEW_EVERY_MS, now: () => performance.now() }
+        ),
         signal: controller.signal,
         onStage: (stage) => {
           phase = STAGE_PHASE[stage];
@@ -129,8 +143,7 @@
         onFrame: (n) => {
           done = n;
           now = performance.now();
-        },
-        onPause: (p) => (paused = p)
+        }
       });
       file = new File([blob], `${render.name}.mp4`, { type: MIME });
       downloadUrl = URL.createObjectURL(blob);
@@ -170,133 +183,197 @@
 </svelte:head>
 
 <main class="render-page" data-testid="render-page">
-  {#if data.refused}
-    <h1>Render</h1>
-    <p class="warn" role="alert" data-testid="render-refused">{REFUSAL_TEXT[data.refused]}</p>
-  {:else if render}
-    <header>
-      <h1>{render.name}</h1>
-      <span class="meta">v{render.revision} · {Math.round(seconds)} s · {render.doc.fps} fps</span>
-    </header>
+  <section class="card">
+    {#if data.refused}
+      <h1>render</h1>
+      <p class="warn" role="alert" data-testid="render-refused">{REFUSAL_TEXT[data.refused]}</p>
+    {:else if render}
+      <header>
+        <h1>{render.name.toLowerCase()}</h1>
+        <span class="meta">v{render.revision} · {+seconds.toFixed(2)} s · {render.doc.fps} fps · {render.doc.width}×{render.doc.height}</span>
+      </header>
 
-    <div class="stage" style={`aspect-ratio: ${render.doc.width} / ${render.doc.height}`}>
-      <MotionPreview bind:this={preview} {html} {fullDoc} gpuCompose={readsOf} width={render.doc.width} height={render.doc.height} fps={render.doc.fps} />
-    </div>
+      <div class="stage" style={`aspect-ratio: ${render.doc.width} / ${render.doc.height}`}>
+        <MotionPreview bind:this={preview} {html} {fullDoc} gpuCompose={readsOf} width={render.doc.width} height={render.doc.height} fps={render.doc.fps} />
+        <canvas bind:this={live} class="live" class:on={showing} data-testid="render-live" aria-hidden="true"></canvas>
+        {#if phase === Phase.Done && downloadUrl}<video class="live on" src={downloadUrl} autoplay muted loop playsinline controls data-testid="render-result"></video>{/if}
+      </div>
 
-    {#if phase === Phase.Checking}
-      <p class="muted">Checking what this device can encode…</p>
-    {:else if phase === Phase.Blocked}
-      <p class="warn" role="alert" data-testid="render-blocked">{blocked}</p>
-      <p class="muted">Open this link on a computer, or ask the agent for a server render.</p>
-    {:else if phase === Phase.Cancelled}
-      <p class="muted" data-testid="render-cancelled">Render cancelled. Ask for a new link to try again.</p>
-    {:else}
-      {#if phase === Phase.Ready || phase === Phase.Failed}
-        <fieldset class="choice" aria-label="Resolution">
-          {#each allowed as r (r)}
-            <label><input type="radio" name="res" value={r} bind:group={resolution} /> {r}</label>
-          {/each}
-        </fieldset>
-        <p class="muted">Free: it renders on this device and saves to your project. Keep this screen on until it finishes.</p>
-      {/if}
-
-      {#if PHASE_LABEL[phase]}
-        <div class="progress" data-testid="render-progress">
-          <div class="track"><div class="fill" style={`width: ${(done / Math.max(1, total)) * 100}%`}></div></div>
-          <span>{PHASE_LABEL[phase]} {#if phase === Phase.Rendering}{done}/{total} · {etaLabel(remaining)}{/if}</span>
-        </div>
-        <p class="notice" role="status">Keep this screen on and this tab open.</p>
-        {#if paused}<p class="warn" role="alert" data-testid="render-paused">Paused: this tab is in the background. Come back to resume.</p>{/if}
-      {/if}
-
-      {#if phase === Phase.Failed}<p class="warn" role="alert">Render failed: {error}</p>{/if}
-
-      {#if phase === Phase.Done}
-        {#if error}<p class="warn" role="alert">{error}</p>{:else}<p class="ok" data-testid="render-saved">Saved to your project.</p>{/if}
-        <div class="actions">
-          <a class="primary" href={downloadUrl} download={file?.name} data-testid="render-download"><Download size={16} /> Download</a>
-          {#if canShare}<button type="button" class="secondary" onclick={share} data-testid="render-share"><Share2 size={16} /> Share</button>{/if}
-        </div>
-      {:else if busy}
-        <button type="button" class="secondary wide" disabled={phase === Phase.Saving} onclick={cancel}>Cancel</button>
+      {#if phase === Phase.Checking}
+        <p class="muted">Checking what this device can encode…</p>
+      {:else if phase === Phase.Blocked}
+        <p class="warn" role="alert" data-testid="render-blocked">{blocked}</p>
+        <p class="muted">Open this link on a computer, or ask the agent for a server render.</p>
+      {:else if phase === Phase.Cancelled}
+        <p class="muted" data-testid="render-cancelled">Render cancelled. Ask for a new link to try again.</p>
       {:else}
-        <button type="button" class="primary wide" disabled={!resolution} onclick={start} data-testid="render-start">Render on this device</button>
+        {#if phase === Phase.Ready || phase === Phase.Failed}
+          <div class="segments" role="radiogroup" aria-label="Resolution">
+            {#each allowed as r (r)}
+              <label class:picked={resolution === r}><input type="radio" name="res" value={r} bind:group={resolution} />{r}</label>
+            {/each}
+          </div>
+          <p class="muted">Free: it renders on this device and saves to your project. Keep this screen on until it finishes.</p>
+        {/if}
+
+        {#if PHASE_LABEL[phase]}
+          <div class="progress" data-testid="render-progress">
+            <div class="readout">
+              <span class="percent">{phase === Phase.Rendering ? percent : phase === Phase.Saving ? 100 : 0}%</span>
+              <span class="left">{phase === Phase.Rendering ? etaLabel(remaining) : PHASE_LABEL[phase]}</span>
+            </div>
+            <div class="track"><div class="fill" style={`width: ${phase === Phase.Saving ? 100 : (done / Math.max(1, total)) * 100}%`}></div></div>
+            <div class="sub">
+              <span>{PHASE_LABEL[phase]}</span>
+              {#if phase === Phase.Rendering}<span class="frames">{done}/{total} frames</span>{/if}
+            </div>
+          </div>
+          <p class="notice" role="status">Keep this screen on and this tab open.</p>
+        {/if}
+
+        {#if phase === Phase.Failed}<p class="warn" role="alert">Render failed: {error}</p>{/if}
+
+        {#if phase === Phase.Done}
+          {#if error}<p class="warn" role="alert">{error}</p>{:else}<p class="ok" data-testid="render-saved">Saved to your project.</p>{/if}
+          <div class="actions">
+            <a class="button primary" href={downloadUrl} download={file?.name} data-testid="render-download"><Download size={16} /> Download</a>
+            <a class="button secondary" href={downloadUrl} target="_blank" rel="noopener" data-testid="render-open"><ExternalLink size={16} /> Open</a>
+            {#if canShare}<button type="button" class="button secondary" onclick={share} data-testid="render-share"><Share2 size={16} /> Share</button>{/if}
+          </div>
+        {:else if busy}
+          <button type="button" class="button secondary" disabled={phase === Phase.Saving} onclick={cancel}>Cancel</button>
+        {:else}
+          <button type="button" class="button primary" disabled={!resolution} onclick={start} data-testid="render-start">Render on this device</button>
+        {/if}
       {/if}
     {/if}
-  {/if}
+  </section>
 </main>
 
 <style>
   .render-page {
+    display: grid;
+    place-items: center;
+    min-height: 100dvh;
+    padding: var(--ui-space-6, 24px) 16px;
+    box-sizing: border-box;
+    background: var(--ui-canvas);
+    color: var(--ui-text);
+    font-size: var(--ui-text-md, 13px);
+  }
+
+  .card {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    max-width: 560px;
-    min-height: 100dvh;
-    margin: 0 auto;
-    padding: 16px;
-    background: var(--ui-bg);
-    color: var(--ui-ink);
-    font-size: var(--ui-text-sm);
+    gap: 20px;
+    width: 100%;
+    max-width: 640px;
+    padding: 28px;
+    box-sizing: border-box;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel);
+    box-shadow: var(--ui-shadow-float);
   }
 
   header {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 8px;
   }
 
   h1 {
     margin: 0;
-    font-size: var(--ui-text-lg, 18px);
+    font-size: clamp(36px, 10vw, 56px);
     font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 0.95;
     overflow-wrap: anywhere;
   }
 
-  .meta {
+  .meta,
+  .frames {
     font-family: var(--ui-mono);
-    font-size: 11px;
-    color: var(--ui-ink-3);
+    font-size: var(--ui-text-xs, 11px);
+    font-variant-numeric: tabular-nums;
+    color: var(--ui-text-3);
   }
 
   .stage {
+    position: relative;
     container-type: size;
     display: flex;
     justify-content: center;
+    align-self: center;
     width: 100%;
     max-height: 56dvh;
-    background: var(--ui-hover);
+    overflow: hidden;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-sunken);
   }
 
-  .choice {
+  .live {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 200ms var(--ui-ease);
+  }
+
+  .live.on {
+    opacity: 1;
+  }
+
+  .segments {
     display: flex;
-    gap: 18px;
-    margin: 0;
-    padding: 0;
-    border: 0;
+    padding: 2px;
+    gap: 2px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
   }
 
-  label {
+  .segments label {
+    flex: 1;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-height: 44px;
+    justify-content: center;
+    min-height: 36px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text-2);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .segments label.picked {
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    box-shadow: var(--ui-shadow-float);
+  }
+
+  .segments input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .segments label:focus-within {
+    box-shadow: var(--ui-ring);
   }
 
   .muted {
     margin: 0;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-2);
   }
 
   .notice {
     margin: 0;
-    color: var(--ui-ink);
-    font-weight: 600;
+    color: var(--ui-text-2);
   }
 
   .ok {
     margin: 0;
-    color: var(--ui-accent);
+    color: var(--ui-accent-text);
   }
 
   .warn {
@@ -307,55 +384,101 @@
   .progress {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    font-family: var(--ui-mono);
-    font-size: 12px;
+    gap: 10px;
+  }
+
+  .readout {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .percent {
+    font-size: clamp(40px, 9vw, 56px);
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .left {
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-lg, 15px);
   }
 
   .track {
-    height: 6px;
-    background: var(--ui-hover);
+    height: 8px;
+    overflow: hidden;
+    border-radius: var(--ui-radius-full, 999px);
+    background: var(--ui-input);
   }
 
   .fill {
     height: 100%;
-    background: var(--ui-accent);
-    transition: width 120ms linear;
+    border-radius: inherit;
+    background: var(--ui-accent-solid);
+    transition: width 200ms var(--ui-ease);
+  }
+
+  .sub {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--ui-text-3);
   }
 
   .actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 8px;
   }
 
-  .primary,
-  .secondary {
+  .button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 48px;
+    min-height: 44px;
     padding: 0 16px;
-    font-size: var(--ui-text-md, 15px);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    font: inherit;
     font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 120ms var(--ui-ease);
   }
 
-  .wide {
-    width: 100%;
+  .button:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .primary {
     background: var(--ui-accent-solid);
-    color: var(--ui-accent-ink);
-  }
-
-  .primary:disabled {
-    background: var(--ui-hover);
-    color: var(--ui-ink-3);
+    color: var(--ui-accent-ink, #fff);
   }
 
   .secondary {
-    border: 1px solid var(--ui-line-strong);
+    background: var(--ui-input);
+    color: var(--ui-text);
+  }
+
+  .secondary:hover:not(:disabled) {
+    background: var(--ui-pressed);
+  }
+
+  .button:disabled {
+    background: var(--ui-input);
+    color: var(--ui-text-3);
+    cursor: default;
+  }
+
+  @media (max-width: 480px) {
+    .card {
+      padding: 20px;
+      gap: 16px;
+    }
   }
 </style>

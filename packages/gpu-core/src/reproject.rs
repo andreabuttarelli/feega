@@ -16,19 +16,37 @@ fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
   return vec4<f32>(p * 2.0 - 1.0, 0.0, 1.0);
 }
 
-@fragment
-fn fs(@builtin(position) at: vec4<f32>) -> @location(0) vec4<f32> {
+fn seen_at(at: vec4<f32>) -> vec4<f32> {
   let px = at.xy * look.scale + look.offset;
   let seen = textureSampleLevel(source, blend_sampler, px / look.size, 0.0);
   let inside = all(px >= vec2<f32>(0.0)) && all(px <= look.size);
   return select(vec4<f32>(0.0), seen, inside);
 }
+
+@fragment
+fn straight(@builtin(position) at: vec4<f32>) -> @location(0) vec4<f32> {
+  return seen_at(at);
+}
+
+@fragment
+fn premultiplied(@builtin(position) at: vec4<f32>) -> @location(0) vec4<f32> {
+  let seen = seen_at(at);
+  return vec4<f32>(seen.rgb * seen.a, seen.a);
+}
 ";
 
+const ENTRY: [(Output, &str); 2] = [(Output::Straight, "straight"), (Output::Premultiplied, "premultiplied")];
+
 pub struct Reprojector {
-    pipelines: Vec<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
+    pipelines: Vec<((wgpu::TextureFormat, Output), wgpu::RenderPipeline)>,
     sampler: wgpu::Sampler,
     module: wgpu::ShaderModule,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Output {
+    Straight,
+    Premultiplied,
 }
 
 pub struct Draw<'a> {
@@ -37,6 +55,7 @@ pub struct Draw<'a> {
     pub format: wgpu::TextureFormat,
     pub look: Lookup,
     pub within: Option<Rect>,
+    pub output: Output,
 }
 
 impl Reprojector {
@@ -46,10 +65,11 @@ impl Reprojector {
         Reprojector { pipelines: Vec::new(), sampler, module }
     }
 
-    fn pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) -> &wgpu::RenderPipeline {
-        if let Some(at) = self.pipelines.iter().position(|(f, _)| *f == format) {
+    fn pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat, output: Output) -> &wgpu::RenderPipeline {
+        if let Some(at) = self.pipelines.iter().position(|(key, _)| *key == (format, output)) {
             return &self.pipelines[at].1;
         }
+        let entry = ENTRY.iter().find(|(o, _)| *o == output).map(|(_, e)| *e);
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: None,
@@ -57,11 +77,11 @@ impl Reprojector {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState { module: &self.module, entry_point: Some("fs"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: None, write_mask: wgpu::ColorWrites::ALL })] }),
+            fragment: Some(wgpu::FragmentState { module: &self.module, entry_point: entry, compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: None, write_mask: wgpu::ColorWrites::ALL })] }),
             multiview_mask: None,
             cache: None,
         });
-        self.pipelines.push((format, pipeline));
+        self.pipelines.push(((format, output), pipeline));
         &self.pipelines.last().expect("just pushed").1
     }
 
@@ -72,7 +92,7 @@ impl Reprojector {
         let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: None, contents: &bytes, usage: wgpu::BufferUsages::UNIFORM });
         let view = d.source.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = self.sampler.clone();
-        let pipeline = self.pipeline(device, d.format).clone();
+        let pipeline = self.pipeline(device, d.format, d.output).clone();
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &pipeline.get_bind_group_layout(0),

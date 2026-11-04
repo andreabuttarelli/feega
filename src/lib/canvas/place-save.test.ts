@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createPlaceSaves, keepPending, keepPlaced } from './place-save';
+import { createPlaceSaves, keepPending, keepPlaced, placedRows } from './place-save';
 import type { ActionAnswer } from './node-save';
 
 const ok: ActionAnswer = { type: 'success', data: {} };
@@ -159,5 +159,36 @@ describe('a snapshot asked for before a move never undoes it', () => {
     expect(places.placedAfter('a', asked)).toBe(true);
     expect(places.placedAfter('a', places.mark())).toBe(false);
     expect(places.placedAfter('b', asked)).toBe(false);
+  });
+
+  it('a placement replayed after a reload counts as placed for a snapshot asked before it landed', async () => {
+    const { places } = harness([]);
+    const asked = places.mark();
+
+    places.restore([{ action: 'move', id: 'a', fields: { x: 50, y: 60 } }]);
+    await places.flush();
+
+    expect(places.dirty('a')).toBe(false);
+    expect(places.placedAfter('a', asked)).toBe(true);
+  });
+});
+
+describe('placements kept offline, read back after a reload', () => {
+  const tile = (id: string, x: number, y: number) => ({ id, x, y, w: 100, h: 50 });
+  const none = () => new Set<string>();
+
+  it('show where the user left them, not where the server last saw them', () => {
+    const rows = [tile('a', 0, 0), tile('b', 10, 10)];
+    const placed = placedRows(rows, [{ action: 'move', id: 'a', fields: { x: 300, y: 125 } }, { action: 'resize', id: 'b', fields: { width: 240, height: 90 } }], none);
+
+    expect(placed[0]).toMatchObject({ x: 300, y: 125, w: 100, h: 50 });
+    expect(placed[1]).toMatchObject({ x: 10, y: 10, w: 240, h: 90 });
+  });
+
+  it('a group move carries its members by the same step', () => {
+    const rows = [tile('g', 0, 0), tile('m', 20, 30), tile('x', 5, 5)];
+    const placed = placedRows(rows, [{ action: 'moveGroup', id: 'g', fields: { x: 100, y: 50 } }], (id) => new Set(id === 'g' ? ['m'] : []));
+
+    expect(placed.map((t) => [t.x, t.y])).toEqual([[100, 50], [120, 80], [5, 5]]);
   });
 });

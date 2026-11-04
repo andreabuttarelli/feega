@@ -4,6 +4,7 @@ import type { FontFace } from '@feega/motion-core/motion/fonts/model';
 import { assemble, type Beat, type TrackSpec } from '$lib/motion/template-kit';
 import { exposeField, FieldType, type FieldInput } from './fields';
 import type { TemplateEntry } from './library';
+import { lazyTemplate } from './lazy';
 import type { KeyFields } from '@feega/motion-core/motion/template/key-fields';
 
 export const BUILTIN_PREFIX = 'builtin:';
@@ -26,7 +27,7 @@ export const text = (key: string, label: string, clipId: string): Field => ({ ke
 export const colour = (key: string, label: string, clipId: string, prop: string): Field => ({ key, label, type: FieldType.Color, clipId, prop });
 export const backdrop = (fill: string, seconds: number): Beat => ({ id: 'bg', track: 'back', component: 'Shape', at: 0, len: seconds, props: { shape: 'rect', fill, x: 0.5, y: 0.5, width: 1, height: 1 } });
 
-export function build(design: Design): TemplateEntry {
+function designDoc(design: Design): MotionDoc {
   let doc: MotionDoc = assemble({ format: FORMAT, seconds: design.seconds, tracks: TRACKS, beats: design.beats, fonts: design.fonts });
   doc = { ...doc, tracks: doc.tracks.filter((t) => t.clips.length) };
   for (const field of design.fields) {
@@ -36,5 +37,9 @@ export function build(design: Design): TemplateEntry {
     }
     doc = exposed.doc;
   }
-  return { id: `${BUILTIN_PREFIX}${design.id}`, template: { name: design.name, description: design.description, keyFields: design.keyFields, doc } };
+  return doc;
+}
+
+export function build(design: Design): TemplateEntry {
+  return { id: `${BUILTIN_PREFIX}${design.id}`, template: lazyTemplate(() => designDoc(design), { name: design.name, description: design.description, keyFields: design.keyFields }) };
 }

@@ -1,6 +1,6 @@
 import { BlendMode } from '../blend';
 import { toneOf, type Tone } from './adjust';
-import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, withAlpha, type Fill, type FillOf, type Stop } from './model';
+import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, cssLinearAngle, linearEnds, withAlpha, type Fill, type FillOf, type Stop } from './model';
 
 export type FillPaint = {
   id: string;
@@ -173,7 +173,7 @@ const halfway = (stops: Stop[]) => stops.map((s) => ({ ...s, pos: s.pos / 2 }));
 
 const TEXT_LAYER: { [T in FillType]: (f: FillOf<T>) => TextLayer[] } = {
   [FillType.Solid]: (f) => [flat(`linear-gradient(${faded(f.color, f.opacity)},${faded(f.color, f.opacity)})`)],
-  [FillType.Linear]: (f) => [flat(`linear-gradient(${round(f.angle + 90)}deg,${cssStops(f.stops, f.opacity)})`)],
+  [FillType.Linear]: (f) => [flat(`linear-gradient(${round(cssLinearAngle(f.angle))}deg,${cssStops(f.stops, f.opacity)})`)],
   [FillType.Radial]: (f) => [flat(`radial-gradient(${round(f.radius * 50)}% ${round(f.radius * 50)}% at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`)],
   [FillType.Angular]: (f) => [flat(`conic-gradient(from ${round(f.angle)}deg at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`)],
   [FillType.Diamond]: (f) => DIAMOND_CORNERS.map(([to, position]) => ({ image: `linear-gradient(${to},${cssStops(halfway(f.stops), f.opacity)})`, size: QUADRANT, position, repeat: 'no-repeat' })),
@@ -219,11 +219,8 @@ const stopTags = (stops: Stop[], paint: FillPaint) =>
 type SvgLayer = { def: string; fill: string };
 
 function linear(f: FillOf<FillType.Linear>, paint: FillPaint, i: number): SvgLayer {
-  const { w, h } = paint.size;
-  const a = (f.angle * Math.PI) / 180;
-  const dx = (Math.cos(a) * w) / 2;
-  const dy = (Math.sin(a) * h) / 2;
-  const def = `<linearGradient id="${gradientId(paint.id, i)}" gradientUnits="userSpaceOnUse" x1="${round(w / 2 - dx)}" y1="${round(h / 2 - dy)}" x2="${round(w / 2 + dx)}" y2="${round(h / 2 + dy)}">${stopTags(f.stops, paint)}</linearGradient>`;
+  const [[x1, y1], [x2, y2]] = linearEnds(f.angle, paint.size.w, paint.size.h);
+  const def = `<linearGradient id="${gradientId(paint.id, i)}" gradientUnits="userSpaceOnUse" x1="${round(x1)}" y1="${round(y1)}" x2="${round(x2)}" y2="${round(y2)}">${stopTags(f.stops, paint)}</linearGradient>`;
   return { def, fill: `url(#${gradientId(paint.id, i)})` };
 }
 

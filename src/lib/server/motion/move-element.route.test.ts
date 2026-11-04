@@ -10,6 +10,7 @@ import { idsFrom, planCopy, planFree, planMove } from '$lib/motion/move-plan';
 import { motionNodeSize } from '$lib/canvas/motion-node';
 import { addClip } from '@feega/motion-core/motion/timeline';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { wrapInStack } from '$lib/motion/layout/ops';
 import { drawnTile } from '$lib/canvas/optimistic-insert';
 import { FIGMA_FILE_KEY, figmaClipWithImage } from '../../../../tests/fixtures/figma/image-clip';
 
@@ -298,6 +299,25 @@ describe('elements in and out of frames', () => {
     expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
   });
 
+  it('moveFree lands a free element in the stack slot a Layers drop names', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const shape = (x: number) => ({ component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x, y: 0.3, width: 0.1, height: 0.1 } }) as const;
+    const two = [['a', 0.1], ['b', 0.3]] as const;
+    const placed = two.reduce<MotionDoc>((d, [id, x]) => {
+      const added = addClip(d, shape(x), id);
+      return added.ok ? added.doc : d;
+    }, newMotionDoc(MotionFormat.Vertical));
+    const stacked = wrapInStack(placed, ['a', 'b'], 'row', 'lane-row');
+    const target = stacked.ok ? stacked.doc : placed;
+    const drop = { on: 'frame', nodeId: TARGET, at: { x: 0.9, y: 0.9 }, slot: { target: 'a', place: 'above' } };
+    const input = event({ source: SOURCE, drop: JSON.stringify(drop) }, { nodes: [element, frameRow(TARGET)], motion_revisions: [revisionRow(SOURCE, 1, withText()), revisionRow(TARGET, 1, target)] });
+
+    expect(await actions.moveFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
+    const [landed] = written(input, TARGET);
+    const row = landed.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'row');
+    expect(row?.autoLayout?.order).toEqual(['txt', 'a', 'b']);
+  });
+
   it('copyFree pastes a free element into a frame and keeps the free element', async () => {
     const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
     const input = event({ source: SOURCE, drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.3, y: 0.6 } }) }, { nodes: [element, frameRow(TARGET)] });
@@ -497,5 +517,35 @@ describe('importLottie action', () => {
 
     expect(await actions.importLottie(input as never)).toMatchObject({ status: 400 });
     expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+});
+
+describe('core usage: frame drawn or pasted on the canvas', async () => {
+  const { useCoreSink } = await import('$lib/server/core-usage');
+  const FIGMA = readFileSync(new URL('../../../../tests/fixtures/figma/clip-1.html', import.meta.url), 'utf8');
+
+  async function events(run: () => unknown) {
+    const sent: { event: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+    await run();
+    useCoreSink(null);
+    return sent;
+  }
+
+  it('drawing a frame is frame_created once its first revision lands', async () => {
+    const sent = await events(() => actions.drawFrame(event({ box: JSON.stringify({ left: 0, top: 0, width: 400, height: 300 }) }) as never));
+
+    expect(sent.map((b) => b.event)).toEqual(['frame_created']);
+  });
+
+  it('a Figma paste is figma_pasted from the clipboard, plus the frame it made', async () => {
+    const sent = await events(() => actions.pasteFigma(event({ html: FIGMA, at: JSON.stringify({ x: 0, y: 0 }) }) as never));
+
+    expect(sent.map((b) => b.event)).toEqual(['frame_created', 'figma_pasted']);
+    expect(sent[1].properties.source).toBe('paste');
+  });
+
+  it('a paste with no Figma layers counts nothing', async () => {
+    expect(await events(() => actions.pasteFigma(event({ html: '<p>hi</p>', at: JSON.stringify({ x: 0, y: 0 }) }) as never))).toEqual([]);
   });
 });

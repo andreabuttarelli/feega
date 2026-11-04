@@ -1,6 +1,6 @@
 <script lang="ts">
   import { LocalOff, isOff } from '$lib/local-user';
-  import { followDocks } from '$lib/canvas/dock-lift';
+  import { LiftMove, followDocks, liftMove } from '$lib/canvas/dock-lift';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
   import Cloud from '@lucide/svelte/icons/cloud';
@@ -32,6 +32,7 @@
   import SegmentedControl, { type SegmentOption } from '$lib/components/ui/shell/SegmentedControl.svelte';
   import { SegmentedShape } from '$lib/components/ui/shell/segmented-shape';
   import { EditorMode, MODES, editorMode } from '$lib/canvas/editor-mode.svelte';
+  import { readMode } from '$lib/motion/edit-mode';
   import { SlotPhase, slotTransition } from '$lib/canvas/slot-motion';
   import ProviderIcon from './ProviderIcon.svelte';
   import { hotDrag, type HotModel } from '$lib/canvas/hot-models';
@@ -88,6 +89,7 @@
 
   let barEl = $state<HTMLElement | null>(null);
   let timelinePx = $state(0);
+  let lifting = $state(LiftMove.Glide);
   $effect(() => {
     const timeline = frameBar.timeline;
     const host = barEl?.parentElement;
@@ -98,6 +100,7 @@
     const bottomDocks = () => [...(timeline ? [timeline] : []), ...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')].filter((el) => el !== barEl);
     return followDocks(host, bottomDocks, (px) => {
       if (px !== timelinePx) {
+        lifting = liftMove(timelinePx, px);
         timelinePx = px;
       }
     });
@@ -159,7 +162,6 @@
   }
 
   const offered = (what: Addable) => !(isOff(LocalOff.CloudNodes) && CLOUD_ADDABLE.has(what)) && !(isOff(LocalOff.AiNodes) && AI_ADDABLE.has(what));
-  const slot = (what: Addable) => CANVAS_ADD_BAR.indexOf(what) + 1;
 
   let fileInput = $state<HTMLInputElement | null>(null);
 
@@ -207,14 +209,16 @@
     [DrawTool.Stack]: Command.ToolStack
   };
 
-  const DRAW_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
-    const name = ACTIONS[command].name;
-    const keys = canvasToolKeys(command);
-    return { tool, name, keys, label: keys ? `${name} (${keys})` : name, icon: ACTIONS[command].icon };
-  });
+  const DRAW_TOOLS = $derived(
+    (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
+      const name = ACTIONS[command].name;
+      const keys = canvasToolKeys(command, readMode(editorMode.spec.edit));
+      return { tool, name, keys, label: keys ? `${name} (${keys})` : name, icon: ACTIONS[command].icon };
+    })
+  );
   const toolOf = (tool: DrawTool) => DRAW_TOOLS.find((t) => t.tool === tool)!;
-  const MENU_TOOLS = [...toolsIn(DockPlace.Bar), ...toolsIn(DockPlace.More)].filter((tool) => tool !== DrawTool.Select).map(toolOf);
-  const SELECT_TOOL = toolOf(DrawTool.Select);
+  const MENU_TOOLS = $derived([...toolsIn(DockPlace.Bar), ...toolsIn(DockPlace.More)].filter((tool) => tool !== DrawTool.Select).map(toolOf));
+  const SELECT_TOOL = $derived(toolOf(DrawTool.Select));
 
   let phone = $state(typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches);
 
@@ -238,7 +242,7 @@
 
   type Tile = { id: string; label: string; icon: (typeof DRAW_TOOLS)[number]['icon'] | typeof Plus; run: () => void; hint?: string; drag?: Addable; tool?: DrawTool; model?: HotModel };
 
-  const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], hint: `${ADDABLE_LABEL[what]} (${slot(what)})`, icon: ADDABLE_ICON[what], run: () => onpick?.(what), drag: what });
+  const addTile = (what: Addable): Tile => ({ id: what, label: ADDABLE_LABEL[what], hint: ADDABLE_LABEL[what], icon: ADDABLE_ICON[what], run: () => onpick?.(what), drag: what });
   const toolTile = (t: (typeof DRAW_TOOLS)[number]): Tile => ({ id: `draw-${t.tool}`, label: t.name, hint: t.label, icon: t.icon, run: () => (frameBar.tool = t.tool), tool: t.tool });
   const modelTile = (m: HotModel): Tile => ({ id: `model-${m.id}`, label: m.label, hint: m.label, icon: Plus, run: () => onmodel?.(m), model: m });
   const optional = (tile: Tile, shown: unknown): Tile[] => (shown ? [tile] : []);
@@ -403,7 +407,7 @@
 
 <svelte:window onresize={fitMenu} />
 
-<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" style:--lift={`${timelinePx}px`}>
+<div bind:this={barEl} class="add-bar" class:phone data-testid="add-bar" data-context={context} data-dock="timeline" data-lift={lifting} style:--lift={`${timelinePx}px`}>
   <div class="group" data-testid={`bar-${context}`}>
     {#each slots as s, i (s)}
       <div class="slot" in:slotTransition={{ phase: SlotPhase.Enter, index: i }} out:slotTransition={{ phase: SlotPhase.Leave, index: i }}>{@render SLOT[s]()}</div>
@@ -425,7 +429,9 @@
 
   {#if menuOpen && !phone}
     <div class="insert-menu" role="menu" aria-label={INSERT_LABEL} data-testid="insert-menu" style:max-height={`${menuMaxPx}px`}>
-      {@render insertMenu()}
+      <div class="insert-scroll">
+        {@render insertMenu()}
+      </div>
     </div>
   {/if}
 </div>
@@ -484,12 +490,19 @@
     bottom: calc(100% + 10px);
     left: 50%;
     transform: translateX(-50%);
+    display: flex;
     width: min(440px, calc(100vw - 32px));
-    overflow-y: auto;
-    padding: 4px 10px 10px;
+    overflow: hidden;
     border-radius: var(--ui-radius-md);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
+  }
+
+  .insert-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 10px 10px;
   }
 
   .insert-menu .insert-tile {
@@ -522,6 +535,11 @@
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
   }
+
+  .add-bar[data-lift='jump'] {
+    transition: left var(--chrome-move) var(--ease-expo), opacity var(--chrome-move) var(--ease-expo), translate var(--chrome-move) var(--ease-expo);
+  }
+
 
   .slot {
     display: flex;

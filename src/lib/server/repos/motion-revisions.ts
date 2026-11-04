@@ -2,6 +2,8 @@ import type { Db } from '$lib/server/db/client';
 import { parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { actorCols, type Actor } from './actor';
 import { Attempt, recordConflict } from './canvas-conflicts';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, type ActorKind } from '$lib/core-usage';
 
 export type MotionHead = { version: number; doc: MotionDoc; summary: string | null; actorKind: string };
 
@@ -232,6 +234,21 @@ async function insertRevision(db: Db, input: CommitArgs): Promise<boolean> {
 
 type RevisionRpc = { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string } | null }> };
 
+const STATEMENT_TIMEOUT = '57014';
+const TIMEOUT_RETRIES_MS = [500, 1500, 3000];
+
+async function patiently<T extends { error: { code?: string } | null }>(call: () => PromiseLike<T>): Promise<T> {
+  let answer = await call();
+  for (const wait of TIMEOUT_RETRIES_MS) {
+    if (answer.error?.code !== STATEMENT_TIMEOUT) {
+      return answer;
+    }
+    await new Promise((done) => setTimeout(done, wait));
+    answer = await call();
+  }
+  return answer;
+}
+
 async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
   const rpc = (args: Record<string, unknown>) => (db as unknown as RevisionRpc).rpc('commit_motion_revision', args);
   const args = {
@@ -245,8 +262,8 @@ async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
     p_agent_key: input.actor.agentKey ?? null,
     p_coalesce_ms: COALESCE_MS[input.checkpoint]
   };
-  const tried = await rpc({ ...args, p_session_id: input.actor.sessionId ?? null });
-  const { data, error } = tried.error?.code === FUNCTION_MISSING ? await rpc(args) : tried;
+  const tried = await patiently(() => rpc({ ...args, p_session_id: input.actor.sessionId ?? null }));
+  const { data, error } = tried.error?.code === FUNCTION_MISSING ? await patiently(() => rpc(args)) : tried;
   if (error?.code === FUNCTION_MISSING) {
     return insertRevision(db, input);
   }
@@ -290,6 +307,8 @@ export async function appendRevision(
     await noteStaleHead(db, { ...input, doc: parsed.doc });
     return { outcome: RevisionOutcome.Conflict };
   }
+
+  coreEvent(input.actor.id, input.expectedVersion === 0 ? CoreEvent.FrameCreated : CoreEvent.FrameEdited, { frame_id: input.nodeId, actor: input.actor.kind as ActorKind });
   return { outcome: RevisionOutcome.Written, head: { version: input.expectedVersion + 1, doc: parsed.doc, summary, actorKind: input.actor.kind } };
 }
 

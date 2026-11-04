@@ -75,6 +75,8 @@ const NAME_SIZE = 11;
 const NAME_GAP = 16;
 export const ADD_BESIDE = { offset: 8, size: 24, gap: 8 };
 const PORT_RING = 1;
+const PORT_STROKE = 2;
+const PORT_DOT = 1.5;
 const TAG_RADIUS = 4;
 
 const PORT_LOOK: Record<PortState, { opacity: number; ring: boolean; named: boolean }> = {
@@ -107,7 +109,7 @@ function roundBand(t: ChromeTile, width: number, radius: number): number[][] {
 const band = (t: ChromeTile, width: number) => (t.radius ? roundBand(t, width, t.radius) : line(outline(t, width), width, true));
 
 function hover(t: StateTile): PathItem[] {
-  if (!t.hovered || t.ring !== NodeChrome.None) {
+  if (!t.hovered || t.ring === NodeChrome.Selected) {
     return [];
   }
   return [item(t, ChromePart.Hover, band(t, widthOf(t, HOVER_SCREEN_PX)), HOVER_COLOR)];
@@ -128,7 +130,9 @@ function port(t: ChromeTile, part: ChromePart, left: number, centre: number, m: 
   const cx = left + PORT_SIZE / 2;
   const outer = PORT_SIZE / 2 + inset + PORT_RING / 2;
   const ring = look.ring ? [item(t, ChromePart.PortRing, [...circle(cx, centre, outer), ...circle(cx, centre, outer - PORT_RING).map(reverse)], colour)] : [];
-  return [item(t, part, circle(cx, centre, PORT_SIZE / 2), colour, look.opacity), ...ring];
+  const r = PORT_SIZE / 2;
+  const hollow = [...circle(cx, centre, r), ...circle(cx, centre, r - PORT_STROKE).map(reverse), ...circle(cx, centre, PORT_DOT)];
+  return [item(t, part, hollow, colour, look.opacity), ...ring];
 }
 
 export function ports(t: ChromeTile): PathItem[] {

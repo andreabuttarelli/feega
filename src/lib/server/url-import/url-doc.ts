@@ -19,6 +19,7 @@ import { componentKit } from './component-kit';
 import { componentPages, type ComponentPages } from './component-sheet';
 import { patternSets, withoutCarriers, withPatterns } from './pattern-sets';
 import { withHoverStates } from './hover-states';
+import { coloursMerged } from './page-colours';
 
 const FILE_KEY = 'url-import';
 const MAX_IMAGES = 200;
@@ -242,7 +243,7 @@ function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: Site
   return { ...plan, items: plan.items.map((item) => ({ ...item, doc: componentKit(tokenised(item.doc, tokens, site, units), site, newId) })) };
 }
 
-const NO_PAGES: ComponentPages = { sets: [], homes: {}, setHomes: {} };
+const NO_PAGES: ComponentPages = { sets: [], homes: {}, setHomes: {}, dropped: [] };
 
 const PAGED: Record<Tokening, (plan: FigmaPlan, newId: () => string) => ComponentPages> = {
   [Tokening.On]: (plan, newId) => componentPages(plan.items, newId),
@@ -276,7 +277,7 @@ export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPE
   const patterns = tree.patterns ?? [];
   const shapedOf = (t: PageTree, sectioning: Sectioning, marker: Marker, parts: typeof patterns) => flattened(withPatterns(stacksOf(SECTIONED[sectioning](t)), parts, marker, stacksOf));
   const sectioning = views.length ? Sectioning.Off : shape.sectioning;
-  const shaped = shapedOf(tree, sectioning, mark, patterns);
+  const shaped = shapedOf(tree, sectioning, views.length ? UNMARKED : mark, patterns);
   const narrow = views.map(({ view, tree: t }) => ({ view, root: shapedOf(t, Sectioning.Off, UNMARKED, []) }));
   const images = refsOf([shaped, ...narrow.map((n) => n.root)]);
   const keyOf = new Map(Object.entries(images).map(([key, url]) => [url, key]));
@@ -289,10 +290,10 @@ export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPE
     return null;
   }
   const dynamic = patternSets(patterns);
-  const stack = { ...made, items: made.items.map((item) => ({ ...item, doc: withoutCarriers(item.doc, dynamic) })) };
+  const stack = { ...made, items: made.items.map((item) => ({ ...item, doc: coloursMerged(withoutCarriers(item.doc, dynamic)) })) };
   const tokening = shape.tokening ?? Tokening.Off;
   const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
   const counts = tokened.items.map((item) => countOf(item.doc));
-  const { sets, homes, setHomes } = PAGED[tokening](tokened, newId);
-  return { plan: tokened, images, name, sets, homes, setHomes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
+  const { sets, homes, setHomes, dropped } = PAGED[tokening](tokened, newId);
+  return { plan: { ...tokened, skipped: [...tokened.skipped, ...dropped] }, images, name, sets, homes, setHomes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };
 }

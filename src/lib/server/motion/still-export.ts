@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
-import { stillSeconds } from '@feega/motion-core/motion/still';
+import { posterSecond } from '$lib/motion/poster-time';
 import type { StillExport } from '@feega/motion-core/motion/still-model';
 import { composeHtml, type ComposeInput } from '@feega/motion-core/motion/hyperframes/compose';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -22,7 +22,7 @@ export async function drawStill(port: StillPort, compose: ComposeInput, spec: St
   const page = await port.open({ width: doc.width, height: doc.height, scale: spec.scale });
   try {
     await page.load(composeHtml({ ...compose, origin: compose.origin ?? libsOrigin() }));
-    await page.seek(stillSeconds(doc) ?? 0);
+    await page.seek(posterSecond(doc));
     return await page.picture(spec.mime, spec.quality);
   } finally {
     await page.close();

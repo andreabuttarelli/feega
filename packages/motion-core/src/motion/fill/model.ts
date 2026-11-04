@@ -243,7 +243,14 @@ const FRESH: Record<FillType, (color: string) => unknown> = {
 
 export const newFill = (type: FillType, color = DEFAULT_COLOR): Fill => fillSchema.parse(FRESH[type](color));
 
-export const addFill = (fills: readonly Fill[], type: FillType): Fill[] => [...fills, newFill(type)].slice(0, MAX_FILLS);
+export enum FillHolder {
+  Layer = 'layer',
+  Container = 'container'
+}
+
+const NEW_FILL_COLOUR: Record<FillHolder, string> = { [FillHolder.Layer]: DEFAULT_COLOR, [FillHolder.Container]: '#ffffff' };
+
+export const addFill = (fills: readonly Fill[], type: FillType, holder = FillHolder.Layer): Fill[] => [...fills, newFill(type, NEW_FILL_COLOUR[holder])].slice(0, MAX_FILLS);
 
 export const removeFill = (fills: readonly Fill[], i: number): Fill[] => fills.filter((_, at) => at !== i);
 
@@ -300,4 +307,18 @@ export function retypeFill(fills: readonly Fill[], i: number, type: FillType): F
         }
       : f
   );
+}
+
+const DEGREE = Math.PI / 180;
+const CSS_TURN = 90;
+
+export const cssLinearAngle = (angle: number) => angle + CSS_TURN;
+
+export function linearEnds(angle: number, w: number, h: number): [[number, number], [number, number]] {
+  const [dx, dy] = [Math.cos(angle * DEGREE), Math.sin(angle * DEGREE)];
+  const reach = (Math.abs(w * dx) + Math.abs(h * dy)) / 2;
+  return [
+    [w / 2 - dx * reach, h / 2 - dy * reach],
+    [w / 2 + dx * reach, h / 2 + dy * reach]
+  ];
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Ease } from '@feega/motion-core/motion/design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
-import { IN_OUT_PRESETS, InOutPreset, PresetSide, applyInOut, presetsFor } from './in-out-presets';
+import { IN_OUT_PRESETS, InOutPreset, PresetPlace, PresetSide, applyInOut, presetStart, presetsFor } from './in-out-presets';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -141,5 +141,17 @@ describe('presetsFor', () => {
 
   it('lists every registry row on the in side of a text clip', () => {
     expect(presetsFor('Title', PresetSide.In).sort()).toEqual(Object.keys(IN_OUT_PRESETS).sort());
+  });
+});
+
+describe('where a preset starts', () => {
+  it('at the clip edge starts at the clip start whatever the playhead, so a text animation picked with Clip edge does not start at the playhead', () => {
+    expect(presetStart(PresetPlace.Edge, 27, { from: 0 })).toBe(0);
+    expect(presetStart(PresetPlace.Edge, 27, { from: 10 })).toBe(0);
+  });
+
+  it('at the playhead starts where the playhead stands inside the clip', () => {
+    expect(presetStart(PresetPlace.Playhead, 27, { from: 10 })).toBe(17);
+    expect(presetStart(PresetPlace.Playhead, 5, { from: 10 })).toBe(0);
   });
 });

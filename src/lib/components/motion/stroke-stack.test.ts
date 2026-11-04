@@ -74,13 +74,35 @@ describe('the stroke stack in Properties', () => {
   it('a collapsed row shows swatch, hex or paint, width, eye and remove', () => {
     show(TWO);
     expect(inRow(0, 'stroke-label').textContent).toBe('222222');
-    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['stroke-swatch', 'stroke-label', 'stroke-width', 'stroke-eye', 'stroke-remove']);
+    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['stroke-swatch', 'stroke-label', 'stroke-meta', 'stroke-width', 'stroke-eye', 'stroke-remove']);
+  });
+
+  it('a row reads its hex over a muted line with the width and the position', () => {
+    show(TWO);
+    expect(inRow(0, 'stroke-meta').textContent?.replace(/\s+/g, ' ').trim()).toMatch(/^px · (Inside|Centre|Center|Outside)$/);
   });
 
   it('+ adds a stroke on top', () => {
     const onchange = show(TWO);
     click(byId('stroke-add'));
     expect(sent(onchange)).toHaveLength(3);
+  });
+
+  it('a new stroke is 1 px wide, whatever the frame size', () => {
+    const onchange = show(TWO);
+    click(byId('stroke-add'));
+    expect(sent(onchange)[2].width * SHORT).toBeCloseTo(1);
+  });
+
+  it('the editor carries the width and labels dash and gap in px', () => {
+    const onchange = show(TWO);
+    click(rows()[1]);
+    const editor = byId('stroke-editor');
+    expect(editor.textContent).toContain('Width');
+    expect(editor.textContent).toContain('Dash length');
+    expect(editor.textContent).toContain('Dash gap');
+    change(byId<HTMLInputElement>('stroke-editor-width'), '3');
+    expect(sent(onchange)[0].width).toBe(0.003);
   });
 
   it('− removes it, the eye hides it', () => {
@@ -109,6 +131,13 @@ describe('the stroke stack in Properties', () => {
     expect(sent(onchange)[0].cap).toBe('round');
     change(byId<HTMLSelectElement>('stroke-join'), 'bevel');
     expect(sent(onchange)[0].join).toBe('bevel');
+  });
+
+  it('a stroke colour opens the same picker as a fill, already open in its editor', () => {
+    show(TWO);
+    click(rows()[1]);
+
+    expect(byId('stroke-editor').querySelector('[data-testid="colour-picker"]')).not.toBeNull();
   });
 
   it('a stroke colour carries its own alpha', () => {

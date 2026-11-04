@@ -32,6 +32,21 @@ export function coverFrame(doc: Pick<MotionDoc, 'still' | 'durationInFrames'>): 
   return stillFrame(doc) ?? Math.floor(doc.durationInFrames / 2);
 }
 
+export function posterFrame(doc: Pick<MotionDoc, 'still' | 'poster'>): number | null {
+  return doc.still?.frame ?? doc.poster?.frame ?? null;
+}
+
+export function setPoster(doc: MotionDoc, frame: number | null): OpResult {
+  if (frame === null) {
+    const { poster: _off, ...rest } = doc;
+    return { ok: true, doc: rest };
+  }
+  if (!Number.isFinite(frame) || frame < 0) {
+    return { ok: false, error: 'the poster is a frame, 0 or more' };
+  }
+  return { ok: true, doc: { ...doc, poster: { frame: Math.min(Math.round(frame), doc.durationInFrames - 1) } } };
+}
+
 export function stillSeconds(doc: Pick<MotionDoc, 'still' | 'fps'>): number | null {
   return doc.still ? doc.still.frame / doc.fps : null;
 }

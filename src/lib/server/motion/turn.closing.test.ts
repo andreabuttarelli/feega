@@ -366,6 +366,18 @@ describe('a motion turn closes on a look and a summary', () => {
     world.viewed = [];
   });
 
+  it('a turn that writes the frame is motion_edited by prompt, for the user who asked', async () => {
+    const { useCoreSink } = await import('$lib/server/core-usage');
+    const sent: { event: string; distinct_id: string; properties: Record<string, unknown> }[] = [];
+    useCoreSink((b) => sent.push(b));
+
+    await turn();
+    useCoreSink(null);
+
+    expect(world.writes.length).toBeGreaterThan(0);
+    expect(sent.find((b) => b.event === 'motion_edited' && b.properties.kind === 'prompt')).toMatchObject({ distinct_id: 'u-1', properties: { frame_id: 'n-1' } });
+  });
+
   it('an independent critic reviews the whole contact sheet, and the user sees it before any fix is spent', async () => {
     world.critic = { score: 4, fixes: ['1.5s: the frame is empty, put the product UI behind the title'] };
     await turn();

@@ -23,6 +23,18 @@ const FOLLOWS: Record<TextSizing, { width: boolean; height: boolean }> = {
   [TextSizing.AutoHeight]: { width: false, height: true }
 };
 
+export enum AxisMode {
+  Hug = 'Hug',
+  Fixed = 'Fixed'
+}
+
+const modeOf = (follows: boolean): AxisMode => (follows ? AxisMode.Hug : AxisMode.Fixed);
+
+export function axisModes(sizing: TextSizing): { width: AxisMode; height: AxisMode } {
+  const follows = FOLLOWS[sizing] ?? FOLLOWS[TextSizing.Fixed];
+  return { width: modeOf(follows.width), height: modeOf(follows.height) };
+}
+
 export function fittedTextBox(sizing: TextSizing, placed: Placement, measured: PxBox, stage: Stage): Placement | null {
   const follows = FOLLOWS[sizing];
   const width = Math.min(follows.width ? measured.width : placed.width * stage.width, stage.width);
@@ -32,7 +44,7 @@ export function fittedTextBox(sizing: TextSizing, placed: Placement, measured: P
     return null;
   }
 
-  const left = Math.max(0, Math.min((placed.x - placed.width / 2) * stage.width, stage.width - width));
+  const left = Math.max(-width / 2, Math.min((placed.x - placed.width / 2) * stage.width, stage.width - width / 2));
   const top = Math.max(0, Math.min((placed.y - placed.height / 2) * stage.height, stage.height - height));
   const round = (n: number) => Math.round(n * 1e6) / 1e6;
   return { x: round((left + width / 2) / stage.width), y: round((top + height / 2) / stage.height), width: round(width / stage.width), height: round(height / stage.height) };

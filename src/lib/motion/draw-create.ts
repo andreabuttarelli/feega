@@ -13,7 +13,7 @@ import { Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout'
 import { setAutoLayout, setLayoutItem } from './layout/ops';
 import { EditMode } from './edit-mode';
 import { DocMode, docMode, setStill, settledStill } from '@feega/motion-core/motion/still';
-import { TOP_LEFT_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
+import { NEW_CLIP_START, addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 
 type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse | DrawTool.Polygon | DrawTool.Star | DrawTool.Frame | DrawTool.Stack;
 
@@ -24,7 +24,7 @@ export type LineTool = DrawTool.Line | DrawTool.Arrow;
 export const DRAWN_TEXT: ComponentId = 'Text';
 
 const BOX_CLIP: Record<BoxTool, { component: ComponentId; props: Record<string, unknown> }> = {
-  [DrawTool.Text]: { component: DRAWN_TEXT, props: { text: 'Text' } },
+  [DrawTool.Text]: { component: DRAWN_TEXT, props: { text: 'Text', align: 'left' } },
   [DrawTool.Rectangle]: { component: 'Shape', props: { shape: ShapeKind.Rect } },
   [DrawTool.Ellipse]: { component: 'Shape', props: { shape: ShapeKind.Ellipse } },
   [DrawTool.Polygon]: { component: 'Shape', props: { shape: ShapeKind.Polygon, sides: 3 } },
@@ -71,7 +71,7 @@ export const drawStart = (mode: EditMode, playhead: number): number => DRAW_STAR
 const fail = (error: string): OpResult => ({ ok: false, error });
 
 function place(doc: MotionDoc, component: ComponentId, props: Record<string, unknown>, frame: number, id: string): OpResult {
-  return addClip(doc, { component, props, ...TOP_LEFT_START, ...SPAN[docMode(doc)](doc, frame, component) }, id);
+  return addClip(doc, { component, props, ...NEW_CLIP_START, ...SPAN[docMode(doc)](doc, frame, component) }, id);
 }
 
 const TEXT_TYPE = COMPONENTS.Text.schema.parse({});
@@ -82,8 +82,18 @@ function fittedSize(doc: MotionDoc, box: DrawBox): number {
   return Math.round(Math.min(Math.max(fit, TYPE_SIZE.min), TYPE_SIZE.max) * SIZE_PRECISION) / SIZE_PRECISION;
 }
 
+const BODY_PX = 16;
+
+const bodySize = (doc: MotionDoc): number => Math.max(TYPE_SIZE.min, BODY_PX / Math.min(doc.width, doc.height));
+
+const TEXT_SIZE: Record<TextSizing, (doc: MotionDoc, box: DrawBox) => number> = {
+  [TextSizing.AutoWidth]: fittedSize,
+  [TextSizing.AutoHeight]: bodySize,
+  [TextSizing.Fixed]: bodySize
+};
+
 const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizing) => Record<string, unknown>> = {
-  [DrawTool.Text]: (doc, box, sizing) => ({ size: fittedSize(doc, box), sizing }),
+  [DrawTool.Text]: (doc, box, sizing) => ({ size: TEXT_SIZE[sizing](doc, box), sizing }),
   [DrawTool.Rectangle]: () => ({}),
   [DrawTool.Ellipse]: () => ({}),
   [DrawTool.Polygon]: () => ({}),
@@ -96,7 +106,7 @@ const STACK_LAYOUT = { direction: Direction.Vertical, gap: 8, padding: { top: 16
 
 function finishStack(doc: MotionDoc, id: string): OpResult {
   const laid = setAutoLayout(doc, id, STACK_LAYOUT);
-  return laid.ok ? setLayoutItem(laid.doc, id, { width: Sizing.Hug, height: Sizing.Hug }) : laid;
+  return laid.ok ? setLayoutItem(laid.doc, id, { width: Sizing.Fixed, height: Sizing.Fixed }) : laid;
 }
 
 const FINISH: Partial<Record<BoxTool, (doc: MotionDoc, id: string) => OpResult>> = {
@@ -207,9 +217,13 @@ export function penPaint({ fill, stroke, gradient, fillRule }: PenPaint): Record
   };
 }
 
+const HAIRLINE_PX = 1;
+
+export const penInk = (doc: Pick<MotionDoc, 'width' | 'height'>): Record<string, unknown> => ({ ...penPaint(LINE_PAINT[DrawTool.Line](DEFAULT_COLOUR.ink)), strokeWidth: HAIRLINE_PX / Math.min(doc.width, doc.height) });
+
 export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
 
-const PIXELS_PER_CANVAS_PX = 2;
+const DOC_PX_PER_CANVAS_PX = 1;
 const MIN_DOC_SIDE = 16;
 const FULL_BOX: DrawBox = { x: 0.5, y: 0.5, width: 1, height: 1 };
 
@@ -222,23 +236,27 @@ type Sides = { long: number; short: number };
 const VIDEO_SIDES: Sides = { long: MAX_SIDE, short: MAX_SHORT_SIDE };
 const STILL_SIDES: Sides = { long: DESIGN_MAX_SIDE, short: DESIGN_MAX_SIDE };
 
-function elementPixels(box: CanvasBox, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
-  const long = Math.max(box.width, box.height);
-  const short = Math.min(box.width, box.height);
-  const scale = Math.min(PIXELS_PER_CANVAS_PX, sides.long / long, sides.short / short);
+const FLOAT_NOISE = 1e6;
+
+const settled = (n: number) => Math.round(n * FLOAT_NOISE) / FLOAT_NOISE;
+
+function docPixels(box: CanvasBox, sides: Sides = VIDEO_SIDES): { width: number; height: number } {
+  const long = settled(Math.max(box.width, box.height));
+  const short = settled(Math.min(box.width, box.height));
+  const scale = Math.min(DOC_PX_PER_CANVAS_PX, sides.long / long, sides.short / short);
   const shortSide = evenFloor(short * scale);
   const longSide = Math.min(evenSide((long * shortSide) / short), evenSide(long * scale));
   return box.width >= box.height ? { width: longSide, height: shortSide } : { width: shortSide, height: longSide };
 }
 
 export function blankElement(box: CanvasBox): OpResult {
-  return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
+  return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...docPixels(box), background: Background.Transparent }, 0);
 }
 
 const SURFACE_ID = 'surface';
 
 function sizedFrame(box: CanvasBox, format: MotionFormat, sides: Sides): MotionDoc {
-  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box, sides) } : newMotionDoc(format);
+  const doc = format === MotionFormat.Custom ? { ...newMotionDoc(MotionFormat.Landscape), ...docPixels(box, sides) } : newMotionDoc(format);
   return withSurface(doc, SURFACE_ID);
 }
 
@@ -252,7 +270,7 @@ export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.C
 }
 
 const MIN_PEN_ELEMENT_SIDE = 24;
-const PEN_STROKE_CANVAS_UNITS = 2;
+const PEN_STROKE_CANVAS_UNITS = 1;
 const MAX_STROKE_WIDTH = 0.2;
 
 function canvasBoxOf(outline: Outline): CanvasBox {

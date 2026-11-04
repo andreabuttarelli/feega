@@ -8,7 +8,7 @@
   import type { BrandTokens } from '@feega/motion-core/motion/brand';
   import { CODE_TARGETS, CodeTarget, exportCode } from '@feega/motion-core/motion/codegen/index';
   import { kebab } from '@feega/motion-core/motion/codegen/naming';
-  import { zipSync, strToU8 } from 'fflate';
+  import { zipCode } from '$lib/canvas/code-zip';
   import { entryFile } from '$lib/components/motion/code-files';
   import { IconButton, IconSize } from '$lib/components/ui/shell';
   import { Select } from '$lib/components/ui/select';
@@ -45,9 +45,9 @@
     setTimeout(() => (copied = false), COPIED_MS);
   }
 
-  function download() {
+  async function download() {
     const folder = kebab(name);
-    const zipped = zipSync(Object.fromEntries(out.files.map((f) => [`${folder}/${f.path}`, strToU8(f.content)])));
+    const zipped = await zipCode(folder, out);
     const url = URL.createObjectURL(new Blob([zipped as BlobPart], { type: ZIP_MIME }));
     Object.assign(document.createElement('a'), { href: url, download: `${folder}-${target}.zip` }).click();
     URL.revokeObjectURL(url);

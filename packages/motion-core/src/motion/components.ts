@@ -121,6 +121,8 @@ export type VerticalAlign = (typeof VERTICAL_ALIGNS)[number];
 export { TEXT_SIZINGS, TextSizing } from './text-sizing';
 export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
+export const TEXT_ENTRANCES = ['none', 'fade-up'] as const;
+export type TextEntrance = (typeof TEXT_ENTRANCES)[number];
 export type Move = (typeof MOVES)[number];
 
 export const MIN_BOX = { width: 0.0005, height: 0.0001 };
@@ -231,6 +233,11 @@ export const MAX_COMPOSITION_MEDIA = 40;
 
 const fillStack = () => fillsSchema.optional().meta({ control: Control.Fills, label: 'Fill', group: Group.Style });
 const strokeStack = () => strokesSchema.optional().meta({ control: Control.Strokes, label: 'Stroke', group: Group.Style });
+const rounding = () => ({
+  roundness: range(0, 0.5, 0.01, 0, 'Roundness', Group.Content),
+  corners: z.array(z.number().min(0).max(0.5)).max(4).default([]).meta({ control: Control.Corners, label: 'Corners', group: Group.Content }),
+  smoothing: range(0, 1, 0.01, 0, 'Corner smoothing', Group.Content)
+});
 const managed = (label: string) => ({ control: Control.Managed, label, group: Group.Content });
 const compositionParams = (label: string) => z.record(z.string(), z.union([z.number(), z.string()])).default({}).meta(managed(label));
 
@@ -319,11 +326,11 @@ export const COMPONENTS = {
   },
   Text: {
     label: 'Text',
-    description: 'Body copy that fades up.',
+    description: 'Body copy, shown as drawn. entrance fade-up fades it up as the clip starts.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, DEFAULT_COLOUR.ink, { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, DEFAULT_COLOUR.ink, { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), entrance: choice(TEXT_ENTRANCES, 'none', 'Entrance', Group.Motion), runs: runsSchema.meta(managed('Styled ranges')), lists: listsSchema.meta(managed('Lists')), counter: counterSchema.optional().meta(managed('Counter')), ...layout({ y: 0.65, height: 0.2 }), ...paragraph() })
       .strict()
   },
   Kicker: {
@@ -344,10 +351,10 @@ export const COMPONENTS = {
   },
   Image: {
     label: 'Image',
-    description: 'A picture from the canvas assets. zoom (1..4) scales it inside its box around focusX/focusY, which also pan; all three take set_keyframes. Never zoom past the picture\'s pixels.',
+    description: 'A picture from the canvas assets. zoom (1..4) scales it inside its box around focusX/focusY, which also pan; all three take set_keyframes. Never zoom past the picture\'s pixels. roundness/corners/smoothing round its corners like a rect; fills paint over the picture and strokes draw around it, as on a Shape.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...crop(), zoom: range(IMAGE_ZOOM.min, IMAGE_ZOOM.max, IMAGE_ZOOM.step, IMAGE_ZOOM.fallback, IMAGE_ZOOM.label, Group.Style), ...layout({ width: 1, height: 1 }) }).strict()
+    schema: z.object({ assetId: asset(AssetKind.Image, 'Image'), fit: choice(['cover', 'contain'] as const, 'cover', 'Fit', Group.Style), ...crop(), zoom: range(IMAGE_ZOOM.min, IMAGE_ZOOM.max, IMAGE_ZOOM.step, IMAGE_ZOOM.fallback, IMAGE_ZOOM.label, Group.Style), ...rounding(), fills: fillStack(), strokes: strokeStack(), ...layout({ width: 1, height: 1 }) }).strict()
   },
   Video: {
     label: 'Video',
@@ -386,9 +393,7 @@ export const COMPONENTS = {
         shape: choice(SHAPES_2D, ShapeKind.Line, 'Shape', Group.Content),
         path: pathString.default('').meta(managed('Path')),
         network: networkSchema.optional().meta(managed('Vector network')),
-        roundness: range(0, 0.5, 0.01, 0, 'Roundness', Group.Content),
-        corners: z.array(z.number().min(0).max(0.5)).max(4).default([]).meta({ control: Control.Corners, label: 'Corners', group: Group.Content }),
-        smoothing: range(0, 1, 0.01, 0, 'Corner smoothing', Group.Content),
+        ...rounding(),
         sides: range(3, 64, 1, 6, 'Sides', Group.Content),
         points: range(3, 64, 1, 5, 'Points', Group.Content),
         innerRadius: range(0.05, 1, 0.01, 0.5, 'Inner radius', Group.Content),

@@ -491,6 +491,7 @@ source_node_id    uuid not null references nodes(id) on delete cascade
 target_node_id    uuid not null references nodes(id) on delete cascade
 source_handle     text
 target_handle     text
+tie               jsonb             -- {id, x, y}: the cable tie the wire passes through
 created_at
 
 unique (source_node_id, source_handle, target_node_id, target_handle)
@@ -505,6 +506,12 @@ esistente.
 `unique` impedisce l'arco doppio, il `check` il cappio su sé stesso. `connect-rules.ts` decide già
 quali archi siano leciti *per medium* — il database impedisce solo l'assurdo, la regola di prodotto
 resta nel codice.
+
+**`tie` sta sull'arco, non in una tabella sua.** Una fascetta è solo un punto per cui passano i
+fili che raccoglie: le righe che portano lo stesso `tie.id` sono il fascio. Spostarla riscrive
+quelle righe in un solo `update ... where id in (...)`; la realtime su `nodes_connections` la porta
+già ai peer. Una tabella `ties` avrebbe chiesto RLS, realtime e un cascade per un record senza
+altri campi.
 
 **? I cicli.** `A → B → A` non li ferma niente qui. Se una catena si esegue a cascata, un ciclo gira
 per sempre: o si vieta in `connect-rules.ts`, o si mette un limite di profondità in esecuzione.

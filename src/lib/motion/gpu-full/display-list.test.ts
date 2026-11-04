@@ -90,6 +90,17 @@ describe('displayListAt', () => {
     expect(pathOf(graded, 'card')?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
   });
 
+  it('turns a linear gradient on a wide card by its true angle, as the HTML engine and the handles do', () => {
+    const fills = [{ type: FillType.Linear, angle: 45, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
+    const paint = pathOf(graded, 'card')?.paint as { from: number[]; to: number[] };
+
+    expect(paint.from[0]).toBeCloseTo(21);
+    expect(paint.from[1]).toBeCloseTo(-21);
+    expect(paint.to[0]).toBeCloseTo(171);
+    expect(paint.to[1]).toBeCloseTo(129);
+  });
+
   it('samples a keyed gradient stop colour and angle at the frame drawn', () => {
     const fills = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
     const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
@@ -211,6 +222,16 @@ describe('displayListAt', () => {
     const glyphs = displayListAt(titled, 60, FEEGA_TOKENS, boxType).items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'title');
 
     expect(glyphs.flatMap((i) => i.contours)).toHaveLength(2);
+  });
+
+  it('shows a text with no animation fully opaque on its first frame, and fades it up only when its entrance asks', () => {
+    const opacityAt = (props: Record<string, unknown>) => {
+      const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', ...props } }, 'text'));
+      return displayListAt(texted, 0, FEEGA_TOKENS, boxType).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'text')?.opacity ?? 0;
+    };
+
+    expect(opacityAt({})).toBe(1);
+    expect(opacityAt({ entrance: 'fade-up' })).toBeLessThan(0.1);
   });
 
   it('draws a text bent along a path, one character at a time', () => {

@@ -5,7 +5,7 @@ import { Action } from '$lib/motion/actions';
 import { barActions, headerActions } from '$lib/motion/clip-bar';
 import { frameSummaries } from '$lib/motion/frame-menu';
 import { wrapInStack } from '$lib/motion/layout/ops';
-import { elementMenuIds, elementToolbarActions, frameBarActions, layerMenuActions } from './frame-inspector';
+import { elementMenuIds, frameBarActions, layerMenuActions } from './frame-inspector';
 import { canvasMenuIds, menuFor } from './selection-actions';
 import { DocNodeType, FrameKind } from './motion-node';
 
@@ -31,8 +31,8 @@ describe('Wrap with stack is on every surface for a text', () => {
     expect(contextMenu(texted, ['t'])).toContain('wrap-stack');
   });
 
-  it('the floating selection toolbar', () => {
-    expect(elementToolbarActions(texted, ['t'])).toContain('wrap-stack');
+  it('leaves aligning out of the element menu, to the inspector', () => {
+    expect([...elementMenuIds(texted, ['t'])].filter((id) => id.startsWith('align-'))).toEqual([]);
   });
 
   it('the More actions menu in the right bar header', () => {
@@ -41,7 +41,7 @@ describe('Wrap with stack is on every surface for a text', () => {
 
   it('a free text on the canvas, from the canvas menu', () => {
     const free = [{ id: 'n1', type: DocNodeType.Element, data: { kind: FrameKind.Element } }];
-    expect(menuFor(canvasMenuIds(1), free).map((a) => a.id)).toContain('wrap-stack');
+    expect(menuFor(canvasMenuIds(), free).map((a) => a.id)).toContain('wrap-stack');
   });
 });
 
@@ -49,14 +49,12 @@ describe('Remove stack is on every surface for a stack, and only for a stack', (
   it('shows for the stack', () => {
     expect(layerMenuActions(stacked, ['stack'])).toContain(Action.RemoveStack);
     expect(contextMenu(stacked, ['stack'])).toContain('remove-stack');
-    expect(elementToolbarActions(stacked, ['stack'])).toContain('remove-stack');
     expect(header(stacked, ['stack'])).toContain(Action.RemoveStack);
   });
 
   it('hides for a text', () => {
     expect(layerMenuActions(texted, ['t'])).not.toContain(Action.RemoveStack);
     expect(contextMenu(texted, ['t'])).not.toContain('remove-stack');
-    expect(elementToolbarActions(texted, ['t'])).not.toContain('remove-stack');
     expect(header(texted, ['t'])).not.toContain(Action.RemoveStack);
   });
 });
@@ -64,14 +62,8 @@ describe('Remove stack is on every surface for a stack, and only for a stack', (
 describe('the canvas Stack tiles arranger keeps no ⇧A', () => {
   it('is no longer called Stack', () => {
     const tiles = [{ id: 'a', type: 'image', data: {} }, { id: 'b', type: 'image', data: {} }];
-    const labels = menuFor(canvasMenuIds(2), tiles).map((a) => a.label);
+    const labels = menuFor(canvasMenuIds(), tiles).map((a) => a.label);
     expect(labels).not.toContain('Stack');
     expect(labels).not.toContain('Wrap with stack');
-  });
-});
-
-describe('the element context menu aligns inside a frame', () => {
-  it('offers every alignment on a picked element', () => {
-    expect(contextMenu(texted, ['t'])).toEqual(expect.arrayContaining(['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom']));
   });
 });

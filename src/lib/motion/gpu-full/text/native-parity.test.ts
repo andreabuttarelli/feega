@@ -56,7 +56,7 @@ type Case = { name: string; doc: MotionDoc; frame: number; smoothing?: Smoothing
 const CASES: Case[] = [
   { name: 'title revealing', doc: clip('Title', { text: 'Make it move\nfast' }), frame: 8 },
   { name: 'title settled', doc: clip('Title', { text: 'Make it move\nfast' }), frame: 60 },
-  { name: 'text wrapping, fading up', doc: clip('Text', { text: 'Body copy that wraps across a few lines', width: 0.3, align: 'left' }), frame: 6 },
+  { name: 'text wrapping, fading up', doc: clip('Text', { text: 'Body copy that wraps across a few lines', width: 0.3, align: 'left', entrance: 'fade-up' }), frame: 6 },
   { name: 'text auto width', doc: clip('Text', { text: 'One line only', sizing: 'auto', align: 'right' }), frame: 40 },
   { name: 'kicker tracked', doc: clip('Kicker', { text: 'new release', tracking: 0.1 }), frame: 30 },
   { name: 'caption on its box', doc: clip('Caption', { text: 'Captions sit on a box', background: '#000000' }), frame: 30 },

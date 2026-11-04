@@ -1,15 +1,18 @@
 import { TrackKind } from '@feega/motion-core/motion/components';
-import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { cloneDoc, findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { pivotBox } from '@feega/motion-core/motion/parent';
+import { withSurface } from '@feega/motion-core/motion/surface';
 import { KeepWorld, setParent } from '../parent-ops';
 import { layerOrder } from '../siblings';
-import { addClip, moveClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
+import { addClip, duplicateClip, moveClip, removeClips, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import type { SizeEntry } from '@feega/motion-core/motion/layout/size-entry';
 import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-layout';
-import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
+import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, TEXT_ITEM, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
+import { NEW_TEXT_SIZING, type TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { childrenInOrder, shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { isText } from '@feega/motion-core/motion/layout/text-extent';
 import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
+import { flowOf } from './flow';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -149,6 +152,19 @@ export function reorderChild(doc: MotionDoc, containerId: string, childId: strin
   return setAutoLayout(doc, containerId, { order: [...rest.slice(0, at), childId, ...rest.slice(at)] });
 }
 
+export function duplicateLayer(doc: MotionDoc, clipId: string, newId: string): OpResult {
+  const found = findClip(doc, clipId);
+  const parent = found ? layoutParent(doc, found.clip) : null;
+  if (!found || !parent) {
+    return duplicateClip(doc, clipId, newId);
+  }
+
+  const copy = { ...cloneDoc(found.clip), id: newId };
+  const added = { ...doc, tracks: doc.tracks.map((t) => (t.id === found.track.id ? { ...t, clips: [...t.clips, copy] } : t)) };
+  const ids = childrenInOrder(added.tracks.flatMap((t) => t.clips as MotionClip[]), parent).map((c) => c.id);
+  return reorderChild(added, parent.id, newId, ids.indexOf(clipId) + 1);
+}
+
 export function leaveStack(doc: MotionDoc, clipId: string): OpResult {
   const found = findClip(doc, clipId);
   const container = found ? layoutParent(doc, found.clip) : null;
@@ -169,14 +185,8 @@ export function leaveStack(doc: MotionDoc, clipId: string): OpResult {
 type Placed = { clip: MotionClip; trackIndex: number; box: { left: number; top: number; width: number; height: number } };
 
 function guessFlow(placed: Placed[]): Pick<AutoLayout, 'direction' | 'gap' | 'order'> {
-  const centre = (p: Placed, axis: 'left' | 'top') => p.box[axis] + (axis === 'left' ? p.box.width : p.box.height) / 2;
-  const spread = (axis: 'left' | 'top') => Math.max(...placed.map((p) => centre(p, axis))) - Math.min(...placed.map((p) => centre(p, axis)));
-  const direction = spread('left') >= spread('top') ? Direction.Horizontal : Direction.Vertical;
-  const [start, length] = direction === Direction.Horizontal ? (['left', 'width'] as const) : (['top', 'height'] as const);
-  const sorted = [...placed].sort((a, b) => a.box[start] - b.box[start]);
-  const spaces = sorted.slice(1).map((p, i) => p.box[start] - (sorted[i].box[start] + sorted[i].box[length]));
-  const gap = spaces.length ? Math.max(0, spaces.reduce((a, b) => a + b, 0) / spaces.length) : 0;
-  return { direction, gap: roundPx(gap), order: sorted.map((p) => p.clip.id) };
+  const { direction, gap, order } = flowOf(placed.map((p) => p.box));
+  return { direction, gap: roundPx(gap), order: order.map((i) => placed[i].clip.id) };
 }
 
 function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string): MotionDoc {
@@ -200,6 +210,8 @@ enum Container {
 }
 
 const CONTAINER_TRACK: Record<Container, string> = { [Container.Frame]: 'Frame', [Container.Stack]: 'Stack', [Container.Group]: 'Group' };
+
+const CONTAINER_LOOK: Record<Container, Partial<MotionClip>> = { [Container.Frame]: { name: CONTAINER_TRACK[Container.Frame], clipContent: true }, [Container.Stack]: {}, [Container.Group]: { group: true } };
 
 export const wrapInStack = (source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult => wrapped(source, clipIds, id, trackId, Container.Stack);
 
@@ -267,8 +279,19 @@ function takePlace(doc: MotionDoc, parentId: string | null, taken: readonly stri
   return setAutoLayout(placed.doc, parent.id, { order });
 }
 
+const BAKES_LAID: Record<Container, boolean> = { [Container.Frame]: true, [Container.Stack]: false, [Container.Group]: true };
+
+function bakedLaid(doc: MotionDoc, clipIds: readonly string[]): MotionDoc {
+  const laid = withAutoLayout(doc);
+  return clipIds.reduce((next, clipId) => {
+    const props = findClip(laid, clipId)?.clip.props;
+    return props ? withClip(next, clipId, (c) => ({ ...c, props: { ...c.props, x: props.x, y: props.y, width: props.width, height: props.height } })) : next;
+  }, doc);
+}
+
 function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string, container: Container): OpResult {
-  const doc = ownTracks(source, clipIds, trackId);
+  const own = ownTracks(source, clipIds, trackId);
+  const doc = BAKES_LAID[container] ? bakedLaid(own, clipIds.filter((c) => stackPlaced(own, c))) : own;
   const size = { width: doc.width, height: doc.height };
   const placed: Placed[] = clipIds.flatMap((c) => {
     const found = findClip(doc, c);
@@ -292,14 +315,14 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
   let result = addClip({ ...doc, tracks }, { component: 'Shape', from, durationInFrames: end - from, trackId, props }, id);
   result = result.ok ? takePlace(result.doc, sharedParent(placed), placed.map((p) => p.clip.id), id) : result;
   result = container === Container.Stack && result.ok ? setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start }) : result;
-  result = container === Container.Group && result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, group: true })) } : result;
+  result = result.ok ? { ok: true, doc: withClip(result.doc, id, (c) => ({ ...c, ...CONTAINER_LOOK[container] })) } : result;
   for (const p of placed) {
     if (!result.ok) {
       return result;
     }
     result = setParent(result.doc, p.clip.id, id, { at: p.clip.from });
     if (result.ok && container === Container.Stack && isText(p.clip.component) && !p.clip.layoutItem) {
-      result = setLayoutItem(result.doc, p.clip.id, HUG);
+      result = setLayoutItem(result.doc, p.clip.id, TEXT_ITEM[(p.clip.props.sizing as TextSizing | undefined) ?? NEW_TEXT_SIZING]);
     }
   }
   return result.ok && container === Container.Stack ? setLayoutItem(result.doc, id, HUG) : result;
@@ -308,6 +331,26 @@ function wrapped(source: MotionDoc, clipIds: readonly string[], id: string, trac
 export function wrapWithStack(doc: MotionDoc, clipIds: readonly string[], newId: () => string): { result: OpResult; containerId: string } {
   const containerId = newId();
   return { result: wrapInStack(doc, clipIds, containerId, newId()), containerId };
+}
+
+export function addAutoLayout(doc: MotionDoc, containerId: string): OpResult {
+  const kids = allClips(doc).filter((c) => c.parent === containerId);
+  const placed: Placed[] = kids.flatMap((clip) => {
+    const box = shownBox(doc, clip.id);
+    return box ? [{ clip, trackIndex: 0, box }] : [];
+  });
+  if (!placed.length) {
+    return fail(`${containerId} holds nothing to lay out`);
+  }
+  return setAutoLayout(doc, containerId, { ...guessFlow(placed), align: Align.Start });
+}
+
+export function stackFrame(source: MotionDoc, surfaceId: string): OpResult {
+  const doc = withSurface(source, surfaceId);
+  const surface = doc.surface!;
+  const layers = doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips as MotionClip[]).filter((c) => !c.parent && c.id !== surface);
+  const parented = layers.reduce<OpResult>((r, c) => (r.ok ? setParent(r.doc, c.id, surface, { at: c.from }) : r), { ok: true, doc });
+  return parented.ok ? addAutoLayout(parented.doc, surface) : parented;
 }
 
 export function removeStack(doc: MotionDoc, stackId: string): OpResult {
@@ -325,7 +368,7 @@ export function removeStack(doc: MotionDoc, stackId: string): OpResult {
   return result.ok ? { ok: true, doc: { ...result.doc, tracks: result.doc.tracks.filter((t) => t.id !== found.track.id || t.clips.length > 0) } } : result;
 }
 
-function reordered(doc: MotionDoc, parentId: string | null, stackId: string, kids: readonly string[]): OpResult {
+export function reordered(doc: MotionDoc, parentId: string | null, stackId: string, kids: readonly string[]): OpResult {
   const parent = parentId ? findClip(doc, parentId)?.clip : undefined;
   if (!parent?.autoLayout) {
     return { ok: true, doc };
@@ -334,4 +377,25 @@ function reordered(doc: MotionDoc, parentId: string | null, stackId: string, kid
   const rest = ids.filter((id) => !kids.includes(id));
   const at = rest.indexOf(stackId);
   return setAutoLayout(doc, parent.id, { order: [...rest.slice(0, at), ...kids, ...rest.slice(at + 1)] });
+}
+
+const UNCHANGED = 1e-6;
+
+export function sizeStackAround(doc: MotionDoc, stackId: string, anchor: readonly [number, number], fx: number, fy: number): OpResult {
+  const laid = laidClip(doc, stackId);
+  if (!laid?.autoLayout || !hasBox(laid)) {
+    return fail(`${stackId} is not a stack`);
+  }
+  const box = pivotBox(laid.props, { width: doc.width, height: doc.height });
+  const left = anchor[0] + (box.left - anchor[0]) * fx;
+  const top = anchor[1] + (box.top - anchor[1]) * fy;
+  const width = Math.abs(box.width * fx);
+  const height = Math.abs(box.height * fy);
+  const item = laid.layoutItem ?? DEFAULT_LAYOUT_ITEM;
+  const fixed = (axis: 'width' | 'height', f: number) => (Math.abs(f - 1) > UNCHANGED && item[axis] === Sizing.Hug ? { [axis]: Sizing.Fixed } : {});
+  const sized = withClip(doc, stackId, (c) => ({
+    ...c,
+    props: { ...c.props, x: (Math.min(left, left + box.width * fx) + width / 2) / doc.width, y: (Math.min(top, top + box.height * fy) + height / 2) / doc.height, width: width / doc.width, height: height / doc.height }
+  }));
+  return setLayoutItem(sized, stackId, { ...fixed('width', fx), ...fixed('height', fy) });
 }

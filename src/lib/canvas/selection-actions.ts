@@ -1,19 +1,3 @@
-/**
- * COSA SI PUÒ FARE A UNA SELEZIONE — una tabella, non un markup scritto a mano per ogni bottone.
- *
- * La barra che disegna questi bottoni (`SelectionToolbar.svelte`) non decide da sé quali mostrare
- * e in che ordine: legge questo elenco. Un'azione nuova — "Crea post dalla selezione", che arriva
- * dopo — è una riga qui, non un `{#if}` in più nel componente: lo stesso motivo per cui
- * `CANVAS_SHORTCUTS` esiste accanto a `matchCanvasShortcut`.
- *
- * `enabledFor` DICE SE L'AZIONE HA SENSO su QUESTA selezione, non se è "sempre visibile ma
- * spenta": duplicare e cancellare vanno bene su qualunque numero di nodi, ma collegare a un nodo
- * esistente ha bisogno di un bersaglio che non sia già nella selezione — quella domanda la fa
- * chi monta la barra, non questo file, perché richiede di sapere quali id esistono sulla tela.
- * Qui la tabella dice solo cosa un'azione È: un id, un'etichetta, quale scorciatoia la richiama
- * (se ne ha una — non tutte, "Connetti a…" resta senza perché ha bisogno di un secondo clic).
- */
-
 import type { PostCompositionNode } from './post-composition';
 import { FrameKind, docKindOf, holdsDoc } from './motion-node';
 import { sourceAssetIdOf } from './image-source';
@@ -23,6 +7,7 @@ import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-pl
 
 export type SelectionActionId =
   | 'duplicate'
+  | 'rename'
   | 'connect-new'
   | 'connect-existing'
   | 'run-workflow'
@@ -117,6 +102,7 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
   { id: 'connect-existing', label: 'Connect to…', group: 'secondary', minNodes: 1 },
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, shortcut: 'Mod+D' },
+  { id: 'rename', label: 'Rename', group: 'menu', minNodes: 1 },
   { id: 'group', label: 'Group', group: 'secondary', minNodes: 2, shortcut: 'Mod+G' },
   { id: 'ungroup', label: 'Ungroup', group: 'secondary', minNodes: 1, shortcut: 'Mod+Shift+G' },
   { id: 'remove-background', label: 'Remove background', group: 'secondary', minNodes: 1 },
@@ -200,7 +186,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'create-formats', 'combine-video', 'export', 'copy', 'paste', 'copy-properties', 'paste-properties', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'wrap-stack', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'rename', 'run-technique', 'run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame', 'create-formats', 'combine-video', 'export', 'frame-code', 'frame-interactive', 'frame-components', 'frame-templates', 'frame-history', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy', 'paste', 'copy-properties', 'paste-properties', 'copy-link', 'copy-id', 'bring-front', 'send-back', 'tidy-up', 'stack', 'section-selection', 'run-technique-rows', 'edit-technique', 'detach-technique', 'save-technique', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'wrap-stack', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text', 'create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'report', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -230,7 +216,9 @@ const isOneTechnique = (summaries: readonly Summary[]) => summaries.length === 1
 
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ...FRAME_DIALOG_SHOWN,
+  'run-workflow': (summaries) => summaries.some((n) => GENERATIVE_TYPES.has(n.type)),
   'frame-history': isOneFrame,
+  rename: (summaries) => summaries.length === 1,
   'run-technique': isOneTechnique,
   'run-technique-rows': isOneTechnique,
   'edit-technique': isOneTechnique,
@@ -253,38 +241,21 @@ export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): 
   return SHOWN[id]?.(summaries) ?? true;
 }
 
-export type FrameOnlyActionId = 'create-component' | 'go-to-main' | 'detach-instance' | 'push-instance' | 'reset-instance' | 'hide' | 'lock' | 'copy-properties' | 'paste-properties' | 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'remove-stack' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
+export type FrameOnlyActionId = 'create-component' | 'go-to-main' | 'detach-instance' | 'push-instance' | 'reset-instance' | 'copy-properties' | 'paste-properties' | 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask' | 'select-matching' | 'select-same-fill' | 'select-same-stroke' | 'select-same-font' | 'select-same-effect' | 'frame-selection' | 'resize-to-fit' | 'remove-stack' | 'union' | 'subtract' | 'intersect' | 'exclude' | 'flatten' | 'outline-stroke' | 'outline-text';
 
 export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId | FrameDialogActionId | FrameModeActionId>;
 
-const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'hide', 'lock', 'copy-properties', 'paste-properties', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
+const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['create-component', 'go-to-main', 'detach-instance', 'push-instance', 'reset-instance', 'copy-properties', 'paste-properties', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'select-matching', 'select-same-fill', 'select-same-stroke', 'select-same-font', 'select-same-effect', 'frame-selection', 'resize-to-fit', 'remove-stack', 'union', 'subtract', 'intersect', 'exclude', 'flatten', 'outline-stroke', 'outline-text']);
 
 export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id) && !isFrameAction(id);
 
-const MIN_ALIGNED_TILES = 2;
-
-export function canvasMenuIds(count: number): ReadonlySet<SelectionActionId> {
-  const aligns = count >= MIN_ALIGNED_TILES;
-  return new Set(MENU_ORDER.filter((id) => !FRAME_ONLY.has(id) && (aligns || !(id in ALIGN_EDGE))));
+export function canvasMenuIds(): ReadonlySet<SelectionActionId> {
+  return new Set(MENU_ORDER.filter((id) => !FRAME_ONLY.has(id)));
 }
 
 export function menuFor(available: ReadonlySet<SelectionActionId>, summaries: readonly Summary[]): SelectionAction[] {
   return CANVAS_MENU.filter((a) => available.has(a.id) && summaries.length >= a.minNodes && shownFor(a.id, summaries));
 }
-
-const PANEL_ORDER: readonly SelectionActionId[] = ['remove-background', 'upscale-image', 'inpaint', 'outpaint', 'reframe', 'split-layers', 'layers-to-frame', 'duplicate', 'group', 'ungroup', 'wrap-stack', 'tidy-up', 'export'];
-
-const PANEL_ACTIONS: readonly SelectionAction[] = PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
-
-const FRAME_PANEL_ORDER: readonly SelectionActionId[] = ['export', 'frame-components', 'frame-templates', 'frame-history', 'frame-interactive', 'frame-chat', 'frame-save-template', 'frame-publish', 'copy-id', 'report'];
-
-export const FRAME_PANEL_ACTIONS: readonly SelectionAction[] = FRAME_PANEL_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
-
-export function panelActionsFor(summaries: readonly Summary[]): SelectionAction[] {
-  return PANEL_ACTIONS.filter((a) => summaries.length >= a.minNodes && shownFor(a.id, summaries));
-}
-
-export const actionsFor = (ids: readonly SelectionActionId[]): SelectionAction[] => SELECTION_ACTIONS.filter((a) => ids.includes(a.id)).map((a) => ({ ...a, group: 'overflow' }));
 
 export function actionsIn(group: SelectionActionGroup, count: number): SelectionAction[] {
   return SELECTION_ACTIONS.filter((a) => a.group === group && count >= a.minNodes);
@@ -327,42 +298,4 @@ export function enabledFor(
   stale: string[] = []
 ): Gate {
   return GATES[id]?.({ nodeSummaries, edges, stale }) ?? ALWAYS;
-}
-
-const PINNED_LIMIT = 3;
-
-const TOOLBAR_PRIORITY: readonly SelectionActionId[] = [
-  'duplicate',
-  'run-downstream',
-  'upscale-image',
-  'remove-background',
-  'run-technique',
-  'run-stale',
-  'inpaint',
-  'outpaint',
-  'connect-new',
-  'connect-existing',
-  'split-layers',
-  'layers-to-frame',
-  'group',
-  'ungroup'
-];
-
-const rankOf = (id: SelectionActionId) => {
-  const at = TOOLBAR_PRIORITY.indexOf(id);
-  return at === -1 ? TOOLBAR_PRIORITY.length : at;
-};
-
-export type ToolbarSlots = { fixed: SelectionAction[]; pinned: SelectionAction[]; overflow: SelectionAction[]; danger: SelectionAction[] };
-
-export function toolbarSlots(actions: readonly SelectionAction[]): ToolbarSlots {
-  const ranked = actions.filter((a) => a.group === 'secondary').sort((a, b) => rankOf(a.id) - rankOf(b.id));
-  const fixed = actions.filter((a) => a.group === 'fixed');
-
-  return {
-    fixed,
-    pinned: ranked.slice(0, PINNED_LIMIT),
-    overflow: [...fixed, ...ranked.slice(PINNED_LIMIT), ...actions.filter((a) => a.group === 'overflow')],
-    danger: actions.filter((a) => a.group === 'danger')
-  };
 }

@@ -181,3 +181,33 @@ fn composing_a_blurred_group_paints_the_same_pixels_as_expanding_it() {
 
     assert!(paint(true) == paint(false));
 }
+
+fn blended_group(clip: &str, blend: &str, inside: &[String]) -> String {
+    format!(
+        r#"{{ "kind": "group", "clip": "{clip}", "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "{blend}", "items": [{}] }}"#,
+        inside.join(",")
+    )
+}
+
+fn blended_path(clip: &str, x: f64) -> String {
+    path(clip, x).replace(r#""blend": "normal""#, r#""blend": "multiply""#)
+}
+
+#[test]
+fn a_blended_group_of_paths_stays_a_group_so_it_blends_with_what_is_under_it() {
+    let mut lib = composing(&[("a", &list(&[path("a", 10.0), blended_group("mix", "multiply", &[path("g1", 30.0), path("g2", 60.0)]), path("b", 120.0)]))]);
+
+    let plan = lib.plan(&screen("a", 1.0, 0.0, false), LIMITS);
+
+    assert_eq!(kinds(&plan.screen), vec!["use", "group", "use"]);
+    assert_eq!(plan.screen.items[1].look().map(|l| l.blend.as_str()), Some("multiply"));
+}
+
+#[test]
+fn a_blended_path_is_drawn_on_its_own_not_folded_into_a_span() {
+    let mut lib = composing(&[("a", &list(&[path("a", 10.0), blended_path("m", 30.0), path("b", 120.0)]))]);
+
+    let plan = lib.plan(&screen("a", 1.0, 0.0, false), LIMITS);
+
+    assert_eq!(kinds(&plan.screen), vec!["use", "path", "use"]);
+}

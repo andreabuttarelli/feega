@@ -5,7 +5,8 @@ import { findClip, MotionFormat, newMotionDoc, type MotionClip, type MotionDoc }
 import { addClip, setProps, type OpResult } from '@feega/motion-core/motion/timeline';
 import { flattenComps } from '@feega/motion-core/motion/precomp';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
-import { componentOf, createComponent, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
+import { wrapInStack } from './layout/ops';
+import { ComponentRole, InstancePart, componentOf, createComponent, instanceParts, roleOf, detachInstance, instanceOf, instanceElements, instanceTexts, Paint, pushOverrides, recolorInstance, overrideInstance, resetOverride, resetOverrides } from './main-component';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -23,6 +24,34 @@ function button(): MotionDoc {
 }
 
 const flatText = (doc: MotionDoc) => flattenComps(doc).tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.component === 'Text').map((c) => c.props.text);
+
+describe('a main component and its instances in Properties', () => {
+  const placed = () => {
+    const doc = must(createComponent(button(), ['bg', 'label'], newId, 'Button'));
+    return { doc, id: doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!.id };
+  };
+  const homed = (doc: MotionDoc, home: string): MotionDoc => ({ ...doc, comps: Object.fromEntries(Object.entries(doc.comps).map(([k, c]) => [k, c.component ? { ...c, component: { ...c.component, home } } : c])) });
+
+  it('the component in the frame that owns it is the main', () => {
+    const { doc, id } = placed();
+    expect(roleOf(doc, id, 'node-a')).toBe(ComponentRole.Main);
+    expect(roleOf(homed(doc, 'node-a'), id, 'node-a')).toBe(ComponentRole.Main);
+  });
+
+  it('a placement in another frame is an instance', () => {
+    const { doc, id } = placed();
+    expect(roleOf(homed(doc, 'node-a'), id, 'node-b')).toBe(ComponentRole.Instance);
+  });
+
+  it('a main offers properties and variants, never swap, reset, push or detach', () => {
+    const main = instanceParts(ComponentRole.Main);
+    for (const part of [InstancePart.Swap, InstancePart.Reset, InstancePart.Push, InstancePart.Detach, InstancePart.GoToMain, InstancePart.Overrides]) {
+      expect(main.has(part)).toBe(false);
+    }
+    expect(main.has(InstancePart.Variants)).toBe(true);
+    expect(instanceParts(ComponentRole.Instance).has(InstancePart.Detach)).toBe(true);
+  });
+});
 
 describe('main components and instances', () => {
   it('creating a component turns the selection into a main and leaves one instance in place', () => {
@@ -179,5 +208,52 @@ describe('pushing instance changes to the main', () => {
 
   it('refuses a clip that is not an instance', () => {
     expect(pushOverrides(button(), 'bg').ok).toBe(false);
+  });
+});
+
+describe('a component made from a stack child', () => {
+  const stacked = () => {
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    for (const [id, x] of [['a', 0.2], ['b', 0.4], ['c', 0.6]] as const) {
+      doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x, y: 0.5, width: 0.1, height: 0.1 } }, id));
+    }
+    return must(wrapInStack(doc, ['a', 'b', 'c'], 'row', 'lane'));
+  };
+
+  it('keeps the instance in the stack, where the child was', () => {
+    const doc = must(createComponent(stacked(), ['b'], newId, 'Chip'));
+    const instance = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+
+    expect(instance.parent).toBe('row');
+    expect(findClip(doc, 'row')!.clip.autoLayout!.order).toEqual(['a', instance.id, 'c']);
+  });
+});
+
+describe('a component made from a container', () => {
+  const button = () => {
+    let doc = newMotionDoc(MotionFormat.Landscape);
+    doc = must(addClip(doc, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'Continue', x: 0.5, y: 0.5, width: 0.2, height: 0.05 } }, 'label'));
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x: 0.6, y: 0.5, width: 0.05, height: 0.05 } }, 'icon'));
+    return must(wrapInStack(doc, ['label', 'icon'], 'button', 'lane'));
+  };
+  const made = () => {
+    const doc = must(createComponent(button(), ['button'], newId, 'Button'));
+    const instance = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Precomp')!;
+    return { doc, instance, inside: doc.comps[String(instance.props.comp)].tracks.flatMap((t) => t.clips) };
+  };
+
+  it('takes the whole subtree into the main, not only the picked stack', () => {
+    const { doc, instance, inside } = made();
+
+    expect(inside.map((c) => c.id).sort()).toEqual(['button', 'icon', 'label']);
+    expect(inside.find((c) => c.id === 'label')!.parent).toBe('button');
+    expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.id)).toEqual([instance.id]);
+  });
+
+  it('draws the subtree through the instance', () => {
+    const { doc, instance } = made();
+    const texts = flattenComps(doc).tracks.flatMap((t) => t.clips).filter((c) => c.component === 'Text');
+
+    expect(texts.map((c) => c.id)).toEqual([`${instance.id}__0__label`]);
   });
 });

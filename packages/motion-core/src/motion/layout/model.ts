@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Align, AlignContent, AutoFlow, DEFAULT_COLUMNS, Direction, Justify, Sizing, TrackType } from './auto-layout';
 import { MAX_FILL_WEIGHT, MAX_PERCENT } from './size-entry';
+import { TextSizing } from '../text-sizing';
 
 export const MAX_LAYOUT_PX = 4000;
 export const MAX_LAYOUT_CHILDREN = 200;
@@ -57,6 +58,10 @@ export const layoutItemSchema = z.object({
   maxWidth: px.optional(),
   minHeight: px.optional(),
   maxHeight: px.optional(),
+  minWidthPercent: percent.optional(),
+  maxWidthPercent: percent.optional(),
+  minHeightPercent: percent.optional(),
+  maxHeightPercent: percent.optional(),
   absolute: z.boolean().default(false),
   column: index.optional(),
   row: index.optional(),
@@ -81,6 +86,12 @@ export type LayoutItem = z.infer<typeof layoutItemSchema>;
 export const DEFAULT_AUTO_LAYOUT: AutoLayout = autoLayoutSchema.parse({});
 export const NEW_AUTO_LAYOUT: AutoLayout = { ...DEFAULT_AUTO_LAYOUT, strokesIncluded: true };
 export const DEFAULT_LAYOUT_ITEM: LayoutItem = layoutItemSchema.parse({});
+
+export const TEXT_ITEM: Record<TextSizing, Partial<Pick<LayoutItem, 'width' | 'height'>>> = {
+  [TextSizing.Fixed]: {},
+  [TextSizing.AutoHeight]: { height: Sizing.Hug },
+  [TextSizing.AutoWidth]: { width: Sizing.Hug, height: Sizing.Hug }
+};
 
 const TRACKS_OF_AXIS = { width: 'columnTracks', height: 'rowTracks' } as const;
 

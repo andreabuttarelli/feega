@@ -16,7 +16,7 @@ const withText = (doc: MotionDoc, from: number) =>
   must(
     addClip(
       doc,
-      { component: "Text", from, durationInFrames: 90, props: { text: "Hi" } },
+      { component: "Text", from, durationInFrames: 90, props: { text: "Hi", entrance: "fade-up" } },
       "tx",
     ),
   );

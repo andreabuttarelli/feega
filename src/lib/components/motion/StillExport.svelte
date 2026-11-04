@@ -8,14 +8,14 @@
 
   type Made = { url: string; width: number; height: number };
 
-  let { doc, editorUrl, fileName, saved, onclose }: { doc: MotionDoc; editorUrl: string; fileName: string; saved: boolean; onclose: () => void } = $props();
+  let { doc, docScale, editorUrl, fileName, saved, onclose }: { doc: MotionDoc; docScale: number; editorUrl: string; fileName: string; saved: boolean; onclose: () => void } = $props();
 
   let format = $state(ImageFormat.Png);
-  let scale = $state(ImageScale.One);
+  let scale = $state(ImageScale.Two);
   let working = $state(false);
   let error = $state('');
   let made = $state<Made | null>(null);
-  const sizeOf = (s: ImageScale) => stillExport(format, s).size(doc);
+  const sizeOf = (s: ImageScale) => stillExport(format, s, docScale).size(doc);
 
   async function exportImage() {
     working = true;
@@ -55,7 +55,7 @@
   {#if !saved}<p class="note">Saving… the image is drawn from the saved version.</p>{/if}
   {#if error}<p class="warn" role="alert">{error}</p>{/if}
   {#if made}
-    <a class="primary" href={attachmentUrl(made.url, `${fileName}.${stillExport(format, scale).ext}`)} download={`${fileName}.${stillExport(format, scale).ext}`} data-testid="still-export-file">Download {made.width}×{made.height}</a>
+    <a class="primary" href={attachmentUrl(made.url, `${fileName}.${stillExport(format, scale, docScale).ext}`)} download={`${fileName}.${stillExport(format, scale, docScale).ext}`} data-testid="still-export-file">Download {made.width}×{made.height}</a>
   {/if}
   <button type="button" class="primary" disabled={working || !saved} onclick={exportImage} data-testid="still-export-go">{working ? 'Drawing…' : 'Export'}</button>
 </div>

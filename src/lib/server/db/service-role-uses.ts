@@ -24,6 +24,11 @@ export type ServiceRoleUse = {
 
 export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
+    path: 'src/lib/server/core-usage.ts — profileIsInternal',
+    why: "Un evento di prodotto nasce anche fuori da una richiesta con sessione (un render che finisce, una chiave API): per escludere il team come fa il browser serve l'email dell'utente che ha agito. Legge solo profiles.email per quell'id, e fuori esce solo il booleano interno/no, mai l'email.",
+    tables: ['profiles']
+  },
+  {
     path: 'src/lib/server/canvas/canvas-share.ts — readSharedCanvas + signSharedMedia (rotta pubblica /s/[token])',
     why: "Chi apre un link condiviso non ha sessione: il token È l'autorizzazione. La riga si trova solo per canvases.share_token; l'org_id si LEGGE da quella riga e limita ogni lettura successiva (nodi non cancellati, connessioni, asset di quei nodi, prodotti e post scaricati da quei nodi). Gli influencer non hanno sempre un org_id: si legge quello referenziato dal nodo e passa solo se è del catalogo (org_id null) o della stessa org — mai il volto di un'altra. Un progetto uncensored non si condivide mai: `projects.mode` si legge solo per rifiutarlo. Sola lettura, e fuori esce solo il contenuto dei nodi con i file firmati — mai org, progetto, prompt, parametri o utenti.",
     tables: ['canvases', 'projects', 'nodes', 'nodes_connections', 'assets', 'products', 'social_posts', 'influencers', 'influencer_views']
@@ -51,6 +56,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   {
     path: 'src/lib/server/canvas/selection-feed.ts — channelFeed (op get_selection)',
     why: "Un agente MCP con chiave API non ha un JWT con cui entrare nel canale privato `canvas:<id>`. L'op lo apre solo dopo aver provato che la tela è del progetto dell'org del chiamante, ascolta soltanto i broadcast `canvas-peer` per al più 3,5 s, tiene i segni del solo utente chiamante e non scrive nulla.",
+    tables: ['realtime.messages']
+  },
+  {
+    path: 'src/lib/server/canvas/agent-cursor.ts — broadcast (cursori degli agenti)',
+    why: "Un agente MCP con chiave API non ha un JWT con cui scrivere nel canale privato `canvas:<id>`, e un turno di chat non porta il JWT fino al livello degli strumenti. Il canvas_id e la posizione si LEGGONO con il client del chiamante (RLS accesa) dai nodi che l'agente ha appena toccato; la chiave serve solo a mandare un broadcast `canvas-peer` via REST su quel canale. Non legge né scrive tabelle.",
     tables: ['realtime.messages']
   },
   {

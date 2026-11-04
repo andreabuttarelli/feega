@@ -6,6 +6,7 @@
   import { preloadCode } from '$app/navigation';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
+  import NewCanvasButton from '$lib/components/app/NewCanvasButton.svelte';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
   import { ComposerKey, composerKey, rotateTemplates } from '$lib/motion/brief-composer';
   import { composerHeight } from '$lib/components/brand-agent/composer-height';
@@ -16,14 +17,13 @@
   import { Tool } from '$lib/motion/actions';
   import FeegaFile from '$lib/components/canvas/FeegaFile.svelte';
   import { isFeegaFile } from '$lib/canvas/feega-file';
-  import { DashboardPage, PAGE_PATH } from '$lib/dashboard/pages';
+  import { DashboardPage, EDITOR_PRELOAD, PAGE_PATH } from '$lib/dashboard/pages';
 
   let { data, form } = $props();
 
   const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
   const EXAMPLES_SHOWN = 3;
   const EXAMPLE_TURN_MS = 6000;
-  const EDITOR_ROUTE = '/p/_/c/_/motion/_';
 
   let phase = $state(BriefPhase.Idle);
   const sending = $derived(phase !== BriefPhase.Idle);
@@ -59,7 +59,7 @@
   });
 
   function preloadEditor() {
-    void preloadCode(EDITOR_ROUTE);
+    void preloadCode(EDITOR_PRELOAD);
   }
 
   function fill(text: string) {
@@ -139,9 +139,7 @@
       <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
     {/if}
     <Button variant="secondary" data-testid="home-import-feega" onclick={() => feegaFile?.pick()}>import .feega</Button>
-    <form method="POST" action="?/project" use:apiEnhance>
-      <Button type="submit" data-testid="new-canvas">new canvas</Button>
-    </form>
+    <NewCanvasButton projects={data.projects} action="?/project" />
     <FeegaFile bind:this={feegaFile} page={PAGE_PATH[DashboardPage.Home]} />
   </div>
 

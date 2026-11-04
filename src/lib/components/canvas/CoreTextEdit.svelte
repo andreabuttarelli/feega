@@ -3,13 +3,13 @@
   import { ColourDisplay } from '$lib/motion/colour-field';
   import { onMount, tick } from 'svelte';
   import { anchorShift, editCss, type EditBody, type EditLayout, type TextEditStyle } from '$lib/canvas/frame-text-edit';
-  import { rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
+  import { TypingBurst, autoList, lineMove, rangeOf, select, selectionIn, textOf, type Span } from '$lib/canvas/editable-text';
   import { textRange } from '$lib/canvas/text-range.svelte';
   import GradientHandles from './GradientHandles.svelte';
   import { ListKind, type ListItem } from '@feega/motion-core/motion/text-lists';
   import { codeIndex, linkOf, MIXED, RunToggle, STYLE_KEYS, type GradientFill, type RunEdit, type RunStyle, type TextRun } from '@feega/motion-core/motion/text-runs';
 
-  let { layout, look, text, body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
+  let { layout, look, text, typedAhead = () => '', body, clipId = '', base = {}, runs: initialRuns = [], lists: initialLists = [], styled = false, oncommit }: { layout: EditLayout; look: TextEditStyle; text: string; typedAhead?: () => string; body: EditBody; clipId?: string; base?: RunStyle; runs?: TextRun[]; lists?: ListItem[]; styled?: boolean; oncommit: (text: string, runs: TextRun[], lists: ListItem[]) => void } = $props();
 
   type Box = { left: number; top: number; width: number; height: number };
   type Snapshot = { text: string; runs: TextRun[]; lists: ListItem[]; sel: Span };
@@ -22,6 +22,8 @@
   let linkField = $state<HTMLInputElement>();
 
   const SHORTCUTS: Record<string, RunEdit> = { b: { weight: RunToggle.Bold }, i: { italic: RunToggle.Italic }, u: { underline: RunToggle.Underline } };
+  const SHIFT_SHORTCUTS: Record<string, RunEdit> = { x: { strike: RunToggle.Strike } };
+  const LIST_TRIGGER = ' ';
   const PANEL = '[data-text-range-panel]';
   const CLEARED: RunEdit = Object.fromEntries(STYLE_KEYS.map((k) => [k, null]));
   const HISTORY_LIMIT = 200;
@@ -32,6 +34,7 @@
   let sel: Span = { start: 0, end: 0 };
   const past: Snapshot[] = [];
   const future: Snapshot[] = [];
+  const burst = new TypingBurst();
 
   const style = $derived(editCss(look, layout));
   let barAt = $state({ left: 0, top: 0 });
@@ -83,6 +86,12 @@
   $effect(() => {
     void style;
     fit();
+  });
+
+  $effect(() => {
+    const fonts = document.fonts;
+    fonts?.addEventListener('loadingdone', fit);
+    return () => fonts?.removeEventListener('loadingdone', fit);
   });
 
   $effect(() => {
@@ -150,6 +159,7 @@
   }
 
   function restore(from: Snapshot[], to: Snapshot[]) {
+    burst.cut();
     const back = from.pop();
     if (!back) {
       return;
@@ -171,6 +181,7 @@
   }
 
   function insert(typed: string) {
+    burst.cut();
     record();
     const plain = typed.replaceAll('\r\n', NEWLINE).replaceAll('\r', NEWLINE);
     write(value.slice(0, sel.start) + plain + value.slice(sel.end), sel.start + plain.length);
@@ -211,9 +222,25 @@
       e.preventDefault();
       return;
     }
-    if (!composing) {
+    if (!composing && listTyped(e)) {
+      e.preventDefault();
+      return;
+    }
+    if (!composing && burst.starts(e.inputType, e.data, performance.now())) {
       record();
     }
+  }
+
+  function listTyped(e: InputEvent): boolean {
+    const list = styled && e.data === LIST_TRIGGER && sel.start === sel.end ? autoList(value, sel.start) : null;
+    if (!list) {
+      return false;
+    }
+    burst.cut();
+    record();
+    write(value.slice(0, list.cut.start) + value.slice(list.cut.end), list.cut.start);
+    textRange.setList(list.kind);
+    return true;
   }
 
   function pasted(e: ClipboardEvent) {
@@ -322,12 +349,19 @@
       e.stopPropagation();
       return;
     }
-    const shortcut = styled && (e.metaKey || e.ctrlKey) ? SHORTCUTS[e.key.toLowerCase()] : undefined;
+    const shortcut = styled && (e.metaKey || e.ctrlKey) ? (e.shiftKey ? SHIFT_SHORTCUTS : SHORTCUTS)[e.key.toLowerCase()] : undefined;
     if (shortcut) {
       e.preventDefault();
       e.stopPropagation();
       selected();
       restyle(shortcut);
+      return;
+    }
+    const line = composing ? null : lineMove(e);
+    if (line) {
+      e.preventDefault();
+      e.stopPropagation();
+      getSelection()?.modify(line.alter, line.direction, 'lineboundary');
       return;
     }
     if (e.key === 'Escape' && !composing) {
@@ -354,8 +388,13 @@
     const follow = () => focused() && !composing && selected();
     document.addEventListener('selectionchange', follow);
     void tick().then(() => {
-      sel = { start: 0, end: value.length };
       field?.focus();
+      const ahead = typedAhead();
+      if (ahead) {
+        value = ahead;
+        textRange.open({ clipId: styled ? clipId : '', text: ahead, runs: [], lists: [], base });
+      }
+      sel = { start: ahead ? value.length : 0, end: value.length };
       paint();
       syncRange();
     });

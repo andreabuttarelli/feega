@@ -16,6 +16,7 @@ import { figmaPlan, type FigmaImage, type FigmaPlan, type PlanItem } from '$lib/
 import { Destination } from '$lib/canvas/figma/scene';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
+import { Place as SlotPlace } from '$lib/motion/layer-place';
 import { commitOnto } from './frame-ops';
 import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { DropOn, OutputKind, linkOutput, mediaElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
@@ -30,7 +31,7 @@ export { DropOn, type Drop };
 const fraction = z.number().min(0).max(1);
 
 export const dropSchema = z.discriminatedUnion('on', [
-  z.object({ on: z.literal(DropOn.Frame), nodeId: z.string().min(1), at: z.object({ x: fraction, y: fraction }), frame: z.number().int().min(0).optional() }).strict(),
+  z.object({ on: z.literal(DropOn.Frame), nodeId: z.string().min(1), at: z.object({ x: fraction, y: fraction }), frame: z.number().int().min(0).optional(), slot: z.object({ target: z.string().min(1), place: z.nativeEnum(SlotPlace) }).strict().optional() }).strict(),
   z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict()
 ]);
 
@@ -314,6 +315,13 @@ export async function placeMedia(store: FrameStore, output: Output, drop: Extrac
   return isLanded(landed) ? done(landed) : landed;
 }
 
+export async function placeFreeMedia(store: FrameStore, place: Place & { id?: string }, output: Output, drop: CanvasDrop): Promise<Moved> {
+  const element = mediaElement(output);
+  const landing = landFree(element, drop, FRAME_OF_OUTPUT[output.kind], null, outputStage(element), newId, StillAt.Settled);
+  const landed = await land(store, place, landing, null, SUMMARY.placed);
+  return isLanded(landed) ? done(landed) : landed;
+}
+
 async function linkFrame(store: FrameStore, ask: { sourceNodeId: string; frameNodeId: string }): Promise<Moved> {
   const [found, frame] = await Promise.all([store.output(ask.sourceNodeId), store.read(ask.frameNodeId)]);
   if (!frame) {
@@ -528,14 +536,14 @@ export async function pasteFigmaAt(store: FrameStore, place: Place, html: string
   return plan ? placeFigmaPlan(store, place, plan, centre) : null;
 }
 
-export async function placeFigmaPlan(store: FrameStore, place: Place, plan: FigmaPlan, centre: Point): Promise<NonNullable<FigmaPasteOutcome>> {
+export async function placeFigmaPlan(store: FrameStore, place: Place, plan: FigmaPlan, centre: Point, ids: readonly string[] = []): Promise<NonNullable<FigmaPasteOutcome>> {
   const frameIds: string[] = [];
   const undo: UndoItem[] = [];
   const fills: FigmaFill[] = [];
-  for (const item of plan.items) {
+  for (const [i, item] of plan.items.entries()) {
     const shaped = ITEM_SHAPE[item.destination](item);
     const at = { x: Math.round(centre.x + item.centre.x - item.size.width / 2), y: Math.round(centre.y + item.centre.y - item.size.height / 2) };
-    const frameId = await store.create({ ...place, ...at }, item.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name }).catch(async (e) => {
+    const frameId = await store.create({ ...place, ...at, ...(ids[i] ? { id: ids[i] } : {}) }, item.doc, { type: shaped.type, data: shaped.data, width: shaped.w, height: shaped.h, displayName: item.name }).catch(async (e) => {
       await Promise.all(frameIds.map((made) => store.remove(made).catch(() => undefined)));
       throw e;
     });

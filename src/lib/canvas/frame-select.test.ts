@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Depth, Gesture } from '$lib/motion/drill';
 import { MotionFormat, newMotionDoc } from '@feega/motion-core/motion/doc';
-import { Reach, clickTarget, frameLevel, grabbedInstead, ownClipToPick, siblingsOf, stepInside, videoSide, Press, pressOn } from './frame-select';
+import { FrameKind, enteredClips } from './motion-node';
+import { Extend, Reach, Root, clickTarget, picksOwnKeys, extendOf, frameLevel, grabbedInstead, leaveLevel, ownClipToPick, siblingsOf, stepInside, videoSide, Press, pressOn } from './frame-select';
 
 const FRAME = frameLevel();
 const clipLevel = (clip: string) => ({ depth: Depth.Clip, clip, part: null });
@@ -22,6 +23,20 @@ describe('stepInside', () => {
   it('Esc goes up from the element to the frame, then to the canvas', () => {
     expect(stepInside(clipLevel('card'), Gesture.Leave, null)).toEqual(FRAME);
     expect(stepInside(FRAME, Gesture.Leave, null).depth).toBe(Depth.Canvas);
+  });
+});
+
+describe('leaveLevel', () => {
+  it('Esc on a free element leaves to the canvas, never to its wrapper frame', () => {
+    expect(leaveLevel(Root.Own, clipLevel('text'))).toBeNull();
+  });
+
+  it('Esc on an element of a frame goes up to the frame', () => {
+    expect(leaveLevel(Root.Page, clipLevel('card'))).toEqual(FRAME);
+  });
+
+  it('Esc on a part of a free element goes back to the element', () => {
+    expect(leaveLevel(Root.Own, { depth: Depth.Part, clip: 'text', part: 'lines.0' })?.clip).toBe('text');
   });
 });
 
@@ -87,6 +102,17 @@ describe('clickTarget', () => {
   });
 });
 
+describe('enteredClips', () => {
+  it('Enter on a group picks every element it holds', () => {
+    expect(enteredClips(FrameKind.Group, nested())).toEqual(['outer', 'other']);
+  });
+
+  it('Enter on a frame or a free element picks nothing here', () => {
+    expect(enteredClips(FrameKind.Frame, nested())).toEqual([]);
+    expect(enteredClips(FrameKind.Element, nested())).toEqual([]);
+  });
+});
+
 describe('siblingsOf', () => {
   it('selects every element sharing the parent of the pick', () => {
     expect(siblingsOf(nested(), ['leaf'])).toEqual(['leaf']);
@@ -135,5 +161,71 @@ describe('pressOn', () => {
 
   it('Cmd/Ctrl prende sempre il figlio', () => {
     expect(pressOn({ selected: [page], inside: null, picks: [] }, page, Reach.Deep)).toBe(Press.Child);
+  });
+});
+
+describe('extendOf', () => {
+  const at = { onClip: true, onBody: true, held: false, entered: false, selectedElsewhere: false, picks: 0, bandable: true };
+  const plain = { shift: false, mod: false };
+  const background = { ...at, onClip: false };
+
+  it('a drag on the background of a frame that is not selected is a marquee over its children', () => {
+    expect(extendOf(plain, background)).toEqual({ extend: Extend.Band, reach: Reach.Top });
+  });
+
+  it('a drag on the background of a selected frame moves it', () => {
+    expect(extendOf(plain, { ...background, held: true, entered: true }).extend).toBe(Extend.None);
+  });
+
+  it('a drag on the frame title moves it', () => {
+    expect(extendOf(plain, { ...background, onBody: false }).extend).toBe(Extend.None);
+    expect(extendOf({ shift: false, mod: true }, { ...background, onBody: false }).extend).toBe(Extend.None);
+  });
+
+  it('a drag on an empty frame or a group moves it', () => {
+    expect(extendOf(plain, { ...background, bandable: false }).extend).toBe(Extend.None);
+  });
+
+  it('shift-click on a child of a frame nobody picked picks the child, not the frame', () => {
+    expect(extendOf({ shift: true, mod: false }, at)).toEqual({ extend: Extend.Toggle, reach: Reach.Top });
+  });
+
+  it('shift-press on the background of a frame starts a marquee over its children', () => {
+    expect(extendOf({ shift: true, mod: false }, { ...at, onClip: false })).toEqual({ extend: Extend.Band, reach: Reach.Top });
+  });
+
+  it('shift leaves other selected nodes to the canvas', () => {
+    expect(extendOf({ shift: true, mod: false }, { ...at, selectedElsewhere: true }).extend).toBe(Extend.None);
+  });
+
+  it('⌘-click adds the deepest child when children are already picked', () => {
+    expect(extendOf({ shift: false, mod: true }, { ...at, entered: true, picks: 1 })).toEqual({ extend: Extend.Toggle, reach: Reach.Deep });
+  });
+
+  it('⌘-click with nothing picked is a deep pick, not an extension', () => {
+    expect(extendOf({ shift: false, mod: true }, at).extend).toBe(Extend.None);
+  });
+
+  it('⌘-drag on the frame background marquees the deepest children instead of moving the frame', () => {
+    expect(extendOf({ shift: false, mod: true }, { ...at, onClip: false, selectedElsewhere: true })).toEqual({ extend: Extend.Band, reach: Reach.Deep });
+  });
+
+  it('⇧⌘-click toggles the deepest child', () => {
+    expect(extendOf({ shift: true, mod: true }, at)).toEqual({ extend: Extend.Toggle, reach: Reach.Deep });
+  });
+
+  it('a plain press extends nothing', () => {
+    expect(extendOf({ shift: false, mod: false }, { ...at, entered: true, picks: 2 }).extend).toBe(Extend.None);
+  });
+});
+
+describe('picksOwnKeys', () => {
+  it('a layer just drawn in a frame takes the frame keys, so ⇧A wraps it and not the whole frame', () => {
+    expect(picksOwnKeys({ nodeId: 'frame', level: frameLevel() }, ['box'])).toBe(true);
+  });
+
+  it('with nothing picked the keys stay on the canvas', () => {
+    expect(picksOwnKeys({ nodeId: 'frame', level: frameLevel() }, [])).toBe(false);
+    expect(picksOwnKeys(null, ['box'])).toBe(false);
   });
 });

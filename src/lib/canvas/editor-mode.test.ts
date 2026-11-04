@@ -55,6 +55,13 @@ describe('editor mode', () => {
     expect(new EditorModeState(store).current).toBe(EditorMode.Play);
   });
 
+  it('reopens in Design after leaving the canvas in Motion, so a reload never starts keying edits', () => {
+    const store = new MemoryStore();
+    new EditorModeState(store).set(EditorMode.Motion);
+
+    expect(new EditorModeState(store).current).toBe(EditorMode.Design);
+  });
+
   it('an unknown or unreadable stored mode falls back to Design', () => {
     expect(readEditorMode('nope')).toBe(EditorMode.Design);
     const mode = new EditorModeState({ getItem: blocked, setItem: blocked });
@@ -102,6 +109,16 @@ describe('editor mode', () => {
     expect(mode.timeline).toBe(TimelineAccess.Edit);
     mode.toggleTimeline();
     expect(mode.timeline).toBe(TimelineAccess.Hidden);
+  });
+
+  it('entering Motion reopens the timeline after it was hidden', () => {
+    const mode = new EditorModeState(new MemoryStore());
+    mode.set(EditorMode.Motion);
+    mode.toggleTimeline();
+    expect(mode.timeline).toBe(TimelineAccess.Hidden);
+    mode.set(EditorMode.Design);
+    mode.set(EditorMode.Motion);
+    expect(mode.timeline).toBe(TimelineAccess.Edit);
   });
 
   it('Play and Code never show the timeline', () => {

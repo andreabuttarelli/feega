@@ -1,4 +1,6 @@
 import { adoptDocLibrary } from '$lib/server/canvas/project-library';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent } from '$lib/core-usage';
 import type { Db } from '$lib/server/db/client';
 import { fetchCanvasLink, importCanvasBytes, importCanvasLink } from '$lib/server/canvas/upload';
 import { MAX_FONT_BYTES, storeFontBytes } from '$lib/server/motion/font-upload';
@@ -85,5 +87,7 @@ export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { ur
   if (head) {
     await adoptDocLibrary(scope.db, scope, head.doc);
   }
+
+  coreEvent(scope.userId, CoreEvent.UrlImported, { canvas_id: canvasId });
   return imported;
 }

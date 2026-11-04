@@ -4,6 +4,8 @@ import { resizeFactors, rotateAround, scaleAroundXY, snappedHandle, turnedBy } f
 import { groupMove } from './multi-select';
 import { Grip, handlesOf, type Bounds, type Guide, type Pt, type Quad } from './scene-select';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { findClip } from '@feega/motion-core/motion/doc';
+import { sizeStackAround } from './layout/ops';
 
 export type Keys = { shift: boolean; alt: boolean; ctrl?: boolean };
 
@@ -63,7 +65,11 @@ function scaled(g: GroupDrag): GroupDragged {
   const dragged: Pt = [at[0] + g.to[0] - g.from[0], at[1] + g.to[1] - g.from[1]];
   const snapped = snappedHandle(dragged, [unit[0] !== SIDE_UNIT, unit[1] !== SIDE_UNIT], g.others, sizeOf(g), g.reach);
   const { anchor, fx, fy } = resizeFactors(g.box, unit, snapped.point, g.keys.shift, g.keys.alt);
-  return { result: scaleAroundXY(g.doc, g.ids, g.frame, anchor, fx, fy, g.mode), guides: snapped.guides };
+  const stacks = g.ids.filter((id) => findClip(g.doc, id)?.clip.autoLayout);
+  const rest = g.ids.filter((id) => !stacks.includes(id));
+  const scaledRest = rest.length ? scaleAroundXY(g.doc, rest, g.frame, anchor, fx, fy, g.mode) : ({ ok: true, doc: g.doc } as OpResult);
+  const result = stacks.reduce<OpResult>((done, id) => (done.ok ? sizeStackAround(done.doc, id, anchor, fx, fy) : done), scaledRest);
+  return { result, guides: snapped.guides };
 }
 
 function moved(g: GroupDrag): GroupDragged {

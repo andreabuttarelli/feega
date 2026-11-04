@@ -12,6 +12,7 @@ import {
   patchNodeData,
   DataCheck,
   setConnectionMode,
+  setConnectionTie,
   writeNodeData
 } from '$lib/server/repos/canvas';
 import type { Db } from '$lib/server/db/client';
@@ -327,6 +328,29 @@ describe('la creazione porta sempre l org', () => {
     const update = calls.find((c) => c.op === 'update')!;
     expect(update.payload).toMatchObject({ mode: 'iterate' });
     expect(update.filters).toContainEqual(['org_id', ORG]);
+  });
+
+  it('setConnectionTie lega i fili di un fascio in una sola scrittura, dentro la propria org', async () => {
+    const tie = { id: 't1', x: 10, y: 20 };
+    const rows = ['c1', 'c2'].map((id) => ({ id, org_id: ORG, canvas_id: CANVAS, source_node_id: NODE, target_node_id: NODE, source_handle: null, target_handle: null, mode: 'fixed', tie }));
+    const { db, calls } = fakeDb({ nodes_connections: rows }, { nodes_connections: rows });
+
+    const out = await setConnectionTie(db, { orgId: ORG, connectionIds: ['c1', 'c2'], tie });
+
+    expect(out.map((c) => c.tie)).toEqual([tie, tie]);
+    const update = calls.find((c) => c.op === 'update')!;
+    expect(update.payload).toEqual({ tie });
+    expect(update.filters).toContainEqual(['id', ['c1', 'c2']]);
+    expect(update.filters).toContainEqual(['org_id', ORG]);
+  });
+
+  it('un arco senza fascetta legge tie null, anche da una riga che non porta la colonna', async () => {
+    const row = { id: 'c1', org_id: ORG, canvas_id: CANVAS, source_node_id: NODE, target_node_id: NODE, source_handle: null, target_handle: null, mode: 'fixed' };
+    const { db } = fakeDb({ nodes_connections: [row] }, { nodes_connections: [row] });
+
+    const [out] = await setConnectionTie(db, { orgId: ORG, connectionIds: ['c1'], tie: null });
+
+    expect(out.tie).toBeNull();
   });
 
   it('un arco si cancella (soft) dentro la sua org', async () => {

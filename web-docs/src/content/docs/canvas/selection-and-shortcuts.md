@@ -10,7 +10,8 @@ sidebar:
 - Drag the background to draw a marquee.
 - Shift-click or Cmd/Ctrl-click adds or removes a node.
 - Cmd/Ctrl+A selects all nodes (not while typing in a field).
-- Esc clears the selection.
+- Esc puts a drawing tool down and goes back to Select; with Select in hand it clears the selection.
+- Right-click a frame (or its name) for **Rename** and **Duplicate**.
 
 ## Select inside a frame
 
@@ -21,10 +22,22 @@ Picking inside a frame works like Figma, in the base frame and in every breakpoi
 - Double-click enters the selected container or component instance and selects its child under the pointer, one level at a time; on text it starts editing, on a shape without children it edits its points.
 - A drag starts only once the pointer has moved a few pixels, so clicks and double-clicks never move anything. An element leaves its frame only when you drag it past the edge of the frame or view you are editing.
 - Once inside a container, hover and click pick among its children. Clicking outside it goes back up.
-- Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it.
-- Esc goes up one level.
+- Cmd-click (Ctrl-click on Windows) selects the deepest element directly; holding Cmd/Ctrl while hovering previews it. With elements already selected, Cmd-click adds or removes the deepest one.
+- Shift-click adds or removes the element a click would select, even before the frame is selected. Shift+Cmd-click does the same with the deepest element.
+- Dragging on the background of a frame that is not selected draws a selection box over its elements; with Cmd/Ctrl held it selects the deepest ones. A frame moves when you drag its title, when it is already selected, or when it is empty.
+- Dropping an element onto a stack, from the same frame, another frame or the free canvas, puts it in the stack at the slot under the pointer. While a free element is dragged over a frame, a line shows the slot it would take in the stack under the pointer.
+- Esc goes up one level. On a free text or shape, Esc clears the selection: there is no frame around it to select.
+
+## Groups on the canvas
+
+- A click on a group selects the group; its properties show position, rotation, size and export.
+- Enter, or a double-click, goes inside and selects what it holds; then a click picks one member. Cmd/Ctrl-click reaches a member directly.
 
 In the Layers panel, Shift-click selects every row between the last picked one and the clicked one; Cmd-click (Ctrl-click on Windows) adds or removes one row. It works on canvas nodes and on the elements inside a frame, and the canvas and the right bar follow.
+
+The Layers panel lists layers in paint order, like Figma: the top row is the frontmost layer, on the canvas and inside each frame. Groups and sections, which paint behind everything, list under the rest.
+
+The search box above the Layers list looks only inside the current frame. Enter on a focused layer row selects that layer's children; rename with a double-click or Cmd/Ctrl+R.
 
 The Layers panel lists what the canvas has loaded: a page far off screen shows as one row, and its elements appear once the canvas loads it.
 
@@ -36,12 +49,26 @@ The Layers panel lists what the canvas has loaded: a page far off screen shows a
 
 With several nodes selected, dragging one moves all, and the selection bar shows the shared properties, editable once for all.
 
+Several shapes, texts or frames selected on the canvas get one box around them all. Its handles resize the whole selection (Shift keeps the ratio, Alt scales from the centre) and the corners just outside it rotate the selection around its centre (Shift snaps to 15°). Properties stays open with X, Y, W, H and rotation for the selection: a value the nodes share is shown, the others read **Mixed**, and typing one applies it to every node. One undo puts the whole selection back.
+
 ## Properties of a frame or a multi-selection
 
 Selecting a frame opens its properties in the right bar.
 
 - **Selection colours** lists every colour used in the frame, nested groups and pasted Figma vectors included, most used first with a count. Changing one swatch recolours every element that uses it, in one step you can undo.
-- With several elements selected inside a frame, the right bar shows the properties they all have: text properties when all are text, plus layout, opacity and their selection colours. Values that differ read **Mixed**; editing one applies it to every selected element at once.
+- With several elements selected inside a frame, the right bar shows the properties they all have: text properties when all are text, plus layout, opacity and their selection colours. Values that differ read **Mixed**; editing one applies it to every selected element at once. **X**, **Y**, **W** and **H** are the bounds of the whole selection, as in Figma: X and Y move it as one, W and H stretch it.
+
+## Groups and frames inside a frame
+
+- **Cmd/Ctrl+G** groups the selection. A group has no fill, radius or stroke of its own: its
+  box is the box around what it holds, and the right bar shows its position, size, appearance
+  and effects. Changing X, Y, W or H moves and scales everything inside it.
+- **Shift+Cmd/Ctrl+G** ungroups. Inside a stack, the layers go back into the stack where the
+  group was.
+- **Option/Alt+Cmd/Ctrl+G** wraps the selection in a **Frame** and selects it.
+- Grouping or framing children of a stack keeps the new group or frame in the stack, at their
+  place.
+- Deleting a stack, a group or a frame deletes what it holds.
 
 ## Edits show at once
 
@@ -55,20 +82,37 @@ saving. If the server refuses one, the canvas puts it back and says so.
 | Key | Action |
 |---|---|
 | Backspace / Delete | Delete the selection |
+| Cmd/Ctrl+G | Group |
+| Shift+Cmd/Ctrl+G | Ungroup |
+| Option/Alt+Cmd/Ctrl+G | Frame the selection: elements inside a frame, or free elements on the canvas (the agent's `frame_elements`) |
 | Cmd/Ctrl+D | Duplicate; an element picked inside a frame is copied inside that frame |
+| Cmd/Ctrl+] / Cmd/Ctrl+[ | Bring forward / send backward one step |
+| Option/Alt+Cmd/Ctrl+] / Option/Alt+Cmd/Ctrl+[ | Bring to front / send to back |
+| Cmd/Ctrl+R | Rename the selection in Layers; Esc or Enter closes the field |
 | Cmd/Ctrl+C | Copy |
 | Cmd/Ctrl+V | Paste at the centre of the view |
-| Cmd/Ctrl+Z | Undo |
+| Cmd/Ctrl+Z | Undo, resizing included |
 | Shift+Cmd/Ctrl+Z | Redo |
 | Arrows | Move the selection |
 | Arrows + Shift | Move by a longer step |
-| 0 | Fit the whole canvas |
 | Shift+1 / Shift+2 | Zoom to fit everything / the selection, up to 400% |
+| Shift+0 | Zoom to 100% |
+| R | Rectangle tool (Shift+R in Motion) |
+| Shift+R | Rulers (in Design) |
+| F or A | Frame tool (A in Design) |
+| Control+Option/Alt+H / V | Distribute the selection horizontally / vertically |
+| Cmd/Ctrl+/ or Cmd/Ctrl+K | Quick actions: search every command by name |
+| / | Cursor chat: say something next to your cursor |
+| Shift + wheel | Scroll sideways |
+| Space + drag | Pan; the canvas follows the pointer exactly and stops when you let go |
 | + / = | Zoom in |
 | - | Zoom out |
-| 1, 2, 3... | Add the node type at that position of the bar |
+| 1 to 9, 0 | Opacity of the selection: 10 to 90%, 0 for 100% |
+| C | Comment mode; Esc leaves it and closes the comments panel it opened |
 
-None fire while typing in a text field, except Esc, which always closes an open menu or overlay. Deleting asks no confirmation.
+The View menu (eye icon, top right) shows the current zoom and lists the same three zoom commands with their keys.
+
+None fire while typing in a text field: Cmd/Ctrl+V while editing a text pastes into the text only. The exception is Esc, which always closes an open menu or overlay. Deleting asks no confirmation.
 
 ## Copy a node id
 

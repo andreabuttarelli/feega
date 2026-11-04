@@ -33,7 +33,7 @@ function ports() {
   const drawn: { targets: DrawTarget[]; format: string }[] = [];
   const stored: { name: string; mime: string }[] = [];
   const base: SelectionPorts = {
-    read: async (nodeId) => (nodeId === 'gone' ? null : { name: `Frame ${nodeId}`, doc: withTitle }),
+    read: async (nodeId) => (nodeId === 'gone' ? null : { name: `Frame ${nodeId}`, doc: withTitle, docScale: 0.5 }),
     draw: async (targets, row) => {
       drawn.push({ targets, format: row.format });
       return { bytes: Buffer.from('x'), skipped: row.format === 'svg' ? ['t1: blend mode multiply'] : [] };
@@ -47,6 +47,20 @@ function ports() {
 }
 
 describe('exporting a selection', () => {
+  it('draws each frame with the size it has on the canvas', async () => {
+    const { base, drawn } = ports();
+    await exportSelection(base, { targets: [{ nodeId: 'a' }], rows: exportRowsSchema.parse([{ format: 'png', by: 'scale', value: 1 }]), name: 'Canvas' });
+
+    expect(drawn[0].targets[0].docScale).toBe(0.5);
+  });
+
+  it('draws a frame at the time it was shown when the export was asked, not at its first frame', async () => {
+    const { base, drawn } = ports();
+    await exportSelection(base, { targets: [{ nodeId: 'a', seconds: 1.5 }], rows, name: 'Poster' });
+
+    expect(drawn[0].targets[0].doc.poster).toEqual({ frame: 1.5 * withTitle.fps });
+  });
+
   it('draws every frame for every row, transparent when asked, and stores one zip', async () => {
     const { base, drawn, stored } = ports();
     const two = exportRowsSchema.parse([{ format: 'png', by: 'scale', value: 2, transparent: true }, { format: 'jpg', by: 'width', value: 540, quality: 70 }]);
@@ -89,5 +103,25 @@ describe('exporting a selection', () => {
     expect(await exportSelection(base, { targets: [{ nodeId: 'a' }, { nodeId: 'gone' }], rows, name: 'C' })).toEqual({ outcome: ExportOutcome.NotFound, nodeId: 'gone' });
     expect(await exportSelection(base, { targets: [{ nodeId: 'a', elementId: 'nope' }], rows, name: 'C' })).toEqual({ outcome: ExportOutcome.NoElement, nodeId: 'a', elementId: 'nope' });
     expect(drawn).toEqual([]);
+  });
+});
+
+describe('exporting a breakpoint view', () => {
+  const PHONE = { id: 'ph', name: 'Phone', width: 390 };
+  const responsive = { ...withTitle, breakpoints: [PHONE] };
+  const responsivePorts = (): SelectionPorts => ({ ...ports().base, read: async () => ({ name: 'Home', doc: responsive, docScale: 0.5 }) });
+
+  it('draws the frame resolved at that breakpoint, named after it', async () => {
+    const { drawn, base } = ports();
+    const out = await exportSelection({ ...base, read: responsivePorts().read }, { targets: [{ nodeId: 'a', breakpointId: PHONE.id }], rows, name: 'X' });
+
+    expect(drawn[0].targets[0].doc.width).toBe(PHONE.width);
+    expect(out).toMatchObject({ outcome: ExportOutcome.Done, files: ['Home Phone.png'] });
+  });
+
+  it('refuses a breakpoint the frame does not have', async () => {
+    const out = await exportSelection(responsivePorts(), { targets: [{ nodeId: 'a', breakpointId: 'nope' }], rows, name: 'X' });
+
+    expect(out).toEqual({ outcome: ExportOutcome.NotFound, nodeId: 'a' });
   });
 });

@@ -1,12 +1,15 @@
 import { isInteractive } from '@feega/motion-core/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
+import { uploadName } from '$lib/motion/asset-name';
 import { findAssets, listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { findBrandLook, findFirstBrandLook } from '$lib/server/repos/brands';
-import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
+import { DataCheck, findNode, moveNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
-import { docNodeSize, motionOf, type MotionNode } from '$lib/canvas/motion-node';
+import { docNodeSize, frameChrome, motionOf, type MotionNode } from '$lib/canvas/motion-node';
+import { Root } from '$lib/canvas/frame-select';
+import { settleElement, unsettled, type HostBox, type Settled } from '$lib/motion/element-host';
 import { formatOf, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -62,12 +65,15 @@ export async function motionTokens(db: Db, input: { orgId: string; brandId: stri
   return { ...brandTokens({ name: brand.name, palette: paletteFrom(brand.content), logoUrl: brand.logoUrl }), fonts: fontsFrom(brand.content, GOOGLE_FONTS) };
 }
 
+const GENERATED = 'generated';
+
 function assetLabel(asset: Asset, kind: AssetKind): string {
   if (kind === AssetKind.Font) {
     const font = fontFileOf(asset);
     return `${font.family} ${font.weight}${font.italic ? ' italic' : ''}`;
   }
-  return `${kind} · ${asset.createdAt.slice(0, 10)} · ${asset.id.slice(0, 6)}`;
+  const named = asset.source === GENERATED ? '' : uploadName(asset.url);
+  return named || `${kind} · ${asset.createdAt.slice(0, 10)} · ${asset.id.slice(0, 6)}`;
 }
 
 export type AssetSigner = (paths: { generated: string[]; uploaded: string[] }, ttlSeconds?: number) => Promise<Map<string, string>>;
@@ -137,7 +143,11 @@ export async function saveMotionDoc(
   db: Db,
   input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; known?: CanvasNodeRecord; checkpoint?: Checkpoint }
 ): Promise<RevisionWrite> {
-  const write = await appendRevision(db, input);
+  const doc = input.doc as Partial<MotionDoc>;
+  const loose = Array.isArray(doc.tracks) && unsettled(doc as MotionDoc);
+  const known = loose ? ((input.known ?? (await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }))) ?? undefined) : input.known;
+  const settled = loose && known ? hostSettle(known, doc as MotionDoc) : null;
+  const write = await appendRevision(db, { ...input, doc: settled?.doc ?? input.doc });
   if (write.outcome !== RevisionOutcome.Written) {
     return write;
   }
@@ -145,16 +155,42 @@ export async function saveMotionDoc(
   const patched = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    patch: headPatch(write.head.doc as MotionDoc, write.head.version, input.nodeId),
+    patch: { ...headPatch(write.head.doc as MotionDoc, write.head.version, input.nodeId), ...(settled && { rotation: settled.box.rotation }) },
     check: DataCheck.Schema,
     actor: input.actor,
-    known: input.known
+    known
   });
   if (patched.outcome === 'written') {
     await followDoc(db, input.orgId, patched.node, write.head.doc as MotionDoc);
   }
+  if (settled && known) {
+    await placeHost(db, input.orgId, known, settled.box);
+  }
   await nudgeInstances(db, { orgId: input.orgId, nodeId: input.nodeId, doc: write.head.doc as MotionDoc, actor: input.actor });
   return write;
+}
+
+function hostBoxOf(record: CanvasNodeRecord): HostBox | null {
+  const node = motionOf(record);
+  const { width, height } = record.size ?? {};
+  if (!node || frameChrome(node.kind).root !== Root.Own || !width || !height) {
+    return null;
+  }
+  return { x: record.position.x, y: record.position.y, w: width, h: height, rotation: typeof record.data.rotation === 'number' ? record.data.rotation : 0 };
+}
+
+function hostSettle(record: CanvasNodeRecord, doc: MotionDoc): Settled | null {
+  const box = hostBoxOf(record);
+  return box ? settleElement(doc, box) : null;
+}
+
+async function placeHost(db: Db, orgId: string, record: CanvasNodeRecord, box: HostBox): Promise<void> {
+  if (box.x !== record.position.x || box.y !== record.position.y) {
+    await moveNode(db, { orgId, nodeId: record.id, x: box.x, y: box.y });
+  }
+  if (box.w !== record.size.width || box.h !== record.size.height) {
+    await resizeNode(db, { orgId, nodeId: record.id, width: box.w, height: box.h });
+  }
 }
 
 async function followDoc(db: Db, orgId: string, record: CanvasNodeRecord, doc: MotionDoc): Promise<void> {

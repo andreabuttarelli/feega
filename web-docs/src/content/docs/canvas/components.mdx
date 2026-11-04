@@ -9,21 +9,25 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 <DemoVideo name="component-variants" caption="Add variants to a component." />
 
-Create a component from the selection with `⌥⌘K`. The **Components** panel lists them; drag one onto the canvas to add an instance.
+Create a component from the selection with `⌥⌘K`. It takes the name of the layer it came from. A stack, frame or group becomes a component with everything inside it, so a button with its label, or a card with its image, title and nested button, is one component. The **Components** panel lists them; drag one onto the canvas to add an instance.
 
 ## The Components page
 
-Every project keeps its mains on a page named **Components**, made the first time you need it. Create a component with `⌥⌘K`, by hand or through an agent, and the main moves there, standing free on the canvas; what stays where you made it is an instance linked to that main. A URL or code import puts its mains there too, each component or variant set free on the page, laid out in a grid, instead of one large frame beside the page. Undoing the import removes them too.
+Every project keeps its mains on a page named **Components**, made the first time you need it. Create a component with `⌥⌘K`, by hand or through an agent, and the main moves there, standing free on the canvas at the size the layer had; what stays where you made it is an instance linked to that main. A URL or code import puts its mains there too, each component or variant set free on the page, laid out in a grid, instead of one large frame beside the page. Undoing the import removes them too.
 
 On the Components page a variant set has a dashed purple outline, 20 px around and between its variants, and a **+** just below it: click it to add a variant beside the last one. Edit a main there and every instance on every page follows, at the same size.
 
+Drag a handle of a main inside a set to resize that main alone: the variants after it move along and the set grows to hug them, live while you drag. Agents do the same with the `component` tool: `{ "action": "resize-set-main", "clip_id": "<main id>", "width": 240, "height": 64 }` (frame px).
+
 Imports made before this change keep their Components frame and keep working.
 
-- **MCP / API:** `home_components` with a `frameId` moves the mains of that frame to the Components page, the same as the app does after `⌥⌘K`.
+Homing is safe to repeat: a main moves to the Components page once, and asking again reuses its set instead of making a second one. Edits you make while it moves are kept.
+
+- **MCP / API:** `home_components` with a `frameId` moves the mains of that frame to the Components page, the same as the app does after `⌥⌘K`. Calling it twice for the same frame answers the same homes; the answer carries the frame's new `version`.
 
 ## Go to main component
 
-Select an instance and click the target icon in the Instance inspector header, or right-click it, on the canvas or in Layers, and pick **Go to main component**. It is also in the **More actions** menu and the selection toolbar's **…** menu. Components, main and copies, are outlined and highlighted in purple; everything else is blue. Feega switches canvas if the main lives on another one, pans to it and selects it. Hover the icon to see where the main is (`canvas › frame`). In the Components panel, the same icon on a tile is **Show main**.
+Select an instance and click the target icon in the Instance inspector header, or right-click it, on the canvas or in Layers, and pick **Go to main component**. It is also in the **More actions** menu of the right bar header. Components, main and copies, are outlined and highlighted in purple; everything else is blue. Feega switches canvas if the main lives on another one, centres it and selects it, zooming in when it would be too small to see at your current zoom. Hover the icon to see where the main is (`canvas › frame`). In the Components panel, the same icon on a tile is **Show main**.
 
 ## Instances follow their main everywhere
 
@@ -31,7 +35,7 @@ Every instance depends on its main, in any frame and on any canvas of the projec
 
 ## Components across canvases
 
-The **Components** panel in the rail (`Alt+5`) shows the components of every canvas in the project as a grid of tiles, grouped by canvas. Each tile is a live preview of the component itself, cropped to what it draws on a light or dark tile that keeps it visible, with its name underneath; a variant gets its own tile. Previews redraw when the main changes. Search by component or canvas name. Drag a tile onto the canvas to add an instance, or hover it for **Show main** and **Copy**. The list response carries each frame's `revision`.
+The **Components** panel in the rail (`Alt+5`) shows the components of every canvas in the project as a grid of tiles, grouped by canvas. Each tile is a live preview of the component itself, cropped to what it draws on a light or dark tile that keeps it visible, with its name underneath; a variant gets its own tile. Previews redraw when the main changes, draw only when scrolled into view and are kept between sessions. Long lists load a page of tiles at a time as you scroll. Search by component or canvas name. Drag a tile onto the canvas to add an instance, or hover it for **Show main** and **Copy**. The list response carries each frame's `revision`.
 
 - **Drag** a component onto a frame of the current canvas to add an instance at the drop point. The frame under the pointer is highlighted while you drag; the main is copied into that frame.
 - **Drop on empty canvas** to place the instance as a free element at the drop point.
@@ -40,7 +44,9 @@ The **Components** panel in the rail (`Alt+5`) shows the components of every can
 
 ## Variants
 
-Select an instance or a main to switch its variant from the right bar: one dropdown per property, and, when the set has one property or a few variants, a row of chips, one per variant. Overrides stay. In the prototype player, an instance whose set has a `State=Hover` or `State=Pressed` variant shows it while hovered or pressed.
+Select a main and click **Add variant** in the right bar (or the **+** under it) to add the next variant 20 px to its right; on the Components page the set's **+** does the same and widens the set. Agents: `component` `add-variant` with `clip_id`.
+
+Select an instance or a main to switch its variant from the right bar: one dropdown per property, listing every variant of the set, in any frame or canvas, and, when the set has one property or a few variants, a row of chips, one per variant. Overrides stay. In the prototype player, a **Change to** interaction switches an instance to another variant of its set, wherever the instance is; an instance whose set has a `State=Hover` or `State=Pressed` variant shows it while hovered or pressed.
 
 A component can have several variant properties, like Size (S, M, L) and State (default, hover). Select an instance and the variant matrix appears in Properties: one cell per combination, the current one highlighted.
 
@@ -71,6 +77,21 @@ A component can expose properties: show or hide a layer, edit text, swap a neste
 An instance-swap property can list preferred components. Under the instance, tick the components to prefer in Preferred; the swap dropdown then shows them first, under Preferred, above All components. Preferred is a suggestion: any component can still be swapped in.
 
 Agent: `set-preferred` with `comp`, `prop` (the swap property) and `preferred` (main component ids).
+
+## Editing a main, editing an instance
+
+Inside the main, on the Components page, every edit changes the main: move, restyle or retype one of its layers and every instance follows. Inside an instance the same edit is an override of that instance only; a component nested in a main (a button inside a card) is an instance there, so its text or fill becomes an override of the card.
+
+To add a layer to a main, draw it over the main (text, shape, frame) or drop a layer onto it: it lands inside, in the stack under the pointer, and every instance shows it. In Layers, drag a layer onto a main's row to put it inside the main (at the end of its stack), or between the layers inside a main to put it there.
+
+In Layers, click a layer inside a component to select it on the canvas. An instance shows its own box in the inspector (X, Y, W, H of what it draws), not the box of the frame. Typing W or H resizes the instance like a frame, never scaling it: its layers follow their constraints and an auto layout main reflows, text keeping its size.
+
+## Copy, paste and duplicate
+
+Copy a main and paste it in another frame: you get an instance linked to that main, at the size it had. Copy an instance and it stays an instance.
+
+
+`⌘D` and Alt-drag copy a layer in place, at the same moment of the timeline, with everything inside it. A copy of an instance is another instance; a copy of a main is a new main, and a copy of a variant inside a set is a new variant of that set, as in Figma. Agents: `duplicate_clip` with `place: "in_place"`.
 
 ## Overrides
 

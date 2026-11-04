@@ -1,14 +1,15 @@
 import { resolveColor, type BrandTokens } from '../brand';
 import { Background, type MotionClip, type MotionDoc } from '../doc';
-import { TrackKind, type ComponentId } from '../components';
+import { TEXT_ENTRANCES, TrackKind, type ComponentId } from '../components';
+import { imageRectangle } from '../image-dress';
 import { animProp, sampleColor, Source, TRANSFORM, ValueKind, type TransformKey } from '../keyframes';
 import { sampleTrack } from '../sample-track';
 import { IDENTITY, ParentOpacity, ancestorsOf, localAt, mul2d, transformAt, worldAt, type Affine } from '../parent';
-import { depthOf, turnedInDepth } from './depth';
+import { depthOf, stageLenses, turnedInDepth } from './depth';
 import { warpItem } from './warp';
 import { apply2d } from '../affine';
 import { boxOf } from '../layout';
-import { placedBox } from '../effects/paint-area';
+import { paintBleed, placedBox } from '../effects/paint-area';
 import type { AudioAnalysis } from '../audio-analysis';
 import { junctionMovesOf, preparedDoc } from '../hyperframes/compose';
 import { shapedText } from './text/measure';
@@ -21,7 +22,7 @@ import { MASK_KEYS, MaskMode } from '../mask';
 import { clipRadii, frameFadeAt } from '../surface';
 import { mattePairs, MATTE_READ } from '../matte';
 import { CoverKind, maskLayers, type MaskLayer } from './mask-layers';import { adjustNodes, isNeutral, type Adjust } from '../fill/adjust';
-import { FillType, cropOf, fillsOf, type Fill, type FillOf } from '../fill/model';
+import { FillType, cropOf, fillsOf, linearEnds, type Fill, type FillOf } from '../fill/model';
 import { applyFillKeys, fillOfKey } from '../fill/keys';
 import { StrokeAlign, dashOf, strokesOf, type Stroke } from '../stroke/model';
 import { Cap, Join, dashes, strokePolygons } from './stroke';
@@ -115,7 +116,7 @@ export type Gap = { clip: string; component: ComponentId; reason: Unsupported; d
 
 export type DomReads = ReadonlyMap<string, DomRead>;
 
-export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[]; faces?: readonly FaceRule[] };
+export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[]; faces?: readonly FaceRule[]; bleed?: number };
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset; moves: JunctionMove[] };
 
@@ -153,9 +154,8 @@ function stopsOf(stops: { color: string; pos: number }[], colour: (v: string) =>
 const PAINTS: Partial<Record<FillType, (f: never, w: number, h: number, colour: (v: string) => Rgba) => Paint>> = {
   [FillType.Solid]: (f: FillOf<FillType.Solid>, _w, _h, colour) => ({ kind: PaintKind.Solid, color: colour(f.color) }),
   [FillType.Linear]: (f: FillOf<FillType.Linear>, w, h, colour) => {
-    const dx = (Math.cos(f.angle * DEG) * w) / 2;
-    const dy = (Math.sin(f.angle * DEG) * h) / 2;
-    return { kind: PaintKind.Linear, from: [w / 2 - dx, h / 2 - dy], to: [w / 2 + dx, h / 2 + dy], stops: stopsOf(f.stops, colour) };
+    const [from, to] = linearEnds(f.angle, w, h);
+    return { kind: PaintKind.Linear, from, to, stops: stopsOf(f.stops, colour) };
   },
   [FillType.Radial]: (f: FillOf<FillType.Radial>, w, h, colour) => ({ kind: PaintKind.Radial, center: [f.center.x * w, f.center.y * h], radius: (f.radius * Math.max(w, h)) / 2, stops: stopsOf(f.stops, colour) }),
   [FillType.Angular]: (f: FillOf<FillType.Angular>, w, h, colour) => ({ kind: PaintKind.Sweep, center: [f.center.x * w, f.center.y * h], start: (f.angle - CSS_TURN) * DEG, stops: stopsOf(f.stops, colour) }),
@@ -238,7 +238,14 @@ const picture = (src: string, size: Size, look: Partial<Omit<ImageItem, 'kind' |
 const imagePainter = (env: Env): Painted => {
   const { props, size, asset } = env;
   const src = asset(props.assetId);
-  return src ? [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })] : customPainter(env);
+  if (!src) {
+    return customPainter(env);
+  }
+  const rectangle = imageRectangle(props);
+  if (rectangle) {
+    return shapePainter({ ...env, clip: { ...env.clip, props: rectangle }, props: rectangle });
+  }
+  return [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })];
 };
 
 const videoPainter = (env: Env): Painted => {
@@ -531,6 +538,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   const items: Item[] = [];
   const unsupported: Gap[] = [];
 
+  const lenses = stageLenses(doc, frame);
+
   const parentsAt = (clip: MotionClip) => ancestorsOf(doc, clip.id).reduce<Affine>((m, id) => (byId.get(id) ? mul2d(m, localAt(byId.get(id)!, frame, size)) : m), IDENTITY);
 
   function clipItems(clip: MotionClip): Item[] | Unsupported {
@@ -550,8 +559,10 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
     unsupported.push(...gaps.map((detail) => ({ clip: clip.id, component: clip.component, reason: Unsupported.Dom, detail })));
     const edge = effectiveEdge(clip);
     const edged = posed(edge, size.width, size.height);
-    const depth = turnedInDepth(clip) ? depthOf(clip, frame, size, mul2d(edged, parentsAt(clip)), box) : null;
-    if (turnedInDepth(clip) && !depth) {
+    const lens = lenses.get(clip.id);
+    const deep = turnedInDepth(clip) || lens !== undefined;
+    const depth = deep ? depthOf(clip, frame, size, mul2d(edged, parentsAt(clip)), box, lens) : null;
+    if (deep && !depth) {
       return Unsupported.Space3d;
     }
     const world = depth?.world ?? mul2d(edged, worldAt(doc, clip.id, frame, size));
@@ -597,7 +608,8 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
 
   type Drawn = { chain: string[]; items: Item[] };
 
-  const maskedChain = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).filter((id) => byId.get(id)?.mask);
+  const isolates = (group: MotionClip | undefined) => Boolean(group?.mask) || (group?.blend ?? BlendMode.Normal) !== BlendMode.Normal;
+  const isolatingChain = (clip: MotionClip) => (enclosing.get(clip.id) ?? []).filter((id) => isolates(byId.get(id)));
 
   function nested(drawn: Drawn[], depth: number): Item[] {
     const out: Item[] = [];
@@ -614,9 +626,10 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
         end++;
       }
       const inner = nested(drawn.slice(at, end), depth + 1);
-      const masks = maskLayers(byId.get(id)!, frame, size, worldAt(doc, id, frame, size), asset);
+      const group = byId.get(id)!;
+      const masks = maskLayers(group, frame, size, worldAt(doc, id, frame, size), asset);
       if (masks) {
-        out.push({ kind: ItemKind.Group, clip: id, items: inner, opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal, masks });
+        out.push({ kind: ItemKind.Group, clip: id, items: inner, opacity: 1, matrix: IDENTITY, blur: 0, blend: group.blend ?? BlendMode.Normal, ...(masks.length ? { masks } : {}) });
       } else {
         unsupported.push({ clip: id, component: GROUP_COMPONENT, reason: Unsupported.Mask });
         out.push(...inner);
@@ -630,7 +643,7 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   for (const clip of drawable) {
     const own = clipItems(clip);
     if (Array.isArray(own)) {
-      drawn.push({ chain: maskedChain(clip), items: own });
+      drawn.push({ chain: isolatingChain(clip), items: own });
       continue;
     }
     unsupported.push({ clip: clip.id, component: clip.component, reason: own });
@@ -639,7 +652,55 @@ export function drawFrame(prepared: Prepared, frame: number, reads: DomReads = N
   const background = doc.surface ? CLEAR : doc.background === Background.Transparent ? null : colour('brand.background');
   const cut = frameCut(doc);
   const framed = cut ? items.map((i) => (i.clip === doc.surface ? i : { ...i, masks: [...(i.masks ?? []), cut] })) : items;
-  return { ...size, background, items: faded(doc, framed, frameFadeAt(doc, frame)), unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
+  const bleed = paintBleed(doc);
+  return { ...size, background, items: faded(doc, framed, frameFadeAt(doc, frame)), unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}), ...(bleed ? { bleed } : {}) };
+}
+
+export type Corner = [number, number];
+
+export type Placed = { clip: string; corners: [Corner, Corner, Corner, Corner]; cuts: Corner[][]; opacity: number };
+
+export type Placer = { drawn: readonly string[]; place: (clipId: string) => Placed | null };
+
+const [STILL_ENTRANCE] = TEXT_ENTRANCES;
+
+const entersFading = (clip: MotionClip) => isText(clip) && (clip.props.entrance ?? STILL_ENTRANCE) !== STILL_ENTRANCE;
+
+const placementOf = (clip: MotionClip): Placement => (PAINTERS[clip.component]?.place === fullFrame ? fullFrame : boxed);
+
+const cutCorners = (cut: MaskLayer): Corner[] => {
+  const contour = cut.cover.kind === CoverKind.Path ? (cut.cover.contours[0] ?? []) : [];
+  return Array.from({ length: contour.length / 2 }, (_, i) => apply2d(cut.cover.matrix, [contour[i * 2], contour[i * 2 + 1]]));
+};
+
+const scissorCorners = ([x, y, w, h]: Scissor): Corner[] => [
+  [x, y],
+  [x + w, y],
+  [x + w, y + h],
+  [x, y + h]
+];
+
+export function placerAt(prepared: Prepared, frame: number): Placer {
+  const { doc } = prepared;
+  const { css, size, byId, effectiveEdge, drawable, alphaOf } = stageAt(prepared, frame);
+
+  const place = (clipId: string): Placed | null => {
+    const clip = byId.get(clipId);
+    if (!clip) {
+      return null;
+    }
+    const { box, turn, opacity } = placementOf(clip)(propsAt(clip, frame, css), size);
+    const edge = effectiveEdge(clip);
+    const world = mul2d(posed(edge, size.width, size.height), worldAt(doc, clipId, frame, size));
+    const placed = mul2d(mul2d(mul2d(world, [1, 0, 0, 1, box.left, box.top]), turn), posed(moveAt(clip, frame), box.width, box.height));
+    const corner = (x: number, y: number): Corner => apply2d(placed, [x, y]);
+    const corners: Placed['corners'] = [corner(0, 0), corner(box.width, 0), corner(box.width, box.height), corner(0, box.height)];
+    const scissor = scissorOf(edge, size.width, size.height);
+    const cuts = [...contentCuts(doc, clip, byId, size, frame).map(cutCorners), ...(scissor ? [scissorCorners(scissor)] : [])];
+    return { clip: clipId, corners, cuts, opacity: alphaOf(clip, opacity, edge) * (entersFading(clip) ? textFadeAt(prepared, frame, clip) : 1) };
+  };
+
+  return { drawn: drawable.map((c) => c.id), place };
 }
 
 const CLEAR: Rgba = [0, 0, 0, 0];

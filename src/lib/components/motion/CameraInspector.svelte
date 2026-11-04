@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fieldKeys } from '$lib/motion/field-keys';
   import Pipette from '@lucide/svelte/icons/pipette';
   import { COMPONENTS } from '@feega/motion-core/motion/components';
   import { clipsOf, type DocVerdict, type MotionDoc } from '@feega/motion-core/motion/doc';
@@ -7,7 +8,7 @@
   import { STAGE_LIGHT_ABOUT, STAGE_LIGHT_KINDS, type StageLightKind } from '@feega/motion-core/motion/lights';
   import { addStageLight } from '@feega/motion-core/motion/lights-ops';
   import { parseDecimal } from '$lib/motion/inspector';
-  import { sliderOf, toShown, toStored } from '$lib/motion/units';
+  import { sliderOf, spaceOf, toShown, toStored } from '$lib/motion/units';
   import NumberField from './NumberField.svelte';
   import { FieldKind } from '$lib/motion/number-field';
   import { fieldLook } from '$lib/motion/inspector-sections';
@@ -16,7 +17,9 @@
   import { setCameraExpression } from '@feega/motion-core/motion/expression/ops';
   import { expressionErrors } from '@feega/motion-core/motion/expression/bake';
 
-  let { doc, frame, onchange }: { doc: MotionDoc; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, frame, scale = 1, onchange }: { doc: MotionDoc; frame: number; scale?: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+
+  const space = $derived(spaceOf(doc, scale));
 
   const GROUPS: { title: string; keys: CameraKey[] }[] = [
     { title: 'Position', keys: ['x', 'y', 'z'] },
@@ -52,10 +55,10 @@
     onchange(result.doc, summary);
   }
 
-  const shown = (key: CameraKey) => toShown(CAMERA_LANE, key, Math.round(cameraValueAt(doc, key, frame) * 1000) / 1000, doc);
+  const shown = (key: CameraKey) => toShown(CAMERA_LANE, key, Math.round(cameraValueAt(doc, key, frame) * 1000) / 1000, space);
 
   function edit(key: CameraKey, value: number) {
-    const stored = toStored(CAMERA_LANE, key, value, doc);
+    const stored = toStored(CAMERA_LANE, key, value, space);
     commit(cameraEditAt(doc, key, Math.min(CAMERA[key].max, Math.max(CAMERA[key].min, stored)), frame), `Edited the camera ${CAMERA[key].label.toLowerCase()}`);
   }
 
@@ -134,7 +137,7 @@
     {#snippet valueRow(key: CameraKey)}
       {@const spec = CAMERA[key]}
       {@const look = fieldLook(key)}
-      {@const range = sliderOf(CAMERA_LANE, { key, ...spec }, doc)}
+      {@const range = sliderOf(CAMERA_LANE, { key, ...spec }, space)}
       <div class="row anim" data-camera-prop={key}>
         <NumberField
           label={spec.label}
@@ -200,7 +203,7 @@
             {#each CAMERA_PRESETS as id (id)}<option value={id}>{PRESETS[id].label}</option>{/each}
           </select>
         </label>
-        <label>Length (s)<input type="text" inputmode="decimal" bind:value={seconds} /></label>
+        <label>Length (s)<input {@attach fieldKeys} type="text" inputmode="decimal" bind:value={seconds} /></label>
       </div>
       {#if preset === CameraPreset.RackFocus}
         <div class="row two">
@@ -208,7 +211,7 @@
           <label>To<select bind:value={rackTo}><option value="">…</option>{#each worldClips as clip (clip.id)}<option value={clip.id}>{label(clip.id)}</option>{/each}</select></label>
         </div>
       {:else}
-        <div class="row"><label for="camera-amount">Amount</label><input id="camera-amount" type="text" inputmode="decimal" bind:value={amount} /></div>
+        <div class="row"><label for="camera-amount">Amount</label><input {@attach fieldKeys} id="camera-amount" type="text" inputmode="decimal" bind:value={amount} /></div>
       {/if}
       <p class="hint">{PRESETS[preset].about}. Starts at the playhead.</p>
       <button type="button" class="primary" data-testid="camera-apply" onclick={applyMove}>Add move</button>

@@ -114,6 +114,19 @@ export const frameColours = (doc: MotionDoc) => selectionColours(doc, topIds(doc
 
 export const recolourFrame = (doc: MotionDoc, from: string, to: string) => recolour(doc, topIds(doc), from, to);
 
+function heldIds(doc: MotionDoc, id: string): string[] {
+  const clips = clipsOf(doc);
+  const held = [id];
+  for (let i = 0; i < held.length; i++) {
+    held.push(...clips.filter((c) => c.parent === held[i]).map((c) => c.id));
+  }
+  return held;
+}
+
+export const clipColours = (doc: MotionDoc, id: string) => selectionColours(doc, heldIds(doc, id));
+
+export const recolourClip = (doc: MotionDoc, id: string, from: string, to: string) => recolour(doc, heldIds(doc, id), from, to);
+
 const DOCUMENT_COLOURS_MAX = 16;
 const BASE_LENGTH = 7;
 

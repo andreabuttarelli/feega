@@ -4,7 +4,7 @@ import { localFaceCss } from '../../fonts/local-files';
 import { googleFontsUrl, uploadFaceCss, usedFaces } from '../../fonts/model';
 import type { MotionDoc } from '../../doc';
 import type { FaceBook } from './face';
-import { SYMBOL_FALLBACKS, faceBook, faceRules, type FaceRule, type Source } from './fonts';
+import { fallbackOf, faceBook, type Fallback, faceRules, type FaceRule, type Source } from './fonts';
 import { fontkitSource } from './fontkit-face';
 import { TEXT_COMPONENTS } from './painter';
 
@@ -22,12 +22,19 @@ export const webReader: Reader = {
 };
 
 const SPACE = 0x20;
-const FIRST_SYMBOL = 0x2000;
 
-function symbolsUrl(points: readonly number[]): string | null {
-  const symbols = String.fromCodePoint(...points.filter((cp) => cp >= FIRST_SYMBOL));
-  const families = SYMBOL_FALLBACKS.map((f) => `family=${f.replaceAll(' ', '+')}`).join('&');
-  return symbols ? `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(symbols)}&display=block` : null;
+function fallbackUrls(points: readonly number[]): string[] {
+  const grouped = new Map<Fallback, number[]>();
+  for (const cp of points) {
+    const fallback = fallbackOf(cp);
+    if (fallback) {
+      grouped.set(fallback, [...(grouped.get(fallback) ?? []), cp]);
+    }
+  }
+  return [...grouped].map(([fallback, own]) => {
+    const families = fallback.families.map((f) => `family=${f.replaceAll(' ', '+')}`).join('&');
+    return `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(String.fromCodePoint(...own))}&display=block`;
+  });
 }
 const CUSTOM = 'Custom';
 const BOOKS_KEPT = 16;
@@ -61,8 +68,8 @@ export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEng
     const doc = preparedDoc({ doc: raw, tokens, assets });
     const google = googleFontsUrl(usedFaces(doc), doc.fonts);
     const points = codePointsOf(doc);
-    const symbols = symbolsUrl(points);
-    const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : []), ...(symbols ? [symbols] : [])].map(sheet));
+    const symbols = fallbackUrls(points);
+    const css = await Promise.all([BUILTIN_FONTS_URL, ...(google ? [google] : []), ...symbols].map(sheet));
     const own = [uploadFaceCss(doc.fonts, assets), localFaceCss(doc.fonts)];
     const rules = [...css, ...own].flatMap(faceRules);
     const urls = [...new Set(rules.filter((r) => needed(r, points)).map((r) => r.url))];

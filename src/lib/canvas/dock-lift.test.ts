@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dockLift, followDocks, type Box, type Watch } from './dock-lift';
+import { LiftMove, dockLift, followDocks, liftMove, type Box, type Watch } from './dock-lift';
 
 const box = (top: number, height: number, bottom = top + height) => ({ getBoundingClientRect: () => ({ top, height, bottom }) as DOMRect }) as Box;
 
@@ -46,5 +46,15 @@ describe('followDocks', () => {
 
     stop();
     expect(watched).toHaveLength(0);
+  });
+});
+
+describe('liftMove', () => {
+  it('jumps up at once when a dock appears, so the bar never slides across the timeline', () => {
+    expect(liftMove(0, 240)).toBe(LiftMove.Jump);
+  });
+
+  it('glides down when the dock goes away, where there is nothing to cover', () => {
+    expect(liftMove(240, 0)).toBe(LiftMove.Glide);
   });
 });

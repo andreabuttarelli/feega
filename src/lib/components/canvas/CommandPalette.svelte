@@ -1,10 +1,9 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { Kbd } from '$lib/components/ui/shell';
-  import { searchPalette, type PaletteEntry } from '$lib/canvas/command-palette';
+  import { searchPalette, togglesPalette, type PaletteEntry } from '$lib/canvas/command-palette';
   import type { Command } from '$lib/motion/shortcuts';
 
-  const PALETTE_KEY = 'k';
   const SHOWN_MAX = 40;
 
   let { onrun }: { onrun: (command: Command) => void } = $props();
@@ -30,8 +29,7 @@
   }
 
   function onWindowKey(e: KeyboardEvent) {
-    const toggle = e.key.toLowerCase() === PALETTE_KEY && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey;
-    if (!toggle) {
+    if (!togglesPalette(e)) {
       return;
     }
     e.preventDefault();

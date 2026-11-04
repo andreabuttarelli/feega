@@ -4,22 +4,25 @@
   import { DRAGGED_TEXT_SIZING, NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
-  import { DRAW_SUMMARY, LINE_PAINT, drawClip, lineOutline, penClip, penPaint, type LineTool } from '$lib/motion/draw-create';
+  import { DRAW_SUMMARY, LINE_PAINT, drawClip, lineOutline, penClip, penInk, penPaint, type LineTool } from '$lib/motion/draw-create';
   import { mapOutline, pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
   import { smoothStroke, straightStroke } from '$lib/motion/shape/pencil';
   import { Handle, Mirror, addPoint, dragHandle, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
+  import { joinStackAt } from '$lib/motion/layout/stack-drag';
 
   let {
     doc,
     frame,
     tool,
+    textClick = null,
     onchange,
     oncreated
   }: {
     doc: MotionDoc;
     frame: number;
     tool: DrawTool;
+    textClick?: { width: number; height: number } | null;
     onchange: (result: OpResult, summary: string) => void;
     oncreated: (id: string) => void;
   } = $props();
@@ -128,14 +131,15 @@
       return;
     }
     const dragged = live && !clickLike(live) ? live : null;
-    const box = dragged ?? (tool === DrawTool.Text ? clickBox(drag.from, { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
+    const box = dragged ?? (tool === DrawTool.Text ? clickBox(drag.from, textClick ? { width: docPx(textClick.width), height: docPx(textClick.height) } : { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
     drag = null;
     if (!box) {
       return;
     }
     held = box;
     const id = newId();
-    create(drawClip(doc, tool, unit(box), frame, id, dragged ? DRAGGED_TEXT_SIZING : NEW_TEXT_SIZING), id);
+    const made = drawClip(doc, tool, unit(box), frame, id, dragged ? DRAGGED_TEXT_SIZING : NEW_TEXT_SIZING);
+    create(made.ok ? joinStackAt(made.doc, id, [dragged ? box.x : box.x - box.width / 2, box.y]) : made, id);
   }
 
   function drawLine(from: DragPoint, to: DragPoint) {
@@ -159,7 +163,7 @@
     }
   }
 
-  function finish(done: Outline, paint: Record<string, unknown> = {}) {
+  function finish(done: Outline, paint: Record<string, unknown> = penInk(doc)) {
     outline = [];
     grab = null;
     const id = newId();

@@ -24,7 +24,11 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 
 A shape drawn over a frame lands inside that frame; drawn on empty canvas it stays free. Either way it shows the moment you release, and saves in the background.
 
-Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. Gradients can be linear, radial, angular or diamond.
+Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. New layers rotate and scale around their centre. Gradients can be linear, radial, angular or diamond; their handles show on the canvas while that fill is open in the Fill section.
+
+A selected line shows a handle at each end instead of a box: drag one to move that end, hold Shift to snap the line to 45 degrees.
+
+X and Y keep decimals, shown up to two. A fill with no colour reads **None** over a checkerboard. With a layer selected, hovering the empty part of its frame highlights the frame.
 
 Colour fields accept hex with or without `#` (`f`, `ff` and `fff` all mean white; 4 and 8 digits carry opacity), `rgb()`/`rgba()`, or bare numbers such as `255, 0, 0` or `255 0 0 50%`. Opacity typed this way sets the fill's opacity. Anything else leaves the colour unchanged.
 
@@ -45,6 +49,10 @@ Every colour in the editor opens the same picker: fill (text included), stroke, 
 
 Colours are still stored as `#rrggbb` (or `#rrggbbaa`) or a brand token, so scripts, the CLI and agents read and write them as before.
 
+## Combining shapes
+
+Select two or more shapes and pick **Union**, **Subtract**, **Intersect** or **Exclude** in Properties. The result is one shape named after the operation, boxed tightly around what is left, without the strokes of the originals. Subtract cuts the shapes in front out of the one at the back. `Cmd+Z` brings the originals back.
+
 ## Editing points
 
 Double-click a selected shape, or press `Enter`, to edit its points. Rectangles, ellipses, polygons, stars and lines become free paths when you do.
@@ -61,18 +69,24 @@ Double-click a selected shape, or press `Enter`, to edit its points. Rectangles,
 | `Delete` | Removes the selected point |
 | `Esc`, `Enter` or click outside | Leaves point editing |
 
-Each change is one undo step. The chat agent edits points the same way with `edit_path_points`.
+Moving a point outside the layer's box grows the box to fit, so X, Y, W and H always match the path. Each change is one undo step. The chat agent edits points the same way with `edit_path_points`.
 
 A shape can morph into any other shape, including hand-drawn paths and shapes with holes.
 
 ## Text
 
 - Select any part of a text and style it: bold, italic, size, colour, gradient, underline or strikethrough (solid, double, dotted, dashed, wavy), small caps, OpenType features.
-- Links: `Shift+Cmd+U`. Lists: `Shift+Cmd+8` bulleted, `Shift+Cmd+7` numbered, `Tab` to nest.
+- Links: `Shift+Cmd+U`. Strikethrough: `Shift+Cmd+X`. Lists: `Shift+Cmd+8` bulleted, `Shift+Cmd+7` numbered, `Tab` to nest. Typing `- ` or `1. ` at the start of a line starts a list too.
+- Undo while typing steps back a word at a time, as in Figma; a pause or a switch between typing and deleting starts a new step.
 - Auto width and auto height text grows as you type.
 - A size applies exactly as typed. Auto width and auto height text grows with it; fixed-size text overflows its box and is never shrunk.
 - Weight steps in hundreds, 100 to 900: scrubbing, arrow keys and typed values snap to the nearest 100.
 - Case is five icon buttons: as typed, uppercase, lowercase, title case and small caps. Hover for the name.
-- Width axis, slant axis and other variable-font axes sit under a collapsed **Advanced** row in the Text section.
+- With a text selected, Properties reads top to bottom: alignment, X/Y, rotation, W/H with the aspect lock at the end of the row, Appearance, **Typography**, Fill, Stroke, Effects.
+- In Layout, above W/H, pick **Auto width**, **Auto height** or **Fixed size**; W and H show **Hug** or **Fixed** accordingly.
+- Font size has a presets menu: 12, 14, 16, 20, 24, 32, 48, 64, 96.
+- In Typography, line height and letter spacing are percentages of the font size: 130% line height, -2% letter spacing.
+- Width axis, slant axis and other variable-font axes sit under a collapsed **Advanced** row in Typography.
+- An uploaded **variable font** (TTF, OTF, WOFF or WOFF2 with a weight axis) is one file for every weight: pick any weight in its range and the editor and exports draw it.
 - Turn text into editable vector shapes with **Outline text** (`Shift+Cmd+O`). The outlines come from the same font file and layout the canvas draws with: family, weight, italic, size, letter spacing, line height, alignment, line breaks, kerning and ligatures stay exactly where they were. Fill, stroke, opacity and transform carry over; per-word colours and text animations do not.
 - Replace a missing or unwanted font in the whole video in one pick.

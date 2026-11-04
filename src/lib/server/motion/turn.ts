@@ -31,6 +31,7 @@ import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion
 import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
+import { docScaleOf } from '$lib/server/motion/doc-scale';
 import { commitDoc, revisionWriteOf } from '$lib/server/motion/frame-ops';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { Reserve, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
@@ -78,6 +79,8 @@ import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
 import { breakdownReader } from '$lib/server/video-reference';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, MotionEditKind } from '$lib/core-usage';
 import { Client, PLATFORM_TIMING, closedByModel, landingWatch, writeText, type Stop, type TurnStep, type TurnTiming } from '$lib/server/agents/turn-core';
 import { CHECK_WAIT_MS, Browser, BROWSER_VISION, EDITOR_DRAWS, BROWSER_DRAWS, Round, MAX_DELIVERY_ATTEMPTS, STILL_OPEN_ID, LAST_LOOK_ID, CRITIC_ID, LOOP_SEAM_ID, CUT_PROBE_ID, CUT_REVIEW_ID, SHEET_FILE, awaitsUser, ROUND_ROLE, shotCrews, crewTools, crewBrief, RESEARCH_BRIEF, RESEARCH_DONE, SOUND_PASS, ROUND_STOPS, ROUND_CHOICE, importFollowed, BUDGET_ID, budgetTool, writeCard, cannedTurn, type MotionTurn, type TurnOutcome } from './motion-session';
 
@@ -188,6 +191,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const tools = createMotionTools({
     spawn: { offers, run: (input) => spawnRun(input) as never },
     session,
+    scale: docScaleOf(motion.record, head.doc),
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
     templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
@@ -254,11 +258,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
     },
-    renderLink: async (quality: Quality) => {
+    renderLink: async (quality: Quality, range?: { from: number; to: number }) => {
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the link renders the saved video, so finish the turn and run render_video in the next one' };
       }
-      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, quality, actor });
+      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, quality, actor, range });
       return { ok: true, render_url: renderPagePath(link.token), expires_at: link.expiresAt, credits: BROWSER_RENDER_CREDITS };
     },
     embed: (action) => embedAction(db, { nodeId: motion.record.id, doc: session.doc, tokens, assetUrls: assetUrls(assets), title: motion.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: project.mode }, action),
@@ -589,6 +593,10 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     }
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
+    if (written) {
+      coreEvent(userId, CoreEvent.MotionEdited, { frame_id: motion.record.id, kind: MotionEditKind.Prompt });
+    }
+
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
     return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card, scripted: role === StudioRole.Director && written !== null };
   }

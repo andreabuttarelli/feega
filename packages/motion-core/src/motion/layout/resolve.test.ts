@@ -293,3 +293,13 @@ describe('a child wider than its column', () => {
     expect(propsOf(withAutoLayout(docOf([column, wide])), 'wide').width * W).toBeCloseTo(400);
   });
 });
+
+describe('a percent max on a stack child', () => {
+  it('reaches the layout from the stored item', () => {
+    const doc = docOf([
+      shape('a', { x: 0, y: 0, width: 0.1, height: 0.1 }, { parent: 'c', layoutItem: { ...DEFAULT_LAYOUT_ITEM, width: Sizing.Fill, maxWidthPercent: 25 } }),
+      shape('c', { x: 0.5, y: 0.5, width: 0.8, height: 0.2 }, { autoLayout: flow() })
+    ]);
+    expect(propsOf(withAutoLayout(doc), 'a').width * W).toBeCloseTo(200);
+  });
+});

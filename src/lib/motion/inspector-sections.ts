@@ -22,6 +22,7 @@ export enum Section {
   Text = 'text',
   Shape = 'shape',
   Effects = 'effects',
+  Colours = 'colours',
   Timing = 'timing',
   Animate = 'animate',
   ThreeD = '3d',
@@ -29,9 +30,9 @@ export enum Section {
 }
 
 export const SECTION_ORDER: readonly Section[] = [
+  Section.Align,
   Section.Layout,
   Section.Stack,
-  Section.Align,
   Section.Constraints,
   Section.Content,
   Section.Layer,
@@ -39,6 +40,7 @@ export const SECTION_ORDER: readonly Section[] = [
   Section.Stroke,
   Section.Shape,
   Section.Effects,
+  Section.Colours,
   Section.Text,
   Section.Transform,
   Section.Timing,
@@ -57,16 +59,17 @@ export const SECTION_TITLE: Record<Section, string> = {
   [Section.Layer]: 'Appearance',
   [Section.Fill]: 'Fill',
   [Section.Stroke]: 'Stroke',
-  [Section.Text]: 'Text',
+  [Section.Text]: 'Typography',
   [Section.Shape]: 'Path',
   [Section.Effects]: 'Effects',
+  [Section.Colours]: 'Selection colours',
   [Section.Timing]: 'Timing',
   [Section.Animate]: 'Animation',
   [Section.ThreeD]: '3D',
   [Section.Parent]: 'Parent & mask'
 };
 
-const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text]);
+const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Stack, Section.Align, Section.Constraints, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Colours, Section.Text]);
 
 const DEFAULT_OPEN = Object.fromEntries(SECTION_ORDER.map((s) => [s, OPEN_FIRST.has(s)])) as Record<Section, boolean>;
 
@@ -161,7 +164,7 @@ const TEXT_TIER: Record<string, TextTier> = {
   paragraphIndent: TextTier.Advanced,
   textWrap: TextTier.Advanced,
   leadingTrim: TextTier.Advanced,
-  sizing: TextTier.Advanced,
+  sizing: TextTier.Hidden,
   features: TextTier.Advanced,
   lineHeight: TextTier.Hidden,
   letterSpacing: TextTier.Hidden,
@@ -233,7 +236,7 @@ export type FieldLook = { short: string | null; unit: string; fill: FieldFill };
 
 const DEGREES = '°';
 const EM = 'em';
-const TIMES = '×';
+const PERCENT_SIGN = '%';
 const SECONDS = 's';
 
 const LOOKS: Record<string, Partial<FieldLook>> = {
@@ -249,13 +252,13 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   weight: { short: 'Weight' },
   fontWeight: { short: 'Weight' },
   size: { short: 'Size' },
-  tracking: { short: 'Spacing', unit: EM },
+  tracking: { short: 'Spacing', unit: PERCENT_SIGN },
   stretch: { short: 'Width' },
   slant: { short: 'Slant' },
   maxLines: { short: 'Max lines' },
   decorationThickness: { short: 'Thickness' },
   decorationOffset: { short: 'Offset' },
-  leading: { short: 'Line', unit: TIMES },
+  leading: { short: 'Line', unit: PERCENT_SIGN },
   paragraphSpacing: { short: 'Paragraph', unit: EM },
   paragraphIndent: { short: 'Indent', unit: EM },
   rotateX: { short: 'Tilt X', unit: DEGREES },
@@ -265,6 +268,7 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   skewY: { short: 'Skew Y', unit: DEGREES },
   perspective: { short: 'Persp.', unit: 'px' },
   opacity: { short: 'Opacity', fill: FieldFill.Range },
+  roundness: { short: 'Radius', fill: FieldFill.Range },
   blur: { short: 'Blur', unit: 'px' },
   volume: { short: 'Volume', fill: FieldFill.Range },
   pan: { short: 'Pan' },
@@ -274,7 +278,13 @@ const LOOKS: Record<string, Partial<FieldLook>> = {
   objectRotateY: { short: 'Turn Y', unit: DEGREES },
   objectRotateZ: { short: 'Turn Z', unit: DEGREES },
   orbit: { short: 'Orbit', unit: DEGREES },
-  fov: { short: 'FOV', unit: DEGREES }
+  fov: { short: 'FOV', unit: DEGREES },
+  focusX: { short: 'Crop X', unit: PERCENT_SIGN },
+  focusY: { short: 'Crop Y', unit: PERCENT_SIGN },
+  zoom: { short: 'Zoom', unit: PERCENT_SIGN },
+  arcStart: { short: 'Start', unit: DEGREES },
+  arcSweep: { short: 'Sweep', unit: PERCENT_SIGN },
+  arcRatio: { short: 'Ratio', unit: PERCENT_SIGN }
 };
 
 const SOURCE_LOOKS: Partial<Record<Source, Record<string, Partial<FieldLook>>>> = {
@@ -321,6 +331,7 @@ const SUMMARY: Record<Section, (clip: Summed, fps: number) => string> = {
   [Section.Text]: () => '',
   [Section.Animate]: (clip) => countOf(animated(clip), 'animated'),
   [Section.Effects]: (clip) => countOf(clip.effects.length, 'effects'),
+  [Section.Colours]: () => '',
   [Section.ThreeD]: () => '',
   [Section.Parent]: (clip) => [clip.parent ? 'Parented' : '', clip.mask ? 'Masked' : ''].filter(Boolean).join(SEP)
 };

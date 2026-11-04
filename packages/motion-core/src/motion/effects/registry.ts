@@ -33,7 +33,7 @@ export enum EffectKind {
 
 export const EFFECT_KINDS = Object.values(EffectKind) as [EffectKind, ...EffectKind[]];
 
-export type EffectParam = { key: string; label: string; kind: ValueKind; min: number; max: number; step: number; fallback: number | string };
+export type EffectParam = { key: string; label: string; kind: ValueKind; min: number; max: number; step: number; fallback: number | string; flag?: boolean; length?: true };
 
 export type Values = Record<string, number | string>;
 
@@ -46,6 +46,8 @@ export type Rendered = { filter: string; nodes: SvgNode[]; backdrop?: string };
 type Spec = { label: string; about: string; params: EffectParam[]; behind?: true; varies?: (v: Values) => boolean; reach?: (v: Values) => number; boxed?: (v: Values, filterId: string) => Rendered; render: (v: Values, frame: EffectFrame, filterId: string, lut: CompiledLut | null) => Rendered };
 
 const num = (key: string, label: string, min: number, max: number, step: number, fallback: number): EffectParam => ({ key, label, kind: ValueKind.Number, min, max, step, fallback });
+const flag = (key: string, label: string, fallback: boolean): EffectParam => ({ ...num(key, label, 0, 1, 1, Number(fallback)), flag: true });
+const len = (key: string, label: string, min: number, max: number, step: number, fallback: number): EffectParam => ({ ...num(key, label, min, max, step, fallback), length: true });
 const colour = (key: string, label: string, fallback: string): EffectParam => ({ key, label, kind: ValueKind.Color, min: 0, max: 0, step: 0, fallback });
 
 const n = (v: Values, key: string) => Number(v[key]);
@@ -281,7 +283,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.GaussianBlur]: {
     label: 'Gaussian blur',
     about: 'blur radius in px',
-    params: [num('radius', 'Radius', 0, 200, 0.5, 8)],
+    params: [len('radius', 'Radius', 0, 200, 0.5, 8)],
     reach: (v) => n(v, 'radius') * GAUSS_TAIL,
     boxed: (v, id) => svg(id, [node('feGaussianBlur', { in: 'SourceGraphic', stdDeviation: r(n(v, 'radius')) })]),
     render: (v) => css(`blur(${r(n(v, 'radius'))}px)`)
@@ -289,7 +291,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.DirectionalBlur]: {
     label: 'Directional blur',
     about: 'motion blur of length px along angle degrees',
-    params: [num('length', 'Length', 0, 400, 1, 40), num('angle', 'Angle', -180, 180, 1, 0)],
+    params: [len('length', 'Length', 0, 400, 1, 40), num('angle', 'Angle', -180, 180, 1, 0)],
     reach: (v) => n(v, 'length') / 2,
     render: (v, _f, id) => svg(id, directionalTaps(n(v, 'length'), n(v, 'angle')))
   },
@@ -297,8 +299,8 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     label: 'Progressive blur',
     about: 'blur that grows from startRadius px at (startX, startY) to endRadius px at (endX, endY), points as 0..1 of the layer',
     params: [
-      num('startRadius', 'Start radius', 0, 200, 0.5, 0),
-      num('endRadius', 'End radius', 0, 200, 0.5, 24),
+      len('startRadius', 'Start radius', 0, 200, 0.5, 0),
+      len('endRadius', 'End radius', 0, 200, 0.5, 24),
       num('startX', 'Start X', 0, 1, 0.01, 0.5),
       num('startY', 'Start Y', 0, 1, 0.01, 0),
       num('endX', 'End X', 0, 1, 0.01, 0.5),
@@ -311,15 +313,15 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     label: 'Drop shadow',
     about: 'shadow at distance px and angle degrees, blur px, colour and opacity',
     params: [
-      num('distance', 'Distance', 0, 300, 1, 16),
+      len('distance', 'Distance', 0, 300, 1, 16),
       num('angle', 'Angle', -180, 180, 1, 135),
-      num('x', 'X', -300, 300, 1, 0),
-      num('y', 'Y', -300, 300, 1, 0),
-      num('blur', 'Softness', 0, 200, 0.5, 24),
-      num('spread', 'Spread', -100, 100, 1, 0),
+      len('x', 'X', -300, 300, 1, 0),
+      len('y', 'Y', -300, 300, 1, 0),
+      len('blur', 'Blur', 0, 200, 0.5, 24),
+      len('spread', 'Spread', -100, 100, 1, 0),
       colour('color', 'Colour', '#000000'),
       num('opacity', 'Opacity', 0, 1, 0.01, 0.5),
-      num('behind', 'Show behind', 0, 1, 1, 1)
+      flag('behind', 'Show behind', true)
     ],
     reach: (v) => n(v, 'distance') + Math.hypot(n(v, 'x'), n(v, 'y')) + Math.max(0, n(v, 'spread')) + (n(v, 'blur') / 2) * GAUSS_TAIL,
     boxed: (v, id) => (plainShadow(v) ? svg(id, [shadowNode(...shadowOffset(v), n(v, 'blur'), String(v.color), n(v, 'opacity'))]) : svg(id, shapedShadow(v))),
@@ -334,7 +336,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.InnerShadow]: {
     label: 'Inner shadow',
     about: 'shadow inside the layer edge at distance px and angle degrees, blur px, colour and opacity',
-    params: [num('distance', 'Distance', 0, 300, 1, 4), num('angle', 'Angle', -180, 180, 1, 90), num('blur', 'Softness', 0, 200, 0.5, 8), colour('color', 'Colour', '#000000'), num('opacity', 'Opacity', 0, 1, 0.01, 0.25)],
+    params: [len('distance', 'Distance', 0, 300, 1, 4), num('angle', 'Angle', -180, 180, 1, 90), len('blur', 'Blur', 0, 200, 0.5, 8), colour('color', 'Colour', '#000000'), num('opacity', 'Opacity', 0, 1, 0.01, 0.25)],
     render: (v, _f, id) => {
       const a = rad(n(v, 'angle'));
       return svg(id, [
@@ -351,13 +353,13 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     label: 'Background blur',
     about: 'blurs what is behind the layer box by radius px; the layer itself stays sharp',
     behind: true,
-    params: [num('radius', 'Radius', 0, 200, 0.5, 4)],
+    params: [len('radius', 'Radius', 0, 200, 0.5, 4)],
     render: (v) => ({ filter: '', nodes: [], backdrop: `blur(${r(n(v, 'radius'))}px)` })
   },
   [EffectKind.Glow]: {
     label: 'Glow',
     about: 'soft light around the layer: radius px, colour, intensity 0..1',
-    params: [num('radius', 'Radius', 0, 200, 0.5, 24), colour('color', 'Colour', '#ffffff'), num('intensity', 'Intensity', 0, 1, 0.01, 0.8)],
+    params: [len('radius', 'Radius', 0, 200, 0.5, 24), colour('color', 'Colour', '#ffffff'), num('intensity', 'Intensity', 0, 1, 0.01, 0.8)],
     reach: (v) => (n(v, 'radius') / 2) * GAUSS_TAIL,
     boxed: (v, id) => {
       const c = String(v.color);
@@ -371,7 +373,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.Stroke]: {
     label: 'Stroke',
     about: 'outline around the layer alpha: width px and colour',
-    params: [num('width', 'Width', 0, 60, 0.5, 4), colour('color', 'Colour', '#ffffff')],
+    params: [len('width', 'Width', 0, 60, 0.5, 4), colour('color', 'Colour', '#ffffff')],
     reach: (v) => n(v, 'width'),
     render: (v, _f, id) =>
       svg(id, [
@@ -400,7 +402,7 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.ChromaticAberration]: {
     label: 'Chromatic aberration',
     about: 'splits red and blue by offset px along angle degrees',
-    params: [num('offset', 'Offset', 0, 60, 0.5, 6), num('angle', 'Angle', -180, 180, 1, 0)],
+    params: [len('offset', 'Offset', 0, 60, 0.5, 6), num('angle', 'Angle', -180, 180, 1, 0)],
     reach: (v) => n(v, 'offset'),
     render: (v, _f, id) => {
       const d = n(v, 'offset');
@@ -483,26 +485,26 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   [EffectKind.LensBlur]: {
     label: 'Lens blur',
     about: 'disc-shaped bokeh blur of radius px; highlights 0..4 makes bright spots bloom into the disc',
-    params: [num('radius', 'Radius', 0, 100, 0.5, 12), num('highlights', 'Highlights', 0, 4, 0.05, 1)],
+    params: [len('radius', 'Radius', 0, 100, 0.5, 12), num('highlights', 'Highlights', 0, 4, 0.05, 1)],
     reach: (v) => n(v, 'radius'),
     render: (v, _f, id) => svg(id, [node('feWarp', { mode: 'lens', cx: 0.5, cy: 0.5, amount: r(n(v, 'radius')), boost: r(n(v, 'highlights')) })])
   },
   [EffectKind.Bulge]: {
     label: 'Bulge',
     about: 'magnifies (amount > 0) or pinches (amount < 0) within radius px of a centre given as 0..1 of the layer',
-    params: [num('centerX', 'Centre X', 0, 1, 0.01, 0.5), num('centerY', 'Centre Y', 0, 1, 0.01, 0.5), num('radius', 'Radius', 1, 2000, 1, 200), num('amount', 'Amount', -1, 1, 0.01, 0.5)],
+    params: [num('centerX', 'Centre X', 0, 1, 0.01, 0.5), num('centerY', 'Centre Y', 0, 1, 0.01, 0.5), len('radius', 'Radius', 1, 2000, 1, 200), num('amount', 'Amount', -1, 1, 0.01, 0.5)],
     render: (v, _f, id) => svg(id, [warpNode('bulge', v, { radius: r(n(v, 'radius')), amount: r(n(v, 'amount')) })])
   },
   [EffectKind.Twirl]: {
     label: 'Twirl',
     about: 'rotates the layer by angle degrees at the centre, fading to nothing at radius px; centre as 0..1 of the layer',
-    params: [num('centerX', 'Centre X', 0, 1, 0.01, 0.5), num('centerY', 'Centre Y', 0, 1, 0.01, 0.5), num('radius', 'Radius', 1, 2000, 1, 240), num('angle', 'Angle', -720, 720, 1, 90)],
+    params: [num('centerX', 'Centre X', 0, 1, 0.01, 0.5), num('centerY', 'Centre Y', 0, 1, 0.01, 0.5), len('radius', 'Radius', 1, 2000, 1, 240), num('angle', 'Angle', -720, 720, 1, 90)],
     render: (v, _f, id) => svg(id, [warpNode('twirl', v, { radius: r(n(v, 'radius')), amount: r(n(v, 'angle')) })])
   },
   [EffectKind.Sharpen]: {
     label: 'Sharpen',
     about: 'unsharp mask: adds amount times the detail finer than radius px',
-    params: [num('amount', 'Amount', 0, 5, 0.05, 1), num('radius', 'Radius', 0.1, 20, 0.1, 1.5)],
+    params: [num('amount', 'Amount', 0, 5, 0.05, 1), len('radius', 'Radius', 0.1, 20, 0.1, 1.5)],
     reach: (v) => n(v, 'radius') * GAUSS_TAIL,
     render: (v, _f, id) => {
       const amount = n(v, 'amount');
@@ -535,13 +537,30 @@ export const EFFECTS: Record<EffectKind, Spec> = {
   }
 };
 
+export const EFFECT_LENGTHS: ReadonlySet<string> = new Set(EFFECT_KINDS.flatMap((kind) => EFFECTS[kind].params.filter((p) => p.length).map((p) => p.key)));
+
 export const EFFECT_ALPHA: Partial<Record<EffectKind, { color: string; alpha: string }>> = {
   [EffectKind.DropShadow]: { color: 'color', alpha: 'opacity' },
   [EffectKind.InnerShadow]: { color: 'color', alpha: 'opacity' },
   [EffectKind.Glow]: { color: 'color', alpha: 'intensity' }
 };
 
-export const editedParams = (kind: EffectKind): EffectParam[] => EFFECTS[kind].params.filter((p) => p.key !== EFFECT_ALPHA[kind]?.alpha);
+const offsetByDistance = (v: Values) => n(v, 'distance') !== 0;
+
+const SHOWN_WHEN: Partial<Record<EffectKind, Record<string, (v: Values) => boolean>>> = {
+  [EffectKind.DropShadow]: { distance: offsetByDistance, angle: offsetByDistance }
+};
+
+export const EFFECT_SEED: Partial<Record<EffectKind, Values>> = {
+  [EffectKind.DropShadow]: { distance: 0, x: 0, y: 4, blur: 4, spread: 0, opacity: 0.25 }
+};
+
+export function editedParams(kind: EffectKind, values: Values): EffectParam[] {
+  const current = { ...defaultValues(kind), ...values };
+  return EFFECTS[kind].params.filter((p) => p.key !== EFFECT_ALPHA[kind]?.alpha && (SHOWN_WHEN[kind]?.[p.key]?.(current) ?? true));
+}
+
+export const isFlag = (kind: EffectKind, key: string): boolean => EFFECTS[kind].params.some((p) => p.key === key && p.flag === true);
 
 export function defaultValues(kind: EffectKind): Values {
   return Object.fromEntries(EFFECTS[kind].params.map((p) => [p.key, p.fallback]));

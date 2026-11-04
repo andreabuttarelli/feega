@@ -4,9 +4,10 @@ import { COLOR, CUSTOM_NAME } from '../components';
 import { contentStamp } from '../stamp';
 
 export { CUSTOM_NAME };
-export const MAX_HTML = 20_000;
-export const MAX_CSS = 20_000;
-export const MAX_JS = 40_000;
+export const MAX_HTML = 100_000;
+export const MAX_CSS = 100_000;
+export const MAX_JS = 200_000;
+export const MAX_SOURCE_TOTAL = 700_000;
 export const MAX_PROPS = 40;
 export const MAX_COMPONENTS = 24;
 export const VAR_PREFIX = 'varPrefix';

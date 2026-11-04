@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setKeyframes, setTransform } from '@feega/motion-core/motion/timeline';
 import { Ease } from '@feega/motion-core/motion/design';
+import { instanceBoxes } from '@feega/motion-core/motion/layout/resolve';
+import { ComponentRole, createComponent, instanceOf, roleOf } from './main-component';
+import { homed } from './canvas-components';
 import { DocMode, docMode, setStill } from '@feega/motion-core/motion/still';
 import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, pasteOverElements, replaceElements, OutputKind } from './move-element';
 
@@ -195,6 +198,19 @@ describe('a picture inserted into a frame', () => {
 
     expect({ from: clip.from, end: clip.from + clip.durationInFrames }).toEqual({ from: 0, end: doc.durationInFrames });
   });
+
+  it('is pinned left and top like a drawn layer, not scaled with the frame', () => {
+    const element = mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen' });
+    const doc = must(placeElement(target(), element, { at: { x: 0.5, y: 0.5 }, frame: 0 }, ids()));
+    const clip = doc.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Image')!;
+
+    expect(clip.constraints).toEqual({ horizontal: 'left', vertical: 'top' });
+  });
+
+  it('is named by its file, cut to the longest name a layer takes', () => {
+    expect(mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'hero.png' }).clip.name).toBe('hero.png');
+    expect(mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'x'.repeat(80) }).clip.name).toHaveLength(60);
+  });
 });
 
 describe('an output linked to a frame', () => {
@@ -301,5 +317,33 @@ describe('copy and paste of a multi-selection', () => {
     expect([props.shape, props.x, props.y]).toEqual(['ellipse', expect.closeTo(0.2), expect.closeTo(0.5)]);
     expect(pasteOverElements(doc, ['a'], [], ids()).ok).toBe(false);
     expect(pasteOverElements(doc, [], copyElements(doc, ['dot']), ids()).ok).toBe(false);
+  });
+});
+
+describe('copy and paste of an instance into another frame', () => {
+  const button = () => {
+    let n = 0;
+    const doc = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 90, props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.05 } }, 'pill');
+    const made = createComponent(doc.ok ? doc.doc : newMotionDoc(MotionFormat.Landscape), ['pill'], () => `c${++n}`, 'Button');
+    return made.ok ? made.doc : newMotionDoc(MotionFormat.Landscape);
+  };
+
+  it('a pasted main from another frame is an instance there, following that main', () => {
+    const elements = copyElements(homed(button(), 'frame-a'), ['c2']);
+    const pasted = pasteElements(newMotionDoc(MotionFormat.Portrait), elements, () => 'p1');
+    const doc = pasted.ok ? pasted.doc : null;
+
+    expect(doc && instanceOf(doc, 'p1')?.comp.component?.home).toBe('frame-a');
+    expect(doc && roleOf(doc, 'p1', 'frame-b')).toBe(ComponentRole.Instance);
+  });
+
+  it('keeps its pixel size in a frame of another size', () => {
+    const source = button();
+    const target = newMotionDoc(MotionFormat.Portrait);
+    const pasted = pasteElements(target, copyElements(source, ['c2']), () => 'p1');
+    const doc = pasted.ok ? pasted.doc : target;
+    const width = (d: MotionDoc, id: string) => instanceBoxes(d).get(id)!.width;
+
+    expect(width(doc, 'p1')).toBeCloseTo(width(source, 'c2'), 3);
   });
 });

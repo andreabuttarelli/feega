@@ -17,41 +17,46 @@ A **Stack** is an element that lays its children out in a row or a column, like 
 2. Press `Shift+A`, or pick **Wrap with stack** from any of these:
    - right-click on the element on the canvas;
    - right-click on its row in **Layers**;
-   - the **…** menu of the floating selection toolbar;
    - the **…** menu in the header of the right bar.
 3. A new Stack holds the selection. Its direction and gap are guessed from where the elements were; text hugs its words and the Stack hugs its children.
 
-Wrapping elements that already sit in a Stack nests the new Stack in their place. Wrapping free elements merges them into one free Stack element on the canvas, which grows and shrinks with its content.
+Wrapping elements that already sit in a Stack nests the new Stack in their place. Wrapping free elements merges them into one free Stack element on the canvas, which grows and shrinks with its content. Free Stacks wrapped together keep their own children, so a column of two rows stays a column of two rows. The new Stack is selected, and nothing moves: a row stays a row, a column becomes a vertical Stack, and the gap is the space that was already between the elements.
 
-**Remove stack** (`Alt+Shift+A`, same four menus, or the **−** in the Stack section) unwraps: the children stay where the layout put them and the Stack goes.
+Drag a side or a corner of a Stack to resize it: the dragged side turns from Hug to Fixed at the size you drag, and the children keep their size. The padding handles sit just inside the edges, so a side drag always resizes.
+
+**Remove stack** (`Alt+Shift+A`, same four menus, or the unwrap button next to the direction in the Stack section) unwraps: the children stay where the layout put them and the Stack goes. `Delete` removes the Stack together with everything inside it.
+
+The **Stack** tool (in the **+** menu of the bottom bar) draws an empty Stack at the size you drag, ready to take elements.
 
 ## The Stack section
 
-Select a Stack and the right bar shows **Stack** under **Layout**, above the shared **Fill**, **Stroke**, **Appearance** and **Effects**:
+Select a Stack (its row in **Layers**, a click on it on the canvas, or `Esc` / `⇧↵` from one of its children). With a Stack selected, a click on one of its children selects that child; pressing and dragging still moves the Stack and the right bar reads top to bottom like Figma's auto layout panel:
 
-- **Direction**: horizontal, vertical, wrap, or grid.
-- **Align**: a 3×3 grid sets the main and cross alignment at once.
-- **Distribute**: stretch children across the cross axis, align text baselines (rows), space between, around or evenly.
-- **Gap**, and the gap between lines when the Stack wraps. On the canvas, drag the small handle in the middle of a gap or padding to change it; a click elsewhere in the gap does nothing.
-- **Padding**: one value, or CSS shorthand `8`, `8 16`, `8 16 24`, `8 16 24 32`, or per side.
-- **Width / Height**: fixed or fit (hug); a child can also fill. A typed width or height keeps the Stack's left and top edges where they are. The **Layout** fields show the size the Stack resolves to, not the one it had before Hug or Fill.
-- **First on top** and **Strokes included**.
+1. The header: the name, then **Create component** and the **…** menu.
+2. **Alignment**: left, centre, right; top, middle, bottom.
+3. **Layout**: X / Y, rotation, rotate 90° and flip.
+4. **Stack**, all chips with the label or an icon inside, no form rows:
+   - **Direction**: vertical, horizontal, wrap, or grid, and the unwrap button. The sliders button in the section header opens the rarely used settings: **Canvas stacking** (first on top or last on top), **Strokes included**, stretch children, align text baselines (rows), space around or evenly, how wrapped lines spread, grid track sizes and fill order.
+   - **W / H**: the size the Stack resolves to, with its mode in the same chip: **Fixed**, **Hug**, and for a child **Fill** or **%**. Typing a number makes it fixed; a typed size keeps the Stack's left and top edges where they are. Dragging a resize handle of a Stack on the canvas does the same on the side you drag: **Hug** becomes **Fixed** at the dragged size, the children re-lay out live while you drag, and the 3×3 grid places them inside the new box. Rotating a Stack turns it as one element around its centre. The mode menu also takes **Min** and **Max**: type `200`, `200px` or `50%` (a share of the parent Stack, inside its padding). A set min or max shows as a chip under W / H, with **×** to clear it.
+   - A 3×3 grid sets the main and cross alignment at once, beside the **Gap** chip. Its menu switches the gap to **Auto**, which spreads the children apart (space between). On the canvas, drag the small handle in the middle of a gap or padding to change it.
+   - **Padding**: a horizontal and a vertical chip. The per-side button opens four chips, left, top, right, bottom, each with its side's icon; pressing it again goes back to two, keeping the left and top values when the sides differ.
+   - **Clip content**.
+5. **Appearance**: opacity with the show / hide eye, corner radius (one value or per corner), blend.
+6. **Fill**, **Stroke**, **Effects**: each with **+**.
+7. **Selection colours**: every colour used inside the Stack; change one to change it everywhere in the Stack.
+8. **Export**: **+** exports the selection.
 
 ## Stack children are flex items
 
 The Stack places its children, like flexbox. Select a child and the right bar drops **X / Y**, frame alignment and constraints, and shows instead:
 
-- **Width / Height**: a value with a unit, from the dropdown or typed:
-  - `120` or `120px`: fixed pixels;
-  - `50%`: a share of the Stack;
-  - `Fill`, `fill 2`, `2fr`: shares the space left by weight, so `1fr` and `2fr` split it 1:2;
-  - `hug`: fits its content.
-- **Min / max** width and height.
+- **W / H** chips: the size in pixels, or the share when the mode is **%**; the mode menu picks **Fixed**, **Hug**, **Fill** (shares the space left; an agent can weight it, `widthGrow` 2 takes twice the space of 1) or **%** (a share of the Stack).
+- **Min / max** width and height, in the same menu, in `px` or `%`.
 - **Align self**: overrides the Stack's align for this child (start, center, end, stretch).
-- **Absolute position**: takes the child out of the flow (Figma's *ignore auto layout*). X and Y come back, measured from the Stack's top-left corner.
+- **Ignore auto layout**: a checkbox that takes the child out of the flow (absolute position). X and Y come back, measured from the Stack's top-left corner.
 - **Move earlier / later** and **Take out of the stack**.
 
-On the canvas, dragging a child reorders it: a line shows where it lands between its siblings. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it. In **Layers**, dragging a child above or below another reorders it in that Stack, or moves it into the Stack of the row it lands on.
+On the canvas, dragging a child reorders it: the child follows the cursor and a line shows where it lands between its siblings. Dragging any other element of the frame onto a Stack inserts it at the line the same way. Drop it on another Stack to move it there, or clearly outside the Stack to take it out. A child is never positioned freely inside its Stack. The arrow keys move it one place earlier or later along the Stack instead of nudging it. In **Layers**, dragging a child above or below another reorders it in that Stack, or moves it into the Stack of the row it lands on. Dropping on the middle of a Stack row puts the layer inside it, at the end.
 
 Fills, per-side strokes, corner radius, opacity, blend, shadows, blur and clip content are the usual sections.
 
@@ -85,8 +90,8 @@ A Stack exports as a `div` with `display: flex`, its direction, gap, padding, `j
 <DemoVideo name="arrange-selection" caption="Tidy up and stack four image nodes from the context menu, then the same ops from the CLI, and undo_last." />
 
 1. Select two or more nodes: click one, hold `Shift` and click the others, or drag a box around them.
-2. Right-click one of the selected nodes. With two or more selected, the menu lists **Align left / horizontal centres / right / top / vertical centres / bottom**, **Tidy up** and **Stack tiles**.
-3. **Tidy up** untangles overlaps, **Stack tiles** puts the selection in a row or column, the align items line up the edges. Distribute is in the toolbar when three or more are selected.
+2. Right-click one of the selected nodes. With two or more selected, the menu lists **Tidy up** and **Stack tiles**.
+3. **Tidy up** untangles overlaps, **Stack tiles** puts the selection in a row or column. Align and distribute live in the right bar, or on `Alt+A/H/D/W/V/S`.
 4. `Cmd+Z` undoes the arrangement.
 
 ### From an agent, MCP or CLI

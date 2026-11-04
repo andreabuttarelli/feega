@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FIELD_INPUT, Field, Section } from '$lib/components/ui/shell';
+  import { FIELD_INPUT, Field, Menu, MenuContent, MenuItem, MenuTrigger, Section } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -9,13 +9,20 @@
   import { styleLibrary } from '$lib/canvas/style-library.svelte';
   import { overridesOf, resetOverride } from '$lib/motion/style-overrides';
 
-  let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, scale = 1, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; commit: (result: OpResult, summary: string) => void } = $props();
 
   const NONE = '';
 
-  const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles));
+  const CREATABLE: { kind: StyleKind; label: string; offered: (clip: MotionClip) => boolean }[] = [
+    { kind: StyleKind.Text, label: 'Text style', offered: (c) => 'font' in c.props },
+    { kind: StyleKind.Colour, label: 'Colour style', offered: () => true },
+    { kind: StyleKind.Paint, label: 'Fill style', offered: (c) => c.component in FILLED },
+    { kind: StyleKind.Effect, label: 'Effect style', offered: (c) => c.effects.length > 0 }
+  ];
+
+  const offered = $derived(offeredStyles(doc, clip.component, styleLibrary.styles, scale));
   const offeredIn = (slot: StyleSlot) => offered.filter((s) => slotOf(s.style.kind) === slot);
-  const linkedStyles = $derived([clip.styleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
+  const linkedStyles = $derived([clip.styleRef, clip.paintStyleRef, clip.effectStyleRef].flatMap((name) => (name && doc.styles?.[name] ? [{ name, kind: doc.styles[name].kind }] : [])));
   const overridden = $derived(overridesOf(doc, clip.id));
   let name = $state('');
 
@@ -48,7 +55,10 @@
 </script>
 
 <Section title="Style">
-  {@render picker('Style', 'clip-style', StyleSlot.Look, clip.styleRef)}
+  {#if 'font' in clip.props || clip.styleRef}
+    {@render picker('Text style', 'clip-style', StyleSlot.Look, clip.styleRef)}
+  {/if}
+  {@render picker('Colour style', 'clip-paint-style', StyleSlot.Paint, clip.paintStyleRef)}
   {#if clip.component in FILLED || clip.effects.length || offeredIn(StyleSlot.Effect).length || clip.effectStyleRef}
     {@render picker('Effect style', 'clip-effect-style', StyleSlot.Effect, clip.effectStyleRef)}
   {/if}
@@ -65,12 +75,16 @@
   <Field label="New style" id="clip-style-name">
     <input id="clip-style-name" class={cn(FIELD_INPUT, 'w-full')} type="text" placeholder="Name" bind:value={name} data-testid="clip-style-name" />
   </Field>
-  <div class="flex flex-wrap gap-2">
-    {#if 'font' in clip.props}<button type="button" class={cn(FIELD_INPUT, 'flex-1')} onclick={() => saveNew(StyleKind.Text)}>Save text style</button>{/if}
-    <button type="button" class={cn(FIELD_INPUT, 'flex-1')} onclick={() => saveNew(StyleKind.Colour)}>Save colour style</button>
-    {#if clip.component in FILLED}<button type="button" class={cn(FIELD_INPUT, 'flex-1')} data-testid="style-save-paint" onclick={() => saveNew(StyleKind.Paint)}>Save fill style</button>{/if}
-    {#if clip.effects.length}<button type="button" class={cn(FIELD_INPUT, 'flex-1')} data-testid="style-save-effect" onclick={() => saveNew(StyleKind.Effect)}>Save effect style</button>{/if}
-  </div>
+  <Menu>
+    <MenuTrigger>
+      {#snippet child({ props })}
+        <button {...props} type="button" class={cn(FIELD_INPUT, 'w-full')} data-testid="style-create">Create style</button>
+      {/snippet}
+    </MenuTrigger>
+    <MenuContent align="start">
+      {#each CREATABLE.filter((c) => c.offered(clip)) as c (c.kind)}<MenuItem label={c.label} onSelect={() => saveNew(c.kind)} />{/each}
+    </MenuContent>
+  </Menu>
 </Section>
 
 {#snippet picker(label: string, id: string, slot: StyleSlot, current: string | undefined)}

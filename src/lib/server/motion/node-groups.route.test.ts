@@ -96,10 +96,11 @@ describe('rotating a group', () => {
     expect([box.x, box.y]).toEqual([10, 20]);
   });
 
-  it('a frame does not turn on the canvas', async () => {
+  it('a frame turns on the canvas, like any layer in Figma', async () => {
     const input = event({ id: FRAME, degrees: '30' }, { nodes: [row(FRAME, { x: 0, y: 0, w: 200, h: 100 }, {})], motion_revisions: [revision(FRAME, newMotionDoc(MotionFormat.Landscape))] });
 
-    expect(await actions.rotateGroup(input as never)).not.toMatchObject({ outcome: 'done' });
+    expect(await actions.rotateGroup(input as never)).toMatchObject({ outcome: 'done', turn: { id: FRAME, degrees: 30 } });
+    expect(nodesOf(input).find((n) => n.id === FRAME)!.data.rotation).toBe(30);
   });
 
   it('a rotation answers its own undo: the same turn the other way', async () => {

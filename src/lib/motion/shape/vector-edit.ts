@@ -3,7 +3,8 @@ import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import { aabb, quadOf, snapMove, type Bounds, type Guide } from '../scene-select';
 import { propBoxes } from '../space';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
-import type { Pt } from '@feega/motion-core/motion/shape/geometry';
+import { pathData, type Outline, type Pt } from '@feega/motion-core/motion/shape/geometry';
+import { reshapedTo } from '@feega/motion-core/motion/shape/boolean';
 import { setPath, shapePath, type ShapeParams } from './ops';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { pathSpace } from '@feega/motion-core/motion/shape/space';
@@ -21,12 +22,28 @@ export function enterPointEdit(doc: MotionDoc, clip: MotionClip): OpResult {
   return NEEDS_PATH.has(String(clip.props.shape)) ? setPath(doc, clip.id, shapePath(clip.props as unknown as ShapeParams)) : { ok: true, doc };
 }
 
+export function pointDraft(doc: MotionDoc, pointEdit: string | null): MotionDoc {
+  const clip = pointEdit ? (findClip(doc, pointEdit)?.clip as MotionClip | undefined) : undefined;
+  const entered = clip ? enterPointEdit(doc, clip) : null;
+  return entered?.ok ? entered.doc : doc;
+}
+
 export function landsOn(doc: MotionDoc, clipId: string, frame: number, at: Pt): boolean {
   const [u, v] = pathSpace(doc, clipId, frame).toLocal(at);
   return u >= 0 && u <= 1 && v >= 0 && v <= 1;
 }
 
-export const pointBounds = (p: Pt): Bounds => ({ left: p[0], right: p[0], top: p[1], bottom: p[1] });
+const morphs = (clip: MotionClip): boolean => ((clip.props.morphs as unknown[] | undefined) ?? []).length > 0;
+
+export function commitOutline(doc: MotionDoc, clipId: string, outline: Outline, frame: number): OpResult {
+  const clip = findClip(doc, clipId)?.clip;
+  if (!clip || morphs(clip) || !outline.length) {
+    return setPath(doc, clipId, pathData(outline));
+  }
+  return reshapedTo(doc, clip, outline, frame);
+}
+
+export const pointBounds =(p: Pt): Bounds => ({ left: p[0], right: p[0], top: p[1], bottom: p[1] });
 
 export function snapPoint(point: Pt, targets: Bounds[], frame: { width: number; height: number }, reach: number): { point: Pt; guides: Guide[] } {
   const { offset, guides } = snapMove(pointBounds(point), [0, 0], targets, frame, reach);

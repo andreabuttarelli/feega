@@ -35,7 +35,7 @@ describe('style tools', () => {
     expect((await run('named_style', { action: 'save', name: 'Ink', clip_ids: [id], kind: 'paint' })).ok).toBe(true);
 
     const clip = session.doc.tracks[0].clips[0];
-    expect([clip.effectStyleRef, clip.styleRef]).toEqual(['Lifted', 'Ink']);
+    expect([clip.effectStyleRef, clip.paintStyleRef]).toEqual(['Lifted', 'Ink']);
     expect(session.doc.styles?.Lifted).toMatchObject({ kind: 'effect', effects: [{ kind: 'drop-shadow', params: { blur: 40 } }] });
   });
 
@@ -48,6 +48,6 @@ describe('style tools', () => {
     await run('named_style', { action: 'save', name: 'Ink', clip_ids: [id], kind: 'paint' });
     await run('named_style', { action: 'detach', clip_ids: [id], slot: 'effectStyleRef' });
 
-    expect([session.doc.tracks[0].clips[0].effectStyleRef, session.doc.tracks[0].clips[0].styleRef]).toEqual([undefined, 'Ink']);
+    expect([session.doc.tracks[0].clips[0].effectStyleRef, session.doc.tracks[0].clips[0].paintStyleRef]).toEqual([undefined, 'Ink']);
   });
 });

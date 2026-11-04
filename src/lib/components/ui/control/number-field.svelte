@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { fieldKeys } from "$lib/motion/field-keys";
 	import { cn } from "$lib/utils.js";
 	import { CONTROL_HEIGHT, DEFAULT_TEXT, MIXED_TEXT, type ControlProps } from "./types";
 
@@ -8,6 +9,7 @@
 
 <div class="flex w-full min-w-0 items-stretch gap-1" data-slot="number-field">
 	<input
+		{@attach fieldKeys}
 		type="number"
 		aria-label={label}
 		{min}
@@ -16,7 +18,7 @@
 		{disabled}
 		value={mixed || value === null ? "" : String(value)}
 		placeholder={mixed ? MIXED_TEXT : DEFAULT_TEXT}
-		class={cn(CONTROL_HEIGHT, "min-w-0 flex-1 border border-line-2 bg-background px-2 text-xs tabular-nums outline-none focus-visible:border-ring")}
+		class={cn(CONTROL_HEIGHT, "min-w-0 flex-1 border border-line-2 bg-background px-2 text-xs tracking-normal tabular-nums outline-none focus-visible:border-ring")}
 		onchange={(e) => onchange(Number(e.currentTarget.value))}
 	/>
 	{@render action?.()}

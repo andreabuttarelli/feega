@@ -1,9 +1,10 @@
 import { isTypingTarget } from '$lib/shortcuts';
-import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { Command, SHORTCUTS, commandFor } from '$lib/motion/shortcuts';
-import { Edge } from '$lib/motion/space';
+import { Command, OPACITY_KEYS, SHORTCUTS, commandFor } from '$lib/motion/shortcuts';
+import { Axis, Edge } from '$lib/motion/space';
 import { FrameView } from './frame-view';
+import { EditMode } from '$lib/motion/edit-mode';
+import { Flip } from '$lib/motion/layer-props';
 
 export const NUDGE_STEP = 1;
 export const NUDGE_STEP_BIG = 10;
@@ -12,7 +13,7 @@ export type CanvasCommandId =
   | 'delete'
   | 'deselect'
   | 'select-all'
-  | 'add'
+  | 'opacity'
   | 'fit'
   | 'zoom-actual'
   | 'zoom-selection'
@@ -20,6 +21,7 @@ export type CanvasCommandId =
   | 'zoom-out'
   | 'nudge'
   | 'align'
+  | 'distribute'
   | 'tidy'
   | 'wrap-stack'
   | 'edit-mode'
@@ -37,20 +39,30 @@ export type CanvasCommandId =
   | 'redo'
   | 'group'
   | 'ungroup'
+  | 'frame'
   | 'tool'
   | 'comment'
   | 'bring-front'
   | 'send-back'
+  | 'bring-forward'
+  | 'send-backward'
+  | 'rename'
   | 'help'
+  | 'toggle-hidden'
+  | 'toggle-locked'
+  | 'flip'
+  | 'export'
   | 'view';
 
 export type CanvasCommand =
-  | { id: 'add'; what: Addable }
+  | { id: 'opacity'; opacity: number }
   | { id: 'nudge'; dx: number; dy: number }
   | { id: 'tool'; tool: DrawTool }
   | { id: 'align'; edge: Edge }
+  | { id: 'distribute'; axis: Axis }
   | { id: 'view'; view: FrameView }
-  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align' | 'view'> };
+  | { id: 'flip'; flip: Flip }
+  | { id: Exclude<CanvasCommandId, 'opacity' | 'nudge' | 'tool' | 'align' | 'distribute' | 'view' | 'flip'> };
 
 const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolSelect]: DrawTool.Select,
@@ -76,13 +88,20 @@ const VIEW_OF_COMMAND: Partial<Record<Command, FrameView>> = {
   [Command.TogglePivot]: FrameView.Pivot
 };
 
-function viewFor(e: KeyboardEvent): FrameView | null {
-  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey });
+function viewFor(e: KeyboardEvent, mode: EditMode): FrameView | null {
+  const command = commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }, mode);
   return command ? (VIEW_OF_COMMAND[command] ?? null) : null;
 }
 
 function sectionFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: false, shift: e.shiftKey }) === Command.Section;
+}
+
+const FLIP_OF_COMMAND: Partial<Record<Command, Flip>> = { [Command.FlipHorizontal]: Flip.Horizontal, [Command.FlipVertical]: Flip.Vertical };
+
+function flipFor(e: KeyboardEvent): Flip | null {
+  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
+  return command ? (FLIP_OF_COMMAND[command] ?? null) : null;
 }
 
 function stackFor(e: KeyboardEvent): boolean {
@@ -97,13 +116,13 @@ function codeModeFor(e: KeyboardEvent): boolean {
   return commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }) === Command.ToggleDevMode;
 }
 
-function toolFor(e: KeyboardEvent): DrawTool | null {
-  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
+function toolFor(e: KeyboardEvent, mode: EditMode = EditMode.Motion): DrawTool | null {
+  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey }, mode);
   return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
 }
 
-export function canvasToolKeys(command: Command): string {
-  const heard = SHORTCUTS.filter((b) => b.command === command && !b.mod && !b.alt && toolFor({ key: b.key, shiftKey: Boolean(b.shift) } as KeyboardEvent) === TOOL_OF_COMMAND[command]);
+export function canvasToolKeys(command: Command, mode: EditMode = EditMode.Motion): string {
+  const heard = SHORTCUTS.filter((b) => b.command === command && !b.mod && !b.alt && (b.mode ?? mode) === mode && toolFor({ key: b.key, shiftKey: Boolean(b.shift) } as KeyboardEvent, mode) === TOOL_OF_COMMAND[command] && !viewFor({ key: b.key, shiftKey: Boolean(b.shift) } as KeyboardEvent, mode));
   return [...new Set(heard.map((b) => b.label))].join(' ');
 }
 
@@ -123,7 +142,12 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.SelectNext]: { id: 'select-next' },
   [Command.SelectPrevious]: { id: 'select-previous' },
   [Command.BringToFront]: { id: 'bring-front' },
+  [Command.BringForward]: { id: 'bring-forward' },
+  [Command.SendBackward]: { id: 'send-backward' },
   [Command.SendToBack]: { id: 'send-back' },
+  [Command.ToggleHidden]: { id: 'toggle-hidden' },
+  [Command.ToggleLocked]: { id: 'toggle-locked' },
+  [Command.Export]: { id: 'export' },
   [Command.PreviewZoomIn]: { id: 'zoom-in' },
   [Command.PreviewZoomOut]: { id: 'zoom-out' },
   [Command.PreviewFit]: { id: 'fit' },
@@ -132,6 +156,8 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.Help]: { id: 'help' },
   [Command.TidyUp]: { id: 'tidy' },
   [Command.WrapStack]: { id: 'wrap-stack' },
+  [Command.FlipHorizontal]: { id: 'flip', flip: Flip.Horizontal },
+  [Command.FlipVertical]: { id: 'flip', flip: Flip.Vertical },
   [Command.ToggleEditMode]: { id: 'edit-mode' },
   [Command.Section]: { id: 'section' },
   [Command.AlignLeft]: { id: 'align', edge: Edge.Left },
@@ -165,11 +191,9 @@ export const CANVAS_COMMAND_OF: Partial<Record<Command, CanvasCommand>> = {
   [Command.MoveDownMore]: nudgeBy(0, 1, NUDGE_STEP_BIG)
 };
 
-const PASTE_MOD_KEYS:Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
+const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-forward' | 'send-backward' | 'rename'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-forward', '[': 'send-backward', r: 'rename' };
 
-export function addableOf(c: CanvasCommand): Addable | null {
-  return c.id === 'add' ? c.what : null;
-}
+const SHIFT_MOD_KEYS: Record<string, CanvasCommand> = { h: { id: 'toggle-hidden' }, l: { id: 'toggle-locked' } };
 
 export function nudgeOf(c: CanvasCommand): { dx: number; dy: number } | null {
   return c.id === 'nudge' ? { dx: c.dx, dy: c.dy } : null;
@@ -184,15 +208,17 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 
 const ZOOM_IN_KEYS = ['+', '='];
 
+const OPACITY_OF_KEY = new Map<string, number>(OPACITY_KEYS.map((o) => [o.key, o.opacity]));
+
 const HELP_KEY = '?';
 const COMMENT_KEY = 'c';
-const MOD_KEY = 'mod';
+const MOD_PREFIX = /^mod ?/;
 
 const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
 
 const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
 
-const MOD_ALT_KEYS: Record<string, CanvasCommand> = { KeyT: { id: 'tidy' }, BracketLeft: { id: 'send-back' }, BracketRight: { id: 'bring-front' } };
+const MOD_ALT_KEYS: Record<string, CanvasCommand> = { KeyT: { id: 'tidy' }, KeyG: { id: 'frame' }, KeyH: { id: 'distribute', axis: Axis.X }, KeyV: { id: 'distribute', axis: Axis.Y }, BracketLeft: { id: 'send-back' }, BracketRight: { id: 'bring-front' } };
 
 function altCommand(e: KeyboardEvent): CanvasCommand | null {
   if (isTypingTarget(e.target)) return null;
@@ -208,11 +234,14 @@ const ACTIVATION_KEYS = new Set(['Enter', ' ']);
 const CONTROL_TAGS = new Set(['button', 'select', 'summary', 'input', 'textarea']);
 const CONTROL_ROLES = new Set(['button', 'link', 'checkbox', 'radio', 'switch', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'tab', 'combobox']);
 
+export const CANVAS_TILE_ATTR = 'data-canvas-tile';
+
 function isControl(target: EventTarget | null): boolean {
   const el = target as (Partial<HTMLElement> & { tagName?: string }) | null;
   if (!el?.tagName) return false;
   const tag = el.tagName.toLowerCase();
   const attr = (name: string) => el.getAttribute?.(name) ?? null;
+  if (attr(CANVAS_TILE_ATTR) !== null) return false;
   if (CONTROL_TAGS.has(tag) || el.isContentEditable === true) return true;
   if (tag === 'a' && attr('href') !== null) return true;
   return CONTROL_ROLES.has(attr('role') ?? '');
@@ -220,7 +249,7 @@ function isControl(target: EventTarget | null): boolean {
 
 const ownsKey = (e: KeyboardEvent): boolean => isTypingTarget(e.target) || (ACTIVATION_KEYS.has(e.key) && isControl(e.target));
 
-export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
+export function matchCanvasShortcut(e: KeyboardEvent, mode: EditMode = EditMode.Motion): CanvasCommand | null {
   if (e.altKey) return altCommand(e);
 
   if (ownsKey(e)) return null;
@@ -228,7 +257,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key;
 
-  const view = viewFor(e);
+  const view = viewFor(e, mode);
   if (view) return { id: 'view', view };
   if (codeModeFor(e)) return { id: 'code-mode' };
 
@@ -236,7 +265,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     if (key.toLowerCase() === 'z') return { id: e.shiftKey ? 'redo' : 'undo' };
     if (key.toLowerCase() === 'g') return { id: e.shiftKey ? 'ungroup' : 'group' };
     if (key === 'Backspace' || key === 'Delete') return { id: 'delete-keep' };
-    if (e.shiftKey) return null;
+    if (e.shiftKey) return SHIFT_MOD_KEYS[key.toLowerCase()] ?? null;
     if (key.toLowerCase() === 'a') return { id: 'select-all' };
     if (key.toLowerCase() === 'j') return { id: 'timeline' };
     const command = PASTE_MOD_KEYS[key.toLowerCase()];
@@ -248,10 +277,12 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
   if (key === COMMENT_KEY) return { id: 'comment' };
 
   if (stackFor(e)) return { id: 'wrap-stack' };
+  const flip = flipFor(e);
+  if (flip) return { id: 'flip', flip };
   if (editModeFor(e)) return { id: 'edit-mode' };
   if (sectionFor(e)) return { id: 'section' };
 
-  const tool = toolFor(e);
+  const tool = toolFor(e, mode);
   if (tool) return { id: 'tool', tool };
 
   if (key === 'Backspace' || key === 'Delete') return { id: 'delete' };
@@ -267,17 +298,18 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
 
   const shiftZoom = e.shiftKey ? SHIFT_DIGIT_ZOOM[e.code] : undefined;
   if (shiftZoom) return { id: shiftZoom };
-  if (key === '0') return { id: 'fit' };
   if (ZOOM_IN_KEYS.includes(key)) return { id: 'zoom-in' };
   if (key === '-') return { id: 'zoom-out' };
 
-  const slot = Number(key);
-  if (Number.isInteger(slot) && slot >= 1 && slot <= CANVAS_ADD_BAR.length) {
-    return { id: 'add', what: CANVAS_ADD_BAR[slot - 1] };
-  }
+  const opacity = e.shiftKey ? undefined : OPACITY_OF_KEY.get(key);
+  if (opacity !== undefined) return { id: 'opacity', opacity };
 
   return null;
 }
+
+const selectsParent = (e: KeyboardEvent): boolean => !isTypingTarget(e.target) && commandFor({ key: e.key, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey }) === Command.SelectParent;
+
+export const climbsUp = (e: KeyboardEvent): boolean => e.key === 'Escape' || selectsParent(e);
 
 export function preventable(c: CanvasCommand): boolean {
   return c.id !== 'deselect';
@@ -286,11 +318,7 @@ export function preventable(c: CanvasCommand): boolean {
 export type CanvasShortcutRow = { id: CanvasCommandId; keys: string[]; label: string };
 
 export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
-  ...CANVAS_ADD_BAR.map((what, i) => ({
-    id: 'add' as const,
-    keys: [String(i + 1)],
-    label: `Add: ${ADDABLE_LABEL[what]}`
-  })),
+  { id: 'opacity', keys: ['1…9', '0'], label: 'Opacity: 1 to 9 = 10 to 90%, 0 = 100%' },
   { id: 'delete', keys: ['⌫'], label: 'Delete selection' },
   { id: 'select-all', keys: ['mod', 'A'], label: 'Select all' },
   { id: 'deselect', keys: ['Esc'], label: 'Deselect' },
@@ -300,16 +328,25 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Redo' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
-  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P', '⇧F'], label: 'Select, text, box, ellipse, pen, frame' },
+  { id: 'tool', keys: ['V', 'T', 'R', 'O', 'P', 'F'], label: 'Select, text, box, ellipse, pen, frame' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
-  { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
-  { id: 'send-back', keys: ['mod', '['], label: 'Send to back' },
+  { id: 'frame', keys: ['⌥', 'mod', 'G'], label: 'Frame the selection' },
+  { id: 'bring-forward', keys: ['mod', ']'], label: 'Bring forward' },
+  { id: 'send-backward', keys: ['mod', '['], label: 'Send backward' },
+  { id: 'bring-front', keys: ['⌥', 'mod', ']'], label: 'Bring to front' },
+  { id: 'send-back', keys: ['⌥', 'mod', '['], label: 'Send to back' },
+  { id: 'rename', keys: ['mod', 'R'], label: 'Rename the selection' },
+  { id: 'toggle-hidden', keys: ['⇧', 'mod', 'H'], label: 'Hide / show the selection' },
+  { id: 'toggle-locked', keys: ['⇧', 'mod', 'L'], label: 'Lock / unlock the selection' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
   { id: 'paste', keys: ['mod', 'V'], label: 'Paste' },
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
-  { id: 'wrap-stack', keys: ['⇧A'], label: 'Wrap with stack' },
+  { id: 'distribute', keys: ['⌃⌥H', '⌃⌥V'], label: 'Distribute horizontally, vertically' },
+  { id: 'wrap-stack', keys: ['⇧A'], label: 'Wrap with stack, or add auto layout to a frame' },
+  { id: 'flip', keys: ['⇧H'], label: 'Flip horizontal' },
+  { id: 'flip', keys: ['⇧V'], label: 'Flip vertical' },
   { id: 'edit-mode', keys: ['E'], label: 'Design or Motion: edit the resting state or key at the playhead' },
   { id: 'timeline', keys: ['mod', 'J'], label: 'Timeline: scrub in Design, key in Motion' },
   { id: 'code-mode', keys: ['⇧D'], label: 'Code: read and export a layer' },
@@ -317,7 +354,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'delete-keep', keys: ['mod', '⌫'], label: 'Delete a section, keep what is in it' },
   { id: 'view', keys: ["⇧'", '⇧G', 'mod Y'], label: 'Pixel grid, layout guides, outline view' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
-  { id: 'fit', keys: ['0', '⇧1'], label: 'Zoom to fit' },
+  { id: 'fit', keys: ['⇧1'], label: 'Zoom to fit' },
   { id: 'zoom-actual', keys: ['⇧0'], label: 'Zoom to 100%' },
   { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
   { id: 'zoom-in', keys: ['+'], label: 'Zoom in' },
@@ -329,14 +366,13 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
 export type CanvasGuideRow = { id: string; name: string; keys: string; gesture: string };
 
 enum GuideGroup {
-  Add = 'Add',
   Select = 'Select',
   Edit = 'Edit',
   View = 'View'
 }
 
 const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
-  add: GuideGroup.Add,
+  opacity: GuideGroup.Edit,
   delete: GuideGroup.Edit,
   'select-all': GuideGroup.Select,
   deselect: GuideGroup.Select,
@@ -352,11 +388,20 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
   paste: GuideGroup.Edit,
   group: GuideGroup.Edit,
   ungroup: GuideGroup.Edit,
+  frame: GuideGroup.Edit,
   'bring-front': GuideGroup.Edit,
   'send-back': GuideGroup.Edit,
+  'bring-forward': GuideGroup.Edit,
+  'send-backward': GuideGroup.Edit,
+  rename: GuideGroup.Edit,
+  'toggle-hidden': GuideGroup.Edit,
+  'toggle-locked': GuideGroup.Edit,
+  export: GuideGroup.Edit,
   align: GuideGroup.Edit,
   tidy: GuideGroup.Edit,
+  distribute: GuideGroup.Edit,
   'wrap-stack': GuideGroup.Edit,
+  flip: GuideGroup.Edit,
   'edit-mode': GuideGroup.Edit,
   timeline: GuideGroup.Edit,
   'code-mode': GuideGroup.View,
@@ -375,5 +420,5 @@ const GUIDE_GROUP: Record<CanvasCommandId, GuideGroup> = {
 export const canvasGuide = (mod: string): { group: string; rows: CanvasGuideRow[] }[] =>
   Object.values(GuideGroup).map((group) => ({
     group,
-    rows: CANVAS_SHORTCUTS.flatMap((row, i) => (GUIDE_GROUP[row.id] === group ? [{ id: `${row.id}-${i}`, name: row.label, keys: row.keys.map((k) => (k === MOD_KEY ? mod : k)).join(' '), gesture: '' }] : []))
+    rows: CANVAS_SHORTCUTS.flatMap((row, i) => (GUIDE_GROUP[row.id] === group ? [{ id: `${row.id}-${i}`, name: row.label, keys: row.keys.map((k) => k.replace(MOD_PREFIX, mod)).join(' '), gesture: '' }] : []))
   }));

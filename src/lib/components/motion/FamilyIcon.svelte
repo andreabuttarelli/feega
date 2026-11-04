@@ -13,6 +13,7 @@
   import Layers from '@lucide/svelte/icons/layers';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import Frame from '@lucide/svelte/icons/frame';
+  import Group from '@lucide/svelte/icons/group';
   import { ClipFamily } from '$lib/motion/track-style';
 
   let { family = null, size = 14 }: { family?: ClipFamily | null; size?: number } = $props();
@@ -29,7 +30,8 @@
     [ClipFamily.Camera]: Camera,
     [ClipFamily.Mask]: SquareDashed,
     [ClipFamily.Precomp]: Layers,
-    [ClipFamily.Adjustment]: SlidersHorizontal
+    [ClipFamily.Adjustment]: SlidersHorizontal,
+    [ClipFamily.Group]: Group
   };
 
   const Icon = $derived(family ? ICONS[family] : Frame);

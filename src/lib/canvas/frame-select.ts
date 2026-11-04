@@ -1,5 +1,5 @@
 import { findClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
-import { Depth, drill, type Gesture, type Level, type Probe } from '$lib/motion/drill';
+import { Depth, Gesture, drill, type Level, type Probe } from '$lib/motion/drill';
 import { EditMode } from '$lib/motion/edit-mode';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { PART_SEP } from '@feega/motion-core/motion/poster-parts';
@@ -11,6 +11,8 @@ import type { ActionId } from '$lib/motion/actions';
 export type Inside = { nodeId: string; level: Level };
 
 export const frameLevel = (): Level => ({ depth: Depth.Frame, clip: null, part: null });
+
+export const picksOwnKeys = (inside: Inside | null, picks: readonly string[]): boolean => !!inside && picks.length > 0;
 
 const probeOf = (top: string | null): Probe => ({ top, picked: top, partOf: () => null, firstClip: null, firstPart: () => null, editable: () => false });
 
@@ -73,12 +75,37 @@ const SPAN_TOLERANCE = 1e-3;
 
 const spansFrame = (clip: MotionClip): boolean => Object.entries(FULL_FRAME).every(([key, full]) => Math.abs(Number(clip.props[key]) - full) <= SPAN_TOLERANCE);
 
-export function framePage(doc: MotionDoc): string | null {
-  const clips = doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips as MotionClip[]);
+export enum Root {
+  Page = 'page',
+  Own = 'own'
+}
+
+const WRAPPER_PICKABLE: Record<Root, boolean> = { [Root.Page]: true, [Root.Own]: false };
+
+export function leaveLevel(root: Root, level: Level): Level | null {
+  const up = stepInside(level, Gesture.Leave, null);
+  return up.clip === null && !WRAPPER_PICKABLE[root] ? null : up;
+}
+
+const visualClips = (doc: MotionDoc) => doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips as MotionClip[]);
+
+export const rootLayersOf = (doc: MotionDoc): string[] => visualClips(doc).flatMap((c) => (!c.parent && isLayer(doc, c.id) ? [c.id] : []));
+
+export const ownClipOf = (doc: MotionDoc): string | null => visualClips(doc).find((c) => !c.parent)?.id ?? null;
+
+function pageClip(doc: MotionDoc): string | null {
+  const clips = visualClips(doc);
   const roots = clips.filter((c) => !c.parent && isLayer(doc, c.id));
   const [only] = roots;
   return roots.length === 1 && spansFrame(only) && clips.some((c) => c.parent === only.id) ? only.id : null;
 }
+
+const PAGE_OF: Record<Root, (doc: MotionDoc) => string | null> = {
+  [Root.Page]: pageClip,
+  [Root.Own]: () => null
+};
+
+export const framePage = (doc: MotionDoc, root: Root = Root.Page): string | null => PAGE_OF[root](doc);
 
 function samePlaceOrTop(doc: MotionDoc, hit: string, picks: readonly string[]): string | null {
   const page = framePage(doc);
@@ -116,3 +143,35 @@ export type Held = { selected: readonly string[]; inside: string | null; picks: 
 const heldWhole = (held: Held, node: string): boolean => held.selected.includes(node) && (held.inside !== node || !held.picks.length);
 
 export const pressOn = (held: Held, node: string, reach: Reach): Press => (reach === Reach.Top && heldWhole(held, node) ? Press.Host : Press.Child);
+
+export enum Extend {
+  None = 'none',
+  Toggle = 'toggle',
+  Band = 'band'
+}
+
+export type ExtendKeys = { shift: boolean; mod: boolean };
+export type ExtendAt = { onClip: boolean; onBody: boolean; held: boolean; entered: boolean; selectedElsewhere: boolean; picks: number; bandable: boolean };
+export type ExtendPlan = { extend: Extend; reach: Reach };
+
+enum Keys {
+  Plain = 'plain',
+  Shift = 'shift',
+  Mod = 'mod',
+  Both = 'both'
+}
+
+const keysOf = ({ shift, mod }: ExtendKeys): Keys => (shift ? (mod ? Keys.Both : Keys.Shift) : mod ? Keys.Mod : Keys.Plain);
+
+const shiftOpen = (at: ExtendAt) => at.entered || !at.selectedElsewhere;
+
+const bandOn = (at: ExtendAt) => (at.onBody ? Extend.Band : Extend.None);
+
+const EXTEND: Record<Keys, (at: ExtendAt) => Extend> = {
+  [Keys.Plain]: (at) => (at.onClip || at.held || !at.bandable ? Extend.None : bandOn(at)),
+  [Keys.Shift]: (at) => (!shiftOpen(at) ? Extend.None : at.onClip ? Extend.Toggle : bandOn(at)),
+  [Keys.Mod]: (at) => (!at.onClip ? bandOn(at) : at.entered && at.picks > 0 ? Extend.Toggle : Extend.None),
+  [Keys.Both]: (at) => (at.onClip ? Extend.Toggle : bandOn(at))
+};
+
+export const extendOf = (keys: ExtendKeys, at: ExtendAt): ExtendPlan => ({ extend: EXTEND[keysOf(keys)](at), reach: keys.mod ? Reach.Deep : Reach.Top });

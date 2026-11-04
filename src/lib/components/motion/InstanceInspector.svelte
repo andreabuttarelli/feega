@@ -1,20 +1,24 @@
 <script lang="ts">
+  import { fieldKeys } from '$lib/motion/field-keys';
   import ColorField from './ColorField.svelte';
   import { ColourDisplay } from '$lib/motion/colour-field';
   import Diamond from '@lucide/svelte/icons/diamond';
   import Target from '@lucide/svelte/icons/target';
   import { mainNav } from '$lib/canvas/main-nav.svelte';
   import type { MotionDoc } from '@feega/motion-core/motion/doc';
-  import { Paint, instanceElements, instanceOf, instanceTexts, overrideInstance, recolorInstance, resetOverride } from '$lib/motion/main-component';
+  import { ComponentRole, InstancePart, Paint, instanceElements, instanceOf, instanceParts, instanceTexts, overrideInstance, recolorInstance, resetOverride, roleOf } from '$lib/motion/main-component';
   import { Action, type ActionId } from '$lib/motion/actions';
   import { defineProperty, exposable, instanceProperties, removeProperty, resetProperty, setPreferred, setProperty, type Exposure } from '$lib/motion/component-properties';
   import { PropertyKind, type PropertyDef } from '@feega/motion-core/motion/property-resolve';
-  import { addVariant, pickVariant, swapInstance, variantChips, variantProps } from '$lib/motion/variants';
+  import { addVariantBeside, setMainOf } from '$lib/motion/component-set';
+  import { pickVariant, swapInstance, variantChips, variantProps } from '$lib/motion/variants';
   import VariantMatrix from './VariantMatrix.svelte';
 
-  let { doc, clipId, onchange, onrun }: { doc: MotionDoc; clipId: string; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();
+  let { doc, clipId, here = null, onchange, onrun }: { doc: MotionDoc; clipId: string; here?: string | null; onchange: (doc: MotionDoc, summary: string) => void; onrun: (id: ActionId) => void } = $props();
 
   const instance = $derived(instanceOf(doc, clipId));
+  const role = $derived(roleOf(doc, clipId, here) ?? ComponentRole.Instance);
+  const parts = $derived(instanceParts(role));
   const mainRequest = $derived(instance ? { compId: instance.compId, home: instance.comp.component?.home ?? null } : null);
   const mainLocation = $derived(mainRequest ? mainNav.where(mainRequest) : null);
   const texts = $derived(instanceTexts(doc, clipId));
@@ -23,7 +27,6 @@
   const variantValues = $derived(instance ? variantProps(doc, instance.compId) : {});
   const chips = $derived(instance ? variantChips(doc, instance.compId) : null);
   const mains = $derived(Object.entries(doc.comps).filter(([, c]) => c.component));
-  const VARIANT_KEY = 'Variant';
 
   function applied(result: ReturnType<typeof swapInstance>, summary: string) {
     if (result.ok) {
@@ -35,9 +38,7 @@
     if (!instance) {
       return;
     }
-    const key = Object.keys(variantValues)[0] ?? VARIANT_KEY;
-    const count = (variantValues[key]?.length ?? 1) + 1;
-    applied(addVariant(doc, instance.compId, { [key]: `${VARIANT_KEY} ${count}` }, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
+    applied(addVariantBeside(doc, clipId, () => crypto.randomUUID().slice(0, 8)), 'Added a variant');
   }
 
   function change(result: ReturnType<typeof overrideInstance>, summary: string) {
@@ -80,9 +81,10 @@
     <header>
       <Diamond size={14} />
       <span class="name">{instance.comp.component?.name}</span>
-      <button type="button" class="go-main" data-testid="instance-go-main" aria-label="Go to main component" title={mainLocation ? `Go to main component: ${mainLocation.label}` : 'Go to main component'} onclick={() => mainRequest && mainNav.go(mainRequest)}>
+      {#if role === ComponentRole.Main}<span class="role" data-testid="main-component-role">Main component</span>{/if}
+      {#if parts.has(InstancePart.GoToMain)}<button type="button" class="go-main" data-testid="instance-go-main" aria-label="Go to main component" title={mainLocation ? `Go to main component: ${mainLocation.label}` : 'Go to main component'} onclick={() => mainRequest && mainNav.go(mainRequest)}>
         <Target size={14} />
-      </button>
+      </button>{/if}
     </header>
     {#each properties as p (p.key)}
       <label class="field" data-testid="instance-property" data-key={p.key}>
@@ -101,7 +103,7 @@
             </optgroup>
           </select>
         {:else}
-          <input type="text" value={String(p.value)} data-testid="instance-property-text" onchange={(e) => setProp(p.key, e.currentTarget.value)} />
+          <input {@attach fieldKeys} type="text" value={String(p.value)} data-testid="instance-property-text" onchange={(e) => setProp(p.key, e.currentTarget.value)} />
         {/if}
         {#if p.overridden}<button type="button" class="reset" data-testid="instance-property-reset" onclick={() => resetProp(p.key)}>Reset</button>{:else}<button type="button" class="reset" data-testid="instance-property-remove" onclick={() => dropProp(p.key)}>Remove</button>{/if}
       </label>
@@ -117,10 +119,11 @@
         {/each}
       </div>
     {/each}
+    {#if parts.has(InstancePart.Overrides)}
     {#each texts as t (t.innerId)}
       <label class="field">
         <span class:overridden={t.overridden}>{t.main}</span>
-        <input type="text" value={t.value} data-testid="instance-text" onchange={(e) => retext(t.innerId, e.currentTarget.value)} />
+        <input {@attach fieldKeys} type="text" value={t.value} data-testid="instance-text" onchange={(e) => retext(t.innerId, e.currentTarget.value)} />
         {#if t.overridden}<button type="button" class="reset" data-testid="instance-reset-text" onclick={() => reset(t.innerId, 'text')}>Reset</button>{/if}
       </label>
     {/each}
@@ -169,6 +172,7 @@
         {/if}
       </div>
     {/each}
+    {/if}
     {#if chips}
       <div class="chips" role="radiogroup" aria-label="Variant" data-testid="instance-variant-chips">
         {#each chips as chip (chip.compId)}
@@ -185,17 +189,19 @@
       </label>
     {/each}
     <VariantMatrix {doc} {clipId} compId={instance.compId} {onchange} />
+    {#if parts.has(InstancePart.Swap)}
     <label class="field">
       <span>Swap</span>
       <select data-testid="instance-swap" value={instance.compId} onchange={(e) => applied(swapInstance(doc, clipId, e.currentTarget.value), 'Swapped instance')}>
         {#each mains as [id, comp] (id)}<option value={id}>{comp.component?.name}{comp.component?.variant ? ` · ${Object.values(comp.component.variant).join(', ')}` : ''}</option>{/each}
       </select>
     </label>
+    {/if}
     <div class="actions">
-      <button type="button" data-testid="instance-add-variant" onclick={newVariant}>Add variant</button>
-      <button type="button" data-testid="instance-reset" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.ResetInstance)}>Reset overrides</button>
-      <button type="button" data-testid="instance-push" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.PushInstance)}>Push to main</button>
-      <button type="button" data-testid="instance-detach" onclick={() => onrun(Action.DetachInstance)}>Detach</button>
+      {#if role === ComponentRole.Main && !setMainOf(doc)}<button type="button" data-testid="instance-add-variant" onclick={newVariant}>Add variant</button>{/if}
+      {#if parts.has(InstancePart.Reset)}<button type="button" data-testid="instance-reset" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.ResetInstance)}>Reset overrides</button>{/if}
+      {#if parts.has(InstancePart.Push)}<button type="button" data-testid="instance-push" disabled={!Object.keys(instance.overrides).length} onclick={() => onrun(Action.PushInstance)}>Push to main</button>{/if}
+      {#if parts.has(InstancePart.Detach)}<button type="button" data-testid="instance-detach" onclick={() => onrun(Action.DetachInstance)}>Detach</button>{/if}
     </div>
   </section>
 {/if}
@@ -221,6 +227,10 @@
   .name {
     flex: 1 1 auto;
     color: var(--ui-text);
+  }
+
+  .role {
+    color: var(--ui-text-2);
   }
 
   .go-main {

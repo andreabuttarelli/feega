@@ -1,5 +1,6 @@
 <script lang="ts">
   import MotionInspector from '$lib/components/motion/MotionInspector.svelte';
+  import ExportSection from './ExportSection.svelte';
   import MultiInspector from '$lib/components/motion/MultiInspector.svelte';
   import LookInspector from '$lib/components/motion/LookInspector.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
@@ -25,6 +26,9 @@
   import ScenesSection from '$lib/components/motion/ScenesSection.svelte';
   import FrameColoursSection from '$lib/components/motion/FrameColoursSection.svelte';
   import FramePresetSection from '$lib/components/motion/FramePresetSection.svelte';
+  import FramePlaceSection from './FramePlaceSection.svelte';
+  import FrameAutoLayoutEntry from './FrameAutoLayoutEntry.svelte';
+  import { stackFrame } from '$lib/motion/layout/ops';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import type { FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
@@ -44,13 +48,14 @@
   import SoundSection from './SoundSection.svelte';
   import PlayInspector from './PlayInspector.svelte';
   import NodeInspector from './NodeInspector.svelte';
-  import { FRAME_PANEL_ACTIONS } from '$lib/canvas/selection-actions';
-  import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
+  import GroupInspector from './GroupInspector.svelte';
+  import { FramePanel } from '$lib/canvas/motion-node';
   import { selectionProperties } from './selection-properties.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import { frameSurface, withSurface } from '@feega/motion-core/motion/surface';
   import { EditMode } from '$lib/motion/edit-mode';
   import { alignSpace, distributeSpace, propBoxes, type Axis, type Edge } from '$lib/motion/space';
+  import { scaleOf } from '$lib/motion/units';
 
   const FIRST_FRAME = 0;
   const SURFACE_ID = 'frame-surface';
@@ -79,7 +84,9 @@
   const doc = $derived(source && session ? inView(source, session.breakpoint) : source);
   const surfaced = $derived(doc ? withSurface(doc, SURFACE_ID) : null);
   const surface = $derived(surfaced ? frameSurface(surfaced) : null);
-  const shown = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const inspected = $derived(session && doc ? inspectorOf(doc, session.selection) : null);
+  const shown = $derived(inspected && { ...inspected, here: frameProperties.nodeId });
+  const scale = $derived(source ? scaleOf(source, frameProperties.place) : 1);
   const edit = (next: NonNullable<typeof doc>, summary: string) => session && source && session.edit(liftEdit(source, session.breakpoint, next), summary);
   const editSource = (result: OpResult, summary: string) => session?.apply(result, summary);
   const pickView = (breakpointId: string) => session && (session.breakpoint = breakpointId);
@@ -95,7 +102,7 @@
     if (!session || !doc) {
       return;
     }
-    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}) });
+    const done = await barActionLater(id, { doc, selection: session.selection, frame: FIRST_FRAME, newId: () => crypto.randomUUID().slice(0, 8), load: letteringOf(tokens ?? FEEGA_TOKENS, frameProperties.extras?.assetUrls ?? {}), here: frameProperties.nodeId });
     if (!done) {
       return;
     }
@@ -105,6 +112,12 @@
 </script>
 
 {#snippet headerBar()}{#if session && doc}<HeaderActions {doc} selection={session.selection} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} />{/if}{/snippet}
+
+{#snippet frameLead()}
+  {#if frameProperties.place}<FramePlaceSection place={frameProperties.place} />{/if}
+  {#if frameProperties.place}<FramePresetSection place={frameProperties.place} />{/if}
+  {#if surfaced && !surface?.autoLayout}<FrameAutoLayoutEntry onadd={() => surfaced && editGuides(stackFrame(surfaced, SURFACE_ID), 'Added auto layout')} />{/if}
+{/snippet}
 
 {#snippet partLead()}{#if part && shown?.clip && doc && tokens}<PosterPartPanel gesture={session?.live} doc={shownDoc!} clip={shown.clip} {part} {assets} {upload} {tokens} onchange={editShown} />{/if}{/snippet}
 
@@ -121,51 +134,45 @@
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}
   </aside>
+{:else if session && doc && frameProperties.panel === FramePanel.Group && !session.selection.length}
+  <GroupInspector />
 {:else if session && doc && tokens && !session.selection.length}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     {#if editorMode.spec.sounds === SoundEntries.Shown && frameProperties.runAction}<SoundSection onrun={frameProperties.runAction} />{/if}
-    <FramePresetSection {doc} onchange={editGuides} />
     {#if surfaced && surface}
       <div class="frame-look" data-testid="frame-look">
-        <MotionInspector as={PropertiesView.Frame} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} onchange={edit} />
+        <MotionInspector as={PropertiesView.Frame} lead={frameLead} title={frameProperties.name} onrename={frameProperties.rename} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} {scale} onchange={edit} />
       </div>
     {/if}
     <LayoutGuidesSection {doc} onchange={editGuides} />
+    {#if frameProperties.exportRows}<ExportSection name={frameProperties.name} onexport={frameProperties.exportRows} />{/if}
     <details class="frame-settings" data-testid="frame-settings">
       <summary>Frame settings</summary>
       <DocFields gesture={session.live} {doc} {assets} {upload} onchange={edit} />
       <ScenesSection {doc} onchange={editGuides} />
       <FrameColoursSection {doc} onchange={editGuides} />
-      <CameraInspector {doc} frame={FIRST_FRAME} onchange={edit} />
+      <CameraInspector {doc} frame={FIRST_FRAME} {scale} onchange={edit} />
       <BreakpointsSection doc={source!} active={session.breakpoint} onchange={editSource} onpick={pickView} />
       <FlowSection {doc} onchange={editGuides} />
-      <StyleLibrarySection {tokens} />
+      <StyleLibrarySection {tokens} unit={Math.min(doc.width, doc.height) * scale} />
       <VariablesLibrarySection {doc} onchange={editGuides} />
     </details>
-    {#if frameProperties.runAction}
-      {@const run = frameProperties.runAction}
-      <section class="frame-actions" aria-label="Frame actions" data-testid="frame-actions">
-        {#each FRAME_PANEL_ACTIONS as action (action.id)}
-          {@const Icon = SELECTION_ACTION_ICON[action.id]}
-          <button type="button" data-testid={`frame-action-${action.id}`} onclick={() => run(action.id)}><Icon size={14} />{action.label}</button>
-        {/each}
-      </section>
-    {/if}
   </aside>
 {:else if session && doc && tokens && shown}
   <aside class="frame-inspector" data-testid="frame-inspector" data-mode-chrome={editorMode.spec.chrome} aria-label="Properties">
     {#if shown.view === PropertiesView.Multiple}
       <ClipBar {doc} selection={session.selection} pick={PickMode.One} extra={frameBarActions(doc, session.selection)} onrun={(id) => void runBar(id)} ondone={() => {}} />
       <AlignBar count={session.selection.length} onalign={alignPicks} ondistribute={distributePicks} />
-      <MultiInspector gesture={session.live} {doc} ids={session.selection} frame={session.playhead} mode={session.mode} onchange={edit} />
+      <MultiInspector gesture={session.live} {doc} ids={session.selection} frame={session.playhead} mode={session.mode} {scale} onchange={edit} />
     {:else if shown.view === PropertiesView.Template}
       <TemplateInspector actions={headerBar} gesture={session.live} {doc} clip={shown.clip} {assets} {upload} onchange={edit} />
     {:else}
       {@const Presets = CLIP_PRESETS[shown.clip.component]}
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
-      <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} onchange={editShown} onrun={(id) => void runBar(id)} />
+      <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} onchange={editShown} onalign={alignPicks} />
+      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} bind:fillOpen={frameProperties.editingFill} onchange={editShown} onalign={alignPicks} />
+      {#if frameProperties.exportRows}<ExportSection name="selection" onexport={frameProperties.exportRows} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}
         <StatesSection doc={shownDoc!} clip={shown.clip} current={statePreview.stateOf(nodeId, shown.clip.id)} commit={commitShown} onpreview={(next) => statePreview.pick(nodeId, shown.clip.id, next)} />
@@ -202,27 +209,6 @@
     font-weight: 600;
     cursor: pointer;
     border-bottom: 1px solid var(--ui-line);
-  }
-
-  .frame-actions {
-    display: flex;
-    flex-direction: column;
-    padding: var(--ui-space-2) var(--ui-space-3);
-  }
-
-  .frame-actions button {
-    display: flex;
-    align-items: center;
-    gap: var(--ui-space-2);
-    min-height: 32px;
-    padding: 0 var(--ui-space-2);
-    border-radius: var(--ui-radius-sm);
-    font-size: var(--ui-type-caption);
-    color: var(--ui-text);
-  }
-
-  .frame-actions button:hover {
-    background: var(--ui-wash);
   }
 
   .empty {

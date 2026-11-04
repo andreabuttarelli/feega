@@ -3,7 +3,7 @@ import { MAX_COMP_DEPTH, SEPARATOR, viewOf, type CompPath } from '@feega/motion-
 import { mergeScope, scopeView } from '$lib/motion/instance-view';
 import { IDENTITY, apply2d, invert2d, mul2d, worldAt, type Affine } from '@feega/motion-core/motion/parent';
 import type { Pt } from '$lib/motion/scene-select';
-import { Reach, clickTarget, framePage } from './frame-select';
+import { Reach, Root, childBelow, clickTarget, framePage } from './frame-select';
 
 export type Scope = { path: CompPath; prefix: string; hosts: string[]; parents: string[] };
 
@@ -47,18 +47,19 @@ function descend(doc: MotionDoc, scope: Scope, frame: number) {
   return { frame: at, toView: (p: Pt) => worlds.reduce<Pt>((q, w) => apply2d(invert2d(w), q) as Pt, p), fromView: worlds.reduce<Affine>((m, w) => mul2d(m, w), IDENTITY) };
 }
 
-export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: number): Scoped | null {
+export function scoped(doc: MotionDoc, sceneIds: readonly string[], frame: number, here: string | null = null): Scoped | null {
   const read = sceneIds.map((id) => scopeOf(doc, id));
   const scope = read[0]?.scope;
   if (!scope || read.some((r) => r?.scope.prefix !== scope.prefix)) {
     return null;
   }
   const inside = descend(doc, scope, frame);
+  const hosted = { ...scope, here };
   return {
-    view: scopeView(doc, scope),
+    view: scopeView(doc, hosted),
     ids: read.map((r) => r!.id),
     frame: inside.frame,
-    merge: (view) => mergeScope(doc, scope, view),
+    merge: (view) => mergeScope(doc, hosted, view),
     scene: (ids) => ids.map((id) => `${scope.prefix}${id}`),
     toView: inside.toView,
     fromView: inside.fromView
@@ -96,9 +97,16 @@ export function enteredFrom(chain: readonly string[], picks: readonly string[]):
   return at >= 0 ? (chain[at + 1] ?? null) : null;
 }
 
-function linkedParent(doc: MotionDoc, id: string): string | null {
-  const up = findClip(doc, id)?.clip.parent ?? null;
-  return up && up !== framePage(doc) ? up : null;
+export function childUnder(doc: MotionDoc, chain: readonly string[], picks: readonly string[]): string | null {
+  const leaf = chain.at(-1);
+  return enteredFrom(chain, picks) ?? (leaf ? childBelow(doc, leaf, picks) : null);
 }
 
-export const parentPick = (doc: MotionDoc, sceneId: string): string | null => linkedParent(doc, sceneId) ?? scopeOf(doc, sceneId)?.scope.parents.at(-1) ?? null;
+export const clickPick = (doc: MotionDoc, chain: readonly string[], picks: readonly string[], reach: Reach): string | null => (reach === Reach.Top ? childUnder(doc, chain, picks) : null) ?? pickTarget(doc, chain, picks, reach);
+
+function linkedParent(doc: MotionDoc, id: string, root: Root): string | null {
+  const up = findClip(doc, id)?.clip.parent ?? null;
+  return up && up !== framePage(doc, root) ? up : null;
+}
+
+export const parentPick = (doc: MotionDoc, sceneId: string, root: Root = Root.Page): string | null => linkedParent(doc, sceneId, root) ?? scopeOf(doc, sceneId)?.scope.parents.at(-1) ?? null;

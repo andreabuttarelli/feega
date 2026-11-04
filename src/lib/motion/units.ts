@@ -1,6 +1,8 @@
 import type { ComponentId } from '@feega/motion-core/motion/components';
 import type { CAMERA_LANE } from '@feega/motion-core/motion/camera';
 import { MASK_KEYS, MASK_PROPS } from '@feega/motion-core/motion/mask';
+import { EFFECT_LENGTHS } from '@feega/motion-core/motion/effects/registry';
+import { effectOfKey } from '@feega/motion-core/motion/effects/model';
 
 export type Owner = ComponentId | typeof CAMERA_LANE | null;
 
@@ -17,10 +19,17 @@ enum Basis {
   Height = 'height',
   Short = 'short',
   Hundred = 'hundred',
-  Same = 'same'
+  Same = 'same',
+  Pixel = 'pixel'
 }
 
-export type Frame = { width: number; height: number };
+export type Frame = { width: number; height: number; scale?: number };
+
+export type NodeSize = { w: number; h: number };
+
+export const scaleOf = (doc: Pick<Frame, 'width'>, node: NodeSize | null): number => (node ? node.w / doc.width : 1);
+
+export const spaceOf = (doc: Frame, scale: number): Frame => ({ width: doc.width * scale, height: doc.height * scale, scale });
 
 type Reach = readonly [number, number];
 
@@ -58,11 +67,11 @@ const degrees = (transform?: true): Rule => ({
 export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   x: px(Basis.Width, ONE_FRAME, true),
   y: px(Basis.Height, ONE_FRAME, true),
-  z: px(Basis.Same, NEAR_DEPTH, true),
-  depth: px(Basis.Same, FAR_DEPTH),
-  focusDistance: px(Basis.Same, FAR_DEPTH),
-  perspective: px(Basis.Same, undefined, true),
-  blur: px(Basis.Same, undefined, true),
+  z: px(Basis.Pixel, NEAR_DEPTH, true),
+  depth: px(Basis.Pixel, FAR_DEPTH),
+  focusDistance: px(Basis.Pixel, FAR_DEPTH),
+  perspective: px(Basis.Pixel, undefined, true),
+  blur: px(Basis.Pixel, undefined, true),
   scale: percent(SCALE_REACH, true),
   scaleX: percent(MIRROR_SCALE_REACH, true),
   scaleY: percent(MIRROR_SCALE_REACH, true),
@@ -77,8 +86,8 @@ export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   maskWidth: px(Basis.Width, UP_TO_TWO_FRAMES, true),
   maskHeight: px(Basis.Height, UP_TO_TWO_FRAMES, true),
   maskRotation: degrees(true),
-  maskFeather: px(Basis.Same, undefined, true),
-  maskExpansion: px(Basis.Same, undefined, true),
+  maskFeather: px(Basis.Pixel, undefined, true),
+  maskExpansion: px(Basis.Pixel, undefined, true),
   maskOpacity: percent(undefined, true),
   width: px(Basis.Width, UP_TO_FRAME),
   height: px(Basis.Height, UP_TO_FRAME),
@@ -100,25 +109,25 @@ export const PROPERTY_UNITS: Readonly<Record<string, Rule>> = {
   objectRotateZ: degrees(),
   orbit: degrees(),
   gradientAngle: degrees(),
-  gravity: { unit: Unit.PxPerSecondSquared, basis: Basis.Same },
-  velocityX: { unit: Unit.PxPerSecond, basis: Basis.Same },
-  velocityY: { unit: Unit.PxPerSecond, basis: Basis.Same },
+  gravity: { unit: Unit.PxPerSecondSquared, basis: Basis.Pixel },
+  velocityX: { unit: Unit.PxPerSecond, basis: Basis.Pixel },
+  velocityY: { unit: Unit.PxPerSecond, basis: Basis.Pixel },
   ringRadius: px(Basis.Short),
   cardHeight: px(Basis.Short),
   tiltX: degrees(),
   tiltZ: degrees(),
   spin: degrees(),
   backOpacity: percent(),
-  backBlur: px(Basis.Same),
+  backBlur: px(Basis.Pixel),
   shadowOpacity: percent(),
-  cornerRadius: px(Basis.Same),
-  cameraDistance: px(Basis.Same),
+  cornerRadius: px(Basis.Pixel),
+  cameraDistance: px(Basis.Pixel),
   cameraHeight: px(Basis.Height, ONE_FRAME),
   centerX: px(Basis.Width, PAST_EDGES),
   centerY: px(Basis.Height, PAST_EDGES),
   diameter: px(Basis.Short),
-  frost: px(Basis.Same),
-  rim: px(Basis.Same),
+  frost: px(Basis.Pixel),
+  rim: px(Basis.Pixel),
   split: px(Basis.Short),
   splitAngle: degrees(),
   restitution: percent(),
@@ -130,14 +139,19 @@ const FACTOR: Record<Basis, (frame: Frame) => number> = {
   [Basis.Height]: (f) => f.height,
   [Basis.Short]: (f) => Math.min(f.width, f.height),
   [Basis.Hundred]: () => 100,
-  [Basis.Same]: () => 1
+  [Basis.Same]: () => 1,
+  [Basis.Pixel]: (f) => f.scale ?? 1
 };
 
 const SCALED_STEP = 1;
 const PRECISION = 100;
 
+const EFFECT_LENGTH = px(Basis.Pixel, undefined, true);
+
+const effectRule = (key: string): Rule | undefined => (EFFECT_LENGTHS.has(effectOfKey(key)?.param ?? '') ? EFFECT_LENGTH : undefined);
+
 function ruleOf(component: Owner, key: string): Rule | null {
-  const rule = PROPERTY_UNITS[key];
+  const rule = PROPERTY_UNITS[key] ?? effectRule(key);
   if (!rule || component === null) {
     return null;
   }
@@ -163,6 +177,10 @@ export function toShown(component: Owner, key: string, value: number, frame: Fra
   const rule = ruleOf(component, key);
   return rule ? tidy(value * FACTOR[rule.basis](frame)) : value;
 }
+
+const SHOWN_PRECISION = 1000;
+
+export const shownNumber = (component: Owner, key: string, value: number, frame: Frame): number => Math.round(toShown(component, key, value, frame) * SHOWN_PRECISION) / SHOWN_PRECISION;
 
 export function toStored(component: Owner, key: string, value: number, frame: Frame): number {
   return value / factorOf(component, key, frame);
@@ -238,4 +256,4 @@ export function storedOffset(component: Owner, [dx, dy]: Offset, frame: Frame): 
 }
 
 export const UNITS_GUIDE =
-  'Units: x, y, width, height (of clips, masks and particle emitters) in px of the composition; size, strokeWidth, dash, gap and particle sizes in px; z, perspective, blur, feather and expansion in px; scale, scaleX, scaleY and opacity in % (100 = as is); rotations, skews and angles in degrees.';
+  'Units are canvas px: the frame as big as it is on the canvas, whatever resolution it exports at. Units: x, y, width, height (of clips, masks and particle emitters) in px of the composition; size, strokeWidth, dash, gap and particle sizes in px; z, perspective, blur, feather and expansion in px; scale, scaleX, scaleY and opacity in % (100 = as is); rotations, skews and angles in degrees.';

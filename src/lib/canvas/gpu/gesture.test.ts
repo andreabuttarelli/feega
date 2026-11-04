@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { Corner } from './geometry';
-import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, resizedAt, rotateZoneAt } from './gesture';
+import { GestureKind, HitKind, Pointer, clicked, glidesAfterPan, gestureFor, marqueeBox, marqueePick, movedBy, resized, resizedAt, rotateZoneAt } from './gesture';
 import { CanvasMode } from '../canvas-mode';
 
-const mouse = { pointer: Pointer.Mouse, button: 0, shift: false, space: false, mode: CanvasMode.Edit };
+const mouse = { pointer: Pointer.Mouse, button: 0, shift: false, alt: false, space: false, mode: CanvasMode.Edit };
 
 const NO_KEYS = { shift: false, alt: false };
 
 describe('gestureFor — one row per way a press can start', () => {
+  it('alt on empty canvas or on a wire draws a cable tie stroke; alt on a node still drags', () => {
+    const alt = { ...mouse, alt: true };
+    expect(gestureFor({ kind: HitKind.Empty }, alt)).toBe(GestureKind.Tie);
+    expect(gestureFor({ kind: HitKind.Edge, edgeId: 'e' }, alt)).toBe(GestureKind.Tie);
+    expect(gestureFor({ kind: HitKind.Node, nodeId: 'a' }, alt)).toBe(GestureKind.Drag);
+  });
+
   it('a press on a port starts a wire, on a corner a resize, on a node a drag', () => {
     expect(gestureFor({ kind: HitKind.Port, nodeId: 'a', handle: 'text' }, mouse)).toBe(GestureKind.Connect);
     expect(gestureFor({ kind: HitKind.Corner, nodeId: 'a', unit: [1, 1] }, mouse)).toBe(GestureKind.Resize);
@@ -129,5 +136,16 @@ describe('rotateZoneAt — the invisible zone just outside a corner', () => {
 describe('gestureFor — rotate', () => {
   it('a press in a rotate zone starts a rotation', () => {
     expect(gestureFor({ kind: HitKind.Rotate, nodeId: 'a', unit: [1, 1] }, mouse)).toBe(GestureKind.Rotate);
+  });
+});
+
+describe('a pan lets go like the pointer that made it', () => {
+  it('a mouse or pen pan stops where the pointer stops, 1:1', () => {
+    expect(glidesAfterPan(Pointer.Mouse)).toBe(false);
+    expect(glidesAfterPan(Pointer.Pen)).toBe(false);
+  });
+
+  it('a finger flick keeps gliding', () => {
+    expect(glidesAfterPan(Pointer.Touch)).toBe(true);
   });
 });

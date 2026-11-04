@@ -10,6 +10,7 @@ A frame can have **breakpoints**: narrower views of the same design, such as Tab
 - **Add a breakpoint** from the frame's Properties (nothing selected): **Breakpoints → +**, then Tablet 810, Phone 390 or a custom width. Each view appears to the right of the frame, labelled with its name and width.
 - **Click an element in a view** to edit it there: the same element, with the view's layout. The inspector shows an **Editing: Phone** badge; changed properties show "overridden in Phone" with **Reset**. Dragging and resizing in the view, and inspector changes, apply to that view only. Properties that cannot vary per breakpoint (text, colours, media) are not changed from a view: edit them on the frame. Undo works as usual.
 - **Click an element in the frame** to edit the Desktop design, as before.
+- **Export a view** by right-clicking its label or the view itself and choosing **Export…**. The image is the frame as it looks at that breakpoint, at the breakpoint's width, named after it (for example `Home Phone.png`).
 - **A new breakpoint inherits everything.** Nothing stacks, scales or hides by itself.
 - **A change made at a breakpoint applies there and at every smaller one**, until a smaller breakpoint changes it again.
 - **Removing a change** makes the element inherit from the next wider view.

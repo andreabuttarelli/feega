@@ -4,30 +4,27 @@ import type { Actor } from '$lib/server/repos/actor';
 import { deleteConnection, deleteNode, findNode, listConnections, listNodes, renameNode, resizeNode, writeNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { runsOf } from '$lib/server/canvas/generate';
-import { nodeSize } from '$lib/canvas/node-size';
+import { minNodeSize } from '$lib/canvas/node-size';
 import { cleanNodeName } from '$lib/canvas/node-name';
 import { docData } from '$lib/canvas-node-data';
 import { mintShareToken } from '$lib/canvas/doc-node';
 
 type CanvasScope = { orgId: string; canvasId: string };
 
-export async function removeNodes(db: Db, input: CanvasScope & { nodeIds: string[]; actor: Actor }): Promise<boolean> {
+export async function removeNodes(db: Db, input: CanvasScope & { nodeIds: string[]; actor: Actor }): Promise<void> {
   const onCanvas = new Set((await listNodes(db, input)).map((node) => node.id));
-  if (input.nodeIds.some((id) => !onCanvas.has(id))) {
-    return false;
-  }
+  const nodeIds = input.nodeIds.filter((id) => onCanvas.has(id));
 
   const connectionIds = (await listConnections(db, input))
-    .filter((edge) => input.nodeIds.includes(edge.sourceNodeId) || input.nodeIds.includes(edge.targetNodeId))
+    .filter((edge) => nodeIds.includes(edge.sourceNodeId) || nodeIds.includes(edge.targetNodeId))
     .map((edge) => edge.id);
 
   for (const connectionId of connectionIds) {
     await deleteConnection(db, { orgId: input.orgId, connectionId, actor: input.actor });
   }
-  for (const nodeId of input.nodeIds) {
+  for (const nodeId of nodeIds) {
     await deleteNode(db, { orgId: input.orgId, nodeId, actor: input.actor });
   }
-  return true;
 }
 
 export async function resizeOnCanvas(db: Db, input: CanvasScope & { nodeId: string; width: number; height: number }): Promise<boolean> {
@@ -36,7 +33,7 @@ export async function resizeOnCanvas(db: Db, input: CanvasScope & { nodeId: stri
     return false;
   }
 
-  const min = nodeSize(existing.type, existing.data);
+  const min = minNodeSize(existing.type, existing.data);
   await resizeNode(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,

@@ -59,7 +59,8 @@ test.describe('layout polish on the canvas @real', () => {
     await page.mouse.click(empty.x, empty.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(empty.x, empty.y);
-    await expect(page.getByTestId('auto-layout-align-content')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('auto-layout-advanced').click({ timeout: 15_000 });
+    await expect(page.getByTestId('auto-layout-align-content')).toBeVisible();
     await shot(page, 'polish-packed');
 
     await page.getByTestId('auto-layout-align-content').getByRole('radio', { name: 'Space between' }).click();
@@ -70,8 +71,8 @@ test.describe('layout polish on the canvas @real', () => {
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, 'polish-strokes-off');
 
-    await page.getByTestId('auto-layout-first-on-top').getByRole('radio', { name: 'Yes' }).click();
-    await expect(page.getByTestId('auto-layout-first-on-top').getByRole('radio', { name: 'Yes' })).toBeChecked();
+    await page.getByTestId('auto-layout-first-on-top').getByRole('radio', { name: 'First on top' }).click();
+    await expect(page.getByTestId('auto-layout-first-on-top').getByRole('radio', { name: 'First on top' })).toBeChecked();
   });
 
   test('the first child draws on top once First on top is on', async ({ page, session, admin, seedNode }) => {
@@ -89,10 +90,11 @@ test.describe('layout polish on the canvas @real', () => {
     await page.mouse.click(r.x + r.width * 0.07, empty.y);
     await page.waitForTimeout(SETTLE_MS);
     await page.mouse.click(r.x + r.width * 0.07, empty.y);
-    await expect(page.getByTestId('auto-layout-first-on-top')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('auto-layout-advanced').click({ timeout: 15_000 });
+    await expect(page.getByTestId('auto-layout-first-on-top')).toBeVisible();
     await shot(page, 'stacking-track-order');
 
-    await page.getByTestId('auto-layout-first-on-top').getByRole('radio', { name: 'Yes' }).click();
+    await page.getByTestId('auto-layout-first-on-top').getByRole('radio', { name: 'First on top' }).click();
     await page.waitForTimeout(SETTLE_MS);
     await shot(page, 'stacking-first-on-top');
   });

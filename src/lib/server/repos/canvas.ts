@@ -1,4 +1,5 @@
 import { codeVarsError } from '$lib/server/canvas/code-source';
+import { tieOf, type Tie } from '$lib/canvas/gpu/wire-magnet';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
 import type { NarrowedDatabase } from '$lib/server/db/typed-database';
@@ -57,7 +58,7 @@ type NodeColumns = Pick<
 type ConnectionColumns = Pick<
   Database['public']['Tables']['nodes_connections']['Row'],
   'id' | 'canvas_id' | 'source_node_id' | 'target_node_id' | 'source_handle' | 'target_handle' | 'mode'
->;
+> & { tie?: unknown };
 
 /** Gli stessi due valori di `nodes_connections_mode_check`. */
 export const WIRE_MODES = ['fixed', 'iterate'] as const;
@@ -101,6 +102,7 @@ export type Connection = {
   /** Fisso (default) entra in OGNI iterazione di un loop a valle; `iterate` è un asse del
    *  prodotto cartesiano/zip che `loop-plan.ts` calcola (CLAUDE.md — loop mode). */
   mode: WireMode;
+  tie?: Tie | null;
 };
 
 export type DataWrite =
@@ -110,7 +112,7 @@ export type DataWrite =
 const NODE_COLUMNS =
   'id, canvas_id, project_id, type, display_name, x, y, z, width, height, data, version';
 const CONNECTION_COLUMNS =
-  'id, canvas_id, source_node_id, target_node_id, source_handle, target_handle, mode';
+  'id, canvas_id, source_node_id, target_node_id, source_handle, target_handle, mode, tie';
 const CANVAS_COLUMNS = 'id, project_id, name, viewport';
 
 function toCanvas(row: CanvasColumns): Canvas {
@@ -147,7 +149,8 @@ function toConnection(row: ConnectionColumns): Connection {
     targetNodeId: row.target_node_id,
     sourceHandle: row.source_handle,
     targetHandle: row.target_handle,
-    mode: isWireMode(row.mode) ? row.mode : 'fixed'
+    mode: isWireMode(row.mode) ? row.mode : 'fixed',
+    tie: tieOf(row.tie)
   };
 }
 
@@ -329,6 +332,20 @@ export async function listMainDependents(db: Db, scope: { orgId: string; homeId:
     throw error;
   }
   return (data ?? []).map(toNode);
+}
+
+export type NodeBoxRow = { id: string; canvasId: string; x: number; y: number; w: number; h: number };
+
+export async function nodeBoxes(db: Db, scope: { orgId: string; nodeIds: string[] }): Promise<NodeBoxRow[]> {
+  if (!scope.nodeIds.length) {
+    return [];
+  }
+
+  const { data, error } = await db.from('nodes').select('id, canvas_id, x, y, width, height').eq('org_id', scope.orgId).in('id', scope.nodeIds).is('deleted_at', null);
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map((row) => ({ id: row.id, canvasId: row.canvas_id, x: row.x, y: row.y, w: row.width ?? 0, h: row.height ?? 0 }));
 }
 
 export async function nodeRowExists(db: Db, input: { orgId: string; nodeId: string }): Promise<boolean> {
@@ -694,8 +711,8 @@ export async function restoreNode(
     orgId: string;
     nodeId: string;
     position: { x: number; y: number; z: number };
-    size: { width: number | null; height: number | null };
-    data: Record<string, unknown>;
+    size?: { width: number | null; height: number | null };
+    data?: Record<string, unknown>;
     actor?: Actor;
   }
 ): Promise<CanvasNodeRecord | null> {
@@ -704,9 +721,8 @@ export async function restoreNode(
     x: input.position.x,
     y: input.position.y,
     z: input.position.z,
-    width: input.size.width,
-    height: input.size.height,
-    data: input.data,
+    ...(input.size ? { width: input.size.width, height: input.size.height } : {}),
+    ...(input.data ? { data: input.data } : {}),
     ...actorCols(input.actor),
     updated_at: new Date().toISOString()
   } as NodeUpdate;
@@ -883,6 +899,23 @@ export async function setConnectionMode(
     throw error;
   }
   return data ? toConnection(data) : null;
+}
+
+export async function setConnectionTie(
+  db: Db,
+  input: { orgId: string; connectionIds: string[]; tie: Tie | null }
+): Promise<Connection[]> {
+  const { data, error } = await db
+    .from('nodes_connections')
+    .update({ tie: input.tie })
+    .in('id', input.connectionIds)
+    .eq('org_id', input.orgId)
+    .select(CONNECTION_COLUMNS);
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(toConnection);
 }
 
 /**

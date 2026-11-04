@@ -82,6 +82,15 @@ describe('the selection drawn over a core frame', () => {
     expect(body).toContain('data-testid="frame-group-selection"');
     expect(body.match(/data-testid="frame-selection-handle"/g)).toHaveLength(8);
   });
+
+  it('draws one solid box around several nodes, its body letting presses reach them', () => {
+    const body = render(FrameSelection, { props: { clip: '', quad: QUAD, kind: SelectionKind.Many, ongrab: () => {} } }).body;
+
+    expect(body).toMatch(/class="selection[^"]*passes/);
+    expect(body).not.toMatch(/class="selection[^"]*group/);
+    expect(body.match(/data-testid="frame-selection-handle"/g)).toHaveLength(8);
+    expect(body.match(/data-testid="frame-selection-rotate"/g)).toHaveLength(4);
+  });
 });
 
 describe('guides drawn over a core frame', () => {
@@ -100,7 +109,7 @@ describe('Layers for a frame drawn by the core', () => {
     if (!added.ok) {
       throw new Error(added.error);
     }
-    const canvas = layersSource.publishCanvas({ nodes: [{ id: 'm1', type: 'motion', name: 'Teaser' }], selected: ['m1'], select: () => {}, open: () => {}, rename: () => {} });
+    const canvas = layersSource.publishCanvas({ nodes: [{ id: 'm1', type: 'motion', name: 'Teaser' }], selected: ['m1'], select: () => {}, open: () => {}, rename: () => {}, flag: () => {}, moveInto: () => {} });
     const video = layersSource.publishVideo(videoSide({ nodeId: 'm1', doc: () => added.doc, selection: () => ['card'], select: () => {}, edit: () => {}, run: () => {} }));
     unpublish = () => (canvas(), video());
 

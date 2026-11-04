@@ -149,7 +149,10 @@ fn inflated<C: Canvas>(item: &Item, look: &Look, pictures: &Shelf<C::Picture>) -
 
 fn region<S: Surface>(surface: &S, item: &Item, look: &Look, pictures: &Shelf<Pic<S>>) -> Rect {
     let frame = surface.frame();
-    inflated::<S::Canvas>(item, look, pictures).map_or(frame, |r| snapped(r, frame))
+    let Some(spread) = inflated::<S::Canvas>(item, look, pictures) else { return frame };
+    let own = bounds::<S::Canvas>(item, pictures).unwrap_or(spread);
+    let cast = frame.inflate((spread.width() - own.width()) / 2.0, (spread.height() - own.height()) / 2.0);
+    snapped(spread, cast)
 }
 
 fn off_frame<S: Surface>(surface: &S, item: &Item, pictures: &Shelf<Pic<S>>) -> bool {

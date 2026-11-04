@@ -17,13 +17,15 @@ export function previewGlyphs(fonts: readonly string[]): string {
   return [...new Set(fonts.join('').split(''))].sort().join('');
 }
 
-export function fontPreviewHref(fonts: readonly string[] = ALL_SHORTLIST_FONTS): string {
+type PreviewAsk = { text?: string; weights?: readonly number[] };
+
+const PREVIEW_WEIGHTS = [400, 600];
+
+export function fontPreviewHref(fonts: readonly string[] = ALL_SHORTLIST_FONTS, { text = previewGlyphs(fonts), weights = PREVIEW_WEIGHTS }: PreviewAsk = {}): string {
   const families = fonts
-    .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;600`)
+    .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@${weights.join(';')}`)
     .join('&');
-  return `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(
-    previewGlyphs(fonts)
-  )}&display=swap`;
+  return `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(text)}&display=swap`;
 }
 
 export function ensureFontPreviews(fonts: readonly string[] = ALL_SHORTLIST_FONTS): void {

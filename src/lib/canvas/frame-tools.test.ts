@@ -4,7 +4,7 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { EditMode } from '$lib/motion/edit-mode';
 import { OnionSkin } from './onion-skin.svelte';
 import { FRAME_VIEW_DEFAULT, FrameView, flipView } from './frame-view';
-import { AlignSide, FrameOverlay, activeAt, alignSide, shownOverlays } from './frame-tools';
+import { FrameOverlay, activeAt, shownOverlays } from './frame-tools';
 
 const clip = (patch: Partial<MotionClip> & { props?: Record<string, unknown> }): MotionClip => ({ id: 'c', from: 10, durationInFrames: 20, component: 'Shape', props: { shape: 'rect' }, ...patch }) as MotionClip;
 const doc = { layoutGuides: [{ id: 'g' }] } as unknown as MotionDoc;
@@ -47,6 +47,14 @@ describe('shownOverlays', () => {
     expect(shownOverlays({ ...plain, clip: clip({ props: { shape: 'ellipse' } }), picks: 1, active: true }).has(FrameOverlay.Corners)).toBe(false);
   });
 
+  it('shows two endpoint handles for one straight line, like Figma, not the box', () => {
+    const line = clip({ props: { shape: 'path', path: 'M 0 0 L 100 40' } });
+    expect(shownOverlays({ ...plain, clip: line, picks: 1, active: true }).has(FrameOverlay.LineEnds)).toBe(true);
+    expect(shownOverlays({ ...plain, clip: line, picks: 2, active: true }).has(FrameOverlay.LineEnds)).toBe(false);
+    expect(shownOverlays({ ...plain, clip: line, picks: 1, active: true, pointEdit: 'c' }).has(FrameOverlay.LineEnds)).toBe(false);
+    expect(shownOverlays({ ...plain, clip: clip({ props: { shape: 'path', path: 'M 0 0 L 100 40 L 50 90' } }), picks: 1, active: true }).has(FrameOverlay.LineEnds)).toBe(false);
+  });
+
   describe('in Motion', () => {
     const motion = { ...plain, mode: EditMode.Motion, picks: 1 };
     const slides = clip({ keyframes: { x: [{ frame: 0, value: 0 }, { frame: 10, value: 0.5 }] } as never });
@@ -73,9 +81,8 @@ describe('shownOverlays', () => {
     });
   });
 
-  it('shows align from two picks', () => {
-    expect(shownOverlays({ ...plain, picks: 1 }).has(FrameOverlay.Align)).toBe(false);
-    expect(shownOverlays({ ...plain, picks: 2 }).has(FrameOverlay.Align)).toBe(true);
+  it('leaves aligning to the inspector, never a bar on the canvas', () => {
+    expect(Object.values(FrameOverlay)).not.toContain('align');
   });
 
   it('shows the mask of a masked clip that is on screen', () => {
@@ -110,21 +117,5 @@ describe('activeAt', () => {
     expect(activeAt(clip({}), 10)).toBe(true);
     expect(activeAt(clip({}), 29)).toBe(true);
     expect(activeAt(clip({}), 30)).toBe(false);
-  });
-});
-
-describe('alignSide', () => {
-  const clear = { width: 1100, bottom: 567 };
-
-  it('puts the align bar under a frame with room below it', () => {
-    expect(alignSide({ left: 100, top: 100, width: 400, height: 200 }, clear)).toBe(AlignSide.Below);
-  });
-
-  it('moves the align bar beside a frame whose bottom sits on the canvas bar', () => {
-    expect(alignSide({ left: 345, top: 307, width: 420, height: 238 }, clear)).toBe(AlignSide.Right);
-  });
-
-  it('puts the align bar over a frame with no room below or beside it', () => {
-    expect(alignSide({ left: 0, top: 307, width: 1000, height: 238 }, clear)).toBe(AlignSide.Above);
   });
 });

@@ -5,6 +5,7 @@ import { ActionKind, TriggerKind, type Interaction } from '@feega/motion-core/mo
 import { createComponent } from '$lib/motion/main-component';
 import { groupClips } from '$lib/motion/group';
 import { addVariant } from '$lib/motion/variants';
+import { homed, placeInstance } from '$lib/motion/canvas-components';
 import { changeTo, placedClips, variantChoices, variantHotspotsOf, variantSpotsOf, withSwaps } from './variant-change';
 
 const must = (r: OpResult): MotionDoc => {
@@ -34,6 +35,16 @@ function accordion() {
   });
   return { doc: wired(wired(withOpen, closed, 'Open'), open, 'Closed'), instance: instance.id, closed, open };
 }
+
+describe('change to variant on an instance placed in another frame', () => {
+  it('Change to on the instance itself swaps it to the other variant of its set', () => {
+    const { doc: home, closed, open } = accordion();
+    const screen = must(placeInstance(newMotionDoc(MotionFormat.Landscape), homed(home, 'components'), closed, () => 'card'));
+    const withClick = { ...screen, tracks: screen.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'card' ? { ...c, interactions: [toggle('Open')] } : c)) })) };
+
+    expect(changeTo(withClick, ['card'], { State: 'Open' })).toEqual({ instance: 'card', comp: open });
+  });
+});
 
 describe('change to variant in the player', () => {
   it('a click inside a closed accordion changes that instance to the open variant', () => {

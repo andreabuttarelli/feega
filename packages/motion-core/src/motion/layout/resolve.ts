@@ -119,6 +119,8 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, cont
     sizing: { width: own.width, height: own.height },
     min: { width: own.minWidth, height: own.minHeight },
     max: { width: own.maxWidth, height: own.maxHeight },
+    minPercent: { width: own.minWidthPercent, height: own.minHeightPercent },
+    maxPercent: { width: own.maxWidthPercent, height: own.maxHeightPercent },
     absolute: own.absolute,
     grow: { width: own.widthGrow, height: own.heightGrow },
     percent: { width: own.widthPercent, height: own.heightPercent },
@@ -225,6 +227,15 @@ export function withAutoLayout(doc: MotionDoc, measure: TextMeasure = estimatedT
   const size = { width: doc.width, height: doc.height };
   const comps = laidComps(doc, size, measure);
   return { ...doc, tracks: laidOut(doc.tracks, size, measure, instanceContent({ ...doc, comps }, size, measure)), comps };
+}
+
+export function instanceBoxes(doc: MotionDoc, measure: TextMeasure = estimatedText): ReadonlyMap<string, Box> {
+  const size = { width: doc.width, height: doc.height };
+  const content = instanceContent(doc, size, measure);
+  return new Map(visualClips(doc.tracks).flatMap((c) => {
+    const box = c.component === 'Precomp' && doc.comps[String(c.props.comp)]?.component ? content(c) : null;
+    return box ? [[c.id, box] as const] : [];
+  }));
 }
 
 export function shownBox(doc: MotionDoc, clipId: string, measure: TextMeasure = estimatedText): Box | null {

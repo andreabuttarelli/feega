@@ -9,6 +9,7 @@ export type FrameDocsSide = {
   edit(nodeId: string, change: FrameDocEdit, summary: string): boolean;
   doc(nodeId: string): MotionDoc | null;
   hold(held: HeldDoc, saved: Promise<boolean>): void;
+  preview(nodeId: string, doc: MotionDoc | null): void;
 };
 
 let side: FrameDocsSide | null = null;
@@ -22,6 +23,9 @@ export const frameDocs = {
   },
   hold(held: HeldDoc, saved: Promise<boolean>) {
     side?.hold(held, saved);
+  },
+  preview(nodeId: string, doc: MotionDoc | null) {
+    side?.preview(nodeId, doc);
   },
   publish(next: FrameDocsSide): () => void {
     side = next;

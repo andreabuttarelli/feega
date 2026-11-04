@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  joinGestures,
   inverseOf,
   checkPrecondition,
   checkGesture,
@@ -168,6 +169,15 @@ describe('checkGesture: il cambio di modello che sgancia connessioni si annulla 
     expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'patch_node_data', nodeId: NODE, patch: { seed: 1 } }] });
   });
 
+  it('undo leaves a null key it did not change, so the node keeps a field its schema requires', () => {
+    const gesture: Gesture = { items: [{ kind: 'node.update', nodeId: NODE, before: { data: { locked: false, posterAssetId: null } }, after: { data: { locked: true, posterAssetId: null } }, expectedVersion: 3 }] };
+    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ version: 4, data: { locked: true, posterAssetId: null } }) };
+
+    const result = checkGesture(gesture, (item) => ({ node: states[(item as { nodeId: string }).nodeId] }));
+
+    expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'patch_node_data', nodeId: NODE, patch: { locked: false } }] });
+  });
+
   it('a key that did not exist before my edit goes away again', () => {
     const gesture: Gesture = { items: [{ kind: 'node.update', nodeId: NODE, before: { data: {} }, after: { data: { refId: 'x' } }, expectedVersion: 3 }] };
     const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ data: { refId: 'x' } }) };
@@ -239,5 +249,15 @@ describe('parseUndoItem: a gesture as the client sent it', () => {
     expect(parseUndoItem({ kind: 'node.explode', nodeId: NODE })).toBeNull();
     expect(parseUndoItem({ kind: 'node.update', nodeId: NODE, expectedVersion: 1.5 })).toBeNull();
     expect(parseUndoItem(null)).toBeNull();
+  });
+});
+
+describe('joinGestures', () => {
+  it('turns the writes of one toggle on many nodes into one undo step', () => {
+    const a = { items: [{ kind: 'doc.revision' as const, nodeId: 'a', before: 1, after: 2 }] };
+    const b = { items: [{ kind: 'doc.revision' as const, nodeId: 'b', before: 3, after: 4 }] };
+
+    expect(joinGestures([a, b])).toEqual({ items: [...a.items, ...b.items] });
+    expect(joinGestures([])).toBeNull();
   });
 });

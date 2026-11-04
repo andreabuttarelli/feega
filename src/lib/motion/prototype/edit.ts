@@ -1,4 +1,4 @@
-import { ActionKind, DEFAULT_DELAY_MS, TransitionKind, TriggerKind, transitionSchema, type Action, type Interaction } from '@feega/motion-core/motion/prototype/model';
+import { ActionKind, DEFAULT_DELAY_MS, DEFAULT_OVERLAY, TransitionKind, TriggerKind, overlaySchema, transitionSchema, type Action, type Interaction, type Overlay } from '@feega/motion-core/motion/prototype/model';
 
 export const TRANSITION_FIELDS: Record<TransitionKind, { direction: boolean; timing: boolean }> = {
   [TransitionKind.Instant]: { direction: false, timing: false },
@@ -15,18 +15,58 @@ export function retriggered(interaction: Interaction, kind: TriggerKind): Intera
 
 type Picked = Record<string, string>;
 
-const ACTION_OF: Record<ActionKind, (target: string, variant: Picked) => Action> = {
+export const DEFAULT_URL = 'https://example.com';
+
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+const overlayOf = (action: Action): Overlay => (action.kind === ActionKind.OpenOverlay ? action.overlay : DEFAULT_OVERLAY);
+
+const ACTION_OF: Record<ActionKind, (target: string, variant: Picked, was: Action) => Action> = {
   [ActionKind.Navigate]: (target) => ({ kind: ActionKind.Navigate, target }),
-  [ActionKind.OpenOverlay]: (target) => ({ kind: ActionKind.OpenOverlay, target }),
+  [ActionKind.OpenOverlay]: (target, _variant, was) => ({ kind: ActionKind.OpenOverlay, target, overlay: overlayOf(was) }),
+  [ActionKind.CloseOverlay]: () => ({ kind: ActionKind.CloseOverlay }),
   [ActionKind.ScrollTo]: (target) => ({ kind: ActionKind.ScrollTo, target }),
   [ActionKind.Back]: () => ({ kind: ActionKind.Back }),
-  [ActionKind.ChangeTo]: (_target, variant) => ({ kind: ActionKind.ChangeTo, variant })
+  [ActionKind.ChangeTo]: (_target, variant) => ({ kind: ActionKind.ChangeTo, variant }),
+  [ActionKind.OpenUrl]: () => ({ kind: ActionKind.OpenUrl, url: DEFAULT_URL })
 };
 
 export function retargeted(interaction: Interaction, kind: ActionKind, target: string, variant: Picked = {}): Interaction {
-  return { ...interaction, action: ACTION_OF[kind](target, variant) };
+  return { ...interaction, action: ACTION_OF[kind](target, variant, interaction.action) };
 }
 
 export function retimed(interaction: Interaction, patch: Record<string, unknown>): Interaction {
   return { ...interaction, transition: transitionSchema.parse({ ...interaction.transition, ...patch }) };
+}
+
+export function reoverlaid(interaction: Interaction, patch: Partial<Overlay>): Interaction {
+  if (interaction.action.kind !== ActionKind.OpenOverlay) {
+    return interaction;
+  }
+  const overlay = overlaySchema.safeParse({ ...interaction.action.overlay, ...patch });
+  return overlay.success ? { ...interaction, action: { ...interaction.action, overlay: overlay.data } } : interaction;
+}
+
+const OPAQUE = 255;
+const PERCENT = 100;
+const RGB_HEX_LENGTH = 7;
+
+export function backdropParts(hex: string): { colour: string; opacity: number } {
+  const alpha = hex.length > RGB_HEX_LENGTH ? parseInt(hex.slice(RGB_HEX_LENGTH), 16) : OPAQUE;
+  return { colour: hex.slice(0, RGB_HEX_LENGTH), opacity: Math.round((alpha / OPAQUE) * PERCENT) };
+}
+
+export function backdropOf(colour: string, opacity: number): string {
+  const alpha = Math.round((Math.min(PERCENT, Math.max(0, opacity)) / PERCENT) * OPAQUE);
+  return `${colour.slice(0, RGB_HEX_LENGTH)}${alpha.toString(16).padStart(2, '0')}`;
+}
+
+export function relinked(interaction: Interaction, typed: string): Interaction {
+  const url = typed.trim();
+  return { ...interaction, action: { kind: ActionKind.OpenUrl, url: HAS_SCHEME.test(url) ? url : `https://${url}` } };
+}
+
+export function freshInteraction(id: string, firstFrame: string | null): Interaction {
+  const action: Action = firstFrame ? { kind: ActionKind.Navigate, target: firstFrame } : { kind: ActionKind.OpenUrl, url: DEFAULT_URL };
+  return { id, trigger: { kind: TriggerKind.Click }, action, transition: { kind: TransitionKind.Instant } };
 }

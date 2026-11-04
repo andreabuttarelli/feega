@@ -164,7 +164,20 @@ describe('the fill stack in Properties', () => {
     expect(inRow(1, 'fill-label').textContent).toBe('11AA33');
     expect(inRow(0, 'fill-label').textContent).toBe('Linear');
     expect(rows()[0].querySelector('select')).toBeNull();
-    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-opacity', 'fill-eye', 'fill-remove']);
+    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-meta', 'fill-opacity', 'fill-eye', 'fill-remove']);
+  });
+
+  it('a transparent solid reads None, never the keyword', () => {
+    show(stack([{ type: 'solid', color: 'transparent' }, { type: 'solid', color: '#11aa3300' }]));
+    expect(inRow(0, 'fill-label').textContent).toBe('None');
+    expect(inRow(1, 'fill-label').textContent).toBe('None');
+  });
+
+  it('a row reads its hex over a muted line with the layer opacity and the type', () => {
+    show(stack([{ type: 'solid', color: '#ff2a69', opacity: 0.4 }]));
+    expect(inRow(0, 'fill-label').textContent).toBe('FF2A69');
+    expect(inRow(0, 'fill-meta').textContent?.replace(/\s+/g, ' ').trim()).toBe('% · Solid');
+    expect(inRow<HTMLInputElement>(0, 'fill-opacity').value).toBe('40');
   });
 
   it('a layer shows only its own type fields', () => {
@@ -188,7 +201,7 @@ describe('the fill stack in Properties', () => {
   it('an image layer picks a picture and a fit', () => {
     const onchange = show(stack([{ type: 'image' }]));
     click(rows()[0]);
-    click(byId('media-add'));
+    click(byId('media-more'));
     click(byId('media-tab-library'));
     click(byId('media-library-item'));
     expect(sent(onchange)[0]).toMatchObject({ type: 'image', assetId: 'pic' });

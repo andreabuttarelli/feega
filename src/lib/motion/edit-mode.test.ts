@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Ease } from '@feega/motion-core/motion/design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, setKeyframes, type OpResult } from '@feega/motion-core/motion/timeline';
-import { EditMode, designWarning, editIn, readMode, timelineShown, modeSwitchShown } from './edit-mode';
+import { EditMode, designWarning, editIn, readMode, timelineDoc, timelineShown, modeSwitchShown } from './edit-mode';
+import { timelineFits } from '@feega/motion-core/motion/editor-mount';
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -107,5 +108,24 @@ describe('the timeline follows the mode', () => {
 
     expect(modeSwitchShown(video)).toBe(true);
     expect(modeSwitchShown({ ...video, still: { frame: 0 } })).toBe(false);
+  });
+});
+
+describe('a still is a frame with no animations', () => {
+  const still: MotionDoc = { ...newMotionDoc(MotionFormat.Square), durationInFrames: 1, still: { frame: 0 } };
+
+  it('opens in Motion like any frame', () => {
+    expect(readMode(EditMode.Motion)).toBe(EditMode.Motion);
+  });
+
+  it('gets a default duration so the timeline renders', () => {
+    const shown = timelineDoc(still);
+
+    expect(timelineFits(shown)).toBe(true);
+    expect(shown.still).toBeUndefined();
+  });
+
+  it('leaves a video untouched', () => {
+    expect(timelineDoc(doc)).toBe(doc);
   });
 });

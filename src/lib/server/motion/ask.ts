@@ -9,6 +9,7 @@ import { motionAsk, offeredChatModels, resolveChoice } from '$lib/server/chat-mo
 import { runInBackground } from '$lib/server/background-work';
 import { motionEditorPath, motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { headOrNew } from '$lib/server/motion/editor';
+import { docScaleOf } from '$lib/server/motion/doc-scale';
 import { Restore, restoreRevision } from '$lib/server/motion/restore';
 import { listRevisions } from '$lib/server/repos/motion-revisions';
 import { docSummary } from '$lib/server/motion/motion-tools';
@@ -165,7 +166,7 @@ export async function motionSummary(db: Db, input: { orgId: string; nodeId: stri
   }
 
   const head = await headOrNew(db, input, motion.node);
-  return { node_id: motion.record.id, name: motion.record.displayName, version: head.version, last_change: head.summary, last_actor: head.actorKind, editor_url: editorUrl(motion.record), doc: docSummary(head.doc, []) };
+  return { node_id: motion.record.id, name: motion.record.displayName, version: head.version, last_change: head.summary, last_actor: head.actorKind, editor_url: editorUrl(motion.record), doc: docSummary(head.doc, [], docScaleOf(motion.record, head.doc)) };
 }
 
 export async function motionRevisions(db: Db, input: { orgId: string; nodeId: string }): Promise<Record<string, unknown> | Response> {

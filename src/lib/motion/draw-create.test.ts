@@ -4,7 +4,7 @@ import { setStill } from '@feega/motion-core/motion/still';
 import { COMPONENTS } from '@feega/motion-core/motion/components';
 import { DrawTool } from './draw-tool';
 import { EditMode } from './edit-mode';
-import { CANVAS_INK, CanvasTheme, drawClip, drawStart, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
+import { CANVAS_INK, CanvasTheme, blankElement, drawClip, drawStart, drawnElement, drawnFrame, drawnOf, lineOutline, penClip } from './draw-create';
 import { parsePath, type Outline } from '@feega/motion-core/motion/shape/geometry';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
@@ -33,13 +33,13 @@ describe('drawing a frame inside a frame', () => {
 });
 
 describe('drawing a stack', () => {
-  it('is an empty vertical auto layout, 8 apart, 16 padded, hugging, with no paint', () => {
+  it('is an empty vertical auto layout, 8 apart, 16 padded, the size it was drawn, with no paint', () => {
     const clip = findClip(ok(drawClip(video(), DrawTool.Stack, BOX, 0, 's1')), 's1')!.clip;
 
     expect(clip.component).toBe('Shape');
     expect(clip.props).toMatchObject({ shape: 'rect', fill: 'transparent', ...BOX });
     expect(clip.autoLayout).toMatchObject({ direction: 'vertical', gap: 8, padding: { top: 16, right: 16, bottom: 16, left: 16 }, order: [] });
-    expect(clip.layoutItem).toMatchObject({ width: 'hug', height: 'hug' });
+    expect(clip.layoutItem).toMatchObject({ width: 'fixed', height: 'fixed' });
   });
 
   it('stands alone on the canvas as an element', () => {
@@ -57,12 +57,12 @@ describe('creating an element by drawing inside a frame', () => {
     expect(clip.props).toMatchObject({ shape: 'rect', ...BOX });
   });
 
-  it('a drawn element pivots from its top-left corner', () => {
+  it('a drawn element pivots from its centre, like Figma and After Effects', () => {
     const inFrame = findClip(ok(drawClip(video(), DrawTool.Rectangle, BOX, 0, 'r1')), 'r1')!.clip;
     const onCanvas = drawnElement({ tool: DrawTool.Rectangle, box: { left: 100, top: 50, width: 300, height: 100 } }, 'r2');
 
-    expect(inFrame.transform).toEqual({ anchorX: 0, anchorY: 0 });
-    expect(onCanvas.ok && findClip(onCanvas.doc, 'r2')!.clip.transform).toEqual({ anchorX: 0, anchorY: 0 });
+    expect(inFrame.transform).toEqual({});
+    expect(onCanvas.ok && findClip(onCanvas.doc, 'r2')!.clip.transform).toEqual({});
   });
 
   it('an ellipse is an ellipse Shape, a text is a Text clip, both on the box', () => {
@@ -141,6 +141,18 @@ describe('drawing an element on the canvas, outside any frame', () => {
     expect(drawn.doc.width / drawn.doc.height).toBeCloseTo(3, 1);
     expect(clip.props).toMatchObject({ shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 });
     expect(drawn.box).toEqual({ left: 100, top: 50, width: 300, height: 100 });
+  });
+
+  it('an element doc has a pixel for each canvas pixel, so its numbers read as the canvas', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Rectangle, box: { left: 100, top: 50, width: 300, height: 100 } }, 'r1'));
+
+    expect([drawn.doc.width, drawn.doc.height]).toEqual([300, 100]);
+  });
+
+  it('a drawn frame has a pixel for each canvas pixel: the export scale makes it sharp', () => {
+    const frame = drawnFrame({ left: 0, top: 0, width: 300, height: 100 });
+
+    expect([frame.width, frame.height]).toEqual([300, 100]);
   });
 
   it('a pen path takes the box of its points', () => {
@@ -237,7 +249,17 @@ describe('a drawn text shows settled', () => {
     expect(findClip(drawn.doc, 't1')!.clip.props.color).toBe(CANVAS_INK[CanvasTheme.Dark]);
   });
 
-  it('its type fills the drawn box height instead of a body size meant for a full video', () => {
+  it('a dragged text box sets 16 px type, left aligned, whatever the box height', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 }, sizing: TextSizing.AutoHeight }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    const props = findClip(drawn.doc, 't1')!.clip.props as { size: number; align: string };
+    expect(props.size * Math.min(drawn.doc.width, drawn.doc.height)).toBeCloseTo(16, 1);
+    expect(props.align).toBe('left');
+  });
+
+  it('a clicked text is sized to the click box', () => {
     const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 } }, 't1');
     if (!drawn.ok) {
       throw new Error(drawn.error);
@@ -346,7 +368,7 @@ describe('shape tools', () => {
     expect(clip?.props).toMatchObject({ shape: 'path', fillKind: 'none', strokeKind: 'solid', stroke: '#111111' });
   });
 
-  it('a flat line on the canvas gets room around it and a stroke two canvas units wide', () => {
+  it('a flat line on the canvas gets room around it and a 1 px stroke, like a pen path', () => {
     const made = drawnElement({ tool: DrawTool.Pen, outline: lineOutline({ x: 0, y: 10 }, { x: 200, y: 10 }, DrawTool.Line), fill: null, stroke: '#111111' }, 'l2');
     expect(made.ok).toBe(true);
     if (!made.ok) {
@@ -354,7 +376,14 @@ describe('shape tools', () => {
     }
     expect(made.box.height).toBeGreaterThanOrEqual(24);
     const clip = findClip(made.doc, 'l2')!.clip;
-    expect((clip.props.strokeWidth as number) * Math.min(made.box.width, made.box.height)).toBeCloseTo(2, 5);
+    expect((clip.props.strokeWidth as number) * Math.min(made.box.width, made.box.height)).toBeCloseTo(1, 5);
   });
 });
 
+
+describe('blankElement', () => {
+  it('a box off by float noise keeps the pixels of the box it means', () => {
+    const made = blankElement({ left: -320, top: -149.99999999999994, width: 400, height: 119.99999999999994 });
+    expect(made.ok && { width: made.doc.width, height: made.doc.height }).toEqual({ width: 400, height: 120 });
+  });
+});

@@ -36,3 +36,22 @@ describe('hugged text in a stack', () => {
     expect(Number(laid.props.width) * prepared.doc.width).toBeCloseTo(shaped.width, 0);
   });
 });
+
+describe('wrapping a text in a stack keeps how it sizes', () => {
+  const wrapped = (sizing: string) => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 120, props: { text: 'A long paragraph', size: 0.05, sizing, x: 0.3, y: 0.5, width: 0.3, height: 0.1 } }, 't'));
+    return must(wrapInStack(doc, ['t'], 's', 'track-s')).tracks.flatMap((t) => t.clips).find((c) => c.id === 't')!.layoutItem;
+  };
+
+  it('a fixed-width text stays fixed width, its height hugs', () => {
+    expect(wrapped('auto-height')).toMatchObject({ width: 'fixed', height: 'hug' });
+  });
+
+  it('an auto-width text hugs both ways', () => {
+    expect(wrapped('auto')).toMatchObject({ width: 'hug', height: 'hug' });
+  });
+
+  it('a fixed text keeps both sides', () => {
+    expect(wrapped('fixed')).toMatchObject({ width: 'fixed', height: 'fixed' });
+  });
+});

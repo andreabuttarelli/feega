@@ -8,4 +8,6 @@ export const CODE_TARGETS = Object.values(CodeTarget) as [CodeTarget, ...CodeTar
 
 export type CodeFile = { path: string; content: string };
 
-export type CodeExport = { target: CodeTarget; files: CodeFile[]; notes: string[] };
+export type CodeAsset = { path: string; ref: string; url: string };
+
+export type CodeExport = { target: CodeTarget; files: CodeFile[]; assets: CodeAsset[]; notes: string[] };

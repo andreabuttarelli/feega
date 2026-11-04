@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, sameLive, shownGroup, stillFrame, toFetch, untilFound } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toFetch, untilFound } from './frame-source';
+import { ItemKind, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
+import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
+import { BlendMode } from '@feega/motion-core/motion/blend';
 import instance from '../../../../tests/e2e/fixtures/motion-doc-template-instance.json';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { TransitionKind } from '@feega/motion-core/motion/design';
@@ -70,6 +73,10 @@ describe('still frame', () => {
     expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), still: { frame: 7 } })).toBe(7);
   });
 
+  it('a video shows its poster frame when one is marked', () => {
+    expect(stillFrame({ ...newMotionDoc(MotionFormat.Landscape), poster: { frame: 42 } })).toBe(42);
+  });
+
   it('a doc longer than its content rests once its text has faded in', () => {
     expect(stillFrame(instance as unknown as MotionDoc)).toBe(12);
   });
@@ -122,6 +129,32 @@ describe('a transparent doc on the canvas', () => {
   });
 });
 
+describe('a free element paints past its own box', () => {
+  const shadowed = { width: 200, height: 100, background: null, items: [{ kind: ItemKind.Path, clip: 'r', contours: [[0, 0, 200, 0, 200, 100, 0, 100]], rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: [0, 0, 0, 1] }, opacity: 1, matrix: [1, 0, 0, 1, 0, 0], blur: 0, blend: BlendMode.Normal, scissor: [0, 0, 200, 100] }], unsupported: [], bleed: 40 } as DisplayList;
+
+  it('an element grows its picture by the bleed on every side, with the content moved in by it', () => {
+    const staged = onStage(shadowed, FrameKind.Element);
+    const [item] = staged.items as PathItem[];
+
+    expect([staged.width, staged.height]).toEqual([280, 180]);
+    expect(item.matrix).toEqual([1, 0, 0, 1, 40, 40]);
+    expect(item.scissor).toEqual([40, 40, 240, 140]);
+  });
+
+  it('and the box it is drawn into grows by the same share, so the shape stays where the node is', () => {
+    const staged = onStage(shadowed, FrameKind.Element);
+
+    expect(stagedBox({ x: 10, y: 20, w: 100, h: 50 }, staged)).toEqual({ x: -10, y: 0, w: 140, h: 90 });
+  });
+
+  it('a frame still clips what it holds to its own edge', () => {
+    const staged = onStage(shadowed, FrameKind.Frame);
+
+    expect([staged.width, staged.height]).toEqual([200, 100]);
+    expect(stagedBox({ x: 10, y: 20, w: 100, h: 50 }, staged)).toEqual({ x: 10, y: 20, w: 100, h: 50 });
+  });
+});
+
 describe('frames to fetch', () => {
   const at = (id: string, revision: number) => ({ id, kind: FrameKind.Frame, revision, box: { x: 0, y: 0, w: 10, h: 10 } });
   const keyOf = (f: { id: string; revision: number }) => `${f.id}:${f.revision}`;
@@ -134,6 +167,17 @@ describe('frames to fetch', () => {
 
   it('a frame already asked for at this revision is not fetched twice', () => {
     expect(toFetch([at('a', 2)], keyOf, new Set(['a:2']), new Set())).toEqual([]);
+  });
+
+  it('a frame picked right after a reload is fetched now, not after the queue of every other frame', () => {
+    const frames = [at('a', 1), at('picked', 2)];
+    const fetched = new Map([['a', 1]]);
+
+    expect(pickedToFetch(frames, ['picked', 'a'], fetched, new Set()).map((f) => f.id)).toEqual(['picked']);
+  });
+
+  it('a picked frame already rushed at this revision is not fetched twice', () => {
+    expect(pickedToFetch([at('picked', 2)], ['picked'], new Map(), new Set(['picked:2']))).toEqual([]);
   });
 });
 

@@ -9,12 +9,18 @@ import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { FieldType, exposeField } from '$lib/motion/template/fields';
 import { insertTemplate, templateFromComp } from '$lib/motion/template/library';
 import { precompose } from '@feega/motion-core/motion/precomp';
-import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor, stacksWholeElement } from './frame-inspector';
+import { FRAME_ELEMENT_MENU, barAction, frameBarActions, frameKeyAction, frameMenuAction, inspectorOf, picksFor, ElementAction, wholeElementAction } from './frame-inspector';
 import { findClip } from '@feega/motion-core/motion/doc';
+import { barActions, headerActions } from '$lib/motion/clip-bar';
 import { copyElements } from '$lib/motion/move-element';
 import { elementClipboard } from './element-clipboard.svelte';
 import { addTrack } from '@feega/motion-core/motion/timeline';
 import { TrackKind } from '@feega/motion-core/motion/components';
+import { liveCombine } from '$lib/motion/shape/boolean-group';
+import { BooleanOp } from '@feega/motion-core/motion/shape/boolean-op';
+import type { MotionClip } from '@feega/motion-core/motion/doc';
+
+const topLevel = (doc: MotionDoc): MotionClip[] => doc.tracks.flatMap((t) => t.clips as MotionClip[]);
 
 const must = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -113,6 +119,13 @@ describe('barAction', () => {
     expect(done?.doc.tracks.flatMap((t) => t.clips)).toHaveLength(3);
   });
 
+  it('a duplicate on the canvas shows at the same moment as its original', () => {
+    const done = barAction(Action.Duplicate, { doc: fixture(), selection: ['a'], frame: 0, newId: ids });
+    const copy = done?.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === done.selection[0]);
+
+    expect(copy?.from).toBe(done?.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'a')?.from);
+  });
+
   it('ignores actions the canvas panel does not run', () => {
     expect(barAction(Action.OpenComp, { doc: fixture(), selection: ['a'], frame: 0, newId: ids })).toBeNull();
   });
@@ -151,6 +164,15 @@ describe('barAction', () => {
     expect([...removed.selection].sort()).toEqual(['bottom', 'top']);
   });
 
+  it('⇧A on a frame gives the frame itself auto layout, like Figma, instead of wrapping it', () => {
+    const framed = barAction(Action.FrameSelection, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const done = barAction(Action.WrapStack, { doc: framed.doc, selection: framed.selection, frame: 0, newId: fresh() })!;
+
+    expect(done.selection).toEqual(framed.selection);
+    expect(findClip(done.doc, framed.selection[0])?.clip.autoLayout?.order.sort()).toEqual(['bottom', 'top']);
+    expect(findClip(done.doc, framed.selection[0])?.clip.parent ?? null).toBeNull();
+  });
+
   it('wraps a stack in another stack on a second run', () => {
     const added = barAction(Action.WrapStack, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
     const again = barAction(Action.WrapStack, { doc: added.doc, selection: added.selection, frame: 0, newId: () => `w${added.doc.tracks.length}${Math.random().toString(36).slice(2, 6)}` })!;
@@ -158,30 +180,34 @@ describe('barAction', () => {
     expect(findClip(again.doc, added.selection[0])?.clip.parent).toBe(again.selection[0]);
   });
 
-  it('unites two shapes into a live group that keeps both editable', () => {
-    const done = barAction(Action.Union, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() });
-    const group = findClip(done!.doc, done!.selection[0])!.clip;
+  it('subtracts two shapes into one shape named after the op, boxed tight to the result', () => {
+    const done = barAction(Action.Subtract, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
+    const result = findClip(done.doc, done.selection[0])!.clip;
 
-    expect(group.props.boolean).toBe('union');
-    expect(done?.selection).toHaveLength(1);
-    const inside = Object.values(done!.doc.comps).flatMap((c) => c.tracks.flatMap((t) => t.clips.map((k) => k.id)));
-    expect(inside.sort()).toEqual(['bottom', 'top']);
+    expect(done.selection).toEqual(['bottom']);
+    expect(result.component).toBe('Shape');
+    expect(result.name).toBe('Subtract');
+    expect(findClip(done.doc, 'top')).toBeNull();
+    expect(Number(result.props.width)).toBeCloseTo(0.1, 5);
+    expect(Object.keys(done.doc.comps)).toHaveLength(0);
   });
 
   it('switches a live group to another operation', () => {
-    const made = barAction(Action.Union, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
-    const done = barAction(Action.Subtract, { doc: made.doc, selection: made.selection, frame: 0, newId: fresh() });
+    const made = must(liveCombine(shapes(), ['top', 'bottom'], BooleanOp.Union, fresh()));
+    const group = topLevel(made).find((c) => c.component === 'Precomp')!;
+    const done = barAction(Action.Subtract, { doc: made, selection: [group.id], frame: 0, newId: fresh() });
 
-    expect(findClip(done!.doc, made.selection[0])!.clip.props.boolean).toBe('subtract');
+    expect(findClip(done!.doc, group.id)!.clip.props.boolean).toBe('subtract');
   });
 
   it('flatten bakes a live group into one shape', () => {
-    const made = barAction(Action.Union, { doc: shapes(), selection: ['top', 'bottom'], frame: 0, newId: fresh() })!;
-    const done = barAction(Action.Flatten, { doc: made.doc, selection: made.selection, frame: 0, newId: fresh() })!;
+    const made = must(liveCombine(shapes(), ['top', 'bottom'], BooleanOp.Union, fresh()));
+    const group = topLevel(made).find((c) => c.component === 'Precomp')!;
+    const done = barAction(Action.Flatten, { doc: made, selection: [group.id], frame: 0, newId: fresh() })!;
 
     expect(done.selection).toHaveLength(1);
     expect(findClip(done.doc, done.selection[0])!.clip.props.shape).toBe('path');
-    expect(findClip(done.doc, made.selection[0])).toBeNull();
+    expect(findClip(done.doc, group.id)).toBeNull();
   });
 
   it('flips the selection', () => {
@@ -379,12 +405,58 @@ describe('use as mask inside a canvas frame', () => {
   });
 });
 
-describe('wrap with stack on a free element', () => {
+describe('acting on a whole free element', () => {
   it('wraps the whole element as a new canvas stack, never turning its own clip into one', () => {
     const doc = fixture();
 
-    expect(stacksWholeElement(Action.WrapStack, doc, ['a', 'b'])).toBe(true);
-    expect(stacksWholeElement(Action.WrapStack, doc, ['a'])).toBe(false);
-    expect(stacksWholeElement(Action.Group, doc, ['a', 'b'])).toBe(false);
+    expect(wholeElementAction(Action.WrapStack, doc, ['a', 'b'])).toBe(ElementAction.WrapStack);
+    expect(wholeElementAction(Action.WrapStack, doc, ['a'])).toBeNull();
+    expect(wholeElementAction(Action.Group, doc, ['a', 'b'])).toBeNull();
+  });
+
+  it('duplicates the whole element as a new canvas layer, not a second clip inside it', () => {
+    const doc = fixture();
+
+    expect(wholeElementAction(Command.Duplicate, doc, ['a', 'b'])).toBe(ElementAction.Duplicate);
+    expect(wholeElementAction(Action.Duplicate, doc, ['a', 'b'])).toBe(ElementAction.Duplicate);
+    expect(wholeElementAction(Command.Duplicate, doc, ['a'])).toBeNull();
+  });
+
+  it('restacks the whole element among the canvas layers, not its clip inside it', () => {
+    const doc = fixture();
+
+    expect(wholeElementAction(Command.BringForward, doc, ['a', 'b'])).toBe(ElementAction.BringForward);
+    expect(wholeElementAction(Command.SendBackward, doc, ['a', 'b'])).toBe(ElementAction.SendBackward);
+    expect(wholeElementAction(Command.BringToFront, doc, ['a', 'b'])).toBe(ElementAction.BringToFront);
+    expect(wholeElementAction(Command.SendToBack, doc, ['a', 'b'])).toBe(ElementAction.SendToBack);
+    expect(wholeElementAction(Command.BringForward, doc, ['a'])).toBeNull();
+  });
+});
+
+describe('the text header', () => {
+  it('shows create component inline beside the layer name', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Text', from: 0, props: { text: 'Hi' } }, 't'));
+
+    expect(headerActions(barActions(doc, ['t'], frameBarActions(doc, ['t']))).inline).toContain(Action.CreateComponent);
+  });
+});
+
+describe('⌥⌘K names the main after the layer it was made from', () => {
+  const mainName = (doc: MotionDoc | undefined) => Object.values(doc?.comps ?? {}).find((c) => c.component)?.component?.name;
+  const named = (name: string) => {
+    const doc = fixture();
+    return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'a' ? { ...c, name } : c)) })) };
+  };
+
+  it('takes the name of the one layer selected', () => {
+    expect(mainName(barAction(Action.CreateComponent, { doc: named('Card'), selection: ['a'], frame: 0, newId: ids() })?.doc)).toBe('Card');
+  });
+
+  it('takes the name the canvas shows for a whole element', () => {
+    expect(mainName(barAction(Action.CreateComponent, { doc: fixture(), selection: ['a'], frame: 0, newId: ids(), layer: 'Box' })?.doc)).toBe('Box');
+  });
+
+  it('falls back to the layer kind, never to a numbered "Component"', () => {
+    expect(mainName(barAction(Action.CreateComponent, { doc: fixture(), selection: ['a'], frame: 0, newId: ids() })?.doc)).toBe('Title');
   });
 });

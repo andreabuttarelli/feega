@@ -1,9 +1,8 @@
 import type { MotionClip, MotionComp, MotionDoc } from '@feega/motion-core/motion/doc';
-import { instanceOf, innerClips, type Overrides } from './main-component';
+import { ComponentRole, instanceOf, innerClips, roleOf, type Overrides } from './main-component';
 import { CLIP_LEVEL_OVERRIDES, mergeView, overridden, viewOf, type CompPath } from '@feega/motion-core/motion/precomp';
-import { setProps } from '@feega/motion-core/motion/timeline';
 
-export type Hosted = { path: CompPath; hosts: readonly string[] };
+export type Hosted = { path: CompPath; hosts: readonly string[]; here?: string | null };
 
 const same = (a: unknown, b: unknown): boolean => {
   if (a === b) {
@@ -32,11 +31,18 @@ export function overridesFrom(main: MotionComp, shown: readonly MotionClip[]): O
   return Object.fromEntries(entries);
 }
 
-const parentOf = (doc: MotionDoc, scope: Hosted) => viewOf(doc, scope.path.slice(0, -1));
+const outerOf = (scope: Hosted): Hosted => ({ path: scope.path.slice(0, -1), hosts: scope.hosts.slice(0, -1), here: scope.here });
+
+const OUTERMOST = 1;
 
 function instanceAt(doc: MotionDoc, scope: Hosted) {
   const hostId = scope.hosts.at(-1);
-  return hostId === undefined ? null : instanceOf(parentOf(doc, scope), hostId);
+  if (hostId === undefined) {
+    return null;
+  }
+  const parent = scopeView(doc, outerOf(scope));
+  const main = scope.hosts.length === OUTERMOST && roleOf(parent, hostId, scope.here ?? null) === ComponentRole.Main;
+  return main ? null : instanceOf(parent, hostId);
 }
 
 export function scopeView(doc: MotionDoc, scope: Hosted): MotionDoc {
@@ -51,8 +57,10 @@ export function mergeScope(doc: MotionDoc, scope: Hosted, view: MotionDoc): Moti
     return mergeView(doc, scope.path, view);
   }
   const overrides = overridesFrom(instance.comp, view.tracks.flatMap((t) => t.clips as MotionClip[]));
-  const parent = parentOf(doc, scope);
-  const set = setProps(parent, instance.clip.id, { overrides: Object.keys(overrides).length ? overrides : undefined });
-  const edited = set.ok ? set.doc : parent;
-  return mergeView(doc, scope.path.slice(0, -1), { ...edited, assets: view.assets, fonts: view.fonts, components: view.components, fields: view.fields, interactive: view.interactive, comps: view.comps });
+  const outer = outerOf(scope);
+  const parent = scopeView(doc, outer);
+  const own = Object.keys(overrides).length ? overrides : undefined;
+  const withOwn = (clip: MotionClip): MotionClip => (clip.id === instance.clip.id ? { ...clip, props: { ...clip.props, overrides: own } } : clip);
+  const edited = { ...parent, tracks: parent.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(withOwn) })) };
+  return mergeScope(doc, outer, { ...edited, assets: view.assets, fonts: view.fonts, components: view.components, fields: view.fields, interactive: view.interactive, comps: view.comps });
 }

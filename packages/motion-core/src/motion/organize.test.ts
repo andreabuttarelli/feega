@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { clipName as nameOfClip } from './organize';
 import { FEEGA_TOKENS } from './brand';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from './doc';
 import { composeHtml } from './hyperframes/compose';
@@ -198,6 +199,14 @@ describe('closing the loop', () => {
     expect(keys(must(closeLoop(doc))).opacity.at(-1)!.frame).toBe(doc.durationInFrames - 10);
   });
 
+  it('closes on the content end when the work area runs a frame past every clip, and pulls the out point back so no empty frame plays', () => {
+    const doc = withClip({ ...clip(0, { opacity: [{ frame: 0, value: 0, ease: 'standard' }, { frame: 30, value: 1, ease: 'standard' }] }), durationInFrames: 180 }, { from: 0, to: 181 });
+    const closed = must(closeLoop(doc));
+
+    expect(keys(closed).opacity.at(-1)).toMatchObject({ frame: 180, value: 0 });
+    expect(closed.workArea).toEqual({ from: 0, to: 180 });
+  });
+
   it('says so when nothing is animated', () => {
     expect(closeLoop(withClip(clip(0, {}))).ok).toBe(false);
   });
@@ -205,5 +214,19 @@ describe('closing the loop', () => {
   it('the loop range is the work area, or the whole video', () => {
     expect(loopRange(base)).toEqual({ from: 0, to: base.durationInFrames });
     expect(loopRange({ ...base, workArea: { from: 30, to: 90 } })).toEqual({ from: 30, to: 90 });
+  });
+});
+
+describe('the name of a group', () => {
+  it('is Group, not the shape it is drawn with', () => {
+    expect(nameOfClip({ component: 'Shape', props: { shape: 'rect' }, group: true })).toBe('Group');
+    expect(nameOfClip({ component: 'Shape', props: { shape: 'rect' } })).toBe('Shape');
+  });
+});
+
+describe('the name of a renamed layer', () => {
+  it('is the name it was given, before what it holds or what it is', () => {
+    expect(nameOfClip({ component: 'Shape', props: { shape: 'rect' }, name: 'Frame' })).toBe('Frame');
+    expect(nameOfClip({ component: 'Title', props: { text: 'Hello' }, name: 'Headline' })).toBe('Headline');
   });
 });

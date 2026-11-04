@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { Device, BUDGET, deviceOf, previewHtml } from './memory-budget';
+import { Device, BUDGET, deviceOf, previewHtml, textureBudget } from './memory-budget';
 
 describe('memory budget', () => {
+  it('the texture budget follows the canvas size, up to the device ceiling', () => {
+    const small = textureBudget(BUDGET[Device.Desktop].textureBytes, { width: 1280, height: 800 });
+    const large = textureBudget(BUDGET[Device.Desktop].textureBytes, { width: 7680, height: 4320 });
+
+    expect(small).toBeLessThan(BUDGET[Device.Desktop].textureBytes);
+    expect(small).toBeGreaterThan(1280 * 800 * 4 * 6);
+    expect(large).toBe(BUDGET[Device.Desktop].textureBytes);
+  });
+
   it('a phone gets a smaller texture budget than a desktop', () => {
     expect(BUDGET[Device.Phone].textureBytes).toBeLessThan(BUDGET[Device.Desktop].textureBytes);
   });

@@ -6,10 +6,13 @@
   import { CAPS, JOINS } from '@feega/motion-core/motion/shape/schema';
   import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, patternPx, removeStroke, setStroke, type Stroke, type StrokePatch } from '@feega/motion-core/motion/stroke/model';
   import { ARROW_CAPS } from '@feega/motion-core/motion/stroke/arrows';
-  import ColorField from './ColorField.svelte';
+  import ColorPicker from './ColorPicker.svelte';
+  import { untrack } from 'svelte';
   import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
+  import { PAINT_GRIP, PAINT_INLINE_INPUT, PAINT_META, PAINT_NAME, PAINT_ROW, PAINT_SWATCH, PAINT_TEXT } from './paint-row';
+  import MinusGlyph from './MinusGlyph.svelte';
 
   let { strokes, tokens, sided = false, short, title = '', adder = Adder.Own, gesture = null, palette = () => [], onchange }: { palette?: () => readonly string[]; gesture?: LiveGesture | null; strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; adder?: Adder; onchange: (strokes: Stroke[], summary: string) => void } = $props();
 
@@ -34,6 +37,12 @@
   };
 
   let open = $state<number | null>(null);
+  let swatches = $state<readonly string[]>([]);
+
+  $effect(() => {
+    void open;
+    swatches = untrack(palette);
+  });
   let dragged = $state<number | null>(null);
   let root = $state<HTMLDivElement | null>(null);
   let rowEls = $state<HTMLElement[]>([]);
@@ -52,7 +61,7 @@
   const toggle = (i: number) => (open = open === i ? null : i);
 
   function add() {
-    onchange(addStroke(strokes), 'Add stroke');
+    onchange(addStroke(strokes, short), 'Add stroke');
     open = strokes.length;
   }
 
@@ -84,7 +93,7 @@
 
 {#snippet colour(name: string, value: string, write: (next: string) => void)}
   {@const { base, alpha } = colourAlpha(value)}
-  <ColorField {name} {gesture} {palette} value={base} {tokens} {alpha} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} onalpha={(next) => write(recolour(base, next))} />
+  <ColorPicker {name} {gesture} value={base} {alpha} {tokens} {swatches} onchange={(next, typedAlpha) => write(recolour(next, typedAlpha ?? alpha))} />
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="stroke-stack" bind:this={root}>
@@ -98,7 +107,7 @@
   {#each topFirst as { stroke, index } (index)}
     <div
       bind:this={rowEls[index]}
-      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_56px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !stroke.visible && '[&>.dim]:opacity-40')}
+      class={cn(PAINT_ROW, open === index && 'bg-ui-selected', !stroke.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
@@ -114,10 +123,14 @@
         drop(index);
       }}
     >
-      <span class="cursor-grab text-ui-text-3 select-none" aria-hidden="true">⋮</span>
-      <span class="dim size-[18px] rounded-xs border border-ui-divider" data-testid="stroke-swatch" style={`background:${swatch(stroke.paint)}`}></span>
-      <span class={cn(LABEL, 'dim truncate')} data-testid="stroke-label">{rowLabel(stroke.paint)}</span>
-      <input class={cn(FIELD_INPUT, 'dim')} type="number" min="0" step="0.5" data-testid="stroke-width" aria-label="Stroke width px" title="Width px" value={toPx(stroke.width)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { width: fromPx(e) }, 'Stroke width')} />
+      <span class={PAINT_GRIP} aria-hidden="true">⋮</span>
+      <span class={PAINT_SWATCH} data-testid="stroke-swatch" style={`background:${swatch(stroke.paint)}`}></span>
+      <span class={PAINT_TEXT}>
+        <span class={PAINT_NAME} data-testid="stroke-label">{rowLabel(stroke.paint)}</span>
+        <span class={PAINT_META} data-testid="stroke-meta">
+          <input class={PAINT_INLINE_INPUT} type="number" min="0" step="0.5" data-testid="stroke-width" aria-label="Stroke width px" title="Width px" value={toPx(stroke.width)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { width: fromPx(e) }, 'Stroke width')} />px · {ALIGN_LABEL[stroke.align]}
+        </span>
+      </span>
       <button
         type="button"
         class={ICON}
@@ -136,7 +149,7 @@
         onclick={(e) => {
           e.stopPropagation();
           remove(index);
-        }}>−</button
+        }}><MinusGlyph /></button
       >
     </div>
 
@@ -160,6 +173,7 @@
             <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="stroke-angle" value={stroke.paint.angle} onchange={(e) => repaint(index, { angle: Number(e.currentTarget.value) }, 'Stroke gradient angle')} /></label>
           {/if}
         {/if}
+        <label class={FIELD_ROW}><span class={LABEL}>Width</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="0.5" data-testid="stroke-editor-width" aria-label="Width px" value={toPx(stroke.width)} onchange={(e) => patch(index, { width: fromPx(e) }, 'Stroke width')} /></label>
         <label class={FIELD_ROW}
           ><span class={LABEL}>Position</span>
           <select class={cn(FIELD_INPUT, 'w-28')} data-testid="stroke-align" value={stroke.align} onchange={(e) => patch(index, { align: e.currentTarget.value }, 'Stroke position')}>
@@ -167,8 +181,8 @@
           </select>
         </label>
         <label class={FIELD_ROW}><span class={LABEL}>Dashes</span><input class={cn(FIELD_INPUT, 'w-28')} type="text" placeholder="10, 5, 2, 5" data-testid="stroke-pattern" value={(stroke.pattern ?? []).map(toPx).join(', ')} onchange={(e) => patch(index, { pattern: patternPx(e.currentTarget.value).map((n) => n / short) }, 'Stroke dash pattern')} /></label>
-        <label class={FIELD_ROW}><span class={LABEL}>Dash</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-dash" value={toPx(stroke.dash)} onchange={(e) => patch(index, { dash: fromPx(e) }, 'Stroke dash')} /></label>
-        <label class={FIELD_ROW}><span class={LABEL}>Gap</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-gap" value={toPx(stroke.gap)} onchange={(e) => patch(index, { gap: fromPx(e) }, 'Stroke gap')} /></label>
+        <label class={FIELD_ROW}><span class={LABEL}>Dash length</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-dash" value={toPx(stroke.dash)} onchange={(e) => patch(index, { dash: fromPx(e) }, 'Stroke dash')} /></label>
+        <label class={FIELD_ROW}><span class={LABEL}>Dash gap</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" step="1" data-testid="stroke-gap" value={toPx(stroke.gap)} onchange={(e) => patch(index, { gap: fromPx(e) }, 'Stroke gap')} /></label>
         <label class={FIELD_ROW}
           ><span class={LABEL}>Cap</span>
           <select class={cn(FIELD_INPUT, 'w-28')} data-testid="stroke-cap" value={stroke.cap} onchange={(e) => patch(index, { cap: e.currentTarget.value }, 'Stroke cap')}>

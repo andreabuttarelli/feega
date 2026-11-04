@@ -14,6 +14,7 @@ import { vectorOf, type Span } from './vector-list';
 import { libsOrigin } from './libs-origin';
 import { composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
+import { docScaleOf } from './doc-scale';
 import type { DrawTarget, SelectionPorts } from './selection-export';
 
 export type SelectionScope = { db: Db; orgId: string; projectId: string; brandId: string | null; actor: Actor };
@@ -47,7 +48,7 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
         return null;
       }
       canvasOf.set(nodeId, frame.canvasId);
-      return { name: node?.displayName || FRAME_NAME, doc: await playedDoc(frames, frame.doc) };
+      return { name: node?.displayName || FRAME_NAME, doc: await playedDoc(frames, frame.doc), docScale: docScaleOf(node, frame.doc) };
     },
     draw: (targets, row) => drawTargets({ port: chromiumExport, compose, vector }, targets, row),
     store: async (packed) => {

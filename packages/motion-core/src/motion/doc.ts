@@ -134,6 +134,7 @@ const clipSchema = z.object({
   acceptsLights: z.boolean().optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional(),
+  paintStyleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),
   bind: bindSchema
 });
@@ -147,7 +148,7 @@ const trackSchema = z.object({
   locked: z.boolean().optional()
 });
 
-export const MAX_TRACKS = 20;
+export const MAX_TRACKS = 1000;
 
 const templateMarkSchema = z.object({
   id: z.string().min(1).max(80),
@@ -184,19 +185,15 @@ const assetRefSchema = z.object({
 export const MIN_SIDE = 16;
 export const DESIGN_MAX_SIDE = 16384;
 export const DESIGN_MIN_SIDE = 1;
-export const RESOLUTION_PROBLEM = `a video is at most 4K (3840x2160); a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} px a side`;
+export const RESOLUTION_PROBLEM = `a frame takes ${MIN_SIDE} to ${DESIGN_MAX_SIDE} px a side (a still design from ${DESIGN_MIN_SIDE}); the video limits apply when it is exported`;
 
 export function sideRange(d: { still?: unknown }): { min: number; max: number } {
-  return d.still ? { min: DESIGN_MIN_SIDE, max: DESIGN_MAX_SIDE } : { min: MIN_SIDE, max: MAX_SIDE };
+  return d.still ? { min: DESIGN_MIN_SIDE, max: DESIGN_MAX_SIDE } : { min: MIN_SIDE, max: DESIGN_MAX_SIDE };
 }
 
 export function fitsResolution(d: { width: number; height: number; still?: unknown }): boolean {
   const { min: shortest, max: longest } = sideRange(d);
-  const sides = [d.width, d.height];
-  if (sides.some((side) => !Number.isInteger(side) || side < shortest || side > longest)) {
-    return false;
-  }
-  return Boolean(d.still) || Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE);
+  return [d.width, d.height].every((side) => Number.isInteger(side) && side >= shortest && side <= longest);
 }
 
 const MAX_POINT_TRACKS = 20;
@@ -236,6 +233,7 @@ export const motionDocSchema = z
     script: scriptSchema.optional(),
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
+    poster: stillSchema.optional(),
     freeSize: z.boolean().optional(),
     surface: z.string().min(1).optional(),
     breakpoints: breakpointsSchema,
@@ -249,7 +247,8 @@ export const motionDocSchema = z
   })
   .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })
-  .refine((d) => !d.still || d.still.frame < d.durationInFrames, { message: 'the still frame is past the end of the doc', path: ['still'] });
+  .refine((d) => !d.still || d.still.frame < d.durationInFrames, { message: 'the still frame is past the end of the doc', path: ['still'] })
+  .refine((d) => !d.poster || d.poster.frame < d.durationInFrames, { message: 'the poster frame is past the end of the doc', path: ['poster'] });
 
 export type MotionDoc = z.infer<typeof motionDocSchema>;
 export type MotionTrack = MotionDoc['tracks'][number];

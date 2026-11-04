@@ -1,9 +1,11 @@
 import { componentsPage, homeComponents } from '$lib/server/canvas/components-page';
+import { coreEvent } from '$lib/server/core-usage';
+import { CoreEvent, TemplateKind } from '$lib/core-usage';
 import { exportCodeNode } from '$lib/server/canvas/code-export-node';
 import { listProjectComponents } from './project-components';
 import { ExportMode } from '$lib/canvas/code-frame';
 import { codeVarsError } from '$lib/server/canvas/code-source';
-import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, stackElements, ungroupElement } from '$lib/server/motion/element-groups';
+import { frameElements, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, stackElements, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { wrapInSection } from './section';
 import { z } from 'zod';
@@ -16,6 +18,7 @@ import {
   findNode,
   listConnections,
   setConnectionMode,
+  setConnectionTie,
   listCanvases,
   listNodes,
   moveNode,
@@ -58,7 +61,7 @@ import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { addComment, deleteComment, editComment, listComments, resolveThread, teammates } from '$lib/server/canvas/canvas-comments';
 import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motion/export-rows';
-import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { ExportOutcome, exportSelection, noteImageExport } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
@@ -68,6 +71,7 @@ import { Side } from '$lib/motion/branch-merge';
 import { ResolveOutcome, resolveConflict } from '$lib/server/canvas/conflicts';
 import { Resolution } from '$lib/server/repos/canvas-conflicts';
 import { canvasPath } from '$lib/server/tenancy/entry';
+import { showAgentAt, touchedNodes } from './agent-cursor';
 import { FeegaImport, exportCanvasFile, importStoredCanvasFile, signCanvasFileUpload, storeCanvasFile } from '$lib/server/canvas/feega-file';
 import { FEEGA_MAX_BYTES, FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
@@ -330,9 +334,10 @@ const createdSize = (type: string, data: Record<string, unknown>) => {
 
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 2; or any nodes with section true'), section: z.boolean().optional().describe('wrap the nodes in a Section instead of a Group') }).strict();
 const stackElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes), at least 1') }).strict();
+const frameElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1).max(50).describe('free elements on the canvas (element nodes or Groups), at least 1; frames are refused') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
-const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a frame, element or group on the canvas; a group turns its members with it'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
 const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
@@ -395,6 +400,7 @@ const canvasIdInput = z.object({ canvasId: z.string() }).strict();
 const renameCanvasInput = z.object({ canvasId: z.string(), name: z.string().min(1) }).strict();
 const renameProjectInput = z.object({ name: z.string().min(1) }).strict();
 const connectionIdInput = z.object({ connectionId: z.string().describe('from list_connections') }).strict();
+const edgeTieInput = z.object({ connectionIds: z.array(z.string()).min(1), tie: z.object({ id: z.string(), x: z.number(), y: z.number() }).strict().nullable().describe('the cable tie every listed line passes through; null unties them') }).strict();
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
 const renameNodeInput = z.object({ nodeId: z.string(), name: z.string() }).strict();
 const setNodeColorInput = z.object({ nodeId: z.string(), color: z.enum(COLOUR_TAGS).nullable().describe('null removes the tag') }).strict();
@@ -620,7 +626,7 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: exportCodeFrameInput,
     run: async (ctx, input) => {
-      const out = await exportCodeNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId, mode: input.mode ?? ExportMode.Inline });
+      const out = await exportCodeNode(ctx.db, { orgId: ctx.orgId, userId: ctx.userId, nodeId: input.nodeId, mode: input.mode ?? ExportMode.Inline });
       return out.ok ? { framework: out.framework, mode: out.mode, folder: out.folder, files: out.files } : { outcome: 'invalid', message: out.error };
     }
   }),
@@ -918,8 +924,9 @@ export const CANVAS_OPS = {
       .object({
         frameIds: z.array(z.string()).max(EXPORT_MAX_FRAMES).default([]),
         elements: exportElementsSchema.default([]),
-        rows: exportRowsSchema.describe('value: 0.5–4 for scale, px for width/height'),
-        name: z.string().max(60).optional()
+        rows: exportRowsSchema.describe('value: 0.5–4 for scale of the frame as big as it is on the canvas (1 = one image px per canvas px, 2 = the default sharp export), px for width/height'),
+        name: z.string().max(60).optional(),
+        seconds: z.number().min(0).optional().describe('the time each frame is drawn at; by default its poster frame, else the frame where it settles')
       })
       .strict()
       .refine((i) => i.frameIds.length + i.elements.length > 0),
@@ -927,9 +934,14 @@ export const CANVAS_OPS = {
       if (needsBrowser(input.rows) && !serverFramesOpen()) {
         return { error: 'renderer_unavailable', message: 'image export needs the server renderer, which is not available here' };
       }
-      const targets = [...input.frameIds.map((nodeId) => ({ nodeId })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))];
+      const targets = [...input.frameIds.map((nodeId) => ({ nodeId, seconds: input.seconds })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId, seconds: input.seconds }))];
       const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
-      return out.outcome === ExportOutcome.Done ? out : { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
+      if (out.outcome !== ExportOutcome.Done) {
+        return { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
+      }
+
+      noteImageExport(ctx.userId, input.rows);
+      return out;
     }
   }),
 
@@ -1008,7 +1020,10 @@ export const CANVAS_OPS = {
   home_components: op({
     access: Access.Write,
     input: homeComponentsInput,
-    run: async (ctx, input) => homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8))
+    run: async (ctx, input) => {
+      const { head, ...done } = await homeComponents(framesOf(ctx), () => componentsPage(ctx.db, ctx), input.frameId, () => crypto.randomUUID().slice(0, 8));
+      return { ...done, version: head?.version ?? null };
+    }
   }),
 
   import_url: op({
@@ -1102,6 +1117,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: stackElementsInput,
     run: async (ctx, input) => frameAnswer(await stackElements(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
+  }),
+
+  frame_elements: op({
+    access: Access.Write,
+    input: frameElementsInput,
+    run: async (ctx, input) => frameAnswer(await frameElements(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
   }),
 
   ungroup_element: op({
@@ -1393,6 +1414,12 @@ export const CANVAS_OPS = {
     }
   }),
 
+  set_edge_tie: op({
+    access: Access.Write,
+    input: edgeTieInput,
+    run: async (ctx, input) => ({ connections: await setConnectionTie(ctx.db, { orgId: ctx.orgId, ...input }) })
+  }),
+
   rename_node: op({
     access: Access.Write,
     input: renameNodeInput,
@@ -1575,7 +1602,12 @@ export const CANVAS_OPS = {
     input: insertTemplateInput,
     run: async (ctx, input) => {
       const out = await insertTemplate(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, templateId: input.templateId, at: { x: input.x, y: input.y }, actor: ctx.actor });
-      return out ?? { error: 'unknown_template' };
+      if (!out) {
+        return { error: 'unknown_template' };
+      }
+
+      coreEvent(ctx.userId, CoreEvent.TemplateInserted, { kind: TemplateKind.Canvas, template_id: input.templateId });
+      return out;
     }
   }),
 
@@ -1905,4 +1937,10 @@ export function isCanvasOp(name: string): name is CanvasOpName {
 
 export function chatSendsOp(name: CanvasOpName): boolean {
   return (CANVAS_OPS[name].audience ?? Audience.Everyone) === Audience.Everyone;
+}
+
+export async function runOp(ctx: CanvasCtx, name: CanvasOpName, input: unknown): Promise<unknown> {
+  const result = await CANVAS_OPS[name].run(ctx, input as never);
+  showAgentAt(ctx, touchedNodes(input, result), name);
+  return result;
 }

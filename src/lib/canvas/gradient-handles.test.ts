@@ -21,6 +21,11 @@ describe('on-canvas gradient handles', () => {
     expect(f.type === FillType.Linear && f.angle).toBeCloseTo(90);
   });
 
+  it('dragging the end to any point lands on a whole degree, like the angle field steps', () => {
+    const f = draggedFill(linear(0), box, { grip: GradientGrip.End }, [180, 90]);
+    expect(f.type === FillType.Linear && f.angle).toBe(27);
+  });
+
   it('dragging a stop moves its position along the line', () => {
     const f = draggedFill(linear(0), box, { grip: GradientGrip.Stop, stop: 1 }, [150, 10]);
     expect(f.type === FillType.Linear && f.stops[1].pos).toBeCloseTo(0.75);
@@ -40,13 +45,26 @@ describe('on-canvas gradient handles', () => {
 });
 
 describe('the gradient a selected element shows handles for', () => {
-  it('is its top visible gradient fill, and a drag writes it back in place', () => {
+  const shaped = () => {
     const fills = [fillSchema.parse({ type: FillType.Solid, color: '#000000' }), linear(0)];
     const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', fills } }, 's');
     if (!added.ok) {
       throw new Error(added.error);
     }
-    const target = gradientTarget(added.doc, 's')!;
+    return added.doc;
+  };
+
+  it('shows none while no fill editor is open, like Figma', () => {
+    expect(gradientTarget(shaped(), 's', null)).toBeNull();
+  });
+
+  it('shows none while the open editor is a solid fill', () => {
+    expect(gradientTarget(shaped(), 's', 0)).toBeNull();
+  });
+
+  it('is the gradient whose editor is open, and a drag writes it back in place', () => {
+    const added = { doc: shaped() };
+    const target = gradientTarget(added.doc, 's', 1)!;
     expect(target.index).toBe(1);
     const written = withFill(added.doc, 's', target.index, linear(45));
     const stored = written.ok ? (findClip(written.doc, 's')!.clip.props.fills as Fill[]) : [];

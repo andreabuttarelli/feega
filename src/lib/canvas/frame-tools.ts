@@ -1,6 +1,7 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { canEditPoints } from '$lib/motion/shape/vector-edit';
+import { lineEnds } from '$lib/motion/shape/line-ends';
 import { EditMode } from '$lib/motion/edit-mode';
 import { positionSpan } from '$lib/motion/motion-trail';
 import { OnionSkin } from './onion-skin.svelte';
@@ -10,7 +11,6 @@ export enum FrameOverlay {
   Draw = 'draw',
   Guides = 'guides',
   Rulers = 'rulers',
-  Align = 'align',
   Mask = 'mask',
   Pen = 'pen',
   ShapeBuilder = 'shape-builder',
@@ -20,33 +20,13 @@ export enum FrameOverlay {
   Outlines = 'outlines',
   Corners = 'corners',
   MotionPath = 'motion-path',
-  Onion = 'onion'
+  Onion = 'onion',
+  LineEnds = 'line-ends'
 }
 
 type Context = { doc: MotionDoc; clip: MotionClip | null; picks: number; tool: DrawTool; pointEdit: string | null; active: boolean; views: FrameViews; mode: EditMode; onion: OnionSkin };
 
 const MIN_ALIGNED = 2;
-const ALIGN_BAR_PX = { width: 280, height: 42 };
-
-export enum AlignSide {
-  Below = 'below',
-  Right = 'right',
-  Above = 'above'
-}
-
-type Screen = { left: number; top: number; width: number; height: number };
-type Clear = { width: number; bottom: number };
-
-export function alignSide(frame: Screen, clear: Clear): AlignSide {
-  if (frame.top + frame.height + ALIGN_BAR_PX.height <= clear.bottom) {
-    return AlignSide.Below;
-  }
-  if (frame.left + frame.width + ALIGN_BAR_PX.width <= clear.width) {
-    return AlignSide.Right;
-  }
-  return AlignSide.Above;
-}
-
 const POINT_OVERLAY: Record<string, FrameOverlay> = { path: FrameOverlay.Pen, vector: FrameOverlay.Vector };
 
 const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
@@ -54,7 +34,6 @@ const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
   [FrameOverlay.ShapeBuilder]: (c) => c.tool === DrawTool.ShapeBuilder && c.picks >= MIN_ALIGNED,
   [FrameOverlay.Guides]: (c) => Boolean(c.doc.layoutGuides?.length) && shows(c.views, FrameView.Guides),
   [FrameOverlay.Rulers]: (c) => shows(c.views, FrameView.Rulers),
-  [FrameOverlay.Align]: (c) => c.picks >= MIN_ALIGNED,
   [FrameOverlay.Mask]: (c) => Boolean(c.clip?.mask) && c.active,
   [FrameOverlay.Pen]: (c) => pointsOf(c) === FrameOverlay.Pen,
   [FrameOverlay.Vector]: (c) => pointsOf(c) === FrameOverlay.Vector,
@@ -63,6 +42,7 @@ const RULES: Record<FrameOverlay, (c: Context) => boolean> = {
   [FrameOverlay.Outlines]: (c) => shows(c.views, FrameView.Outlines),
   [FrameOverlay.Corners]: (c) => c.clip?.component === 'Shape' && c.clip.props.shape === 'rect' && c.picks === 1 && c.active,
   [FrameOverlay.MotionPath]: (c) => recording(c) && Boolean(c.clip!.path || positionSpan(c.clip!)),
+  [FrameOverlay.LineEnds]: (c) => c.tool === DrawTool.Select && c.picks === 1 && c.active && !!c.clip && c.clip.id !== c.pointEdit && lineEnds(c.clip) !== null,
   [FrameOverlay.Onion]: (c) => recording(c) && c.onion === OnionSkin.On && Object.values(c.clip!.keyframes).some((track) => track?.length)
 };
 

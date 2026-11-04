@@ -88,11 +88,9 @@ export type NewClip = {
   constraints?: Constraints;
 };
 
-export const TOP_LEFT_ANCHOR: Transform = { anchorX: 0, anchorY: 0 };
-
 const NEW_CLIP_CONSTRAINTS: Constraints = { horizontal: Horizontal.Left, vertical: Vertical.Top };
 
-export const TOP_LEFT_START = { transform: TOP_LEFT_ANCHOR, constraints: NEW_CLIP_CONSTRAINTS } satisfies Pick<NewClip, 'transform' | 'constraints'>;
+export const NEW_CLIP_START = { constraints: NEW_CLIP_CONSTRAINTS } satisfies Pick<NewClip, 'constraints'>;
 
 type Span = { from: number; durationInFrames?: number };
 
@@ -377,9 +375,10 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; size?:
     return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
   const still = fitted.still ? { still: { frame: Math.min(fitted.still.frame, durationInFrames - 1) } } : {};
+  const poster = fitted.poster ? { poster: { frame: Math.min(fitted.poster.frame, durationInFrames - 1) } } : {};
   const { freeSize: _, ...rest } = fitted;
   const free = freeSize ? { freeSize } : {};
-  return { ok: true, doc: { ...rest, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still, ...free } };
+  return { ok: true, doc: { ...rest, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still, ...poster, ...free } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {

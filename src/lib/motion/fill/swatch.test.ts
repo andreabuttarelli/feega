@@ -10,7 +10,12 @@ const [linear, image] = fillsSchema.parse([
 
 describe('fill swatch', () => {
   it('a gradient swatch lists its stops in order', () => {
-    expect(swatchOf(linear, paints)).toBe('linear-gradient(90deg,#000000 0%,#ffffff 100%)');
+    expect(swatchOf(linear, paints)).toMatch(/^linear-gradient\(90deg,#000000 0%,#ffffff 100%\), repeating-conic-gradient/);
+  });
+
+  it('a solid swatch sits over a checkerboard, so a transparent one reads as empty', () => {
+    const [clear] = fillsSchema.parse([{ type: FillType.Solid, color: 'transparent' }]);
+    expect(swatchOf(clear, paints)).toMatch(/^linear-gradient\(transparent,transparent\), repeating-conic-gradient/);
   });
 
   it('an image without a preview falls back to the neutral swatch', () => {

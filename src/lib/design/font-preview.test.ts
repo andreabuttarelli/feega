@@ -36,4 +36,10 @@ describe('fontPreviewHref', () => {
   it('encodes multi-word families with a plus, the way Google Fonts expects', () => {
     expect(fontPreviewHref(['Space Grotesk'])).toContain('family=Space+Grotesk');
   });
+
+  it('asks for the given glyphs and weights when a preview draws its own sample', () => {
+    const href = fontPreviewHref(['Manrope'], { text: 'Aa', weights: [500, 700] });
+    expect(href).toContain('family=Manrope:wght@500;700');
+    expect(href).toContain('&text=Aa&');
+  });
 });

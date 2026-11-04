@@ -7,26 +7,6 @@ export type Page = {
 type Sentinel = { release: () => Promise<void> };
 export type WakeLockHost = { wakeLock?: { request: (type: 'screen') => Promise<Sentinel> } };
 
-export function visibleGate(page: Page, onPause: (paused: boolean) => void): () => Promise<void> {
-  return () => {
-    if (!page.hidden) {
-      return Promise.resolve();
-    }
-    onPause(true);
-    return new Promise((resolve) => {
-      const back = () => {
-        if (page.hidden) {
-          return;
-        }
-        page.removeEventListener('visibilitychange', back);
-        onPause(false);
-        resolve();
-      };
-      page.addEventListener('visibilitychange', back);
-    });
-  };
-}
-
 export async function keepAwake(host: WakeLockHost, page: Page): Promise<() => void> {
   if (!host.wakeLock) {
     return () => {};

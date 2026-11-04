@@ -9,7 +9,7 @@ describe('main menu model', () => {
   });
 
   it('shows the shortcut the keyboard uses', () => {
-    expect(preferenceShortcut(Command.ToggleRulers)).toBe('⌥⇧R');
+    expect(preferenceShortcut(Command.ToggleRulers)).toBe('⇧R');
   });
 
   it('offers light, dark and system in that order', () => {

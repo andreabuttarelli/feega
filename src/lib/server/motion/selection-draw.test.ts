@@ -52,14 +52,45 @@ const ports = (port: ExportPort) => ({ port, compose, vector });
 describe('drawing an export', () => {
   it('a raster row is a screenshot at its scale, cropped to the element when one is asked', async () => {
     const { port, log } = fakePort();
-    await drawTargets(ports(port), [{ nodeId: 'a', doc, elementId: 'title' }], row({ format: 'jpg', by: 'scale', value: 2, quality: 70 }));
+    await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc, elementId: 'title' }], row({ format: 'jpg', by: 'scale', value: 2, quality: 70 }));
 
     expect(log).toEqual([`open ${doc.width}x${doc.height}@2`, 'load', 'seek 0', 'shot image/jpeg 70 100,200,300,120', 'close']);
   });
 
+  it('1x is the frame as big as it is on the canvas, 2x twice that', async () => {
+    const one = fakePort();
+    const two = fakePort();
+    await drawTargets(ports(one.port), [{ nodeId: 'a', doc, docScale: 0.5 }], row({ format: 'png', by: 'scale', value: 1 }));
+    await drawTargets(ports(two.port), [{ nodeId: 'a', doc, docScale: 0.5 }], row({ format: 'png', by: 'scale', value: 2 }));
+
+    expect(one.log[0]).toBe(`open ${doc.width}x${doc.height}@0.5`);
+    expect(two.log[0]).toBe(`open ${doc.width}x${doc.height}@1`);
+  });
+
+  it('a width row asks for canvas px of the frame, not doc px', async () => {
+    const { port, log } = fakePort();
+    await drawTargets(ports(port), [{ nodeId: 'a', doc, docScale: 0.5 }], row({ format: 'png', by: 'width', value: doc.width }));
+
+    expect(log[0]).toBe(`open ${doc.width}x${doc.height}@1`);
+  });
+
+  it('an SVG at 1x is as wide as the frame on the canvas', async () => {
+    const { port } = fakePort();
+    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', doc: withCard, docScale: 0.5 }], row({ format: 'svg', by: 'scale', value: 1 }));
+
+    expect(bytes.toString()).toContain(`width="${doc.width / 2}"`);
+  });
+
+  it('a raster row of a video is shot at its poster frame, not its first', async () => {
+    const { port, log } = fakePort();
+    await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, poster: { frame: 60 } }, docScale: 1 }], row({ format: 'png', by: 'scale', value: 1 }));
+
+    expect(log).toContain(`seek ${60 / doc.fps}`);
+  });
+
   it('an SVG row is drawn from the display list: paths, no foreign object, no browser', async () => {
     const { port, log } = fakePort();
-    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', doc: withCard }], row({ format: 'svg', by: 'scale', value: 1 }));
+    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: withCard }], row({ format: 'svg', by: 'scale', value: 1 }));
 
     expect(bytes.toString()).toContain('<path');
     expect(bytes.toString()).not.toContain('foreignObject');
@@ -68,7 +99,7 @@ describe('drawing an export', () => {
 
   it('an SVG of one element is cropped to the box that element covers', async () => {
     const { port } = fakePort();
-    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', doc: withCard, elementId: 'card' }], row({ format: 'svg', by: 'scale', value: 2 }));
+    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: withCard, elementId: 'card' }], row({ format: 'svg', by: 'scale', value: 2 }));
 
     expect(bytes.toString()).toContain(`viewBox="${doc.width * 0.375} ${doc.height * 0.375} ${doc.width * 0.25} ${doc.height * 0.25}"`);
   });
@@ -76,7 +107,7 @@ describe('drawing an export', () => {
   it('an SVG row says what it could not draw', async () => {
     const { port } = fakePort();
     const blended = { ...withCard, tracks: withCard.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'card' ? { ...c, blend: 'multiply' } : c)) })) } as typeof withCard;
-    const { skipped } = await drawTargets(ports(port), [{ nodeId: 'a', doc: blended }], row({ format: 'svg', by: 'scale', value: 1 }));
+    const { skipped } = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: blended }], row({ format: 'svg', by: 'scale', value: 1 }));
 
     expect(skipped).toEqual(['card: blend mode multiply']);
   });
@@ -84,7 +115,7 @@ describe('drawing an export', () => {
   it('a Lottie row is the animation of the frame as JSON, one frame per doc frame', async () => {
     const { port, log } = fakePort();
     const short = { ...withCard, durationInFrames: 12 };
-    const { bytes, skipped } = await drawTargets(ports(port), [{ nodeId: 'a', doc: short }], row({ format: 'lottie', by: 'scale', value: 1 }));
+    const { bytes, skipped } = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: short }], row({ format: 'lottie', by: 'scale', value: 1 }));
     const json = JSON.parse(bytes.toString());
 
     expect(json).toMatchObject({ w: doc.width, h: doc.height, fr: doc.fps, op: 12 });
@@ -95,7 +126,7 @@ describe('drawing an export', () => {
 
   it('a dotLottie row is a zip holding that animation', async () => {
     const { port } = fakePort();
-    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, durationInFrames: 3 } }], row({ format: 'dotlottie', by: 'scale', value: 1 }));
+    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: { ...withCard, durationInFrames: 3 } }], row({ format: 'dotlottie', by: 'scale', value: 1 }));
 
     expect(Object.keys(unzipSync(new Uint8Array(bytes))).sort()).toEqual(['animations/animation.json', 'manifest.json']);
   });
@@ -103,8 +134,8 @@ describe('drawing an export', () => {
   it('a Lottie of one element holds only that element, and says what it left out', async () => {
     const { port } = fakePort();
     const blended = { ...withCard, tracks: withCard.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'card' ? { ...c, blend: 'multiply' } : c)) })) } as typeof withCard;
-    const element = await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...withCard, durationInFrames: 2 }, elementId: 'card' }], row({ format: 'lottie', by: 'scale', value: 1 }));
-    const skipped = await drawTargets(ports(port), [{ nodeId: 'a', doc: { ...blended, durationInFrames: 2 }, elementId: 'card' }], row({ format: 'lottie', by: 'scale', value: 1 }));
+    const element = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: { ...withCard, durationInFrames: 2 }, elementId: 'card' }], row({ format: 'lottie', by: 'scale', value: 1 }));
+    const skipped = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: { ...blended, durationInFrames: 2 }, elementId: 'card' }], row({ format: 'lottie', by: 'scale', value: 1 }));
 
     expect(JSON.parse(element.bytes.toString()).layers.map((l: { nm: string }) => l.nm)).toEqual(['card:0']);
     expect(skipped.skipped).toEqual(['card: blend mode multiply']);
@@ -112,7 +143,7 @@ describe('drawing an export', () => {
 
   it('a PDF row prints every target as one page of one file', async () => {
     const { port, log } = fakePort();
-    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', doc: withCard }, { nodeId: 'b', doc: withCard, elementId: 'card' }], row({ format: 'pdf', by: 'scale', value: 1 }));
+    const { bytes } = await drawTargets(ports(port), [{ nodeId: 'a', docScale: 1, doc: withCard }, { nodeId: 'b', docScale: 1, doc: withCard, elementId: 'card' }], row({ format: 'pdf', by: 'scale', value: 1 }));
 
     expect(bytes.toString()).toBe('%PDF');
     expect(log.at(-1)).toBe('print 2');

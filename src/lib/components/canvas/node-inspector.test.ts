@@ -5,26 +5,42 @@ import { selectionProperties, type NodeSummary } from './selection-properties.sv
 
 const noop = () => undefined;
 
-const panelOf = (summaries: NodeSummary[]) => ({ summaries, runQuote: null, onaction: noop, onpropertychange: noop, onview: noop, onalign: noop, ondistribute: noop });
+const panelOf = (summaries: NodeSummary[]) => ({ summaries, runQuote: null, onpropertychange: noop, onalign: noop, ondistribute: noop });
 
 const html = () => render(FrameInspectorPanel, { props: { session: null, tokens: null } }).body;
 
 describe('right bar of a canvas selection', () => {
   afterEach(() => selectionProperties.clear());
 
-  it('shows a generated image with its toolbar actions', () => {
+  it('shows a generated image with properties only, its actions left to the context menu', () => {
     selectionProperties.publish(panelOf([{ id: 'i', type: 'image', data: { refId: 'r1' } }]));
     const body = html();
 
     expect(body).toContain('data-testid="node-inspector"');
-    expect(body).toContain('data-testid="panel-remove-background"');
-    expect(body).toContain('data-testid="panel-view-output"');
+    expect(body).not.toContain('data-testid="panel-remove-background"');
+    expect(body).not.toContain('data-testid="panel-view-output"');
   });
 
   it('aligns and distributes several free elements', () => {
     selectionProperties.publish(panelOf([{ id: 'a', type: 'text', data: {} }, { id: 'b', type: 'text', data: {} }]));
 
     expect(html()).toContain('data-testid="align-bar"');
+  });
+
+  it('places several free elements: X/Y/W/H/rotation, Mixed where they differ', () => {
+    const items = [
+      { id: 'a', x: 0, y: 0, w: 100, h: 50, rotation: 0 },
+      { id: 'b', x: 200, y: 0, w: 100, h: 80, rotation: 0 }
+    ];
+    selectionProperties.publish({ ...panelOf([{ id: 'a', type: 'element', data: {} }, { id: 'b', type: 'element', data: {} }]), box: { items, set: noop } });
+    const body = html();
+
+    expect(body).toContain('data-testid="selection-box-fields"');
+    expect(body).toMatch(/aria-label="X"[^>]*placeholder="Mixed"/);
+    expect(body).toMatch(/aria-label="Y"[^>]*value="0"/);
+    expect(body).toMatch(/aria-label="Width"[^>]*value="100"/);
+    expect(body).toMatch(/aria-label="Height"[^>]*placeholder="Mixed"/);
+    expect(body).toContain('aria-label="Rotation"');
   });
 
   it('falls back to the hint when nothing is selected', () => {

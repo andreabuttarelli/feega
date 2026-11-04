@@ -22,9 +22,20 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
     expect(faceOf({ id: 'v', kind: 'video', tag: NameTag.Shown }, { prompt: 'x', refId: 'r' }, asset).media).toEqual({ url: '/a/r', video: true });
   });
 
-  it('a motion frame draws its poster and, when rendered, its mp4', () => {
-    const face = faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown, poster: { url: '/a/p', source: PosterSource.Image } }, { lastRenderAssetId: 'mp4' }, asset);
-    expect(face).toMatchObject({ surface: Surface.Frame, media: { url: '/a/p', video: false }, live: '/a/mp4' });
+  it('a motion frame draws its poster while it pictures the head revision', () => {
+    const face = faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown, poster: { url: '/a/p', source: PosterSource.Image } }, { docHeadRevision: 4, posterRevision: 4 }, asset);
+    expect(face).toMatchObject({ surface: Surface.Frame, media: { url: '/a/p', video: false } });
+  });
+
+  it('a motion frame never draws content older than its doc: a stale poster, an unversioned one, a past render', () => {
+    const poster = { url: '/a/p', source: PosterSource.Image };
+    const stale = faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown, poster }, { docHeadRevision: 9, posterRevision: 4 }, asset);
+    const unversioned = faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown, poster }, { docHeadRevision: 9 }, asset);
+    const rendered = faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown }, { docHeadRevision: 9, lastRenderAssetId: 'mp4' }, asset);
+
+    expect(stale.media).toBeNull();
+    expect(unversioned.media).toBeNull();
+    expect(rendered.media).toBeNull();
   });
 
   it('a free element has no label and no card chrome', () => {
@@ -91,9 +102,9 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
 });
 
 describe('a face the core draws', () => {
-  it('drops its poster and live media, so Pixi holds no texture for it', () => {
+  it('drops its poster, so Pixi holds no texture for it', () => {
     const face = faceOf({ id: 'f', kind: 'motion', poster: { url: 'p.jpg' } as never }, {}, (id) => id);
-    expect(handedToCore(face)).toMatchObject({ media: null, live: null, surface: face.surface });
+    expect(handedToCore(face)).toMatchObject({ media: null, surface: face.surface });
   });
 
   it('a list shows one row per item, with its thumbnail when it holds images', () => {

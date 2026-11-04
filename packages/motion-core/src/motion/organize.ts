@@ -64,7 +64,7 @@ export function setWorkArea(doc: MotionDoc, area: Area | null): OpResult {
   return watchable(doc, { from, to }) ? ok({ ...doc, workArea: { from, to } }) : fail(`the work area needs at least ${MIN_WORK_AREA_S}s between its in and out points`);
 }
 
-export function loopRange(doc: MotionDoc): Area {
+export function loopRange(doc: Pick<MotionDoc, 'workArea' | 'fps' | 'durationInFrames'>): Area {
   const area = doc.workArea;
   return area && watchable(doc, area) ? area : { from: 0, to: doc.durationInFrames };
 }
@@ -90,8 +90,14 @@ function closeClip(clip: MotionClip, to: number): MotionClip | null {
   return closed.length ? { ...clip, keyframes: { ...clip.keyframes, ...Object.fromEntries(closed) } } : null;
 }
 
-export function closeLoop(doc: MotionDoc): OpResult {
+function seamOf(doc: MotionDoc): number {
   const { to } = loopRange(doc);
+  const ends = doc.tracks.flatMap((t) => t.clips.filter((c) => c.from < to).map((c) => Math.min(to, c.from + c.durationInFrames)));
+  return ends.length ? Math.max(...ends) : to;
+}
+
+export function closeLoop(doc: MotionDoc): OpResult {
+  const to = seamOf(doc);
   let changed = false;
   const tracks = doc.tracks.map((t) => ({
     ...t,
@@ -101,7 +107,8 @@ export function closeLoop(doc: MotionDoc): OpResult {
       return closed ?? c;
     })
   })) as MotionDoc['tracks'];
-  return changed ? ok({ ...doc, tracks }) : fail('nothing is animated across the loop end: key a prop first');
+  const workArea = doc.workArea ? { ...doc.workArea, to } : doc.workArea;
+  return changed ? ok({ ...doc, tracks, workArea }) : fail('nothing is animated across the loop end: key a prop first');
 }
 
 export function loopFrame(doc: MotionDoc, frame: number): number {
@@ -144,10 +151,13 @@ export function isLocked(doc: MotionDoc, clipId: string): boolean {
 
 export type TrackView = { solo: readonly string[]; shy: readonly string[]; hideShy: boolean; filter: string };
 
-export function clipName(clip: Pick<MotionClip, 'component' | 'props'> & Partial<Pick<MotionClip, 'autoLayout'>>): string {
+const GROUP_NAME = 'Group';
+
+export function clipName(clip: Pick<MotionClip, 'component' | 'props'> & Partial<Pick<MotionClip, 'autoLayout' | 'group' | 'name'>>): string {
   const p = clip.props as { text?: string; title?: string; name?: string };
   const kind = layoutKind(clip);
-  return (clip.component === 'Custom' ? p.name : undefined) ?? p.text?.split('\n')[0] ?? p.title ?? (kind ? LAYOUT_KIND_LABEL[kind] : COMPONENTS[clip.component].label);
+  const label = kind ? LAYOUT_KIND_LABEL[kind] : clip.group ? GROUP_NAME : COMPONENTS[clip.component].label;
+  return clip.name || ((clip.component === 'Custom' ? p.name : undefined) ?? p.text?.split('\n')[0] ?? p.title ?? label);
 }
 
 export function shownTracks(doc: MotionDoc, view: TrackView): MotionTrack[] {

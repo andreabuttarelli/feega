@@ -6,13 +6,14 @@ import { addClip, setTransform, type OpResult } from '@feega/motion-core/motion/
 import { SEPARATOR } from '@feega/motion-core/motion/precomp';
 
 export type FrameDoc = { id: string; doc: MotionDoc };
+export type FrameMains = { id: string; doc: { comps: Record<string, Pick<MotionComp, 'component'>> } };
 export type ComponentVariant = { compId: string; variant: Variant };
 export type ComponentGroup = { key: string; frameId: string; home: string; name: string; variants: ComponentVariant[] };
 export type Offset = { x: number; y: number };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
-export function componentGroups(frames: readonly FrameDoc[]): ComponentGroup[] {
+export function componentGroups(frames: readonly FrameMains[]): ComponentGroup[] {
   const seen = new Set<string>();
   const present = new Set(frames.map((f) => f.id));
   return frames.flatMap(({ id, doc }) =>
@@ -29,6 +30,13 @@ export function componentGroups(frames: readonly FrameDoc[]): ComponentGroup[] {
   );
 }
 
+function withSet(source: MotionDoc, compId: string): Map<string, MotionComp> {
+  const found = new Map<string, MotionComp>();
+  const members = setMembers(source, compId).map(([id]) => id);
+  [compId, ...members].forEach((id) => withNested(source, id, found));
+  return found;
+}
+
 function withNested(source: MotionDoc, compId: string, found: Map<string, MotionComp> = new Map()): Map<string, MotionComp> {
   const comp = source.comps[compId];
   if (!comp || found.has(compId)) {
@@ -43,14 +51,14 @@ function copied(target: MotionDoc, source: MotionDoc, compId: string): MotionDoc
   if (target.comps[compId]) {
     return target;
   }
-  const comps = Object.fromEntries([...withNested(source, compId)].filter(([id]) => !target.comps[id]).map(([id, comp]) => [id, reframed(comp, source, target)]));
+  const comps = Object.fromEntries([...withSet(source, compId)].filter(([id]) => !target.comps[id]).map(([id, comp]) => [id, reframed(comp, source, target)]));
   const known = new Set(target.assets.map((a) => a.id));
   const assets = [...target.assets, ...source.assets.filter((a) => !known.has(a.id))];
   return { ...target, assets, comps: { ...target.comps, ...comps } };
 }
 
 export function componentSlice(source: MotionDoc, compId: string): MotionDoc {
-  const comps = Object.fromEntries(withNested(source, compId));
+  const comps = Object.fromEntries(withSet(source, compId));
   return { ...source, tracks: [], comps };
 }
 

@@ -2,14 +2,15 @@ import { strokesOf, strokesSchema, type Stroke } from './model';
 
 type Stroked = { replaces: readonly string[]; legacy: (props: Record<string, unknown>) => Stroke[] };
 
-const TEXT: Stroked = { replaces: [], legacy: () => [] };
+const UNSTROKED: Stroked = { replaces: [], legacy: () => [] };
 
 export const STROKED: Record<string, Stroked> = {
   Shape: { replaces: ['strokeKind', 'stroke', 'strokeWidth', 'dash', 'gap', 'cap', 'join'], legacy: strokesOf },
-  Title: TEXT,
-  Text: TEXT,
-  Kicker: TEXT,
-  Caption: TEXT
+  Title: UNSTROKED,
+  Text: UNSTROKED,
+  Kicker: UNSTROKED,
+  Caption: UNSTROKED,
+  Image: UNSTROKED
 };
 
 export function elementStrokes(component: string, props: Record<string, unknown>): Stroke[] {

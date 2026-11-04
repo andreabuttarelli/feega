@@ -14,10 +14,7 @@
   import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
   import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
-  import { setProps, setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
-  import { setClipFlags } from '@feega/motion-core/motion/organize';
-  import { Action } from '$lib/motion/actions';
-  import IconButton from './IconButton.svelte';
+  import { setTransform, type OpResult } from '@feega/motion-core/motion/timeline';
   import { HORIZONTALS, Horizontal, VERTICALS, Vertical } from '@feega/motion-core/motion/constraints/model';
   import { setConstraints } from '$lib/motion/constraints/constraints';
   import { Side, Toggle, pinnedHorizontally, pinnedVertically, toggleHorizontal, toggleVertical } from '$lib/motion/constraints/sides';
@@ -27,8 +24,14 @@
   import { TRANSFORM } from '@feega/motion-core/motion/keyframes';
   import { Placement } from '@feega/motion-core/motion/layout/stack';
   import { positionShown } from '$lib/motion/properties-view';
+  import { placeLayer } from '$lib/motion/light-group';
+  import type { ElementHost } from '$lib/motion/element-host';
+  import type { Frame } from '$lib/motion/units';
+  import { liveEdits } from '$lib/motion/live-edit';
+  import { FieldKind, FieldText } from '$lib/motion/number-field';
+  import NumberField from './NumberField.svelte';
 
-  let { doc, clip, part, placement = Placement.Free, within = null, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
+  let { doc, clip, part, placement = Placement.Free, within = null, host = null, space = doc, onchange, onalign }: { doc: MotionDoc; clip: MotionClip; part: PositionPart; placement?: Placement; within?: MotionClip | null; host?: ElementHost | null; space?: Frame; onchange: (result: OpResult, summary: string) => void; onalign: (edge: Edge) => void } = $props();
 
   const ICON = 15;
   const PIVOT_STOPS = [0, 0.5, 1] as const;
@@ -66,17 +69,26 @@
   const down = $derived(pinnedVertically(vertical));
   const pivotX = $derived(clip.transform.anchorX ?? TRANSFORM.anchorX.fallback);
   const pivotY = $derived(clip.transform.anchorY ?? TRANSFORM.anchorY.fallback);
-  const rotation = $derived(clip.transform.rotateZ ?? 0);
+  const PLACE_RANGE = { min: -1_000_000, max: 1_000_000, step: 1 };
+  const TURN_RANGE = { min: -360, max: 360, step: 1 };
 
-  const numberOf = (e: Event) => Number((e.currentTarget as HTMLInputElement).value);
-  const moveX = (e: Event) => onchange(setProps(doc, clip.id, { x: (numberOf(e) + origin.left + box.width / 2) / doc.width }), 'Moved horizontally');
-  const moveY = (e: Event) => onchange(setProps(doc, clip.id, { y: (numberOf(e) + origin.top + box.height / 2) / doc.height }), 'Moved vertically');
+  const own = $derived(clip.transform.rotateZ ?? 0);
+  const rotation = $derived((host?.box.rotation ?? 0) + own);
+  const scale = $derived({ x: space.width / doc.width, y: space.height / doc.height });
+  const seat = $derived(host ? { x: host.box.x, y: host.box.y } : { x: 0, y: 0 });
+  const offset = $derived({ x: (clip.transform.x ?? 0) * doc.width, y: (clip.transform.y ?? 0) * doc.height });
+  const shownX = $derived(seat.x + (box.left + offset.x - origin.left) * scale.x);
+  const shownY = $derived(seat.y + (box.top + offset.y - origin.top) * scale.y);
+  const hostEdit = liveEdits<() => void>({ show: () => {}, record: (run) => run() });
+  const gesture = $derived(host ? hostEdit : null);
+
+  const rotate = (degrees: number) => (host ? hostEdit.edit(() => host.turn(degrees - own), 'Rotated the element') : onchange(setTransform(doc, clip.id, { rotateZ: degrees }), 'Rotated the layer'));
+  const moveX = (x: number) => (host ? hostEdit.edit(() => host.move(host.box.x + x - shownX, host.box.y), 'Moved horizontally') : onchange(placeLayer(doc, clip.id, { x: ((x - seat.x) / scale.x + origin.left - offset.x + box.width / 2) / doc.width }), 'Moved horizontally'));
+  const moveY = (y: number) => (host ? hostEdit.edit(() => host.move(host.box.x, host.box.y + y - shownY), 'Moved vertically') : onchange(placeLayer(doc, clip.id, { y: ((y - seat.y) / scale.y + origin.top - offset.y + box.height / 2) / doc.height }), 'Moved vertically'));
   const pinH = (h: Horizontal) => onchange(setConstraints(doc, [clip.id], { horizontal: h }), 'Changed the horizontal constraint');
   const pinV = (v: Vertical) => onchange(setConstraints(doc, [clip.id], { vertical: v }), 'Changed the vertical constraint');
   const tickH = (side: Side, e: MouseEvent) => pinH(toggleHorizontal(horizontal, side, e.shiftKey ? Toggle.Both : Toggle.One));
   const tickV = (side: Side, e: MouseEvent) => pinV(toggleVertical(vertical, side, e.shiftKey ? Toggle.Both : Toggle.One));
-  const sized = $derived(typeof clip.props.width === 'number' && typeof clip.props.height === 'number');
-  const toggleRatio = () => onchange(setClipFlags(doc, clip.id, { lockRatio: !clip.lockRatio }), clip.lockRatio ? 'Unlocked the aspect ratio' : 'Locked the aspect ratio');
   const centre = () => onchange(setConstraints(doc, [clip.id], { horizontal: Horizontal.Center, vertical: Vertical.Center }), 'Centred the constraints');
 </script>
 
@@ -98,11 +110,8 @@
 
   {#if part === PositionPart.Position && placed}
     <div class="row xy">
-      <label class="field"><span>X</span><input type="number" step="1" value={Math.round(box.left - origin.left)} data-testid="position-x" onchange={moveX} /></label>
-      <label class="field"><span>Y</span><input type="number" step="1" value={Math.round(box.top - origin.top)} data-testid="position-y" onchange={moveY} /></label>
-      {#if sized}
-        <IconButton action={clip.lockRatio ? Action.UnlockRatio : Action.LockRatio} size={ICON} pressed={Boolean(clip.lockRatio)} data-testid="ratio-lock" onclick={toggleRatio} />
-      {/if}
+      <div class="slot"><NumberField label="X" name="X" testid="position-x" kind={FieldKind.Glyph} shows={FieldText.Precise} value={shownX} range={PLACE_RANGE} unit="px" {gesture} onchange={moveX} /></div>
+      <div class="slot"><NumberField label="Y" name="Y" testid="position-y" kind={FieldKind.Glyph} shows={FieldText.Precise} value={shownY} range={PLACE_RANGE} unit="px" {gesture} onchange={moveY} /></div>
     </div>
   {/if}
 
@@ -135,7 +144,7 @@
   {#if part === PositionPart.Rotation}
     <div class="row turn">
       <div class="rotation">
-        <label class="field"><Triangle size={ICON} /><input type="number" step="1" value={rotation} aria-label="Rotation" data-testid="rotation-field" onchange={(e) => onchange(setTransform(doc, clip.id, { rotateZ: numberOf(e) }), 'Rotated the layer')} /><span>°</span></label>
+        <div class="slot"><NumberField label="" icon={Triangle} name="Rotation" testid="rotation-field" kind={FieldKind.Glyph} value={rotation} range={TURN_RANGE} unit="°" {gesture} onchange={rotate} /></div>
         <div class="pivot" role="group" aria-label="Pivot">
           {#each PIVOT_STOPS as py (py)}
             {#each PIVOT_STOPS as px (px)}
@@ -157,9 +166,8 @@
   .position {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
     min-width: 0;
-    padding: var(--ui-space-1, 4px) 0;
     font-size: var(--ui-text-xs);
     color: var(--ui-ink-2);
   }
@@ -167,7 +175,7 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .row > * {
@@ -175,41 +183,57 @@
     min-width: 0;
   }
 
+  .row > :global(.ib) {
+    flex: 0 0 var(--ui-row);
+    height: var(--ui-row);
+  }
+
   .segments {
     display: flex;
-    background: var(--ui-input);
-    border-radius: var(--ui-radius-sm);
+    gap: 1px;
+    border-radius: var(--ui-radius-md);
+    overflow: hidden;
   }
 
   .segments button {
     display: grid;
     place-items: center;
     flex: 1;
-    height: 28px;
+    height: var(--ui-row);
     padding: 0;
     border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: none;
+    border-radius: 0;
+    background: var(--ui-input);
     color: var(--ui-ink);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
   .segments button:hover {
-    background: var(--ui-hover);
+    background: var(--ui-input-hover);
   }
 
-  .field,
   .select {
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 8px;
-    border-radius: var(--ui-radius-sm);
+    gap: 8px;
+    height: var(--ui-row);
+    padding: 0 10px;
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+    transition: background-color var(--ui-dur-fast, 120ms) ease;
   }
 
-  .field input,
+  .select:hover {
+    background: var(--ui-input-hover);
+  }
+
+  .select:focus-within {
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
+  }
+
   .select select {
     flex: 1;
     min-width: 0;
@@ -219,24 +243,34 @@
     background: none;
     color: var(--ui-ink);
     font: inherit;
+    outline: none;
+    appearance: textfield;
+  }
+
+  .select select {
+    padding-right: 18px;
+    appearance: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4l2.5 2.5L7.5 4'/%3E%3C/svg%3E") no-repeat right 0 center / 10px 10px;
   }
 
   .constraints {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
   .selects {
     display: grid;
-    gap: 6px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ui-space-2);
     align-content: start;
+    min-width: 0;
   }
 
   .widget {
     position: relative;
-    min-height: 62px;
-    border-radius: var(--ui-radius-sm);
+    min-height: 72px;
+    border-radius: var(--ui-radius-md);
     background: var(--ui-input);
   }
 
@@ -303,10 +337,10 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--ui-space-2);
   }
 
-  .rotation .field {
+  .rotation .slot {
     flex: 1;
     min-width: 0;
   }
@@ -315,9 +349,9 @@
     display: grid;
     grid-template-columns: repeat(3, 6px);
     gap: 3px;
-    padding: 4px;
+    padding: 7px;
     background: var(--ui-input);
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-md);
   }
 
   .pivot button {

@@ -7,7 +7,7 @@ sidebar:
 
 ## Add a node
 
-The bottom bar pins the essentials: Select, Rectangle, Ellipse, Text, Pen and Frame, then Generate text, image, video and sound. Click one, or drag a Generate button onto the canvas to drop the node at that spot. They show in Design and Motion mode, are hidden in Play and Code, and fold into **+** on narrow windows. The rest is behind **+** in the bottom bar. One menu holds everything you can add: drawing tools, Generate nodes (text, image, video, product, list and more), import (upload a file, Drive or Dropbox, Figma) and templates; with a frame selected it also offers Insert image and templates for that frame. On a phone the Insert sheet shows the same menu, with Tools and Generate at the top. Each node entry has a number; the same number on the keyboard adds that type without opening the menu, and an entry can be dragged onto the canvas to drop it at that spot. Dragging a file from the asset library, or a colour or product from the brand panel, creates a node already filled.
+The bottom bar pins the essentials: Select, Rectangle, Ellipse, Text, Pen and Frame, then Generate text, image, video and sound. Click one, or drag a Generate button onto the canvas to drop the node at that spot. They show in Design and Motion mode, are hidden in Play and Code, and fold into **+** on narrow windows. The rest is behind **+** in the bottom bar. One menu holds everything you can add: drawing tools, Generate nodes (text, image, video, product, list and more), import (upload a file, Drive or Dropbox, Figma) and templates — an uploaded or dropped picture lands as a plain image layer you can move, resize, rotate, flip and copy, not as a Generate image node; with a frame selected it also offers Insert image and templates for that frame. On a phone the Insert sheet shows the same menu, with Tools and Generate at the top. An entry can be dragged onto the canvas to drop it at that spot. Dragging a file from the asset library, or a colour or product from the brand panel, creates a node already filled.
 
 ## What a wire carries
 
@@ -26,3 +26,9 @@ Text blue, images green, video pink, audio orange, first frame purple, last fram
 ## First and last frame
 
 A video node can have separate **first frame** and **last frame** ports. An image wired there gets that temporal role instead of being a generic reference.
+
+## Magnetic ports, cable ties and cutting wires
+
+- **Magnetic ports.** While you drag a wire, the nearest port that accepts it pulls the wire's end into a soft bubble. Let go inside the bubble and the wire connects. Ports that can't take the wire are dimmed.
+- **Cable ties.** Hold <kbd>Alt</kbd> and drag a line across two or more wires to tie them together. Drag the tie to move the bundle. Hover it and click **×** to remove it. Agents can do the same with the `set_edge_tie` canvas tool.
+- **Cut a wire.** Hover the middle of a wire and click **×**.

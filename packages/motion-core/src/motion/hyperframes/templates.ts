@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { COMPONENTS, ComponentId, LeadingTrim, TextAlign, TextWrap, VerticalAlign } from '../components';
+import type { COMPONENTS, ComponentId, LeadingTrim, TextAlign, TextEntrance, TextWrap, VerticalAlign } from '../components';
 import { decorationCss } from '../decoration';
 import { AUTO, CAP_TRIM_CSS, leadingOf, measured } from '../type-units';
 import { TextSizing } from '../text-sizing';
@@ -25,6 +25,7 @@ import { elementStrokes } from '../stroke/elements';
 import { textStroke } from '../stroke/render';
 import { textBody } from './text-body';
 import { CUSTOM_ROOT_PREFIX } from '../gpu-full/dom/tree';
+import { imageRectangle } from '../image-dress';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -184,6 +185,11 @@ function clampLines(ctx: TemplateCtx<'Text'>, size: number): number | null {
 
 const clampCss = (lines: number | null): Record<string, string | number> => (lines === null ? {} : { display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical', overflow: 'hidden' });
 
+const TEXT_ENTRANCE: Record<TextEntrance, (ctx: TemplateCtx<'Text'>) => Tween[]> = {
+  none: () => [],
+  'fade-up': (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
+};
+
 const Text: Template<'Text'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
@@ -193,7 +199,7 @@ const Text: Template<'Text'> = {
     const style = css({ ...typeStyle(ctx, measured(ctx.p, size), size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: ctx.p.textWrap === 'none' ? NO_WRAP : WHITE_SPACE[ctx.p.sizing], textWrapStyle: WRAP_STYLE[ctx.p.textWrap], textBox: TEXT_BOX_TRIM[ctx.p.leadingTrim], ...decorationCss(ctx.p, ctx.color), ...clampCss(lines), ...ctx.text.vars });
     return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-text style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${textBody(ctx)}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, { justifyContent: VERTICAL[ctx.p.verticalAlign], ...TEXT_BOX[ctx.p.sizing](ctx.p.truncate) });
   },
-  tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
+  tweens: (ctx) => TEXT_ENTRANCE[ctx.p.entrance ?? 'none'](ctx)
 };
 
 const Kicker: Template<'Kicker'> = {
@@ -227,6 +233,10 @@ const Image: Template<'Image'> = {
   timing: Timing.Wrapper,
   html: (ctx) => {
     const url = ctx.asset(ctx.p.assetId);
+    const rectangle = url ? imageRectangle(ctx.p as unknown as Record<string, unknown>) : null;
+    if (rectangle) {
+      return Shape.html({ ...ctx, p: rectangle } as unknown as TemplateCtx<'Shape'>);
+    }
     return placed(ctx, ctx.p, url ? zoomed(url, ctx.p) : missing('Pick an image', ctx.id), true);
   }
 };

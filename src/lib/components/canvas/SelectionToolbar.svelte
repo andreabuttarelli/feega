@@ -5,8 +5,7 @@
   import Columns2 from '@lucide/svelte/icons/columns-2';
   import { OUTPUT_KIND_OF } from '$lib/canvas/run-info';
   import Square from '@lucide/svelte/icons/square';
-  import { isFrameAction } from '$lib/canvas/frame-dialogs';
-  import { actionsFor, actionsIn, enabledFor, shownFor, toolbarSlots, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
@@ -20,7 +19,6 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import { formatPrice } from '$lib/components/credit-amount-format';
-  import { cn } from '$lib/utils.js';
   import ModelMenu from './ModelMenu.svelte';
   import VariantsMenu from './VariantsMenu.svelte';
   import HistoryMenu from './HistoryMenu.svelte';
@@ -50,10 +48,6 @@
     choicesFor,
     catalogueSynced = true,
     runQuote = null,
-    frameTools = false,
-    musicEnabled = false,
-    withheld = [],
-    elementActions = [],
     onrun,
     oncancelvariants,
     variantsInFlight = 0,
@@ -76,10 +70,6 @@
     choicesFor?: (type: GenPropertyType) => ModelChoice[];
     catalogueSynced?: boolean;
     runQuote?: RunQuote | null;
-    frameTools?: boolean;
-    musicEnabled?: boolean;
-    withheld?: readonly SelectionActionId[];
-    elementActions?: readonly SelectionActionId[];
     onrun?: () => void;
     oncancelvariants?: () => void;
     variantsInFlight?: number;
@@ -133,41 +123,12 @@
   const providerValue = $derived(gen.providerValue);
   const controls = $derived(gen.controls);
 
-  const primary = $derived(actionsIn('primary', count));
-  const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
-  const overflow = $derived(actionsIn('overflow', count).filter((a) => shownFor(a.id, nodeSummaries) && (frameTools || !isFrameAction(a.id)) && (musicEnabled || a.id !== 'frame-music')));
-  const danger = $derived(actionsIn('danger', count));
-  const fixed = $derived(actionsIn('fixed', count).filter((a) => !withheld.includes(a.id)));
-  const picked = $derived(actionsFor(elementActions).filter((a) => !overflow.some((o) => o.id === a.id)));
-  const slots = $derived(toolbarSlots([...fixed, ...secondary, ...picked, ...overflow, ...danger]));
+  const primary = $derived(actionsIn('primary', count).filter((a) => shownFor(a.id, nodeSummaries)));
 
   function gateOf(action: SelectionAction) {
     return enabledFor(action.id, nodeSummaries, edges, stale);
   }
 </script>
-
-{#snippet iconAction(action: SelectionAction, tone: string)}
-  {@const Icon = SELECTION_ACTION_ICON[action.id]}
-  {@const gate = gateOf(action)}
-  <Tooltip.Root>
-    <Tooltip.Trigger>
-      {#snippet child({ props })}
-        <Button
-          {...props}
-          variant="ghost"
-          size="icon-sm"
-          class={cn(ICON_BUTTON, tone)}
-          aria-label={action.label}
-          disabled={!gate.enabled}
-          onclick={() => onaction?.(action.id)}
-        >
-          <Icon strokeWidth={1.7} />
-        </Button>
-      {/snippet}
-    </Tooltip.Trigger>
-    <Tooltip.Content side="top">{gate.reason ?? action.label}</Tooltip.Content>
-  </Tooltip.Root>
-{/snippet}
 
 {#snippet runButton()}
   {@const blocked = !running && !runQuote?.enabled}
@@ -290,12 +251,7 @@
             <Columns2 strokeWidth={1.7} />
           </Button>
         {/if}
-        {#each slots.fixed as action (action.id)}
-          {@render iconAction(action, '')}
-        {/each}
-        {#each slots.pinned as action (action.id)}
-          {@render iconAction(action, '')}
-        {/each}
+        {#if exportable || oncolourchange}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
@@ -305,14 +261,6 @@
             {/snippet}
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end" class="w-56">
-            {#each slots.overflow as action (action.id)}
-              {@const Icon = SELECTION_ACTION_ICON[action.id]}
-              {@const gate = gateOf(action)}
-              <DropdownMenu.Item class="min-h-11 md:min-h-8" disabled={!gate.enabled} title={gate.reason} data-action={action.id} onSelect={() => onaction?.(action.id)}>
-                <Icon strokeWidth={1.7} />
-                {action.label}
-              </DropdownMenu.Item>
-            {/each}
             {#if exportable}
               <DropdownMenu.Sub>
                 <DropdownMenu.SubTrigger class="min-h-11 md:min-h-8" data-testid="export-cloud-menu"><Cloud strokeWidth={1.7} />Export to cloud</DropdownMenu.SubTrigger>
@@ -340,18 +288,9 @@
                 </DropdownMenu.SubContent>
               </DropdownMenu.Sub>
             {/if}
-            {#if slots.danger.length}
-              <DropdownMenu.Separator />
-              {#each slots.danger as action (action.id)}
-                {@const Icon = SELECTION_ACTION_ICON[action.id]}
-                <DropdownMenu.Item class="min-h-11 md:min-h-8" variant="destructive" data-testid={`action-${action.id}`} onSelect={() => onaction?.(action.id)}>
-                  <Icon strokeWidth={1.7} />
-                  {action.label}
-                </DropdownMenu.Item>
-              {/each}
-            {/if}
           </DropdownMenu.Content>
         </DropdownMenu.Root>
+        {/if}
       </div>
     </Tooltip.Provider>
   </div>
