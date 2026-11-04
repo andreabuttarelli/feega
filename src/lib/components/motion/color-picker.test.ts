@@ -173,6 +173,12 @@ describe('colour picker', () => {
     expect(onchange).toHaveBeenCalledWith('#5b4cf5', undefined);
   });
 
+  it('renders palette colours that differ only in case', () => {
+    show({ swatches: ['#ff0000', '#FF0000'] });
+
+    expect(document.querySelectorAll('button[aria-label="FF0000"]')).toHaveLength(2);
+  });
+
   it('keeps the hue when a grey is picked on the square', () => {
     show({ value: '#808080' });
 
