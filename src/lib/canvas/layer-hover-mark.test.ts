@@ -15,7 +15,7 @@ const must = (r: OpResult): MotionDoc => {
   return r.doc;
 };
 
-const text = (x: number) => ({ component: 'Text', from: 0, props: { text: 'Ciao', size: 0.09, x, y: 0.4, width: 0.2, height: 0.12 } });
+const text = (x: number) => ({ component: 'Text' as const, from: 0, props: { text: 'Ciao', size: 0.09, x, y: 0.4, width: 0.2, height: 0.12 } });
 const loose = must(addClip(must(addClip(must(addClip({ ...newMotionDoc(MotionFormat.Landscape), width: 1000, height: 700 }, text(0.25), 'a')), text(0.5), 'b')), text(0.75), 'c'));
 const doc = must(wrapInStack(loose, ['a', 'b', 'c'], 'stack', 'lane'));
 const picker = framePicker({ doc, tokens: FEEGA_TOKENS, assets: {} });
