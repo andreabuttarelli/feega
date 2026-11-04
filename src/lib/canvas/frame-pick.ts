@@ -1,4 +1,6 @@
 import { prepare, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+import { NO_TYPESET, type Smoothing, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
+import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
 import { isLayer } from '@feega/motion-core/motion/surface';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
 import { FramePlacements, type FrameRect } from './frame-placements';
@@ -52,14 +54,31 @@ export function frameSpace(box: Box, frame: Size, rotation: number, fit = FrameF
 
 const covers = (r: FrameRect | null, x: number, y: number): boolean => Boolean(r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height);
 
-export function framePicker(live: LiveDoc, playhead: () => number | undefined = () => live.playhead) {
+export type Typesetter = (live: LiveDoc) => Promise<Typeset>;
+
+export const estimated: Typesetter = async () => NO_TYPESET;
+
+export const shaped =
+  (smoothing: Smoothing): Typesetter =>
+  async (live) => ({ fonts: await loadFonts(live.doc, live.assets, live.tokens), smoothing });
+
+export function framePicker(live: LiveDoc, playhead: () => number | undefined = () => live.playhead, typesetter: Typesetter = estimated, onTypeset: () => void = () => {}) {
+  let typeset = NO_TYPESET;
   let prepared: Prepared | null = null;
   let shown: { frame: number; placements: FramePlacements } | null = null;
+  typesetter(live)
+    .then((loaded) => {
+      typeset = loaded;
+      prepared = null;
+      shown = null;
+      onTypeset();
+    })
+    .catch(() => undefined);
   const size = (): Size => ({ width: live.doc.width, height: live.doc.height });
   const placements = (): FramePlacements => {
     const frame = frameOfLive({ doc: live.doc, playhead: playhead() });
     if (shown?.frame !== frame) {
-      prepared ??= prepare(live.doc, live.tokens, live.assets);
+      prepared ??= prepare(live.doc, live.tokens, live.assets, typeset);
       shown = { frame, placements: new FramePlacements(prepared, frame) };
     }
     return shown!.placements;
@@ -132,13 +151,20 @@ export enum Reuse {
 
 export class FramePickers {
   #held = new Map<string, HeldPicker>();
+  readonly #typesetter: Typesetter;
+  readonly #onTypeset: () => void;
+
+  constructor(typesetter: Typesetter = estimated, onTypeset: () => void = () => {}) {
+    this.#typesetter = typesetter;
+    this.#onTypeset = onTypeset;
+  }
 
   of(id: string, live: LiveDoc, playhead: () => number | undefined = () => live.playhead, reuse = Reuse.Changed): FramePicker {
     const held = this.#held.get(id);
     if (held && (reuse === Reuse.Held || (held.doc === live.doc && held.assets === live.assets))) {
       return held.picker;
     }
-    const picker = framePicker(live, playhead);
+    const picker = framePicker(live, playhead, this.#typesetter, this.#onTypeset);
     this.#held.set(id, { doc: live.doc, assets: live.assets, picker });
     return picker;
   }

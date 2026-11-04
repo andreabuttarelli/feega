@@ -1,4 +1,6 @@
-import { placerAt, type Corner, type Placed, type Placer, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+import { placerAt, textCaretAt, type Corner, type Placed, type Placer, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
+import { apply2d } from '@feega/motion-core/motion/affine';
+import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import type { MotionClip } from '@feega/motion-core/motion/doc';
 import { ancestorsOf } from '@feega/motion-core/motion/parent';
 import { SEPARATOR } from '@feega/motion-core/motion/precomp';
@@ -8,6 +10,7 @@ export type FrameRect = { left: number; top: number; width: number; height: numb
 export type Quad = Placed['corners'];
 
 const HOST = 'Precomp';
+const HUGGING_TEXT = 'Text';
 const CELL = 256;
 const PATH_STEP = 2;
 
@@ -50,6 +53,7 @@ const samePath = (a: readonly string[], b: readonly string[]) => a.length === b.
 export class FramePlacements {
   readonly #prepared: Prepared;
   readonly #placer: Placer;
+  readonly #frame: number;
   readonly #placed = new Map<string, Placed | null>();
   readonly #owners = new Map<string, string[]>();
   #hosts: ReadonlySet<string> | null = null;
@@ -59,6 +63,7 @@ export class FramePlacements {
   constructor(prepared: Prepared, frame: number) {
     this.#prepared = prepared;
     this.#placer = placerAt(prepared, frame);
+    this.#frame = frame;
   }
 
   ownersOf(clipId: string): string[] {
@@ -123,9 +128,20 @@ export class FramePlacements {
 
   #place(clipId: string): Placed | null {
     if (!this.#placed.has(clipId)) {
-      this.#placed.set(clipId, this.#placer.place(clipId));
+      this.#placed.set(clipId, this.#wordsOf(this.#placer.place(clipId)));
     }
     return this.#placed.get(clipId)!;
+  }
+
+  #wordsOf(placed: Placed | null): Placed | null {
+    const clip = placed ? this.#prepared.doc.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === placed.clip) : null;
+    const hugs = clip?.component === HUGGING_TEXT && clip.props.sizing === TextSizing.AutoWidth;
+    const caret = placed && hugs ? textCaretAt(this.#prepared, this.#frame, placed.clip) : null;
+    if (!placed || !caret) {
+      return placed;
+    }
+    const at = (x: number, y: number) => apply2d(caret.matrix, [x, y]);
+    return { ...placed, corners: [at(0, 0), at(caret.width, 0), at(caret.width, caret.height), at(0, caret.height)] };
   }
 
   #all(): Placed[] {
