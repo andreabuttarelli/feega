@@ -1,6 +1,8 @@
 import { prepare, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
 import { NO_TYPESET, type Smoothing, type Typeset } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
+import { shapedText } from '@feega/motion-core/motion/gpu-full/text/measure';
+import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { isLayer } from '@feega/motion-core/motion/surface';
 import { frameOfLive } from '$lib/canvas/core/frame-source';
 import { FramePlacements, type FrameRect } from './frame-placements';
@@ -116,6 +118,9 @@ export function framePicker(live: LiveDoc, playhead: () => number | undefined = 
     },
     frameSize(): Size {
       return size();
+    },
+    textMeasure(): TextMeasure {
+      return shapedText(typeset);
     },
     leafRects() {
       return placements().leafRects();

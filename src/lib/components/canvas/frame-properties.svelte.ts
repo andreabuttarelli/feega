@@ -8,6 +8,7 @@ import type { Flip } from '$lib/motion/layer-props';
 import type { Edge } from '$lib/motion/space';
 import type { ExportRow } from '$lib/motion/export-rows';
 import { FramePanel } from '$lib/canvas/motion-node';
+import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 
 const BAR_SELECTOR = '[data-testid="right-bar"]';
 export const UNNAMED_FRAME = 'Frame';
@@ -34,6 +35,7 @@ export class FrameProperties {
   host = $state.raw<ElementHost | null>(null);
   editingFill = $state<number | null>(null);
   panel = $state(FramePanel.Frame);
+  measure = $state.raw<TextMeasure>(estimatedText);
   #fillOwner: string | null = null;
 
   publish(nodeId: string, session: FrameEditSession, tokens: BrandTokens, extras: FrameExtras | null) {
@@ -76,6 +78,7 @@ export class FrameProperties {
     this.rename = null;
     this.host = null;
     this.panel = FramePanel.Frame;
+    this.measure = estimatedText;
   }
 }
 

@@ -6,6 +6,7 @@ import { childrenInOrder } from '@feega/motion-core/motion/layout/resolve';
 import type { Box } from '@feega/motion-core/motion/layout';
 import { KeepWorld, setParent } from '../parent-ops';
 import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { guessedBoxes } from '../move-element';
 import { layoutParent, leaveStack, reorderChild } from './ops';
 
@@ -110,14 +111,14 @@ export function dropInStack(doc: MotionDoc, clipId: string, boxes: Record<string
 
 const INCOMING = '';
 
-export function stackLineAt(doc: MotionDoc, at: Pt): DropLine | null {
-  const boxes = guessedBoxes(withAutoLayout(doc));
+export function stackLineAt(doc: MotionDoc, at: Pt, measure: TextMeasure = estimatedText): DropLine | null {
+  const boxes = guessedBoxes(withAutoLayout(doc, measure));
   const target = stackUnder(doc, INCOMING, null, boxes, at);
   return target ? slotOf(doc, target, INCOMING, boxes, at).line : null;
 }
 
-export function joinStackAt(doc: MotionDoc, clipId: string, at: Pt): OpResult {
-  const joined = dropInStack(doc, clipId, guessedBoxes(withAutoLayout(doc)), at)?.result;
+export function joinStackAt(doc: MotionDoc, clipId: string, at: Pt, measure: TextMeasure = estimatedText): OpResult {
+  const joined = dropInStack(doc, clipId, guessedBoxes(withAutoLayout(doc, measure)), at)?.result;
   return joined?.ok ? joined : { ok: true, doc };
 }
 

@@ -9,6 +9,7 @@ import { Grip, aabb, dragPatch, quadOf, spacing, type Bounds, type Boxes, type G
 import { moveBy, writeTransform } from '$lib/motion/space';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { arrowStep, stackPlaced, stepInStack } from '$lib/motion/layout/ops';
+import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 
 export enum SelectionKind {
   Element = 'element',
@@ -38,7 +39,7 @@ export enum SnapMode {
   Off = 'off'
 }
 
-export type Drag = { doc: MotionDoc; ids: readonly string[]; frame: number; boxes: Boxes; grip: Grip; handle: number; from: Pt; to: Pt; keys: Keys; reach: number; snap?: SnapMode; mode: EditMode };
+export type Drag = { doc: MotionDoc; ids: readonly string[]; frame: number; boxes: Boxes; grip: Grip; handle: number; from: Pt; to: Pt; keys: Keys; reach: number; snap?: SnapMode; mode: EditMode; measure?: TextMeasure };
 export type Dragged = { result: OpResult; guides: Guide[]; gaps: Gap[] };
 
 const boundsOf = (doc: MotionDoc, id: string, frame: number, boxes: Boxes): Bounds => aabb(quadOf(doc, id, frame, boxes[id]));
