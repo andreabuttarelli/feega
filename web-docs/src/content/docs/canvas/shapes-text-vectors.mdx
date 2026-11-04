@@ -22,6 +22,8 @@ import DemoVideo from '../../../components/DemoVideo.astro';
 | Add bar, Stack | Draw an empty stack: a transparent rectangle with vertical auto layout that hugs what you drop in |
 | `K` | Scale tool: scales size, text, strokes and effects together |
 
+The kind of a shape is chosen once, when you draw it: Properties has no Shape switcher. Start, sweep and ratio appear only on an ellipse, sides only on a polygon, points and inner radius only on a star. To get another kind, draw it and delete the old one.
+
 A shape drawn over a frame lands inside that frame; drawn on empty canvas it stays free. Either way it shows the moment you release, and saves in the background.
 
 Rotate by dragging just outside a corner (Shift snaps to 15 degrees). `Alt+R` shows the rotation origin so you can move it. New layers rotate and scale around their centre. Gradients can be linear, radial, angular or diamond; their handles show on the canvas while that fill is open in the Fill section.
