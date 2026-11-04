@@ -127,7 +127,7 @@
   {#if pointClip && shown.has(FrameOverlay.Pen)}<PenOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only && shown.has(FrameOverlay.LineEnds)}<LineEndsOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if pointClip && shown.has(FrameOverlay.Vector)}<VectorOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
-  {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
+  {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} {measure} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
   {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Onion)}<OnionOverlay {doc} clip={only} {frame} {boxes} />{/if}

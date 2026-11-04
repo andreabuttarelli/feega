@@ -6,6 +6,7 @@ import type { AutoLayout, Padding } from '@feega/motion-core/motion/layout/model
 import { reorderChild } from './ops';
 import { childrenInOrder, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
+import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 
 export type Side = keyof Padding;
 export type Pt = [number, number];
@@ -33,8 +34,8 @@ const PADDING_GROWS: Record<Side, (delta: Pt) => number> = {
   right: ([dx]) => -dx
 };
 
-function laid(doc: MotionDoc, containerId: string): { container: Container; box: Box; kids: { id: string; box: Box }[] } | null {
-  const resolved = withAutoLayout(doc);
+function laid(doc: MotionDoc, containerId: string, measure: TextMeasure = estimatedText): { container: Container; box: Box; kids: { id: string; box: Box }[] } | null {
+  const resolved = withAutoLayout(doc, measure);
   const container = findClip(resolved, containerId)?.clip;
   if (!container?.autoLayout) {
     return null;
@@ -47,8 +48,8 @@ function laid(doc: MotionDoc, containerId: string): { container: Container; box:
   return { container: container as Container, box: pivotBox(container.props, size), kids };
 }
 
-export function layoutStrips(doc: MotionDoc, containerId: string): Strip[] {
-  const found = laid(doc, containerId);
+export function layoutStrips(doc: MotionDoc, containerId: string, measure: TextMeasure = estimatedText): Strip[] {
+  const found = laid(doc, containerId, measure);
   if (!found) {
     return [];
   }

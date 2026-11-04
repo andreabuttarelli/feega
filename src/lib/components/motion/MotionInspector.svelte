@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { localStore } from '$lib/browser-storage';
   import { fieldKeys } from '$lib/motion/field-keys';
   import { setMotionPath } from '$lib/motion/path-ops';
@@ -156,6 +157,7 @@
     here = null,
     onrename = null,
     onalign,
+    measure = estimatedText,
     fillOpen = $bindable(null)
   }: {
     doc: MotionDoc;
@@ -186,6 +188,7 @@
     here?: string | null;
     onrename?: ((name: string) => void) | null;
     onalign?: (edge: AlignEdge) => void;
+    measure?: TextMeasure;
     fillOpen?: number | null;
   } = $props();
 
@@ -517,7 +520,7 @@
   const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, percentStored(field.key, v), space);
   const fieldSlider = (field: Field) => percentSlider(field.key, steppedRange(field.key, sliderOf(propsOwner(clip.component), fieldRange(field), space)));
   const LAID_KEYS: ReadonlySet<string> = new Set(['width', 'height']);
-  const laid = $derived(stackParent || clip.autoLayout ? (laidClip(doc, clip.id) ?? clip) : clip);
+  const laid = $derived(stackParent || clip.autoLayout ? (laidClip(doc, clip.id, measure) ?? clip) : clip);
   const radiusBox = $derived({ width: Number(laid.props.width ?? 0) * space.width, height: Number(laid.props.height ?? 0) * space.height });
   type FieldScale = { shown: number; range: Slider; stored: (v: number) => number; commit?: (v: number) => void; gesture?: LiveGesture };
   const unitScale = (field: Field): FieldScale => ({ shown: fieldShown(field), range: fieldSlider(field), stored: (v) => fieldStored(field, v) });
@@ -1150,7 +1153,7 @@
 {/snippet}
 
 {#snippet stackBody()}
-  <StackSection {doc} {clip} scale={space.scale ?? 1} {commit} />
+  <StackSection {doc} {clip} {measure} scale={space.scale ?? 1} {commit} />
 {/snippet}
 
 

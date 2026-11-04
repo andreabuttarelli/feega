@@ -10,6 +10,7 @@ import { fontkitSource } from '@feega/motion-core/motion/gpu-full/text/fontkit-f
 import { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
 import { sizeStackAround, wrapInStack } from './ops';
 import { stackLineAt } from './stack-drag';
+import { StripKind, layoutStrips } from './guides';
 
 const LATIN: [number, number][] = [[0, 0xff]];
 const rules: FaceRule[] = [
@@ -58,5 +59,14 @@ describe('the drop line in a wrapped stack sits on the drawn children', () => {
 
     expect(line.x1).toBeCloseTo(stack.left, 0);
     expect(line.x2).toBeCloseTo(stack.left + stack.width, 0);
+  });
+});
+
+describe('the padding handles of a wrapped stack sit on the drawn edges', () => {
+  it('the right padding strip ends at the drawn right edge', () => {
+    const stack = drawn(wrapped, 's');
+    const right = layoutStrips(wrapped, 's', measure).find((s) => s.kind === StripKind.Padding && s.side === 'right')!;
+
+    expect(right.box.left + right.box.width).toBeCloseTo(stack.left + stack.width, 0);
   });
 });

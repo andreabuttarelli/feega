@@ -13,4 +13,10 @@ The picker now exposes its shaped measure (`textMeasure()`), and
 and `FrameTools` take it. The estimate stays the default where no fonts exist
 (server, tests).
 
-Not changed: the properties panel W/H of a hug stack still reads the estimate.
+The properties panel (W/H of a stack and of its children) and the padding
+handles (`layoutStrips`) read the same measure: GpuFlow publishes it on
+`frameProperties.measure`, refreshed when the typeset lands.
+
+Checked, not changed: shrinking a hug stack below its text makes the text
+overflow, not clip, unless "Clip content" is on. The dragged child covering its
+neighbour during a reorder is the drag preview; the drop line marks the slot.

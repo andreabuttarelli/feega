@@ -104,7 +104,7 @@
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-  import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
+  import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
   import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
@@ -1847,6 +1847,8 @@
     frameProperties.exportRows = (rows) => (picks.length ? props.onExportElementRows?.(panelNodeId, picks, rows) : props.onExportRows?.([panelNodeId], rows)) ?? Promise.resolve('Export failed');
     frameProperties.runAction = runSelectionAction;
     frameProperties.place = nodePlaceOf(panelNodeId);
+    void typesetLanded;
+    frameProperties.measure = textMeasureOf(panelNodeId) ?? estimatedText;
     frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
     frameProperties.host = hostOf(panelNodeId);
     frameProperties.panel = frameChrome(kindOfNode(panelNodeId)).panel;

@@ -141,7 +141,7 @@
     {#if editorMode.spec.sounds === SoundEntries.Shown && frameProperties.runAction}<SoundSection onrun={frameProperties.runAction} />{/if}
     {#if surfaced && surface}
       <div class="frame-look" data-testid="frame-look">
-        <MotionInspector as={PropertiesView.Frame} lead={frameLead} title={frameProperties.name} onrename={frameProperties.rename} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} {scale} onchange={edit} />
+        <MotionInspector measure={frameProperties.measure} as={PropertiesView.Frame} lead={frameLead} title={frameProperties.name} onrename={frameProperties.rename} gesture={session.live} doc={surfaced} clip={surface} {tokens} {assets} {fonts} {upload} frame={session.playhead} mode={EditMode.Design} {scale} onchange={edit} />
       </div>
     {/if}
     <LayoutGuidesSection {doc} onchange={editGuides} />
@@ -171,7 +171,7 @@
       <BreakpointOverrides doc={source!} clipId={shown.clip.id} active={session.breakpoint} onchange={editSource} />
       <InstanceInspector doc={shownDoc!} clipId={shown.clip.id} here={frameProperties.nodeId} onchange={editShown} onrun={(id) => void runBar(id)} />
       {#if textRange.clipId === shown.clip.id}<RangeTextInspector {doc} {tokens} {fonts} onchange={edit} />{/if}
-      <MotionInspector here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} bind:fillOpen={frameProperties.editingFill} onchange={editShown} onalign={alignPicks} />
+      <MotionInspector measure={frameProperties.measure} here={frameProperties.nodeId} gesture={session.live} lead={partLead} actions={headerBar} doc={shownDoc!} clip={shown.clip} {tokens} {assets} {fonts} {upload} {analyses} frame={session.playhead} mode={session.mode} host={frameProperties.host} {scale} bind:fillOpen={frameProperties.editingFill} onchange={editShown} onalign={alignPicks} />
       {#if frameProperties.exportRows}<ExportSection name="selection" onexport={frameProperties.exportRows} />{/if}
       {#if frameProperties.nodeId}
         {@const nodeId = frameProperties.nodeId}
