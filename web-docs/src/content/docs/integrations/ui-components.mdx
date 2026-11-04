@@ -1,0 +1,36 @@
+---
+title: UI components
+description: Bring free shadcn/ui, Magic UI and Origin UI components onto the canvas as editable layers.
+sidebar:
+  order: 5
+---
+
+Feega can draw a component from a free, MIT-licensed shadcn registry (shadcn/ui, Magic UI, Origin UI) as layers you edit like anything else: text stays text, layout becomes stacks, and colours and type become variables named after the library (`shadcn/Background`, `Magic UI/Text`).
+
+Components are inserted by an agent through the MCP `edit` tool.
+
+## Find a component
+
+`find_components` searches shadcn/ui and Magic UI by name and answers each match with its `registryUrl`.
+
+```json
+{ "op": "find_components", "input": { "query": "button" } }
+```
+
+Origin UI has no public index: pass its item URL (`https://coss.com/origin/r/<name>.json`) directly.
+
+## Insert a component
+
+`insert_component` takes the `registryUrl` and optional `props` (texts, images, colours).
+
+- Without `frameId`, it draws a new frame at canvas `x`,`y`.
+- With `frameId`, it lands inside that frame, `x` and `y` being 0–1 across and down it.
+- With `frameId` and `parentId`, it lands inside that stack or group.
+
+```json
+{ "op": "insert_component", "input": { "canvasId": "…", "registryUrl": "https://ui.shadcn.com/r/styles/new-york-v4/login-01.json", "frameId": "…", "x": 0.3, "y": 0.5 } }
+```
+
+## Animations
+
+CSS animations the component runs (a marquee, a shimmer, a spinning border, a fade) come in as keyframes, and the frame plays instead of holding a still. Animations driven by JavaScript state, like a list that adds items on a timer, come in as the moment they were read.
