@@ -3713,3 +3713,12 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### After `git switch` in a worktree the dev server still serves the old branch
 **Signal:** a before/after harness run on two branches gives the same numbers, or `curl` of a served module lacks a line `git show HEAD:<file>` has; the server was started before the switch (or a merge, or a fast-forward). **Move:** the watcher ignores worktree files, so a switch changes the disk, not the served modules. Stop the server, `npm ci` if the lockfile moved, start it again, and only then measure. Do the same after rebuilding `static/gpu-core`.
+
+### Local Playwright never gets past the canvas: the page's main thread is pinned, not Playwright
+**Signal:** a `@real` canvas spec hangs on the first click, `boundingBox()` or `screenshot()` of an element that already resolved visible; the console fills with thousands of `updated at` lines. **Move:** probe liveness (`page.evaluate(() => 1)` raced against a 3 s timer) and count `effect_update_depth_exceeded` / `updated at` before blaming selectors or seeds. In dev Svelte logs a stack per effect update, so an effect loop that production survives (it throws and moves on) freezes the tab for 30 s and more. The 2026-11-04 one was `reopenOutbox` tracked inside the canvas page `$effect` (#1811/#1812): any branch older than that fix needs it applied before a browser check.
+
+### Headless Chromium has no WebGPU adapter, and with one it screenshots a blank canvas
+**Signal:** `No available adapters.` in the console and the canvas drawn by the WebGL fallback; with `--enable-unsafe-webgpu` headless gets a Metal adapter but every screenshot shows overlays on an empty frame. **Move:** for pictures of the WebGPU renderer launch headed with `--enable-unsafe-webgpu`; the very first screenshot after load can time out while shaders compile, so retry it once.
+
+### A worktree with a symlinked `node_modules` serves `@feega/*` from the main checkout
+**Signal:** a branch newer than the main checkout answers 500 on `/login`, the dev log says `@feega/motion-core/... could not be resolved`. **Move:** the `@feega/*` links are relative (`../../packages/...`), so linking the whole folder points them at the main checkout's packages. Make `node_modules` a real folder that links every entry of the main one except `@feega` and `.vite`, and recreate `@feega/*` with the same relative targets.
