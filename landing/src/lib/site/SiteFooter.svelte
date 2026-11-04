@@ -33,7 +33,10 @@
   <div class="mark-box" aria-hidden="true"><p class="mark">feega</p></div>
 
   <div class="base">
-    <p class="copy"><span>© {year} Feega.</span> <span>All rights reserved.</span><br /><span>Made in Italy, by Andrea Buttarelli.</span></p>
+    <p class="copy">
+      <span class="rights"><span>© {year} Feega.</span> <span>All rights reserved.</span></span>
+      <span class="made"><span>Made in Italy,</span> <span>by Andrea Buttarelli.</span></span>
+    </p>
     <a class="to-top" href="#top">Back to top ↑</a>
   </div>
 
@@ -57,7 +60,7 @@
   .site-foot {
     max-width: 430px;
     margin: 0 auto;
-    padding: 42px 12px 20px;
+    padding: 42px 12px 12px;
     background: #000;
   }
 
@@ -125,16 +128,16 @@
 
   .mark-box {
     container-type: inline-size;
-    margin-top: 150px;
+    margin-top: 151px;
   }
 
   .mark {
-    height: 53.8cqw;
+    height: 53.72cqw;
     color: #ff5100;
     font-family: 'DM Sans', sans-serif;
     font-variation-settings: normal;
     font-size: 42.474cqw;
-    line-height: 51.04cqw;
+    line-height: 53.72cqw;
     letter-spacing: -0.05em;
     text-align: center;
     white-space: nowrap;
@@ -151,17 +154,17 @@
     max-width: 177px;
   }
 
-  .copy span:not(:last-child) {
+  .rights > span {
     display: block;
     color: #fff;
   }
 
-  .copy br {
-    display: none;
+  .made {
+    display: block;
   }
 
   .legal {
-    margin-top: 42px;
+    margin-top: 39px;
     opacity: 0.5;
   }
 
@@ -169,17 +172,17 @@
     display: flex;
     flex-wrap: wrap;
     column-gap: 12px;
-    margin-top: 20px;
+    margin-top: 24px;
   }
 
   .notice {
-    margin-top: 45px;
+    margin-top: 42px;
     font-size: 12px;
     line-height: 12px;
     opacity: 0.5;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .site-foot {
       width: min(1100px, 100% - 0px);
       max-width: none;
@@ -218,17 +221,17 @@
       max-width: none;
     }
 
-    .copy span:not(:last-child) {
+    .rights > span {
       display: inline;
       color: inherit;
     }
 
-    .copy br {
-      display: inline;
-    }
-
     .notice {
       margin-top: 24px;
+    }
+
+    .mark-box {
+      margin-top: 150px;
     }
 
     .base {
@@ -237,6 +240,7 @@
 
     .mark {
       height: 51.04cqw;
+      line-height: 51.04cqw;
     }
 
     .legal {
@@ -247,6 +251,84 @@
 
     .legal nav {
       margin-top: 0;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .site-foot {
+      max-width: 810px;
+      padding: 41px 16px 16px;
+    }
+
+    .top {
+      grid-template-columns: 379px 178px 1fr;
+      column-gap: 20px;
+    }
+
+    .ready {
+      grid-column: 1;
+      font-size: 46px;
+      line-height: 46px;
+    }
+
+    .ready a {
+      margin-top: 8px;
+    }
+
+    .col {
+      margin-top: -1px;
+    }
+
+    .col p {
+      margin-bottom: 18px;
+    }
+
+    .mark-box {
+      margin-top: 152px;
+    }
+
+    .mark {
+      height: 51.04cqw;
+      line-height: 51.04cqw;
+    }
+
+    .base {
+      margin-top: 21px;
+    }
+
+    .copy {
+      max-width: 379px;
+    }
+
+    .rights > span {
+      color: inherit;
+    }
+
+    .made {
+      font-size: 16px;
+      line-height: 19.2px;
+    }
+
+    .made > span {
+      display: block;
+    }
+
+    .legal {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-top: 24px;
+    }
+
+    .legal nav {
+      justify-content: flex-end;
+      max-width: 561px;
+      margin-top: 0;
+    }
+
+    .notice {
+      max-width: 745px;
+      margin-top: 24px;
     }
   }
 </style>

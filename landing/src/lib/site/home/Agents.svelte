@@ -109,7 +109,7 @@
     cursor: pointer;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .agents {
       display: grid;
       grid-template-columns: 518px 518px;
@@ -125,6 +125,21 @@
 
     .box {
       margin-top: 0;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .agents {
+      padding: 0 0 149px;
+    }
+
+    h2 {
+      font-size: 62px;
+      line-height: 55.8px;
+    }
+
+    .box {
+      margin-top: 25px;
     }
   }
 </style>

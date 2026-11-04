@@ -3,25 +3,29 @@
   import { CODE_VIDEO, MODEL_ROWS } from '../home';
   import { lazyPlay } from '../lazy-video';
 
-  const PHONE_LAYOUT: readonly (readonly [string, number])[] = [
-    ['1 / 3', 12],
-    ['3 / 5', 12],
-    ['1 / 3', 23],
-    ['3 / 5', 23],
-    ['1 / 3', 12],
-    ['3 / 5', 12],
-    ['2 / 4', 23],
-    ['1 / 3', 24],
-    ['3 / 5', 24],
-    ['1 / 3', 0],
-    ['3', 0],
-    ['4', 0]
+  const SMALL_GAP = 'calc(21.05px - 2.5cqw)';
+  const BIG_GAP = 'calc(14.95px + 2.5cqw)';
+  const LAST_GAP = 'calc(33.05px - 2.5cqw)';
+
+  const PHONE_LAYOUT: readonly (readonly [string, string])[] = [
+    ['1 / 3', SMALL_GAP],
+    ['3 / 5', SMALL_GAP],
+    ['1 / 3', BIG_GAP],
+    ['3 / 5', BIG_GAP],
+    ['1 / 3', SMALL_GAP],
+    ['3 / 5', SMALL_GAP],
+    ['2 / 4', BIG_GAP],
+    ['1 / 3', LAST_GAP],
+    ['3 / 5', LAST_GAP],
+    ['1 / 3', '0px'],
+    ['3', '0px'],
+    ['4', '0px']
   ];
 
   const tiles = MODEL_ROWS.flatMap((row, r) => row.map((m) => ({ ...m, row: r + 1 }))).map((m, i) => ({
     ...m,
     phone: PHONE_LAYOUT[i][0],
-    gap: `${PHONE_LAYOUT[i][1]}px`
+    gap: PHONE_LAYOUT[i][1]
   }));
 </script>
 
@@ -37,7 +41,7 @@
 
     <div class="tiles">
       {#each tiles as t, i (i)}
-        <a class="tile" href={APP_URL} style:--col={t.col} style:--row={t.row} style:--phone={t.phone} style:--gap={t.gap}>
+        <a class="tile" class:first={t.row === 1} href={APP_URL} style:--col={t.col} style:--row={t.row} style:--phone={t.phone} style:--gap={t.gap}>
           <span class="label">
             <span class="view" aria-hidden="true">View →</span>
             <span class="name">{t.name}</span>
@@ -108,13 +112,15 @@
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     column-gap: 12px;
-    margin: 80px 0 179px;
+    margin: 80px 0 190px;
     padding: 12px 12px 0;
+    container-type: inline-size;
   }
 
   .tile {
     grid-column: var(--phone);
     align-self: start;
+    aspect-ratio: 1 / 1.1;
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -157,8 +163,9 @@
 
   .pic {
     display: block;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
-    aspect-ratio: 1;
   }
 
   .pic img {
@@ -173,7 +180,7 @@
     transform: scale(1);
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .inner {
       padding: 200px 0;
     }
@@ -217,8 +224,68 @@
       margin-bottom: 0;
     }
 
+    .tile {
+      aspect-ratio: auto;
+    }
+
     .pic {
+      flex: none;
       aspect-ratio: 129 / 124;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .inner {
+      padding: 150px 0;
+    }
+
+    .pair {
+      display: grid;
+      grid-template-columns: 379px 379px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h2 {
+      font-size: 46px;
+      line-height: 46px;
+    }
+
+    .pair img,
+    .pair video {
+      margin-top: 0;
+    }
+
+    .pair img {
+      aspect-ratio: 379 / 222;
+    }
+
+    .pair video {
+      aspect-ratio: 379 / 212;
+    }
+
+    .tiles {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      column-gap: 15.8px;
+      row-gap: 88.5px;
+      margin: 80px 0 246px;
+      padding: 16px 16px 0;
+    }
+
+    .tile {
+      grid-column: var(--col);
+      grid-row: var(--row);
+      aspect-ratio: auto;
+      margin-bottom: 0;
+    }
+
+    .tile.first {
+      margin-bottom: 37.5px;
+    }
+
+    .pic {
+      flex: none;
+      aspect-ratio: 93 / 85;
     }
   }
 </style>

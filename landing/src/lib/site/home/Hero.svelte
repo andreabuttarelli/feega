@@ -89,7 +89,7 @@
     object-fit: cover;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .hero {
       max-width: 1100px;
       padding: 150px 20px 0;
@@ -102,6 +102,26 @@
 
     .lead {
       width: 600px;
+    }
+
+    .lead strong {
+      padding: 0;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .hero {
+      max-width: 810px;
+      padding: 150px 16px 0;
+    }
+
+    h1 {
+      font-size: 80px;
+      line-height: 64px;
+    }
+
+    .lead {
+      width: 550px;
     }
 
     .lead strong {

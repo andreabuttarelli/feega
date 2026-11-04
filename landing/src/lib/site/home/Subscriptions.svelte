@@ -26,8 +26,7 @@
   }
 
   a {
-    display: inline-block;
-    padding-top: 3px;
+    display: inline;
   }
 
   .logos {
@@ -41,7 +40,7 @@
     height: 32px;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .subs {
       display: grid;
       grid-template-columns: 518px 518px;
@@ -56,7 +55,28 @@
     }
 
     a {
+      display: inline-block;
       padding: 4px 0;
+    }
+
+    .logos {
+      justify-content: space-around;
+      margin-top: 0;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .subs {
+      display: grid;
+      grid-template-columns: 379px 379px;
+      justify-content: space-between;
+      align-items: center;
+      padding: 89px 0 300px;
+    }
+
+    h2 {
+      font-size: 30px;
+      line-height: 36px;
     }
 
     .logos {

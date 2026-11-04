@@ -59,8 +59,9 @@
 
   .ruler {
     display: block;
-    width: 349px;
-    height: 13px;
+    width: calc(100% - 1px);
+    height: auto;
+    aspect-ratio: 1178 / 44;
     margin-left: 1px;
     overflow: visible;
   }
@@ -116,7 +117,7 @@
 
   .focus {
     position: absolute;
-    left: 67px;
+    left: calc(50% - 108px);
     top: 35px;
     width: 216px;
     height: 213px;
@@ -142,10 +143,14 @@
     bottom: 20px;
   }
 
+  .tpl {
+    container-type: inline-size;
+  }
+
   .shots {
     position: relative;
     overflow: hidden;
-    height: 423px;
+    height: calc(63cqw + 202.3px);
     border-radius: 12px 12px 0 0;
     background: rgba(255, 255, 255, 0.08);
   }
@@ -165,7 +170,7 @@
   .shots .b {
     left: 168px;
     top: 171px;
-    width: 61%;
+    width: calc(50.5cqw + 37.4px);
     height: auto;
     aspect-ratio: 4 / 5;
   }
@@ -176,12 +181,11 @@
   }
 
   .text p {
-    margin-top: 17px;
+    margin-top: 16.6px;
     color: #fff;
   }
 
   .agents {
-    height: 484px;
     border-radius: 24px;
   }
 
@@ -191,13 +195,11 @@
   }
 
   .dots {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 101px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    height: 300px;
+    margin: 10px 0;
   }
 
   .row {
@@ -214,14 +216,11 @@
   }
 
   .agents p {
-    position: absolute;
-    left: 20px;
-    right: 20px;
-    bottom: 20px;
+    padding: 20px;
     color: #fff;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .features {
       padding: 70px 0 0;
     }
@@ -265,6 +264,7 @@
       height: 245px;
     }
 
+
     .gen h3 {
       right: 72px;
     }
@@ -282,10 +282,6 @@
       text-align: center;
     }
 
-    .tpl .text {
-      text-align: center;
-    }
-
     .text p {
       margin-top: 16px;
       color: var(--site-ink);
@@ -296,8 +292,80 @@
       color: var(--site-ink);
     }
 
-    .dots {
-      top: 169px;
+    .card.agents {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .agents p {
+      margin-top: auto;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .features {
+      padding: 69px 0 0;
+    }
+
+    .ruler {
+      width: 723px;
+      height: 27px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      font-size: 46px;
+      line-height: 46px;
+    }
+
+    .cards {
+      gap: 16px;
+      margin-top: 26px;
+    }
+
+    h3 {
+      font-size: 35px;
+      line-height: 31.5px;
+    }
+
+    .gen {
+      height: 878px;
+    }
+
+    .focus {
+      left: calc(50% - 251px);
+      top: 24px;
+      width: 502px;
+      height: 456px;
+    }
+
+    .gen h3 {
+      right: 137px;
+    }
+
+    .shots {
+      height: 561px;
+    }
+
+    .shots .a {
+      width: 359px;
+      height: 449px;
+    }
+
+    .shots .b {
+      left: 399px;
+      width: 325px;
+      height: 406px;
+    }
+
+    .text p {
+      margin-top: 15px;
+      color: var(--site-ink);
+    }
+
+    .agents h3,
+    .agents p {
+      color: var(--site-ink);
     }
   }
 </style>

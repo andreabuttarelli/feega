@@ -129,12 +129,54 @@
     height: 20px;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
       max-width: none;
       padding: 0 20px;
+    }
+
+    .links {
+      display: flex;
+      gap: 8px;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: end;
+      gap: 8px;
+    }
+
+    .brand {
+      justify-self: start;
+    }
+
+    .star {
+      background: #4f4f4f;
+      color: #fff;
+    }
+
+    .cta {
+      background: #ff5100;
+    }
+
+    .actions span {
+      border-bottom: 1px solid currentColor;
+    }
+
+    .toggle,
+    .drawer {
+      display: none;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .bar {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      max-width: 810px;
+      padding: 16px 16px 0;
     }
 
     .links {

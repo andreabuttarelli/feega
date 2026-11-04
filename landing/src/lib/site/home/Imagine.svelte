@@ -24,7 +24,7 @@
     display: none;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .imagine {
       position: relative;
       display: block;

@@ -59,7 +59,7 @@
   }
 
   h2 {
-    max-width: 257px;
+    max-width: calc(75% - 17.5px);
     font-size: 24px;
     line-height: 28.8px;
     letter-spacing: -0.04em;
@@ -140,7 +140,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-top: 29px;
+    margin-top: 31px;
   }
 
   .run span {
@@ -151,11 +151,14 @@
   .prices {
     display: flex;
     flex-direction: column;
-    gap: 6px;
   }
 
-  .prices p {
-    margin-bottom: 3px;
+  .local .prices p {
+    margin-bottom: 9px;
+  }
+
+  .prices a + a {
+    margin-top: 5.8px;
   }
 
   .prices a {
@@ -192,7 +195,7 @@
     font-weight: 500;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .pricing {
       padding: 200px 0;
     }
@@ -237,12 +240,13 @@
       margin-top: auto;
     }
 
-    .prices {
-      gap: 8.1px;
+    .prices a + a {
+      margin-top: 8.1px;
     }
 
-    .prices p {
-      margin-bottom: 1.9px;
+    .prices p,
+    .local .prices p {
+      margin-bottom: 9.6px;
     }
 
     .prices a {
@@ -261,6 +265,74 @@
 
     .cloud .body {
       margin-top: 21px;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .pricing {
+      padding: 150px 0;
+    }
+
+    h2 {
+      max-width: 566px;
+      font-size: 30px;
+      line-height: 36px;
+    }
+
+    .local {
+      height: 483px;
+      margin-top: 40px;
+    }
+
+    h3 {
+      font-size: 30px;
+      line-height: 36px;
+    }
+
+    .local .body {
+      height: calc(100% - 56px);
+    }
+
+    .body {
+      display: grid;
+      grid-template-columns: 570px 1fr;
+      margin-top: 20px;
+    }
+
+    .features,
+    .cloud .features {
+      margin-top: 0;
+    }
+
+    .run,
+    .try {
+      margin-top: auto;
+    }
+
+    .prices p,
+    .local .prices p {
+      margin-bottom: 10.4px;
+    }
+
+    .prices a {
+      font-size: 38px;
+      line-height: 53.2px;
+    }
+
+    .prices a + a {
+      margin-top: 8px;
+    }
+
+    .usage {
+      display: grid;
+      grid-template-columns: 363px 1fr;
+      align-items: center;
+      gap: 0;
+      margin-top: 28px;
+    }
+
+    .cloud .body {
+      margin-top: 11px;
     }
   }
 </style>

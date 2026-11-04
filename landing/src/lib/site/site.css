@@ -308,6 +308,13 @@
 }
 
 @media (min-width: 810px) {
+  .site-wide {
+    width: 778px;
+    max-width: none;
+  }
+}
+
+@media (min-width: 1200px) {
   :is(.site-wide, .site-full) {
     width: min(1060px, 100% - 40px);
     max-width: none;

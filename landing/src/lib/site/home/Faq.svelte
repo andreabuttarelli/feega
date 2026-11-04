@@ -93,7 +93,7 @@
     color: #0099ff;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .faq {
       padding: 160px 0 160px;
     }
@@ -112,6 +112,17 @@
 
     .site-col details:last-child {
       border-bottom: 1px solid rgba(240, 238, 233, 0.2);
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .faq {
+      padding: 120px 16px 162px;
+    }
+
+    h2 {
+      font-size: 62px;
+      line-height: 55.8px;
     }
   }
 </style>

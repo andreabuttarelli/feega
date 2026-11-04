@@ -87,7 +87,7 @@
     color: #f0eee9;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .inner {
       padding: 160px 0;
     }
@@ -107,6 +107,32 @@
       flex-direction: row;
       gap: 12px;
       margin-top: 32px;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .inner {
+      padding: 120px 16px;
+    }
+
+    h2 span {
+      font-size: 62px;
+      line-height: 55.8px;
+    }
+
+    .body {
+      font-size: 30px;
+      line-height: 36px;
+    }
+
+    .sign {
+      margin-top: 34px;
+    }
+
+    .links {
+      flex-direction: row;
+      gap: 12px;
+      margin-top: 30px;
     }
   }
 </style>

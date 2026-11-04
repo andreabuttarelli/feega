@@ -21,7 +21,7 @@
     left: 0;
     right: 0;
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(calc(-50% - 3px));
     padding: 0 20px;
     color: #fff;
     text-align: center;
@@ -32,14 +32,27 @@
     pointer-events: none;
   }
 
-  @media (min-width: 810px) {
+  @media (min-width: 1200px) {
     .motion {
       height: 900px;
     }
 
     h2 {
+      transform: translateY(-50%);
       font-size: 58px;
       line-height: 58px;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .motion {
+      height: 700px;
+    }
+
+    h2 {
+      transform: translateY(-50%);
+      font-size: 46px;
+      line-height: 46px;
     }
   }
 </style>
