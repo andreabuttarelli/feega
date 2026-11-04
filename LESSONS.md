@@ -3713,3 +3713,11 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### After `git switch` in a worktree the dev server still serves the old branch
 **Signal:** a before/after harness run on two branches gives the same numbers, or `curl` of a served module lacks a line `git show HEAD:<file>` has; the server was started before the switch (or a merge, or a fast-forward). **Move:** the watcher ignores worktree files, so a switch changes the disk, not the served modules. Stop the server, `npm ci` if the lockfile moved, start it again, and only then measure. Do the same after rebuilding `static/gpu-core`.
+
+### A select that disagrees with the fields beside it is a control to remove, not a state to trust
+
+**Signal:** Properties shows Shape `Rectangle` next to Start/Sweep/Ratio, which only an ellipse has (fields are gated by the clip's real `props.shape`, the select by its own rendering). Not reproduced: in the app an ellipse shows `Ellipse` there. **Move:** the kind of a shape is set once at creation, so the select is gone (`FIELD_SHOWN.shape`) and `set_props` refuses it; check the selected layer's id and kind in the doc before blaming the panel. A transparent stack drawn over a shape takes the click (panel title `Stack`, no Content section), so the layer you meant may not be the one selected.
+
+### A canvas e2e that never paints a frame may be an effect loop, not a slow compile
+
+**Signal:** the first click hangs, the canvas screenshot is blank, the console prints `updated at` stacks ending in `reopenOutbox` > `restoreDraws`. **Move:** an `$effect` that calls a function writing `nodes` must run it under `untrack`, or it re-triggers itself. Also start a fresh dev server after editing: the watcher ignores worktree files, so a running one serves the old code.

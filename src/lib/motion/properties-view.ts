@@ -82,6 +82,7 @@ export type FieldContext = { mode: EditMode; shape: ShapeKind | null; morphTarge
 const morphing = (c: FieldContext) => c.mode === EditMode.Motion && c.morphTargets > 0;
 
 const FIELD_SHOWN: Record<string, (c: FieldContext) => boolean> = {
+  shape: () => false,
   morph: morphing,
   morphStart: morphing,
   fillRule: (c) => c.shape === ShapeKind.Path,
