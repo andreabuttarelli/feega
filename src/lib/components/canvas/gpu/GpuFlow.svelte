@@ -104,6 +104,7 @@
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+  import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
   import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
@@ -2240,6 +2241,11 @@
     }));
   }
 
+  function textMeasureOf(nodeId: string): TextMeasure | undefined {
+    const live = liveOf(nodeId);
+    return live ? pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead).textMeasure() : undefined;
+  }
+
   function toolsOf(nodeId: string) {
     const live = inside?.nodeId === nodeId ? liveOf(nodeId) : null;
     return live ? { doc: live.doc, frame: frameOfLive(live) } : null;
@@ -2666,7 +2672,8 @@
       return;
     }
     const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8), nodeId) : null) ?? { doc: inScope.view, ids: inScope.ids };
-    const boxes = guessedBoxes(withAutoLayout(work.doc));
+    const measure = at.picker.textMeasure();
+    const boxes = guessedBoxes(withAutoLayout(work.doc, measure));
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
@@ -2714,7 +2721,7 @@
         }
         return;
       }
-      const dragged = dragClips({ doc: work.doc, ids: work.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
+      const dragged = dragClips({ doc: work.doc, ids: work.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode, measure });
       const shown = dragged.result.ok ? { ok: true as const, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
       const into = joinable ? dropInStack(work.doc, work.ids[0], boxes, framePt(ev)) : null;
       result = into?.result.ok ? { ok: true, doc: lifted(inScope.merge(into.result.doc)) } : shown;
@@ -2773,7 +2780,7 @@
     if (!live || !pickHover) {
       return [];
     }
-    return measuredGaps(live.doc, frameOfLive(live), guessedBoxes(withAutoLayout(live.doc)), picks, pickHover.clip);
+    return measuredGaps(live.doc, frameOfLive(live), guessedBoxes(withAutoLayout(live.doc, textMeasureOf(nodeId))), picks, pickHover.clip);
   }
 
   $effect(() => {
@@ -3298,7 +3305,7 @@
 
   function showStackLine(over: FrameTarget | null) {
     const doc = over ? liveOf(over.frameId)?.doc : null;
-    const drop = over && doc ? stackLineAt(doc, [over.at.x * doc.width, over.at.y * doc.height]) : null;
+    const drop = over && doc ? stackLineAt(doc, [over.at.x * doc.width, over.at.y * doc.height], textMeasureOf(over.frameId)) : null;
     frameGuides = over && drop ? { nodeId: over.frameId, guides: [], gaps: [], drop } : null;
   }
 
@@ -4326,7 +4333,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} measure={textMeasureOf(frame.id)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}

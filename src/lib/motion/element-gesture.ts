@@ -6,6 +6,7 @@ import { Grip, handlesOf, type Bounds, type Guide, type Pt, type Quad } from './
 import type { OpResult } from '@feega/motion-core/motion/timeline';
 import { findClip } from '@feega/motion-core/motion/doc';
 import { sizeStackAround } from './layout/ops';
+import type { TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 
 export type Keys = { shift: boolean; alt: boolean; ctrl?: boolean };
 
@@ -22,6 +23,7 @@ export type GroupDrag = {
   others: Bounds[];
   reach: number;
   keys: Keys;
+  measure?: TextMeasure;
 };
 
 export type GroupDragged = { result: OpResult; guides: Guide[] };
@@ -68,7 +70,7 @@ function scaled(g: GroupDrag): GroupDragged {
   const stacks = g.ids.filter((id) => findClip(g.doc, id)?.clip.autoLayout);
   const rest = g.ids.filter((id) => !stacks.includes(id));
   const scaledRest = rest.length ? scaleAroundXY(g.doc, rest, g.frame, anchor, fx, fy, g.mode) : ({ ok: true, doc: g.doc } as OpResult);
-  const result = stacks.reduce<OpResult>((done, id) => (done.ok ? sizeStackAround(done.doc, id, anchor, fx, fy) : done), scaledRest);
+  const result = stacks.reduce<OpResult>((done, id) => (done.ok ? sizeStackAround(done.doc, id, anchor, fx, fy, g.measure) : done), scaledRest);
   return { result, guides: snapped.guides };
 }
 

@@ -10,7 +10,7 @@ import { Align, Direction, Sizing } from '@feega/motion-core/motion/layout/auto-
 import { DEFAULT_LAYOUT_ITEM, NEW_AUTO_LAYOUT, TEXT_ITEM, autoLayoutSchema, flexOnHug, layoutItemSchema, type AutoLayout, type LayoutItem } from '@feega/motion-core/motion/layout/model';
 import { NEW_TEXT_SIZING, type TextSizing } from '@feega/motion-core/motion/text-sizing';
 import { childrenInOrder, shownBox, withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
-import { isText } from '@feega/motion-core/motion/layout/text-extent';
+import { estimatedText, isText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 import { Placement, placementOf } from '@feega/motion-core/motion/layout/stack';
 import { flowOf } from './flow';
 
@@ -26,7 +26,7 @@ function withClip(doc: MotionDoc, clipId: string, edit: (clip: MotionClip) => Mo
 
 export const hasBox = (clip: MotionClip) => typeof clip.props.width === 'number' && typeof clip.props.height === 'number';
 
-export const laidClip = (doc: MotionDoc, clipId: string): MotionClip | null => (findClip(withAutoLayout(doc), clipId)?.clip as MotionClip | undefined) ?? null;
+export const laidClip = (doc: MotionDoc, clipId: string, measure: TextMeasure = estimatedText): MotionClip | null => (findClip(withAutoLayout(doc, measure), clipId)?.clip as MotionClip | undefined) ?? null;
 
 export function layoutParent(doc: MotionDoc, clip: MotionClip): (MotionClip & { autoLayout: AutoLayout }) | null {
   const parent = clip.parent ? findClip(doc, clip.parent)?.clip : undefined;
@@ -381,8 +381,8 @@ export function reordered(doc: MotionDoc, parentId: string | null, stackId: stri
 
 const UNCHANGED = 1e-6;
 
-export function sizeStackAround(doc: MotionDoc, stackId: string, anchor: readonly [number, number], fx: number, fy: number): OpResult {
-  const laid = laidClip(doc, stackId);
+export function sizeStackAround(doc: MotionDoc, stackId: string, anchor: readonly [number, number], fx: number, fy: number, measure: TextMeasure = estimatedText): OpResult {
+  const laid = laidClip(doc, stackId, measure);
   if (!laid?.autoLayout || !hasBox(laid)) {
     return fail(`${stackId} is not a stack`);
   }
