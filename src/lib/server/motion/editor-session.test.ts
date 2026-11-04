@@ -25,6 +25,7 @@ vi.mock('./templates', () => ({ templateLibrary: () => ({ own: () => slow([]) })
 vi.mock('$lib/server/gallery/editor', () => ({ editorGallery: () => slow(null) }));
 vi.mock('./renderer', () => ({ motionRenderFarm: () => null, knownRenderLimit: () => null }));
 vi.mock('./font-upload', () => ({ orgFontFamilies: () => slow([]) }));
+vi.mock('$lib/server/export-watermark', () => ({ exportMark: () => slow('watermarked') }));
 
 const { loadEditorSession } = await import('./editor-session');
 const { serverTiming } = await import('$lib/server/server-timing');

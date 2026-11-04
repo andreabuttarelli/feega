@@ -15,6 +15,7 @@ import type { Db } from '$lib/server/db/client';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { storyboardPath } from '$lib/canvas/motion-node';
 import { editorGallery } from '$lib/server/gallery/editor';
+import { exportMark } from '$lib/server/export-watermark';
 
 type EditorParams = { projectId: string; canvasId: string; nodeId: string };
 type SessionAsk = { projectId: string; nodeId: string; briefIds: string[] };
@@ -36,7 +37,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
   const nodeScope = { orgId: found.orgId, nodeId: params.nodeId };
   const farm = motionRenderFarm();
   const uploadLimit = farm ? knownRenderLimit() : null;
-  const [lookup, savedHead, tokens, assets, runs, templates, gallery, briefAttachments, fonts] = await Promise.all([
+  const [lookup, savedHead, tokens, assets, runs, templates, gallery, briefAttachments, fonts, mark] = await Promise.all([
     phases.time('node', nodeLookup(canvas, params.nodeId)),
     phases.time('head', readHead(db, nodeScope, HEADS)),
     phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId })),
@@ -45,7 +46,8 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
     phases.time('templates', libraryOf({ db, orgId: found.orgId, userId }).own()),
     phases.time('gallery', editorGallery(db, nodeScope)),
     briefIds.length ? phases.time('brief', loadAttachments(db, { orgId: found.orgId, projectId: params.projectId, ids: briefIds })) : [],
-    phases.time('fonts', orgFontFamilies(db, found.orgId))
+    phases.time('fonts', orgFontFamilies(db, found.orgId)),
+    phases.time('plan', exportMark(db, found.orgId))
   ]);
   const scope = motionOrThrow(canvas, lookup);
   const head = savedHead ? await phases.time('mains', linkedHead(db, { ...nodeScope, head: savedHead })) : newHead(scope.motion.node);
@@ -59,6 +61,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
     tokens,
     assets,
     fonts,
+    exportMark: mark,
     serverRender: { configured: farm !== null && serverRenderOpen(), latest: renderView(runs), queue: renderQueue(), uploadLimit },
     batch: batchView(runs),
     templates,

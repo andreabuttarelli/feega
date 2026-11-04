@@ -14,6 +14,7 @@ const store = vi.hoisted(() => ({
   revisions: [] as unknown[]
 }));
 
+vi.mock('$lib/server/export-watermark', () => ({ watermarked: async (_db: unknown, _org: string, doc: unknown) => doc }));
 vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => ({ storage: { from: () => ({ createSignedUploadUrl: async (path: string) => ({ data: { token: `upload-${path}` }, error: null }) }) } }) }));
 vi.mock('$lib/server/repos/node-runs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/node-runs')>()),
