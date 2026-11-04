@@ -33,6 +33,13 @@ export function libraryOf(registryUrl: string): string {
   return LIBRARIES.find((library) => library.origin === origin)?.name ?? UNKNOWN_LIBRARY;
 }
 
+const MAX_COLLECTION = 40;
+
+export function collectionOf(registryUrl: string): string {
+  const name = URL.canParse(registryUrl) ? (new URL(registryUrl).pathname.split('/').pop() ?? '').replace(/\.json$/, '').replace(/[^A-Za-z0-9 _-]/g, '') : '';
+  return `${libraryOf(registryUrl)} ${name}`.trim().slice(0, MAX_COLLECTION).trim();
+}
+
 export function dependencyUrl(ref: string): string {
   if (URL.canParse(ref)) {
     return ref;

@@ -4,7 +4,7 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { UrlImportOutcome, type UrlImported } from '$lib/server/url-import/import-url';
 import { Sectioning, Tokening } from '$lib/server/url-import/url-doc';
 import { frameStore, MoveOutcome } from '$lib/server/motion/move-element';
-import { libraryOf } from './registry-item';
+import { collectionOf } from './registry-item';
 import { landInFrame, type FrameSpot } from './land-component';
 
 export const PREVIEW_PATH = '/components/preview';
@@ -38,7 +38,7 @@ export async function insertComponentInto(scope: UrlScope, canvasId: string, ask
   const imported = await importUrlInto(scope, canvasId, {
     url: previewUrl(ask.registryUrl, ask.props),
     at: ask.at,
-    shape: { sectioning: Sectioning.Off, tokening: Tokening.On, site: libraryOf(ask.registryUrl) },
+    shape: { sectioning: Sectioning.Off, tokening: Tokening.On, site: collectionOf(ask.registryUrl) },
     views: [],
     guard: ownPreview
   });
