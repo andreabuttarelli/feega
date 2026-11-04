@@ -44,7 +44,7 @@ export const CANVAS_OP_SUMMARIES: OpSummaries<typeof CANVAS_OPS> = {
   github_repos: 'The GitHub repositories your connected account can read, newest push first, with their default branch.',
   github_branches: 'The GitHub branches of one repository (owner/name) your connected account can read.',
   home_components: 'Move the main components of a frame to the project Components page, one frame per set, leaving linked instances in place.',
-  insert_component: 'Draw a UI component from a shadcn registry (shadcn/ui, Magic UI, Origin UI) as an editable frame at x,y: rendered with its props, then turned into layers, text, auto layout and images.',
+  insert_component: 'Draw a UI component from a shadcn registry (shadcn/ui, Magic UI, Origin UI) as editable layers, text, auto layout and images: a new frame at x,y, or with frameId inside that frame at x,y as 0–1 fractions (parentId: inside one of its stacks). Its colours and type become variables named after the library.',
   find_components: 'Search free MIT component registries (shadcn/ui, Magic UI) by name; returns registryUrl for insert_component.',
   import_url: 'Draw a public web page as an editable frame at x,y: layers, text, auto layout and images, not a screenshot; split into named sections (Nav, Hero, Features, Footer…) unless sections is false; its colours, type, effects, radii and spacing become shared variables and styles bound to the layers unless tokens is false.',
   import_figma: 'Draw Figma frames from a link onto the canvas at x,y, with their layers, auto layout and images.',

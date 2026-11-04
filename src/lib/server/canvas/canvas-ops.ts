@@ -280,7 +280,15 @@ const importUrlInput = z
   .strict();
 
 const insertComponentInput = z
-  .object({ canvasId: z.string(), registryUrl: z.string().max(2000).describe('a shadcn registry item JSON URL (shadcn/ui, Magic UI, Origin UI…), from find_components'), props: z.record(z.string(), z.unknown()).optional().describe('props passed to the component: texts, images, colours'), x: z.number().finite(), y: z.number().finite() })
+  .object({
+    canvasId: z.string(),
+    registryUrl: z.string().max(2000).describe('a shadcn registry item JSON URL (shadcn/ui, Magic UI, Origin UI…), from find_components'),
+    props: z.record(z.string(), z.unknown()).optional().describe('props passed to the component: texts, images, colours'),
+    x: z.number().finite().describe('canvas x of a new frame; with frameId, 0–1 across that frame'),
+    y: z.number().finite().describe('canvas y of a new frame; with frameId, 0–1 down that frame'),
+    frameId: z.string().optional().describe('an existing Frame node to land the component in, instead of drawing a new frame'),
+    parentId: z.string().optional().describe('with frameId: the stack or group clip inside that frame to land it in')
+  })
   .strict();
 
 const findComponentsInput = z.object({ query: z.string().max(200).describe('words matched against component names, e.g. "button" or "bento"') }).strict();
@@ -1043,7 +1051,7 @@ export const CANVAS_OPS = {
   insert_component: op({
     access: Access.Write,
     input: insertComponentInput,
-    run: async (ctx, input) => insertComponentInto(figmaScope(ctx), input.canvasId, { registryUrl: input.registryUrl, props: input.props, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => insertComponentInto(figmaScope(ctx), input.canvasId, { registryUrl: input.registryUrl, props: input.props, at: { x: input.x, y: input.y }, into: input.frameId ? { frameId: input.frameId, parentId: input.parentId, at: { x: input.x, y: input.y } } : undefined })
   }),
 
   find_components: op({

@@ -18,19 +18,28 @@ export type RegistryFile = { path: string; content: string };
 
 export type RegistryBundle = { name: string; type: string; entry: string; files: RegistryFile[]; theme: Record<string, string>; css: Record<string, unknown> };
 
-const NAMESPACES: Record<string, (name: string) => string> = {
-  '@magicui': (name) => `https://magicui.design/r/${name}.json`,
-  '@originui': (name) => `https://coss.com/origin/r/${name}.json`,
-  '@shadcn': (name) => `${SHADCN_REGISTRY}/${name}.json`
-};
+const LIBRARIES = [
+  { name: 'shadcn', namespace: '@shadcn', origin: 'https://ui.shadcn.com', item: (name: string) => `${SHADCN_REGISTRY}/${name}.json` },
+  { name: 'Magic UI', namespace: '@magicui', origin: 'https://magicui.design', item: (name: string) => `https://magicui.design/r/${name}.json` },
+  { name: 'Origin UI', namespace: '@originui', origin: 'https://coss.com', item: (name: string) => `https://coss.com/origin/r/${name}.json` }
+];
+
+const [SHADCN] = LIBRARIES;
+
+const UNKNOWN_LIBRARY = 'Components';
+
+export function libraryOf(registryUrl: string): string {
+  const origin = URL.canParse(registryUrl) ? new URL(registryUrl).origin : '';
+  return LIBRARIES.find((library) => library.origin === origin)?.name ?? UNKNOWN_LIBRARY;
+}
 
 export function dependencyUrl(ref: string): string {
   if (URL.canParse(ref)) {
     return ref;
   }
 
-  const [namespace, name] = ref.startsWith('@') ? ref.split('/') : ['@shadcn', ref];
-  return (NAMESPACES[namespace] ?? NAMESPACES['@shadcn'])(name);
+  const [namespace, name] = ref.startsWith('@') ? ref.split('/') : [SHADCN.namespace, ref];
+  return (LIBRARIES.find((library) => library.namespace === namespace) ?? SHADCN).item(name);
 }
 
 async function itemAt(url: string) {

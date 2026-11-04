@@ -26,6 +26,13 @@ describe('flattened', () => {
     expect(made.children![0]).toMatchObject({ type: 'TEXT', characters: 'Products' });
   });
 
+  it('a wrapper that fades what it holds with a mask stays, with its mask (Magic UI bento: the file cards ran over the title without their fade)', () => {
+    const fade = { type: 'GRADIENT_LINEAR', gradientHandlePositions: [{ x: 0.5, y: 1 }, { x: 0.5, y: 0 }, { x: 0, y: 1 }], gradientStops: [{ position: 0.4, color: { r: 0, g: 0, b: 0, a: 0 } }, { position: 1, color: { r: 0, g: 0, b: 0, a: 1 } }] };
+    const made = flattened(page([frame('div', [10, 10, 80, 20], [frame('figure', [10, 10, 80, 20], [text('Go', [10, 10, 80, 20])], { fills: red })], { maskGradient: fade })]));
+
+    expect(made.children![0].maskGradient).toEqual(fade);
+  });
+
   it('un involucro dipinto resta', () => {
     const made = flattened(page([frame('div', [10, 10, 80, 20], [text('Go', [10, 10, 80, 20])], { fills: red })]));
 

@@ -5,6 +5,7 @@ import type { RestNode } from '$lib/server/figma/rest-message';
 import { localBrowser } from '$lib/server/web/browser';
 import { TREE_LIMITS, treeScript, type PageTree } from './page-tree';
 import { RevealMode } from './page-reveal';
+import { stacksOf } from './page-stacks';
 
 const PAGE = `<body style="margin:0;background:oklch(0.98 0 0)"><div style="width:200px;height:80px;background:oklch(0.21 0.034 264.665);color:oklch(0.985 0.002 247.839);font:16px sans-serif">Download</div></body>`;
 
@@ -561,6 +562,63 @@ describe.runIf(process.env.CHROMIUM_PATH)('a page that scrolls smoothly', () => 
 
       expect([data[0], data[1], data[2]]).toEqual([0, 170, 0]);
       expect(top).toBe(0);
+    } finally {
+      await browser.close();
+    }
+  }, 30_000);
+});
+
+const LINKED = `<body style="margin:0"><p style="margin:0;font:16px sans-serif">Have one? <a href="#" style="text-decoration:underline;color:inherit">Sign up</a></p></body>`;
+
+const FIELD = `<body style="margin:0"><input placeholder="m@example.com" style="box-sizing:border-box;width:300px;height:36px;padding:4px 12px;border:1px solid #ccc;font:14px sans-serif"></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('text a component draws', () => {
+  const treeOf = async (html: string): Promise<RestNode[]> => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(html);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      return all(stacksOf(tree.root));
+    } finally {
+      await browser.close();
+    }
+  };
+
+  it('an underlined link inside a sentence keeps its underline as a run (shadcn login: "Sign up")', async () => {
+    const sentence = (await treeOf(LINKED)).find((n) => n.type === 'TEXT')!;
+    const underlined = Object.entries(sentence.styleOverrideTable ?? {}).filter(([, style]) => style.textDecoration === 'UNDERLINE');
+
+    expect(underlined).toHaveLength(1);
+    expect(sentence.style?.textDecoration).toBeUndefined();
+  }, 30_000);
+
+  it('a field placeholder spans the field and starts at its left padding, not centred on its own width (shadcn login: "m@example.com" sat in the middle)', async () => {
+    const placeholder = (await treeOf(FIELD)).find((n) => n.characters === 'm@example.com')!;
+
+    expect(placeholder.layoutAlign).toBe('STRETCH');
+  }, 30_000);
+});
+
+const MARQUEE = `<style>@keyframes slide{to{transform:translateX(-200px)}}</style><body style="margin:0"><div style="overflow:hidden;width:300px;height:40px"><div id="row" style="display:flex;gap:10px;width:600px;height:40px;background:#c00;animation:slide 2s linear infinite;animation-play-state:paused">moving</div></div></body>`;
+
+describe.runIf(process.env.CHROMIUM_PATH)('a block a CSS animation moves', () => {
+  it('carries what the animation does to it over one cycle, relative to where it was read (Magic UI marquee froze)', async () => {
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH, headless: 'shell' });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 400, height: 200 });
+      await page.setContent(MARQUEE);
+      const tree = (await page.evaluate(treeScript(TREE_LIMITS))) as PageTree;
+      const all = (n: RestNode): RestNode[] => [n, ...(n.children ?? []).flatMap(all)];
+      const moving = all(tree.root).find((n) => n.motion);
+
+      expect(moving?.motion).toMatchObject({ durationMs: 2000, loop: true });
+      expect(moving!.motion!.samples[0].dx).toBeCloseTo(0, 1);
+      expect(moving!.motion!.samples.at(-1)!.dx).toBeCloseTo(-200, 0);
+      expect(await page.evaluate(() => getComputedStyle(document.getElementById('row')!).transform)).toBe('matrix(1, 0, 0, 1, 0, 0)');
     } finally {
       await browser.close();
     }
