@@ -38,7 +38,7 @@ export const llmsFullTxt = () =>
     '# feega',
     `> ${SUMMARY}`,
     '## Run it with your agent',
-    `git clone ${GITHUB_URL} && cd feega && npm install\nnpm run local -- my-canvas.feega`,
+    'npx feega',
     '## FAQ',
     FAQ.map((f) => `### ${f.q}\n${plainText(f.a)}`).join('\n\n'),
     '## Pages',

@@ -255,3 +255,77 @@
   font-style: normal;
   font-display: swap;
 }
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/site/fonts/ibm-plex-sans-400-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/site/fonts/ibm-plex-sans-500-latin.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  src: url('/site/fonts/dm-mono-400-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.site .site-pill {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 290px;
+  height: 43px;
+  border-radius: 100px;
+  background: #ff5100;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-variation-settings: normal;
+  font-size: 18px;
+  line-height: 23.4px;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+  transition: background 0.3s ease;
+}
+
+.site .site-pill:hover {
+  background: #ff6a26;
+}
+
+.site-wide {
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+@media (min-width: 810px) {
+  :is(.site-wide, .site-full) {
+    width: min(1060px, 100% - 40px);
+    max-width: none;
+    margin: 0 auto;
+  }
+}
+
+:where(.site-home, .bar, .drawer, .site-foot) :where(*, *::before, *::after) {
+  box-sizing: border-box;
+}
+
+:where(.site-home, .bar, .drawer, .site-foot) :where(h1, h2, h3, h4, h5, h6, p, ul, figure) {
+  margin: 0;
+  padding: 0;
+}
+
+.bar,
+.drawer,
+.site-foot {
+  box-sizing: border-box;
+}

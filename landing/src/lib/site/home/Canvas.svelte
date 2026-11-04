@@ -14,20 +14,19 @@
   .motion {
     position: relative;
     height: 600px;
-    margin-top: 20px;
   }
 
   h2 {
     position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
     padding: 0 20px;
     color: #fff;
     text-align: center;
-    font-size: 40px;
-    line-height: 1;
+    font-size: 37px;
+    line-height: 37px;
     letter-spacing: -0.04em;
     font-weight: 400;
     pointer-events: none;

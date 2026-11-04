@@ -6,7 +6,7 @@
   const columns = [FAQ.slice(0, FIRST_COLUMN), FAQ.slice(FIRST_COLUMN)];
 </script>
 
-<section class="faq" id="faq">
+<section class="faq site-full" id="faq">
   <h2>FAQ</h2>
 
   <div class="cols">
@@ -25,13 +25,13 @@
 
 <style>
   .faq {
-    margin: 0 auto;
-    padding: 0 20px 121px;
+    padding: 96px 16px 161px;
+    color: var(--site-ink);
   }
 
   h2 {
     font-size: 50px;
-    line-height: 0.9;
+    line-height: 45px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -41,16 +41,12 @@
     margin-top: 40px;
   }
 
-  .site-col + .site-col details:first-child {
-    border-top: 0;
-  }
-
   details {
-    border-bottom: 1px solid rgba(240, 238, 233, 0.2);
+    border-top: 1px solid rgba(240, 238, 233, 0.2);
   }
 
-  details:first-child {
-    border-top: 1px solid rgba(240, 238, 233, 0.2);
+  .site-col:last-child details:last-child {
+    border-bottom: 1px solid rgba(240, 238, 233, 0.2);
   }
 
   summary {
@@ -62,15 +58,20 @@
     list-style: none;
     cursor: pointer;
     font-family: 'Inter', sans-serif;
-    font-size: 20px;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
     font-variation-settings: normal;
+    font-size: 20px;
+    line-height: 24px;
+    letter-spacing: -0.02em;
     font-weight: 500;
   }
 
   summary::-webkit-details-marker {
     display: none;
+  }
+
+  summary span:last-child {
+    flex-shrink: 0;
+    transition: transform 0.2s;
   }
 
   details[open] summary span:last-child {
@@ -79,31 +80,38 @@
 
   p {
     padding-bottom: 18px;
-    opacity: 0.7;
+    color: rgba(240, 238, 233, 0.7);
+    font-family: 'Inter', sans-serif;
+    font-variation-settings: normal;
+    font-size: 15px;
+    line-height: 21px;
+    letter-spacing: -0.01em;
+    font-weight: 500;
   }
 
   p :global(a) {
     color: #0099ff;
   }
 
-  @media (min-width: 1200px) {
+  @media (min-width: 810px) {
     .faq {
-      max-width: 1500px;
-      padding: 0 20px 120px;
+      padding: 160px 0 160px;
     }
 
     h2 {
       font-size: 78px;
+      line-height: 70.2px;
     }
 
     .cols {
-      grid-template-columns: 1fr 1fr;
-      column-gap: 40px;
+      grid-template-columns: 510px 510px;
+      justify-content: space-between;
       align-items: start;
+      margin-top: 41px;
     }
 
-    .site-col + .site-col details:first-child {
-      border-top: 1px solid rgba(240, 238, 233, 0.2);
+    .site-col details:last-child {
+      border-bottom: 1px solid rgba(240, 238, 233, 0.2);
     }
   }
 </style>
