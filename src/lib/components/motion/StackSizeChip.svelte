@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
   import { FOCUS_RING, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
@@ -12,7 +13,7 @@
   import { laidClip, setChildSize, setLayoutItem } from '$lib/motion/layout/ops';
   import NumberField from './NumberField.svelte';
 
-  let { doc, clip, axis, sizings, commit }: { doc: MotionDoc; clip: MotionClip; axis: LimitAxis; sizings: readonly Sizing[]; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, axis, sizings, measure = estimatedText, commit }: { doc: MotionDoc; clip: MotionClip; axis: LimitAxis; sizings: readonly Sizing[]; measure?: TextMeasure; commit: (result: OpResult, summary: string) => void } = $props();
 
   const AXIS_NAME: Record<LimitAxis, { label: string; short: string }> = { width: { label: 'Width', short: 'W' }, height: { label: 'Height', short: 'H' } };
   const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'Fixed', [Sizing.Hug]: 'Hug', [Sizing.Fill]: 'Fill', [Sizing.Percent]: '%' };
@@ -24,7 +25,7 @@
   const name = $derived(AXIS_NAME[axis]);
   const item = $derived(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM);
   const sizing = $derived(item[axis]);
-  const laidPx = $derived(Math.round(Number((laidClip(doc, clip.id) ?? clip).props[axis] ?? 0) * doc[axis]));
+  const laidPx = $derived(Math.round(Number((laidClip(doc, clip.id, measure) ?? clip).props[axis] ?? 0) * doc[axis]));
   const percented = $derived(sizing === Sizing.Percent);
   let open = $state(false);
   let root = $state<HTMLDivElement | null>(null);
