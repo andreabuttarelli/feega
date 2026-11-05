@@ -6,7 +6,7 @@ export default {
   preprocess: vitePreprocess(),
   kit: {
     adapter: vercelAdapter({ runtime: 'nodejs22.x' }),
-    prerender: { handleHttpError: 'warn' },
+    prerender: { handleHttpError: 'warn', handleMissingId: 'warn' },
     inlineStyleThreshold: 50000
   }
 };
