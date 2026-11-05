@@ -150,7 +150,7 @@ export const FAQ = [
   },
   {
     q: "How do credits and pricing work?",
-    a: "In the cloud, AI runs are paid in credits. Every \u20ac1 of your plan gives 100 credits (\u20ac8/mo = 800 credits). A run costs 120 credits for every $1 the AI provider charges. Running locally with your own keys needs no credits. See <a href=\"#canvas\">pricing</a>."
+    a: "In the cloud, AI runs are paid in credits. Every \u20ac1 of your plan gives 100 credits (\u20ac8/mo = 800 credits). A run costs 120 credits for every $1 the AI provider charges. Running locally with your own keys needs no credits. See <a href=\"#pricing\">pricing</a>."
   },
   {
     q: "Who is behind Feega?",
