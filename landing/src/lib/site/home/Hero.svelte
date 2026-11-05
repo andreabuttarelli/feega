@@ -9,6 +9,7 @@
 
 <svelte:head>
   <link rel="preload" as="image" href={POSTER} type="image/webp" fetchpriority="high" />
+  <link rel="preload" href="/site/fonts/instrument-serif-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 </svelte:head>
 
 <section class="hero" id="hero">
@@ -22,7 +23,7 @@
 
   <p class="run"><span>or run it locally:</span> <NpxChip /></p>
 
-  <video class="canvas" autoplay muted loop playsinline preload="metadata" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" src={CANVAS_VIDEO}></video>
+  <video class="canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
 
   <div class="ticker" aria-label="Videos made with Feega">
     {#each TICKER_VIDEOS as src (src)}

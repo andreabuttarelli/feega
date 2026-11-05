@@ -60,14 +60,14 @@ describe('structured data', () => {
 
   it('a breadcrumb ends at the page itself', () => {
     const data = JSON.parse(breadcrumbJsonLd('Changelog', '/changelog').replace(/^<script[^>]*>|<\/script>$/g, ''));
-    expect(data.itemListElement.map((i: { item: string }) => i.item)).toEqual(['https://www.feega.app/', 'https://www.feega.app/changelog']);
+    expect(data.itemListElement.map((i: { item: string }) => i.item)).toEqual(['https://feega.app/', 'https://feega.app/changelog']);
   });
 });
 
 describe('llms.txt', () => {
   it('lists every public page', () => {
     for (const path of SITE_PATHS.filter((p) => p !== '/')) {
-      expect(llmsTxt()).toContain(`https://www.feega.app${path}`);
+      expect(llmsTxt()).toContain(`https://feega.app${path}`);
     }
   });
 

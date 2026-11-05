@@ -3,8 +3,8 @@ import type { Competitor } from '../tool';
 
 export const JITTER: Competitor = {
   name: 'Jitter',
-  title: 'Feega vs Jitter: motion design tools compared',
-  description: 'Feega and Jitter both animate designs in the browser. What each does better, a feature table, and who should pick which.',
+  title: 'Feega vs Jitter: animate, design and generate (2026)',
+  description: 'Jitter animates. Feega also designs and generates with AI, is open source and runs locally. Features, export, pricing, and when Jitter still wins.',
   heading: 'Feega vs Jitter',
   intro:
     'Jitter is a browser motion design tool built around a simple timeline, Figma import and polished presets. Feega is an open-source canvas that puts design, a keyframe timeline and AI generation in one file, and lets an AI agent edit it. They overlap a lot; the differences are in who drives the work and where the file lives.',
