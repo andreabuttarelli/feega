@@ -30,6 +30,7 @@ import { ffmpegLumas } from './track-frames';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { contested, type Contested } from '$lib/motion/doc-contest';
 
 export enum ToolRun {
   Done = 'done',
@@ -49,7 +50,7 @@ export type EditorFrames = (callId: string, times: number[], doc: MotionDoc) => 
 
 export type ToolRunTurn = { sessions: Map<string, MotionSession>; selection: string[]; editor: EditorFrames | null };
 
-export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string };
+export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string; changed?: Contested[] };
 
 export const TOOL_RUN_AGENT_KEY = 'mcp';
 export const SPENDING_TOOLS: ReadonlySet<string> = new Set(['generate_voiceover', 'add_music']);
@@ -133,9 +134,24 @@ export type BatchOp = { tool: string; input?: unknown };
 
 export type BatchResult = { outcome: ToolRun.Done; output: { results: unknown[] }; version: number; saved: boolean } | { outcome: Exclude<ToolRun, ToolRun.Done>; detail?: string; index?: number } | { outcome: ToolRun.Refused; detail: string; index: number; output: unknown };
 
-type Prepared = { saved: NonNullable<Awaited<ReturnType<typeof savedMotionWith<MotionAsset[]>>>>; session: MotionSession; tools: Record<string, Tool>; actor: ReturnType<typeof agentActor>; nodeScope: { orgId: string; nodeId: string } };
+type Prepared = { saved: NonNullable<Awaited<ReturnType<typeof savedMotionWith<MotionAsset[]>>>>; read: MotionDoc; session: MotionSession; tools: Record<string, Tool>; actor: ReturnType<typeof agentActor>; nodeScope: { orgId: string; nodeId: string } };
 
-type Failure = { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string };
+const isFailure = <T extends object>(p: T | Failure): p is Failure => 'outcome' in p;
+
+type Failure = { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string; changed?: Contested[] };
+
+const REREAD = 'a person changed these elements after the revision you read: view the frame again and redo the edit on what is there now';
+
+async function readAt(db: Db, scope: { orgId: string; nodeId: string }, saved: { version: number; doc: MotionDoc }, version: number | undefined): Promise<MotionDoc | Failure> {
+  if (version === undefined || version === saved.version) {
+    return saved.doc;
+  }
+  if (version > saved.version) {
+    return { outcome: ToolRun.Invalid, detail: `revision ${version} does not exist yet: the video is at ${saved.version}` };
+  }
+  const read = await readRevision(db, { ...scope, version });
+  return read ? read.doc : { outcome: ToolRun.Conflict, detail: `revision ${version} is gone: the video is at ${saved.version}` };
+}
 
 async function prepare(db: Db, scope: ToolRunScope, version: number | undefined, turn?: ToolRunTurn): Promise<Prepared | Failure> {
   const place = (record: CanvasNodeRecord) => ({ db, orgId: scope.orgId, projectId: record.projectId, canvasId: record.canvasId });
@@ -143,12 +159,13 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
   if (!saved || (scope.projectId && saved.project.id !== scope.projectId)) {
     return { outcome: ToolRun.NotFound };
   }
-  if (version !== undefined && version !== saved.version) {
-    return { outcome: ToolRun.Conflict, detail: `the video is at revision ${saved.version}, not ${version}` };
+  const nodeScope = { orgId: scope.orgId, nodeId: scope.nodeId };
+  const read = await readAt(db, nodeScope, saved, version);
+  if (isFailure(read)) {
+    return read;
   }
 
   const actor = agentActor(scope.userId, scope.agentKey ?? TOOL_RUN_AGENT_KEY, scope.sessionId);
-  const nodeScope = { orgId: scope.orgId, nodeId: scope.nodeId };
   const assets = saved.alongside;
   const tokens = once(() => motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId }));
   const session = carried(turn, scope.nodeId, saved.doc, saved.version);
@@ -170,10 +187,8 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId: scope.orgId, projectId: saved.project.id }, assets, [assetId]))[assetId] ?? null,
     embed: async (action) => embedAction(db, { nodeId: scope.nodeId, doc: session.doc, tokens: await tokens(), assetUrls: assetUrls(assets), title: saved.record.displayName ?? 'feega', fetchBlob: (url) => fetch(url).then((r) => r.blob()), mode: saved.project.mode }, action)
   }, frames);
-  return { saved, session, tools, actor, nodeScope };
+  return { saved, read, session, tools, actor, nodeScope };
 }
-
-const isFailure = <T extends object>(p: T | Failure): p is Failure => 'outcome' in p;
 
 type Checked = { found: Tool & { execute: NonNullable<Tool['execute']> }; value: unknown };
 
@@ -215,6 +230,10 @@ async function commit(db: Db, ready: Prepared, summary: string): Promise<{ versi
   const { saved, session } = ready;
   if (session.doc === saved.doc) {
     return { version: saved.version, saved: false };
+  }
+  const changed = contested(ready.read, saved.doc, session.doc);
+  if (changed.length) {
+    return { outcome: ToolRun.Conflict, detail: REREAD, changed };
   }
   const written = await commitDoc(db, { ...ready.nodeScope, node: saved.node, record: saved.record, checkpoint: Checkpoint.Coalesce, base: saved, doc: session.doc, actor: ready.actor, summary: session.edits.join('; ') || summary });
   if (written.outcome === OpsOutcome.Invalid) {
