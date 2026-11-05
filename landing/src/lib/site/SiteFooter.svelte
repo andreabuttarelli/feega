@@ -1,36 +1,43 @@
 <script lang="ts">
   import { LEGAL_DOCS } from './legal';
-  import { APP_URL, GITHUB_URL } from './links';
+  import { APP_URL, SOCIAL_LINKS } from './links';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
 </script>
 
 <footer class="site-foot">
-  <div class="grid">
-    <div class="site-ready">
+  <div class="top">
+    <div class="ready">
       <h2>Ready?</h2>
       <a href={APP_URL}><span>Let's start now</span></a>
     </div>
 
-    <div class="cols">
-      <div class="site-col">
-        <p>( Navigate )</p>
-        <a href="/">Product</a>
-        <a href={APP_URL}>Sign In</a>
-      </div>
-      <div class="site-col">
-        <p>( Socials )</p>
-        <a href={GITHUB_URL}>GitHub [Star Us]</a>
-      </div>
+    <div class="col">
+      <p>( Navigate )</p>
+      <a href="/">Product</a>
+      <a href={APP_URL}>Sign In</a>
+      <a href="/blog">Compare</a>
     </div>
 
-    <p class="mark" aria-hidden="true">feega</p>
-
-    <div class="base">
-      <a class="to-top" href="#top">Back to top ↑</a>
-      <p class="copy">© {year} Feega. All rights reserved.<br />Made in Italy, by Andrea Buttarelli.</p>
+    <div class="col">
+      <p>( Open building )</p>
+      <div class="icons">
+        {#each SOCIAL_LINKS as social (social.label)}
+          <a href={social.href} aria-label={social.label}>{@html social.icon}</a>
+        {/each}
+      </div>
     </div>
+  </div>
+
+  <div class="mark-box" aria-hidden="true"><p class="mark">feega</p></div>
+
+  <div class="base">
+    <p class="copy">
+      <span class="rights"><span>© {year} Feega.</span> <span>All rights reserved.</span></span>
+      <span class="made"><span>Made in Italy,</span> <span>by Andrea Buttarelli.</span></span>
+    </p>
+    <a class="to-top" href="#top">Back to top ↑</a>
   </div>
 
   <div class="legal">
@@ -53,96 +60,111 @@
   .site-foot {
     max-width: 430px;
     margin: 0 auto;
-    padding: 20px var(--site-gutter) var(--site-gutter);
+    padding: 42px 12px 12px;
+    background: #000;
   }
 
-  .grid {
-    container-type: inline-size;
+  .top {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    column-gap: var(--site-gutter);
-    margin-top: 48px;
+    column-gap: 12px;
   }
 
-  .site-ready {
+  .ready {
     grid-column: 1 / -1;
     font-size: 37px;
-    line-height: 1;
+    line-height: 37px;
     letter-spacing: -0.04em;
   }
 
-  .site-ready h2 {
-    margin: 0;
+  .ready h2 {
     font: inherit;
     color: #fff;
   }
 
-  .site-ready a {
+  .ready a {
     display: block;
-    margin-top: 0;
+    margin-top: 1px;
   }
 
-  .site-ready span {
+  .ready span {
     display: inline-block;
     border-bottom: 2px solid var(--site-ink);
   }
 
-  .cols {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: subgrid;
-    margin-top: 53.4px;
-  }
-
-  .site-col {
+  .col {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
+    margin-top: 78px;
   }
 
-  .site-col a,
+  .col p {
+    margin-bottom: 18px;
+  }
+
+  .col a,
   .to-top,
   .legal a {
     padding-bottom: 2px;
   }
 
-  .site-col p {
-    margin-bottom: 18px;
+  .icons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .icons a {
+    padding: 0;
+  }
+
+  .icons :global(svg) {
+    display: block;
+    width: 20px;
+    height: 20px;
+    color: var(--site-ink);
+  }
+
+  .mark-box {
+    container-type: inline-size;
+    margin-top: 151px;
   }
 
   .mark {
-    grid-column: 1 / -1;
-    margin: 120px 0 0;
+    height: 53.72cqw;
+    color: #ff5100;
     font-family: 'DM Sans', sans-serif;
     font-variation-settings: normal;
-    color: var(--site-accent);
-    font-size: 46.5cqw;
-    line-height: 36cqw;
-    letter-spacing: -0.08em;
+    font-size: 42.474cqw;
+    line-height: 53.72cqw;
+    letter-spacing: -0.05em;
+    text-align: center;
+    white-space: nowrap;
   }
 
   .base {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: subgrid;
-    align-items: end;
-    margin-top: 40px;
-  }
-
-  .to-top {
-    grid-column: 2;
-    grid-row: 1;
-    text-align: right;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 39px;
   }
 
   .copy {
-    grid-column: 1;
-    grid-row: 1;
+    max-width: 177px;
+  }
+
+  .rights > span {
+    display: block;
+    color: #fff;
+  }
+
+  .made {
+    display: block;
   }
 
   .legal {
-    margin-top: 40px;
+    margin-top: 39px;
     opacity: 0.5;
   }
 
@@ -154,51 +176,141 @@
   }
 
   .notice {
-    margin-top: 40px;
+    margin-top: 42px;
     font-size: 12px;
-    line-height: 1;
+    line-height: 12px;
     opacity: 0.5;
   }
 
   @media (min-width: 1200px) {
     .site-foot {
-      max-width: 1500px;
+      width: min(1100px, 100% - 0px);
+      max-width: none;
+      padding: 41px 20px 20px;
     }
 
-    .site-ready {
+    .top {
+      grid-template-columns: 520px 160px 1fr;
+      column-gap: 20px;
+    }
+
+    .ready {
       grid-column: 1;
       font-size: 58px;
+      line-height: 58px;
     }
 
-    .site-ready a {
-      margin-top: 7px;
+    .ready a {
+      margin-top: 8px;
     }
 
-    .cols {
-      grid-column: 2;
-      grid-row: 1;
-      grid-template-columns: 1fr 1fr 1fr;
-      column-gap: var(--site-gutter);
-      margin-top: 18px;
+    .ready span {
+      border-bottom-width: 3px;
     }
 
-    .mark {
-      grid-column: 1 / -1;
-      grid-row: 2;
-      margin-top: 100px;
-      font-size: 43.4cqw;
-      line-height: 34cqw;
-      letter-spacing: -0.05em;
+    .col {
+      margin-top: 3px;
+      gap: 7px;
     }
 
-    .base {
-      grid-column: 1 / -1;
-      grid-row: 3;
-      margin-top: 60px;
+    .col p {
+      margin-bottom: 17px;
     }
 
     .copy {
-      white-space: nowrap;
+      max-width: none;
+    }
+
+    .rights > span {
+      display: inline;
+      color: inherit;
+    }
+
+    .notice {
+      margin-top: 24px;
+    }
+
+    .mark-box {
+      margin-top: 150px;
+    }
+
+    .base {
+      margin-top: 24px;
+    }
+
+    .mark {
+      height: 51.04cqw;
+      line-height: 51.04cqw;
+    }
+
+    .legal {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+    }
+
+    .legal nav {
+      margin-top: 0;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .site-foot {
+      max-width: 810px;
+      padding: 41px 16px 16px;
+    }
+
+    .top {
+      grid-template-columns: 379px 178px 1fr;
+      column-gap: 20px;
+    }
+
+    .ready {
+      grid-column: 1;
+      font-size: 46px;
+      line-height: 46px;
+    }
+
+    .ready a {
+      margin-top: 8px;
+    }
+
+    .col {
+      margin-top: -1px;
+    }
+
+    .col p {
+      margin-bottom: 18px;
+    }
+
+    .mark-box {
+      margin-top: 152px;
+    }
+
+    .mark {
+      height: 51.04cqw;
+      line-height: 51.04cqw;
+    }
+
+    .base {
+      margin-top: 21px;
+    }
+
+    .copy {
+      max-width: 379px;
+    }
+
+    .rights > span {
+      color: inherit;
+    }
+
+    .made {
+      font-size: 16px;
+      line-height: 19.2px;
+    }
+
+    .made > span {
+      display: block;
     }
 
     .legal {
@@ -209,10 +321,13 @@
     }
 
     .legal nav {
+      justify-content: flex-end;
+      max-width: 561px;
       margin-top: 0;
     }
 
     .notice {
+      max-width: 745px;
       margin-top: 24px;
     }
   }

@@ -74,6 +74,7 @@ import type { MotionNode } from '$lib/canvas/motion-node';
 import { createRenderLink } from './render-link';
 import { frameMover } from './move-element';
 import { exportStill } from './still-export';
+import { watermarked } from '$lib/server/export-watermark';
 import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
@@ -271,7 +272,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
         return { ok: false, error: 'this turn has unsaved edits: the batch renders the saved video, so finish the turn and run render_batch in the next one' };
       }
       const renderAssets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId }, SIGNED_URL_TTL_S.render);
-      const made = rowRequests(head, rows, { tokens, assets: assetUrls(renderAssets) }, settingsOf(Preset.Social));
+      const made = rowRequests({ version: head.version, doc: await watermarked(db, orgId, head.doc) }, rows, { tokens, assets: assetUrls(renderAssets) }, settingsOf(Preset.Social));
       if (!made.ok) {
         return made;
       }

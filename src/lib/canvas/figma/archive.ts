@@ -1,3 +1,4 @@
+import type { CapturedMotion } from './captured-motion';
 import { inflateSync } from 'fflate';
 import { decompress } from 'fzstd';
 import { compileSchema, decodeBinarySchema } from 'kiwi-schema';
@@ -91,6 +92,7 @@ export type FigmaRawNode = {
   symbolData?: { symbolID?: Guid; symbolOverrides?: NodePatch[] };
   codeComponent?: CodeComponent;
   behaviour?: ClipBehaviour;
+  motion?: CapturedMotion;
   derivedSymbolData?: NodePatch[];
 };
 

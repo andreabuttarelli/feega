@@ -87,6 +87,8 @@ import { figmaFramesOf, importFigmaInto } from '$lib/server/figma/canvas-import'
 import { MAX_FRAMES } from '$lib/server/figma/import-file';
 import { importUrlInto } from '$lib/server/url-import/canvas-import';
 import { viewsOf } from '$lib/server/url-import/page-views';
+import { insertComponentInto } from '$lib/server/registry-components/insert-component';
+import { findComponents } from '$lib/server/registry-components/find-components';
 import { sectioningOf, tokeningOf } from '$lib/server/url-import/url-doc';
 import { importCodeInto } from '$lib/server/code-import/canvas-import';
 import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
@@ -276,6 +278,20 @@ const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(30
 const importUrlInput = z
   .object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite(), sections: z.boolean().default(true).describe('split the page into named section frames (Nav, Hero, Features, Footer…); false keeps one layer tree'), tokens: z.boolean().default(true).describe('turn the page colours, type, effects, radii and spacing into shared variables and styles bound to its layers; false keeps raw values'), breakpoints: z.boolean().default(true).describe('also read the page at tablet (768) and phone (390) width and add them to the frame as breakpoints, each view drawn as the page is at that width; false reads the desktop width only, faster, and keeps section frames') })
   .strict();
+
+const insertComponentInput = z
+  .object({
+    canvasId: z.string(),
+    registryUrl: z.string().max(2000).describe('a shadcn registry item JSON URL (shadcn/ui, Magic UI, Origin UI…), from find_components'),
+    props: z.record(z.string(), z.unknown()).optional().describe('props passed to the component: texts, images, colours'),
+    x: z.number().finite().describe('canvas x of a new frame; with frameId, 0–1 across that frame'),
+    y: z.number().finite().describe('canvas y of a new frame; with frameId, 0–1 down that frame'),
+    frameId: z.string().optional().describe('an existing Frame node to land the component in, instead of drawing a new frame'),
+    parentId: z.string().optional().describe('with frameId: the stack or group clip inside that frame to land it in')
+  })
+  .strict();
+
+const findComponentsInput = z.object({ query: z.string().max(200).describe('words matched against component names, e.g. "button" or "bento"') }).strict();
 
 const drawFrameInput = z
   .object({
@@ -1030,6 +1046,18 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: importUrlInput,
     run: async (ctx, input) => importUrlInto(figmaScope(ctx), input.canvasId, { url: input.url, at: { x: input.x, y: input.y }, shape: { sectioning: sectioningOf(input.sections), tokening: tokeningOf(input.tokens) }, views: viewsOf(input.breakpoints) })
+  }),
+
+  insert_component: op({
+    access: Access.Write,
+    input: insertComponentInput,
+    run: async (ctx, input) => insertComponentInto(figmaScope(ctx), input.canvasId, { registryUrl: input.registryUrl, props: input.props, at: { x: input.x, y: input.y }, into: input.frameId ? { frameId: input.frameId, parentId: input.parentId, at: { x: input.x, y: input.y } } : undefined })
+  }),
+
+  find_components: op({
+    access: Access.Read,
+    input: findComponentsInput,
+    run: async (_ctx, input) => ({ components: await findComponents(input.query) })
   }),
 
   import_code: op({

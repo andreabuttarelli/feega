@@ -99,6 +99,26 @@ describe('a page becomes a frame that looks like the page', () => {
     ]);
   });
 
+  it('a block a CSS animation moves keeps moving: its keyframes come in and the frame plays instead of holding a still (Magic UI marquee froze)', () => {
+    const motion = { durationMs: 1000, delayMs: 0, loop: true, samples: [{ at: 0, dx: 0, dy: 0, rotate: 0, scale: 1, opacity: 1 }, { at: 1, dx: -200, dy: 0, rotate: 0, scale: 1, opacity: 1 }] };
+    const row = rect([{ type: 'SOLID', color: BLACK }], { x: 100, y: 100, width: 400, height: 100 }, { name: 'marquee', motion });
+    const doc = docOf(pageOf([row]));
+    const clip = clipsOf(doc).find((c) => c.name === 'marquee')!;
+
+    expect(clip.keyframes.x?.length).toBeGreaterThan(2);
+    expect(doc.still).toBeUndefined();
+    expect(docOf(pageOf([rect([{ type: 'SOLID', color: BLACK }])])).still).toBeDefined();
+  });
+
+  it('an underlined link inside a sentence stays underlined, the rest of the sentence does not (shadcn login: "Sign up" lost its underline)', () => {
+    const linked = text('Have one? Sign up', { characterStyleOverrides: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1], styleOverrideTable: { 1: { textDecoration: 'UNDERLINE' } } });
+    const clip = clipsOf(docOf(pageOf([linked]))).find((c) => c.props.text === 'Have one? Sign up')!;
+    const runs = clip.props.runs as { start: number; end: number; underline?: boolean }[];
+
+    expect(clip.props.decoration ?? 'none').toBe('none');
+    expect(runs.map((r) => [r.start, r.end, r.underline])).toEqual([[10, 17, true]]);
+  });
+
   it('a half see-through block in auto layout shows its contents half see-through, not a quarter (framer: faded cards came in twice as faded)', () => {
     const flow = { layoutMode: 'VERTICAL', itemSpacing: 0, paddingTop: 20, paddingRight: 20, paddingBottom: 20, paddingLeft: 20, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', primaryAxisSizingMode: 'FIXED', counterAxisSizingMode: 'FIXED' };
     const block = (extra: Partial<RestNode>): RestNode => ({ id: id(), type: 'FRAME', name: 'block', opacity: 0.5, absoluteBoundingBox: { x: 100, y: 100, width: 200, height: 200 }, fills: [{ type: 'SOLID', color: BLACK }], ...extra, children: [{ id: id(), type: 'FRAME', name: 'inner', absoluteBoundingBox: { x: 120, y: 120, width: 100, height: 100 }, fills: [{ type: 'SOLID', color: WHITE }], clipsContent: false, children: [] }] });

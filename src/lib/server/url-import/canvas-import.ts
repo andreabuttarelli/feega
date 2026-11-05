@@ -63,7 +63,7 @@ async function shapeFor(scope: UrlScope, url: string, shape: PageShape | undefin
   return brand ? { ...shape, brand } : shape;
 }
 
-export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape; views?: PageView[] }): Promise<UrlImported> {
+export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { url: string; at: { x: number; y: number }; maxHeight?: number; shape?: PageShape; views?: PageView[]; guard?: (url: URL) => Promise<void> }): Promise<UrlImported> {
   if (!limiter.allow(scope.userId)) {
     return { outcome: UrlImportOutcome.RateLimited };
   }
@@ -75,7 +75,7 @@ export async function importUrlInto(scope: UrlScope, canvasId: string, ask: { ur
     store,
     place: { projectId: scope.projectId, canvasId },
     open: liveBrowser({ orgId: scope.orgId, userId: scope.userId, projectId: scope.projectId }),
-    guard: (url) => assertPublicUrl(url),
+    guard: ask.guard ?? ((url) => assertPublicUrl(url)),
     ...pageAssets(scope),
     components: () => componentsPage(scope.db, scope),
     newId: () => crypto.randomUUID().slice(0, 8)

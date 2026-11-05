@@ -177,6 +177,22 @@ function withCtas(clusters: Cluster[], ctas: CtaUse[], brand: SiteBrand | undefi
   return clusters;
 }
 
+const CONTRAST_PAIRS: { strong: string; quiet: string; against: string }[] = [{ strong: 'Text', quiet: 'Text muted', against: 'Background' }];
+
+function contrastOrdered(named: ColourToken[]): void {
+  for (const pair of CONTRAST_PAIRS) {
+    const [strong, quiet, against] = [pair.strong, pair.quiet, pair.against].map((name) => named.find((t) => t.name === name));
+    if (!strong || !quiet || !against) {
+      continue;
+    }
+
+    const away = (t: ColourToken) => Math.abs(labOf(t.hex)[0] - labOf(against.hex)[0]);
+    if (away(quiet) > away(strong)) {
+      [strong.name, quiet.name] = [quiet.name, strong.name];
+    }
+  }
+}
+
 function coloursOf(uses: ColourUse[], ctas: CtaUse[], brand: SiteBrand | undefined): ColourToken[] {
   const clusters = withCtas(clustersOf(uses), ctas, brand);
   const claimed = new Map<Cluster, Set<ColourPaint>>(clusters.map((c) => [c, new Set()]));
@@ -190,6 +206,7 @@ function coloursOf(uses: ColourUse[], ctas: CtaUse[], brand: SiteBrand | undefin
     role.paints.forEach((p) => claimed.get(best.c)!.add(p));
     named.push({ name: role.name, hex: pulledToBrand(best.c, brand), members: [...best.c.members.keys()].sort(), paints: role.paints });
   }
+  contrastOrdered(named);
   const extras = clusters.filter((c) => claimed.get(c)!.size === 0 && c.uses >= MIN_USES).sort((a, b) => b.uses - a.uses);
   for (const c of extras.slice(0, Math.max(0, MAX_COLOURS - named.length))) {
     named.push({ name: unique(extraName(c), named.map((t) => t.name)), hex: pulledToBrand(c, brand), members: [...c.members.keys()].sort(), paints: ALL_PAINTS });

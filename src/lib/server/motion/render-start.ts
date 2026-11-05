@@ -3,6 +3,7 @@ import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { clipsOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { RenderSettings } from '$lib/motion/export-formats';
 import { SERVER_RENDER_UNAVAILABLE, serverRenderOpen } from '$lib/motion/server-render';
+import { watermarked } from '$lib/server/export-watermark';
 import { assetUrls, motionAssets, motionTokens } from './editor';
 import { analyzeSounds, storageAnalysis } from './audio-analysis';
 import { motionRenderFarm, motionRenderStorage } from './renderer';
@@ -23,7 +24,8 @@ export async function startFarmRender(db: Db, input: FarmStart): Promise<RenderS
   ]);
   const soundIds = clipsOf(input.head.doc).map((c) => String(c.props.assetId ?? ''));
   const analyses = await analyzeSounds(storageAnalysis(db), { orgId: input.orgId, projectId: input.projectId }, assets, soundIds);
-  const req = renderRequest(input.head.version, { doc: input.head.doc, tokens, assets: assetUrls(assets), analyses }, input.settings);
+  const doc = await watermarked(db, input.orgId, input.head.doc);
+  const req = renderRequest(input.head.version, { doc, tokens, assets: assetUrls(assets), analyses }, input.settings);
 
   const renderScope = { orgId: input.orgId, nodeId: input.nodeId, projectId: input.projectId, userId: input.userId, editorUrl: input.editorUrl };
   return startRender(db, motionRenderFarm(), renderScope, req, motionRenderStorage());

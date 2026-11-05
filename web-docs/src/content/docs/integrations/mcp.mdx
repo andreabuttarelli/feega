@@ -97,6 +97,18 @@ A session lists 10 core tools (`query`, `view`, `edit`, `describe`, `render_vide
 
 The whole surface: [MCP tools](/reference/generated/mcp-tools/) and [Edit ops](/reference/generated/edit-ops/). Never guess an org or project id: read it with `query` first.
 
+## Edit what you read, not what changed since
+
+`view` `get` on a frame returns its `revision`. Pass it as `version` on every `edit` step for that frame.
+
+| Since your read | Result |
+|---|---|
+| Nothing changed | The edit lands. |
+| A person changed other elements | The edit lands on top of their changes. |
+| A person changed an element you edit | `409` with `changed`: each element id and its current value. Nothing is written. |
+
+On a `409`, `view` the frame again and redo the edit on what is there now. Without `version` the edit applies to the latest revision unchecked.
+
 ## Know what "this" means: get_selection
 
 <DemoVideo name="get-selection" caption="Select two nodes in the app, then ask the CLI what is selected." />

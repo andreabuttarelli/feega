@@ -15,7 +15,7 @@ const step = z.object({
   target: z.string().optional().describe('Id of the node or frame the op acts on.'),
   element: z.string().optional().describe('Id of an element inside the target frame.'),
   input: z.record(z.string(), z.unknown()).optional(),
-  version: z.number().int().min(0).optional().describe('Frame revision you read; a stale one is refused with 409.')
+  version: z.number().int().min(0).optional().describe('The frame `revision` from `view` get. An edit on an element a person changed since then is refused with 409 and `changed` (ids and current values): view again, then redo it.')
 });
 
 type Frame = { time: number; mime: string; data: string };
@@ -61,7 +61,7 @@ export function registerEditTools(server: McpServer, surface: ToolSurface) {
         'Op "describe": {} gives the three families (canvas|frame|editor) with counts; {family} its op names, access (read|write|spend|editor) and one line; {op} or {ops:[...]} strict JSON input schemas. ' +
         'One op: {op, target?, element?, input?, version?, project_id?}. `target` = the node or frame id the op acts on (a frame op requires it); `element` = an element id inside that frame; they fill the id fields of the op\'s input (nodeId, frameId, elementId, clip_id, clip_ids) unless you set them. `project_id` is needed by a canvas op without a `target`. ' +
         'Batch: op "batch" with `ops:[{op,target?,element?,input?},...]` (up to 500), canvas and frame ops mixed, run in order. Consecutive ops on the same frame are ONE revision, all or none. Across steps nothing is atomic: it stops at the first failure and answers `applied` (steps done), `failed` (index) and each step\'s result; earlier steps stay. A later step cannot use an id created by an earlier one: create first, then batch. ' +
-        'In a frame: element ids come from `view` canvas_summary/get; move or restyle with set_props/set_transform; `version` refuses a stale write. Free canvas element or node: move_node, resize_node, rename_node, update_node, delete_node. Between frames: move_frame_element. ' +
+        'In a frame: element ids come from `view` canvas_summary/get; move or restyle with set_props/set_transform; pass `version` = the frame `revision` you read: an edit on elements a person changed since is refused with `changed`, edits elsewhere land. Free canvas element or node: move_node, resize_node, rename_node, update_node, delete_node. Between frames: move_frame_element. ' +
         'Names shared by two registries: the canvas op keeps the name, the frame tool becomes `frame_<name>`, the editor action `editor_<name>` (e.g. list_templates = canvas, frame_list_templates). ' +
         'Access in describe: read and write are free, spend costs credits (run_node, generate_voiceover), editor needs a chat turn in the app (recreate_ui, add_music). Errors answer the reason, with `fix` when known.',
       inputSchema: z.object({ org, project_id: z.string().optional(), verbose: z.boolean().optional().describe('Whole documents back, not ids and changed fields.'), ops: z.array(step).max(500).optional() }).extend(step.shape).partial({ op: true }),

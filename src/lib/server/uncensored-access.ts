@@ -1,11 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isOrgOwner } from './org-billing';
-
-export enum BillingTier {
-  Free = 'free',
-  Paid = 'paid'
-}
+import { BillingTier, billingTierOf } from './billing-tier';
 
 export const UNCENSORED_ENTITLEMENT: Readonly<Record<BillingTier, boolean>> = {
   [BillingTier.Free]: false,
@@ -31,11 +27,6 @@ function untyped(db: Db): SupabaseClient {
   return db as unknown as SupabaseClient;
 }
 
-async function tierOf(db: Db, orgId: string): Promise<BillingTier> {
-  const { data } = await untyped(db).from('orgs').select('id, stripe_subscription_id').eq('id', orgId).maybeSingle();
-  return (data as { stripe_subscription_id?: string | null } | null)?.stripe_subscription_id ? BillingTier.Paid : BillingTier.Free;
-}
-
 async function activeOptIn(db: Db, orgId: string): Promise<OptInRow | null> {
   const { data } = await untyped(db)
     .from('org_uncensored_optins')
@@ -47,7 +38,7 @@ async function activeOptIn(db: Db, orgId: string): Promise<OptInRow | null> {
 }
 
 export async function uncensoredAccess(db: Db, orgId: string): Promise<UncensoredAccess> {
-  const [tier, optIn] = await Promise.all([tierOf(db, orgId), activeOptIn(db, orgId)]);
+  const [tier, optIn] = await Promise.all([billingTierOf(db, orgId), activeOptIn(db, orgId)]);
   const entitled = UNCENSORED_ENTITLEMENT[tier];
   const recorded = optIn ? { enabledBy: optIn.enabled_by, enabledAt: optIn.enabled_at } : null;
 
@@ -72,7 +63,7 @@ export async function enableUncensored(
   if (!(await isOrgOwner(untyped(db), input.orgId, input.userId))) {
     return { ok: false, error: 'owner_only' };
   }
-  if (!UNCENSORED_ENTITLEMENT[await tierOf(db, input.orgId)]) {
+  if (!UNCENSORED_ENTITLEMENT[await billingTierOf(db, input.orgId)]) {
     return { ok: false, error: 'plan_not_entitled' };
   }
 

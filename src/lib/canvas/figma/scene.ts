@@ -1,3 +1,4 @@
+import type { CapturedMotion } from './captured-motion';
 import { BLEND_MODES, BlendMode } from '@feega/motion-core/motion/blend';
 import { TextSizing } from '@feega/motion-core/motion/text-sizing';
 import type { ClipBehaviour, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, NodePatch, Paint, Rgba, Vec } from './archive';
@@ -83,7 +84,7 @@ export type Padding = { top: number; right: number; bottom: number; left: number
 export type AutoLayout = { flow: Flow; wrap: boolean; gap: number; crossGap: number; padding: Padding; justify: Justify; align: Cross; width: Fit; height: Fit };
 export type ChildItem = { grow: boolean; stretch: boolean; absolute: boolean; maxWidth?: number };
 
-export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number };
+export type TextRun = { start: number; end: number; font?: string; weight?: number; size?: number; color?: string; italic?: boolean; tracking?: number; underline?: boolean; strike?: boolean };
 
 export enum MaskBand {
   Solid = 'solid',
@@ -92,7 +93,7 @@ export enum MaskBand {
 
 export type LayerMask = { band: MaskBand; x: number; y: number; length: number; span: number; rotation: number; opacity: number };
 
-type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[]; ref?: string; behaviour?: ClipBehaviour };
+type Common = { name: string; box: Box; rotation: number; opacity: number; effects: LayerEffect[]; item: ChildItem; hidden: boolean; blend: BlendMode; masks: LayerMask[]; ref?: string; behaviour?: ClipBehaviour; motion?: CapturedMotion };
 
 export type ComponentRef = { key: string; name: string; inPaste: boolean; variant?: Record<string, string>; texts?: Record<string, string> };
 
@@ -186,6 +187,8 @@ const WEIGHTS: [RegExp, number][] = [
 const REGULAR = 400;
 
 const DECORATION: Record<string, Decoration> = { UNDERLINE: Decoration.Underline, STRIKETHROUGH: Decoration.Strikethrough };
+
+const RUN_DECORATION: Record<Decoration, Pick<TextRun, 'underline' | 'strike'>> = { [Decoration.None]: {}, [Decoration.Underline]: { underline: true }, [Decoration.Strikethrough]: { strike: true } };
 
 const ALIGN: Record<string, TextLayer['align']> = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'justify' };
 
@@ -454,6 +457,7 @@ function runsOf(n: FigmaRawNode, base: { font: string; weight: number; size: num
       if (style.letterSpacing && Math.abs(spacing - spacingPx(n.letterSpacing, base.size)) > SPACING_STEP) {
         run.tracking = spacing / size;
       }
+      Object.assign(run, RUN_DECORATION[DECORATION[style.textDecoration ?? ''] ?? Decoration.None]);
       if (Object.keys(run).length > 2) {
         runs.push(run);
       }
@@ -593,7 +597,7 @@ function masksOf(gradient: FigmaRawNode['maskGradient'], box: Box): LayerMask[] 
 }
 
 function common(n: FigmaRawNode, m: Matrix, ctx: Ctx): Common {
-  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true, blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })), ...(n.ref ? { ref: n.ref } : {}), ...(n.behaviour ? { behaviour: n.behaviour } : {}) };
+  return { name: n.name ?? n.type ?? '', box: boxOf(m, n.size ?? { x: 0, y: 0 }), rotation: rotationOf(m), opacity: round(n.opacity ?? 1), effects: effectsOf(n, ctx.report), item: itemOf(n), hidden: n.collapsed === true, blend: blendOf(n.blendMode), masks: masksOf(n.maskGradient, boxOf(m, n.size ?? { x: 0, y: 0 })), ...(n.ref ? { ref: n.ref } : {}), ...(n.behaviour ? { behaviour: n.behaviour } : {}), ...(n.motion ? { motion: n.motion } : {}) };
 }
 
 const DEFAULT_TEXT_SIZE = 12;

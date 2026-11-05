@@ -30,6 +30,12 @@ describe('page tokens', () => {
     expect(names(PAGE)).toEqual({ Background: '#ffffff', Surface: '#f6f9fc', Text: '#061b31', 'Text muted': '#50617a', Primary: '#533afd', Border: '#e5edf5', Accent: '#ff6118' });
   });
 
+  it('the text colour further from the background is Text, the closer one Text muted, even when the grey covers more (shadcn login: the title was bound to Text muted)', () => {
+    const form: Samples = { ...EMPTY, colours: [colour('#ffffff', ColourPaint.Fill, 1_000_000), colour('#737373', ColourPaint.Text, 900), colour('#0a0a0a', ColourPaint.Text, 400)] };
+
+    expect(names(form)).toMatchObject({ Text: '#0a0a0a', 'Text muted': '#737373' });
+  });
+
   it('a very dark tint is named Navy or Ink, a very light one Tint, never by its hue', () => {
     const twice = (hex: string) => [colour(hex, ColourPaint.Fill, 20), colour(hex, ColourPaint.Fill, 20)];
     const found = names({ ...PAGE, colours: [...PAGE.colours, ...twice('#0a2540'), ...twice('#1f0a40'), ...twice('#bcd2ff')] });

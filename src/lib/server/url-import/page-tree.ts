@@ -1,5 +1,6 @@
 import { DESIGN_MAX_SIDE } from '@feega/motion-core/motion/doc';
 import type { RestColor, RestNode, RestPaint } from '$lib/server/figma/rest-message';
+import type { CapturedMotion } from '$lib/canvas/figma/captured-motion';
 import { pageKit, type KitMatrix, type KitRect, type PageKit } from './page-kit';
 import { OUTLINE_LIMITS, pageOutlineOf, type PageOutline } from './page-outline';
 import { PATTERN_LIMITS, pagePatterns, type PagePattern, type PatternKit } from './page-patterns';
@@ -38,6 +39,10 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   const SVG_RASTER = 'mask, filter, pattern, image, foreignObject, textPath, feImage';
   const SHAPES = /^(path|rect|circle|ellipse|line|polyline|polygon)$/;
   const FIELDS = /^(text|email|search|url|tel|number|password|)$/;
+  const DECORATION_LINES = [
+    { css: 'underline', figma: 'UNDERLINE' },
+    { css: 'line-through', figma: 'STRIKETHROUGH' }
+  ];
   const TEXT_ALIGN: Record<string, string> = { center: 'CENTER', right: 'RIGHT', end: 'RIGHT', justify: 'JUSTIFIED' };
   const ALIGN: Record<string, string> = { center: 'CENTER', 'flex-end': 'MAX', end: 'MAX', right: 'MAX', 'space-between': 'SPACE_BETWEEN' };
   const FIT: Record<string, string> = { cover: 'FILL', contain: 'FIT', fill: 'STRETCH', 'scale-down': 'FIT', none: 'FIT' };
@@ -391,11 +396,16 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   type Seg = { node: Text | null; css: CSSStyleDeclaration; fills: RestPaint[] | null; br: boolean; lead?: number; trail?: number; host?: Element };
   type Char = { c: string; seg: number; node: Text | null; at: number; extra?: number };
 
+  const decorationOf = (css: CSSStyleDeclaration) => {
+    const line = DECORATION_LINES.find((d) => css.textDecorationLine.includes(d.css));
+    return line ? { textDecoration: line.figma } : {};
+  };
   const styleOf = (seg: Seg, scale: number) => ({
     fontFamily: familyOf(seg.css.fontFamily),
     fontWeight: Number(seg.css.fontWeight) || 400,
     italic: seg.css.fontStyle === 'italic' || seg.css.fontStyle.startsWith('oblique'),
-    fontSize: round(px(seg.css.fontSize) * scale)
+    fontSize: round(px(seg.css.fontSize) * scale),
+    ...decorationOf(seg.css)
   });
   const segFills = (seg: Seg) => {
     if (seg.fills) {
@@ -553,8 +563,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
         letterSpacing: base.css.letterSpacing === 'normal' ? 0 : px(base.css.letterSpacing) * ctx.scale,
         ...tuning(base.css, fontSize),
         lineHeightUnit: 'PIXELS',
-        lineHeightPx: round(lineHeight),
-        ...(/underline|line-through/.test(base.css.textDecorationLine) ? { textDecoration: base.css.textDecorationLine.includes('underline') ? 'UNDERLINE' : 'STRIKETHROUGH' } : {})
+        lineHeightPx: round(lineHeight)
       },
       ...(styleIds.size ? { characterStyleOverrides: overrides, styleOverrideTable: table } : {})
     };
@@ -933,7 +942,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     const line = css.lineHeight === 'normal' ? size * 1.2 : px(css.lineHeight);
     const inner = { x: r.x + px(css.borderLeftWidth) + px(css.paddingLeft), width: r.width - px(css.borderLeftWidth) - px(css.borderRightWidth) - px(css.paddingLeft) - px(css.paddingRight) };
     const top = el instanceof HTMLTextAreaElement ? r.y + px(css.borderTopWidth) + px(css.paddingTop) : r.y + (r.height - line) / 2;
-    return { id: id(), type: 'TEXT', name: text.slice(0, 40), characters: text.slice(0, limits.text), absoluteBoundingBox: box({ x: inner.x, y: top, width: Math.max(1, inner.width), height: line }), fills: solid(look.color), ...(el instanceof HTMLTextAreaElement ? { textAutoResize: 'HEIGHT' } : {}), style: { fontFamily: familyOf(css.fontFamily), fontWeight: Number(css.fontWeight) || 400, italic: css.fontStyle === 'italic', fontSize: round(size), textAlignHorizontal: TEXT_ALIGN[css.textAlign] ?? 'LEFT', letterSpacing: css.letterSpacing === 'normal' ? 0 : px(css.letterSpacing), lineHeightUnit: 'PIXELS', lineHeightPx: round(line) } };
+    return { id: id(), type: 'TEXT', name: text.slice(0, 40), characters: text.slice(0, limits.text), absoluteBoundingBox: box({ x: inner.x, y: top, width: Math.max(1, inner.width), height: line }), fills: solid(look.color), textAutoResize: 'HEIGHT', style: { fontFamily: familyOf(css.fontFamily), fontWeight: Number(css.fontWeight) || 400, italic: css.fontStyle === 'italic', fontSize: round(size), textAlignHorizontal: TEXT_ALIGN[css.textAlign] ?? 'LEFT', letterSpacing: css.letterSpacing === 'normal' ? 0 : px(css.letterSpacing), lineHeightUnit: 'PIXELS', lineHeightPx: round(line) } };
   };
 
   const flowOf = (css: CSSStyleDeclaration, r: Rect, kids: RestNode[]): Partial<RestNode> => {
@@ -1207,6 +1216,41 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     return Boolean(b) && Math.abs(b!.x - r.x) <= EXACT && Math.abs(b!.y - r.y) <= EXACT && Math.abs(b!.width - r.width) <= EXACT && Math.abs(b!.height - r.height) <= EXACT;
   };
 
+  const MOTION_SAMPLES = 12;
+  const CYCLE_END = 0.9999;
+  const DEGREES = 180 / Math.PI;
+  const placedAt = (el: Element) => {
+    const css = getComputedStyle(el);
+    const m = new DOMMatrixReadOnly(css.transform === 'none' ? undefined : css.transform);
+    const [tx, ty] = css.translate === 'none' ? [0, 0] : css.translate.split(' ').map((v) => parseFloat(v) || 0);
+    return { x: m.e + tx, y: m.f + (ty ?? 0), rotate: Math.atan2(m.b, m.a) * DEGREES + (parseFloat(css.rotate) || 0), scale: Math.hypot(m.a, m.b) * (css.scale === 'none' ? 1 : parseFloat(css.scale) || 1), opacity: Number(css.opacity) };
+  };
+  function motionsRead(): Map<Element, CapturedMotion> {
+    const read = new Map<Element, CapturedMotion>();
+    for (const animation of document.getAnimations()) {
+      const effect = animation.effect as KeyframeEffect | null;
+      const target = effect?.target;
+      const timing = effect?.getComputedTiming();
+      const duration = Number(timing?.duration);
+      if (!target || !timing || effect!.pseudoElement || read.has(target) || !(duration > 0)) {
+        continue;
+      }
+
+      const was = animation.currentTime;
+      animation.pause();
+      const base = placedAt(target);
+      const delay = Number(timing.delay) || 0;
+      const samples = Array.from({ length: MOTION_SAMPLES + 1 }, (_, i) => {
+        animation.currentTime = delay + duration * Math.min(i / MOTION_SAMPLES, CYCLE_END);
+        const now = placedAt(target);
+        return { at: i / MOTION_SAMPLES, dx: now.x - base.x, dy: now.y - base.y, rotate: now.rotate - base.rotate, scale: base.scale ? now.scale / base.scale : 1, opacity: now.opacity };
+      });
+      animation.currentTime = was;
+      read.set(target, { durationMs: duration, delayMs: delay, loop: timing.iterations === Infinity, samples });
+    }
+    return read;
+  }
+
   const stamped = (el: Element, made: RestNode[]): RestNode[] => {
     const hover = hovered.get(el);
     if (hover && made.length === 1) {
@@ -1214,7 +1258,8 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     }
     const pattern = el.getAttribute(limits.patternAttr);
     const go = el.getAttribute(limits.goAttr);
-    if ((pattern === null && go === null) || !made.length) {
+    const motion = moving.get(el);
+    if ((pattern === null && go === null && !motion) || !made.length) {
       return made;
     }
     const r = pageRect(el.getBoundingClientRect());
@@ -1225,6 +1270,9 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     }
     if (go !== null) {
       one.go = go;
+    }
+    if (motion) {
+      one.motion = motion;
     }
     return [one];
   };
@@ -1347,6 +1395,7 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
   };
 
   const hovered = hovers.read();
+  const moving = motionsRead();
   const found = patterns.found();
   found.forEach((p, i) => p.root.setAttribute(limits.patternAttr, String(i)));
   found.forEach((p) => aimed(p, p.initial));

@@ -33,6 +33,10 @@ describe('creditQuota', () => {
     expect(creditQuota(undefined)).toBe(FREE_CREDITS);
     expect(creditQuota('some-unknown-plan')).toBe(FREE_CREDITS);
   });
+
+  it('gives the free plan no credits', () => {
+    expect(creditQuota(null)).toBe(0);
+  });
 });
 
 describe('currentBillingPeriod', () => {

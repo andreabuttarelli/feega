@@ -32,6 +32,8 @@
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import { Target, composeHtml } from '@feega/motion-core/motion/hyperframes/compose';
+  import { withWatermark } from '@feega/motion-core/motion/watermark';
+  import { ExportMark } from '$lib/motion/export-mark';
   import type { ExportRow } from '$lib/motion/export-rows';
   import type { FrameSource } from '$lib/motion/export/browser-render';
   import { loadScenes, type LoadedScenes } from '$lib/canvas/scene-sources';
@@ -104,7 +106,8 @@
   });
 
   let capture = $state<MotionPreview | null>(null);
-  const captureHtml = $derived(composeHtml({ doc: played(doc), tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen }));
+  const exportDoc = (d: MotionDoc) => (data?.exportMark === ExportMark.Watermarked ? withWatermark(d) : d);
+  const captureHtml = $derived(composeHtml({ doc: played(dialog === FrameDialog.Export ? exportDoc(doc) : doc), tokens, assets: assetUrls, analyses: extras.analyses, liveness: Liveness.Baked, target: Target.Screen }));
 
   $effect(() => {
     if (dialog !== FrameDialog.Export) {
@@ -119,7 +122,10 @@
 
   const sceneOf = (d: MotionDoc) => ({ doc: played(d), tokens, assets: assetUrls, analyses: extras.analyses, compose: (only?: ReadonlySet<string>) => composeOnly(d, only) });
 
-  const framesFor = (d: MotionDoc): FrameSource => (times, size, onFrame, signal) => renderer(times, size, onFrame, signal, composeDraft(d), undefined, RenderEngine.GpuCore, sceneOf(d));
+  const framesFor = (d: MotionDoc): FrameSource => {
+    const shown = exportDoc(d);
+    return (times, size, onFrame, signal) => renderer(times, size, onFrame, signal, composeDraft(shown), undefined, RenderEngine.GpuCore, sceneOf(shown));
+  };
 
   const assetHref = (id: string) => canvasAssetUrl(projectId, canvasId, id, AssetSize.Full);
 
@@ -200,7 +206,7 @@
   <StillExport {doc} docScale={scaleOf(doc, box)} {editorUrl} fileName={data.node.name ?? 'still'} saved={session.saveState === SaveState.Saved} {onclose} />
 {:else if dialog === FrameDialog.Export && data && scenesReady}
   <ExportDialog
-    doc={played(doc)}
+    doc={played(exportDoc(doc))}
     {assetUrls}
     scope={{ orgId: data.orgId, projectId, nodeId }}
     {editorUrl}
