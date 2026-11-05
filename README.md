@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="static/favicon.svg" width="72" alt="feega" />
+  <img src="https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website/Frame%2072.png" width="72" alt="feega" />
 </p>
 
-<h1 align="center">feega</h1>
+<h3 align="center">feega</h3>
+<h1 align="center">The smart canvas for smarter ideas</h1>
 
 <p align="center">
   <a href="https://github.com/andreabuttarelli/feega/stargazers"><img src="https://img.shields.io/github/stars/andreabuttarelli/feega?style=flat&logo=github&logoColor=white&labelColor=131313&color=c485fe" alt="GitHub stars" /></a>
