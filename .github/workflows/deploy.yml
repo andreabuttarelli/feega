@@ -30,6 +30,9 @@ jobs:
           - project: web-blog
             id: prj_BoTkXM9Cx4NCXcjVGfOJMIx5W8iz
             paths: "web-blog"
+          - project: feega-landing
+            id: prj_V7f935RhytdbTUSVjngGIDdVuSJ0
+            paths: "landing src/lib/content/changelog"
     env:
       VERCEL_ORG_ID: team_wWk9EtwETritPiiIdh0CHqua
       VERCEL_PROJECT_ID: ${{ matrix.id }}
