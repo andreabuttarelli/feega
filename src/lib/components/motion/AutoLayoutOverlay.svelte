@@ -7,8 +7,9 @@
   import type { AutoLayout } from '@feega/motion-core/motion/layout/model';
   import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
   import { pastSlop, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
 
-  let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip & { autoLayout: AutoLayout }; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, measure = estimatedText, onchange }: { doc: MotionDoc; clip: MotionClip & { autoLayout: AutoLayout }; measure?: TextMeasure; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const SUMMARY: Record<StripKind, string> = {
     [StripKind.Padding]: 'Changed the padding',
@@ -23,7 +24,7 @@
     const result = live ? setAutoLayout(doc, clip.id, live) : null;
     return result?.ok ? result.doc : doc;
   });
-  const strips = $derived(layoutStrips(shown, clip.id));
+  const strips = $derived(layoutStrips(shown, clip.id, measure));
   const layout = $derived(live ? { ...clip.autoLayout, ...live } : clip.autoLayout);
 
   type Anchor = { x: 'left' | 'right'; y: 'top' | 'bottom'; inset: 'x' | 'y' | null };

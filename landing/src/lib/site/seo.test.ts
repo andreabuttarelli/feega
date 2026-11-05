@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LANDING_PAGES } from './landing';
 import { UPSCALER } from './landing/upscaler';
 import { LEGAL_DOCS } from './legal';
+import { BLOG_INDEX, COMPARISONS } from './compare';
 import { FAQ } from './home';
 import { HOME_META } from './seo';
 import { breadcrumbJsonLd, faqJsonLd, HOME_JSON_LD } from './structured-data';
@@ -15,7 +16,9 @@ const metas = [
   ['home', HOME_META],
   ['upscaler', UPSCALER],
   ...Object.entries(LANDING_PAGES),
-  ...Object.entries(LEGAL_DOCS)
+  ...Object.entries(LEGAL_DOCS),
+  ['blog', BLOG_INDEX],
+  ...Object.entries(COMPARISONS)
 ] as const;
 
 describe('search metadata', () => {
