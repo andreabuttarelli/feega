@@ -1,4 +1,4 @@
-const NEAR_VIEWPORT = '400px';
+const NEAR_VIEWPORT = '200px';
 
 export function lazyPlay(video: HTMLVideoElement) {
   const observer = new IntersectionObserver(

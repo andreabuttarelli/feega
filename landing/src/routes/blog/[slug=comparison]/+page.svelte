@@ -5,7 +5,7 @@
   import { BLOG_PATH, COMPARISONS, comparisonPath } from '$lib/site/compare';
   import { FEEGA_FEATURES, FEEGA_PRICING } from '$lib/site/compare/feega';
   import { FEATURE_LABELS, Feature, type Verdict } from '$lib/site/compare/features';
-  import { breadcrumbJsonLd } from '$lib/site/structured-data';
+  import { articleJsonLd } from '$lib/site/structured-data';
 
   let { data } = $props();
 
@@ -21,7 +21,7 @@
   <meta property="og:description" content={page.description} />
   <meta name="twitter:title" content={page.title} />
   <meta name="twitter:description" content={page.description} />
-  {@html breadcrumbJsonLd(page.heading, comparisonPath(data.slug))}
+  {@html articleJsonLd({ title: page.title, description: page.description, path: comparisonPath(data.slug), checked: page.checked })}
 </svelte:head>
 
 <article class="landing compare">

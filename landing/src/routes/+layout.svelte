@@ -21,7 +21,7 @@
   <link rel="icon" href="/site/favicon.png" />
   <link rel="apple-touch-icon" href="/site/favicon.png" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="feega" />
+  <meta property="og:site_name" content="Feega" />
   {#if crumb}{@html breadcrumbJsonLd(crumb, page.url.pathname)}{/if}
   <meta property="og:url" content={canonical} />
   <meta property="og:image" content={OG_IMAGE} />
