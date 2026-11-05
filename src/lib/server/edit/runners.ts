@@ -121,7 +121,7 @@ export async function runFrameTool(caller: OrgCaller, ask: FrameToolAsk): Promis
 
   const run = await runMotionTool(caller.db, scope, { tool: ask.tool, input: ask.input, version: ask.version });
   if (run.outcome !== ToolRun.Done) {
-    return { status: STATUS_OF[run.outcome], body: { error: run.outcome, detail: run.detail } };
+    return { status: STATUS_OF[run.outcome], body: { error: run.outcome, detail: run.detail, changed: run.changed } };
   }
   const refused = refusalOf(run.output);
   if (refused) {

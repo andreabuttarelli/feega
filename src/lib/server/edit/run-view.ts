@@ -39,7 +39,7 @@ const canvasId = z.string().min(1);
 
 export const VIEW_OPS = {
   [ViewOp.CanvasSummary]: { summary: 'Compact outline of a canvas: every node (id, type, title, place, size, wiring, last run status) and, for each frame, the tree of its elements (id, kind, name, bounds, text).', input: z.object({ canvas_id: canvasId }).strict() },
-  [ViewOp.Get]: { summary: 'Full detail of one node (`id`), or of one element of a frame (`id` = element, `frame_id` = its frame): data, props, transform, keyframes.', input: z.object({ id: z.string().min(1), frame_id: z.string().optional() }).strict() },
+  [ViewOp.Get]: { summary: 'Full detail of one node (`id`), or of one element of a frame (`id` = element, `frame_id` = its frame): data, props, transform, keyframes, and the frame `revision` to pass as `version` on `edit`.', input: z.object({ id: z.string().min(1), frame_id: z.string().optional() }).strict() },
   [ViewOp.Activity]: { summary: 'What is happening on a canvas now: recent structural events (who, what, when), runs still working, and presence.', input: z.object({ canvas_id: canvasId, since: z.string().optional().describe('ISO time; only newer events') }).strict() },
   [ViewOp.Snapshot]: { summary: 'An image of one frame at a time (seconds, default 0), returned as an image. Drawn by the server renderer, or by the remote one when this server has none; a whole canvas, a region or a single element cannot be drawn alone: snapshot their frame.', input: z.object({ node_id: z.string().min(1), element_id: z.string().optional(), canvas_id: z.string().optional(), region: z.unknown().optional(), time: z.number().min(0).optional(), width: z.number().int().min(64).optional() }).strict() },
   [ViewOp.ListHistory]: { summary: 'One timeline of everything that changed a canvas, newest first: structural events, named versions, frame revisions and branches, each on its author lane (a person, the sidebar chat, or an outside agent).', input: z.object({ canvas_id: canvasId, author: z.enum(HistoryFilter).optional().describe('all (default), ai or people'), frame_id: z.string().optional().describe('Only changes to this frame'), limit: z.number().int().min(1).max(200).optional() }).strict() }
@@ -65,10 +65,16 @@ async function openCanvas(caller: OrgCaller, id: string) {
   return found;
 }
 
-async function docsOf(caller: OrgCaller, nodes: { id: string; type: string }[]): Promise<Map<string, MotionDoc>> {
+type FrameHead = { revision: number; doc: MotionDoc };
+
+async function headsOf(caller: OrgCaller, nodes: { id: string; type: string }[]): Promise<Map<string, FrameHead>> {
   const frames = nodes.filter((n) => n.type === MOTION_NODE);
   const heads = await Promise.all(frames.map((n) => readHead(caller.db, { orgId: caller.orgId, nodeId: n.id })));
-  return new Map(frames.flatMap((n, i) => (heads[i] ? [[n.id, heads[i].doc as MotionDoc] as const] : [])));
+  return new Map(frames.flatMap((n, i) => (heads[i] ? [[n.id, { revision: heads[i].version, doc: heads[i].doc as MotionDoc }] as const] : [])));
+}
+
+async function docsOf(caller: OrgCaller, nodes: { id: string; type: string }[]): Promise<Map<string, MotionDoc>> {
+  return new Map([...(await headsOf(caller, nodes))].map(([id, head]) => [id, head.doc]));
 }
 
 async function canvasSummary(caller: OrgCaller, input: { canvas_id: string }): Promise<Answer> {
@@ -87,13 +93,12 @@ async function getOne(caller: OrgCaller, input: { id: string; frame_id?: string 
   if (!node) {
     return refusal(HTTP_NOT_FOUND, 'not_found', { id: nodeId });
   }
+  const head = (await headsOf(caller, [node])).get(node.id);
   if (!input.frame_id) {
-    const doc = node.type === MOTION_NODE ? (await docsOf(caller, [node])).get(node.id) : undefined;
-    return { status: HTTP_OK, body: { node, ...(doc ? { frame: { width: doc.width, height: doc.height }, elements: elementsOf(doc) } : {}) } };
+    return { status: HTTP_OK, body: { node, ...(head ? { revision: head.revision, frame: { width: head.doc.width, height: head.doc.height }, elements: elementsOf(head.doc) } : {}) } };
   }
-  const doc = (await docsOf(caller, [node])).get(node.id);
-  const element = doc ? detailOf(doc, input.id) : null;
-  return element ? { status: HTTP_OK, body: { frame_id: node.id, element } } : refusal(HTTP_NOT_FOUND, 'element_not_found', { frame_id: node.id, id: input.id });
+  const element = head ? detailOf(head.doc, input.id) : null;
+  return element ? { status: HTTP_OK, body: { frame_id: node.id, revision: head?.revision, element } } : refusal(HTTP_NOT_FOUND, 'element_not_found', { frame_id: node.id, id: input.id });
 }
 
 async function activity(caller: OrgCaller, input: { canvas_id: string; since?: string }): Promise<Answer> {
