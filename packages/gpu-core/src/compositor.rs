@@ -27,6 +27,7 @@ pub struct Frame {
     pub pending: bool,
     pub skipped: Vec<Skipped>,
     pub rastered: usize,
+    pub sharp_full: bool,
 }
 
 impl Frame {
@@ -93,12 +94,17 @@ impl Compositor {
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
+    pub fn gpu_took(&mut self, ms: f64) {
+        self.retained.gpu_took(ms);
+    }
+
     pub fn frame<P: Painter>(&mut self, painter: &mut P, library: &mut Library, camera: Camera, now_ms: f64, clock: &mut dyn FnMut() -> f64) -> Result<Frame, P::Error> {
         self.pending = false;
         let damage: Damage = self.world.take_damage();
         let step = self.retained.step(camera, damage, now_ms);
         let mut skipped = Vec::new();
         let mut rastered_all = 0;
+        let sharp_full = matches!(&step, Step::Raster(r) if r.outcome == Outcome::Full && r.quality == Quality::Sharp);
         let outcome = match &step {
             Step::Idle => None,
             Step::Present => Some(Outcome::Reused),
@@ -126,6 +132,6 @@ impl Compositor {
         if outcome.is_some() {
             painter.present(self.retained.lookup(camera))?;
         }
-        Ok(Frame { outcome, pending: self.pending || self.retained.pending(), skipped, rastered: rastered_all })
+        Ok(Frame { outcome, pending: self.pending || self.retained.pending(), skipped, rastered: rastered_all, sharp_full })
     }
 }

@@ -133,6 +133,7 @@ pub struct Retained {
     zoom_seen: f64,
     zoom_moved_at: f64,
     full_ms: f64,
+    gpu_ms: f64,
 }
 
 pub fn subtract(from: Rect, cut: Rect) -> Vec<Rect> {
@@ -194,7 +195,7 @@ pub fn tiles(rect: Rect, width: u32, height: u32) -> Vec<Rect> {
 impl Retained {
     pub fn new(width: u32, height: u32) -> Self {
         let overscan = (width.min(height) / OVERSCAN_SHARE).min(OVERSCAN_MAX);
-        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, full_ms: 0.0 }
+        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, full_ms: 0.0, gpu_ms: 0.0 }
     }
 
     pub fn overscan(&self) -> u32 {
@@ -212,6 +213,14 @@ impl Retained {
 
     pub fn took(&mut self, ms: f64) {
         self.full_ms = ms;
+    }
+
+    pub fn gpu_took(&mut self, ms: f64) {
+        self.gpu_ms = ms;
+    }
+
+    fn cost(&self) -> f64 {
+        self.full_ms.max(self.gpu_ms)
     }
 
     pub fn pending(&self) -> bool {
@@ -267,7 +276,7 @@ impl Retained {
     }
 
     fn refined(&self) -> Quality {
-        if self.full_ms > SLOW_FULL_MS {
+        if self.cost() > SLOW_FULL_MS {
             Quality::Rough
         } else {
             Quality::Sharp
@@ -296,7 +305,7 @@ impl Retained {
             return self.full(c, Quality::Sharp);
         };
         if held.camera.zoom != c.zoom {
-            if gesture && self.full_ms <= LIVE_FULL_MS {
+            if gesture && self.cost() <= LIVE_FULL_MS {
                 return self.full(c, Quality::Sharp);
             }
             let stretch = c.zoom / (held.camera.zoom * held.quality.scale());
@@ -310,7 +319,7 @@ impl Retained {
             return self.full(c, quality);
         }
         if held.quality == Quality::Rough {
-            if gesture && self.full_ms > LIVE_FULL_MS {
+            if gesture && self.cost() > LIVE_FULL_MS {
                 return self.present(c);
             }
             return self.full(c, Quality::Sharp);

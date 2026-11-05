@@ -4,7 +4,7 @@ pub type Side = (u32, u32);
 
 const RGBA_BYTES: u64 = 4;
 const SCREEN_TEXTURES: u64 = 6;
-const POOL_SHARE: u64 = 8;
+const POOL_SHARE: u64 = 3;
 const LAYERS_SHARE: u64 = 8;
 
 pub fn bytes_of((width, height): Side) -> u64 {
@@ -177,6 +177,16 @@ mod tests {
     fn layers_over_their_cap_go_least_recently_used_first() {
         let entries = [("old", 1, 4 * MB), ("new", 9, 4 * MB), ("mid", 5, 4 * MB)];
         assert_eq!(over_cap(&entries, 5 * MB), vec!["old", "mid"]);
+    }
+
+    #[test]
+    fn a_retina_desktop_pool_holds_a_screen_sized_effect_layer() {
+        let screen = (2880, 1800);
+        let retained = (3136, 2056);
+        let budget = 12 * bytes_of(screen);
+        let share = split(budget, retained);
+        assert!(share.pool >= bytes_of(screen), "pool is {} MB", share.pool / MB);
+        assert!(share.cache > share.pool);
     }
 
     #[test]
