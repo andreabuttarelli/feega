@@ -147,7 +147,7 @@ async function readAt(db: Db, scope: { orgId: string; nodeId: string }, saved: {
     return saved.doc;
   }
   if (version > saved.version) {
-    return { outcome: ToolRun.Invalid, detail: `revision ${version} does not exist yet: the video is at ${saved.version}` };
+    return { outcome: ToolRun.Conflict, detail: `revision ${version} does not exist yet: the video is at ${saved.version}` };
   }
   const read = await readRevision(db, { ...scope, version });
   return read ? read.doc : { outcome: ToolRun.Conflict, detail: `revision ${version} is gone: the video is at ${saved.version}` };
