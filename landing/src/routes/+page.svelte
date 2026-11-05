@@ -1,10 +1,9 @@
 <script lang="ts">
   import Hero from '$lib/site/home/Hero.svelte';
+  import OpenSource from '$lib/site/home/OpenSource.svelte';
+  import StartSite from '$lib/site/home/StartSite.svelte';
   import Features from '$lib/site/home/Features.svelte';
-  import Imagine from '$lib/site/home/Imagine.svelte';
-  import Subscriptions from '$lib/site/home/Subscriptions.svelte';
-  import Canvas from '$lib/site/home/Canvas.svelte';
-  import Providers from '$lib/site/home/Providers.svelte';
+  import Remotion from '$lib/site/home/Remotion.svelte';
   import Switch from '$lib/site/home/Switch.svelte';
   import Pricing from '$lib/site/home/Pricing.svelte';
   import Agents from '$lib/site/home/Agents.svelte';
@@ -26,14 +25,11 @@
 </svelte:head>
 
 <div class="site-home">
-<div class="lift">
-  <Hero />
-  <Features />
-  <Imagine />
-  <Subscriptions />
-</div>
-<Canvas />
-<Providers />
+<Hero />
+<OpenSource />
+<StartSite />
+<Features />
+<Remotion />
 <Switch />
 
 <div class="cool">
@@ -46,8 +42,8 @@
 </div>
 
 <style>
-  .lift {
-    background: linear-gradient(#161616 0, #000 690px);
+  .site-home {
+    background: linear-gradient(#161616 0%, #000 5.37446%);
   }
 
   .cool {

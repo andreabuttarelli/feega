@@ -1,11 +1,11 @@
 <script lang="ts">
   import { APP_URL } from '../links';
-  import { CLOUD_FEATURES, LOCAL_FEATURES, PLAN_CREDITS } from '../home';
+  import { CLOUD_FEATURES, CLOUD_PRICE, LOCAL_FEATURES } from '../home';
   import NpxChip from './NpxChip.svelte';
 </script>
 
 <section class="pricing site-wide" id="pricing">
-  <h2>100% open source &amp; free.<br />Pay only for AI usage in our cloud version or use with your own agent via MCP</h2>
+  <h2>Free to run locally.<br />Pay only for speed in the cloud.</h2>
 
   <article class="plan local">
     <h3>Local version</h3>
@@ -44,9 +44,7 @@
       </div>
       <div class="prices">
         <p>Pricing</p>
-        {#each PLAN_CREDITS as credits (credits)}
-          <a href={APP_URL}>{credits} / mo</a>
-        {/each}
+        <a href={APP_URL}>{CLOUD_PRICE} / mo</a>
       </div>
     </div>
   </article>
@@ -81,6 +79,10 @@
 
   .cloud .features {
     margin-top: 24px;
+  }
+
+  .cloud .prices {
+    height: 432px;
   }
 
   .cloud {
@@ -157,9 +159,6 @@
     margin-bottom: 9px;
   }
 
-  .prices a + a {
-    margin-top: 5.8px;
-  }
 
   .prices a {
     width: fit-content;
@@ -207,12 +206,17 @@
     }
 
     .local {
-      height: 509px;
+      height: 475px;
       margin-top: 39px;
     }
 
     .cloud {
+      height: 673px;
       margin-top: 17px;
+    }
+
+    .cloud .body {
+      height: calc(100% - 156px);
     }
 
     h3 {
@@ -240,9 +244,6 @@
       margin-top: auto;
     }
 
-    .prices a + a {
-      margin-top: 8.1px;
-    }
 
     .prices p,
     .local .prices p {
@@ -270,7 +271,7 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .pricing {
-      padding: 150px 0;
+      padding: 154px 0 150px;
     }
 
     h2 {
@@ -280,8 +281,16 @@
     }
 
     .local {
-      height: 483px;
-      margin-top: 40px;
+      height: 449px;
+      margin-top: 45px;
+    }
+
+    .cloud {
+      height: 641px;
+    }
+
+    .cloud .body {
+      height: calc(100% - 141px);
     }
 
     h3 {
@@ -319,9 +328,6 @@
       line-height: 53.2px;
     }
 
-    .prices a + a {
-      margin-top: 8px;
-    }
 
     .usage {
       display: grid;

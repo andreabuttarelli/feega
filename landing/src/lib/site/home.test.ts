@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
-import { AGENT_LOGOS, FAQ, IMAGINE, MODEL_ROWS } from './home';
+import { AGENT_LOGOS, FAQ, TICKER_VIDEOS } from './home';
 import { HOME_JSON_LD } from './structured-data';
 import { LEGAL_DOCS } from './legal';
 
@@ -8,14 +8,14 @@ const mailtos = (html: string) => [...html.matchAll(/mailto:([^"]+)">([^<]+)</g)
 
 describe('the marketing homepage', () => {
   it('ships every image the page asks for', () => {
-    const files = [...AGENT_LOGOS.map((l) => l.file), ...MODEL_ROWS.flat().map((m) => `model-${m.slug}.webp`)];
+    const files = AGENT_LOGOS.map((l) => l.file);
     for (const file of files) {
       expect(existsSync(`static/site/home/${file}`), file).toBe(true);
     }
   });
 
-  it('lists the eight things you can bring to life', () => {
-    expect(IMAGINE).toHaveLength(8);
+  it('fills the video wall with twenty distinct clips', () => {
+    expect(new Set(TICKER_VIDEOS).size).toBe(20);
   });
 
   it('names feega’s founder, not the template author', () => {

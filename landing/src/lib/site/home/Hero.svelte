@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { APP_URL } from '../links';
-  import { CANVAS_VIDEO } from '../home';
+  import { CANVAS_VIDEO, TICKER_VIDEOS } from '../home';
+  import { lazyPlay } from '../lazy-video';
   import NpxChip from './NpxChip.svelte';
+  import UrlField from './UrlField.svelte';
 
   const POSTER = '/site/home/canvas-poster.webp';
 </script>
@@ -11,18 +12,23 @@
 </svelte:head>
 
 <section class="hero" id="hero">
-  <h1><span>The smart canvas</span> <span>for smarter ideas</span></h1>
+  <h1><span>The motion canvas</span> <span>for Claude Code</span></h1>
 
-  <div class="lead">
-    <p><strong>The all-in-one open-source alternative of Figma, Jitter &amp; Flora.</strong></p>
-    <p>From AI generation and UI &amp; graphic design to motion and interactive experiences, bring your entire creative workflow into one infinite canvas.</p>
+  <p class="lead">Paste any website. Claude rebuilds it as editable layers, animates it on a real timeline, and you ship it as video or code.</p>
+
+  <div class="start">
+    <UrlField id="hero-url" />
   </div>
 
-  <a class="site-pill" href={APP_URL}>Start Now</a>
+  <p class="run"><span>or run it locally:</span> <NpxChip /></p>
 
-  <p class="run"><span>Or just run</span> <NpxChip /></p>
+  <video class="canvas" autoplay muted loop playsinline preload="metadata" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" src={CANVAS_VIDEO}></video>
 
-  <video autoplay muted loop playsinline preload="metadata" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" src={CANVAS_VIDEO}></video>
+  <div class="ticker" aria-label="Videos made with Feega">
+    {#each TICKER_VIDEOS as src (src)}
+      <video data-src={src} muted loop playsinline preload="none" width="1920" height="1080" use:lazyPlay></video>
+    {/each}
+  </div>
 </section>
 
 <style>
@@ -55,17 +61,9 @@
     opacity: 0.8;
   }
 
-  .lead strong {
-    display: block;
-    padding: 0 17px;
-    font-weight: inherit;
-  }
-
-  .lead p + p {
-    margin-top: 20px;
-  }
-
-  .site-pill {
+  .start {
+    width: calc(100% - 32px);
+    max-width: 560px;
     margin-top: 22px;
   }
 
@@ -83,10 +81,21 @@
 
   video {
     width: 100%;
-    margin-top: 100px;
     aspect-ratio: 16 / 9;
-    border-radius: 8px;
     object-fit: cover;
+  }
+
+  .canvas {
+    margin-top: 100px;
+    border-radius: 8px;
+  }
+
+  .ticker {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    margin-top: 100px;
   }
 
   @media (min-width: 1200px) {
@@ -102,10 +111,12 @@
 
     .lead {
       width: 600px;
+      font-size: 16px;
+      line-height: 19.2px;
     }
 
-    .lead strong {
-      padding: 0;
+    .ticker {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 
@@ -124,8 +135,8 @@
       width: 550px;
     }
 
-    .lead strong {
-      padding: 0;
+    .ticker {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 </style>
