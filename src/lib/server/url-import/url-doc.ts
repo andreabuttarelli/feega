@@ -2,7 +2,8 @@ import { Grouping, planOf, type FigmaPlan, type FontUpload, type PlanItem } from
 import { catalogueFamily, familyFor } from '$lib/motion/vector-ui/piece';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { restMessage, type RestNode, type RestPaint, type RestStyle } from '$lib/server/figma/rest-message';
-import { DESIGN_MAX_SIDE, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { DESIGN_MAX_SIDE, everyClip, type MotionClip, type MotionDoc } from '@feega/motion-core/motion/doc';
+import { setStill } from '@feega/motion-core/motion/still';
 import { Horizontal, Vertical } from '@feega/motion-core/motion/constraints/model';
 import type { FontVariant } from '@feega/motion-core/motion/fonts/model';
 import type { PageFont, PageTree } from './page-tree';
@@ -226,20 +227,20 @@ export enum Tokening {
 
 export const tokeningOf = (tokens: boolean) => (tokens ? Tokening.On : Tokening.Off);
 
-export type PageShape = { sectioning: Sectioning; tokening?: Tokening; brand?: SiteBrand };
+export type PageShape = { sectioning: Sectioning; tokening?: Tokening; brand?: SiteBrand; site?: string };
 
 export const PLAIN_SHAPE: PageShape = { sectioning: Sectioning.Off, tokening: Tokening.Off };
 
 export const FULL_SHAPE: PageShape = { sectioning: Sectioning.On, tokening: Tokening.On };
 
-type Tokenise = (plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined, newId: () => string) => FigmaPlan;
+type Tokenise = (plan: FigmaPlan, tree: PageTree, root: RestNode, shape: PageShape, newId: () => string) => FigmaPlan;
 
-function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, brand: SiteBrand | undefined, newId: () => string): FigmaPlan {
+function withTokens(plan: FigmaPlan, tree: PageTree, root: RestNode, shape: PageShape, newId: () => string): FigmaPlan {
   const docs = plan.items.map((item) => item.doc);
   const images = new Set(plan.items.flatMap((item) => item.images.flatMap((image) => [image.clipId, ...(image.innerId ? [image.innerId] : [])])));
   const units = { docPerPx: (docs[0]?.width ?? tree.width) / tree.width, images };
-  const tokens = tokensOf(samplesOf(docs, root, units), brand);
-  const site = siteName(tree.url);
+  const tokens = tokensOf(samplesOf(docs, root, units), shape.brand);
+  const site = shape.site ?? siteName(tree.url);
   return { ...plan, items: plan.items.map((item) => ({ ...item, doc: componentKit(tokenised(item.doc, tokens, site, units), site, newId) })) };
 }
 
@@ -270,6 +271,14 @@ const hovered = (tree: PageTree): PageTree => ({
   ...(tree.patterns ? { patterns: tree.patterns.map((p) => ({ ...p, variants: p.variants.map((v) => ({ ...v, root: withHoverStates(v.root) })) })) } : {})
 });
 
+function played(doc: MotionDoc): MotionDoc {
+  if (!everyClip(doc).some((c) => Object.keys(c.keyframes).length)) {
+    return doc;
+  }
+  const video = setStill(doc, null);
+  return video.ok ? video.doc : doc;
+}
+
 export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPEATED, fonts: FontAssets = {}, shape: PageShape = PLAIN_SHAPE, reads: ViewRead[] = []): UrlPlan | null {
   const [joined, views] = reads.length ? [joinedTree(read), reads.map((v) => ({ ...v, tree: hovered(joinedTree(v.tree)) }))] : [read, reads];
   const tree = hovered(joined);
@@ -290,9 +299,9 @@ export function urlPlan(read: PageTree, newId: () => string, mark: Marker = REPE
     return null;
   }
   const dynamic = patternSets(patterns);
-  const stack = { ...made, items: made.items.map((item) => ({ ...item, doc: coloursMerged(withoutCarriers(item.doc, dynamic)) })) };
+  const stack = { ...made, items: made.items.map((item) => ({ ...item, doc: played(coloursMerged(withoutCarriers(item.doc, dynamic))) })) };
   const tokening = shape.tokening ?? Tokening.Off;
-  const tokened = TOKENISED[tokening](stack, tree, root, shape.brand, newId);
+  const tokened = TOKENISED[tokening](stack, tree, root, shape, newId);
   const counts = tokened.items.map((item) => countOf(item.doc));
   const { sets, homes, setHomes, dropped } = PAGED[tokening](tokened, newId);
   return { plan: { ...tokened, skipped: [...tokened.skipped, ...dropped] }, images, name, sets, homes, setHomes, components: { components: counts.reduce((s, c) => s + c.components, 0), instances: counts.reduce((s, c) => s + c.instances, 0) } };

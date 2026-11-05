@@ -1,3 +1,4 @@
+import type { CapturedMotion } from '$lib/canvas/figma/captured-motion';
 import type { ClipBehaviour, CodeComponent, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
 
 export type RestColor = { r: number; g: number; b: number; a?: number };
@@ -83,6 +84,7 @@ export type RestNode = {
   dom?: { tag: string; role?: string; hint?: string; landmark?: string; press?: string };
   codeComponent?: CodeComponent;
   behaviour?: ClipBehaviour;
+  motion?: CapturedMotion;
   children?: RestNode[];
 };
 
@@ -219,6 +221,7 @@ function textOf(n: RestNode): Partial<FigmaRawNode> {
     fontName: fontOf(style),
     fontSize: style.fontSize,
     fillPaints: paintsOf(style.fills),
+    textDecoration: style.textDecoration,
     ...(style.letterSpacing !== undefined ? { letterSpacing: { value: style.letterSpacing, units: 'PIXELS' } } : {})
   }));
   const style = n.style;
@@ -319,7 +322,8 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     ...(n.type === 'TEXT' ? textOf(n) : {}),
     ...(symbolID ? { symbolData: { symbolID } } : {}),
     ...(n.codeComponent ? { codeComponent: n.codeComponent } : {}),
-    ...(n.behaviour ? { behaviour: n.behaviour } : {})
+    ...(n.behaviour ? { behaviour: n.behaviour } : {}),
+    ...(n.motion ? { motion: n.motion } : {})
   });
   (n.children ?? []).forEach((child, i) => add(child, { rest: n, guid }, i, build));
 }

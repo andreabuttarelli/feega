@@ -86,6 +86,13 @@ describe('repeated blocks of an imported page become a component kit', () => {
     expect(Object.keys(card?.[1].component!.properties ?? {}).sort()).toEqual(['Text', 'Title']);
   });
 
+  it('a page read from our own preview names its variables after the library it came from, not the host (insert_component: "Localhost/Background")', () => {
+    let n = 0;
+    const doc = pageOf(urlPlan({ ...tree(), url: 'http://localhost:5173/components/preview' }, () => `c${++n}`, undefined, {}, { ...FULL_SHAPE, site: 'shadcn' })!);
+
+    expect(Object.keys(doc.variables!)).toEqual(['shadcn']);
+  });
+
   it('buttons get Hover and Pressed states bound to darker variables of their colour', () => {
     const doc = pageOf(planned());
     const states = mainsOf(doc).map(([, c]) => c.component!.variant?.State).filter(Boolean);
