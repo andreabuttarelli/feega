@@ -152,6 +152,7 @@ fn base(colour: Option<Rgba>) -> Color {
 
 impl Gpu<'_> {
     fn render(&mut self, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
+        self.runner.passes.flush(self.runner.queue);
         let params = RenderParams { base_color: base, width, height, antialiasing_method: AaConfig::Area };
         if !empties_the_atlas(scene) {
             return self.vello.render_to_texture(self.runner.device, self.runner.queue, scene, target, &params);
