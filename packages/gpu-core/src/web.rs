@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use vello::wgpu;
@@ -27,6 +27,8 @@ const FRAMES_IN_FLIGHT: u32 = 1;
 const GESTURE_RASTER_EVERY_MS: f64 = 80.0;
 
 const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
+
+const NOT_TIMED: u64 = u64::MAX;
 
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
@@ -69,6 +71,7 @@ pub struct WebCore {
     scratch: Option<wgpu::Texture>,
     motion: CoreMotion,
     rastered_at: f64,
+    gpu_full_ms: Arc<AtomicU64>,
 }
 
 struct GpuPainter<'a> {
@@ -247,7 +250,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)) })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -377,6 +380,10 @@ impl WebCore {
     pub fn frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
         let limits = self.frame_limits(now_ms);
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
+        let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
+        if timed != NOT_TIMED {
+            self.compositor.gpu_took(f64::from_bits(timed));
+        }
         let frame = self.compositor.frame(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?;
         if frame.rastered > 0 {
             self.rastered_at = now_ms;
@@ -384,8 +391,12 @@ impl WebCore {
         self.pending = frame.pending;
         self.in_flight.fetch_add(1, Ordering::Relaxed);
         let done = self.in_flight.clone();
+        let full = frame.sharp_full.then(|| (self.gpu_full_ms.clone(), js_sys::Date::now()));
         self.queue.on_submitted_work_done(move || {
             done.fetch_sub(1, Ordering::Relaxed);
+            if let Some((cost, started)) = &full {
+                cost.store((js_sys::Date::now() - started).to_bits(), Ordering::Relaxed);
+            }
         });
         Ok(frame.report())
     }

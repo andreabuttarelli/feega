@@ -310,3 +310,16 @@ fn a_frame_painted_in_tiles_rasters_at_most_one_cached_group() {
 
     assert_eq!(fake.rasters, 1);
 }
+
+#[test]
+fn a_full_render_cheap_to_encode_but_slow_on_the_gpu_is_only_reprojected_while_zooming() {
+    let (mut c, mut lib) = scene();
+    let mut fake = Fake::default();
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+    c.gpu_took(300.0);
+
+    let frame = c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.1), 16.0, &mut || 0.0).unwrap();
+
+    assert_eq!(frame.outcome, Some(Outcome::Reused));
+    assert_eq!(fake.painted.len(), 1);
+}
