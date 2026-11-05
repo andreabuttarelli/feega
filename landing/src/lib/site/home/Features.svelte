@@ -5,18 +5,6 @@
 </script>
 
 <section class="features site-wide" id="features">
-  <svg class="ruler" viewBox="0 0 1178 44" preserveAspectRatio="none" aria-hidden="true">
-    <path d="M4 21.5H1174" stroke="#202020" />
-    {#each [44.5, 408.5, 772.5, 1136.5] as x (x)}
-      <path d="M{x} 2V42" stroke="#262626" />
-    {/each}
-    {#each [226.5, 590.5, 954.5] as x (x)}
-      <path d="M{x} 13V31" stroke="#262626" opacity="0.5" />
-    {/each}
-  </svg>
-
-  <h2>AI-native.<br />Open source.<br />Local.<br />100% free.</h2>
-
   <div class="cards">
     <article class="card gen" use:tilt>
       <img src="/site/home/tool-gen.webp" alt="" width="920" height="1269" loading="lazy" decoding="async" />
@@ -53,32 +41,14 @@
 
 <style>
   .features {
-    padding: 69px 20px 0;
+    padding: 0 20px;
     color: var(--site-ink);
-  }
-
-  .ruler {
-    display: block;
-    width: calc(100% - 1px);
-    height: auto;
-    aspect-ratio: 1178 / 44;
-    margin-left: 1px;
-    overflow: visible;
-  }
-
-  h2 {
-    margin-top: 72px;
-    font-size: 37px;
-    line-height: 37px;
-    letter-spacing: -0.04em;
-    font-weight: 400;
-    text-align: center;
   }
 
   .cards {
     display: grid;
     gap: 15px;
-    margin-top: 25px;
+    margin-top: 72px;
   }
 
   .card {
@@ -222,25 +192,14 @@
 
   @media (min-width: 1200px) {
     .features {
-      padding: 70px 0 0;
-    }
-
-    .ruler {
-      width: 100%;
-      height: 44px;
-      margin-left: 0;
-    }
-
-    h2 {
-      font-size: 58px;
-      line-height: 58px;
+      padding: 0;
     }
 
     .cards {
       grid-template-columns: repeat(3, 343px);
       justify-content: space-between;
       gap: 16px;
-      margin-top: 26px;
+      margin-top: 72px;
     }
 
     .card {
@@ -263,7 +222,6 @@
       width: 265px;
       height: 245px;
     }
-
 
     .gen h3 {
       right: 72px;
@@ -304,23 +262,12 @@
 
   @media (min-width: 810px) and (max-width: 1199.98px) {
     .features {
-      padding: 69px 0 0;
-    }
-
-    .ruler {
-      width: 723px;
-      height: 27px;
-      margin: 0 auto;
-    }
-
-    h2 {
-      font-size: 46px;
-      line-height: 46px;
+      padding: 0;
     }
 
     .cards {
       gap: 16px;
-      margin-top: 26px;
+      margin-top: 72px;
     }
 
     h3 {

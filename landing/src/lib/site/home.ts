@@ -4,45 +4,33 @@ export const CANVAS_VIDEO = `${VIDEO_BASE}/feega-canvas-hero.MP4`;
 export const CODE_VIDEO = `${VIDEO_BASE}/2026-10-29-export-code-final.mp4`;
 
 export const AGENT_LOGOS = [
-  { file: 'mcp-0.svg', width: 32 },
-  { file: 'mcp-1.svg', width: 33 },
-  { file: 'mcp-2.svg', width: 28 },
-  { file: 'mcp-3.svg', width: 33 },
-  { file: 'mcp-4.svg', width: 44 },
-  { file: 'mcp-5.svg', width: 33 }
+  { file: 'mcp-0.svg', width: 32, name: 'Claude Code' },
+  { file: 'mcp-1.svg', width: 33, name: 'Codex' },
+  { file: 'mcp-2.svg', width: 28, name: 'Cursor' }
 ] as const;
 
-export const IMAGINE = ['Photography', 'UGC Videos', 'Fashion Shoots', '3D Models', 'Brand Identity', 'Art Direction', 'Video Trailers', 'Remix Ads'] as const;
-
-export type Model = { readonly name: string; readonly slug: string };
-
-export const FEATURED_MODELS = [
-  { name: 'GPT Images 2.5', maker: 'OpenAI', slug: 'neuroline' },
-  { name: 'Nano Banana 2', maker: 'Google', slug: 'voltage' }
-] as const;
-
-export const MODEL_ROWS: readonly (readonly (Model & { readonly col: number })[])[] = [
-  [
-    { name: 'Seedance 2.5', slug: 'voltage', col: 1 },
-    { name: 'Opus 5.5', slug: 'neuroline', col: 3 },
-    { name: 'Kling 3.0', slug: 'lumen-east', col: 5 },
-    { name: 'GPT 6 Astra', slug: 'rift-studio', col: 7 }
-  ],
-  [
-    { name: 'Grok Imagine', slug: 'pulse', col: 2 },
-    { name: 'Seedream 5.0', slug: 'origin', col: 4 },
-    { name: 'Qwen 3.0 Pro', slug: 'flux', col: 6 }
-  ],
-  [
-    { name: 'DeepSeek 4.1', slug: 'haven', col: 3 },
-    { name: 'MAI Image 2.6', slug: 'aero', col: 5 }
-  ],
-  [
-    { name: 'Meta Muse', slug: 'nova', col: 2 },
-    { name: 'Recraft', slug: 'axis', col: 4 },
-    { name: 'Recraft', slug: 'evolve', col: 6 }
-  ]
-];
+export const TICKER_VIDEOS = [
+  'liquid-glass-1x1.MP4',
+  'masking-loop-v3.MP4',
+  'feega-showcase-v2.mp4',
+  'demo-v2.MP4',
+  'ui-morph-v2.mp4',
+  'launch.MP4',
+  '2-dark-pill-chips.mp4',
+  'ui-ring-farm.MP4',
+  'sting-loop-1x1.mp4',
+  'scroll-story-default.mp4',
+  'poster-liquid-glass-4x5.MP4',
+  'draft-wide.mp4',
+  'phone-chat-1x1-720.MP4',
+  'split-headline-16x9.mp4',
+  'preview-wide.mp4',
+  'feature-scroll-dark-centred-16x9.mp4',
+  'melting-type-poster-4x5.MP4',
+  'floating-media-default.mp4',
+  'ring-through-title-16x9.MP4',
+  'media-cloud-white-16x9-720p.MP4'
+].map((file) => `${VIDEO_BASE}/${file}`);
 
 export const LOCAL_FEATURES = [
   'Design + Motion, infinite canvas',
@@ -68,7 +56,7 @@ export const CLOUD_FEATURES = [
   'Embed mode for interactive scenes'
 ] as const;
 
-export const PLAN_CREDITS = [8, 16, 32, 64, 128, 256] as const;
+export const CLOUD_PRICE = 18;
 
 const MCP_URL = 'https://mcp.feega.app/mcp';
 
@@ -169,5 +157,3 @@ export const FAQ = [
     a: "Feega is built in Italy by Andrea Buttarelli, a freelance designer who wanted a faster way to work. No VC money, no growth team: just a designer building the tool he needed, in the open. Company details are in the <a href=\"/legal-notice\">Legal Notice</a>, or write to <a href=\"mailto:hi@feega.app\">hi@feega.app</a>."
   }
 ] as const;
-
-export const MOTION_EMBED_ID = 'c76b6d3b-8262-4b68-ad58-3cb51a6190a9';
