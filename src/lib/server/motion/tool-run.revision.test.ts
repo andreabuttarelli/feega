@@ -21,7 +21,7 @@ function seen(): MotionDoc {
 const retimed = (doc: MotionDoc, id: string, at: number): MotionDoc => ({
   ...doc,
   tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, keyframes: { ...c.keyframes, opacity: [{ frame: at, value: 1 }] } } : c)) }))
-});
+}) as unknown as MotionDoc;
 
 const base = seen();
 const head = retimed(base, 'title', 24);
