@@ -10,7 +10,7 @@ describe('a CSS animation read from a page, as keyframes', () => {
   it('a loop repeats over the whole timeline, sliding by the distance it slid on the page in doc units, linearly', () => {
     const keys = motionKeyframes(marquee, { x: 0, y: 0 }, 1, STAGE);
 
-    expect(keys.x.map((k) => [k.frame, Number(k.value.toFixed(3))])).toEqual([
+    expect(keys.x.map((k) => [k.frame, Number(Number(k.value).toFixed(3))])).toEqual([
       [0, 0],
       [29, -0.193],
       [30, 0],
