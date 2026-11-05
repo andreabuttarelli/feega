@@ -1,26 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
-import { FAQ, COLLAGE, COLLAGE_STAGE, IMAGINE } from './home';
+import { AGENT_LOGOS, FAQ, IMAGINE, MODEL_ROWS } from './home';
 import { HOME_JSON_LD } from './structured-data';
 import { LEGAL_DOCS } from './legal';
 
 const mailtos = (html: string) => [...html.matchAll(/mailto:([^"]+)">([^<]+)</g)].map((m) => [m[1], m[2]]);
 
 describe('the marketing homepage', () => {
-  it('ships every collage image and places every tile inside the stage', () => {
-    for (const tile of COLLAGE) {
-      if (tile.kind === 'image') {
-        expect(existsSync(`static/site/home/${tile.file}.webp`), tile.file).toBe(true);
-      }
-
-      expect(tile.x + tile.w, tile.file).toBeLessThanOrEqual(COLLAGE_STAGE.width);
-      expect(tile.y + tile.h, tile.file).toBeLessThanOrEqual(COLLAGE_STAGE.height);
+  it('ships every image the page asks for', () => {
+    const files = [...AGENT_LOGOS.map((l) => l.file), ...MODEL_ROWS.flat().map((m) => `model-${m.slug}.webp`)];
+    for (const file of files) {
+      expect(existsSync(`static/site/home/${file}`), file).toBe(true);
     }
-  });
-
-  it('never repeats a collage video', () => {
-    const videos = COLLAGE.filter((t) => t.kind === 'video').map((t) => t.file);
-    expect(new Set(videos).size).toBe(videos.length);
   });
 
   it('lists the eight things you can bring to life', () => {

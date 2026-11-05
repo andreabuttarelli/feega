@@ -15,7 +15,7 @@
   }
 </script>
 
-<section class="agents" id="mcp">
+<section class="agents site-wide" id="mcp">
   <h2>Let your agents do the work</h2>
 
   <div class="box">
@@ -31,14 +31,13 @@
 
 <style>
   .agents {
-    max-width: 430px;
-    margin: 0 auto;
     padding: 0 12px 100px;
+    color: var(--site-ink);
   }
 
   h2 {
     font-size: 50px;
-    line-height: 0.9;
+    line-height: 45px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -59,7 +58,6 @@
     display: flex;
     overflow-x: auto;
     scrollbar-width: none;
-    border-bottom: 1px solid #444;
   }
 
   .tabs button {
@@ -69,7 +67,7 @@
     padding: 12px 18px;
     font-size: 13px;
     font-weight: 500;
-    line-height: 1.4;
+    line-height: 18.2px;
     white-space: nowrap;
     color: #737373;
     background: none;
@@ -79,7 +77,7 @@
 
   .tabs button.is-active {
     color: #fff;
-    box-shadow: inset 0 -2px 0 #0a0a0a;
+    box-shadow: inset 0 -2px 0 #ff5100;
   }
 
   pre {
@@ -91,15 +89,15 @@
     color: #fff;
     font-family: 'Fragment Mono', monospace;
     font-size: 13px;
-    line-height: 1.55;
+    line-height: 20.15px;
   }
 
   .copy {
     font-family: inherit;
     letter-spacing: inherit;
     position: absolute;
-    top: 55px;
-    right: 12px;
+    top: 56px;
+    right: 13px;
     padding: 6px 10px;
     font-size: 11px;
     font-weight: 500;
@@ -113,20 +111,35 @@
 
   @media (min-width: 1200px) {
     .agents {
-      max-width: 1500px;
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      column-gap: 24px;
+      grid-template-columns: 518px 518px;
+      justify-content: space-between;
       align-items: center;
-      padding: 0 20px 200px;
+      padding: 0 0 200px;
     }
 
     h2 {
       font-size: 78px;
+      line-height: 70.2px;
     }
 
     .box {
       margin-top: 0;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .agents {
+      padding: 0 0 149px;
+    }
+
+    h2 {
+      font-size: 62px;
+      line-height: 55.8px;
+    }
+
+    .box {
+      margin-top: 25px;
     }
   }
 </style>

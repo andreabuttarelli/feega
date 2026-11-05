@@ -1,29 +1,9 @@
 <script lang="ts">
-  import { APP_URL, GITHUB_URL } from '../links';
-  import { LOCAL_COMMANDS, AGENT_PROMPT } from '../home';
-  import { cloneLink } from '../clone-link';
+  import { APP_URL } from '../links';
+  import { CANVAS_VIDEO } from '../home';
+  import NpxChip from './NpxChip.svelte';
 
-  const POSTER = '/site/home/hero-poster.webp';
-  const COPIED_MS = 1500;
-
-  let copied = $state('');
-  let site = $state('');
-  let siteRefused = $state(false);
-
-  function clone(event: SubmitEvent) {
-    event.preventDefault();
-    const link = cloneLink(site);
-    siteRefused = link === null;
-    if (link) {
-      location.href = link;
-    }
-  }
-
-  async function copy(id: string, text: string) {
-    await navigator.clipboard.writeText(text);
-    copied = id;
-    setTimeout(() => (copied = ''), COPIED_MS);
-  }
+  const POSTER = '/site/home/canvas-poster.webp';
 </script>
 
 <svelte:head>
@@ -31,195 +11,121 @@
 </svelte:head>
 
 <section class="hero" id="hero">
-  <h1>The smart canvas for smarter ideas</h1>
+  <h1><span>The smart canvas</span> <span>for smarter ideas</span></h1>
 
-  <form class="clone" onsubmit={clone} novalidate>
-    <label for="clone-site">Paste any website</label>
-    <div class="row">
-      <input id="clone-site" type="text" inputmode="url" autocomplete="url" placeholder="stripe.com" bind:value={site} oninput={() => (siteRefused = false)} aria-invalid={siteRefused} aria-describedby="clone-hint" />
-      <button type="submit">Clone it</button>
-    </div>
-    <p id="clone-hint" class="hint" aria-live="polite">{siteRefused ? 'Enter a public web address, like stripe.com.' : 'It opens in feega as an editable design.'}</p>
-  </form>
-
-  <video autoplay muted loop playsinline preload="metadata" poster={POSTER} width="1920" height="1080" aria-label="feega canvas overview">
-    <source src="/site/home/hero-720.mp4" type="video/mp4" media="(max-width: 800px)" />
-    <source src="/site/home/hero-1080.mp4" type="video/mp4" />
-  </video>
-
-  <p class="lead">One canvas where you and your AI agents draw, animate and generate. Run it on your machine, or in the cloud.</p>
-
-
-  <div class="block">
-    <div class="head">
-      <p class="label">Tell your AI agent (Claude Code, Codex)</p>
-      <button type="button" onclick={() => copy('prompt', AGENT_PROMPT)}>{copied === 'prompt' ? 'Copied' : 'Copy prompt'}</button>
-    </div>
-    <pre>{AGENT_PROMPT}</pre>
+  <div class="lead">
+    <p><strong>The all-in-one open-source alternative of Figma, Jitter &amp; Flora.</strong></p>
+    <p>From AI generation and UI &amp; graphic design to motion and interactive experiences, bring your entire creative workflow into one infinite canvas.</p>
   </div>
 
-  <div class="block">
-    <div class="head">
-      <p class="label">Or run it yourself (Node 22)</p>
-      <button type="button" onclick={() => copy('commands', LOCAL_COMMANDS)}>{copied === 'commands' ? 'Copied' : 'Copy commands'}</button>
-    </div>
-    <pre>{LOCAL_COMMANDS}</pre>
-  </div>
+  <a class="site-pill" href={APP_URL}>Start Now</a>
 
-  <p class="cloud">
-    Prefer the cloud?
-    <a class="primary" href="{APP_URL}/login">Sign up</a>
-    <a href="{APP_URL}/login">Log in</a>
-    <a href={GITHUB_URL}>Star on GitHub</a>
-  </p>
+  <p class="run"><span>Or just run</span> <NpxChip /></p>
+
+  <video autoplay muted loop playsinline preload="metadata" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" src={CANVAS_VIDEO}></video>
 </section>
 
 <style>
   .hero {
-    max-width: 1160px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 430px;
     margin: 0 auto;
-    padding: 120px 20px 60px;
+    padding: 140px 20px 0;
+    text-align: center;
   }
 
   h1 {
-    font-size: 44px;
-    line-height: 0.95;
+    color: #fff;
+    font-family: 'Instrument Serif', serif;
+    font-variation-settings: normal;
+    font-size: 72px;
+    line-height: 57.6px;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
 
-  video {
+  h1 span {
     display: block;
-    width: 100%;
-    height: auto;
-    aspect-ratio: 16 / 9;
-    margin-top: 24px;
-    background: #000;
-    border-radius: 10px;
   }
 
   .lead {
+    margin-top: 22px;
+    opacity: 0.8;
+  }
+
+  .lead strong {
+    display: block;
+    padding: 0 17px;
+    font-weight: inherit;
+  }
+
+  .lead p + p {
     margin-top: 20px;
-    max-width: 560px;
-    font-size: 18px;
-    line-height: 1.3;
-    opacity: 0.75;
   }
 
-  .clone {
-    margin-top: 24px;
-    max-width: 760px;
+  .site-pill {
+    margin-top: 22px;
   }
 
-  .clone .row {
+  .run {
     display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .clone input {
-    flex: 1;
-    min-width: 0;
-    padding: 12px 14px;
-    font: inherit;
-    color: var(--site-ink);
-    background: #141414;
-    border: 1px solid var(--site-line);
-    border-radius: 6px;
-  }
-
-  .clone input[aria-invalid='true'] {
-    border-color: #e5484d;
-  }
-
-  .clone button {
-    padding: 12px 20px;
-    background: #0043fc;
-  }
-
-  .hint {
-    margin-top: 6px;
-    font-size: 14px;
-    opacity: 0.6;
-  }
-
-  .block {
-    margin-top: 24px;
-    max-width: 760px;
-    padding: 16px;
-    background: #141414;
-    border: 1px solid var(--site-line);
-    border-radius: 10px;
-  }
-
-  .label {
-    opacity: 0.6;
-  }
-
-  pre {
-    margin: 10px 0 0;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: 'Fragment Mono', monospace;
-    font-size: 13px;
-    line-height: 1.5;
-  }
-
-  .head {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    margin-top: 12px;
   }
 
-  button {
-    flex: none;
-    padding: 6px 10px;
-    font: inherit;
-    color: var(--site-ink);
-    background: #262626;
-    border: 0;
-    border-radius: 6px;
-    cursor: pointer;
+  .run span {
+    opacity: 0.8;
+    color: #fff;
   }
 
-  .cloud {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 20px;
-    margin-top: 32px;
-  }
-
-  .cloud a {
-    border-bottom: 1px solid var(--site-ink);
-  }
-
-  .cloud .primary {
-    padding: 12px 24px;
-    background: #0043fc;
-    border: 0;
-    border-radius: 6px;
+  video {
+    width: 100%;
+    margin-top: 100px;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    object-fit: cover;
   }
 
   @media (min-width: 1200px) {
     .hero {
-      padding: 120px 20px 80px;
+      max-width: 1100px;
+      padding: 150px 20px 0;
     }
 
     h1 {
-      font-size: 64px;
-      max-width: 1100px;
+      font-size: 80px;
+      line-height: 64px;
     }
 
     .lead {
-      font-size: 24px;
-      max-width: 720px;
+      width: 600px;
     }
 
-    pre {
-      font-size: 14px;
+    .lead strong {
+      padding: 0;
+    }
+  }
+
+  @media (min-width: 810px) and (max-width: 1199.98px) {
+    .hero {
+      max-width: 810px;
+      padding: 150px 16px 0;
+    }
+
+    h1 {
+      font-size: 80px;
+      line-height: 64px;
+    }
+
+    .lead {
+      width: 550px;
+    }
+
+    .lead strong {
+      padding: 0;
     }
   }
 </style>

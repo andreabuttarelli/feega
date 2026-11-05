@@ -48,7 +48,7 @@ describe('structured data', () => {
 
   it('answers what people ask assistants', () => {
     const q = FAQ.map((f) => f.q).join('\n');
-    for (const topic of [/open source/i, /locally/i, /cost/i, /Figma/, /Jitter/, /Flora/]) {
+    for (const topic of [/open source/i, /locally/i, /pricing/i, /Figma/]) {
       expect(q).toMatch(topic);
     }
   });

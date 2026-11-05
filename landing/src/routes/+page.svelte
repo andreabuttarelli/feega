@@ -1,13 +1,14 @@
 <script lang="ts">
   import Hero from '$lib/site/home/Hero.svelte';
-  import Collage from '$lib/site/home/Collage.svelte';
-  import Tools from '$lib/site/home/Tools.svelte';
+  import Features from '$lib/site/home/Features.svelte';
   import Imagine from '$lib/site/home/Imagine.svelte';
+  import Subscriptions from '$lib/site/home/Subscriptions.svelte';
   import Canvas from '$lib/site/home/Canvas.svelte';
-  import Models from '$lib/site/home/Models.svelte';
-  import Scenes from '$lib/site/home/Scenes.svelte';
+  import Providers from '$lib/site/home/Providers.svelte';
+  import Switch from '$lib/site/home/Switch.svelte';
   import Pricing from '$lib/site/home/Pricing.svelte';
   import Agents from '$lib/site/home/Agents.svelte';
+  import Story from '$lib/site/home/Story.svelte';
   import Faq from '$lib/site/home/Faq.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
 
@@ -24,26 +25,29 @@
   {@html HOME_JSON_LD}
 </svelte:head>
 
-<Hero />
-<Collage />
-<Tools />
-<Imagine />
-<Canvas />
-<div class="warm">
-  <Models />
-  <Scenes />
+<div class="site-home">
+<div class="lift">
+  <Hero />
+  <Features />
+  <Imagine />
+  <Subscriptions />
 </div>
+<Canvas />
+<Providers />
+<Switch />
 
 <div class="cool">
   <Pricing />
   <Agents />
-  <Faq />
+</div>
+
+<Story />
+<Faq />
 </div>
 
 <style>
-  .warm {
-    background: #ff5100;
-    color: #000;
+  .lift {
+    background: linear-gradient(#161616 0, #000 690px);
   }
 
   .cool {

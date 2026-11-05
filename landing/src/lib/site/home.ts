@@ -1,29 +1,16 @@
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
 
-export const COLLAGE_STAGE = { width: 1440, height: 900 } as const;
+export const CANVAS_VIDEO = `${VIDEO_BASE}/feega-canvas-hero.MP4`;
+export const CODE_VIDEO = `${VIDEO_BASE}/2026-10-29-export-code-final.mp4`;
 
-type Placement = { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
-
-export type CollageTile = Placement &
-  ({ readonly kind: 'image'; readonly file: string } | { readonly kind: 'video'; readonly file: string });
-
-const image = (file: string, x: number, y: number, w: number, h: number): CollageTile => ({ kind: 'image', file, x, y, w, h });
-const video = (file: string, x: number, y: number, w: number, h: number): CollageTile => ({ kind: 'video', file: `${VIDEO_BASE}/${file}`, x, y, w, h });
-
-export const COLLAGE: readonly CollageTile[] = [
-  image('c-e', 588, 132, 175, 233),
-  video('ui-ring-farm.MP4', 773, 132, 140, 79),
-  image('c-d', 786, 232, 276, 276),
-  image('c-h', 860, 430, 298, 298),
-  image('c-a', 237, 233, 330, 400),
-  video('ring-through-title-16x9.MP4', 318, 170, 256, 144),
-  image('c-c', 108, 447, 260, 314),
-  image('c-b', 276, 590, 298, 275),
-  image('c-g', 616, 762, 210, 113),
-  image('c-i', 513, 181, 413, 581),
-  video('media-cloud-white-16x9-720p.MP4', 314, 519, 299, 168),
-  video('ui-morph-v2.mp4', 1005, 275, 286, 286)
-];
+export const AGENT_LOGOS = [
+  { file: 'mcp-0.svg', width: 32 },
+  { file: 'mcp-1.svg', width: 33 },
+  { file: 'mcp-2.svg', width: 28 },
+  { file: 'mcp-3.svg', width: 33 },
+  { file: 'mcp-4.svg', width: 44 },
+  { file: 'mcp-5.svg', width: 33 }
+] as const;
 
 export const IMAGINE = ['Photography', 'UGC Videos', 'Fashion Shoots', '3D Models', 'Brand Identity', 'Art Direction', 'Video Trailers', 'Remix Ads'] as const;
 
@@ -57,17 +44,28 @@ export const MODEL_ROWS: readonly (readonly (Model & { readonly col: number })[]
   ]
 ];
 
-export const PLAN_FEATURES = [
-  'All models',
+export const LOCAL_FEATURES = [
+  'Design + Motion, infinite canvas',
+  'Text, image, video, audio, 3D generations',
+  'Bring your own keys for AI generations',
   'Unlimited canvases & projects',
-  'Smart brand & products import',
+  'Design & Motion templates library',
+  'Copy & paste from Figma',
+  'Coder mode for code export',
+  'Embed mode for interactive scenes'
+] as const;
+
+export const CLOUD_FEATURES = [
+  'All models from OpenRouter, Kie, Higgsfield, Wiro, Elevenlabs',
+  'Unlimited canvases & projects',
   'AI assistant in-editor',
+  'Use with your agents via MCP',
+  'Unlimited team members',
+  'Real-time collaboration',
+  'Brand & products import',
+  'Social accounts & posts import',
   'AI influencers',
-  'Image & video effects',
-  'HD download',
-  'Gif download',
-  'Personal & Commercial Use rights',
-  '4k generation'
+  'Embed mode for interactive scenes'
 ] as const;
 
 export const PLAN_CREDITS = [8, 16, 32, 64, 128, 256] as const;
@@ -107,79 +105,69 @@ Server URL: ${MCP_URL}
 
 export const FAQ = [
   {
-    q: 'What is feega?',
-    a: 'feega is an open-source infinite canvas where people and AI agents design, animate and generate together. Frames, motion, images, video, audio and text live as connected nodes on one canvas. Google Sign-In is used only for authentication; no Google API is used to generate or edit content.'
+    q: "What is Feega?",
+    a: "Feega is one infinite canvas for design, motion and AI generation. It is open source: use it in the browser, or run it locally with npx feega. Google Sign-In is used only for authentication; no Google API is used to generate or edit content."
   },
   {
-    q: 'Is feega open source?',
-    a: 'Yes. feega is licensed under Apache-2.0 and the full source is on <a href="https://github.com/andreabuttarelli/feega">GitHub</a>, including the app, the command-line tool and the MCP server.'
+    q: "Is Feega open source?",
+    a: "Yes. Feega is open source under the Apache-2.0 license. The code is on <a href=\"https://github.com/andreabuttarelli/feega\">GitHub</a>."
   },
   {
-    q: 'Can I run feega locally or offline?',
-    a: 'Yes. Clone the repository, run npm install and then npm run local -- my-canvas.feega. The canvas runs on your machine with no account, database or Docker, and is saved in one .feega file. AI generation, sharing and comments need the cloud app.'
+    q: "Can I run it locally?",
+    a: "Yes. Run npx feega: no account, no cloud. Your work is saved in one .feega file on your machine. You need Node 22."
   },
   {
-    q: 'How do I use feega with my AI agent?',
-    a: 'Tell Claude Code or Codex to clone the repository and start it locally: the CLI and MCP server find the local canvas automatically and every edit shows live in your browser. For the cloud app, connect the MCP server at https://mcp.feega.app/mcp.'
+    q: "How does the canvas work?",
+    a: "Design in frames with layers and components, animate them on a motion timeline, and add AI nodes for text, images, video, 3D and audio. Wire nodes together so one output feeds the next, then run them to generate."
   },
   {
-    q: 'How much does feega cost?',
-    a: 'Running feega locally is free. The cloud app has monthly plans from 8 to 256 credits, where 1 credit = $1 of generations; you can top up when you need more. See <a href="#pricing">pricing</a>.'
+    q: "Which AI models can I use?",
+    a: "Images: Nano Banana (Google), GPT Image (OpenAI), Seedream (ByteDance) and Qwen. Video: Seedance (ByteDance), Kling and Grok Imagine (xAI). 3D: Trellis (Microsoft) and Hunyuan3D (Tencent). Voice, sound and music: ElevenLabs. You pick the model for each node."
   },
   {
-    q: 'How is feega different from Figma, Jitter and Flora?',
-    a: 'Figma is a design tool, Jitter is a motion design tool and Flora is an AI generation canvas. feega puts design frames, a keyframe timeline and AI image, video and audio generation on one canvas, is open source, and can be driven by an AI agent through its CLI and MCP server.'
+    q: "Can I use my own AI keys?",
+    a: "Yes, in local mode. Add your keys for OpenRouter, Kie.ai, Higgsfield, Wiro, ElevenLabs and a text LLM provider, and generate from text with them. No plan or credits needed."
   },
   {
-    q: 'How does the canvas work?',
-    a: 'Everything is a node on an infinite canvas: text, images, video, audio, documents, products and more. Connect nodes to pass one output into the next as input, then run a node to generate. You can chain steps into a full workflow and rerun any of them.'
+    q: "What file formats can I import and export?",
+    a: "Import images, video, SVG and Lottie files, paste from Figma, or open a .feega file. Export stills as PNG, JPG, WebP, SVG or PDF, and motion as MP4, GIF, APNG or Lottie."
   },
   {
-    q: 'Which AI models can I use?',
-    a: 'Image, video, audio and text models from many providers, including Google, OpenAI, ElevenLabs and ByteDance. You pick the model for each node, so you can compare and switch freely.'
+    q: "Can I bring my Figma designs?",
+    a: "Yes. Paste from Figma and your layers stay editable on the canvas."
   },
   {
-    q: 'What file formats can I upload and download?',
-    a: 'You can upload images (JPEG, PNG, GIF, WebP, AVIF, HEIC, SVG) and video. Generated images and videos download as standard files, such as PNG, WebP and MP4.'
+    q: "Can I collaborate with my team in real time?",
+    a: "Yes. Invite teammates to your workspace as members or admins: everyone works on the same canvas and sees changes and who is online live."
   },
   {
-    q: 'Can I collaborate with my team in real time?',
-    a: 'Yes. Invite teammates to your workspace as members or admins: everyone works on the same canvas and sees changes and who is online live.'
+    q: "Can AI agents use Feega?",
+    a: "Yes. Agents like Claude or Codex can work on your canvas through our MCP server and REST API, acting on your behalf with your permissions."
   },
   {
-    q: 'Can I plan and publish to social accounts?',
-    a: 'Yes. Connect Instagram, Facebook, TikTok, YouTube, LinkedIn, X, Threads, Pinterest or Reddit, plan posts on the calendar and publish or schedule them after you approve. Publishing uses only the platforms’ official APIs.'
+    q: "Are generated files marked as AI-generated?",
+    a: "Yes. Every image and video Feega renders carries a machine-readable AI-generated marker in the file, and when we publish for you we set the platform\u2019s AI-content label where one exists. See <a href=\"/ai-transparency\">AI Transparency</a>."
   },
   {
-    q: 'Can AI agents use feega?',
-    a: 'Yes. Agents like Claude or Codex can work on your canvas through our MCP server, REST API and command-line tool, acting on your behalf with your permissions.'
+    q: "Who owns what I create?",
+    a: "You keep ownership of the content you bring, and you may use what you generate for your own business purposes, subject to our <a href=\"/terms\">Terms</a> and third-party rights."
   },
   {
-    q: 'Are generated files marked as AI-generated?',
-    a: 'Yes. Every image and video feega renders carries a machine-readable AI-generated marker in the file, and when we publish for you we set the platform’s AI-content label where one exists. See <a href="/ai-transparency">AI Transparency</a>.'
+    q: "Is my content used to train AI?",
+    a: "No. We do not use your prompts, uploads or generated content to train AI models. See our <a href=\"/privacy\">Privacy Policy</a>."
   },
   {
-    q: 'Who owns what I create?',
-    a: 'You keep ownership of the content you bring, and you may use what you generate for your own business purposes, subject to our <a href="/terms">Terms</a> and third-party rights.'
+    q: "How is content kept safe?",
+    a: "Feega must never be used to create non-consensual intimate imagery (NCII), sexual deepfakes or any sexual content of real people. Sexual content involving minors is forbidden and reported to the authorities. Prompts and reference images are screened automatically, real or identifiable people are blocked in sensitive contexts, and AI outputs are labelled as AI-generated. Anyone can report content to <a href=\"mailto:support@feega.app\">support@feega.app</a>: we remove it and suspend the accounts responsible. Read our <a href=\"/acceptable-use\">Acceptable Use Policy</a>, <a href=\"/terms\">Terms</a> and <a href=\"/ai-transparency\">AI Transparency</a>."
   },
   {
-    q: 'Is my content used to train AI?',
-    a: 'No. We do not use your prompts, uploads or generated content to train AI models. See our <a href="/privacy">Privacy Policy</a>.'
+    q: "How do credits and pricing work?",
+    a: "In the cloud, AI runs are paid in credits. Every \u20ac1 of your plan gives 100 credits (\u20ac8/mo = 800 credits). A run costs 120 credits for every $1 the AI provider charges. Running locally with your own keys needs no credits. See <a href=\"#canvas\">pricing</a>."
   },
   {
-    q: 'How is content kept safe?',
-    a: 'feega must never be used to create non-consensual intimate imagery (NCII), sexual deepfakes or any sexual content of real people. Sexual content involving minors is forbidden and reported to the authorities. Prompts and reference images are screened automatically, real or identifiable people are blocked in sensitive contexts, and AI outputs are labelled as AI-generated. Anyone can report content to <a href="mailto:support@feega.app">support@feega.app</a>: we remove it and suspend the accounts responsible. Read our <a href="/acceptable-use">Acceptable Use Policy</a>, <a href="/terms">Terms</a> and <a href="/ai-transparency">AI Transparency</a>.'
-  },
-  {
-    q: 'Who is behind feega?',
-    a: 'feega is built in Italy by Andrea Buttarelli. Company details are in our <a href="/legal-notice">Legal Notice</a>; you can reach us at <a href="mailto:hi@feega.app">hi@feega.app</a>.'
+    q: "Who is behind Feega?",
+    a: "Feega is built in Italy by Andrea Buttarelli, a freelance designer who wanted a faster way to work. No VC money, no growth team: just a designer building the tool he needed, in the open. Company details are in the <a href=\"/legal-notice\">Legal Notice</a>, or write to <a href=\"mailto:hi@feega.app\">hi@feega.app</a>."
   }
 ] as const;
-
-export const LOCAL_COMMANDS = `git clone https://github.com/andreabuttarelli/feega && cd feega && npm install
-npm run local -- my-canvas.feega`;
-
-export const AGENT_PROMPT =
-  'Use feega locally: clone https://github.com/andreabuttarelli/feega, run npm install, start it with npm run local -- my-canvas.feega, then use the feega CLI or MCP server on http://localhost:5173 to design on the canvas.';
 
 export const MOTION_EMBED_ID = 'c76b6d3b-8262-4b68-ad58-3cb51a6190a9';
