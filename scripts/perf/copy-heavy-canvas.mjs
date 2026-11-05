@@ -2,13 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 
-const SOURCE_PROJECT = 'ec948b64-7dd0-48b6-ad52-51eb232cc821';
-const SOURCE_CANVAS = '0aef6d1a-b9e4-462f-8bb6-a43d1209edc1';
+const SOURCE_PROJECT = process.env.HEAVY_SOURCE_PROJECT ?? 'ec948b64-7dd0-48b6-ad52-51eb232cc821';
+const SOURCE_CANVAS = process.env.HEAVY_SOURCE_CANVAS ?? '0aef6d1a-b9e4-462f-8bb6-a43d1209edc1';
 const TEST_EMAIL = 'test@dazero.co';
-const COPY_NAME = 'PERF heavy canvas copy';
+const COPY_NAME = process.env.HEAVY_COPY_NAME ?? 'PERF heavy canvas copy';
 const BUCKET = 'canvas-assets';
 const BATCH = 100;
-const OUT = new URL('./fixture.json', import.meta.url);
+const OUT = new URL(process.env.HEAVY_FIXTURE_OUT ?? './fixture.json', import.meta.url);
 
 const url = process.env.PUBLIC_SUPABASE_URL;
 const options = { auth: { persistSession: false, autoRefreshToken: false } };

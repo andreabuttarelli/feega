@@ -65,3 +65,20 @@ fn an_evicted_raster_frees_its_texture() {
     engine.hold(&mut held, plan(vec![], vec!["a".into()]), &Pictures::new(), &device, &queue).unwrap();
     assert!(!usable(&device, &queue, &raw));
 }
+
+#[cfg(feature = "gpu")]
+#[test]
+fn a_chain_of_filter_passes_reaches_the_queue_in_one_submission() {
+    use gpu_core::filter_passes::Op;
+    let (device, queue) = device();
+    let passes = FilterPasses::new(&device);
+    let source = passes.texture(&device, 32, 32);
+
+    let once = passes.run(&device, Op::Blur, [&source, &source], &[1.0, 0.0]);
+    let twice = passes.run(&device, Op::Blur, [&once, &once], &[0.0, 1.0]);
+    let thrice = passes.run(&device, Op::Blur, [&twice, &twice], &[1.0, 0.0]);
+    passes.flush(&queue);
+
+    assert_eq!(passes.submits(), 1);
+    assert!(usable(&device, &queue, &thrice));
+}
