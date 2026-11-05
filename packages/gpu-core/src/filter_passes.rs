@@ -537,17 +537,34 @@ const POOL_BYTES: u64 = 32 * 1024 * 1024;
 
 type Shelves = crate::texture_budget::Shelves<wgpu::Texture>;
 
+#[derive(Default)]
+struct Pending {
+    encoder: Option<wgpu::CommandEncoder>,
+    buffers: Vec<wgpu::Buffer>,
+    doomed: Vec<wgpu::Texture>,
+}
+
+impl Pending {
+    fn retire(&mut self, gone: Vec<wgpu::Texture>) {
+        if self.encoder.is_some() {
+            self.doomed.extend(gone);
+            return;
+        }
+        gone.iter().for_each(wgpu::Texture::destroy);
+    }
+}
+
 struct Slot {
     texture: wgpu::Texture,
     shelves: Rc<RefCell<Shelves>>,
+    pending: Rc<RefCell<Pending>>,
 }
 
 impl Drop for Slot {
     fn drop(&mut self) {
         let size = (self.texture.width(), self.texture.height());
-        for gone in self.shelves.borrow_mut().give(size, self.texture.clone()) {
-            gone.destroy();
-        }
+        let gone = self.shelves.borrow_mut().give(size, self.texture.clone());
+        self.pending.borrow_mut().retire(gone);
     }
 }
 
@@ -566,6 +583,8 @@ pub struct FilterPasses {
     layout: wgpu::BindGroupLayout,
     pipelines: Vec<(Op, wgpu::ComputePipeline)>,
     shelves: Rc<RefCell<Shelves>>,
+    pending: Rc<RefCell<Pending>>,
+    submits: std::cell::Cell<u64>,
 }
 
 pub fn layer_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
@@ -591,7 +610,7 @@ impl Runner for WgpuRunner<'_> {
     type Tex = Pooled;
 
     fn run(&self, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
-        self.passes.run(self.device, self.queue, op, inputs, params)
+        self.passes.run(self.device, op, inputs, params)
     }
 
     fn size(tex: &Pooled) -> (u32, u32) {
@@ -626,26 +645,25 @@ impl FilterPasses {
                 (*op, device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: None, layout: Some(&shared), module: &module, entry_point: Some("main"), compilation_options: Default::default(), cache: None }))
             })
             .collect();
-        Self { layout, pipelines, shelves: Rc::new(RefCell::new(Shelves::new(POOL_BYTES))) }
+        Self { layout, pipelines, shelves: Rc::new(RefCell::new(Shelves::new(POOL_BYTES))), pending: Rc::default(), submits: std::cell::Cell::new(0) }
     }
 
     pub fn texture(&self, device: &wgpu::Device, width: u32, height: u32) -> Pooled {
         let reused = self.shelves.borrow_mut().take((width, height));
         let texture = reused.unwrap_or_else(|| layer_texture(device, width, height));
-        Pooled(Rc::new(Slot { texture, shelves: self.shelves.clone() }))
+        Pooled(Rc::new(Slot { texture, shelves: self.shelves.clone(), pending: self.pending.clone() }))
     }
 
     pub fn set_pool_bytes(&self, bytes: u64) {
-        for gone in self.shelves.borrow_mut().set_cap(bytes) {
-            gone.destroy();
-        }
+        let gone = self.shelves.borrow_mut().set_cap(bytes);
+        self.pending.borrow_mut().retire(gone);
     }
 
     pub fn pooled_bytes(&self) -> u64 {
         self.shelves.borrow().bytes()
     }
 
-    pub fn run(&self, device: &wgpu::Device, queue: &wgpu::Queue, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
+    pub fn run(&self, device: &wgpu::Device, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
         let pipeline = &self.pipelines.iter().find(|(o, _)| *o == op).expect("every op has a pipeline").1;
         let [a, b] = inputs;
         let out = self.texture(device, a.width(), a.height());
@@ -662,15 +680,28 @@ impl FilterPasses {
                 wgpu::BindGroupEntry { binding: 3, resource: buffer.as_entire_binding() },
             ],
         });
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        let mut pending = self.pending.borrow_mut();
+        let encoder = pending.encoder.get_or_insert_with(|| device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default()));
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
             pass.set_pipeline(pipeline);
             pass.set_bind_group(0, &group, &[]);
             pass.dispatch_workgroups(out.width().div_ceil(GROUP), out.height().div_ceil(GROUP), 1);
         }
-        queue.submit([encoder.finish()]);
-        buffer.destroy();
+        pending.buffers.push(buffer);
         out
+    }
+
+    pub fn flush(&self, queue: &wgpu::Queue) {
+        let mut pending = self.pending.borrow_mut();
+        let Some(encoder) = pending.encoder.take() else { return };
+        queue.submit([encoder.finish()]);
+        self.submits.set(self.submits.get() + 1);
+        pending.buffers.drain(..).for_each(|b| b.destroy());
+        pending.doomed.drain(..).for_each(|t| t.destroy());
+    }
+
+    pub fn submits(&self) -> u64 {
+        self.submits.get()
     }
 }
