@@ -3730,3 +3730,6 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 ### A canvas e2e that never paints a frame may be an effect loop, not a slow compile
 
 **Signal:** the first click hangs, the canvas screenshot is blank, the console prints `updated at` stacks ending in `reopenOutbox` > `restoreDraws`. **Move:** an `$effect` that calls a function writing `nodes` must run it under `untrack`, or it re-triggers itself. Also start a fresh dev server after editing: the watcher ignores worktree files, so a running one serves the old code.
+
+### A landing PR merged with the `landing` check red
+**Signal:** `gh pr merge` succeeds on a PR whose `landing` check failed — `main` has no required checks, so a watch-then-merge script merges whatever the checks say. **Move:** gate the merge on the result (`gh pr checks <n>` exit status, or grep for `fail`) instead of on the watch ending; run `npx vite build` in `landing/` before pushing, since prerender fails on a link to an anchor a removed section owned (`/#canvas`).

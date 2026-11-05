@@ -22,6 +22,11 @@ const metas = [
 ] as const;
 
 describe('search metadata', () => {
+  it('the home page names Feega capitalised, as all copy does', () => {
+    expect(HOME_META.title).toMatch(/^Feega\b/);
+    expect(HOME_META.description).toMatch(/^Feega\b/);
+  });
+
   it.each(metas)('%s fits the title and description limits', (_, m) => {
     expect(m.title.length).toBeLessThanOrEqual(MAX_TITLE);
     expect(m.description.length).toBeLessThanOrEqual(MAX_DESCRIPTION);
