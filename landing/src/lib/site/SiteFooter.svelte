@@ -17,6 +17,7 @@
       <div class="site-col">
         <p>( Navigate )</p>
         <a href="/">Product</a>
+        <a href="/blog">Compare</a>
         <a href={APP_URL}>Sign In</a>
       </div>
       <div class="site-col">
