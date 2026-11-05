@@ -3733,3 +3733,9 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### A landing PR merged with the `landing` check red
 **Signal:** `gh pr merge` succeeds on a PR whose `landing` check failed — `main` has no required checks, so a watch-then-merge script merges whatever the checks say. **Move:** gate the merge on the result (`gh pr checks <n>` exit status, or grep for `fail`) instead of on the watch ending; run `npx vite build` in `landing/` before pushing, since prerender fails on a link to an anchor a removed section owned (`/#canvas`).
+
+### A GPU cost measured on the CPU clock looks cheap
+**Signal:** a budget like "redraw live if the full raster takes under N ms" keeps choosing the expensive path on a heavy scene; the measured time is a few ms while frames take hundreds. **Move:** `clock()` around encoding stops before the GPU starts. Time submit → `on_submitted_work_done`, or read GPU lag, before trusting a cost gate; check with a CPU profile whether time sits in `submit` (blocked on the GPU) rather than in your code.
+
+### Effects that each submit block the main thread
+**Signal:** a CPU profile of a heavy canvas shows `queue.submit` as the top self-time entry under `FilterPasses::run`; textures created per session in the thousands. **Move:** record passes into one encoder and submit once before the render that reads them; size the pool so one screen-sized layer fits, or every pass allocates.
