@@ -1,6 +1,6 @@
 import { DISCORD_ICON, GITHUB_ICON, INSTAGRAM_ICON, X_ICON } from './social-icons';
 
-export const SITE_URL = 'https://www.feega.app';
+export const SITE_URL = 'https://feega.app';
 export const APP_URL = 'https://oh.feega.app';
 export const GITHUB_URL = 'https://github.com/andreabuttarelli/feega';
 export const DOCS_URL = 'https://docs.feega.app';

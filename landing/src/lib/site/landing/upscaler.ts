@@ -1,8 +1,8 @@
-const PAGE = 'https://www.feega.app/ai-video-upscaler';
+const PAGE = 'https://feega.app/ai-video-upscaler';
 const MEDIA = '/site/landing/ai-video-upscaler';
 
 export const UPSCALER = {
-  title: 'AI Video Upscaler – Upscale Video to 2× or 4K | feega',
+  title: 'AI Video Upscaler – Upscale Video to 2× or 4K | Feega',
   description:
     'Upscale a video to 2× or 4K with AI. Upload an MP4 up to 20 s, see the exact price before you run, compare before and after, download. FLUX Video Upscale.',
   cta: {
@@ -20,7 +20,7 @@ export const UPSCALER = {
     ['Labelling', 'Output marked AI-generated in the file metadata (IPTC trainedAlgorithmicMedia)']
   ],
   comparison: [
-    ['', 'feega', 'Topaz Video', 'Browser upscalers (ArtPlayer, free.upscaler.video)', 'Canva / CapCut'],
+    ['', 'Feega', 'Topaz Video', 'Browser upscalers (ArtPlayer, free.upscaler.video)', 'Canva / CapCut'],
     ['Runs', 'Cloud, from the browser', 'Desktop app / cloud', 'In your browser, nothing uploaded', 'Cloud'],
     ['Max length', '20 s', 'Long footage', 'Device-bound', 'Short free tier (Canva: 10 s, 10 MB)'],
     ['Up to', '4K', '4K+ and frame interpolation', '~2×', '4K'],
@@ -61,7 +61,7 @@ export function upscalerJsonLd(): string {
         url: PAGE,
         description: 'Upscale an MP4 clip of up to 20 seconds to 2x or 4K with FLUX Video Upscale, with a price quote before you run it.',
         offers: { '@type': 'Offer', priceCurrency: 'USD', description: 'Billed in credits per second of output.' },
-        publisher: { '@type': 'Organization', name: 'feega', url: 'https://www.feega.app' }
+        publisher: { '@type': 'Organization', name: 'Feega', url: 'https://feega.app' }
       },
       {
         '@type': 'FAQPage',
@@ -71,8 +71,8 @@ export function upscalerJsonLd(): string {
         '@type': 'VideoObject',
         name: 'AI video upscale example: 480p to 2x',
         description: 'Real FLUX Video Upscale output on feega: 854x480 to 1708x960. Big Buck Bunny (c) Blender Foundation, CC BY 3.0.',
-        thumbnailUrl: `https://www.feega.app${UPSCALER.media.poster}`,
-        contentUrl: `https://www.feega.app${UPSCALER.media.after}`,
+        thumbnailUrl: `https://feega.app${UPSCALER.media.poster}`,
+        contentUrl: `https://feega.app${UPSCALER.media.after}`,
         uploadDate: '2026-10-04',
         duration: 'PT2S'
       }
