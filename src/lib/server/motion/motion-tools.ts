@@ -586,6 +586,7 @@ const INTERP_HELP = `in/out set how the value enters and leaves a keyframe: bezi
 type KeyInput = { time: number; value: Keyframe['value']; ease: Keyframe['ease']; intensity?: number; in?: Keyframe['in']; out?: Keyframe['out']; roving?: boolean };
 
 const MODIFIER_CATALOGUE = MODIFIER_KINDS.map((k) => `${k} (${MODIFIERS[k].params.map((p) => `${p.key} ${p.options ? p.options.map((o, i) => `${i}=${o}`).join('/') : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
+const SHAPE_KIND_FIXED = 'the kind of a shape is chosen when it is added: add_shape with the kind you want, then delete this one';
 const PATH_GUIDE = 'SVG path data (M L H V C S Q T Z, absolute or relative) in the shape box: 0,0 is its top-left and 1,1 its bottom-right';
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 
@@ -1108,6 +1109,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const outside = component ? shownProblem(shownIn(), component, input.props) : null;
         if (outside) {
           return { ok: false, error: outside };
+        }
+        if (component === 'Shape' && 'shape' in input.props) {
+          return { ok: false, error: SHAPE_KIND_FIXED };
         }
         const result = placeLayer(session.doc, input.clip_id, storedRecord(propsOf(input.clip_id), input.props, shownIn()));
         if (!result.ok) {

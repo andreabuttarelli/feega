@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import WrapText from '@lucide/svelte/icons/wrap-text';
@@ -35,7 +36,7 @@
   import { FieldKind } from '$lib/motion/number-field';
   import StackSizeChip from './StackSizeChip.svelte';
 
-  let { doc, clip, scale = 1, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; commit: (result: OpResult, summary: string) => void } = $props();
+  let { doc, clip, scale = 1, measure = estimatedText, commit }: { doc: MotionDoc; clip: MotionClip; scale?: number; measure?: TextMeasure; commit: (result: OpResult, summary: string) => void } = $props();
 
   const GapMode = { Fixed: 'fixed', Auto: 'auto' } as const;
   type GapMode = (typeof GapMode)[keyof typeof GapMode];
@@ -147,7 +148,7 @@
 
   {#if layout || parent}
     <div class="grid grid-cols-2 gap-1.5">
-      {#each LIMIT_AXES as axis (axis)}<StackSizeChip {doc} {clip} {axis} {sizings} {commit} />{/each}
+      {#each LIMIT_AXES as axis (axis)}<StackSizeChip {doc} {clip} {axis} {measure} {sizings} {commit} />{/each}
     </div>
     {#if limits.length}
       <div class="flex flex-wrap gap-1.5" data-testid="stack-limits">

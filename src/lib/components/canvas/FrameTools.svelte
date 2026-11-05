@@ -25,6 +25,7 @@
   import type { OpResult } from '@feega/motion-core/motion/timeline';
   import { containFit } from '$lib/canvas/frame-hover';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+  import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import type { Boxes } from '$lib/motion/scene-select';
   import { GridToggle } from '$lib/motion/pixel-grid';
   import { FRAME_VIEW_DEFAULT, FrameView, shows, type FrameViews } from '$lib/canvas/frame-view';
@@ -41,6 +42,7 @@
     tool,
     views = FRAME_VIEW_DEFAULT,
     boxes = {},
+    measure = estimatedText,
     apply,
     ondrawn,
     onleave
@@ -53,6 +55,7 @@
     tool: DrawTool;
     views?: FrameViews;
     boxes?: Boxes;
+    measure?: TextMeasure;
     apply: (result: OpResult, summary: string) => void;
     ondrawn: (id: string) => void;
     onleave: () => void;
@@ -66,7 +69,7 @@
   const drafted = $derived(pointDraft(doc, pointEdit));
   const pointClip = $derived(pointEdit && only?.id === pointEdit ? (findClip(drafted, pointEdit)?.clip ?? only) : only);
   const shown = $derived(shownOverlays({ doc, clip: pointClip, picks: picks.length, tool, pointEdit, active: only ? activeAt(only, frame) : false, views, mode, onion: onionSetting.skin }));
-  const laidOut = $derived(only && shown.has(FrameOverlay.Corners) ? (findClip(withAutoLayout(doc), only.id)?.clip ?? only) : null);
+  const laidOut = $derived(only && shown.has(FrameOverlay.Corners) ? (findClip(withAutoLayout(doc, measure), only.id)?.clip ?? only) : null);
 
   $effect(() => {
     if (pointEdit && only?.id !== pointEdit) {
@@ -124,7 +127,7 @@
   {#if pointClip && shown.has(FrameOverlay.Pen)}<PenOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
   {#if only && shown.has(FrameOverlay.LineEnds)}<LineEndsOverlay {doc} clip={only} {frame} onchange={edit} />{/if}
   {#if pointClip && shown.has(FrameOverlay.Vector)}<VectorOverlay doc={drafted} clip={pointClip} {frame} onchange={edit} onexit={() => (pointEdit = null)} />{/if}
-  {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
+  {#if only?.autoLayout && shown.has(FrameOverlay.AutoLayout)}<AutoLayoutOverlay {doc} {measure} clip={{ ...only, autoLayout: only.autoLayout }} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.TextPath)}<TextPathOverlay {doc} clip={only} {frame} />{/if}
   {#if laidOut}<CornerOverlay {doc} {frame} clip={laidOut} onchange={edit} />{/if}
   {#if only && shown.has(FrameOverlay.Onion)}<OnionOverlay {doc} clip={only} {frame} {boxes} />{/if}

@@ -3722,3 +3722,11 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### A worktree with a symlinked `node_modules` serves `@feega/*` from the main checkout
 **Signal:** a branch newer than the main checkout answers 500 on `/login`, the dev log says `@feega/motion-core/... could not be resolved`. **Move:** the `@feega/*` links are relative (`../../packages/...`), so linking the whole folder points them at the main checkout's packages. Make `node_modules` a real folder that links every entry of the main one except `@feega` and `.vite`, and recreate `@feega/*` with the same relative targets.
+
+### A select that disagrees with the fields beside it is a control to remove, not a state to trust
+
+**Signal:** Properties shows Shape `Rectangle` next to Start/Sweep/Ratio, which only an ellipse has (fields are gated by the clip's real `props.shape`, the select by its own rendering). Not reproduced: in the app an ellipse shows `Ellipse` there. **Move:** the kind of a shape is set once at creation, so the select is gone (`FIELD_SHOWN.shape`) and `set_props` refuses it; check the selected layer's id and kind in the doc before blaming the panel. A transparent stack drawn over a shape takes the click (panel title `Stack`, no Content section), so the layer you meant may not be the one selected.
+
+### A canvas e2e that never paints a frame may be an effect loop, not a slow compile
+
+**Signal:** the first click hangs, the canvas screenshot is blank, the console prints `updated at` stacks ending in `reopenOutbox` > `restoreDraws`. **Move:** an `$effect` that calls a function writing `nodes` must run it under `untrack`, or it re-triggers itself. Also start a fresh dev server after editing: the watcher ignores worktree files, so a running one serves the old code.

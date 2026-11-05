@@ -63,6 +63,7 @@
   import { baseStyle, editBody, editLayout, editsText, hideText, listsOfClip, runsOfClip, styledKind, textEditStyle, type EditBody, type TextEditStyle } from '$lib/canvas/frame-text-edit';
   import { caretSource } from '$lib/canvas/core/text-caret';
   import { applyTextFit, measuredTexts } from '$lib/canvas/text-autosize';
+  import { layerHoverMark } from '$lib/canvas/layer-hover-mark';
   import { HostLedger, settleElement, type ElementHost, type HostBox } from '$lib/motion/element-host';
   import type { TextCaret } from '@feega/motion-core/motion/gpu-full/display-list';
   import type { RunStyle, TextRun } from '@feega/motion-core/motion/text-runs';
@@ -103,6 +104,7 @@
   import { copyElements, guessedBoxes } from '$lib/motion/move-element';
   import { PENDING_ASSET, imageInFrame, sizeOfImage, withAssetSwapped } from '$lib/canvas/image-in-frame';
   import { withAutoLayout } from '@feega/motion-core/motion/layout/resolve';
+  import { estimatedText, type TextMeasure } from '@feega/motion-core/motion/layout/text-extent';
   import { stackFrame, stackPlaced } from '$lib/motion/layout/ops';
   import { dragInStack, dropInStack, followCursor, stackLineAt, type DropLine } from '$lib/motion/layout/stack-drag';
   import { frameOfLive } from '$lib/canvas/core/frame-source';
@@ -1329,6 +1331,12 @@
     handleCursor = hit.kind === HitKind.Corner ? resizeCursor(outward, box.rotation ?? 0) : rotateCursor(outward, box.rotation ?? 0);
   }
 
+  function layerMark(nodeId: string) {
+    const at = pickHover ? null : pickerOf(nodeId);
+    const mark = at ? layerHoverMark(layersSource.hovered, inside?.nodeId ?? null, { nodeId, picker: at.picker, space: at.space }) : null;
+    return mark && at ? { ...mark, highlight: highlightOf(at.live.doc, mark.clip) } : null;
+  }
+
   function dropHover() {
     pickHover = null;
     layersSource.hover(null);
@@ -1839,6 +1847,8 @@
     frameProperties.exportRows = (rows) => (picks.length ? props.onExportElementRows?.(panelNodeId, picks, rows) : props.onExportRows?.([panelNodeId], rows)) ?? Promise.resolve('Export failed');
     frameProperties.runAction = runSelectionAction;
     frameProperties.place = nodePlaceOf(panelNodeId);
+    void typesetLanded;
+    frameProperties.measure = textMeasureOf(panelNodeId) ?? estimatedText;
     frameProperties.rename = props.onRename ? (name) => props.onRename?.(panelNodeId, name) : null;
     frameProperties.host = hostOf(panelNodeId);
     frameProperties.panel = frameChrome(kindOfNode(panelNodeId)).panel;
@@ -2231,6 +2241,11 @@
       const rect = at.picker.frameRect(id);
       return rect ? [[id, rect]] : [];
     }));
+  }
+
+  function textMeasureOf(nodeId: string): TextMeasure | undefined {
+    const live = liveOf(nodeId);
+    return live ? pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead).textMeasure() : undefined;
   }
 
   function toolsOf(nodeId: string) {
@@ -2659,7 +2674,8 @@
       return;
     }
     const work = (grip === Grip.Move && e.altKey ? altCopies(inScope.view, inScope.ids, () => crypto.randomUUID().slice(0, 8), nodeId) : null) ?? { doc: inScope.view, ids: inScope.ids };
-    const boxes = guessedBoxes(withAutoLayout(work.doc));
+    const measure = at.picker.textMeasure();
+    const boxes = guessedBoxes(withAutoLayout(work.doc, measure));
     const framePt = (ev: PointerEvent): Pt => inScope.toView(at.picker.framePoint(toWorld(view, local(ev)), at.space));
     const from = framePt(e);
     const reach = frameReach(at);
@@ -2707,7 +2723,7 @@
         }
         return;
       }
-      const dragged = dragClips({ doc: work.doc, ids: work.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode });
+      const dragged = dragClips({ doc: work.doc, ids: work.ids, frame: inScope.frame, boxes, grip, handle, from, to: framePt(ev), keys: { shift: ev.shiftKey, alt: ev.altKey, ctrl: ev.ctrlKey }, reach, snap: snapOf(ev), mode: saver.mode, measure });
       const shown = dragged.result.ok ? { ok: true as const, doc: lifted(inScope.merge(dragged.result.doc)) } : dragged.result;
       const into = joinable ? dropInStack(work.doc, work.ids[0], boxes, framePt(ev)) : null;
       result = into?.result.ok ? { ok: true, doc: lifted(inScope.merge(into.result.doc)) } : shown;
@@ -2766,7 +2782,7 @@
     if (!live || !pickHover) {
       return [];
     }
-    return measuredGaps(live.doc, frameOfLive(live), guessedBoxes(withAutoLayout(live.doc)), picks, pickHover.clip);
+    return measuredGaps(live.doc, frameOfLive(live), guessedBoxes(withAutoLayout(live.doc, textMeasureOf(nodeId))), picks, pickHover.clip);
   }
 
   $effect(() => {
@@ -3291,7 +3307,7 @@
 
   function showStackLine(over: FrameTarget | null) {
     const doc = over ? liveOf(over.frameId)?.doc : null;
-    const drop = over && doc ? stackLineAt(doc, [over.at.x * doc.width, over.at.y * doc.height]) : null;
+    const drop = over && doc ? stackLineAt(doc, [over.at.x * doc.width, over.at.y * doc.height], textMeasureOf(over.frameId)) : null;
     frameGuides = over && drop ? { nodeId: over.frameId, guides: [], gaps: [], drop } : null;
   }
 
@@ -4308,6 +4324,10 @@
         {#if pickHover?.at === frame.id}
           <div class="pick-outline" data-testid="frame-pick-box" data-hovered={pickHover.clip} style={highlightStyle(pickHover.highlight) + ';' + quadStyle(pickHover.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
         {/if}
+        {@const layered = layerMark(frame.id)}
+        {#if layered}
+          <div class="pick-outline" data-testid="frame-layer-hover-box" data-hovered={layered.clip} style={highlightStyle(layered.highlight) + ';' + quadStyle(layered.quad.map((p) => [(p.x - frame.x) * view.zoom, (p.y - frame.y) * view.zoom] as const))}></div>
+        {/if}
         {@const live = peering ? liveOf(frame.id) : null}
         {@const peers = peering ? peering.peersOf(frame.id, onCanvas) : []}
         {#if peering && live && (peers.length || pointedFrame === frame.id)}
@@ -4315,7 +4335,7 @@
         {/if}
         {@const tools = toolsOf(frame.id)}
         {#if tools}
-          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
+          <FrameTools doc={tools.doc} frame={tools.frame} mode={frameMode} views={frameViews.all} boxes={outlineBoxes(frame.id, tools.doc)} measure={textMeasureOf(frame.id)} size={{ width: frame.w * view.zoom, height: frame.h * view.zoom }} {picks} tool={frameBar.tool} apply={(result, summary) => commit(frame.id, result, summary)} ondrawn={(id) => drawnInside(frame.id, id)} onleave={leaveBuilder} />
         {/if}
         {@const band = marqueeRect(frame.id)}
         {#if band}
