@@ -26,6 +26,7 @@ Define colour, number, text and on/off variables, with modes such as light and d
 - Collections from a URL import are saved to the project.
 - Colour tokens are listed in the Styles panel under the styles. Click a token's colour to change it: every layer bound to it, in every frame of the project, updates.
 - Agents can create and bind variables through the [edit ops](/reference/generated/edit-ops/).
+- New to variables? Follow the [Variables guide](/canvas/variables-guide/).
 
 ## Bind a field to a variable
 
