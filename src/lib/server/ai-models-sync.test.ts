@@ -649,3 +649,41 @@ describe('wireModelId — il nostro id interno, sul filo di OpenRouter', () => {
     expect(await wireModelId('not-a-real-model', 'image')).toBe('not-a-real-model');
   });
 });
+
+describe('syncAiModels — Wiro audio rows before their migration', () => {
+  it('keeps the sync green when the table still refuses the audio catalogue', async () => {
+    const wiroAudio = {
+      tool: [
+        {
+          title: 'Lyria 3',
+          cleanslugowner: 'google',
+          cleanslugproject: 'lyria-3',
+          categories: ['music-generation'],
+          parameters: [{ items: [{ id: 'prompt', type: 'textarea', required: true }] }],
+          dynamicprice: '[{"inputs":{},"price":0.04,"priceMethod":"cpr"}]'
+        }
+      ]
+    };
+    const gateway = okAllThree();
+    const fetchImpl = (async (url: string, init?: RequestInit) =>
+      String(url).includes('/Tool/List') ? Response.json(wiroAudio) : gateway(url, init)) as unknown as typeof fetch;
+    const written: Array<Record<string, unknown>> = [];
+    const admin = {
+      from: () => ({
+        upsert: (rows: Array<Record<string, unknown>>) => {
+          const refused = rows.some((r) => r.catalogue === 'audio');
+          if (!refused) {
+            written.push(...rows);
+          }
+          return Promise.resolve({ error: refused ? { message: 'violates check constraint "ai_models_catalogue_check"' } : null });
+        },
+        select: () => ({ eq: () => ({ then: (resolve: (v: unknown) => unknown) => resolve({ data: [], error: null }) }) })
+      })
+    } as unknown as SupabaseClient;
+
+    const out = await syncAiModels(admin, { fetchImpl, baseUrl: 'https://openrouter.ai/api/v1', wiroBaseUrl: 'https://wiro.test/v1' });
+
+    expect(out).toMatchObject({ ok: true });
+    expect(written.some((r) => r.id === 'bytedance/seedance-2-5')).toBe(true);
+  });
+});

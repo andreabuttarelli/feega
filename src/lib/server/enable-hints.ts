@@ -2,7 +2,7 @@ type OptionalFeature = { missing: RegExp; keys: readonly string[]; enables: stri
 
 const OPTIONAL_FEATURES: readonly OptionalFeature[] = [
   { missing: /LLM_API_KEY|llm_unconfigured/i, keys: ['LLM_API_KEY'], enables: 'the AI agent and text generation' },
-  { missing: /WIRO_API_KEY|WIRO_API_SECRET/i, keys: ['WIRO_API_KEY', 'WIRO_API_SECRET'], enables: 'Wiro image and video models' },
+  { missing: /WIRO_API_KEY|WIRO_API_SECRET/i, keys: ['WIRO_API_KEY', 'WIRO_API_SECRET'], enables: 'Wiro image, video, text and audio models' },
   { missing: /KIE_API_KEY/i, keys: ['KIE_API_KEY'], enables: 'Kie.ai image and video models' },
   { missing: /HIGGSFIELD_API_KEY/i, keys: ['HIGGSFIELD_API_KEY_ID', 'HIGGSFIELD_API_KEY_SECRET'], enables: 'Higgsfield models' },
   { missing: /STRIPE_SECRET_KEY/i, keys: ['STRIPE_SECRET_KEY'], enables: 'paid plans and checkout' },

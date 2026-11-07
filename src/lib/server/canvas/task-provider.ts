@@ -20,7 +20,7 @@ export type TaskOutput = { url: string; contentType: string };
 
 export type TaskState =
   | { state: 'pending' }
-  | { state: 'done'; outputs: TaskOutput[]; costUsd: number | null }
+  | { state: 'done'; outputs: TaskOutput[]; costUsd: number | null; text?: string }
   | { state: 'failed'; error: string };
 
 export type TaskProvider = {

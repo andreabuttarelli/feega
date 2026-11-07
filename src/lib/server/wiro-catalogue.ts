@@ -13,8 +13,30 @@ const CATALOGUE_QUERIES: ReadonlyArray<Record<string, unknown>> = [
   { categories: ['image-to-video'] },
   { categories: ['video-to-video'] },
   { categories: ['3d-generation'] },
+  { categories: ['partner-llm'] },
+  { categories: ['text-to-speech'] },
+  { categories: ['music-generation'] },
   { search: 'uncensored' }
 ];
+
+export const CURATED_WIRO_MODELS: Readonly<Record<string, 'chat' | 'audio'>> = {
+  'openai/gpt-5-nano': 'chat',
+  'openai/gpt-5-mini': 'chat',
+  'google/gemini-3-flash': 'chat',
+  'deepseek/v4-1-flash': 'chat',
+  'xai/grok-4-1-fast': 'chat',
+  'claude/sonnet-5': 'chat',
+  'elevenlabs/eleven-v4-turbo': 'audio',
+  'elevenlabs/eleven-v4': 'audio',
+  'resemble-ai/chatterbox-multilingual': 'audio',
+  'elevenlabs/sound-effects-v3': 'audio',
+  'elevenlabs/text-to-music-v2': 'audio',
+  'stabilityai/stable-audio-3-small-music': 'audio',
+  'google/lyria-3': 'audio'
+};
+const CURATED_ONLY_CATEGORIES: ReadonlySet<string> = new Set(['partner-llm', 'llm', 'text-to-speech', 'text-to-music', 'music-generation']);
+const TEXT_ONLY_CATALOGUES: ReadonlySet<AiModelCatalogue> = new Set(['chat', 'audio']);
+const TOKEN_RATE_GAP = '[^$.,]{0,40}';
 
 const CATALOGUE_OF_CATEGORY: Readonly<Record<string, AiModelCatalogue>> = {
   'text-to-video': 'video',
@@ -97,7 +119,16 @@ function optionValues(param: WiroParam): string[] {
   return (param.options ?? []).map((o) => String(o.value ?? '')).filter(Boolean);
 }
 
-function catalogueOf(tool: WiroTool): AiModelCatalogue {
+const slugOf = (tool: WiroTool): string => `${tool.cleanslugowner}/${tool.cleanslugproject}`;
+
+function catalogueOf(tool: WiroTool): AiModelCatalogue | null {
+  const curated = CURATED_WIRO_MODELS[slugOf(tool)];
+  if (curated) {
+    return curated;
+  }
+  if ((tool.categories ?? []).some((c) => CURATED_ONLY_CATEGORIES.has(c))) {
+    return null;
+  }
   const matched = (tool.categories ?? []).map((c) => CATALOGUE_OF_CATEGORY[c]).find(Boolean);
   return matched ?? 'image';
 }
@@ -115,6 +146,53 @@ function pricingOf(raw: string | null | undefined): TaskPricing {
   } catch {
     return { lines: [] };
   }
+}
+
+function tokenRate(note: string, side: 'input' | 'output'): number | null {
+  const sideFirst = new RegExp(`${side}${TOKEN_RATE_GAP}\\$(\\d+(?:\\.\\d+)?)`, 'i').exec(note);
+  const priceFirst = new RegExp(`\\$(\\d+(?:\\.\\d+)?)${TOKEN_RATE_GAP}${side}`, 'i').exec(note);
+  const match = sideFirst ?? priceFirst;
+  return match ? Number(match[1]) : null;
+}
+
+export function wiroTokenRates(note: string): { usdPerMillionIn: number; usdPerMillionOut: number } | null {
+  const usdPerMillionIn = tokenRate(note, 'input');
+  const usdPerMillionOut = tokenRate(note, 'output');
+  return usdPerMillionIn !== null && usdPerMillionOut !== null ? { usdPerMillionIn, usdPerMillionOut } : null;
+}
+
+function noteOf(raw: string | null | undefined): string {
+  try {
+    return (JSON.parse(raw ?? '[]') as Array<{ note?: unknown }>).map((line) => String(line.note ?? '')).join(' ');
+  } catch {
+    return '';
+  }
+}
+
+function chatRow(tool: WiroTool, syncedAt: string): (AiModelRow & { wire_spec: WiroWireSpec }) | null {
+  const rates = wiroTokenRates(noteOf(tool.dynamicprice));
+  if (!rates) {
+    return null;
+  }
+  return {
+    id: `${WIRO_ID_PREFIX}${slugOf(tool)}`,
+    catalogue: 'chat',
+    provider: WIRO_PROVIDER,
+    label: tool.title?.trim() || slugOf(tool),
+    input_modalities: ['text'],
+    output_modalities: ['text'],
+    supported_parameters: paramsOf(tool).map((p) => p.id!),
+    supported_resolutions: [],
+    param_schema: {},
+    pricing: rates,
+    synced_at: syncedAt,
+    released_at: releasedAt(tool.time),
+    expires_at: null,
+    context_length: null,
+    intelligence_index: null,
+    uncensored: false,
+    wire_spec: { owner: tool.cleanslugowner!, project: tool.cleanslugproject!, fields: { prompt: PROMPT_FIELD, images: [] } }
+  };
 }
 
 function releasedAt(time: WiroTool['time']): string | null {
@@ -181,11 +259,21 @@ export function wiroModelRow(tool: WiroTool, syncedAt: string): (AiModelRow & { 
   if (!tool.cleanslugowner || !tool.cleanslugproject) {
     return null;
   }
-  const params = paramsOf(tool);
   const catalogue = catalogueOf(tool);
+  if (!catalogue) {
+    return null;
+  }
+  if (catalogue === 'chat') {
+    return chatRow(tool, syncedAt);
+  }
+  const params = paramsOf(tool);
   const wiring = wiringOf(params, catalogue);
   if (!wiring) {
     return null;
+  }
+  if (TEXT_ONLY_CATALOGUES.has(catalogue)) {
+    wiring.fields.images = [];
+    delete wiring.fields.lastFrame;
   }
 
   const resolutionParam = params.find((p) => p.id === wiring.fields.resolution);
