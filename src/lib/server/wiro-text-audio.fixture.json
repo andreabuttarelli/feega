@@ -1,0 +1,2651 @@
+{
+ "tool": [
+  {
+   "title": "GPT-5 Nano AI Model",
+   "cleanslugowner": "openai",
+   "cleanslugproject": "gpt-5-nano",
+   "categories": [
+    "tool",
+    "partner",
+    "openai",
+    "partner-llm",
+    "nogpu-pipeline",
+    "llm-tool-call",
+    "llm-response-format"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputImage",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Tell me about T\u00fcrkiye",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "user_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "session_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": false,
+       "id": "systemInstructions",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "reasoning",
+       "value": "medium",
+       "options": [
+        {
+         "value": "minimal"
+        },
+        {
+         "value": "low"
+        },
+        {
+         "value": "medium"
+        },
+        {
+         "value": "high"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "webSearch",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "verbosity",
+       "value": "medium",
+       "options": [
+        {
+         "value": "low"
+        },
+        {
+         "value": "medium"
+        },
+        {
+         "value": "high"
+        }
+       ]
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "max_output_tokens",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "messages",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "tools",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "tool_choice",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "parallel_tool_calls",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "previousTaskToken",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "toolOutputs",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "response_format",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0,\"priceMethod\":\"cp-readoutput\",\"note\":\"1 million input token $0.05, 1 million output token $0.40, $10.00 for 1000 web search\"}]",
+   "time": "1768579312"
+  },
+  {
+   "title": "GPT-5 Mini AI Model",
+   "cleanslugowner": "openai",
+   "cleanslugproject": "gpt-5-mini",
+   "categories": [
+    "tool",
+    "partner",
+    "openai",
+    "partner-llm",
+    "nogpu-pipeline",
+    "llm-tool-call",
+    "llm-response-format"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputImage",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Tell me about T\u00fcrkiye",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "user_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "session_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": false,
+       "id": "systemInstructions",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "reasoning",
+       "value": "medium",
+       "options": [
+        {
+         "value": "minimal"
+        },
+        {
+         "value": "low"
+        },
+        {
+         "value": "medium"
+        },
+        {
+         "value": "high"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "webSearch",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "verbosity",
+       "value": "medium",
+       "options": [
+        {
+         "value": "low"
+        },
+        {
+         "value": "medium"
+        },
+        {
+         "value": "high"
+        }
+       ]
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "max_output_tokens",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "messages",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "tools",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "tool_choice",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "parallel_tool_calls",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "previousTaskToken",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "toolOutputs",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "response_format",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0,\"priceMethod\":\"cp-readoutput\",\"note\":\"1 million input token $0.25, 1 million output token $2.00, $10.00 for 1000 web search\"}]",
+   "time": "1768578627"
+  },
+  {
+   "title": "Gemini 3 Flash",
+   "cleanslugowner": "google",
+   "cleanslugproject": "gemini-3-flash",
+   "categories": [
+    "tool",
+    "partner",
+    "google",
+    "use-agent",
+    "price-list",
+    "partner-llm",
+    "nogpu-pipeline",
+    "llm-tool-call",
+    "llm-response-format"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputAll",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Tell me about T\u00fcrkiye",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "user_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "session_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": false,
+       "id": "systemInstructions",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "thinkingLevel",
+       "value": "low",
+       "options": [
+        {
+         "value": "minimal"
+        },
+        {
+         "value": "low"
+        },
+        {
+         "value": "medium"
+        },
+        {
+         "value": "high"
+        }
+       ]
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "temperature",
+       "value": "1",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "topP",
+       "value": "0.95",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "maxOutputTokens",
+       "value": "65536",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "messages",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "tools",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "tool_choice",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "parallel_tool_calls",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "previousTaskToken",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "toolOutputs",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "response_format",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0,\"priceMethod\":\"cp-readoutput\",\"note\":\"Will be calculated when the task finishes. $0.50 (text / image / video) for 1m input tokens, $1.00 (audio) for 1m input tokens. $3.0 for 1m output tokens(including thinking tokens)\"}]",
+   "time": "1766414190"
+  },
+  {
+   "title": "DeepSeek V4.1 Flash (Text + Vision)",
+   "cleanslugowner": "deepseek",
+   "cleanslugproject": "v4-1-flash",
+   "categories": [
+    "tool",
+    "partner",
+    "use-agent",
+    "price-list",
+    "partner-llm",
+    "nogpu-pipeline",
+    "deepseek",
+    "llm-tool-call",
+    "llm-response-format"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Who won the latest f1 race?",
+       "options": []
+      },
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputImage",
+       "value": [],
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "user_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "session_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": false,
+       "id": "systemInstructions",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "thinkingType",
+       "value": "auto",
+       "options": [
+        {
+         "value": "auto"
+        },
+        {
+         "value": "enabled"
+        },
+        {
+         "value": "disabled"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "reasoningEffort",
+       "value": "medium",
+       "options": [
+        {
+         "value": "minimal"
+        },
+        {
+         "value": "low"
+        },
+        {
+         "value": "medium"
+        },
+        {
+         "value": "high"
+        }
+       ]
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "temperature",
+       "value": "1.0",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "topP",
+       "value": "0.7",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "frequencyPenalty",
+       "value": "0",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "presencePenalty",
+       "value": "0",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "maxCompletionTokens",
+       "value": "65536",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "messages",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "tools",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "tool_choice",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "parallel_tool_calls",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "previousTaskToken",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "toolOutputs",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "response_format",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0,\"priceMethod\":\"cp-readoutput\",\"note\":\"DeepSeek V4.1 Flash pricing per 1M tokens. Off-peak: $0.15 input, $0.60 output, $0.003 cached input. Peak (Mon\u2013Fri 09:00\u201312:00 and 14:00\u201318:00 UTC+8): $0.30 input, $1.20 output, $0.006 cached input. Reasoning tokens are billed as output, so enabling thinking or raising reasoning effort increases cost.\"}]",
+   "time": "1792672674"
+  },
+  {
+   "title": "Grok 4.1 Fast by xAI for Agentic Chat",
+   "cleanslugowner": "xai",
+   "cleanslugproject": "grok-4-1-fast",
+   "categories": [
+    "tool",
+    "partner",
+    "partner-llm",
+    "llm",
+    "xai",
+    "llm-reasoning",
+    "nogpu-pipeline",
+    "llm-tool-call",
+    "llm-response-format"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputImage",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Tell me about T\u00fcrkiye",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "user_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "session_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "reasoning",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "webSearch",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "textarea",
+       "required": false,
+       "id": "systemInstructions",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "maxOutputTokens",
+       "value": "65536",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "temperature",
+       "value": "1",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "topP",
+       "value": "1",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "messages",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "tools",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "tool_choice",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "parallel_tool_calls",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "previousTaskToken",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "toolOutputs",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "response_format",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0,\"priceMethod\":\"cp-readoutput\",\"note\":\"Flat pricing per million tokens. Input: $0.20 / Cached input: $0.05 / Output: $0.50 (reasoning tokens are billed as output). Context window: 2M tokens. Reasoning and non-reasoning variants share identical rates. If web_search is enabled, each tool invocation is billed separately at $5 / 1,000 calls on top of token costs.\"}]",
+   "time": "1776440239"
+  },
+  {
+   "title": "Claude Sonnet 5 for Coding and PDF Q&A",
+   "cleanslugowner": "claude",
+   "cleanslugproject": "sonnet-5",
+   "categories": [
+    "tool",
+    "partner",
+    "use-agent",
+    "price-list",
+    "partner-llm",
+    "nogpu-pipeline",
+    "llm-tool-call",
+    "llm-response-format"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputAll",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Tell me about T\u00fcrkiye",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "user_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "session_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": false,
+       "id": "systemInstructions",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "effort",
+       "value": "medium",
+       "options": [
+        {
+         "value": "low"
+        },
+        {
+         "value": "medium"
+        },
+        {
+         "value": "high"
+        },
+        {
+         "value": "xhigh"
+        },
+        {
+         "value": "max"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "webSearch",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "maxOutputTokens",
+       "value": "64000",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "messages",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "tools",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "tool_choice",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "parallel_tool_calls",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "previousTaskToken",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "toolOutputs",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "response_format",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0,\"priceMethod\":\"cp-readoutput\",\"note\":\"Pricing per 1M tokens: $2 input (text/image/pdf), $10 output. Prompt caching: cache writes $2.50 (5-minute) or $4 (1-hour), cache reads $0.20. Thinking tokens are billed as output, so higher effort levels increase cost. Web search is billed separately at $10 per 1000 searches.\"}]",
+   "time": "1787224425"
+  },
+  {
+   "title": "Qwen3-32B",
+   "cleanslugowner": "qwen",
+   "cleanslugproject": "qwen3-32b",
+   "categories": [
+    "model",
+    "llm",
+    "persistent",
+    "chat",
+    "checkpoint-folder",
+    "bf16",
+    "rag",
+    "qwen3",
+    "llm-reasoning",
+    "llm-tool-call",
+    "llm-response-format"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Can you say something short and interesting about dogs?",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "user_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "session_id",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": false,
+       "id": "system_prompt",
+       "value": "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. \nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "temperature",
+       "value": "0.7",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "top_p",
+       "value": "0.95",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "top_k",
+       "value": "0",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "repetition_penalty",
+       "value": "1.0",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "length_penalty",
+       "value": "1",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "max_tokens",
+       "value": "0",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "min_tokens",
+       "value": "0",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "min_new_tokens",
+       "value": "-1",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "stop_sequences",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "seed",
+       "value": "123456",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "quantization",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "do_sample",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "messages",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "tools",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "tool_choice",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "checkbox",
+       "required": false,
+       "id": "parallel_tool_calls",
+       "value": "true",
+       "options": []
+      },
+      {
+       "type": "text",
+       "required": false,
+       "id": "previousTaskToken",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json-array",
+       "required": false,
+       "id": "toolOutputs",
+       "value": "",
+       "options": []
+      },
+      {
+       "type": "json",
+       "required": false,
+       "id": "response_format",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": null,
+   "time": "1754290535"
+  },
+  {
+   "title": "Eleven V4 Turbo by ElevenLabs",
+   "cleanslugowner": "elevenlabs",
+   "cleanslugproject": "eleven-v4-turbo",
+   "categories": [
+    "tool",
+    "partner",
+    "elevenlabs",
+    "text-to-speech",
+    "quick-showcase",
+    "nogpu-pipeline"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "[friendly] Hi there! Your table for two is ready. [casual] Right this way, please.",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "voice",
+       "value": "alice",
+       "options": [
+        {
+         "value": "adam"
+        },
+        {
+         "value": "alice"
+        },
+        {
+         "value": "bella"
+        },
+        {
+         "value": "bill"
+        },
+        {
+         "value": "brian"
+        },
+        {
+         "value": "callum"
+        },
+        {
+         "value": "charlie"
+        },
+        {
+         "value": "chris"
+        },
+        {
+         "value": "daniel"
+        },
+        {
+         "value": "eric"
+        },
+        {
+         "value": "george"
+        },
+        {
+         "value": "harry"
+        },
+        {
+         "value": "jessica"
+        },
+        {
+         "value": "laura"
+        },
+        {
+         "value": "liam"
+        },
+        {
+         "value": "lily"
+        },
+        {
+         "value": "matilda"
+        },
+        {
+         "value": "river"
+        },
+        {
+         "value": "roger"
+        },
+        {
+         "value": "sarah"
+        },
+        {
+         "value": "will"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "outputFormat",
+       "value": "mp3_44100_128",
+       "options": [
+        {
+         "value": "mp3_22050_32"
+        },
+        {
+         "value": "mp3_44100_32"
+        },
+        {
+         "value": "mp3_44100_64"
+        },
+        {
+         "value": "mp3_44100_96"
+        },
+        {
+         "value": "mp3_44100_128"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "languageCode",
+       "value": "auto",
+       "options": [
+        {
+         "value": "auto"
+        },
+        {
+         "value": "af"
+        },
+        {
+         "value": "am"
+        },
+        {
+         "value": "ar"
+        },
+        {
+         "value": "hy"
+        },
+        {
+         "value": "as"
+        },
+        {
+         "value": "az"
+        },
+        {
+         "value": "be"
+        },
+        {
+         "value": "bn"
+        },
+        {
+         "value": "bs"
+        },
+        {
+         "value": "bg"
+        },
+        {
+         "value": "my"
+        },
+        {
+         "value": "ca"
+        },
+        {
+         "value": "zh"
+        },
+        {
+         "value": "hr"
+        },
+        {
+         "value": "cs"
+        },
+        {
+         "value": "da"
+        },
+        {
+         "value": "nl"
+        },
+        {
+         "value": "en"
+        },
+        {
+         "value": "et"
+        },
+        {
+         "value": "fi"
+        },
+        {
+         "value": "fr"
+        },
+        {
+         "value": "ff"
+        },
+        {
+         "value": "gl"
+        },
+        {
+         "value": "ka"
+        },
+        {
+         "value": "de"
+        },
+        {
+         "value": "el"
+        },
+        {
+         "value": "gu"
+        },
+        {
+         "value": "ha"
+        },
+        {
+         "value": "he"
+        },
+        {
+         "value": "hi"
+        },
+        {
+         "value": "hu"
+        },
+        {
+         "value": "is"
+        },
+        {
+         "value": "id"
+        },
+        {
+         "value": "it"
+        },
+        {
+         "value": "ja"
+        },
+        {
+         "value": "jv"
+        },
+        {
+         "value": "kn"
+        },
+        {
+         "value": "kk"
+        },
+        {
+         "value": "ko"
+        },
+        {
+         "value": "ky"
+        },
+        {
+         "value": "lo"
+        },
+        {
+         "value": "lv"
+        },
+        {
+         "value": "ln"
+        },
+        {
+         "value": "lt"
+        },
+        {
+         "value": "lg"
+        },
+        {
+         "value": "lb"
+        },
+        {
+         "value": "mk"
+        },
+        {
+         "value": "ms"
+        },
+        {
+         "value": "ml"
+        },
+        {
+         "value": "mt"
+        },
+        {
+         "value": "mi"
+        },
+        {
+         "value": "mr"
+        },
+        {
+         "value": "mn"
+        },
+        {
+         "value": "ne"
+        },
+        {
+         "value": "no"
+        },
+        {
+         "value": "oc"
+        },
+        {
+         "value": "or"
+        },
+        {
+         "value": "ps"
+        },
+        {
+         "value": "fa"
+        },
+        {
+         "value": "pl"
+        },
+        {
+         "value": "pt"
+        },
+        {
+         "value": "pa"
+        },
+        {
+         "value": "ro"
+        },
+        {
+         "value": "ru"
+        },
+        {
+         "value": "sr"
+        },
+        {
+         "value": "sn"
+        },
+        {
+         "value": "sd"
+        },
+        {
+         "value": "sk"
+        },
+        {
+         "value": "sl"
+        },
+        {
+         "value": "so"
+        },
+        {
+         "value": "es"
+        },
+        {
+         "value": "sw"
+        },
+        {
+         "value": "sv"
+        },
+        {
+         "value": "tg"
+        },
+        {
+         "value": "ta"
+        },
+        {
+         "value": "te"
+        },
+        {
+         "value": "th"
+        },
+        {
+         "value": "tr"
+        },
+        {
+         "value": "uk"
+        },
+        {
+         "value": "ur"
+        },
+        {
+         "value": "uz"
+        },
+        {
+         "value": "vi"
+        },
+        {
+         "value": "cy"
+        },
+        {
+         "value": "wo"
+        },
+        {
+         "value": "zu"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "timestamps",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "applyTextNormalization",
+       "value": "auto",
+       "options": [
+        {
+         "value": "auto"
+        },
+        {
+         "value": "on"
+        },
+        {
+         "value": "off"
+        }
+       ]
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "stability",
+       "value": "0.5",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "similarityBoost",
+       "value": "0.75",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "seed",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0.00004,\"priceMethod\":\"cp-promptlength\"}]",
+   "time": "1790688961"
+  },
+  {
+   "title": "Eleven V4 by ElevenLabs (Text-to-Speech)",
+   "cleanslugowner": "elevenlabs",
+   "cleanslugproject": "eleven-v4",
+   "categories": [
+    "tool",
+    "partner",
+    "elevenlabs",
+    "text-to-speech",
+    "quick-showcase",
+    "nogpu-pipeline"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "[measured] Every great story begins with a single voice. [softly] Tonight, let that voice be yours.",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "voice",
+       "value": "alice",
+       "options": [
+        {
+         "value": "adam"
+        },
+        {
+         "value": "alice"
+        },
+        {
+         "value": "bella"
+        },
+        {
+         "value": "bill"
+        },
+        {
+         "value": "brian"
+        },
+        {
+         "value": "callum"
+        },
+        {
+         "value": "charlie"
+        },
+        {
+         "value": "chris"
+        },
+        {
+         "value": "daniel"
+        },
+        {
+         "value": "eric"
+        },
+        {
+         "value": "george"
+        },
+        {
+         "value": "harry"
+        },
+        {
+         "value": "jessica"
+        },
+        {
+         "value": "laura"
+        },
+        {
+         "value": "liam"
+        },
+        {
+         "value": "lily"
+        },
+        {
+         "value": "matilda"
+        },
+        {
+         "value": "river"
+        },
+        {
+         "value": "roger"
+        },
+        {
+         "value": "sarah"
+        },
+        {
+         "value": "will"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "outputFormat",
+       "value": "mp3_44100_128",
+       "options": [
+        {
+         "value": "mp3_22050_32"
+        },
+        {
+         "value": "mp3_44100_32"
+        },
+        {
+         "value": "mp3_44100_64"
+        },
+        {
+         "value": "mp3_44100_96"
+        },
+        {
+         "value": "mp3_44100_128"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "languageCode",
+       "value": "auto",
+       "options": [
+        {
+         "value": "auto"
+        },
+        {
+         "value": "af"
+        },
+        {
+         "value": "am"
+        },
+        {
+         "value": "ar"
+        },
+        {
+         "value": "hy"
+        },
+        {
+         "value": "as"
+        },
+        {
+         "value": "az"
+        },
+        {
+         "value": "be"
+        },
+        {
+         "value": "bn"
+        },
+        {
+         "value": "bs"
+        },
+        {
+         "value": "bg"
+        },
+        {
+         "value": "my"
+        },
+        {
+         "value": "ca"
+        },
+        {
+         "value": "zh"
+        },
+        {
+         "value": "hr"
+        },
+        {
+         "value": "cs"
+        },
+        {
+         "value": "da"
+        },
+        {
+         "value": "nl"
+        },
+        {
+         "value": "en"
+        },
+        {
+         "value": "et"
+        },
+        {
+         "value": "fi"
+        },
+        {
+         "value": "fr"
+        },
+        {
+         "value": "ff"
+        },
+        {
+         "value": "gl"
+        },
+        {
+         "value": "ka"
+        },
+        {
+         "value": "de"
+        },
+        {
+         "value": "el"
+        },
+        {
+         "value": "gu"
+        },
+        {
+         "value": "ha"
+        },
+        {
+         "value": "he"
+        },
+        {
+         "value": "hi"
+        },
+        {
+         "value": "hu"
+        },
+        {
+         "value": "is"
+        },
+        {
+         "value": "id"
+        },
+        {
+         "value": "it"
+        },
+        {
+         "value": "ja"
+        },
+        {
+         "value": "jv"
+        },
+        {
+         "value": "kn"
+        },
+        {
+         "value": "kk"
+        },
+        {
+         "value": "ko"
+        },
+        {
+         "value": "ky"
+        },
+        {
+         "value": "lo"
+        },
+        {
+         "value": "lv"
+        },
+        {
+         "value": "ln"
+        },
+        {
+         "value": "lt"
+        },
+        {
+         "value": "lg"
+        },
+        {
+         "value": "lb"
+        },
+        {
+         "value": "mk"
+        },
+        {
+         "value": "ms"
+        },
+        {
+         "value": "ml"
+        },
+        {
+         "value": "mt"
+        },
+        {
+         "value": "mi"
+        },
+        {
+         "value": "mr"
+        },
+        {
+         "value": "mn"
+        },
+        {
+         "value": "ne"
+        },
+        {
+         "value": "no"
+        },
+        {
+         "value": "oc"
+        },
+        {
+         "value": "or"
+        },
+        {
+         "value": "ps"
+        },
+        {
+         "value": "fa"
+        },
+        {
+         "value": "pl"
+        },
+        {
+         "value": "pt"
+        },
+        {
+         "value": "pa"
+        },
+        {
+         "value": "ro"
+        },
+        {
+         "value": "ru"
+        },
+        {
+         "value": "sr"
+        },
+        {
+         "value": "sn"
+        },
+        {
+         "value": "sd"
+        },
+        {
+         "value": "sk"
+        },
+        {
+         "value": "sl"
+        },
+        {
+         "value": "so"
+        },
+        {
+         "value": "es"
+        },
+        {
+         "value": "sw"
+        },
+        {
+         "value": "sv"
+        },
+        {
+         "value": "tg"
+        },
+        {
+         "value": "ta"
+        },
+        {
+         "value": "te"
+        },
+        {
+         "value": "th"
+        },
+        {
+         "value": "tr"
+        },
+        {
+         "value": "uk"
+        },
+        {
+         "value": "ur"
+        },
+        {
+         "value": "uz"
+        },
+        {
+         "value": "vi"
+        },
+        {
+         "value": "cy"
+        },
+        {
+         "value": "wo"
+        },
+        {
+         "value": "zu"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "timestamps",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "applyTextNormalization",
+       "value": "auto",
+       "options": [
+        {
+         "value": "auto"
+        },
+        {
+         "value": "on"
+        },
+        {
+         "value": "off"
+        }
+       ]
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "stability",
+       "value": "0.5",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "similarityBoost",
+       "value": "0.75",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "seed",
+       "value": "",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0.00008,\"priceMethod\":\"cp-promptlength\"}]",
+   "time": "1790687467"
+  },
+  {
+   "title": "Chatterbox Multilingual",
+   "cleanslugowner": "resemble-ai",
+   "cleanslugproject": "chatterbox-multilingual",
+   "categories": [
+    "tool",
+    "speech-to-speech",
+    "text-to-speech",
+    "persistent",
+    "voice-clone"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputAudio",
+       "value": "https://cdn.wiro.ai/uploads/sampleinputs/chatterbox.mp3",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "I completely understand the frustration you're experiencing. Technical issues are never convenient. To help me resolve this for you immediately, could you please confirm the last four digits of your account number?",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "language",
+       "value": "en",
+       "options": [
+        {
+         "value": "ar"
+        },
+        {
+         "value": "da"
+        },
+        {
+         "value": "de"
+        },
+        {
+         "value": "el"
+        },
+        {
+         "value": "en"
+        },
+        {
+         "value": "es"
+        },
+        {
+         "value": "fi"
+        },
+        {
+         "value": "fr"
+        },
+        {
+         "value": "he"
+        },
+        {
+         "value": "hi"
+        },
+        {
+         "value": "it"
+        },
+        {
+         "value": "ja"
+        },
+        {
+         "value": "ko"
+        },
+        {
+         "value": "ms"
+        },
+        {
+         "value": "nl"
+        },
+        {
+         "value": "no"
+        },
+        {
+         "value": "pl"
+        },
+        {
+         "value": "pt"
+        },
+        {
+         "value": "ru"
+        },
+        {
+         "value": "sv"
+        },
+        {
+         "value": "sw"
+        },
+        {
+         "value": "tr"
+        },
+        {
+         "value": "zh"
+        }
+       ]
+      },
+      {
+       "type": "float",
+       "required": true,
+       "id": "exaggeration",
+       "value": "0.5",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": true,
+       "id": "cfg_weight",
+       "value": "0.5",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": true,
+       "id": "temperature",
+       "value": "0.8",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": true,
+       "id": "topP",
+       "value": "1.0",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0.00035,\"priceMethod\":\"cp-promptlength\"}]",
+   "time": "1771329026"
+  },
+  {
+   "title": "ElevenLabs Text to Music v2 API",
+   "cleanslugowner": "elevenlabs",
+   "cleanslugproject": "text-to-music-v2",
+   "categories": [
+    "tool",
+    "partner",
+    "elevenlabs",
+    "quick-showcase",
+    "nogpu-pipeline",
+    "text-to-music",
+    "music-generation"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Lofi hip hop with warm rhodes chords, a soft dusty drum loop and light vinyl crackle, relaxed and nostalgic",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "outputFormat",
+       "value": "mp3_44100_128",
+       "options": [
+        {
+         "value": "mp3_22050_32"
+        },
+        {
+         "value": "mp3_44100_32"
+        },
+        {
+         "value": "mp3_44100_64"
+        },
+        {
+         "value": "mp3_44100_96"
+        },
+        {
+         "value": "mp3_44100_128"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "duration",
+       "value": "30",
+       "options": [
+        {
+         "value": "10"
+        },
+        {
+         "value": "15"
+        },
+        {
+         "value": "20"
+        },
+        {
+         "value": "25"
+        },
+        {
+         "value": "30"
+        },
+        {
+         "value": "35"
+        },
+        {
+         "value": "40"
+        },
+        {
+         "value": "45"
+        },
+        {
+         "value": "50"
+        },
+        {
+         "value": "55"
+        },
+        {
+         "value": "60"
+        },
+        {
+         "value": "70"
+        },
+        {
+         "value": "80"
+        },
+        {
+         "value": "90"
+        },
+        {
+         "value": "100"
+        },
+        {
+         "value": "110"
+        },
+        {
+         "value": "120"
+        },
+        {
+         "value": "130"
+        },
+        {
+         "value": "140"
+        },
+        {
+         "value": "150"
+        },
+        {
+         "value": "160"
+        },
+        {
+         "value": "170"
+        },
+        {
+         "value": "180"
+        },
+        {
+         "value": "190"
+        },
+        {
+         "value": "200"
+        },
+        {
+         "value": "210"
+        },
+        {
+         "value": "220"
+        },
+        {
+         "value": "230"
+        },
+        {
+         "value": "240"
+        },
+        {
+         "value": "250"
+        },
+        {
+         "value": "260"
+        },
+        {
+         "value": "270"
+        },
+        {
+         "value": "280"
+        },
+        {
+         "value": "290"
+        },
+        {
+         "value": "300"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "instrumental",
+       "value": "true",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"duration\":\"10\"},\"price\":0.025,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"15\"},\"price\":0.0375,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"20\"},\"price\":0.05,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"25\"},\"price\":0.0625,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"30\"},\"price\":0.075,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"35\"},\"price\":0.0875,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"40\"},\"price\":0.1,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"45\"},\"price\":0.1125,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"50\"},\"price\":0.125,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"55\"},\"price\":0.1375,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"60\"},\"price\":0.15,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"70\"},\"price\":0.175,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"80\"},\"price\":0.2,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"90\"},\"price\":0.225,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"100\"},\"price\":0.25,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"110\"},\"price\":0.275,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"120\"},\"price\":0.3,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"130\"},\"price\":0.325,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"140\"},\"price\":0.35,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"150\"},\"price\":0.375,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"160\"},\"price\":0.4,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"170\"},\"price\":0.425,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"180\"},\"price\":0.45,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"190\"},\"price\":0.475,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"200\"},\"price\":0.5,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"210\"},\"price\":0.525,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"220\"},\"price\":0.55,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"230\"},\"price\":0.575,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"240\"},\"price\":0.6,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"250\"},\"price\":0.625,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"260\"},\"price\":0.65,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"270\"},\"price\":0.675,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"280\"},\"price\":0.7,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"290\"},\"price\":0.725,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"300\"},\"price\":0.75,\"priceMethod\":\"cpr\"}]",
+   "time": "1788345322"
+  },
+  {
+   "title": "Stable Audio 3 Small Music by Stability AI",
+   "cleanslugowner": "stabilityai",
+   "cleanslugproject": "stable-audio-3-small-music",
+   "categories": [
+    "persistent",
+    "fast-inference",
+    "tool",
+    "text-to-music",
+    "music-generation"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "Cyberpunk darksynth, industrial electronic, mid-tempo 110 BPM. Heavy distorted basslines, pulsing analog synthesizers, crisp futuristic drum machine patterns, and gritty tech-noir atmosphere. Haunting cyberpunk soundscapes, sweeping filter cuts, cinematic sci-fi build-up leading into an aggressive, driving electronic drop. High-fidelity production, wide stereo imaging, aggressive and immersive.",
+       "options": []
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "duration",
+       "value": "60",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "promptExpansion",
+       "value": "False",
+       "options": [
+        {
+         "value": "True"
+        },
+        {
+         "value": "False"
+        }
+       ]
+      },
+      {
+       "type": "number",
+       "required": false,
+       "id": "steps",
+       "value": "8",
+       "options": []
+      },
+      {
+       "type": "float",
+       "required": true,
+       "id": "scale",
+       "value": "1.0",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0.03,\"priceMethod\":\"cpr\"}]",
+   "time": "1781080811"
+  },
+  {
+   "title": "Google Lyria 3: 30s Music Generator",
+   "cleanslugowner": "google",
+   "cleanslugproject": "lyria-3",
+   "categories": [
+    "tool",
+    "partner",
+    "google",
+    "text-to-song",
+    "image-to-song",
+    "image-to-music",
+    "nogpu-pipeline",
+    "music-generation"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "combinefileinput",
+       "required": false,
+       "id": "inputImage",
+       "value": "https://cdn.wiro.ai/uploads/sampleinputs/lyria-3-input-1.jpeg",
+       "options": []
+      },
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "A 30-second atmospheric synthwave clip inspired by the mood and colors of this image.\nSlow tempo around 80 BPM, warm analog synth pads, a melancholic lead synth melody, soft electronic drums with a gated reverb snare, and subtle rain ambience.\nNostalgic, dreamy, and a bit lonely.\nInstrumental only, no vocals.",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{},\"price\":0.04,\"priceMethod\":\"cpr\"}]",
+   "time": "1778752867"
+  },
+  {
+   "title": "ElevenLabs Sound Effects v3 (SFX v3)",
+   "cleanslugowner": "elevenlabs",
+   "cleanslugproject": "sound-effects-v3",
+   "categories": [
+    "tool",
+    "partner",
+    "elevenlabs",
+    "text-to-speech",
+    "quick-showcase",
+    "nogpu-pipeline"
+   ],
+   "parameters": [
+    {
+     "title": "",
+     "subtitle": "",
+     "items": [
+      {
+       "type": "textarea",
+       "required": true,
+       "id": "prompt",
+       "value": "A heavy wooden door creaks slowly open, then slams shut with a deep echo in an empty stone hallway",
+       "options": []
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "duration",
+       "value": "5",
+       "options": [
+        {
+         "value": "1"
+        },
+        {
+         "value": "2"
+        },
+        {
+         "value": "3"
+        },
+        {
+         "value": "4"
+        },
+        {
+         "value": "5"
+        },
+        {
+         "value": "6"
+        },
+        {
+         "value": "7"
+        },
+        {
+         "value": "8"
+        },
+        {
+         "value": "9"
+        },
+        {
+         "value": "10"
+        },
+        {
+         "value": "11"
+        },
+        {
+         "value": "12"
+        },
+        {
+         "value": "13"
+        },
+        {
+         "value": "14"
+        },
+        {
+         "value": "15"
+        },
+        {
+         "value": "16"
+        },
+        {
+         "value": "17"
+        },
+        {
+         "value": "18"
+        },
+        {
+         "value": "19"
+        },
+        {
+         "value": "20"
+        },
+        {
+         "value": "21"
+        },
+        {
+         "value": "22"
+        },
+        {
+         "value": "23"
+        },
+        {
+         "value": "24"
+        },
+        {
+         "value": "25"
+        },
+        {
+         "value": "26"
+        },
+        {
+         "value": "27"
+        },
+        {
+         "value": "28"
+        },
+        {
+         "value": "29"
+        },
+        {
+         "value": "30"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": true,
+       "id": "outputFormat",
+       "value": "mp3_44100_128",
+       "options": [
+        {
+         "value": "mp3_22050_32"
+        },
+        {
+         "value": "mp3_44100_32"
+        },
+        {
+         "value": "mp3_44100_64"
+        },
+        {
+         "value": "mp3_44100_96"
+        },
+        {
+         "value": "mp3_44100_128"
+        }
+       ]
+      },
+      {
+       "type": "select",
+       "required": false,
+       "id": "loop",
+       "value": "false",
+       "options": [
+        {
+         "value": "false"
+        },
+        {
+         "value": "true"
+        }
+       ]
+      },
+      {
+       "type": "float",
+       "required": false,
+       "id": "promptInfluence",
+       "value": "0.3",
+       "options": []
+      }
+     ]
+    }
+   ],
+   "dynamicprice": "[{\"inputs\":{\"duration\":\"1\"},\"price\":0.002,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"2\"},\"price\":0.004,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"3\"},\"price\":0.006,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"4\"},\"price\":0.008,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"5\"},\"price\":0.01,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"6\"},\"price\":0.012,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"7\"},\"price\":0.014,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"8\"},\"price\":0.016,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"9\"},\"price\":0.018,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"10\"},\"price\":0.02,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"11\"},\"price\":0.022,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"12\"},\"price\":0.024,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"13\"},\"price\":0.026,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"14\"},\"price\":0.028,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"15\"},\"price\":0.03,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"16\"},\"price\":0.032,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"17\"},\"price\":0.034,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"18\"},\"price\":0.036,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"19\"},\"price\":0.038,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"20\"},\"price\":0.04,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"21\"},\"price\":0.042,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"22\"},\"price\":0.044,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"23\"},\"price\":0.046,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"24\"},\"price\":0.048,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"25\"},\"price\":0.05,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"26\"},\"price\":0.052,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"27\"},\"price\":0.054,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"28\"},\"price\":0.056,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"29\"},\"price\":0.058,\"priceMethod\":\"cpr\"},{\"inputs\":{\"duration\":\"30\"},\"price\":0.06,\"priceMethod\":\"cpr\"}]",
+   "time": "1793360147"
+  }
+ ]
+}

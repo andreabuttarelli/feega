@@ -11,7 +11,7 @@ A generation node holds a prompt, a model and its result. Its `type` is one of `
 - **Medium must match the node type**, or the run is refused before anything is spent.
 - **Concurrency.** Pass the node's current `version`; a stale one returns `conflict`.
 - **Video is queued.** A video comes back `queued` and lands later; the node stays `running`.
-- **Models.** `wiro/` and `higgsfield/` models run on those providers and are always queued. An organization can restrict models: see [Model allow-list](/ai/model-allow-list/).
+- **Models.** `wiro/` image, video and 3D models and `higgsfield/` models run on those providers and are always queued. `wiro/` text and audio models run inline: the node waits for the answer (up to four minutes) and fills in when it lands. An organization can restrict models: see [Model allow-list](/ai/model-allow-list/).
 - **Model menu.** Makers come first (Google, ByteDance, Black Forest Labs…); hover or arrow into one to see its models. When more than one API serves a model, a third level lets you pick Auto or a specific provider, each marked `$`, `$$` or `$$$` relative to the others at your current settings. Search filters models directly.
 - **Full size.** Double-click a generated image or video, or use the open button next to download, to open the original file in a new tab.
 - **Cost preview.** The Generate button shows the credits the run will cost with the chosen model, provider, duration, resolution and variants, and updates as you change them. Each provider is priced at its own rate for that resolution; Auto shows the price of the provider it will actually use.
@@ -27,6 +27,7 @@ Node data shapes per type: MCP `describe_node_types`. Tool details: [MCP tools](
 The model menu of a node is a catalogue that feega refreshes on a schedule, so new models appear without a release. Kie.ai models come from Kie's own sources, Wiro models from its live tool list, and Higgsfield models from the public Higgsfield docs: each model page gives its endpoint and input schema, and a model is added only if feega can fill every input it requires (a prompt and image or video URLs). Prices come from the provider's own estimate call, so a new model arrives with a credit price.
 
 - A model that feega wires by hand keeps priority over the same endpoint found in the docs: the hand entry carries what the docs do not say, such as reference limits.
+- **Wiro text and audio.** A short curated list, not the whole Wiro catalogue: LLMs (GPT-5 Nano and Mini, Gemini 3 Flash, DeepSeek V4.1 Flash, Grok 4.1 Fast, Claude Sonnet 5) in the text node, and speech, sound effects and music (Eleven v4 and v4 Turbo, Chatterbox Multilingual, ElevenLabs Sound Effects v3 and Music v2, Stable Audio 3 Small Music, Lyria 3) in the audio node, all under the Wiro heading. Text is estimated from Wiro's per-million-token rates, speech per character, music and effects per run or per duration; the credits charged follow Wiro's billed cost for the task. A model whose price Wiro does not publish is not offered. Wiro audio models use the model's default voice: the voice picker applies to ElevenLabs models only.
 - If the Higgsfield docs cannot be reached, the models already known stay as they are.
 - A model that leaves the docs is expired, never deleted.
 

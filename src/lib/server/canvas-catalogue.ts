@@ -37,6 +37,7 @@ import { withRecommendations, type CandidateModel, type Recommendation } from '$
 import { syncedCandidates } from './recommended-models';
 import { AUDIO_INPUT_MODALITIES, AUDIO_PROVIDER, audioModelsOf, audioOperationIdsFor, operationSpec } from '$lib/canvas/audio-operations';
 import { musicEnabled } from './elevenlabs-music';
+import { wiroChoices } from './wiro-choices';
 
 function audioChoices(): ModelChoice[] {
   return audioOperationIdsFor(musicEnabled()).flatMap((operation) =>
@@ -93,14 +94,16 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
   await ensureGatewayModels().catch(() => {});
   const admin = createAdminClient();
 
-  const [image, video, model3d, textModalities, textSynced, imageSynced, videoSynced] = await Promise.all([
+  const [image, video, model3d, textModalities, textSynced, imageSynced, videoSynced, wiroText, wiroAudio] = await Promise.all([
     offerableModels(admin, 'image'),
     offerableModels(admin, 'video'),
     offerableModels(admin, 'model3d'),
     chatInputModalities(admin),
     syncedCandidates(admin, 'text'),
     syncedCandidates(admin, 'image'),
-    syncedCandidates(admin, 'video')
+    syncedCandidates(admin, 'video'),
+    wiroChoices(admin, 'chat', env),
+    wiroChoices(admin, 'audio', env)
   ]);
   const now = new Date();
 
@@ -118,13 +121,13 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
     }
   }));
 
-  textChoices.push(...kieTextChoices(env));
+  textChoices.push(...kieTextChoices(env), ...wiroText);
 
   return {
     text: { ...withRecommendations('text', textChoices, textSynced, now), synced: true },
     image: { ...image, ...withRecommendations('image', image.choices, imageSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS },
     video: { ...video, ...withRecommendations('video', video.choices, videoSynced, now), enhanceUnitCredits: TEXT_NODE_CREDITS },
-    audio: { choices: audioChoices(), synced: true, recommended: [], candidates: [] },
+    audio: { choices: [...audioChoices(), ...wiroAudio], synced: true, recommended: [], candidates: [] },
     model3d: { ...model3d, recommended: [], candidates: [] }
   };
 }

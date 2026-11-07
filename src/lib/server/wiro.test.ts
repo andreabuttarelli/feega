@@ -52,6 +52,11 @@ describe('Wiro adapter', () => {
     });
   });
 
+  it('reads an LLM answer from the merged debug output', async () => {
+    const { gateway } = recorder(() => task({ status: 'task_postprocess_end', totalcost: '0.0004', debugoutput: 'Hello there.' }));
+    expect(await gateway.task('534574')).toMatchObject({ state: 'done', costUsd: 0.0004, text: 'Hello there.' });
+  });
+
   it('reads a non-zero exit or a cancel as failed', async () => {
     const failed = recorder(() => task({ status: 'task_postprocess_end', pexit: '1', debugoutput: 'nsfw filter' }));
     expect(await failed.gateway.task('1')).toEqual({ state: 'failed', error: 'wiro_task_failed: nsfw filter' });

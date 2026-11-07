@@ -56,6 +56,7 @@ function taskOf(row: TaskRow | undefined): TaskState {
   }
   return {
     state: 'done',
+    ...(row.debugoutput ? { text: row.debugoutput } : {}),
     costUsd: Number(row.totalcost ?? 0) || 0,
     outputs: (row.outputs ?? [])
       .filter((o): o is { url: string; contenttype?: string } => Boolean(o.url))

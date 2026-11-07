@@ -63,6 +63,7 @@ export type ModelChoice = {
     estimatedOutputTokens?: number;
   };
   creditOverrides?: Record<string, Record<string, number>>;
+  creditsPerCharacter?: number;
   perSecondCredits?: PerSecondCredits;
   variableCredits?: boolean;
   /** I campi extra dichiarati da `ai_models.param_schema` per questo modello, oltre a quelli con

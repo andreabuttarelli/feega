@@ -41,10 +41,10 @@ import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
 import { resolveModelIn } from './node-model';
-import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
-import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
+import { depositAudio, finishAudioJob, mp3Seconds, outputRefsOf, runAudio, type AudioScope } from './audio-run';
+import { AUDIO_PROBLEM_MESSAGE, audioOperationOf, defaultAudioModel, isWiroAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { inputTtlOf, RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf, WAITING_TASK_ID, waitingJobOf } from '$lib/server/generation/task-providers';
+import { inputTtlOf, RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf, TaskProviderName, WAITING_TASK_ID, waitingJobOf } from '$lib/server/generation/task-providers';
 import { AUTO_ROUTE } from '$lib/canvas/model-routes';
 import { kieTextModel } from '$lib/server/kie-chat';
 import { PRIMARY_ROUTE } from '$lib/server/generation/discount-routes';
@@ -275,6 +275,7 @@ async function giveUp(db: Db, input: StartRun, run: NodeRun, message: string): P
 }
 
 const AUDIO_NOT_CONFIGURED = 'elevenlabs_not_configured';
+const WIRO_NOT_CONFIGURED = 'wiro_not_configured';
 
 function audioScopeOf(input: StartRun): AudioScope {
   return { orgId: input.orgId, projectId: input.projectId, nodeId: input.nodeId, userId: input.userId, actor: input.actor };
@@ -289,7 +290,51 @@ async function refusedVoice(db: Db, input: StartRun): Promise<string | null> {
   return voiceUseRefusal(db, { orgId: input.orgId, projectId: input.projectId, voiceId: voiceIdOf(input.params) });
 }
 
+function wiroScopeOf(input: StartRun) {
+  return { orgId: input.orgId, projectId: input.projectId, userId: input.userId, actorKind: input.actor?.kind === 'agent' ? ('agent' as const) : ('user' as const), actorId: input.actor?.id ?? undefined, agentKey: input.actor?.agentKey ?? null };
+}
+
+async function wiroRequestOf(db: Db, input: StartRun, catalogue: 'chat' | 'audio') {
+  const [{ wiroNodeDeps }, { wiroSpecOf }] = await Promise.all([import('$lib/server/wiro-run'), import('$lib/server/wiro-choices')]);
+  const [deps, spec] = await Promise.all([wiroNodeDeps(), wiroSpecOf(db as never, input.model ?? '', catalogue)]);
+  if (!deps) {
+    throw new Error(WIRO_NOT_CONFIGURED);
+  }
+  if (!spec) {
+    throw new Error(`wiro_model_unknown: ${input.model}`);
+  }
+  return { deps, spec, model: input.model ?? '', scope: wiroScopeOf(input) };
+}
+
+async function wiroTextOf(db: Db, input: StartRun, prompt: string, system: string | undefined) {
+  const { runWiroText } = await import('$lib/server/wiro-run');
+  const { deps, ...request } = await wiroRequestOf(db, input, 'chat');
+  return runWiroText(deps, { ...request, prompt, system });
+}
+
+async function runWiroAudioNode(db: Db, input: StartRun, run: NodeRun, text: string): Promise<RunOutcome> {
+  if (!text.trim()) {
+    await giveUp(db, input, run, AUDIO_PROBLEM_MESSAGE.text_required);
+    return { kind: 'refused', error: AUDIO_PROBLEM_MESSAGE.text_required };
+  }
+  try {
+    const { runWiroAudio } = await import('$lib/server/wiro-run');
+    const { deps, ...request } = await wiroRequestOf(db, input, 'audio');
+    const duration = typeof input.params.duration === 'number' ? input.params.duration : undefined;
+    const out = await runWiroAudio(deps, { ...request, prompt: text, duration });
+    const asset = await depositAudio(db, audioScopeOf(input), out.file, mp3Seconds(out.file), request.model);
+    return land(db, input, run, asset, out.costUsd, { outputRefs: outputRefsOf({ audios: asset }) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'audio_failed';
+    await giveUp(db, input, run, message);
+    return { kind: 'refused', error: message };
+  }
+}
+
 async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, text: string): Promise<RunOutcome> {
+  if (isWiroAudioModel(input.model)) {
+    return runWiroAudioNode(db, input, run, text);
+  }
   const { configuredAudioProvider } = await import('$lib/server/elevenlabs-config');
   const provider = configuredAudioProvider();
   if (!provider) {
@@ -537,8 +582,10 @@ async function runModel3dNode(db: Db, requested: StartRun, run: NodeRun, upstrea
 
 const MEDIUM_RUNS: Partial<Record<GenMedium, ProviderRun>> = { audio: runAudioNode, model3d: runModel3dNode };
 
+const OWN_RUNNER_MEDIA: ReadonlySet<GenMedium> = new Set(['text', 'audio']);
+
 function providerRunOf(medium: GenMedium, model: string | null): ProviderRun | null {
-  if (medium === 'text') {
+  if (OWN_RUNNER_MEDIA.has(medium)) {
     return null;
   }
   return taskProviderOf(model) ? runTaskNode : null;
@@ -721,6 +768,11 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   }
 
   try {
+    if (input.medium === 'text' && taskProviderOf(input.model) === TaskProviderName.Wiro) {
+      const out = await wiroTextOf(db, input, prompt, textInput?.system || undefined);
+      return land(db, input, run, await depositText(db, input, out.text), out.costUsd);
+    }
+
     if (input.medium === 'text' && kieTextModel(input.model)) {
       const [{ runKieText, kieTextDeps }, { logAiCall }] = await Promise.all([import('$lib/server/kie-text-run'), import('$lib/server/ai-log')]);
       const out = await runKieText(kieTextDeps(logAiCall), {
