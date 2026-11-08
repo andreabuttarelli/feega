@@ -7,6 +7,7 @@ import { cardItems } from './cards';
 import type { CardIcons } from './card-kit';
 import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
 import { labelScale } from './label-size';
+import { shiftDown } from './shift-down';
 import type { CoreTheme } from './overlay';
 
 export type CardTile = {
@@ -51,10 +52,18 @@ function framed(t: CardTile, card: Item[], glyphs: Glyphs, layer: CardLayer): Fr
 
 export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): (t: CardTile, layer?: CardLayer) => FrameOnCanvas {
   const drawn = new Map<string, { key: string; frame: FrameOnCanvas }>();
+  const bodies = new Map<string, { key: string; items: Item[] }>();
+  const bodyOf = (t: CardTile): Item[] => {
+    const key = bodyKey(t);
+    const hit = bodies.get(t.id);
+    const items = hit?.key === key ? hit.items : cardItems({ id: t.id, x: CHROME_REACH.side, y: 0, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons);
+    bodies.set(t.id, { key, items });
+    return shiftDown(items, reachTop(t));
+  };
   return (t, layer = CardLayer.Whole) => {
     const key = `${layer}:${cardKey(t)}`;
     const hit = drawn.get(t.id);
-    const frame = hit?.key === key ? hit.frame : cardOnCanvas(t, theme, glyphs, bold, icons, layer);
+    const frame = hit?.key === key ? hit.frame : framed(t, bodyOf(t), glyphs, layer);
     drawn.set(t.id, { key, frame });
     return { ...frame, box: { ...frame.box, x: t.box.x - CHROME_REACH.side, y: t.box.y - reachTop(t) } };
   };
@@ -71,6 +80,8 @@ export function portMarks(t: PortTile): { inputs: PortMark[]; outputs: PortMark[
   const named = (t.outputs ?? []).map((o) => ({ type: o.port, state: PortState.Quiet, label: o.handle }));
   return { inputs, outputs: [...single, ...named] };
 }
+
+const bodyKey = (t: CardTile): string => JSON.stringify([t.box.w, t.box.h, t.face]);
 
 export function cardKey(t: CardTile): string {
   return `${t.id}:${JSON.stringify([t.box.w, t.box.h, t.face, t.inputs, t.outputs, t.label, t.tag, t.zoom])}`;
