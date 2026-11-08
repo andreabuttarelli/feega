@@ -1,6 +1,5 @@
 use vello::kurbo::Rect;
 use vello::wgpu;
-use vello::wgpu::util::DeviceExt;
 
 use crate::retained::Lookup;
 
@@ -35,12 +34,17 @@ fn premultiplied(@builtin(position) at: vec4<f32>) -> @location(0) vec4<f32> {
 }
 ";
 
+const UNIFORM_BYTES: u64 = 32;
+const IN_FLIGHT_SLOTS: usize = 4;
+
 const ENTRY: [(Output, &str); 2] = [(Output::Straight, "straight"), (Output::Premultiplied, "premultiplied")];
 
 pub struct Reprojector {
     pipelines: Vec<((wgpu::TextureFormat, Output), wgpu::RenderPipeline)>,
     sampler: wgpu::Sampler,
     module: wgpu::ShaderModule,
+    uniforms: Vec<wgpu::Buffer>,
+    next: usize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -62,7 +66,19 @@ impl Reprojector {
     pub fn new(device: &wgpu::Device) -> Self {
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source: wgpu::ShaderSource::Wgsl(SHADER.into()) });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor { mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, ..Default::default() });
-        Reprojector { pipelines: Vec::new(), sampler, module }
+        let uniforms = (0..IN_FLIGHT_SLOTS).map(|_| device.create_buffer(&wgpu::BufferDescriptor { label: None, size: UNIFORM_BYTES, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false })).collect();
+        Reprojector { pipelines: Vec::new(), sampler, module, uniforms, next: 0 }
+    }
+
+    pub fn uniform_bytes(&self) -> u64 {
+        self.uniforms.iter().map(|b| b.size()).sum()
+    }
+
+    fn uniform(&mut self, queue: &wgpu::Queue, bytes: &[u8]) -> wgpu::Buffer {
+        let slot = self.uniforms[self.next].clone();
+        self.next = (self.next + 1) % self.uniforms.len();
+        queue.write_buffer(&slot, 0, bytes);
+        slot
     }
 
     fn pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat, output: Output) -> &wgpu::RenderPipeline {
@@ -85,11 +101,11 @@ impl Reprojector {
         &self.pipelines.last().expect("just pushed").1
     }
 
-    pub fn draw(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, d: Draw) {
+    pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, d: Draw) {
         let size = [d.source.width() as f32, d.source.height() as f32];
         let values: [f32; 8] = [d.look.scale as f32, d.look.scale as f32, d.look.x as f32, d.look.y as f32, size[0], size[1], 0.0, 0.0];
         let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
-        let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: None, contents: &bytes, usage: wgpu::BufferUsages::UNIFORM });
+        let uniform = self.uniform(queue, &bytes);
         let view = d.source.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = self.sampler.clone();
         let pipeline = self.pipeline(device, d.format, d.output).clone();
