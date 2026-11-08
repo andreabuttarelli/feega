@@ -238,6 +238,7 @@
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { assetTier } from '$lib/canvas/core/asset-tier';
+  import { whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Fling, type Glide } from '$lib/canvas/core/inertia';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { themeOf } from '$lib/canvas/gpu/theme';
@@ -338,7 +339,7 @@
 
   const assetUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, AssetSize.Full);
   const tier = $derived(assetTier(view.zoom));
-  const tierUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, tier);
+  const tierUrl = (size: AssetSize) => (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, size);
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
@@ -416,7 +417,7 @@
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const labelZoom = $derived(labelZoomStep(view.zoom));
   const strokeZoom = $derived(strokeZoomStep(view.zoom));
-  const cardBases = $derived.by(() => {
+  const basesAt = (size: AssetSize) => {
     const text = coreType;
     if (!text) {
       return [];
@@ -425,7 +426,7 @@
       card: {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl(size), props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null,
@@ -434,6 +435,13 @@
       turn: turnOf(t),
       poster: holdsDoc(t.kind ?? '')
     }));
+  };
+  const nearBases = $derived.by(() => basesAt(AssetSize.Px1024));
+  const farBases = $derived.by(() => basesAt(AssetSize.Px256));
+  const cardBases = $derived(tier === AssetSize.Px1024 ? nearBases : farBases);
+  $effect(() => {
+    void cardBases;
+    whenIdle(() => void (tier === AssetSize.Px1024 ? farBases : nearBases));
   });
   const coreCards = $derived.by(() => {
     const draw = drawCard;

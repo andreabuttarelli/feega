@@ -56,19 +56,23 @@ function listed(t: CardTile, items: Item[]): FrameOnCanvas {
   };
 }
 
-type Body = { key: string; items: Item[]; reached: Map<string, Item[]> };
+type Body = { items: Item[]; reached: Map<string, Item[]> };
+
+const BODIES_PER_CARD = 2;
 
 export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): (t: CardTile, layer?: CardLayer) => FrameOnCanvas {
   const drawn = new Map<string, { key: string; frame: FrameOnCanvas }>();
-  const bodies = new Map<string, Body>();
+  const bodies = new Map<string, Map<string, Body>>();
   const bodyOf = (t: CardTile): Body => {
     const key = bodyKey(t);
-    const hit = bodies.get(t.id);
-    if (hit?.key === key) {
-      return hit;
+    const kept = bodies.get(t.id) ?? new Map<string, Body>();
+    const body = kept.get(key) ?? { items: cardItems({ id: t.id, x: CHROME_REACH.side, y: 0, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons), reached: new Map() };
+    kept.delete(key);
+    kept.set(key, body);
+    if (kept.size > BODIES_PER_CARD) {
+      kept.delete(kept.keys().next().value!);
     }
-    const body = { key, items: cardItems({ id: t.id, x: CHROME_REACH.side, y: 0, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons), reached: new Map() };
-    bodies.set(t.id, body);
+    bodies.set(t.id, kept);
     return body;
   };
   const steady = (t: CardTile, layer: CardLayer): Item[] => {

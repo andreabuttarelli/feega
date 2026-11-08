@@ -178,6 +178,16 @@ describe('cards while the camera zooms', () => {
     expect(cards({ ...faces[1], zoom: 0.21 }).list.items[0]).toBe(first);
   });
 
+  it('a face that flips to another asset tier and back reuses the body moved before', () => {
+    const near = { ...tile, id: 'm', face: faceOf({ id: 'm', kind: 'image' }, { assetId: 'a' }, (id) => `${id}?w=1024`), zoom: 0.84 };
+    const far = { ...near, face: faceOf({ id: 'm', kind: 'image' }, { assetId: 'a' }, (id) => `${id}?w=256`) };
+    const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
+    const first = cards(near).list.items[0];
+    cards(far);
+
+    expect(cards(near).list.items[0]).toBe(first);
+  });
+
   it('a card drawn at one zoom step and reused at another matches one drawn fresh there', () => {
     for (const layer of [CardLayer.Whole, CardLayer.Face]) {
       const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
