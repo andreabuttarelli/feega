@@ -151,7 +151,7 @@ impl Painter for GpuPainter<'_> {
                 let scale = list.width as f64 / into.width();
                 let look = Lookup { scale, x: -into.x0 * scale, y: -into.y0 * scale };
                 let target = self.retained.create_view(&wgpu::TextureViewDescriptor::default());
-                self.reprojector.draw(self.device, &mut encoder, Draw { source: &scratch, target: &target, format: wgpu::TextureFormat::Rgba8Unorm, look, within: Some(into), output: Output::Straight });
+                self.reprojector.draw(self.device, self.queue, &mut encoder, Draw { source: &scratch, target: &target, format: wgpu::TextureFormat::Rgba8Unorm, look, within: Some(into), output: Output::Straight });
             }
         }
         self.queue.submit([encoder.finish()]);
@@ -165,7 +165,7 @@ impl Painter for GpuPainter<'_> {
         };
         let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.reprojector.draw(self.device, &mut encoder, Draw { source: self.retained, target: &out, format: self.format, look, within: None, output: Output::Premultiplied });
+        self.reprojector.draw(self.device, self.queue, &mut encoder, Draw { source: self.retained, target: &out, format: self.format, look, within: None, output: Output::Premultiplied });
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(())
@@ -426,7 +426,7 @@ impl WebCore {
         };
         let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        self.reprojector.draw(&self.device, &mut encoder, Draw { source: &self.target, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Premultiplied });
+        self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &self.target, target: &out, format: self.format, look: UNMOVED, within: None, output: Output::Premultiplied });
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(report(&[skipped, missing].concat()))
