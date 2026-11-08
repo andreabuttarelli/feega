@@ -160,6 +160,24 @@ describe('cards while the camera zooms', () => {
     expect(bodyShaped).toBe(once);
   });
 
+  it('zoom steps within one octave keep the card body and ports, laying out only the label', () => {
+    const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
+    const near = cards({ ...faces[1], zoom: 0.84 }).list.items;
+    const nearer = cards({ ...faces[1], zoom: 0.71 }).list.items;
+    const kept = near.filter((i) => !['label', 'icon', 'tag'].includes(i.clip.split(':')[1]));
+
+    expect(kept.length).toBeGreaterThan(0);
+    kept.forEach((item, i) => expect(nearer[i]).toBe(item));
+  });
+
+  it('a zoom step seen before reuses the body it moved there', () => {
+    const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);
+    const first = cards({ ...faces[1], zoom: 0.21 }).list.items[0];
+    cards({ ...faces[1], zoom: 1 });
+
+    expect(cards({ ...faces[1], zoom: 0.21 }).list.items[0]).toBe(first);
+  });
+
   it('a card drawn at one zoom step and reused at another matches one drawn fresh there', () => {
     for (const layer of [CardLayer.Whole, CardLayer.Face]) {
       const cards = cardsOnCanvas(theme, glyphs, glyphs, icons);

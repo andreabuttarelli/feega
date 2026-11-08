@@ -242,6 +242,10 @@ function names(t: ChromeTile, glyphs: Glyphs, shown: (m: PortMark) => boolean): 
 
 const lit = (m: PortMark) => PORT_LOOK[m.state].named;
 
-export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit), ...label(t, glyphs), ...tag(t)];
+export const portChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...ports(t), ...names(t, glyphs, lit)];
+
+export const labelChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...label(t, glyphs), ...tag(t)];
+
+export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...portChrome(t, glyphs), ...labelChrome(t, glyphs)];
 
 export const stateChrome = (t: StateTile, glyphs: Glyphs): PathItem[] => [...hover(t), ...RINGS[t.ring](t), ...(t.names ? names(t, glyphs, (m) => !lit(m)) : []), ...handles(t)];
