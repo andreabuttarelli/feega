@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { IconTone } from '$lib/canvas/model-families';
   import {
     siAnthropic,
     siGoogle,
@@ -9,10 +10,17 @@
     siDeepseek,
     siKuaishou,
     siMinimax,
+    siClaude,
+    siGooglegemini,
+    siMeta,
+    siX,
+    siElevenlabs,
+    siSuno,
+    siAlibabacloud,
     type SimpleIcon
   } from 'simple-icons';
 
-  let { provider, size = 12 }: { provider: string; size?: number } = $props();
+  let { provider, size = 12, tone = IconTone.Brand }: { provider: string; size?: number; tone?: IconTone } = $props();
 
   const PETAL_ANGLES = [0, 60, 120, 180, 240, 300];
 
@@ -26,7 +34,14 @@
     perplexity: siPerplexity,
     deepseek: siDeepseek,
     kuaishou: siKuaishou,
-    minimax: siMinimax
+    minimax: siMinimax,
+    claude: siClaude,
+    gemini: siGooglegemini,
+    meta: siMeta,
+    'x-ai': siX,
+    elevenlabs: siElevenlabs,
+    suno: siSuno,
+    alibaba: siAlibabacloud
   };
 
   const icon = $derived(ICON[provider]);
@@ -40,7 +55,7 @@
     {/each}
   </svg>
 {:else if icon}
-  <svg class="provider-icon" viewBox="0 0 24 24" width={size} height={size} fill={`#${icon.hex}`} aria-hidden="true">
+  <svg class="provider-icon" viewBox="0 0 24 24" width={size} height={size} fill={tone === IconTone.Mono ? 'currentColor' : `#${icon.hex}`} aria-hidden="true">
     <path d={icon.path} />
   </svg>
 {:else}
