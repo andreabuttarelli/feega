@@ -5,7 +5,7 @@ import type { PortTile } from '$lib/canvas/gpu/geometry';
 import type { Box, FrameOnCanvas } from './canvas-scene';
 import { cardItems } from './cards';
 import type { CardIcons } from './card-kit';
-import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
+import { PortState, labelChrome, portChrome, tileChrome, type ChromeTile, type Glyphs, type PortMark } from './chrome';
 import { labelScale } from './label-size';
 import { shiftDown } from './shift-down';
 import type { CoreTheme } from './overlay';
@@ -24,7 +24,7 @@ export type CardTile = {
 
 export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
 
-const reachTop = (t: Pick<CardTile, 'zoom'>): number => Math.ceil(CHROME_REACH.top * Math.max(1, labelScale(t.zoom ?? 1)));
+const reachTop = (t: Pick<CardTile, 'zoom'>): number => CHROME_REACH.top * 2 ** Math.ceil(Math.log2(Math.max(1, labelScale(t.zoom ?? 1))));
 
 export const ringColour = (): string => HIGHLIGHT[HighlightKind.Node];
 
@@ -38,32 +38,60 @@ export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold
   return framed(t, card, glyphs, layer);
 }
 
+const chromeTile = (t: CardTile, x: number, y: number): ChromeTile => ({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon, tag: t.tag, zoom: t.zoom });
+
 function framed(t: CardTile, card: Item[], glyphs: Glyphs, layer: CardLayer): FrameOnCanvas {
-  const [x, y] = [CHROME_REACH.side, reachTop(t)];
+  const chrome = layer === CardLayer.Face ? [] : tileChrome(chromeTile(t, CHROME_REACH.side, reachTop(t)), glyphs);
+  return listed(t, [...card, ...chrome]);
+}
+
+function listed(t: CardTile, items: Item[]): FrameOnCanvas {
+  const y = reachTop(t);
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + y + CHROME_REACH.bottom;
-  const chrome = layer === CardLayer.Face ? [] : tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon, tag: t.tag, zoom: t.zoom }, glyphs);
   return {
     id: t.id,
-    box: { x: t.box.x - x, y: t.box.y - y, w, h },
-    list: { width: w, height: h, background: null, items: [...card, ...chrome], unsupported: [] }
+    box: { x: t.box.x - CHROME_REACH.side, y: t.box.y - y, w, h },
+    list: { width: w, height: h, background: null, items, unsupported: [] }
   };
 }
 
+type Body = { key: string; items: Item[]; reached: Map<string, Item[]> };
+
 export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): (t: CardTile, layer?: CardLayer) => FrameOnCanvas {
   const drawn = new Map<string, { key: string; frame: FrameOnCanvas }>();
-  const bodies = new Map<string, { key: string; items: Item[] }>();
-  const bodyOf = (t: CardTile): Item[] => {
+  const bodies = new Map<string, Body>();
+  const bodyOf = (t: CardTile): Body => {
     const key = bodyKey(t);
     const hit = bodies.get(t.id);
-    const items = hit?.key === key ? hit.items : cardItems({ id: t.id, x: CHROME_REACH.side, y: 0, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons);
-    bodies.set(t.id, { key, items });
-    return shiftDown(items, reachTop(t));
+    if (hit?.key === key) {
+      return hit;
+    }
+    const body = { key, items: cardItems({ id: t.id, x: CHROME_REACH.side, y: 0, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons), reached: new Map() };
+    bodies.set(t.id, body);
+    return body;
+  };
+  const steady = (t: CardTile, layer: CardLayer): Item[] => {
+    const body = bodyOf(t);
+    const top = reachTop(t);
+    const key = `${layer}:${top}:${JSON.stringify([t.inputs, t.outputs])}`;
+    const hit = body.reached.get(key);
+    if (hit) {
+      return hit;
+    }
+    const ports = layer === CardLayer.Face ? [] : portChrome(chromeTile(t, CHROME_REACH.side, top), glyphs);
+    const items = [...shiftDown(body.items, top), ...ports];
+    body.reached.set(key, items);
+    return items;
+  };
+  const draw = (t: CardTile, layer: CardLayer): FrameOnCanvas => {
+    const label = layer === CardLayer.Face ? [] : labelChrome(chromeTile(t, CHROME_REACH.side, reachTop(t)), glyphs);
+    return listed(t, [...steady(t, layer), ...label]);
   };
   return (t, layer = CardLayer.Whole) => {
     const key = `${layer}:${cardKey(t)}`;
     const hit = drawn.get(t.id);
-    const frame = hit?.key === key ? hit.frame : framed(t, bodyOf(t), glyphs, layer);
+    const frame = hit?.key === key ? hit.frame : draw(t, layer);
     drawn.set(t.id, { key, frame });
     return { ...frame, box: { ...frame.box, x: t.box.x - CHROME_REACH.side, y: t.box.y - reachTop(t) } };
   };
