@@ -3,11 +3,11 @@ import type { Competitor } from '../tool';
 
 export const JITTER: Competitor = {
   name: 'Jitter',
-  title: 'Feega vs Jitter: animate, design and generate (2026)',
-  description: 'Jitter animates. Feega also designs and generates with AI, is open source and runs locally. Features, export, pricing, and when Jitter still wins.',
+  title: 'Jitter alternative for AI agents: Feega vs Jitter',
+  description: 'Jitter alternative for AI agents and Lottie export: Feega is open source, designs and generates with AI, and runs locally. Where Jitter still wins.',
   heading: 'Feega vs Jitter',
   intro:
-    'Jitter is a browser motion design tool built around a simple timeline, Figma import and polished presets. Feega is an open-source canvas that puts design, a keyframe timeline and AI generation in one file, and lets an AI agent edit it. They overlap a lot; the differences are in who drives the work and where the file lives.',
+    'Feega is a Jitter alternative for AI agents: an open-source canvas that puts design, a keyframe timeline and AI generation in one file, exports Lottie, and lets Claude Code edit it over MCP. Jitter offers a simple timeline, Figma import and polished presets; the differences are who drives the work.',
   pricing:
     'Free plan with a watermark, 720p and 30 fps exports. Paid plans (Pro, Max, Ultra) are billed per editor and add higher resolution, ProRes, WebM, transparent and batch export.',
   features: {

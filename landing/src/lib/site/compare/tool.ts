@@ -18,5 +18,6 @@ export type Competitor = {
   readonly pickFeega: string;
   readonly sections: readonly Section[];
   readonly sources: readonly Source[];
+  readonly faq?: readonly { readonly q: string; readonly a: string }[];
   readonly checked: string;
 };

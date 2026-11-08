@@ -3,11 +3,11 @@ import type { Competitor } from '../tool';
 
 export const AFTER_EFFECTS: Competitor = {
   name: 'After Effects',
-  title: 'Feega vs After Effects: browser motion vs compositing',
-  description: 'Feega vs Adobe After Effects: timeline, 3D, effects, export, collaboration and pricing as of October 2026, and when After Effects is the right call.',
+  title: 'After Effects alternative for developers: Feega',
+  description: 'An After Effects alternative developers and AI agents can script: Feega is an open-source motion canvas with CLI and MCP. Where After Effects still wins.',
   heading: 'Feega vs After Effects',
   intro:
-    'After Effects is the industry standard for motion graphics, compositing and visual effects, with decades of plugins and tutorials behind it. Feega is a browser canvas for design and motion that an AI agent can edit. Most After Effects work is out of Feega’s scope; the overlap is product, UI and social motion.',
+    'Feega is an After Effects alternative for developers: a browser canvas for product, UI and social motion that a CLI, a REST API and an MCP server can drive, so Claude Code can build the animation. After Effects stays ahead for compositing, tracking, 3D and visual effects, which Feega does not attempt.',
   pricing: 'Single-app subscription on an annual plan, billed monthly, as part of Creative Cloud.',
   features: {
     [Feature.DesignCanvas]: { has: false },

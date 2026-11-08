@@ -1,8 +1,10 @@
 import { FAQ } from './home';
 import { plainText } from './text';
-import { SITE_URL } from './links';
+import { DISCORD_URL, GITHUB_URL, SITE_URL, SOCIAL_LINKS } from './links';
 
 const SITE = `${SITE_URL}/`;
+
+const SAME_AS = [...new Set([GITHUB_URL, DISCORD_URL, ...SOCIAL_LINKS.map((l) => l.href)])];
 
 const ORGANIZATION = {
   '@context': 'https://schema.org',
@@ -10,6 +12,7 @@ const ORGANIZATION = {
   name: 'Feega',
   url: SITE,
   email: 'hi@feega.app',
+  sameAs: SAME_AS,
   founder: { '@type': 'Person', name: 'Andrea Buttarelli' },
   contactPoint: [{ '@type': 'ContactPoint', contactType: 'customer support', email: 'support@feega.app' }]
 };
@@ -23,7 +26,8 @@ const APPLICATION = {
   operatingSystem: 'Web',
   description: 'An AI infinite canvas: generate images, video, audio and documents, upscale video, and publish to social media and Meta ads.',
   offers: { '@type': 'Offer', category: 'subscription' },
-  publisher: { '@type': 'Organization', name: 'Feega' }
+  sameAs: SAME_AS,
+  publisher: { '@type': 'Organization', name: 'Feega', sameAs: SAME_AS }
 };
 
 const FOUNDER = {
@@ -66,4 +70,12 @@ export const articleJsonLd = (article: { title: string; description: string; pat
     dateModified: article.checked,
     author: { '@type': 'Person', name: 'Andrea Buttarelli' },
     publisher: { '@type': 'Organization', name: 'Feega', url: SITE }
+  });
+
+export const howToJsonLd = (name: string, steps: readonly { name: string; text: string }[]) =>
+  script({
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name,
+    step: steps.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.name, text: s.text }))
   });

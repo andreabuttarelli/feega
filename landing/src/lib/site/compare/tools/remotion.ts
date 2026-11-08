@@ -3,11 +3,11 @@ import type { Competitor } from '../tool';
 
 export const REMOTION: Competitor = {
   name: 'Remotion',
-  title: 'Feega vs Remotion: visual canvas vs video in React (2026)',
-  description: 'Feega vs Remotion: visual timeline vs React code, rendering, export formats, AI agents and license pricing as of October 2026.',
+  title: 'Remotion alternative for Claude Code: Feega vs Remotion',
+  description: 'Remotion alternative for Claude Code: Feega has the agent edit a visual video document over MCP instead of writing React. Where Remotion wins.',
   heading: 'Feega vs Remotion',
   intro:
-    'Remotion lets developers write videos as React components and render them programmatically. Feega stores a video as a document of tracks, clips and properties that you edit on a canvas, or that an AI agent edits through typed operations. Both work with Claude Code; they disagree on what the agent should write.',
+    'Feega is a Remotion alternative for Claude Code: the agent sends typed edits to a visual video document a person can also edit by hand, instead of writing React code. Remotion is ahead for templated, personalised video rendered in bulk. Both work with Claude Code.',
   pricing:
     'Free for individuals, non-profits and companies of up to three people. Larger companies need a Company License, billed by usage; enterprise plans start at a monthly minimum.',
   features: {

@@ -3,11 +3,11 @@ import type { Competitor } from '../tool';
 
 export const CANVA: Competitor = {
   name: 'Canva',
-  title: 'Feega vs Canva: open-source design and motion canvas (2026)',
-  description: 'Feega vs Canva: templates, AI, motion, export and pricing as of October 2026. When an open-source canvas beats a template editor, and when it doesn’t.',
+  title: 'Canva alternative for Claude Code: Feega vs Canva',
+  description: 'Canva alternative for Claude Code and AI agents: Feega is an open-source canvas with motion and AI generation, edited over MCP. Where Canva wins.',
   heading: 'Feega vs Canva',
   intro:
-    'Canva is a template-first design tool for everyone, with a huge template library, brand kits and AI tools across web, desktop and mobile. Feega is an open-source canvas for design, timeline motion and AI generation, aimed at people who want precise control.',
+    'Feega is a Canva alternative for Claude Code: an open-source canvas with a keyframe timeline and AI generation that an agent edits over MCP. Canva is ahead for templates, brand kits, mobile and desktop apps, and non-designers making most of the content.',
   pricing: 'Free: $0 per year for one person. Pro: $144 per year for one person. Business: $250 per year for one person. Enterprise: contact sales.',
   features: {
     [Feature.DesignCanvas]: { has: true, note: 'Drag-and-drop editor, brand kits' },

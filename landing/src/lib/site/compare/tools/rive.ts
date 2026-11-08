@@ -3,11 +3,11 @@ import type { Competitor } from '../tool';
 
 export const RIVE: Competitor = {
   name: 'Rive',
-  title: 'Feega vs Rive: video motion vs interactive runtime animation',
-  description: 'Feega vs Rive: state machines, runtimes, timeline, export formats, AI and pricing as of October 2026. Which animation tool fits your project.',
+  title: 'Rive alternative for AI agents: Feega vs Rive',
+  description: 'Rive alternative for AI agents: Feega makes video, GIF and Lottie on a canvas Claude Code edits over MCP. Rive wins for runtime state machines.',
   heading: 'Feega vs Rive',
   intro:
-    'Rive is a design and animation tool whose files run live inside apps, websites and games, driven by state machines. Feega makes motion that ends as a video, a GIF or a Lottie file, on a canvas an AI agent can edit. If your animation has to react to input at runtime, Rive is the tool.',
+    'Feega is an alternative to Rive for AI agents when your animation ends as a video, a GIF or a Lottie file: Claude Code edits the canvas over MCP. If the animation has to react to input at runtime through state machines, Rive is the tool.',
   pricing:
     'Free plan with a splash screen on exports and three collaborative files. Paid plans are per seat and add unlimited files, libraries and hosted embeds.',
   features: {

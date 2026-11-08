@@ -6,15 +6,19 @@ import { APP_URL, GITHUB_URL, SITE_URL } from './links';
 import { SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
 import { BLOG_INDEX, BLOG_PATH, COMPARISONS, comparisonPath } from './compare';
+import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
+import { CONNECT_COMMAND, MCP_TOOLS, MCP_URL } from './guides/shared';
 import { plainText } from './text';
 
-const SUMMARY = 'feega is an open-source (Apache-2.0) infinite canvas where people and AI agents design, animate and generate together: frames, motion, images, video, audio and text as connected nodes. It runs locally from one .feega file with no account, or in the cloud at ' + APP_URL + '.';
+const SUMMARY = 'Feega is motion design for Claude Code: an open-source (Apache-2.0) infinite canvas where people and AI agents design, animate and generate together. Claude Code, Codex and Cursor edit motion videos and frames through an MCP server, then render to MP4. It runs locally from one .feega file with no account, or in the cloud at ' + APP_URL + '.';
 
 export const PAGE_TITLES: Record<string, string> = {
   '/': HOME_META.title,
   '/changelog': 'Changelog',
   '/ai-video-upscaler': UPSCALER.title,
   [BLOG_PATH]: BLOG_INDEX.title,
+  [GUIDES_PATH]: GUIDES_INDEX.title,
+  ...Object.fromEntries(Object.entries(GUIDES).map(([slug, g]) => [guidePath(slug), g.title])),
   ...Object.fromEntries(Object.entries(COMPARISONS).map(([slug, c]) => [comparisonPath(slug), c.title])),
   ...Object.fromEntries(Object.entries(LANDING_PAGES).map(([slug, p]) => [`/${slug}`, p.title])),
   ...Object.fromEntries(Object.entries(LEGAL_DOCS).map(([slug, d]) => [`/${slug}`, d.title]))
@@ -42,6 +46,10 @@ export const llmsFullTxt = () =>
     `> ${SUMMARY}`,
     '## Run it with your agent',
     'npx feega',
+    '## Connect Claude Code',
+    `${CONNECT_COMMAND}\n\nMCP server: ${MCP_URL}. Core tools: ${MCP_TOOLS.join(', ')}.`,
+    '## Guides',
+    Object.entries(GUIDES).map(([slug, g]) => `### ${g.heading}\n${g.answer}\n${SITE_URL}${guidePath(slug)}`).join('\n\n'),
     '## FAQ',
     FAQ.map((f) => `### ${f.q}\n${plainText(f.a)}`).join('\n\n'),
     '## Pages',

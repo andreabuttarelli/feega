@@ -7,7 +7,7 @@ export const PENCIL_DEV: Competitor = {
   description: 'Feega vs Pencil.dev, now pen.dev: AI agents, MCP, Figma import, export and pricing as of October 2026. Where each canvas fits.',
   heading: 'Feega vs Pencil.dev',
   intro:
-    'Pencil.dev, now pen.dev, is an agentic design canvas that lives next to your code, with IDE extensions and HTML/Tailwind export. Feega is an open-source canvas for design, motion and AI media generation that agents edit over MCP.',
+    'Pencil.dev, now pen.dev, is an agentic design canvas that lives next to your code, with IDE extensions and HTML/Tailwind export. Feega is an open-source canvas for design, motion and AI media generation that agents edit over MCP. Both suit AI agents; they differ in scope, licence and export.',
   pricing: 'Free: $0, 5 agent-design days per month, 25 image/SVG generations. Pro: $16 per user per month. Ultra: $48 per user per month. Enterprise: custom. Annual billing saves 20%.',
   features: {
     [Feature.DesignCanvas]: { has: true, note: 'Components, variables, flex layout, slides' },
