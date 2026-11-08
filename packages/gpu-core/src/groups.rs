@@ -215,6 +215,12 @@ const FAR_PX: f64 = 4096.0;
 const MAX_STRETCH: f64 = std::f64::consts::SQRT_2;
 const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unseen {
+    Drop,
+    Keep,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     pub side: u32,
@@ -791,6 +797,10 @@ impl Library {
     }
 
     pub fn plan(&mut self, list: &DisplayList, limits: Limits) -> Plan {
+        self.plan_part(list, limits, Unseen::Drop)
+    }
+
+    pub fn plan_part(&mut self, list: &DisplayList, limits: Limits, unseen: Unseen) -> Plan {
         let mut missing = Vec::new();
         let mut rasters = Vec::new();
         let mut seen = FxHashSet::default();
@@ -883,8 +893,9 @@ impl Library {
                 None => self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded),
             }
         }
-        let gone: Vec<String> = self.held.keys().filter(|k| !seen.contains(*k)).cloned().collect();
-        let abandoned: Vec<String> = self.building.keys().filter(|k| !seen.contains(*k)).cloned().collect();
+        let dropped = |k: &String| unseen == Unseen::Drop && !seen.contains(k);
+        let gone: Vec<String> = self.held.keys().filter(|k| dropped(k)).cloned().collect();
+        let abandoned: Vec<String> = self.building.keys().filter(|k| dropped(k)).cloned().collect();
         for key in &gone {
             self.held.remove(key);
         }

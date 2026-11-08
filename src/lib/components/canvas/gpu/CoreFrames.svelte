@@ -4,6 +4,7 @@
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
+  import { rasterMode } from '$lib/canvas/gpu/raster-mode';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
   import { createMedia, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
@@ -357,6 +358,7 @@
         putting.clear();
         sent = new SentUses();
         sentOverlay = new SentParts();
+        r.setRaster?.(rasterMode(location.search));
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         raster = r;
       },
