@@ -20,6 +20,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A sibling worktree turns unreadable mid-session
 **Signal:** `ls` in `../dazero-<task>` answers `Operation not permitted`, and the preview served from it dies with `ERR_CONNECTION_REFUSED`. The agent sandbox only allows the session's own checkout. **Move:** put the task worktree inside the allowed checkout (`.claude/worktrees/<name>`, gitignored), or work on a branch in the checkout itself.
 
+### A perf run from a worktree measures the main checkout's packages
+**Signal:** a change under `packages/` (gpu-core glue, motion-core) leaves the probe numbers identical; `realpath node_modules/@feega/motion-core` points into the main checkout, which is behind `dev`. **Move:** give the worktree its own `node_modules`: a real folder of symlinks to every entry of the main one, except `@feega/*`, which point to `../../packages/<name>` of the worktree. Check with `realpath` before the first run.
+
+### The zoom probe reports 0 zoom frames in headless Chromium
+**Signal:** `tests/e2e/canvas-zoom-profile-probe.spec.ts` prints `zoom frames 0` and fps from an empty list when launched headless. **Move:** headless Chromium does not run the WebGPU canvas frames the probe counts; launch headed (the spec does; never add `headless: true` to compare quicker), and keep the windows on screen while it runs.
+
 ### Panning zoomed in stalls on `submit` and the wasm encoder: count layers per frame
 
 **Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
