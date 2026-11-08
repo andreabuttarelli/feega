@@ -1,3 +1,4 @@
+import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { HIGHLIGHT, HighlightKind } from '../highlight';
 import type { CardFace } from '$lib/canvas/gpu/card-face';
 import type { PortTile } from '$lib/canvas/gpu/geometry';
@@ -32,10 +33,14 @@ export enum CardLayer {
 }
 
 export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null, layer = CardLayer.Whole): FrameOnCanvas {
+  const card = cardItems({ id: t.id, x: CHROME_REACH.side, y: reachTop(t), w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons);
+  return framed(t, card, glyphs, layer);
+}
+
+function framed(t: CardTile, card: Item[], glyphs: Glyphs, layer: CardLayer): FrameOnCanvas {
   const [x, y] = [CHROME_REACH.side, reachTop(t)];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + y + CHROME_REACH.bottom;
-  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face }, theme, glyphs, bold, icons);
   const chrome = layer === CardLayer.Face ? [] : tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon, tag: t.tag, zoom: t.zoom }, glyphs);
   return {
     id: t.id,
