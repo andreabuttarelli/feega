@@ -416,25 +416,33 @@
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
   const labelZoom = $derived(labelZoomStep(view.zoom));
   const strokeZoom = $derived(strokeZoomStep(view.zoom));
-  const coreCards = $derived.by(() => {
+  const cardBases = $derived.by(() => {
     const text = coreType;
-    const draw = drawCard;
-    if (!text || !draw) {
+    if (!text) {
       return [];
     }
-    return placed.filter(drawsCard).flatMap((t) => {
-      const card: CardTile = {
+    return placed.filter(drawsCard).map((t) => ({
+      card: {
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.viewOf?.(t.id) ?? null, props.genViewFor?.(t.id) ?? null),
         ...portMarks(t),
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null,
-        tag: tagHexOf(t.id),
-        zoom: labelZoom
-      };
-      const poster = holdsDoc(t.kind ?? '');
-      return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
+        tag: tagHexOf(t.id)
+      },
+      turn: turnOf(t),
+      poster: holdsDoc(t.kind ?? '')
+    }));
+  });
+  const coreCards = $derived.by(() => {
+    const draw = drawCard;
+    if (!draw) {
+      return [];
+    }
+    return cardBases.map(({ card: base, turn, poster }) => {
+      const card: CardTile = { ...base, zoom: labelZoom };
+      return { key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn, poster };
     });
   });
   const addsBeside = (t: Tile) => holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame;
