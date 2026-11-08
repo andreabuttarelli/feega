@@ -1,4 +1,5 @@
-use gpu_core::compositor::{render_tile, Compositor, Painter};
+use gpu_core::compositor::{render_tile, Compositor, Painter, RasterMode, TilePainter};
+use gpu_core::tile_pyramid::{Cover, Key};
 use gpu_core::display_list::{parse, Item};
 use gpu_core::groups::{Library, Limits, Plan};
 use gpu_core::retained::{Camera, Lookup, Outcome, Quality};
@@ -15,6 +16,9 @@ struct Fake {
     presented: Vec<Lookup>,
     tile: Option<(u32, u32)>,
     rasters: usize,
+    tiles_painted: Vec<Key>,
+    tiles_dropped: Vec<Key>,
+    tiles_presented: Vec<Vec<Cover>>,
 }
 
 impl Painter for Fake {
@@ -41,6 +45,22 @@ impl Painter for Fake {
 
     fn present(&mut self, look: Lookup) -> Result<(), ()> {
         self.presented.push(look);
+        Ok(())
+    }
+}
+
+impl TilePainter for Fake {
+    fn paint_tile(&mut self, key: Key, _plan: Plan) -> Result<Vec<Skipped>, ()> {
+        self.tiles_painted.push(key);
+        Ok(vec![])
+    }
+
+    fn drop_tiles(&mut self, keys: &[Key]) {
+        self.tiles_dropped.extend_from_slice(keys);
+    }
+
+    fn present_tiles(&mut self, covers: &[Cover]) -> Result<(), ()> {
+        self.tiles_presented.push(covers.to_vec());
         Ok(())
     }
 }
@@ -322,4 +342,70 @@ fn a_full_render_cheap_to_encode_but_slow_on_the_gpu_is_only_reprojected_while_z
 
     assert_eq!(frame.outcome, Some(Outcome::Reused));
     assert_eq!(fake.painted.len(), 1);
+}
+
+const ROOMY: u64 = 1 << 40;
+
+fn tiled() -> (Compositor, Library) {
+    let (mut c, lib) = scene();
+    c.set_mode(RasterMode::Tiles, ROOMY);
+    (c, lib)
+}
+
+#[test]
+fn tiles_render_once_then_a_still_camera_is_idle() {
+    let (mut c, mut lib) = tiled();
+    let mut fake = Fake::default();
+    let first = c.frame_tiles(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+    let painted = fake.tiles_painted.len();
+
+    let second = c.frame_tiles(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 500.0, &mut || 0.0).unwrap();
+
+    assert_eq!(first.outcome, Some(Outcome::Full));
+    assert_eq!(painted, 4);
+    assert_eq!(second.outcome, None);
+    assert_eq!(fake.tiles_painted.len(), painted);
+}
+
+#[test]
+fn a_tiled_pan_over_cached_tiles_only_composites() {
+    let (mut c, mut lib) = tiled();
+    let mut fake = Fake::default();
+    c.frame_tiles(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    let frame = c.frame_tiles(&mut fake, &mut lib, at(-20.0, -10.0, 1.0), 500.0, &mut || 0.0).unwrap();
+
+    assert_eq!(frame.outcome, Some(Outcome::Reused));
+    assert_eq!(fake.tiles_painted.len(), 4);
+}
+
+#[test]
+fn a_tiled_zoom_draws_within_the_frame_budget_and_keeps_asking_for_frames() {
+    let (mut c, mut lib) = tiled();
+    let mut fake = Fake::default();
+    c.frame_tiles(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+    let mut now = 0.0;
+    let mut slow = || {
+        now += 10.0;
+        now
+    };
+
+    let frame = c.frame_tiles(&mut fake, &mut lib, at(0.0, 0.0, 3.0), 500.0, &mut slow).unwrap();
+
+    assert_eq!(fake.tiles_painted.len(), 5);
+    assert!(frame.pending);
+    assert!(fake.tiles_presented.last().unwrap().iter().any(|cv| cv.key.zoom() == 1.0));
+}
+
+#[test]
+fn an_edit_repaints_only_the_tile_it_touches() {
+    let (mut c, mut lib) = tiled();
+    let mut fake = Fake::default();
+    c.frame_tiles(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+    c.touch("g", &lib);
+
+    c.frame_tiles(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 500.0, &mut || 0.0).unwrap();
+
+    assert_eq!(fake.tiles_dropped.len(), 1);
+    assert_eq!(fake.tiles_painted.len(), 5);
 }

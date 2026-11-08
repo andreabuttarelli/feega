@@ -8,7 +8,7 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 
 use vello::kurbo::Rect;
 
-use crate::compositor::{Compositor, Painter};
+use crate::compositor::{Compositor, Painter, RasterMode, TilePainter};
 use crate::display_list::{parse, parse_splice};
 use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
@@ -18,6 +18,7 @@ use crate::reproject::{Draw, Output, Reprojector};
 use crate::retained::{Camera, Lookup, Quality};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
+use crate::tile_pyramid::{side, Cover, Key};
 use crate::Skipped;
 
 const CACHE_SIDE: u32 = 4096;
@@ -35,6 +36,22 @@ const NOT_TIMED: u64 = u64::MAX;
 pub enum CoreMotion {
     Still = 0,
     Gesture = 1,
+}
+
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum CoreRaster {
+    Retained = 0,
+    Tiles = 1,
+}
+
+impl From<CoreRaster> for RasterMode {
+    fn from(r: CoreRaster) -> RasterMode {
+        match r {
+            CoreRaster::Retained => RasterMode::Retained,
+            CoreRaster::Tiles => RasterMode::Tiles,
+        }
+    }
 }
 
 impl From<CoreMotion> for Motion {
@@ -72,6 +89,8 @@ pub struct WebCore {
     motion: CoreMotion,
     rastered_at: f64,
     gpu_full_ms: Arc<AtomicU64>,
+    tiles: HashMap<Key, wgpu::Texture>,
+    budget: u64,
 }
 
 struct GpuPainter<'a> {
@@ -87,6 +106,7 @@ struct GpuPainter<'a> {
     spare: &'a mut wgpu::Texture,
     reprojector: &'a mut Reprojector,
     scratch: &'a mut Option<wgpu::Texture>,
+    tiles: &'a mut HashMap<Key, wgpu::Texture>,
 }
 
 fn scratch_of<'s>(device: &wgpu::Device, kept: &'s mut Option<wgpu::Texture>, (width, height): (u32, u32)) -> &'s wgpu::Texture {
@@ -172,6 +192,57 @@ impl Painter for GpuPainter<'_> {
     }
 }
 
+impl TilePainter for GpuPainter<'_> {
+    fn paint_tile(&mut self, key: Key, plan: Plan) -> Result<Vec<Skipped>, JsValue> {
+        let (list, missing) = self.engine.hold(self.cached, plan, self.pictures, self.device, self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let scratch = scratch_of(self.device, self.scratch, (side(), side()));
+        let skipped = self.engine.draw(self.device, self.queue, &list, &pictures, &scratch.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let device = self.device;
+        let tile = self.tiles.entry(key).or_insert_with(|| held_texture(device, (side(), side())));
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.copy_texture_to_texture(texel(scratch, 0, 0), texel(tile, 0, 0), wgpu::Extent3d { width: side(), height: side(), depth_or_array_layers: 1 });
+        self.queue.submit([encoder.finish()]);
+        Ok([skipped, missing].concat())
+    }
+
+    fn drop_tiles(&mut self, keys: &[Key]) {
+        for key in keys {
+            if let Some(texture) = self.tiles.remove(key) {
+                texture.destroy();
+            }
+        }
+    }
+
+    fn present_tiles(&mut self, covers: &[Cover]) -> Result<(), JsValue> {
+        let frame = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+            _ => return Err(failed("no surface texture")),
+        };
+        let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        clear(&mut encoder, &out);
+        for c in covers {
+            let Some(source) = self.tiles.get(&c.key) else { continue };
+            self.reprojector.draw(self.device, &mut encoder, Draw { source, target: &out, format: self.format, look: c.look, within: Some(c.within), output: Output::Premultiplied });
+        }
+        self.queue.submit([encoder.finish()]);
+        self.queue.present(frame);
+        Ok(())
+    }
+}
+
+fn clear(encoder: &mut wgpu::CommandEncoder, target: &wgpu::TextureView) {
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: None,
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: target, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store } })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    });
+}
+
 fn failed<E: std::fmt::Debug>(e: E) -> JsValue {
     JsValue::from_str(&format!("{e:?}"))
 }
@@ -250,7 +321,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)) })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiles: HashMap::new(), budget: 0 })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -367,9 +438,30 @@ impl WebCore {
     }
 
     pub fn set_budget(&mut self, bytes: f64) {
-        let share = split(bytes as u64, self.compositor.size());
-        self.library.set_budget(share.cache);
+        self.budget = bytes as u64;
+        let share = split(self.budget, self.compositor.size());
+        let (cache, tiles) = match self.compositor.mode() {
+            RasterMode::Retained => (share.cache, 0),
+            RasterMode::Tiles => (share.cache / 2, share.cache / 2),
+        };
+        self.library.set_budget(cache);
+        self.compositor.set_tile_cap(tiles);
         self.engine.set_budget(share.pool, share.layers);
+    }
+
+    pub fn set_raster(&mut self, raster: CoreRaster) {
+        for (_, texture) in self.tiles.drain() {
+            texture.destroy();
+        }
+        self.compositor.set_mode(raster.into(), 0);
+        let budget = self.budget;
+        if budget > 0 {
+            self.set_budget(budget as f64);
+        }
+    }
+
+    pub fn tile_bytes(&self) -> f64 {
+        self.compositor.tile_bytes() as f64
     }
 
     fn frame_limits(&self, now_ms: f64) -> Limits {
@@ -379,12 +471,15 @@ impl WebCore {
 
     pub fn frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
         let limits = self.frame_limits(now_ms);
-        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
+        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch, tiles: &mut self.tiles };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
         if timed != NOT_TIMED {
             self.compositor.gpu_took(f64::from_bits(timed));
         }
-        let frame = self.compositor.frame(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?;
+        let frame = match self.compositor.mode() {
+            RasterMode::Retained => self.compositor.frame(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?,
+            RasterMode::Tiles => self.compositor.frame_tiles(&mut painter, &mut self.library, self.camera, now_ms, &mut js_sys::Date::now)?,
+        };
         if frame.rastered > 0 {
             self.rastered_at = now_ms;
         }

@@ -1,12 +1,22 @@
 use vello::kurbo::{Affine as Matrix, Rect};
 
 use crate::display_list::Item;
-use crate::groups::{Library, Limits, Plan};
+use crate::groups::{Library, Limits, Plan, Unseen};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
+use crate::tile_pyramid::{cover, side, Cover, Key, Pyramid, Target};
 use crate::world::{OverlayPart, Patch, World};
 use crate::Skipped;
 
 const RENDER_TILE_PX: u32 = 1024;
+const ZOOM_IDLE_MS: f64 = 100.0;
+const TILE_BUDGET_MS: f64 = 4.0;
+const TILES_PER_FRAME: usize = 4;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RasterMode {
+    Retained,
+    Tiles,
+}
 
 pub fn render_tile(max_texture: u32) -> (u32, u32) {
     let side = max_texture.min(RENDER_TILE_PX);
@@ -20,6 +30,32 @@ pub trait Painter {
     fn shift(&mut self, by: (i32, i32)) -> Result<(), Self::Error>;
     fn paint(&mut self, plan: Plan, into: Rect, quality: Quality) -> Result<Vec<Skipped>, Self::Error>;
     fn present(&mut self, look: Lookup) -> Result<(), Self::Error>;
+}
+
+pub trait TilePainter: Painter {
+    fn paint_tile(&mut self, key: Key, plan: Plan) -> Result<Vec<Skipped>, Self::Error>;
+    fn drop_tiles(&mut self, keys: &[Key]);
+    fn present_tiles(&mut self, covers: &[Cover]) -> Result<(), Self::Error>;
+}
+
+struct Tiles {
+    pyramid: Pyramid,
+    zoom_seen: f64,
+    zoom_moved_at: f64,
+    shown: Option<Camera>,
+}
+
+impl Tiles {
+    fn target(&mut self, camera: Camera, now_ms: f64) -> Target {
+        if camera.zoom != self.zoom_seen {
+            self.zoom_seen = camera.zoom;
+            self.zoom_moved_at = now_ms;
+        }
+        if now_ms - self.zoom_moved_at < ZOOM_IDLE_MS {
+            return Target::Gesture;
+        }
+        Target::Settled
+    }
 }
 
 pub struct Frame {
@@ -41,11 +77,37 @@ pub struct Compositor {
     world: World,
     retained: Retained,
     pending: bool,
+    viewport: (u32, u32),
+    tiles: Option<Tiles>,
 }
 
 impl Compositor {
     pub fn new(width: u32, height: u32) -> Self {
-        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false }
+        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, viewport: (width, height), tiles: None }
+    }
+
+    pub fn set_mode(&mut self, mode: RasterMode, cap: u64) {
+        self.tiles = match mode {
+            RasterMode::Retained => None,
+            RasterMode::Tiles => Some(Tiles { pyramid: Pyramid::new(cap), zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, shown: None }),
+        };
+    }
+
+    pub fn mode(&self) -> RasterMode {
+        match self.tiles {
+            Some(_) => RasterMode::Tiles,
+            None => RasterMode::Retained,
+        }
+    }
+
+    pub fn set_tile_cap(&mut self, cap: u64) {
+        if let Some(tiles) = self.tiles.as_mut() {
+            tiles.pyramid.set_cap(cap);
+        }
+    }
+
+    pub fn tile_bytes(&self) -> u64 {
+        self.tiles.as_ref().map_or(0, |t| t.pyramid.bytes())
     }
 
     pub fn size(&self) -> (u32, u32) {
@@ -133,5 +195,55 @@ impl Compositor {
             painter.present(self.retained.lookup(camera))?;
         }
         Ok(Frame { outcome, pending: self.pending || self.retained.pending(), skipped, rastered: rastered_all, sharp_full })
+    }
+
+    pub fn frame_tiles<P: TilePainter>(&mut self, painter: &mut P, library: &mut Library, camera: Camera, now_ms: f64, clock: &mut dyn FnMut() -> f64) -> Result<Frame, P::Error> {
+        let Some(tiles) = self.tiles.as_mut() else {
+            return self.frame(painter, library, camera, now_ms, clock);
+        };
+        let mut pending = false;
+        let damage = self.world.take_damage();
+        let dropped = tiles.pyramid.invalidate(&damage);
+        painter.drop_tiles(&dropped);
+        let c = Camera { x: camera.x.round(), y: camera.y.round(), zoom: camera.zoom };
+        let target = tiles.target(c, now_ms);
+        let plan = tiles.pyramid.plan(c, self.viewport, target);
+        let mut covers = plan.covers;
+        let mut skipped = Vec::new();
+        let mut limits = painter.limits();
+        let mut drawn = 0;
+        let mut rastered_all = 0;
+        let started = clock();
+        for render in &plan.render {
+            let over = drawn >= TILES_PER_FRAME || (drawn > 0 && clock() - started > TILE_BUDGET_MS);
+            if over && !render.forced {
+                continue;
+            }
+            let list = self.world.screen(render.key.camera().matrix(), side(), side());
+            let tile_plan = library.plan_part(&list, limits, Unseen::Keep);
+            rastered_all += tile_plan.rasters.len();
+            limits.rasters = limits.rasters.saturating_sub(tile_plan.rasters.len());
+            pending |= tile_plan.pending || !tile_plan.finished.is_empty();
+            for group in tile_plan.finished.iter().chain(&tile_plan.waiting) {
+                self.world.touch(group, library.size_of(group));
+            }
+            skipped.extend(painter.paint_tile(render.key, tile_plan)?);
+            tiles.pyramid.kept(render.key);
+            covers.extend(cover(render.key, c, self.viewport));
+            drawn += 1;
+        }
+        painter.drop_tiles(&tiles.pyramid.evict());
+        let moved = tiles.shown != Some(c);
+        let outcome = match (drawn > 0, moved || !dropped.is_empty()) {
+            (true, _) => Some(Outcome::Full),
+            (false, true) => Some(Outcome::Reused),
+            (false, false) => None,
+        };
+        if outcome.is_some() {
+            painter.present_tiles(&covers)?;
+            tiles.shown = Some(c);
+        }
+        let unsettled = drawn < plan.render.len() || target == Target::Gesture;
+        Ok(Frame { outcome, pending: pending || unsettled, skipped, rastered: rastered_all, sharp_full: false })
     }
 }
