@@ -16,7 +16,7 @@ enum Cache {
 
 type Build = { name: string; root: string; port: number };
 type FrameLoad = { id: string; contentMs: number | null };
-type LoadRun = { build: string; cache: Cache; frames: FrameLoad[]; firstMs: number | null; allContentMs: number | null; sharpMs: number; fixtureKept: boolean };
+type LoadRun = { build: string; cache: Cache; frames: FrameLoad[]; firstMs: number | null; allContentMs: number | null; sharpMs: number; requests: number; bytes: number; fixtureKept: boolean };
 type Hotspot = { fn: string; url: string; selfMs: number };
 type ProfileNode = { id: number; callFrame: { functionName: string; url: string; lineNumber: number; columnNumber: number } };
 type Profile = { nodes: ProfileNode[]; samples: number[]; timeDeltas: number[] };
@@ -124,7 +124,7 @@ async function inked(png: Buffer, clip: Clip, scale: number, paper: Rgb): Promis
   return ink / (data.length / 3) >= INK_SHARE;
 }
 
-async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build' | 'cache' | 'fixtureKept'>> {
+async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build' | 'cache' | 'fixtureKept' | 'requests' | 'bytes'>> {
   const content = new Map<string, number | null>();
   let last: Buffer | null = null;
   let changedAt = 0;
@@ -162,6 +162,12 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
   const page = await context.newPage();
   const cdp: CDPSession = await context.newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
+  await cdp.send('Network.enable');
+  const wire = { requests: 0, bytes: 0 };
+  cdp.on('Network.loadingFinished', (e) => {
+    wire.requests++;
+    wire.bytes += e.encodedDataLength;
+  });
   if (profiled) {
     await cdp.send('Profiler.enable');
     await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
@@ -169,7 +175,7 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
   }
   const from = Date.now();
   await page.goto(`http://127.0.0.1:${build.port}${CANVAS_PATH}`, { waitUntil: 'commit' });
-  const load = await watchLoad(page, from);
+  const load = { ...(await watchLoad(page, from)), ...wire };
   const spots = profiled ? hotspots((await cdp.send('Profiler.stop')).profile as Profile) : [];
   if (video) {
     writeFileSync(join(OUT, `${video}-end.png`), await page.screenshot());
@@ -212,7 +218,7 @@ function summary(runs: LoadRun[]) {
         const values = rs.map(f).filter((v): v is number => v !== null);
         return values.length === rs.length ? range(values) : { missing: rs.length - values.length, ...(values.length ? range(values) : {}) };
       };
-      return [key, { runs: rs.length, firstContentMs: pick((r) => r.firstMs), allContentMs: pick((r) => r.allContentMs), sharpMs: pick((r) => r.sharpMs), frameContentMs: pick((r) => (r.frames.length ? mid(r.frames.map((f) => f.contentMs ?? GIVE_UP_MS)) : null)) }];
+      return [key, { runs: rs.length, firstContentMs: pick((r) => r.firstMs), allContentMs: pick((r) => r.allContentMs), sharpMs: pick((r) => r.sharpMs), requests: pick((r) => r.requests), bytes: pick((r) => r.bytes), frameContentMs: pick((r) => (r.frames.length ? mid(r.frames.map((f) => f.contentMs ?? GIVE_UP_MS)) : null)) }];
     })
   );
 }
@@ -229,7 +235,7 @@ test('load benchmark: on-screen frames show content, then turn sharp', async () 
         const done = await runOnce(browser, build, cache, i === 0);
         runs.push(done.run);
         spots[key] ??= done.spots;
-        console.log(`run ${i + 1}/${RUNS} ${key} ${JSON.stringify({ first: done.run.firstMs, all: done.run.allContentMs, sharp: done.run.sharpMs, frames: done.run.frames.length, kept: done.run.fixtureKept })}`);
+        console.log(`run ${i + 1}/${RUNS} ${key} ${JSON.stringify({ first: done.run.firstMs, all: done.run.allContentMs, sharp: done.run.sharpMs, requests: done.run.requests, bytes: done.run.bytes, frames: done.run.frames.length, kept: done.run.fixtureKept })}`);
       }
     }
   }
