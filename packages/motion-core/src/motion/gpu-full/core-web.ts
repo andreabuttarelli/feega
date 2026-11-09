@@ -270,7 +270,7 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     patchUses: (patch: UsePatch) => attached.patch_uses(JSON.stringify(patch)),
     setOverlay: (part: OverlayPart, items: readonly Item[]) => OVERLAY_SETTERS[part](attached, JSON.stringify(items)),
     frame: (now: number) => {
-      const [outcome, ...skipped] = attached.frame(now).split("\n");
+      const [outcome, ...skipped] = attached.frame(now).split('\n');
       return { outcome: outcome as Outcome, pending: attached.cache_pending(), skipped: skipped.filter(Boolean) };
     },
     cacheBytes: () => attached.cache_bytes(),
