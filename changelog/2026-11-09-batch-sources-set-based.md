@@ -9,3 +9,7 @@ The batch is a GET (`?ids=`, at most 100 per request) answered with an
 ETag and `private, no-cache`: as POST it re-downloaded ~11 MB on every
 warm open of the landings fixture, where the per-frame route already got
 304s since #1858.
+
+Each batched frame also carries `media`: `{ [assetId]: { kind, width,
+height } }` for its image assets, so the client can fetch and decode them
+when sources arrive instead of after the frame build.
