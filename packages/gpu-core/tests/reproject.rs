@@ -114,3 +114,29 @@ fn a_zoom_gesture_reuses_the_same_uniform_memory_and_each_frame_sees_its_own_loo
         assert_eq!(*first_bytes.get_or_insert(bytes), bytes, "uniform memory grew at frame {frame}");
     }
 }
+
+#[test]
+fn an_overlay_drawn_over_the_tiles_keeps_them_where_it_is_transparent() {
+    let (device, queue) = device();
+    let source = texture(&device);
+    let target = texture(&device);
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture: &source, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        &[0u8; (SIDE * SIDE * 4) as usize],
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(SIDE * 4), rows_per_image: None },
+        source.size(),
+    );
+    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    drop(encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: None,
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: &view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::WHITE), store: wgpu::StoreOp::Store } })],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    }));
+    Reprojector::new(&device).draw(&device, &queue, &mut encoder, Draw { source: &source, target: &view, format: FORMAT, look: IDENTITY, within: None, output: Output::Over });
+
+    assert_eq!(first_texel(&device, &queue, encoder, &target), [255; 4]);
+}

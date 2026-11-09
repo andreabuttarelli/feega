@@ -126,3 +126,18 @@ fn a_deep_fast_zoom_from_rest_always_finds_a_covering_tile_in_the_idle_set() {
         assert!(frame.missing.iter().all(|k| tiles.covered(*k)), "blank at zoom {zoom}");
     }
 }
+
+#[test]
+fn eviction_never_leaves_a_drawn_tile_without_its_store_entry() {
+    let mut tiles = Tiles::default();
+    for step in -12..=4 {
+        for key in tiles.frame(camera(step_zoom(step)), SCREEN).missing {
+            tiles.hold(key);
+        }
+    }
+    let gone = tiles.evict_beyond(camera(1.0), SCREEN, 40);
+    assert!(!gone.is_empty());
+
+    let frame = tiles.frame(camera(1.0), SCREEN);
+    assert!(frame.draw.iter().all(|k| tiles.holds(*k) && !gone.contains(k)));
+}

@@ -80,5 +80,9 @@ frame (the exact frame never runs, so the screen keeps the last tiled present â€
 last tiled present is not itself empty, e.g. by logging per-tile `within` rects). Next test to
 write: fill to cap, evict, assert every key in `TileFrame::draw` maps to a live texture.
 
+Resolved 2026-11-09: the blank was the overlay, not eviction. The reprojector drew the overlay
+without blending over the tiles, replacing the screen with a mostly transparent texture whenever an
+overlay existed (`Output::Over` now). Test: `an_overlay_drawn_over_the_tiles_keeps_them_where_it_is_transparent`.
+
 Then: A/B of the current version, batched tile renders (step 3), drag reuse + idle prebuild
 (step 4), default on (step 5).

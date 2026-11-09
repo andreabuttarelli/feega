@@ -14,3 +14,8 @@ Gotcha paid for: the reprojector writes its uniforms through `queue.write_buffer
 on screen). Each tile draw now submits its own encoder.
 
 Without the flag nothing changes. Next: batched tile renders, drag reuse, default on.
+
+Second gotcha: the reprojector pipelines had no blending, so the overlay (selection, handles)
+drawn last over the tiles replaced the whole screen with its mostly transparent texture: a full
+blank whenever an overlay existed, not tile eviction as first suspected. The overlay now draws
+with `Output::Over` (premultiplied source-over, target loaded).

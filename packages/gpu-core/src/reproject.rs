@@ -37,7 +37,20 @@ fn premultiplied(@builtin(position) at: vec4<f32>) -> @location(0) vec4<f32> {
 const UNIFORM_BYTES: u64 = 32;
 const IN_FLIGHT_SLOTS: usize = 4;
 
-const ENTRY: [(Output, &str); 2] = [(Output::Straight, "straight"), (Output::Premultiplied, "premultiplied")];
+struct Mode {
+    entry: &'static str,
+    blend: Option<wgpu::BlendState>,
+}
+
+const MODES: [(Output, Mode); 3] = [
+    (Output::Straight, Mode { entry: "straight", blend: None }),
+    (Output::Premultiplied, Mode { entry: "premultiplied", blend: None }),
+    (Output::Over, Mode { entry: "premultiplied", blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING) }),
+];
+
+fn mode(output: Output) -> &'static Mode {
+    &MODES.iter().find(|(o, _)| *o == output).expect("every output has a mode").1
+}
 
 pub struct Reprojector {
     pipelines: Vec<((wgpu::TextureFormat, Output), wgpu::RenderPipeline)>,
@@ -51,6 +64,7 @@ pub struct Reprojector {
 pub enum Output {
     Straight,
     Premultiplied,
+    Over,
 }
 
 pub struct Draw<'a> {
@@ -85,7 +99,7 @@ impl Reprojector {
         if let Some(at) = self.pipelines.iter().position(|(key, _)| *key == (format, output)) {
             return &self.pipelines[at].1;
         }
-        let entry = ENTRY.iter().find(|(o, _)| *o == output).map(|(_, e)| *e);
+        let Mode { entry, blend } = mode(output);
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: None,
@@ -93,7 +107,7 @@ impl Reprojector {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState { module: &self.module, entry_point: entry, compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: None, write_mask: wgpu::ColorWrites::ALL })] }),
+            fragment: Some(wgpu::FragmentState { module: &self.module, entry_point: Some(entry), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: *blend, write_mask: wgpu::ColorWrites::ALL })] }),
             multiview_mask: None,
             cache: None,
         });
@@ -118,7 +132,7 @@ impl Reprojector {
                 wgpu::BindGroupEntry { binding: 2, resource: uniform.as_entire_binding() },
             ],
         });
-        let load = if d.within.is_some() { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT) };
+        let load = if d.within.is_some() || mode(d.output).blend.is_some() { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT) };
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: d.target, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load, store: wgpu::StoreOp::Store } })],

@@ -477,7 +477,7 @@ impl WebCore {
             self.queue.submit([std::mem::replace(&mut encoder, self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default())).finish()]);
         }
         if let Some(overlay) = self.overlay_texture()? {
-            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Premultiplied });
+            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
             self.overlay_tex = Some(overlay);
         }
         self.queue.submit([encoder.finish()]);
