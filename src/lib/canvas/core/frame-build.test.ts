@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,7 @@ import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
-import { builtAnswer, buildFrame, frameBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
+import { builtAnswer, buildFrame, frameBuilder, transfers, warmFonts, type BuildAsk, type BuildWorker } from './frame-build';
 import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
 import { onStage } from './frame-source';
 import { withoutPictures } from './placeholders';
@@ -58,6 +58,19 @@ describe('building a frame away from the main thread', () => {
   });
 });
 
+describe('a fresh worker', () => {
+  it('loads the default faces before any frame asks, so the first build does not wait on them', async () => {
+    const asked: unknown[] = [];
+    await warmFonts(async (doc) => (asked.push(doc), boxBook()));
+
+    expect(asked).toHaveLength(1);
+  });
+
+  it('stays usable when the default faces cannot load', async () => {
+    await expect(warmFonts(async () => Promise.reject(new Error('offline')))).resolves.toBeUndefined();
+  });
+});
+
 describe('the builder', () => {
   const echo = (): BuildWorker & { asked: BuildAsk[] } => {
     const worker = {
@@ -80,6 +93,21 @@ describe('the builder', () => {
     expect(worker.asked.every((a) => typeof a.source === 'string')).toBe(true);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
+  });
+
+  it('writes a doc out once, not again when the frame rebuilds with sharper assets', async () => {
+    const worker = echo();
+    const build = frameBuilder(() => worker);
+    const written = vi.spyOn(JSON, 'stringify');
+    const doc = structuredClone(shapeDoc);
+
+    await build({ ...source(doc), assets: { a: 'small' } }, Smoothing.Plain);
+    await build({ ...source(doc), assets: { a: 'large' } }, Smoothing.Plain);
+    const docWrites = written.mock.calls.filter(([value]) => value === doc || (value as { doc?: unknown })?.doc === doc).length;
+    written.mockRestore();
+
+    expect(docWrites).toBe(1);
+    expect(worker.asked.map((a) => JSON.parse(a.source))).toEqual([{ ...source(doc), assets: { a: 'small' } }, { ...source(doc), assets: { a: 'large' } }].map((x) => JSON.parse(JSON.stringify(x))));
   });
 
   it('spreads builds over its workers, so frames build side by side instead of in one queue', async () => {

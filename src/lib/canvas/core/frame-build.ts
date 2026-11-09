@@ -1,5 +1,5 @@
-import type { BrandTokens } from '@feega/motion-core/motion/brand';
-import type { MotionDoc } from '@feega/motion-core/motion/doc';
+import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
 import { stripContours, type ContourView } from '@feega/motion-core/motion/gpu-full/wire';
@@ -30,6 +30,10 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
   return drawFrame(prepared, frameOfLive(source));
 }
 
+export async function warmFonts(fonts: Fonts): Promise<void> {
+  await fonts(newMotionDoc(MotionFormat.Landscape), {}, FEEGA_TOKENS).catch(() => null);
+}
+
 export function builtAnswer(id: number, list: DisplayList | null): BuildAnswer {
   if (!list) {
     return { id, list };
@@ -41,6 +45,14 @@ export function builtAnswer(id: number, list: DisplayList | null): BuildAnswer {
 export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('contours' in answer && answer.contours ? [answer.contours.floats.buffer as ArrayBuffer, answer.contours.ends.buffer as ArrayBuffer] : []);
 
 type Lane = { worker: BuildWorker; busy: number };
+
+const docTexts = new WeakMap<MotionDoc, string>();
+
+function sourceText({ doc, ...rest }: FrameDoc): string {
+  const text = docTexts.get(doc) ?? JSON.stringify(doc);
+  docTexts.set(doc, text);
+  return `{"doc":${text},${JSON.stringify(rest).slice(1)}`;
+}
 
 export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
   const pool: Lane[] = [];
@@ -91,7 +103,7 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (sourc
     }
     const id = next++;
     lane.busy++;
-    lane.worker.postMessage({ id, source: JSON.stringify(source), smoothing, locals: localFilesSnapshot() });
+    lane.worker.postMessage({ id, source: sourceText(source), smoothing, locals: localFilesSnapshot() });
     return new Promise((resolve, reject) => waiting.set(id, { lane, resolve, reject }));
   };
 }
