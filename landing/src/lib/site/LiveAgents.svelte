@@ -32,6 +32,8 @@
   const STYLE_PROPS = ['min-height', 'font-family', 'color', 'scale', 'translate', 'transition', 'transform-origin', 'min-width'];
 
   let agents = $state<View[]>([]);
+  let paused = $state(false);
+  const MENU_OPEN = '.drawer';
   let running: Agent[] = [];
   const busy = new Set<HTMLElement>();
   const ledger = createLedger<HTMLElement>();
@@ -446,6 +448,12 @@
     const targets = outermost([...document.querySelectorAll<HTMLElement>(BUILD_SELECTOR)]);
     let raf = 0;
     const loop = (now: number) => {
+      paused = document.querySelector(MENU_OPEN) !== null;
+      if (paused) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+
       for (const agent of running) {
         frame(agent, (now - start) * TEMPO + start, targets);
       }
@@ -471,7 +479,7 @@
 </script>
 
 {#if agents.length > 0}
-  <div class="live" aria-hidden="true">
+  <div class="live" class:paused aria-hidden="true">
     {#each agents as a (a.name)}
       {#if a.live}
         {#each a.marks as m, i (i)}
@@ -486,13 +494,6 @@
               {/each}
             {/if}
 
-            {#if a.menu}
-              <div class="menu">
-                {#each a.menu.items as item, i (item)}
-                  <span class:on={i === a.menu.active} style:font-family="'{item}'" style:background={i === a.menu.active ? a.colour : undefined}>{item}</span>
-                {/each}
-              </div>
-            {/if}
           </div>
         {/if}
 
@@ -511,14 +512,26 @@
     {/each}
   </div>
 
+  {#each agents as a (a.name)}
+    {#if a.live && a.menu && a.box}
+      <div class="live menus" class:paused aria-hidden="true">
+        <div class="menu" style:left="{a.box.x - 1.5}px" style:top="{a.box.y + a.box.h + 8}px">
+          {#each a.menu.items as item, i (item)}
+            <span class:on={i === a.menu.active} style:font-family="'{item}'" style:background={i === a.menu.active ? a.colour : undefined}>{item}</span>
+          {/each}
+        </div>
+      </div>
+    {/if}
+  {/each}
+
   {@const present = agents.filter((a) => a.live)}
-  <div class="stack" aria-hidden="true" class:gone={present.length === 0}>
+  <div class="stack" aria-hidden="true" class:gone={present.length === 0 || paused}>
     <div class="faces">
       {#each present.slice(0, 5) as a (a.name)}
         <span style:background={a.colour}>{initials(a.name)}</span>
       {/each}
     </div>
-    <span><i></i>{present.length} agents editing</span>
+    <span><i></i>{present.length} {present.length === 1 ? 'agent' : 'agents'} editing</span>
   </div>
 {/if}
 
@@ -526,7 +539,7 @@
   .live {
     position: fixed;
     inset: 0;
-    z-index: 20;
+    z-index: var(--site-z-agents);
     overflow: hidden;
     pointer-events: none;
     font-family: 'Inter', sans-serif;
@@ -575,10 +588,12 @@
     bottom: -5px;
   }
 
+  .live.paused {
+    visibility: hidden;
+  }
+
   .menu {
     position: absolute;
-    left: -1.5px;
-    top: calc(100% + 8px);
     display: flex;
     flex-direction: column;
     min-width: 160px;
@@ -636,7 +651,7 @@
     position: fixed;
     left: 12px;
     bottom: 12px;
-    z-index: 20;
+    z-index: var(--site-z-agents);
     display: flex;
     align-items: center;
     gap: 8px;

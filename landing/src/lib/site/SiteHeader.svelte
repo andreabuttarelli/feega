@@ -46,7 +46,7 @@
   .bar {
     position: fixed;
     inset: 0 0 auto;
-    z-index: 10;
+    z-index: var(--site-z-header);
     display: flex;
     justify-content: space-between;
     align-items: start;
@@ -94,7 +94,7 @@
   .drawer {
     position: fixed;
     inset: 0;
-    z-index: 9;
+    z-index: var(--site-z-drawer);
     display: flex;
     flex-direction: column;
     max-width: 430px;
