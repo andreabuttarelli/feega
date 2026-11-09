@@ -13,7 +13,7 @@ export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string
 
 export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>;
 
-export type BuildAsk = { id: number; source: FrameDoc; smoothing: Smoothing; locals: LocalFilesSnapshot };
+export type BuildAsk = { id: number; source: string; smoothing: Smoothing; locals: LocalFilesSnapshot };
 
 export type BuildAnswer = { id: number; list: DisplayList | null; contours?: ContourView } | { id: number; error: string };
 
@@ -91,7 +91,7 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (sourc
     }
     const id = next++;
     lane.busy++;
-    lane.worker.postMessage({ id, source, smoothing, locals: localFilesSnapshot() });
+    lane.worker.postMessage({ id, source: JSON.stringify(source), smoothing, locals: localFilesSnapshot() });
     return new Promise((resolve, reject) => waiting.set(id, { lane, resolve, reject }));
   };
 }

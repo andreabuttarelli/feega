@@ -76,7 +76,8 @@ describe('the builder', () => {
     const worker = echo();
     const build = frameBuilder(() => worker);
     const [a, b] = await Promise.all([build(source(shapeDoc), Smoothing.Plain), build(source(customDoc), Smoothing.Plain)]);
-    expect(worker.asked.map((a) => a.source.doc)).toEqual([shapeDoc, customDoc]);
+    expect(worker.asked.map((a) => (JSON.parse(a.source) as { doc: unknown }).doc)).toEqual([shapeDoc, customDoc]);
+    expect(worker.asked.every((a) => typeof a.source === 'string')).toBe(true);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
   });
