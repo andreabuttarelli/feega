@@ -2,7 +2,7 @@ import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { DataCheck, listMainDependents, listNodesByIds, patchNodeData } from '$lib/server/repos/canvas';
-import { readHead, type MotionHead } from '$lib/server/repos/motion-revisions';
+import { latestHeads, readHead, type MotionHead } from '$lib/server/repos/motion-revisions';
 import { linkedMains, mainHomesOf, mainsSignature } from '$lib/motion/linked-mains';
 
 const MAX_DEPTH = 8;
@@ -28,6 +28,25 @@ export async function linkedHead(db: Db, input: FrameScope & { head: MotionHead 
   }
 
   return doc === input.head.doc ? input.head : { ...input.head, doc };
+}
+
+export async function linkedHeads(db: Db, input: { orgId: string; heads: Map<string, MotionHead> }): Promise<Map<string, MotionHead>> {
+  const loaded = new Map<string, MotionDoc | null>();
+  const docs = new Map([...input.heads].map(([nodeId, head]) => [nodeId, head.doc]));
+
+  for (let depth = 0; depth < MAX_DEPTH; depth++) {
+    const missing = [...new Set([...docs].flatMap(([nodeId, doc]) => mainHomesOf(doc, nodeId)))].filter((home) => !loaded.has(home));
+    if (!missing.length) {
+      break;
+    }
+
+    const alive = (await listNodesByIds(db, { orgId: input.orgId, nodeIds: missing })).map((n) => n.id);
+    const heads = await latestHeads(db, { orgId: input.orgId, nodeIds: alive });
+    missing.forEach((home) => loaded.set(home, heads.get(home)?.doc ?? null));
+    docs.forEach((doc, nodeId) => docs.set(nodeId, linkedMains(doc, nodeId, loaded)));
+  }
+
+  return new Map([...input.heads].map(([nodeId, head]) => [nodeId, docs.get(nodeId) === head.doc ? head : { ...head, doc: docs.get(nodeId)! }]));
 }
 
 const linkedOf = (data: Record<string, unknown>): Record<string, unknown> => (data.linked as Record<string, unknown> | undefined) ?? {};

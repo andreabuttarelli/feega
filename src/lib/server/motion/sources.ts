@@ -1,7 +1,7 @@
-import { readHead, readHeads, type MotionHead } from '$lib/server/repos/motion-revisions';
+import { latestHeads, readHead, type MotionHead } from '$lib/server/repos/motion-revisions';
 import { listNodesByIds } from '$lib/server/repos/canvas';
 import { motionOf } from '$lib/canvas/motion-node';
-import { linkedHead } from './linked-mains';
+import { linkedHead, linkedHeads } from './linked-mains';
 import { assetUrls, motionAssets, namedAssets, type AssetSigner, type MotionScope } from './editor';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { mayUseAssets, mentionedIds, referencedAssets } from '$lib/motion/doc-assets';
@@ -30,16 +30,9 @@ export async function motionSource(scope: MotionScope): Promise<MotionSource | n
 type FramesScope = SourceScope & { canvasId: string; nodeIds: string[] };
 
 async function headsOf(scope: FramesScope): Promise<Map<string, MotionHead>> {
-  const frames = (await listNodesByIds(scope.db, { orgId: scope.orgId, nodeIds: scope.nodeIds }))
-    .filter((record) => record.canvasId === scope.canvasId)
-    .flatMap((record) => {
-      const node = motionOf(record);
-      return node && node.docHeadRevision > 0 ? [{ nodeId: record.id, version: node.docHeadRevision }] : [];
-    });
-  const saved = await readHeads(scope.db, { orgId: scope.orgId, heads: frames });
-  const asked = new Set(frames.map((f) => f.nodeId));
-  const linked = await Promise.all([...saved].filter(([nodeId]) => asked.has(nodeId)).map(async ([nodeId, head]) => [nodeId, await linkedHead(scope.db, { orgId: scope.orgId, nodeId, head })] as const));
-  return new Map(linked);
+  const frames = (await listNodesByIds(scope.db, { orgId: scope.orgId, nodeIds: scope.nodeIds })).filter((record) => record.canvasId === scope.canvasId && motionOf(record)).map((record) => record.id);
+  const saved = await latestHeads(scope.db, { orgId: scope.orgId, nodeIds: frames });
+  return linkedHeads(scope.db, { orgId: scope.orgId, heads: saved });
 }
 
 export async function motionSources(scope: FramesScope): Promise<Map<string, MotionSource>> {
