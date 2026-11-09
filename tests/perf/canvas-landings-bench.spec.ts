@@ -80,7 +80,6 @@ async function frameOnScreen(page: Page): Promise<{ x: number; left: number; top
 
 async function dragFrame(page: Page, until: number) {
   const box = await frameOnScreen(page);
-  writeFileSync(join(OUT, 'drag-start.png'), await shot(page));
   await dragFrom(page, { x: box.left + TITLE_IN_PX, y: box.top - TITLE_ABOVE_PX }, until);
 }
 
@@ -89,8 +88,6 @@ async function dragElement(page: Page, until: number) {
   await dragFrom(page, { x: box.x, y: VIEWPORT.height / 2 }, until);
 }
 
-const moved: string[] = [];
-
 async function dragFrom(page: Page, from: { x: number; y: number }, until: number) {
   await page.mouse.click(from.x, from.y);
   await page.mouse.down();
@@ -98,7 +95,6 @@ async function dragFrom(page: Page, from: { x: number; y: number }, until: numbe
     const t = i / 10;
     await page.mouse.move(from.x + Math.sin(t) * 200, from.y + Math.cos(t * 0.7) * 150);
   }
-  moved.push(await page.evaluate(() => [...document.querySelectorAll('.gpu-node.selected')].map((n) => n.getAttribute('data-box')).join('|') + ' ' + JSON.stringify((window as unknown as { __gpuMem?: object }).__gpuMem ?? null)));
   await page.mouse.move(from.x, from.y);
   await page.mouse.up();
 }
@@ -142,7 +138,6 @@ async function untilDrawn(page: Page) {
     return nodes.every((n) => n.hasAttribute('data-core'));
   }, null, { timeout: DRAWN_GIVE_UP_MS, polling: SHARP_POLL_MS }).catch(async (e: unknown) => {
     writeFileSync(join(OUT, 'undrawn.png'), await shot(page));
-    console.log('UNDRAWN', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('[data-testid="gpu-node"]')].map((n) => [n.getAttribute('aria-label')?.slice(0, 10), n.hasAttribute('data-core'), JSON.stringify(n.getBoundingClientRect())]))));
     throw e;
   });
   const started = Date.now();
@@ -190,12 +185,11 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   await page.addInitScript(instrument);
-  page.on('console', (m) => { if (process.env.BENCH_DEBUG && m.text().startsWith('[probe]')) { console.log(m.text().slice(0, 600)); } });
   await page.addInitScript(({ key, view }) => localStorage.setItem(key, JSON.stringify(view)), { key: VIEW_KEY, view: START_VIEW });
   const cdp = ENGINE === Engine.Chromium ? await context.newCDPSession(page) : null;
   await cdp?.send('Performance.enable');
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}${process.env.BENCH_DEBUG ? '?coreDebug' : ''}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await untilDrawn(page);
   return { context, page, cdp };
@@ -218,11 +212,9 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture):
   }
   const shown = await inkedOnScreen(page);
   expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture`).toBe(true);
-  console.log('SELECTED-BEFORE', gesture, await page.evaluate(() => [...document.querySelectorAll('.gpu-node.selected')].map((n) => n.getAttribute('data-box')).join('|')));
   const before = await taskMs(cdp);
   const frames: Frames = await measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until));
   const after = await taskMs(cdp);
-  console.log('MID', gesture, moved.at(-1));
   await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
   return { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before) };

@@ -602,7 +602,7 @@
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileEdited(zooming.active() || edited.size ? cached(shown, wide.view, wide.area, textureBytes) : uncached(shown), edited)));
+    const patch = sent.patch(worldUses(heldWhileEdited(zooming.active() || edited.size ? cached(shown, wide.view, wide.area, textureBytes) : uncached(shown), edited.size ? new Set(shown.map((f) => f.id)) : edited)));
     if (patch) {
       into.patchUses(patch);
     }

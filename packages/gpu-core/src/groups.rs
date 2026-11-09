@@ -317,7 +317,7 @@ fn chunk_of(u: &UseItem, group: &DisplayList, at: Building, items: usize) -> Chu
     let placed = UseItem { matrix: [at.scale, 0.0, 0.0, at.scale, 0.0, 0.0], ..u.clone() };
     let all = used(&placed, group, 0);
     let whole = all.iter().any(|i| matches!(i, Item::Lens(_)));
-    let end = if whole { all.len() } else { (at.next + items).min(all.len()) };
+    let end = if whole { all.len() } else { at.next.saturating_add(items).min(all.len()) };
     let done = end == all.len();
     let base = (at.next > 0).then(|| partial(&u.group, size));
     let list = DisplayList { width: size.0, height: size.1, background: None, items: base.into_iter().chain(all[at.next..end].iter().cloned()).collect(), faces: group.faces.clone(), fragments: Default::default() };
@@ -816,7 +816,8 @@ impl Library {
             let cast = self.encoding(&u.group);
             let Some(group) = self.groups.get(&u.group) else { continue };
             let moved_as_texture = u.cache && u.hold;
-            if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some() && !moved_as_texture) {
+            let cached_texture = u.cache;
+            if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some() && !cached_texture) {
                 if on_screen {
                     let (laid, spans) = laid(u, group, whole, view);
                     items.extend(laid);
@@ -849,10 +850,11 @@ impl Library {
             }
             let shown = match held {
                 Some(h) if sharp_enough(self.motion, want, h.scale) => Some(h.scale),
-                _ if rasters.len() < limits.rasters && self.may_raster(&u.group, &first) => {
+                _ if moved_as_texture || (rasters.len() < limits.rasters && self.may_raster(&u.group, &first)) => {
                     let at = self.building.get(&u.group).copied().filter(|b| sharp_enough(self.motion, want, b.scale)).unwrap_or(Building { scale: want, next: 0 });
-                    let chunk = chunk_of(u, group, at, limits.items);
-                    let next = at.next + limits.items;
+                    let per_chunk = if moved_as_texture { usize::MAX } else { limits.items };
+                    let chunk = chunk_of(u, group, at, per_chunk);
+                    let next = at.next.saturating_add(per_chunk);
                     rasters.push(chunk.raster);
                     if chunk.done {
                         self.building.remove(&u.group);

@@ -13,7 +13,7 @@ const FIXTURE_KIND = process.env.BENCH_CASE === BenchFixture.Landings ? BenchFix
 const LANDINGS_FILE = process.env.BENCH_FIXTURE ?? join(homedir(), 'Documents/feega-videos/perf/landings/landings.feega');
 const FIXTURE: Record<BenchFixture, { file: string; make: string | null; spec: RegExp }> = {
   [BenchFixture.Zoom]: { file: join(tmpdir(), 'feega-zoom-bench.feega'), make: 'node scripts/perf/zoom-fixture.mjs', spec: /canvas-zoom-bench/ },
-  [BenchFixture.Landings]: { file: LANDINGS_FILE, make: existsSync(LANDINGS_FILE) ? null : 'node scripts/perf/landings-fixture.mjs', spec: /canvas-landings-bench/ }
+  [BenchFixture.Landings]: { file: LANDINGS_FILE, make: existsSync(LANDINGS_FILE) ? null : 'node scripts/perf/landings-fixture.mjs', spec: process.env.BENCH_SPEC ? new RegExp(process.env.BENCH_SPEC) : /canvas-landings-bench/ }
 };
 const { file, make, spec } = FIXTURE[FIXTURE_KIND];
 const SERVED = join(tmpdir(), `feega-${FIXTURE_KIND}-served.feega`);
