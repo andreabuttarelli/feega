@@ -8,6 +8,7 @@ import { test, expect, chromium, type Browser, type BrowserContext, type CDPSess
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
 import { localEnv } from '../../scripts/local.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
+import { Step, timeline, type FrameSteps } from '../../src/lib/canvas/core/frame-timeline';
 
 enum Cache {
   Cold = 'cold',
@@ -15,7 +16,7 @@ enum Cache {
 }
 
 type Build = { name: string; root: string; port: number };
-type FrameLoad = { id: string; contentMs: number | null };
+type FrameLoad = { id: string; contentMs: number | null; steps?: FrameSteps['steps'] };
 type LoadRun = { build: string; cache: Cache; frames: FrameLoad[]; firstMs: number | null; allContentMs: number | null; sharpMs: number; requests: number; bytes: number; fixtureKept: boolean };
 type Hotspot = { fn: string; url: string; selfMs: number };
 type ProfileNode = { id: number; callFrame: { functionName: string; url: string; lineNumber: number; columnNumber: number } };
@@ -32,7 +33,7 @@ const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = Number(process.env.BENCH_ZOOM ?? 0.12);
 const START_VIEW = { x: VIEWPORT.width / 2 - LANDINGS_FIXTURE_CENTRE.x * START_ZOOM, y: VIEWPORT.height / 2 - LANDINGS_FIXTURE_CENTRE.y * START_ZOOM, zoom: START_ZOOM };
 const VIEW_KEY = `feega:viewport:${LOCAL_USER_ID}:${LANDINGS_FIXTURE_PLACE.canvasId}`;
-const CANVAS_PATH = `/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`;
+const CANVAS_PATH = `/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}${process.env.BENCH_QUERY ?? ""}`;
 const POLL_MS = 50;
 const STILL_MS = 1500;
 const GIVE_UP_MS = 60_000;
@@ -175,7 +176,10 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
   }
   const from = Date.now();
   await page.goto(`http://127.0.0.1:${build.port}${CANVAS_PATH}`, { waitUntil: 'commit' });
-  const load = { ...(await watchLoad(page, from)), ...wire };
+  const watched = await watchLoad(page, from);
+  const marks = timeline(await page.evaluate(() => performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime }))));
+  console.log(marks.filter((m) => !watched.frames.some((f) => f.id === m.id)).map((m) => `offscreen ${m.id.slice(0, 8)} ${m.steps.map((x) => `${x.step}@${x.at}`).join(' ')}`).join('\n'));
+  const load = { ...watched, frames: watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] })), ...wire };
   const spots = profiled ? hotspots((await cdp.send('Profiler.stop')).profile as Profile) : [];
   if (video) {
     writeFileSync(join(OUT, `${video}-end.png`), await page.screenshot());
@@ -203,6 +207,26 @@ async function runOnce(browser: Browser, build: Build, cache: Cache, profiled: b
     await context.close();
     server.kill();
   }
+}
+
+const WATERFALL_MS_PER_CHAR = 200;
+const LETTER: Record<Step, string> = { [Step.Asked]: 'a', [Step.Source]: 's', [Step.Built]: 'b', [Step.Vectors]: 'v', [Step.Whole]: 'w', [Step.Put]: 'p', [Step.Patched]: 'x', [Step.Pictured]: 'P', [Step.Drawn]: 'd', [Step.MainAsked]: 'm', [Step.MainBuild]: 'M', [Step.MainBuilt]: 'B' };
+
+function waterfall(title: string, frames: FrameLoad[]): string {
+  const rows = [...frames].sort((a, b) => (a.contentMs ?? GIVE_UP_MS) - (b.contentMs ?? GIVE_UP_MS));
+  const end = Math.max(0, ...rows.flatMap((f) => [f.contentMs ?? 0, ...(f.steps ?? []).map((s) => s.at)]));
+  const lines = rows.map((f) => {
+    const bar = new Array<string>(Math.floor(end / WATERFALL_MS_PER_CHAR) + 1).fill(' ');
+    for (const s of f.steps ?? []) {
+      bar[Math.floor(s.at / WATERFALL_MS_PER_CHAR)] = LETTER[s.step];
+    }
+    if (f.contentMs !== null) {
+      bar[Math.floor(f.contentMs / WATERFALL_MS_PER_CHAR)] = '#';
+    }
+    const steps = (f.steps ?? []).map((s) => `${s.step}@${s.at}${s.group.includes(":") && !s.group.startsWith("[") ? s.group.slice(s.group.indexOf(":")) : ""}`).join(' ');
+    return `${f.id.slice(0, 8)} |${bar.join('').trimEnd()}| content@${f.contentMs ?? '-'} ${steps}`;
+  });
+  return [`waterfall ${title} (1 char = ${WATERFALL_MS_PER_CHAR} ms; a=asked s=source b=built v=vectors w=whole p=put x=patched P=pictured d=drawn #=on screen)`, ...lines].join('\n');
 }
 
 const range = (values: number[]) => ({ median: Math.round(mid(values)), min: Math.min(...values), max: Math.max(...values) });
@@ -235,6 +259,7 @@ test('load benchmark: on-screen frames show content, then turn sharp', async () 
         const done = await runOnce(browser, build, cache, i === 0);
         runs.push(done.run);
         spots[key] ??= done.spots;
+        console.log(waterfall(key, done.run.frames));
         console.log(`run ${i + 1}/${RUNS} ${key} ${JSON.stringify({ first: done.run.firstMs, all: done.run.allContentMs, sharp: done.run.sharpMs, requests: done.run.requests, bytes: done.run.bytes, frames: done.run.frames.length, kept: done.run.fixtureKept })}`);
       }
     }
