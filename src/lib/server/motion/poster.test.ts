@@ -32,7 +32,14 @@ describe('a poster upload', () => {
     expect(patched.at(-1)).toMatchObject({ posterRevision: 3 });
   });
 
-  it('refuses anything that is not a jpeg or png picture', async () => {
+  it('keeps a webp as webp, the format the canvas grabs its frame thumbnails in', async () => {
+    const { fake, result } = save(new File([new Uint8Array([1, 2, 3])], 'poster.webp', { type: 'image/webp' }));
+
+    expect(await result).toMatchObject({ assetId: expect.any(String) });
+    expect(String(fake.calls.find((c) => c.op === 'upload')?.filters[0]?.[1])).toMatch(/\.webp$/);
+  });
+
+  it('refuses anything that is not a jpeg, png or webp picture', async () => {
     const { result } = save(new File([new Uint8Array([1])], 'x.gif', { type: 'image/gif' }));
 
     expect(await result).toMatchObject({ status: 400 });
