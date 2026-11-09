@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import sharp from 'sharp';
 import { test, expect, chromium, webkit, type Browser, type BrowserContext, type CDPSession, type Page } from '@playwright/test';
 import { instrument, measure, wheelPan, wheelZoom, type Frames } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
@@ -33,10 +34,13 @@ const VIEW_KEY = `feega:viewport:${LOCAL_USER_ID}:${LANDINGS_FIXTURE_PLACE.canva
 const SETTLE_MS = 8000;
 const GESTURE_MS = 4000;
 const FIT_TOGGLE_MS = 700;
-const DRAG_FROM = { x: 790, y: 450 };
+const CLOSER_STEPS = 2;
+const DRAWN_GIVE_UP_MS = 300_000;
+const INK_MIN_PX = 24;
+const INK_STDEV = 6;
+const INK_INSET = 0.15;
 const SHARP_POLL_MS = 60;
 const SHARP_GIVE_UP_MS = 15_000;
-const BURST_STEPS = 12;
 const MS_PER_S = 1000;
 const US_PER_MS = 1000;
 const HOTSPOTS = 25;
@@ -57,15 +61,6 @@ async function untilSharp(page: Page): Promise<number> {
   return SHARP_GIVE_UP_MS;
 }
 
-async function burst(page: Page) {
-  await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
-  await page.keyboard.down('Control');
-  for (let i = 0; i < BURST_STEPS; i++) {
-    await page.mouse.wheel(0, -60);
-  }
-  await page.keyboard.up('Control');
-}
-
 async function fitToggle(page: Page, until: number) {
   for (let i = 0; Date.now() < until; i++) {
     await page.keyboard.press(i % 2 ? 'Shift+Digit0' : 'Shift+Digit1');
@@ -73,12 +68,19 @@ async function fitToggle(page: Page, until: number) {
   }
 }
 
+async function frameOnScreen(page: Page): Promise<{ x: number; y: number }> {
+  const boxes = await page.locator('[data-testid="gpu-node"]').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
+  const inside = boxes.find((b) => b.x + b.w / 2 > 0 && b.x + b.w / 2 < VIEWPORT.width && b.y < VIEWPORT.height / 2 && b.y + b.h > VIEWPORT.height / 2)!;
+  return { x: inside.x + inside.w / 2, y: VIEWPORT.height / 2 };
+}
+
 async function dragFrame(page: Page, until: number) {
-  await page.mouse.click(DRAG_FROM.x, DRAG_FROM.y);
+  const from = await frameOnScreen(page);
+  await page.mouse.click(from.x, from.y);
   await page.mouse.down();
   for (let i = 0; Date.now() < until; i++) {
     const t = i / 10;
-    await page.mouse.move(DRAG_FROM.x + Math.sin(t) * 200, DRAG_FROM.y + Math.cos(t * 0.7) * 150);
+    await page.mouse.move(from.x + Math.sin(t) * 200, from.y + Math.cos(t * 0.7) * 150);
   }
   await page.mouse.up();
 }
@@ -114,6 +116,50 @@ function hotspots(profile: Profile): Hotspot[] {
   return [...self.values()].filter((s) => s.fn !== '(idle)').sort((a, b) => b.selfMs - a.selfMs).slice(0, HOTSPOTS).map((s) => ({ ...s, selfMs: Math.round(s.selfMs) }));
 }
 
+async function untilDrawn(page: Page) {
+  await page.waitForFunction(() => {
+    const onScreen = (r: DOMRect) => r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+    const nodes = [...document.querySelectorAll('[data-testid="gpu-node"]')].filter((n) => onScreen(n.getBoundingClientRect()));
+    return nodes.length > 0 && nodes.every((n) => n.hasAttribute('data-core'));
+  }, null, { timeout: DRAWN_GIVE_UP_MS, polling: SHARP_POLL_MS });
+  const started = Date.now();
+  while (!(await framesInked(page)) && Date.now() - started < DRAWN_GIVE_UP_MS) {
+    await page.waitForTimeout(SHARP_POLL_MS);
+  }
+  await untilSharp(page);
+}
+
+async function framesInked(page: Page): Promise<boolean> {
+  const boxes = await page.locator('[data-testid="gpu-node"]').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
+  const clips = boxes.map((b) => ({ x: b.x + b.w * INK_INSET, y: b.y + b.h * INK_INSET, w: b.w * (1 - 2 * INK_INSET), h: b.h * (1 - 2 * INK_INSET) })).flatMap((b) => {
+    const x = Math.max(0, b.x);
+    const y = Math.max(0, b.y);
+    const width = Math.min(VIEWPORT.width, b.x + b.w) - x;
+    const height = Math.min(VIEWPORT.height, b.y + b.h) - y;
+    return width > INK_MIN_PX && height > INK_MIN_PX ? [{ x, y, width, height }] : [];
+  });
+  for (const clip of clips) {
+    const { channels } = await sharp(await page.screenshot({ clip })).stats();
+    if (channels[0].stdev < INK_STDEV) {
+      return false;
+    }
+  }
+  return clips.length > 0;
+}
+
+async function fitThenZoomIn(page: Page) {
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(FIT_TOGGLE_MS);
+  await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
+  await page.keyboard.down('Control');
+  for (let i = 0; i < CLOSER_STEPS; i++) {
+    await page.mouse.wheel(0, -60);
+  }
+  await page.keyboard.up('Control');
+  await untilSharp(page);
+}
+
 async function open(browser: Browser, base: string): Promise<{ context: BrowserContext; page: Page; cdp: CDPSession | null }> {
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
@@ -124,13 +170,12 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
   await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
-  await page.waitForTimeout(SETTLE_MS);
+  await untilDrawn(page);
   return { context, page, cdp };
 }
 
 async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture): Promise<GestureRun> {
-  await page.keyboard.press('Escape');
-  await page.evaluate(({ key, view }) => localStorage.setItem(key, JSON.stringify(view)), { key: VIEW_KEY, view: START_VIEW });
+  await fitThenZoomIn(page);
   const before = await taskMs(cdp);
   const frames: Frames = await measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until));
   const after = await taskMs(cdp);
@@ -162,11 +207,21 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
     await page.waitForTimeout(SETTLE_MS / 4);
   }
 
-  await page.reload({ waitUntil: 'commit' });
-  await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
-  await page.waitForTimeout(SETTLE_MS);
-  await burst(page);
-  result.sharpMs = await untilSharp(page);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(FIT_TOGGLE_MS);
+  await untilSharp(page);
+  if (index === 0) {
+    writeFileSync(join(OUT, `landings-${ENGINE}-fit.png`), await shot(page));
+  }
+  const grip = await frameOnScreen(page);
+  await page.mouse.click(grip.x, grip.y);
+  const zooming = Date.now();
+  await page.keyboard.press('Shift+Digit2');
+  await page.waitForTimeout(FIT_TOGGLE_MS);
+  await page.keyboard.press('Escape');
+  await untilDrawn(page);
+  result.sharpMs = Date.now() - zooming;
   if (index === 0) {
     writeFileSync(join(OUT, `landings-${ENGINE}-zoomed.png`), await shot(page));
   }

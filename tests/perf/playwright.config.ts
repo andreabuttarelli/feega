@@ -16,6 +16,7 @@ const FIXTURE: Record<BenchFixture, { file: string; make: string | null; spec: R
   [BenchFixture.Landings]: { file: LANDINGS_FILE, make: existsSync(LANDINGS_FILE) ? null : 'node scripts/perf/landings-fixture.mjs', spec: /canvas-landings-bench/ }
 };
 const { file, make, spec } = FIXTURE[FIXTURE_KIND];
+const SERVED = join(tmpdir(), `feega-${FIXTURE_KIND}-served.feega`);
 
 export default defineConfig({
   testDir: '.',
@@ -25,7 +26,7 @@ export default defineConfig({
   reporter: 'list',
   use: { baseURL: `http://127.0.0.1:${PORT}` },
   webServer: {
-    command: [make && `${make} ${file}`, `node scripts/local.mjs ${file} --port=${PORT}`].filter(Boolean).join(' && '),
+    command: [make && `${make} "${file}"`, `cp "${file}" "${SERVED}"`, `node scripts/local.mjs ${SERVED} --port=${PORT}`].filter(Boolean).join(' && '),
     cwd: '../..',
     url: `http://127.0.0.1:${PORT}/favicon-16.png`,
     reuseExistingServer: false,
