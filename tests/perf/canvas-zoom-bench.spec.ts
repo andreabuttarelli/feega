@@ -5,6 +5,15 @@ import { instrument, measure, wheelZoom } from '../e2e/fixtures/frame-sweeps';
 import { ZOOM_FIXTURE_CENTRE, ZOOM_FIXTURE_PLACE } from '../../scripts/perf/zoom-fixture.mjs';
 import { median, type BenchRun } from '../../scripts/perf/bench-stats.mjs';
 
+enum BenchCase {
+  Steady = 'steady',
+  FirstZoom = 'first-zoom'
+}
+
+const CASE = (process.env.BENCH_CASE ?? BenchCase.Steady) as BenchCase;
+const ASSET_LATENCY_MS = [120, 260, 420];
+const FIT_ZOOM = 0.06;
+const FIRST_ZOOM_TARGET = 1.2;
 const RUNS = Number(process.env.BENCH_RUNS ?? 5);
 const CPU_THROTTLE = Number(process.env.BENCH_CPU ?? 4);
 const OUT = process.env.BENCH_OUT ?? 'perf-results';
@@ -13,7 +22,9 @@ const CI_GPU_ARGS = ['--enable-unsafe-webgpu', '--enable-unsafe-swiftshader', '-
 const VIEWPORT = { width: 1440, height: 900 };
 const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = 0.5;
-const START_VIEW = { x: VIEWPORT.width / 2 - ZOOM_FIXTURE_CENTRE.x * START_ZOOM, y: VIEWPORT.height / 2 - ZOOM_FIXTURE_CENTRE.y * START_ZOOM, zoom: START_ZOOM };
+const viewAt = (zoom: number) => ({ x: VIEWPORT.width / 2 - ZOOM_FIXTURE_CENTRE.x * zoom, y: VIEWPORT.height / 2 - ZOOM_FIXTURE_CENTRE.y * zoom, zoom });
+const START_VIEW = viewAt(CASE === BenchCase.FirstZoom ? FIT_ZOOM : START_ZOOM);
+const VIEW_KEY = `feega:viewport:${LOCAL_USER_ID}:${ZOOM_FIXTURE_PLACE.canvasId}`;
 const SETTLE_MS = 8000;
 const GESTURE_MS = 4000;
 const SHARP_POLL_MS = 60;
@@ -47,6 +58,16 @@ async function burst(page: Page) {
   await page.keyboard.up('Control');
 }
 
+async function zoomIn(page: Page, until: number) {
+  await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
+  await page.keyboard.down('Control');
+  while (Date.now() < until) {
+    const zoom = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{"zoom":0}').zoom as number, VIEW_KEY);
+    await page.mouse.wheel(0, zoom < FIRST_ZOOM_TARGET ? -40 : 0);
+  }
+  await page.keyboard.up('Control');
+}
+
 async function taskMs(cdp: CDPSession): Promise<number> {
   const { metrics } = await cdp.send('Performance.getMetrics');
   return (metrics.find((m) => m.name === 'TaskDuration')?.value ?? 0) * MS_PER_S;
@@ -67,10 +88,15 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   await page.addInitScript(instrument);
-  await page.addInitScript(({ key, view }) => localStorage.setItem(key, JSON.stringify(view)), { key: `feega:viewport:${LOCAL_USER_ID}:${ZOOM_FIXTURE_PLACE.canvasId}`, view: START_VIEW });
+  await page.addInitScript(({ key, view }) => localStorage.setItem(key, JSON.stringify(view)), { key: VIEW_KEY, view: START_VIEW });
   const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable');
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
+  let served = 0;
+  await page.route('**/assets/**', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, ASSET_LATENCY_MS[served++ % ASSET_LATENCY_MS.length]));
+    await route.continue();
+  });
 
   await page.goto(`${base}/p/${ZOOM_FIXTURE_PLACE.projectId}/c/${ZOOM_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
@@ -78,7 +104,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
 
   console.log(`webgpu adapter: ${await page.evaluate(async () => !!(await (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu?.requestAdapter()))}`);
   const cpuBefore = await taskMs(cdp);
-  const gesture = () => measure(page, GESTURE_MS, (until) => wheelZoom(page, until));
+  const gesture = () => measure(page, GESTURE_MS, (until) => (CASE === BenchCase.FirstZoom ? zoomIn(page, until) : wheelZoom(page, until)));
   const { result: zoom, events } = TRACE_OVER_MS ? await traced(cdp, gesture) : { result: await gesture(), events: [] };
   const cpuMs = Math.round((await taskMs(cdp)) - cpuBefore);
   if (TRACE_OVER_MS && zoom.max > TRACE_OVER_MS) {

@@ -24,6 +24,8 @@ npx playwright test -c tests/perf/playwright.config.ts
 node scripts/perf/zoom-compare.mjs perf-results/zoom-bench.json
 ```
 
+`BENCH_CASE=first-zoom` starts from fit view on a fresh page and zooms in across the 0.75 asset tier, with asset requests delayed 120–420 ms.
+
 Headed only: headless Chromium does not run the WebGPU frames. `BENCH_TRACE_OVER_MS=500` saves a
 Chrome trace (timeline, GPU, GC) of any run whose worst frame exceeds 500 ms into `perf-results/`.
 
