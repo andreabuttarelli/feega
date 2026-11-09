@@ -25,6 +25,7 @@ jobs:
     if: github.event.action != 'labeled' || github.event.label.name == 'perf'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

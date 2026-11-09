@@ -50,3 +50,10 @@ it carries the widest band.
 `src/lib/canvas/core/card-source.counts.test.ts` counts expensive calls across a zoom sweep (card
 bodies built, bodies shifted per label octave). They never flake and fail on the exact cache that
 broke.
+
+## Status on GitHub-hosted runners
+
+Hosted `ubuntu-latest` has no GPU. With SwiftShader WebGPU the adapter is granted in only some runs
+and zoom runs at 1-2 fps with 3-15 s frames: the numbers measure software rasterization, not the
+app. The job is `continue-on-error` until it runs on a machine with a GPU (a self-hosted macOS
+runner); locally the benchmark is stable (spread below).
