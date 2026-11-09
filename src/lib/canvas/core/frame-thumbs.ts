@@ -35,9 +35,14 @@ export function thumbRect(box: Box, view: Viewport, area: Size, resolution: numb
   return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
 }
 
-export async function grabThumb(canvas: HTMLCanvasElement, rect: Rect): Promise<Blob | null> {
+export function thumbSize(rect: Rect): Size {
   const scale = Math.min(1, MAX_SIDE_PX / Math.max(rect.width, rect.height));
-  const out = new OffscreenCanvas(Math.max(1, Math.round(rect.width * scale)), Math.max(1, Math.round(rect.height * scale)));
+  return { width: Math.max(1, Math.round(rect.width * scale)), height: Math.max(1, Math.round(rect.height * scale)) };
+}
+
+export async function grabThumb(canvas: HTMLCanvasElement, rect: Rect): Promise<Blob | null> {
+  const size = thumbSize(rect);
+  const out = new OffscreenCanvas(size.width, size.height);
   out.getContext('2d')?.drawImage(canvas, rect.x, rect.y, rect.width, rect.height, 0, 0, out.width, out.height);
   return out.convertToBlob({ type: THUMB_TYPE, quality: THUMB_QUALITY }).catch(() => null);
 }

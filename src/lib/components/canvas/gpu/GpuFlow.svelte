@@ -1,6 +1,10 @@
 <script lang="ts">
   import { heldFrames } from '$lib/canvas/core/held-frames';
   import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
+  import { posterUploads } from '$lib/canvas/core/poster-upload';
+  import { POSTER_DEBOUNCE_MS } from '$lib/motion/poster-capture';
+  import { postPageAction } from '$lib/api/page-action';
+  import { motionNodePath } from '$lib/canvas/motion-node';
   import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
   import { ownsPress } from '$lib/canvas/press-owner';
@@ -494,6 +498,23 @@
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
+  const offerPoster = posterUploads(async (shot) => {
+    const form = new FormData();
+    form.set('file', new File([shot.blob], 'poster.webp', { type: shot.blob.type }));
+    form.set('width', String(shot.width));
+    form.set('height', String(shot.height));
+    form.set('revision', String(shot.revision));
+    await postPageAction(motionNodePath({ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', nodeId: shot.id }), 'poster', form);
+  }, POSTER_DEBOUNCE_MS);
+
+  function postThumb(id: string, revision: number, blob: Blob, size: { width: number; height: number }) {
+    if (baseNodeId(id) !== id) {
+      return;
+    }
+    const posterRevision = summaries.get(id)?.data?.posterRevision;
+    offerPoster({ id, revision, posterRevision: typeof posterRevision === 'number' ? posterRevision : undefined, blob, ...size });
+  }
+
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${baseNodeId(id)}/source`;
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (!holdsDoc(t.kind ?? '') || domShows.has(t.id));
@@ -4321,7 +4342,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '' }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '' }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
