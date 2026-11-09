@@ -24,3 +24,12 @@ fn a_missing_packed_contour_is_an_error_not_an_empty_shape() {
 fn a_packed_index_without_a_pack_is_an_error() {
     assert!(parse(PACKED).is_err());
 }
+
+const TWO_ITEMS: &str = r#"{"width":10,"height":10,"background":null,"items":[{"kind":"path","clip":"a","contours":[0,1],"rule":"nonzero","paint":{"kind":"solid","color":[1,0,0,1]},"opacity":1,"matrix":[1,0,0,1,0,0]},{"kind":"path","clip":"b","contours":[0],"rule":"nonzero","paint":{"kind":"solid","color":[1,0,0,1]},"opacity":1,"matrix":[1,0,0,1,0,0]}]}"#;
+
+#[test]
+fn each_item_counts_its_contours_from_zero_so_items_pack_alone() {
+    let list = parse_packed(TWO_ITEMS, vec![1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0], vec![2, 5, 7]).unwrap();
+
+    assert!(contours_of(&list.items[1]).contains("[3.0, 3.0]"));
+}
