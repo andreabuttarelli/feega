@@ -5,7 +5,7 @@
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
-  import { createMedia, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
+  import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Outcome } from '@feega/motion-core/motion/gpu-full/core-outcome';
@@ -36,6 +36,8 @@
   import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import { OnScreen, showStaged } from '$lib/canvas/core/staged-show';
+  import { uploadWithin } from '$lib/canvas/core/picture-uploads';
+  import { Step, markFrame } from '$lib/canvas/core/frame-timeline';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
@@ -85,6 +87,7 @@
   const thumbAsked = new Set<string>();
   const thumbTaken = new Set<string>();
   const THUMB = ':thumb';
+  const VECTORS = ':vectors';
   const pictures: Pictures = (item) => thumbPictures.get(item.clip) ?? [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
 
   async function readDom(f: FrameAt, source: FrameDoc, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
@@ -122,12 +125,16 @@
     };
 
   async function buildSource(f: FrameAt, given: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
+    markFrame(f.id, Step.MainAsked);
     const source = await withScenes(given, sceneSource(f.scenes ?? ''));
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = frameOfLive(source);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
-    return { list: drawFrame(prepared, still, custom?.reads), custom };
+    markFrame(f.id, Step.MainBuild);
+    const list = drawFrame(prepared, still, custom?.reads);
+    markFrame(f.id, Step.MainBuilt);
+    return { list, custom };
   }
 
   const RUNS_EVERY = 5;
@@ -152,6 +159,7 @@
     if (!fetched) {
       return null;
     }
+    markFrame(f.id, Step.Source);
     const source = place ? tieredAssets(fetched, place, at) : fetched;
     if (source !== fetched && !imaged.has(f.id)) {
       imaged.add(f.id);
@@ -184,12 +192,14 @@
 
   async function load(f: FrameAt) {
     const at = tier;
+    markFrame(f.id, Step.Asked);
     const given = known(f) ?? (loaded.get(f.id)?.endsWith(THUMB) === false ? await awaitKnown(f) : null);
     const read = given ? null : await untilFound(() => fetchAndBuild(f, at), UNSAVED_SOURCE);
     const built = given ? await buildSource(f, given) : read;
     if (!built) {
       return;
     }
+    markFrame(f.id, Step.Built);
     if (read) {
       onsource(f.id, { ...read.source, revision: f.revision });
     }
@@ -205,8 +215,11 @@
       if (asking.get(f.id) !== key) {
         return;
       }
-      loaded.set(f.id, key);
-      lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
+      const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
+      const shown = loaded.get(f.id);
+      loaded.set(f.id, group);
+      markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
+      lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
     });
   }
 
@@ -484,6 +497,8 @@
   let cacheBytes = $state(0);
   const IDLE_MS = 50;
   const PICTURES_PER_FRAME = 4;
+  const UPLOAD_BUDGET_MS = 8;
+  const PUT_BUDGET_MS = 8;
   const ITEMS_PER_FRAME = 2 * PART_ITEMS;
   let sent = new SentUses();
   let sentOverlay = new SentParts();
@@ -552,6 +567,7 @@
       return 0;
     }
     put.add(group);
+    markFrame(group, Step.Patched);
     return splice.items.length + 1;
   }
 
@@ -574,6 +590,7 @@
     }
     putting.delete(group);
     put.add(group);
+    markFrame(group, Step.Put);
     return part.items.length + 1;
   }
 
@@ -725,15 +742,18 @@
       }
     }
     let room = gesture.active() ? 0 : ITEMS_PER_FRAME;
+    const putUntil = performance.now() + PUT_BUDGET_MS;
+    const roomLeft = () => room > 0 || (!gesture.active() && performance.now() < putUntil);
     for (const f of onScreenFirst(held, view, area)) {
-      while (room > 0 && !put.has(f.group)) {
+      while (roomLeft() && !put.has(f.group)) {
         room -= putPart(into, f.group);
       }
     }
-    for (const f of [...tails, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
-      if (into.upload(listOf(f.group), pictures, 1)) {
-        pictured.add(f.group);
-      }
+    const unpictured = [...new Set([...tails, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
+    const quietUploads = !gesture.active();
+    for (const group of uploadWithin(quietUploads ? unpictured : unpictured.slice(0, PICTURES_PER_FRAME), (g) => into.upload(listOf(g), pictures, 1), () => performance.now(), quietUploads ? UPLOAD_BUDGET_MS : 0)) {
+      pictured.add(group);
+      markFrame(group, Step.Pictured);
     }
     const shown = chains.flatMap((c) => {
       const layer = firstDrawn(c, pictured);
@@ -741,6 +761,9 @@
     });
     for (const layer of shown) {
       if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
+        if (drawnLast.get(layer.id)?.group !== layer.group) {
+          markFrame(layer.group, Step.Drawn);
+        }
         drawnLast.set(layer.id, layer);
       }
     }
