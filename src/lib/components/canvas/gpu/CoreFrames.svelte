@@ -35,6 +35,7 @@
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
+  import { OnScreen, showStaged } from '$lib/canvas/core/staged-show';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
@@ -192,13 +193,21 @@
     if (read) {
       onsource(f.id, { ...read.source, revision: f.revision });
     }
-    const ready = await media.ready(built.list);
+    const key = tieredKey(f, at);
+    const held = loaded.get(f.id)?.endsWith(THUMB) ? OnScreen.Thumb : OnScreen.Nothing;
     if (built.custom) {
-      customPictures.set(tieredKey(f, at), built.custom.picture);
+      customPictures.set(key, built.custom.picture);
     }
     logGaps(f.id, built.list);
-    loaded.set(f.id, tieredKey(f, at));
-    lists = listed(lists, f.id, tieredKey(f, at), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
+    asking.set(f.id, key);
+
+    void showStaged(media.ready(built.list), held, (ready) => {
+      if (asking.get(f.id) !== key) {
+        return;
+      }
+      loaded.set(f.id, key);
+      lists = listed(lists, f.id, key, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
+    });
   }
 
   async function showThumb(f: FrameAt) {
@@ -257,6 +266,7 @@
   const liveAtRevision = new Map<string, number>();
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
   const loaded = new Map<string, string>();
+  const asking = new Map<string, string>();
   const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
