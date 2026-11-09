@@ -16,8 +16,8 @@ pub struct Patch {
 }
 
 impl Patch {
-    pub fn uncached(self) -> Patch {
-        Patch { put: self.put.into_iter().map(|u| UseItem { cache: false, hold: false, ..u }).collect(), ..self }
+    pub fn for_tiles(self) -> Patch {
+        Patch { put: self.put.into_iter().map(|u| UseItem { cache: u.hold, ..u }).collect(), ..self }
     }
 }
 
@@ -134,8 +134,13 @@ impl World {
     }
 
     fn mark_if_sized(&mut self, rect: Option<Rect>) {
-        if let Some(r) = rect {
-            self.damage.add(r);
+        self.mark_use(rect, true);
+    }
+
+    fn mark_use(&mut self, rect: Option<Rect>, in_scene: bool) {
+        let Some(r) = rect else { return };
+        self.damage.add(r);
+        if in_scene {
             self.scene_damage.add(r);
         }
     }
@@ -144,22 +149,30 @@ impl World {
         for gone in &patch.drop {
             let Some(at) = self.uses.iter().position(|u| &u.clip == gone) else { continue };
             let old = self.uses.remove(at);
-            self.mark_if_sized(reach(&old, sizes(&old.group)));
+            self.mark_use(reach(&old, sizes(&old.group)), !old.hold);
         }
         for u in patch.put {
             let fresh = reach(&u, sizes(&u.group));
             match self.uses.iter().position(|o| o.clip == u.clip) {
                 Some(at) => {
-                    let looks_alike = self.uses[at].group == u.group && self.uses[at].matrix == u.matrix;
+                    let in_scene = !u.hold;
                     let old = std::mem::replace(&mut self.uses[at], u);
-                    if looks_alike {
-                        continue;
+                    let now = &self.uses[at];
+                    let moved = old.group != now.group || old.matrix != now.matrix;
+                    let lifted = old.hold != now.hold;
+                    if moved {
+                        self.mark_use(reach(&old, sizes(&old.group)), !old.hold);
+                        self.mark_use(fresh, in_scene);
+                    } else if lifted {
+                        self.scene_damage.join(Damage::Rects(fresh.into_iter().collect()));
                     }
-                    self.mark_if_sized(reach(&old, sizes(&old.group)));
                 }
-                None => self.uses.push(u),
+                None => {
+                    let in_scene = !u.hold;
+                    self.uses.push(u);
+                    self.mark_use(fresh, in_scene);
+                }
             }
-            self.mark_if_sized(fresh);
         }
         if let Some(order) = patch.order {
             let rank = |clip: &str| order.iter().position(|c| c == clip).unwrap_or(usize::MAX);
@@ -219,18 +232,19 @@ impl World {
     }
 
     pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
+        let uses = self.uses.iter().filter(|u| !u.hold).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
         DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let items = OVERLAY_PARTS.iter().flat_map(|p| {
+        let held = self.uses.iter().filter(|u| u.hold).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| {
             let part = &self.overlays[p.index()];
             match &part.at {
                 Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
                 None => part.items.iter().map(|i| through(i, camera)).collect(),
             }
-        });
+        }));
         DisplayList { width, height, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 

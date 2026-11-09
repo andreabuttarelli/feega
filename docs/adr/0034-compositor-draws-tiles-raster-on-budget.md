@@ -86,3 +86,20 @@ overlay existed (`Output::Over` now). Test: `an_overlay_drawn_over_the_tiles_kee
 
 Then: A/B of the current version, batched tile renders (step 3), drag reuse + idle prebuild
 (step 4), default on (step 5).
+
+## Status 2026-11-09 (evening)
+
+A/B on landings, CPU 1x, 5 interleaved runs, median [min–max], overlay fix only:
+
+| gesture | off fps | on fps | off p95 ms | on p95 ms |
+|---|---|---|---|---|
+| pan | 59 [58–60] | 60 [58–60] | 18.7 | 18.6 |
+| zoom | 18 [15–19] | 56 [48–58] | 308 [283–417] | 18.7 [18.7–33] |
+| fit | 35.5 [34–39] | 46 [39–54] | 32.9 | 31.7 |
+| drag | 50 | 20 [11–23] | 18.6 | 148 |
+| drag-element | 51 | 24 [20–32] | 18.6 | 118 |
+| sharp at rest | 1.9 s | 2.8 s | | |
+
+(off n=4: one off run blanked mid-fit, a defect of the flag-off path.) After batched renders and
+drag reuse, one run: pan 59/18.6, zoom 56/18.7, fit 46/31.4, drag 47/18.6, drag-element 43/18.5;
+drag start worst 0.47–0.65 s. Open: idle prebuild of held textures, fit p95, sharp-at-rest time.

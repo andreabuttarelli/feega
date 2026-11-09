@@ -19,3 +19,13 @@ Second gotcha: the reprojector pipelines had no blending, so the overlay (select
 drawn last over the tiles replaced the whole screen with its mostly transparent texture: a full
 blank whenever an overlay existed, not tile eviction as first suspected. The overlay now draws
 with `Output::Over` (premultiplied source-over, target loaded).
+
+Batched renders: missing tiles raster by 2x2 block into one atlas (4x4 blocks overshot the
+per-frame budget: zoom fell to 32 fps) and are copied out; every tile composites in a single
+pass with dynamic uniform offsets and bind groups kept per tile texture.
+
+Drag reuse: a use the app holds as a texture (a dragged frame) leaves the tiles once
+(`Patch::for_tiles`, `World::scene` skips held uses) and is drawn on the overlay; moving it
+damages the screen but never the tiles. Tile plans no longer sweep held textures
+(`Sweep::Keep`). Still open: drag start costs one full raster of the frame (worst 0.45–0.65 s),
+the idle prebuild that would hide it is not built.

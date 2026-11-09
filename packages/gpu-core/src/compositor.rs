@@ -1,7 +1,7 @@
 use vello::kurbo::{Affine as Matrix, Rect};
 
 use crate::display_list::Item;
-use crate::groups::{Library, Limits, Plan};
+use crate::groups::{Library, Limits, Plan, Sweep};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
 use crate::world::{OverlayPart, Patch, World};
 use crate::Skipped;
@@ -112,7 +112,7 @@ impl Compositor {
     }
 
     pub fn plan_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
-        let plan = library.plan(&self.world.scene(camera.matrix(), w, h), limits);
+        let plan = library.plan_with(&self.world.scene(camera.matrix(), w, h), limits, Sweep::Keep);
         self.pending |= plan.pending || !plan.finished.is_empty();
         for group in plan.finished.iter().chain(&plan.waiting) {
             self.world.touch(group, library.size_of(group));

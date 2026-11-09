@@ -161,10 +161,55 @@ fn a_live_overlay_change_damages_only_the_live_items() {
 }
 
 #[test]
-fn a_tiled_canvas_takes_every_use_uncached_so_no_group_cache_ever_damages_its_tiles() {
-    let patch = gpu_core::world::parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true }], "drop": [] }"#).unwrap();
+fn a_tiled_canvas_takes_resting_uses_uncached_and_keeps_held_ones_as_textures() {
+    let patch = gpu_core::world::parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true }, { "kind": "use", "clip": "b", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true }], "drop": [] }"#).unwrap();
 
-    let tiled = patch.uncached();
+    let tiled = patch.for_tiles();
 
-    assert!(tiled.put.iter().all(|u| !u.cache && !u.hold));
+    assert!(tiled.put[0].cache && tiled.put[0].hold);
+    assert!(!tiled.put[1].cache && !tiled.put[1].hold);
+}
+
+fn held(clip: &str, x: f64) -> String {
+    format!(r#"{{ "put": [{{ "kind": "use", "clip": "{clip}", "group": "g:{clip}", "matrix": [1, 0, 0, 1, {x}, 0], "cache": true, "hold": true }}], "drop": [] }}"#)
+}
+
+const IDENTITY: [f64; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+
+#[test]
+fn holding_a_use_lifts_it_out_of_the_tiles_once_and_onto_the_overlay() {
+    let mut w = World::new();
+    w.patch(parse_patch(&put("a", 0.0)).unwrap(), sized);
+    w.take_scene_damage();
+
+    w.patch(parse_patch(&held("a", 0.0)).unwrap(), sized);
+
+    assert_eq!(rects(w.take_scene_damage()), vec![Rect::new(0.0, 0.0, 100.0, 50.0)]);
+    assert!(w.scene(IDENTITY, 10, 10).items.is_empty());
+    assert_eq!(w.overlay(IDENTITY, 10, 10).items.iter().map(|i| i.clip().to_string()).collect::<Vec<_>>(), vec!["a"]);
+}
+
+#[test]
+fn a_held_use_dragged_across_the_canvas_never_damages_the_tiles() {
+    let mut w = World::new();
+    w.patch(parse_patch(&held("a", 0.0)).unwrap(), sized);
+    w.take_scene_damage();
+    w.take_damage();
+
+    w.patch(parse_patch(&held("a", 300.0)).unwrap(), sized);
+
+    assert_eq!(rects(w.take_scene_damage()), vec![]);
+    assert_eq!(rects(w.take_damage()), vec![Rect::new(0.0, 0.0, 100.0, 50.0), Rect::new(300.0, 0.0, 400.0, 50.0)]);
+}
+
+#[test]
+fn letting_go_of_a_held_use_puts_it_back_into_the_tiles() {
+    let mut w = World::new();
+    w.patch(parse_patch(&held("a", 300.0)).unwrap(), sized);
+    w.take_scene_damage();
+
+    w.patch(parse_patch(&put("a", 300.0)).unwrap(), sized);
+
+    assert_eq!(rects(w.take_scene_damage()), vec![Rect::new(300.0, 0.0, 400.0, 50.0)]);
+    assert_eq!(w.scene(IDENTITY, 10, 10).items.len(), 1);
 }

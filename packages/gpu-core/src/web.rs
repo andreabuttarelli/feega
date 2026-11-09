@@ -380,7 +380,7 @@ impl WebCore {
 
     pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
         let patch = parse_patch(utf8(patch_json)?).map_err(failed)?;
-        let patch = if self.tiled { patch.uncached() } else { patch };
+        let patch = if self.tiled { patch.for_tiles() } else { patch };
         self.compositor.patch(patch, &self.library);
         Ok(())
     }

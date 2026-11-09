@@ -357,3 +357,14 @@ fn a_held_use_is_rastered_whole_in_one_plan_so_a_drag_is_live_for_one_frame_only
     assert!(next.rasters.is_empty());
     assert_eq!(kinds(&next.screen), vec!["image", "image"]);
 }
+
+#[test]
+fn a_tile_planned_beside_a_held_texture_leaves_that_texture_alone() {
+    let mut lib = library(&["a"]);
+    lib.plan(&screen(&[("a", 1.0, 0.0)]), LIMITS);
+
+    let tile = lib.plan_with(&screen(&[]), LIMITS, gpu_core::groups::Sweep::Keep);
+
+    assert!(tile.evicted.is_empty());
+    assert!(lib.cache_bytes() > 0);
+}
