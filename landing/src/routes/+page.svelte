@@ -11,7 +11,6 @@
   import Story from '$lib/site/home/Story.svelte';
   import Faq from '$lib/site/home/Faq.svelte';
   import { HOME_JSON_LD } from '$lib/site/structured-data';
-  import { BUILD_HEAD } from '$lib/site/live-agents';
 
   import { HOME_META } from '$lib/site/seo';
 </script>
@@ -24,7 +23,6 @@
   <meta name="twitter:title" content={HOME_META.title} />
   <meta name="twitter:description" content={HOME_META.description} />
   {@html HOME_JSON_LD}
-  {@html BUILD_HEAD}
 </svelte:head>
 
 <div class="site-home">

@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, BUILD_CLASS, BUILD_SELECTOR, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, rewriteFrom, thin, typeFrames, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, BUILD_SELECTOR, BuildMode, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
-  type View = { name: string; colour: string; x: number; y: number; box: Box | null; handles: boolean; marks: Box[]; caret: Box | null; tip: string | null; menu: Menu | null; live: boolean };
+  type View = { name: string; colour: string; x: number; y: number; box: Box | null; handles: boolean; tip: string | null; menu: Menu | null; live: boolean };
   type Anchor = { el: HTMLElement | null; fx: number; fy: number };
   type Step = { ms: number; move?: boolean; start?: () => void; tick?: (t: number) => void; end?: () => void };
-  type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; resident: HTMLElement | null; typing: boolean; grow: number; push: Point; seed: number };
+  type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; resident: HTMLElement | null; grow: number; push: Point; seed: number };
 
   const DESKTOP_AGENTS = 24;
   const MOBILE_AGENTS = 8;
@@ -21,7 +21,6 @@
   const BEND_PX = 40;
   const EASE_PUSH = 0.12;
   const TEMPO = 2.6;
-  const MAX_TYPE_FRAMES = 40;
   const PARALLEL_FRONT = 24;
   const OFFSCREEN_PX = 60;
   const TWEAK_GAP_MS = 3500;
@@ -29,16 +28,18 @@
   const MEDIA_START_SCALE = 0.6;
   const FONTS = ['BDO Grotesk', 'Instrument Serif', 'DM Sans', 'Fragment Mono', 'Inter'];
   const SWATCHES = ['#ff4000', '#f0eee9', '#0090ff', '#ffc53d', '#30a46c'];
-  const STYLE_PROPS = ['min-height', 'font-family', 'color', 'scale', 'translate', 'transition', 'transform-origin', 'min-width', 'letter-spacing'];
+  const STYLE_PROPS = ['min-height', 'font-family', 'color', 'scale', 'translate', 'transition', 'transform-origin', 'height', 'letter-spacing'];
 
   let agents = $state<View[]>([]);
   let paused = $state(false);
+  const FACES = 5;
+  const FACE_STEP_PX = 16;
+  const FACE_PX = 22;
   const MENU_OPEN = '.drawer';
   let running: Agent[] = [];
   const busy = new Set<HTMLElement>();
   const ledger = createLedger<HTMLElement>();
   let clock = 0;
-  const originals = new Map<HTMLElement, string>();
   const mouse: Point = { x: -1e4, y: -1e4 };
 
   const rand = Math.random;
@@ -91,38 +92,7 @@
     return { x: b.x + b.w * a.fx, y: b.y + b.h * a.fy };
   }
 
-  function textRects(el: HTMLElement, from: number): Box[] {
-    const node = el.firstChild;
-    if (!node || node.nodeType !== Node.TEXT_NODE) {
-      return [];
-    }
-
-    const range = document.createRange();
-    const len = node.textContent?.length ?? 0;
-    range.setStart(node, Math.min(from, len));
-    range.setEnd(node, len);
-    return [...range.getClientRects()].map((r) => ({ x: r.left, y: r.top, w: r.width, h: r.height }));
-  }
-
-  function caretOf(el: HTMLElement): Box | null {
-    const node = el.firstChild;
-    const len = node?.textContent?.length ?? 0;
-    if (!node || len === 0) {
-      const b = boxOf(el);
-      return { x: b.x, y: b.y, w: 2, h: b.h };
-    }
-
-    const last = textRects(el, len - 1).at(-1);
-    return last ? { x: last.x + last.w, y: last.y, w: 2, h: last.h } : null;
-  }
-
   function restore(el: HTMLElement) {
-    const text = originals.get(el);
-    if (text !== undefined) {
-      (el.firstChild as Text).data = text;
-      originals.delete(el);
-    }
-
     for (const prop of STYLE_PROPS) {
       el.style.removeProperty(prop);
     }
@@ -158,45 +128,26 @@
       busy.delete(el);
       releaseTweak(ledger, el);
       agent.target = null;
-      agent.typing = false;
       agent.grow = 1;
       agent.view.handles = false;
-      agent.view.marks = [];
-      agent.view.caret = null;
       agent.view.tip = null;
       agent.view.menu = null;
     });
   }
 
   function reveal(el: HTMLElement) {
+    if ('pending' in el.dataset) {
+      el.style.removeProperty('opacity');
+      delete el.dataset.pending;
+    }
+
     el.dataset.built = '';
     el.querySelectorAll<HTMLElement>('*').forEach((d) => (d.dataset.built = ''));
   }
 
   function lockSize(el: HTMLElement) {
     const r = el.getBoundingClientRect();
-    el.style.minHeight = `${r.height}px`;
-    el.style.minWidth = `${r.width}px`;
-  }
-
-  function typeIn(agent: Agent, el: HTMLElement): Step[] {
-    const node = el.firstChild as Text;
-    const text = node.data;
-    const steps: Step[] = [
-      wait(1, () => {
-        originals.set(el, text);
-        lockSize(el);
-        node.data = '';
-        reveal(el);
-        agent.typing = true;
-      })
-    ];
-
-    for (const frame of thin(typeFrames(text, 0, rand), MAX_TYPE_FRAMES)) {
-      steps.push({ ms: text.startsWith(frame) ? between(25, 70) : between(110, 200), start: () => (node.data = frame) });
-    }
-
-    return steps;
+    el.style.height = `${r.height}px`;
   }
 
   function place(agent: Agent, el: HTMLElement): Step[] {
@@ -236,43 +187,13 @@
 
   function build(agent: Agent, el: HTMLElement, batch: HTMLElement[]): Step[] {
     const start = { el, fx: 0, fy: 0.5 };
+    const pending = 'pending' in el.dataset;
+    const arrive = pending ? place(agent, el) : [...ACTION_STEPS[pick(ruleOf(el).beats, rand)](agent, el), wait(1, () => reveal(el))];
     const dropBatch = wait(1, () => {
       batch.forEach(reveal);
       batch.forEach((b) => busy.delete(b));
     });
-    return [moveTo(agent, start), select(agent, el, false), ...(kindOf(el) === 'text' ? typeIn(agent, el) : place(agent, el)), dropBatch, release(agent, el)];
-  }
-
-  function typing(agent: Agent, el: HTMLElement): Step[] {
-    const node = el.firstChild as Text;
-    const text = node.data;
-    const keep = rewriteFrom(text, rand);
-    const frames = typeFrames(text, keep, rand);
-    const steps: Step[] = [
-      {
-        ms: between(500, 800),
-        start() {
-          originals.set(el, text);
-          el.style.minHeight = `${el.getBoundingClientRect().height}px`;
-          agent.view.marks = textRects(el, keep);
-        }
-      },
-      {
-        ms: 1,
-        start() {
-          agent.view.marks = [];
-          agent.typing = true;
-        }
-      }
-    ];
-
-    for (const frame of frames) {
-      const typo = !text.startsWith(frame);
-      steps.push({ ms: typo ? between(140, 260) : between(35, 110), start: () => (node.data = frame) });
-    }
-
-    steps.push(wait(between(400, 900), () => restore(el)));
-    return steps;
+    return [moveTo(agent, start), select(agent, el, false), ...arrive, dropBatch, release(agent, el)];
   }
 
   function fontSwap(agent: Agent, el: HTMLElement): Step[] {
@@ -282,7 +203,7 @@
       ms: between(250, 350),
       start() {
         agent.view.menu = { items: FONTS, active: i };
-        el.style.minHeight = `${el.getBoundingClientRect().height}px`;
+        lockSize(el);
         el.style.fontFamily = i === current ? '' : `'${FONTS[i]}', serif`;
       }
     });
@@ -347,6 +268,7 @@
     const to = between(-0.08, 0.06);
     const drag = (from: number, end: number): Step => ({
       ms: between(350, 550),
+      start: () => lockSize(el),
       tick(t) {
         const k = from + (end - from) * t;
         el.style.letterSpacing = `calc(${base === 'normal' ? '0px' : base} + ${k * to}em)`;
@@ -386,7 +308,6 @@
   }
 
   const ACTION_STEPS: Record<ActionKind, (agent: Agent, el: HTMLElement) => Step[]> = {
-    type: typing,
     font: fontSwap,
     colour: colourSwap,
     resize,
@@ -466,7 +387,6 @@
     agent.view.y = p.y + agent.push.y + Math.cos(s * 1.7) * JITTER_PX;
     const box = agent.target ? boxOf(agent.target) : null;
     agent.view.box = box && { ...box, w: box.w * agent.grow, h: box.h * agent.grow };
-    agent.view.caret = agent.typing && agent.target ? caretOf(agent.target) : null;
   }
 
   onMount(() => {
@@ -475,7 +395,7 @@
     }
 
     const count = matchMedia(MOBILE_QUERY).matches ? MOBILE_AGENTS : DESKTOP_AGENTS;
-    agents = AGENTS.slice(0, count).map((a, i) => ({ name: a.name, colour: PEER_COLOURS[i % PEER_COLOURS.length], x: -50, y: -50, box: null, handles: false, marks: [], caret: null, tip: null, menu: null, live: false }));
+    agents = AGENTS.slice(0, count).map((a, i) => ({ name: a.name, colour: PEER_COLOURS[i % PEER_COLOURS.length], x: -50, y: -50, box: null, handles: false, tip: null, menu: null, live: false }));
     const start = performance.now();
     running = agents.map((view, i) => ({
       skills: AGENTS[i].skills,
@@ -486,15 +406,19 @@
       step: null,
       since: start,
       target: null,
-      typing: false,
       resident: null,
       grow: 1,
       push: { x: 0, y: 0 },
       seed: rand()
     }));
 
-    document.documentElement.dataset.agents = 'on';
     const targets = outermost([...document.querySelectorAll<HTMLElement>(BUILD_SELECTOR)]);
+    for (const el of targets) {
+      if (ruleOf(el).build === BuildMode.Place && el.getBoundingClientRect().top > innerHeight) {
+        el.dataset.pending = '';
+        el.style.opacity = '0';
+      }
+    }
     let raf = 0;
     const loop = (now: number) => {
       paused = document.querySelector(MENU_OPEN) !== null;
@@ -521,7 +445,6 @@
       removeEventListener('pointermove', track);
       targets.forEach(restore);
       targets.forEach(reveal);
-      document.documentElement.classList.remove(BUILD_CLASS);
       busy.clear();
     };
   });
@@ -531,12 +454,8 @@
   <div class="live" class:paused aria-hidden="true">
     {#each agents as a (a.name)}
       {#if a.live}
-        {#each a.marks as m, i (i)}
-          <div class="mark" style:left="{m.x}px" style:top="{m.y}px" style:width="{m.w}px" style:height="{m.h}px" style:background="{a.colour}40"></div>
-        {/each}
-
         {#if a.box}
-          <div class="box" style:left="{a.box.x}px" style:top="{a.box.y}px" style:width="{a.box.w}px" style:height="{a.box.h}px" style:border-color={a.colour}>
+          <div class="box" style:transform="translate({a.box.x}px, {a.box.y}px)" style:width="{a.box.w}px" style:height="{a.box.h}px" style:border-color={a.colour}>
             {#if a.handles}
               {#each ['nw', 'ne', 'sw', 'se'] as corner (corner)}
                 <span class="handle {corner}" style:border-color={a.colour}></span>
@@ -544,10 +463,6 @@
             {/if}
 
           </div>
-        {/if}
-
-        {#if a.caret}
-          <div class="caret" style:left="{a.caret.x}px" style:top="{a.caret.y}px" style:height="{a.caret.h}px" style:background={a.colour}></div>
         {/if}
 
         <div class="cursor" style:transform="translate({a.x}px, {a.y}px)">
@@ -564,7 +479,7 @@
   {#each agents as a (a.name)}
     {#if a.live && a.menu && a.box}
       <div class="live menus" class:paused aria-hidden="true">
-        <div class="menu" style:left="{a.box.x - 1.5}px" style:top="{a.box.y + a.box.h + 8}px">
+        <div class="menu" style:transform="translate({a.box.x - 1.5}px, {a.box.y + a.box.h + 8}px)">
           {#each a.menu.items as item, i (item)}
             <span class:on={i === a.menu.active} style:font-family="'{item}'" style:background={i === a.menu.active ? a.colour : undefined}>{item}</span>
           {/each}
@@ -575,9 +490,9 @@
 
   {@const present = agents.filter((a) => a.live)}
   <div class="stack" aria-hidden="true" class:gone={present.length === 0 || paused}>
-    <div class="faces">
-      {#each present.slice(0, 5) as a (a.name)}
-        <span style:background={a.colour}>{initials(a.name)}</span>
+    <div class="faces" style:width="{FACE_PX + (FACES - 1) * FACE_STEP_PX}px">
+      {#each present.slice(0, FACES) as a, i (a.name)}
+        <span style:background={a.colour} style:transform="translateX({i * FACE_STEP_PX}px)">{initials(a.name)}</span>
       {/each}
     </div>
     <span><i></i>{present.length} {present.length === 1 ? 'agent' : 'agents'} editing</span>
@@ -598,10 +513,8 @@
 
   .live > div {
     position: absolute;
-  }
-
-  .mark {
-    border-radius: 2px;
+    left: 0;
+    top: 0;
   }
 
   .box {
@@ -665,11 +578,6 @@
     color: #fff;
   }
 
-  .caret {
-    width: 2px;
-    animation: blink 1s steps(1) infinite;
-  }
-
   .cursor {
     left: 0;
     top: 0;
@@ -725,24 +633,25 @@
   }
 
   .faces {
-    display: flex;
+    position: relative;
+    height: var(--face);
+    --face: 22px;
   }
 
   .faces span {
+    position: absolute;
+    left: 0;
+    top: 0;
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
-    margin-left: -6px;
+    width: var(--face);
+    height: var(--face);
     color: #fff;
     font-size: 9px;
     border: 2px solid #141414;
     border-radius: 9999px;
   }
 
-  .faces span:first-child {
-    margin-left: 0;
-  }
 
   .stack i {
     display: inline-block;
@@ -753,9 +662,4 @@
     border-radius: 9999px;
   }
 
-  @keyframes blink {
-    50% {
-      opacity: 0;
-    }
-  }
 </style>
