@@ -3,19 +3,21 @@ import type { FrameDoc } from './frame-build';
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
 
-export type ReadSource = (url: string) => Promise<FrameDoc | null>;
+export type ReadSource = ((url: string) => Promise<FrameDoc | null>) & { warm: (urls: string[]) => void };
 
 export function sourceReader(fetcher: (url: string) => Promise<Response>, kept = SOURCES_KEPT): ReadSource {
   const held = new Map<string, Promise<FrameDoc | null>>();
+  const unread = new Set<string>();
 
   const keep = (url: string, reading: Promise<FrameDoc | null>) => {
     held.set(url, reading);
-    if (held.size > kept) {
-      held.delete(held.keys().next().value!);
+    const evictable = [...held.keys()].filter((u) => !unread.has(u));
+    for (const old of evictable.slice(0, Math.max(0, evictable.length - kept))) {
+      held.delete(old);
     }
   };
 
-  return (url) => {
+  const fetchOnce = (url: string) => {
     const known = held.get(url);
     if (known) {
       return known;
@@ -27,12 +29,27 @@ export function sourceReader(fetcher: (url: string) => Promise<Response>, kept =
       .then((source) => {
         if (!source) {
           held.delete(url);
+          unread.delete(url);
         }
         return source;
       });
     keep(url, reading);
     return reading;
   };
+
+  const read = (url: string) => {
+    unread.delete(url);
+    return fetchOnce(url);
+  };
+
+  const warm = (urls: string[]) => {
+    for (const url of urls.filter((u) => !held.has(u))) {
+      unread.add(url);
+      void fetchOnce(url);
+    }
+  };
+
+  return Object.assign(read, { warm });
 }
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;

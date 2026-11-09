@@ -129,8 +129,10 @@
     onRuns(ram.runs(range));
   }
 
+  const sourceOf = (f: FrameAt) => `${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`;
+
   async function fetchAndBuild(f: FrameAt) {
-    const source = await frameSources(`${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`);
+    const source = await frameSources(sourceOf(f));
     if (!source) {
       return null;
     }
@@ -229,11 +231,14 @@
   let settledFrames = $state(new Set<string>());
 
   $effect(() => {
+    const waiting = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup);
+    frameSources.warm(waiting.filter((f) => !known(f)).map(sourceOf));
+
     const room = IN_FLIGHT[currentDevice()] - inFlight;
     if (room <= 0) {
       return;
     }
-    const next = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup).slice(0, room);
+    const next = waiting.slice(0, room);
     for (const f of next) {
       asked.add(keyOf(f));
       inFlight++;
