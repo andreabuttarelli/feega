@@ -90,3 +90,21 @@ describe('reading the frames of a canvas in one request', () => {
     expect(asked).toEqual(['/s?revision=2']);
   });
 });
+
+describe('warming the sources of every frame on open', () => {
+  const ids = Array.from({ length: 30 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+  const url = (id: string) => `/p/p1/c/c1/motion/${id}/source?revision=1`;
+  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+
+  it('asks for all the frames in one request, even when only a few are built at once (the canvas asked six at a time, one request each)', async () => {
+    const asked: string[] = [];
+    const read = batchedSources(async (u) => (asked.push(u), json({ tokens: {}, frames: Object.fromEntries(ids.map((id) => [id, { revision: 1, doc: { id }, assets: {} }])) })));
+
+    read.warm(ids.map(url));
+    for (const id of ids) {
+      expect((await read(url(id)))?.doc).toEqual({ id });
+    }
+
+    expect(asked).toEqual([`/p/p1/c/c1/motion/sources?ids=${ids.join(',')}`]);
+  });
+});

@@ -2,7 +2,7 @@ import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
-import { itemWire, wiresKnown } from '@feega/motion-core/motion/gpu-full/wire';
+import { itemPack, itemWire, packsKnown, wiresKnown, type ItemPack } from '@feega/motion-core/motion/gpu-full/wire';
 import { localFilesSnapshot, type LocalFilesSnapshot } from '@feega/motion-core/motion/fonts/local-files';
 import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
 import type { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -15,7 +15,7 @@ export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: Bra
 
 export type BuildAsk = { id: number; source: FrameDoc; smoothing: Smoothing; locals: LocalFilesSnapshot };
 
-export type BuildAnswer = { id: number; list: DisplayList | null; wires: string[] } | { id: number; error: string };
+export type BuildAnswer = { id: number; list: DisplayList | null; wires: string[]; packs?: ItemPack[] } | { id: number; error: string };
 
 export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: ErrorEvent) => void) | null };
 
@@ -30,23 +30,31 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
   return drawFrame(prepared, frameOfLive(source));
 }
 
-export const builtAnswer = (id: number, list: DisplayList | null): BuildAnswer => ({ id, list, wires: list ? list.items.map(itemWire) : [] });
+export const builtAnswer = (id: number, list: DisplayList | null): BuildAnswer => ({ id, list, wires: list ? list.items.map(itemWire) : [], packs: list ? list.items.map(itemPack) : [] });
 
-export function frameBuilder(spawn: () => BuildWorker | null): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
-  let worker: BuildWorker | null = null;
+export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('packs' in answer ? (answer.packs ?? []).flatMap((p) => [p.floats.buffer as ArrayBuffer, p.ends.buffer as ArrayBuffer]) : []);
+
+type Lane = { worker: BuildWorker; busy: number };
+
+export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
+  const pool: Lane[] = [];
   let dead = false;
   let next = 0;
-  const waiting = new Map<number, { resolve: (list: DisplayList | null) => void; reject: (e: Error) => void }>();
+  const waiting = new Map<number, { lane: Lane; resolve: (list: DisplayList | null) => void; reject: (e: Error) => void }>();
 
   const answer = (e: MessageEvent<BuildAnswer>) => {
     const asked = waiting.get(e.data.id);
     waiting.delete(e.data.id);
+    if (asked) {
+      asked.lane.busy--;
+    }
     if ('error' in e.data) {
       asked?.reject(new Error(e.data.error));
       return;
     }
     if (e.data.list) {
       wiresKnown(e.data.list.items, e.data.wires);
+      packsKnown(e.data.list.items, e.data.packs ?? []);
     }
     asked?.resolve(e.data.list);
   };
@@ -59,15 +67,29 @@ export function frameBuilder(spawn: () => BuildWorker | null): (source: FrameDoc
     waiting.clear();
   };
 
-  return (source, smoothing) => {
-    worker = dead ? null : (worker ?? spawn());
+  const laneFor = (): Lane | null => {
+    const idle = pool.find((l) => l.busy === 0);
+    if (idle || pool.length >= lanes) {
+      return idle ?? pool.reduce((a, b) => (b.busy < a.busy ? b : a));
+    }
+    const worker = spawn();
     if (!worker) {
-      return Promise.reject(new Error('no frame worker'));
+      return pool[0] ?? null;
     }
     worker.onmessage = answer;
     worker.onerror = die;
+    pool.push({ worker, busy: 0 });
+    return pool[pool.length - 1];
+  };
+
+  return (source, smoothing) => {
+    const lane = dead ? null : laneFor();
+    if (!lane) {
+      return Promise.reject(new Error('no frame worker'));
+    }
     const id = next++;
-    worker.postMessage({ id, source, smoothing, locals: localFilesSnapshot() });
-    return new Promise((resolve, reject) => waiting.set(id, { resolve, reject }));
+    lane.busy++;
+    lane.worker.postMessage({ id, source, smoothing, locals: localFilesSnapshot() });
+    return new Promise((resolve, reject) => waiting.set(id, { lane, resolve, reject }));
   };
 }

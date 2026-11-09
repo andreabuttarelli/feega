@@ -7,6 +7,8 @@ use serde::de::{self, Deserializer, SeqAccess, Visitor};
 struct Pack {
     floats: Vec<f64>,
     ends: Vec<u32>,
+    base: usize,
+    read: usize,
 }
 
 thread_local! {
@@ -14,15 +16,17 @@ thread_local! {
 }
 
 pub fn within<T>(floats: Vec<f64>, ends: Vec<u32>, read: impl FnOnce() -> T) -> T {
-    PACK.with(|pack| *pack.borrow_mut() = Pack { floats, ends });
+    PACK.with(|pack| *pack.borrow_mut() = Pack { floats, ends, base: 0, read: 0 });
     let out = read();
     PACK.with(|pack| *pack.borrow_mut() = Pack::default());
     out
 }
 
-fn packed_contour(index: usize) -> Option<Vec<f64>> {
+fn packed_contour(local: usize) -> Option<Vec<f64>> {
     PACK.with(|pack| {
-        let pack = pack.borrow();
+        let mut pack = pack.borrow_mut();
+        pack.read += 1;
+        let index = pack.base + local;
         let end = *pack.ends.get(index)? as usize;
         let start = if index == 0 { 0 } else { pack.ends[index - 1] as usize };
         pack.floats.get(start..end).map(<[f64]>::to_vec)
@@ -70,4 +74,35 @@ pub fn contours<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<Vec<f64>>, D::Err
             Contour::Packed(index) => packed_contour(index).ok_or_else(|| de::Error::custom(format!("no packed contour {index}"))),
         })
         .collect()
+}
+
+fn item_done() {
+    PACK.with(|pack| {
+        let mut pack = pack.borrow_mut();
+        pack.base += pack.read;
+        pack.read = 0;
+    });
+}
+
+pub fn items<'de, D: Deserializer<'de>, T: de::Deserialize<'de>>(d: D) -> Result<Vec<T>, D::Error> {
+    struct ItemsVisitor<T>(std::marker::PhantomData<T>);
+
+    impl<'de, T: de::Deserialize<'de>> Visitor<'de> for ItemsVisitor<T> {
+        type Value = Vec<T>;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a list of items")
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Vec<T>, A::Error> {
+            let mut out = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+            while let Some(item) = seq.next_element::<T>()? {
+                out.push(item);
+                item_done();
+            }
+            Ok(out)
+        }
+    }
+
+    d.deserialize_seq(ItemsVisitor(std::marker::PhantomData))
 }
