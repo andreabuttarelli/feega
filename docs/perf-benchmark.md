@@ -96,5 +96,4 @@ BENCH_CASE=load BENCH_BUILDS=base=../dazero-base,fix=. npx playwright test -c te
 ```
 
 `BENCH_BUILDS` interleaves builds (each root needs `npm run build:node`); without it the spec
-measures this checkout. `BENCH_RECORD=1` saves a video per case, `BENCH_DEBUG=1` the request
-timeline and the screenshot where each frame first showed content.
+measures this checkout. `BENCH_RECORD=1` saves a video per case.

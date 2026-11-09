@@ -26,7 +26,7 @@ const CPU_THROTTLE = Number(process.env.BENCH_CPU ?? 4);
 const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const FIXTURE = process.env.BENCH_FIXTURE ?? join(homedir(), 'Documents/feega-videos/perf/landings/landings.feega');
 const RECORD = process.env.BENCH_RECORD === '1';
-const FIRST_PORT = 5291;
+const FIRST_PORT = 5391;
 const VIEWPORT = { width: 1440, height: 900 };
 const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = Number(process.env.BENCH_ZOOM ?? 0.12);
@@ -140,10 +140,6 @@ async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build
     for (const clip of await frameClips(page)) {
       if (content.get(clip.id) == null) {
         content.set(clip.id, (await inked(png, clip, scale, paper)) ? at : null);
-        if (process.env.BENCH_DEBUG && content.get(clip.id) !== null) {
-          writeFileSync(join(OUT, `debug-${at}-${clip.id.slice(0, 8)}.png`), await sharp(png).extract({ left: Math.round(clip.x * scale), top: Math.round(clip.y * scale), width: Math.round(clip.width * scale), height: Math.round(clip.height * scale) }).png().toBuffer());
-          writeFileSync(join(OUT, `debug-${at}-full.png`), png);
-        }
       }
     }
     if (!last || !png.equals(last)) {
@@ -164,7 +160,6 @@ async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build
 
 async function openOnce(context: BrowserContext, build: Build, profiled: boolean, video: string | null) {
   const page = await context.newPage();
-  page.on('console', (m) => /core|frame/i.test(m.text()) && console.log(`  [page] ${m.text().slice(0, 240)}`));
   const cdp: CDPSession = await context.newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
   if (profiled) {
@@ -173,18 +168,8 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
     await cdp.send('Profiler.start');
   }
   const from = Date.now();
-  const requests: string[] = [];
-  if (process.env.BENCH_DEBUG) {
-    page.on('requestfinished', async (r) => {
-      const size = (await r.sizes().catch(() => null))?.responseBodySize ?? -1;
-      requests.push(`${Date.now() - from}\t${size}\t${r.url().replace(/^https?:\/\/[^/]+/, '').slice(0, 140)}`);
-    });
-  }
   await page.goto(`http://127.0.0.1:${build.port}${CANVAS_PATH}`, { waitUntil: 'commit' });
   const load = await watchLoad(page, from);
-  if (requests.length) {
-    writeFileSync(join(OUT, `requests-${build.name}-${Date.now()}.tsv`), requests.join('\n'));
-  }
   const spots = profiled ? hotspots((await cdp.send('Profiler.stop')).profile as Profile) : [];
   if (video) {
     writeFileSync(join(OUT, `${video}-end.png`), await page.screenshot());
