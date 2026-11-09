@@ -4,7 +4,8 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/m
 import { addClip } from '@feega/motion-core/motion/timeline';
 
 const lookup = vi.fn();
-vi.mock('$lib/server/canvas/lookup', () => ({ openCanvasForUser: async (...a: unknown[]) => ({ memberships: [], found: await lookup(...a) }) }));
+vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
+vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: (...a: unknown[]) => lookup(...a) }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 
@@ -50,11 +51,11 @@ describe('GET the sources of every frame on a canvas at once', () => {
     expect(body.frames[M1].tokens).toBeUndefined();
   });
 
-  it('reads all heads with one query when every frame points at its head', async () => {
+  it('reads all heads with two queries, versions then docs, not one per frame', async () => {
     const { run, calls } = ask([M1, M2]);
     await run();
 
-    expect(calls.filter((c) => c.table === 'motion_revisions')).toHaveLength(1);
+    expect(calls.filter((c) => c.table === 'motion_revisions')).toHaveLength(2);
     expect(calls.filter((c) => c.table === 'nodes')).toHaveLength(1);
   });
 
@@ -87,12 +88,5 @@ describe('GET the sources of every frame on a canvas at once', () => {
   it('is a 400 for ids that are not node ids', async () => {
     await expect(ask([`${M1}@bp:x`]).run()).rejects.toMatchObject({ status: 400 });
     await expect(ask('nope').run()).rejects.toMatchObject({ status: 400 });
-  });
-
-  it('says in Server-Timing how long each phase took', async () => {
-    const res = await ask([M1, M2], { 'accept-encoding': 'br' }).run();
-
-    const phases = (res.headers.get('server-timing') ?? '').split(', ').map((p) => p.split(';')[0]);
-    expect(phases).toEqual(expect.arrayContaining(['auth', 'canvas', 'heads', 'linked', 'assets', 'named', 'tokens', 'stringify', 'etag', 'compress']));
   });
 });

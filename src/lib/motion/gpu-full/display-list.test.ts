@@ -430,3 +430,13 @@ describe('textBoxesAt', () => {
     expect(auto.flow.wraps).toBe(false);
   });
 });
+
+describe('small curves', () => {
+  it('un pallino di pochi pixel non porta 64 punti nel display list', () => {
+    const dot = must(addClip(withBg, { component: 'Shape', from: 0, durationInFrames: 90, props: { ...square, shape: 'ellipse', width: 0.002, height: 0.004 } }, 'dot'));
+
+    const points = pathOf(dot, 'dot')!.contours.reduce((n, c) => n + c.length / 2, 0);
+
+    expect(points).toBeLessThanOrEqual(24);
+  });
+});

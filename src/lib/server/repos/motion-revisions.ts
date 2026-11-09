@@ -113,26 +113,27 @@ export async function readHeads(db: Db, input: { orgId: string; heads: { nodeId:
   );
 }
 
-export type HeadPointer = { nodeId: string; version: number | null };
-
-const NEWEST_LANES = 8;
-
-async function newestVersions(db: Db, input: { orgId: string; nodeIds: string[] }): Promise<{ nodeId: string; version: number }[]> {
-  const found: { nodeId: string; version: number }[] = [];
-  for (let at = 0; at < input.nodeIds.length; at += NEWEST_LANES) {
-    const lane = input.nodeIds.slice(at, at + NEWEST_LANES);
-    const versions = await Promise.all(lane.map(async (nodeId) => ({ nodeId, version: await headVersion(db, { orgId: input.orgId, nodeId }) })));
-    found.push(...versions.flatMap((v) => (v.version === null ? [] : [{ nodeId: v.nodeId, version: v.version }])));
+async function headVersions(db: Db, input: { orgId: string; nodeIds: string[] }): Promise<{ nodeId: string; version: number }[]> {
+  if (!input.nodeIds.length) {
+    return [];
   }
-  return found;
+
+  const { data, error } = await db.from('motion_revisions').select('node_id, version').eq('org_id', input.orgId).in('node_id', input.nodeIds);
+  if (error) {
+    throw error;
+  }
+
+  const newest = new Map<string, number>();
+  for (const row of (data ?? []) as { node_id: string; version: number }[]) {
+    newest.set(row.node_id, Math.max(Number(row.version), newest.get(row.node_id) ?? 0));
+  }
+  return [...newest].map(([nodeId, version]) => ({ nodeId, version }));
 }
 
-export async function latestHeads(db: Db, input: { orgId: string; frames: HeadPointer[] }): Promise<Map<string, MotionHead>> {
-  const pointed = await readHeads(db, { orgId: input.orgId, heads: input.frames.flatMap((f) => (f.version ? [{ nodeId: f.nodeId, version: f.version }] : [])) });
-  const unpointed = input.frames.filter((f) => !pointed.has(f.nodeId)).map((f) => f.nodeId);
-  const newest = await readHeads(db, { orgId: input.orgId, heads: await newestVersions(db, { orgId: input.orgId, nodeIds: unpointed }) });
-  const asked = new Set(input.frames.map((f) => f.nodeId));
-  return new Map([...pointed, ...newest].filter(([nodeId]) => asked.has(nodeId)));
+export async function latestHeads(db: Db, input: { orgId: string; nodeIds: string[] }): Promise<Map<string, MotionHead>> {
+  const asked = new Set(input.nodeIds);
+  const heads = await readHeads(db, { orgId: input.orgId, heads: await headVersions(db, input) });
+  return new Map([...heads].filter(([nodeId]) => asked.has(nodeId)));
 }
 
 export async function readRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<MotionHead | null> {
