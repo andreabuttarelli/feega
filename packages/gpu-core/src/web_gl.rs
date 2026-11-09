@@ -125,7 +125,7 @@ impl Surface for GlSurface<'_> {
     fn place(&mut self, tex: Tex, region: Rect) -> Placed<GlPicture> {
         let id = self.renderer.upload_image(self.resources, &WebGlTextureWithDimensions { texture: tex.texture.clone(), width: tex.width, height: tex.height });
         self.placed.push(id);
-        Placed { image: GlPicture { id, size: Size { width: tex.width as f64, height: tex.height as f64 } }, origin: region.origin() }
+        Placed { image: GlPicture { id, size: Size { width: tex.width as f64, height: tex.height as f64 } }, origin: region.origin(), scale: 1.0 }
     }
 }
 

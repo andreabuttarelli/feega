@@ -258,6 +258,7 @@ pub fn plain<C: Canvas>(scene: &mut C, items: &[Item], pictures: &Shelf<C::Pictu
 pub struct Placed<P = ImageData> {
     pub image: P,
     pub origin: Point,
+    pub scale: f64,
 }
 
 pub struct Layers<P = ImageData> {
@@ -280,6 +281,10 @@ impl<P> Layers<P> {
         Self::default()
     }
 
+    pub fn plain(&self) -> bool {
+        self.bodies.is_empty() && self.behind.is_empty() && self.blended.is_empty() && self.culled.is_empty() && self.groups.values().all(Layers::plain)
+    }
+
     pub fn into_images(self) -> Vec<P> {
         let nested = self.groups.into_values().flat_map(Layers::into_images);
         self.bodies.into_values().chain(self.behind.into_values()).chain(self.blended.into_values()).map(|p| p.image).chain(nested).collect()
@@ -288,7 +293,7 @@ impl<P> Layers<P> {
 
 fn placed<C: Canvas>(scene: &mut C, layer: &Placed<C::Picture>) {
     let size = C::size(&layer.image);
-    scene.picture(Affine::translate(layer.origin.to_vec2()), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
+    scene.picture(Affine::translate(layer.origin.to_vec2()) * Affine::scale(layer.scale), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
 }
 
 fn corners(m: Affine, r: Rect) -> impl Iterator<Item = Point> {

@@ -110,6 +110,12 @@ pub struct Engine {
 
 pub type EngineError = vello::Error;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Steps {
+    Exact,
+    Stepped,
+}
+
 struct Gpu<'a> {
     vello: &'a mut vello::Renderer,
     runner: WgpuRunner<'a>,
@@ -119,6 +125,7 @@ struct Gpu<'a> {
     last: Option<Pooled>,
     cache: &'a mut LayerCache,
     scenes: &'a mut Vec<Scene>,
+    stepped: bool,
 }
 
 fn borrowed(scenes: &mut Vec<Scene>) -> Scene {
@@ -205,7 +212,7 @@ impl<'a> Surface for Gpu<'a> {
         let cached = self.cache.entries.get_mut(&self.key(item))?;
         cached.used = tick;
         self.vello.mark_override_image_dirty(&cached.image);
-        Some(Placed { image: cached.image.clone(), origin: cached.origin })
+        Some(Placed { image: cached.image.clone(), origin: cached.origin, scale: 1.0 })
     }
 
     fn remember(&mut self, item: &Item, placed: &Placed) {
@@ -219,11 +226,30 @@ impl<'a> Surface for Gpu<'a> {
         }
     }
 
+    fn stepped(&self) -> bool {
+        self.stepped
+    }
+
+    fn recall_body(&mut self, key: &str, origin: Point, scale: f64) -> Option<Placed> {
+        let tick = self.cache.tick;
+        let cached = self.cache.entries.get_mut(key)?;
+        cached.used = tick;
+        self.vello.mark_override_image_dirty(&cached.image);
+        Some(Placed { image: cached.image.clone(), origin, scale })
+    }
+
+    fn remember_body(&mut self, key: &str, placed: &Placed) {
+        if let Some(texture) = self.last.take() {
+            let used = self.cache.tick;
+            self.cache.entries.insert(key.to_string(), Cached { image: placed.image.clone(), origin: placed.origin, _texture: texture, used });
+        }
+    }
+
     fn place(&mut self, texture: Pooled, region: Rect) -> Placed {
         let image = self.vello.register_texture((*texture).clone());
         self.last = Some(texture.clone());
         self.kept.push(texture);
-        Placed { image, origin: region.origin() }
+        Placed { image, origin: region.origin(), scale: 1.0 }
     }
 }
 
@@ -249,7 +275,11 @@ impl Engine {
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes };
+        self.draw_at(device, queue, list, pictures, target, Steps::Exact)
+    }
+
+    pub fn draw_at(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView, steps: Steps) -> Result<Vec<Skipped>, EngineError> {
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, stepped: steps == Steps::Stepped };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);

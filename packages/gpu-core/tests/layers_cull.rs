@@ -67,7 +67,7 @@ impl Surface for Counting {
     }
 
     fn place(&mut self, _: (u32, u32), region: Rect) -> Placed<()> {
-        Placed { image: (), origin: Point::new(region.x0, region.y0) }
+        Placed { image: (), origin: Point::new(region.x0, region.y0), scale: 1.0 }
     }
 }
 

@@ -1,4 +1,4 @@
-use vello::kurbo::Rect;
+use vello::kurbo::{Point, Rect};
 
 use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
@@ -29,6 +29,87 @@ pub trait Surface {
     }
 
     fn remember(&mut self, _item: &Item, _placed: &Placed<Pic<Self>>) {}
+
+    fn recall_body(&mut self, _key: &str, _origin: Point, _scale: f64) -> Option<Placed<Pic<Self>>> {
+        None
+    }
+
+    fn stepped(&self) -> bool {
+        false
+    }
+
+    fn remember_body(&mut self, _key: &str, _placed: &Placed<Pic<Self>>) {}
+}
+
+const BODY_MAX_PX: f64 = 2048.0;
+
+fn pictures_ready<P>(item: &Item, pictures: &Shelf<P>) -> bool {
+    match item {
+        Item::Image(image) => pictures.contains_key(&image.src),
+        Item::Group(group) => group.items.iter().all(|i| pictures_ready(i, pictures)),
+        _ => true,
+    }
+}
+
+struct Step {
+    key: String,
+    region: Rect,
+    factor: f64,
+}
+
+fn step_of<S: Surface>(item: &Item, pictures: &Shelf<Pic<S>>) -> Option<Step> {
+    let look = item.look()?;
+    let content = look.key?;
+    if look.backdrop.is_some() || !pictures_ready(item, pictures) {
+        return None;
+    }
+    let [a, b, c, d, _, _] = look.matrix;
+    let scale = (a * d - b * c).abs().sqrt();
+    if scale <= 0.0 {
+        return None;
+    }
+    let factor = crate::groups::rung(scale) / scale;
+    let spread = inflated::<S::Canvas>(item, look, pictures)?;
+    if (factor - 1.0).abs() < STEP_SLACK || spread.width() * factor > BODY_MAX_PX || spread.height() * factor > BODY_MAX_PX {
+        return None;
+    }
+    let region = Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil().max(spread.x0.floor() + 1.0), spread.y1.ceil().max(spread.y0.floor() + 1.0));
+    let key = format!("{content:x} step {:.6} {:.4} {:.4} {:.4} {:.4}", scale * factor, a / scale, b / scale, c / scale, d / scale);
+    Some(Step { key, region, factor })
+}
+
+fn stepped_body<S: Surface>(surface: &mut S, item: &Item, step: &Step, pictures: &Shelf<Pic<S>>, blending: Blending, fragments: &Fragments) -> Result<Option<Placed<Pic<S>>>, S::Error> {
+    let at_step = crate::groups::scaled_about(item, step.factor, (step.region.x0, step.region.y0));
+    let inner = match &at_step {
+        Item::Group(group) => Some(prepare_items(surface, &group.items, None, pictures, blending, fragments)?),
+        _ => None,
+    };
+    if inner.as_ref().is_some_and(|l| !l.plain()) {
+        return Ok(None);
+    }
+    let r = step.region;
+    let region = Rect::new(r.x0, r.y0, r.x0 + (r.width() * step.factor).ceil(), r.y0 + (r.height() * step.factor).ceil());
+    let made = body(surface, &at_step, pictures, inner.as_ref(), Some(region))?;
+    surface.remember_body(&step.key, &made);
+    Ok(Some(Placed { scale: 1.0 / step.factor, ..made }))
+}
+
+const STEP_SLACK: f64 = 1e-6;
+
+fn body_key<S: Surface>(item: &Item, pictures: &Shelf<Pic<S>>) -> Option<(String, Rect)> {
+    let look = item.look()?;
+    let content = look.key?;
+    if look.backdrop.is_some() || !pictures_ready(item, pictures) {
+        return None;
+    }
+    let spread = inflated::<S::Canvas>(item, look, pictures)?;
+    if spread.width() > BODY_MAX_PX || spread.height() > BODY_MAX_PX {
+        return None;
+    }
+    let region = Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil().max(spread.x0.floor() + 1.0), spread.y1.ceil().max(spread.y0.floor() + 1.0));
+    let [a, b, c, d, _, _] = look.matrix;
+    let key = format!("{content:x} {a:.6} {b:.6} {c:.6} {d:.6} {:.3} {:.3} {}x{}", spread.x0 - region.x0, spread.y0 - region.y0, region.width(), region.height());
+    Some((key, region))
 }
 
 fn reach(sigma: f64) -> f64 {
@@ -76,17 +157,35 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             layers.culled.insert(i);
             continue;
         }
-        let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
+        let step = if layer_worthy(item) && surface.stepped() { step_of::<S>(item, pictures) } else { None };
+        let stepped = match &step {
+            Some(step) => match surface.recall_body(&step.key, step.region.origin(), 1.0 / step.factor) {
+                Some(layer) => Some(layer),
+                None => stepped_body(surface, item, step, pictures, blending, fragments)?,
+            },
+            None => None,
+        };
+        let keyed = if layer_worthy(item) && stepped.is_none() { body_key::<S>(item, pictures) } else { None };
+        let recalled = match &keyed {
+            _ if stepped.is_some() => stepped,
+            Some((key, region)) => surface.recall_body(key, region.origin(), 1.0),
+            None if layer_worthy(item) => surface.recall(item),
+            None => None,
+        };
         if let (Item::Group(group), None) = (item, &recalled) {
             let inner = prepare_items(surface, &group.items, None, pictures, blending, fragments)?;
             layers.groups.insert(i, inner);
         }
         if layer_worthy(item) {
+            let whole = keyed.filter(|_| layers.groups.get(&i).is_none_or(Layers::plain));
             let layer = match recalled {
                 Some(layer) => layer,
                 None => {
-                    let made = body(surface, item, pictures, layers.groups.get(&i))?;
-                    surface.remember(item, &made);
+                    let made = body(surface, item, pictures, layers.groups.get(&i), whole.as_ref().map(|(_, region)| *region))?;
+                    match &whole {
+                        Some((key, _)) => surface.remember_body(key, &made),
+                        None => surface.remember(item, &made),
+                    }
                     made
                 }
             };
@@ -160,10 +259,10 @@ fn off_frame<S: Surface>(surface: &S, item: &Item, pictures: &Shelf<Pic<S>>) -> 
     look.backdrop.is_none() && inflated::<S::Canvas>(item, look, pictures).is_some_and(|r| !r.overlaps(surface.frame()))
 }
 
-fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inner: Option<&Layers<Pic<S>>>) -> Result<Placed<Pic<S>>, S::Error> {
-    let frame = surface.frame();
+fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inner: Option<&Layers<Pic<S>>>, whole: Option<Rect>) -> Result<Placed<Pic<S>>, S::Error> {
     let look = item.look().expect("a drawable item");
-    let region = region(surface, item, look, pictures);
+    let region = whole.unwrap_or_else(|| region(surface, item, look, pictures));
+    let frame = whole.unwrap_or_else(|| surface.frame());
     let drawn = surface.paint(region, None, &|c| match (item, inner) {
         (Item::Group(group), Some(inner)) => {
             build_items(c, &group.items, frame, pictures, inner);
