@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { heldFrames } from '$lib/canvas/core/held-frames';
   import { baseNodeId, heldViews, viewAt, viewOf } from '$lib/canvas/breakpoint-views';
   import { liftViewEdit } from '@feega/motion-core/motion/breakpoints/view';
   import { BASE_BREAKPOINT } from '@feega/motion-core/motion/breakpoints/model';
@@ -1397,7 +1398,7 @@
   };
   const resolveViews = heldViews();
   const bpViews = $derived(resolveViews(coreFrames, viewDocOf));
-  const heldInResize = $derived(new Set([...resizing].filter((id) => frameChrome(kindOfNode(id)).resize === ResizePaint.Held)));
+  const heldInGesture = $derived(heldFrames({ resizing, heldOnResize: (id) => frameChrome(kindOfNode(id)).resize === ResizePaint.Held, moving: [...overrides.keys()].filter((id) => !resizing.has(id)), shown: bpViews.map((v) => v.frame.id), base: baseNodeId }));
   const drawnFrames = $derived(coreFrames.map((f) => {
     const doc = liveOf(f.id)?.doc;
     const scenes = doc ? sceneStamp(doc, (id) => sceneRevision(revisionOfFrame(id), liveDocs.edits.get(id))) : '';
@@ -4301,7 +4302,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInResize} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>

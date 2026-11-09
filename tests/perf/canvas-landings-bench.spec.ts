@@ -15,7 +15,8 @@ enum Gesture {
   Pan = 'pan',
   Zoom = 'zoom',
   Fit = 'fit',
-  Drag = 'drag'
+  Drag = 'drag',
+  DragElement = 'drag-element'
 }
 
 type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null };
@@ -35,8 +36,11 @@ const SETTLE_MS = 8000;
 const GESTURE_MS = 4000;
 const FIT_TOGGLE_MS = 700;
 const CLOSER_STEPS = 2;
-const DRAWN_GIVE_UP_MS = 300_000;
+const DRAWN_GIVE_UP_MS = 60_000;
 const INK_MIN_PX = 24;
+const TITLE_ABOVE_PX = 10;
+const TITLE_IN_PX = 30;
+const TITLE_ROOM_PX = 120;
 const INK_STDEV = 6;
 const INK_INSET = 0.15;
 const SHARP_POLL_MS = 60;
@@ -68,20 +72,33 @@ async function fitToggle(page: Page, until: number) {
   }
 }
 
-async function frameOnScreen(page: Page): Promise<{ x: number; y: number }> {
+async function frameOnScreen(page: Page): Promise<{ x: number; left: number; top: number }> {
   const boxes = await page.locator('[data-testid="gpu-node"]').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
-  const inside = boxes.find((b) => b.x + b.w / 2 > 0 && b.x + b.w / 2 < VIEWPORT.width && b.y < VIEWPORT.height / 2 && b.y + b.h > VIEWPORT.height / 2)!;
-  return { x: inside.x + inside.w / 2, y: VIEWPORT.height / 2 };
+  const inside = boxes.find((b) => b.x + b.w / 2 > 0 && b.x + b.w / 2 < VIEWPORT.width && b.y > TITLE_ABOVE_PX * 2 && b.y < VIEWPORT.height / 2) ?? boxes.find((b) => b.x + b.w / 2 > 0 && b.x + b.w / 2 < VIEWPORT.width && b.y < VIEWPORT.height / 2 && b.y + b.h > VIEWPORT.height / 2)!;
+  return { x: inside.x + inside.w / 2, left: inside.x, top: inside.y };
 }
 
 async function dragFrame(page: Page, until: number) {
-  const from = await frameOnScreen(page);
+  const box = await frameOnScreen(page);
+  writeFileSync(join(OUT, 'drag-start.png'), await shot(page));
+  await dragFrom(page, { x: box.left + TITLE_IN_PX, y: box.top - TITLE_ABOVE_PX }, until);
+}
+
+async function dragElement(page: Page, until: number) {
+  const box = await frameOnScreen(page);
+  await dragFrom(page, { x: box.x, y: VIEWPORT.height / 2 }, until);
+}
+
+const moved: string[] = [];
+
+async function dragFrom(page: Page, from: { x: number; y: number }, until: number) {
   await page.mouse.click(from.x, from.y);
   await page.mouse.down();
   for (let i = 0; Date.now() < until; i++) {
     const t = i / 10;
     await page.mouse.move(from.x + Math.sin(t) * 200, from.y + Math.cos(t * 0.7) * 150);
   }
+  moved.push(await page.evaluate(() => [...document.querySelectorAll('.gpu-node.selected')].map((n) => n.getAttribute('data-box')).join('|') + ' ' + JSON.stringify((window as unknown as { __gpuMem?: object }).__gpuMem ?? null)));
   await page.mouse.move(from.x, from.y);
   await page.mouse.up();
 }
@@ -90,7 +107,8 @@ const GESTURES: Record<Gesture, (page: Page, until: number) => Promise<void>> = 
   [Gesture.Pan]: wheelPan,
   [Gesture.Zoom]: wheelZoom,
   [Gesture.Fit]: fitToggle,
-  [Gesture.Drag]: dragFrame
+  [Gesture.Drag]: dragFrame,
+  [Gesture.DragElement]: dragElement
 };
 
 async function taskMs(cdp: CDPSession | null): Promise<number | null> {
@@ -121,8 +139,12 @@ async function untilDrawn(page: Page) {
   await page.waitForFunction(() => {
     const onScreen = (r: DOMRect) => r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
     const nodes = [...document.querySelectorAll('[data-testid="gpu-node"]')].filter((n) => onScreen(n.getBoundingClientRect()));
-    return nodes.length > 0 && nodes.every((n) => n.hasAttribute('data-core'));
-  }, null, { timeout: DRAWN_GIVE_UP_MS, polling: SHARP_POLL_MS });
+    return nodes.every((n) => n.hasAttribute('data-core'));
+  }, null, { timeout: DRAWN_GIVE_UP_MS, polling: SHARP_POLL_MS }).catch(async (e: unknown) => {
+    writeFileSync(join(OUT, 'undrawn.png'), await shot(page));
+    console.log('UNDRAWN', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('[data-testid="gpu-node"]')].map((n) => [n.getAttribute('aria-label')?.slice(0, 10), n.hasAttribute('data-core'), JSON.stringify(n.getBoundingClientRect())]))));
+    throw e;
+  });
   const started = Date.now();
   while (!(await framesInked(page)) && Date.now() - started < DRAWN_GIVE_UP_MS) {
     await page.waitForTimeout(SHARP_POLL_MS);
@@ -131,6 +153,10 @@ async function untilDrawn(page: Page) {
 }
 
 async function framesInked(page: Page): Promise<boolean> {
+  return (await inkedOnScreen(page)).every(Boolean);
+}
+
+async function inkedOnScreen(page: Page): Promise<boolean[]> {
   const boxes = await page.locator('[data-testid="gpu-node"]').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
   const clips = boxes.map((b) => ({ x: b.x + b.w * INK_INSET, y: b.y + b.h * INK_INSET, w: b.w * (1 - 2 * INK_INSET), h: b.h * (1 - 2 * INK_INSET) })).flatMap((b) => {
     const x = Math.max(0, b.x);
@@ -139,13 +165,12 @@ async function framesInked(page: Page): Promise<boolean> {
     const height = Math.min(VIEWPORT.height, b.y + b.h) - y;
     return width > INK_MIN_PX && height > INK_MIN_PX ? [{ x, y, width, height }] : [];
   });
+  const inked: boolean[] = [];
   for (const clip of clips) {
     const { channels } = await sharp(await page.screenshot({ clip })).stats();
-    if (channels[0].stdev < INK_STDEV) {
-      return false;
-    }
+    inked.push(channels[0].stdev >= INK_STDEV);
   }
-  return clips.length > 0;
+  return inked;
 }
 
 async function fitThenZoomIn(page: Page) {
@@ -165,23 +190,40 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
   await page.addInitScript(instrument);
+  page.on('console', (m) => { if (process.env.BENCH_DEBUG && m.text().startsWith('[probe]')) { console.log(m.text().slice(0, 600)); } });
   await page.addInitScript(({ key, view }) => localStorage.setItem(key, JSON.stringify(view)), { key: VIEW_KEY, view: START_VIEW });
   const cdp = ENGINE === Engine.Chromium ? await context.newCDPSession(page) : null;
   await cdp?.send('Performance.enable');
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}${process.env.BENCH_DEBUG ? '?coreDebug' : ''}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await untilDrawn(page);
   return { context, page, cdp };
 }
 
+async function titlesInView(page: Page) {
+  const box = await frameOnScreen(page);
+  if (box.top > TITLE_ABOVE_PX * 2) {
+    return;
+  }
+  await page.mouse.move(VIEWPORT.width / 2, VIEWPORT.height / 2);
+  await page.mouse.wheel(0, box.top - TITLE_ROOM_PX);
+  await untilDrawn(page);
+}
+
 async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture): Promise<GestureRun> {
   await fitThenZoomIn(page);
-  expect(await framesInked(page), `${gesture}: frames not drawn before the gesture`).toBe(true);
+  if (gesture === Gesture.Drag) {
+    await titlesInView(page);
+  }
+  const shown = await inkedOnScreen(page);
+  expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture`).toBe(true);
+  console.log('SELECTED-BEFORE', gesture, await page.evaluate(() => [...document.querySelectorAll('.gpu-node.selected')].map((n) => n.getAttribute('data-box')).join('|')));
   const before = await taskMs(cdp);
   const frames: Frames = await measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until));
   const after = await taskMs(cdp);
-  await untilSharp(page);
+  console.log('MID', gesture, moved.at(-1));
+  await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
   return { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before) };
 }
@@ -219,7 +261,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
     writeFileSync(join(OUT, `landings-${ENGINE}-fit.png`), await shot(page));
   }
   const grip = await frameOnScreen(page);
-  await page.mouse.click(grip.x, grip.y);
+  await page.mouse.click(grip.left + TITLE_IN_PX, grip.top - TITLE_ABOVE_PX);
   const zooming = Date.now();
   await page.keyboard.press('Shift+Digit2');
   await page.waitForTimeout(FIT_TOGGLE_MS);

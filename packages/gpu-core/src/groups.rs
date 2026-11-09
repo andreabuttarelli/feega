@@ -815,7 +815,8 @@ impl Library {
             let on_screen = at_screen.overlaps(view);
             let cast = self.encoding(&u.group);
             let Some(group) = self.groups.get(&u.group) else { continue };
-            if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some()) {
+            let moved_as_texture = u.cache && u.hold;
+            if let Some(whole) = cast.as_deref().filter(|c| c.whole().is_some() && !moved_as_texture) {
                 if on_screen {
                     let (laid, spans) = laid(u, group, whole, view);
                     items.extend(laid);

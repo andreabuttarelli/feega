@@ -318,3 +318,20 @@ fn a_cached_group_is_never_shown_blurrier_than_its_screen_scale() {
         assert!(image.size.width >= (100.0 * want).floor(), "texture {} under {} wide at zoom {want}", image.size.width, 100.0 * want);
     }
 }
+
+fn dragged_use(group: &str, x: f64) -> DisplayList {
+    parse(&format!(r#"{{ "width": 800, "height": 600, "background": null, "items": [{{ "kind": "use", "clip": "{group}", "group": "{group}", "matrix": [1, 0, 0, 1, {x}, 0], "cache": true, "hold": true }}] }}"#)).unwrap()
+}
+
+#[test]
+fn a_held_use_is_moved_as_one_texture_even_when_its_group_composes_from_an_encoding() {
+    let mut lib = library(&["a"]);
+    lib.compose_encodings();
+
+    let first = lib.plan(&dragged_use("a", 10.0), LIMITS);
+    assert_eq!(first.rasters.len(), 1);
+
+    let dragged = lib.plan(&dragged_use("a", 90.0), LIMITS);
+    assert!(dragged.rasters.is_empty());
+    assert_eq!(kinds(&dragged.screen), vec!["image"]);
+}
