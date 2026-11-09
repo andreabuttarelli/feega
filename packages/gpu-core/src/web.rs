@@ -126,6 +126,17 @@ fn held_texture(device: &wgpu::Device, (width, height): (u32, u32)) -> wgpu::Tex
     })
 }
 
+fn input_pending() -> bool {
+    let global = js_sys::global();
+    let call = || -> Option<bool> {
+        let navigator = js_sys::Reflect::get(&global, &"navigator".into()).ok()?;
+        let scheduling = js_sys::Reflect::get(&navigator, &"scheduling".into()).ok()?;
+        let pending: js_sys::Function = js_sys::Reflect::get(&scheduling, &"isInputPending".into()).ok()?.dyn_into().ok()?;
+        pending.call0(&scheduling).ok()?.as_bool()
+    };
+    call().unwrap_or(false)
+}
+
 fn placed<'a>(key: TileKey, source: &'a wgpu::Texture, c: Camera, clip: Rect) -> Option<Tile<'a>> {
     let on = key.screen(c);
     let within = Rect::new(on.x0.floor(), on.y0.floor(), on.x1.ceil(), on.y1.ceil()).intersect(clip);
@@ -457,7 +468,7 @@ impl WebCore {
         let screen = (self.target.width(), self.target.height());
         let wanted: Vec<TileKey> = self.tiles.reserve(self.camera, screen).into_iter().chain(self.tiles.ahead(self.camera, screen)).collect();
         for key in wanted {
-            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS {
+            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
                 return Ok(true);
             }
             self.raster_batch(&Batch { step: key.step, keys: vec![key] })?;
@@ -580,8 +591,11 @@ impl WebCore {
         let started = js_sys::Date::now();
         let mut rastered = 0;
         let missing = self.tiles.frame(self.camera, screen).missing;
-        let (blank, behind): (Vec<TileKey>, Vec<TileKey>) = missing.into_iter().partition(|k| !self.tiles.covered_within(*k, NEAR_STEPS));
-        for batch in batches(&blank) {
+        let (blurry, behind): (Vec<TileKey>, Vec<TileKey>) = missing.into_iter().partition(|k| !self.tiles.covered_within(*k, NEAR_STEPS));
+        let (blank, blurry): (Vec<TileKey>, Vec<TileKey>) = blurry.into_iter().partition(|k| !self.tiles.covered(*k));
+        let gesture = matches!(self.motion, CoreMotion::Gesture);
+        let sharpen: Vec<TileKey> = if gesture { blurry.into_iter().take(1).collect() } else { blurry };
+        for batch in batches(&blank).into_iter().chain(batches(&sharpen)) {
             if rastered > 0 && js_sys::Date::now() - started > budget {
                 break;
             }

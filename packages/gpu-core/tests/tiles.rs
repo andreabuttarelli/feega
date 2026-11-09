@@ -274,3 +274,13 @@ fn while_idle_the_tiles_around_the_screen_and_one_step_sharper_are_fetched_ahead
     assert!(ahead.iter().any(|k| k.step == step && !k.screen(camera(1.0)).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
     assert!(ahead.iter().any(|k| k.step == step + 1));
 }
+
+#[test]
+fn zooming_out_over_sharper_tiles_needs_no_raster_during_the_gesture() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(2)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+
+    assert!(tiles.covered_within(key, NEAR_STEPS));
+}

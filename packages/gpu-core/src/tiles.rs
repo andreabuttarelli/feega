@@ -161,7 +161,9 @@ impl Tiles {
 
     pub fn covered_within(&self, key: TileKey, steps: i32) -> bool {
         let world = key.world();
-        (key.step - steps..key.step).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
+        let coarser = key.step - steps..key.step;
+        let finer = key.step + 1..=key.step + steps.min(FINER_STEPS);
+        coarser.chain(finer).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
     }
 
     pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
