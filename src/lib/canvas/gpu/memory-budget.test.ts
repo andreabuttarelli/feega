@@ -44,6 +44,13 @@ describe('memory budget', () => {
   });
 });
 
+describe('filtered-body cache', () => {
+  it('a phone keeps no filtered bodies across tiles, a desktop keeps some', () => {
+    expect(BUDGET[Device.Phone].bodyBytes).toBe(0);
+    expect(BUDGET[Device.Desktop].bodyBytes).toBeGreaterThan(0);
+  });
+});
+
 describe('tile memory', () => {
   it('a phone or a low-memory machine keeps at most 128 MB of canvas tiles, a desktop more', () => {
     expect(BUDGET[deviceOf({ touch: false, memoryGb: 4 })].tileBytes).toBeLessThanOrEqual(128 * 1024 * 1024);
@@ -56,7 +63,7 @@ describe('device profile', () => {
   const MB = 1024 * 1024;
 
   it('a desktop keeps the values it had before phones got their own profile', () => {
-    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident });
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, bodyBytes: 64 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident });
   });
 
   it('a desktop builds frames on one lane per spare core, up to four', () => {

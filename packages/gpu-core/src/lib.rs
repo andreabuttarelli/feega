@@ -1,6 +1,7 @@
 pub mod canvas;
 pub mod colour;
 pub mod compositor;
+pub mod content_key;
 pub mod display_list;
 pub mod packed;
 pub mod engine;
