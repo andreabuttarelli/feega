@@ -108,6 +108,10 @@ impl Compositor {
         std::mem::take(&mut self.pending)
     }
 
+    pub fn stirred(&mut self) -> bool {
+        !matches!(self.world.take_damage(), Damage::Rects(r) if r.is_empty())
+    }
+
     pub fn take_damage(&mut self) -> Damage {
         let mut damage = std::mem::replace(&mut self.tile_damage, Damage::none());
         damage.join(self.world.take_scene_damage());

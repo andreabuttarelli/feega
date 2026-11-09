@@ -339,3 +339,21 @@ fn a_tile_plan_of_a_group_still_building_its_cache_damages_no_tile() {
 
     assert_eq!(c.take_damage(), gpu_core::retained::Damage::none());
 }
+
+#[test]
+fn a_dragged_frame_stirs_the_screen_so_the_rest_picture_waits_though_no_tile_changes() {
+    let mut library = Library::new();
+    library.put_group("g", &parse(&busy_group()).unwrap());
+    let mut c = Compositor::new(800, 600);
+    let at = |x: f64, hold: bool| parse_patch(&format!(r#"{{ "put": [{{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, {x}, 0], "cache": {hold}, "hold": {hold} }}], "drop": [] }}"#)).unwrap();
+    c.patch(at(0.0, false), &library);
+    c.patch(at(50.0, true), &library);
+    c.stirred();
+    c.take_damage();
+
+    c.patch(at(90.0, true), &library);
+
+    assert!(c.stirred());
+    assert_eq!(c.take_damage(), gpu_core::retained::Damage::none());
+    assert!(!c.stirred());
+}

@@ -153,8 +153,8 @@ impl World {
     }
 
     fn shifted_from_rest(&self, u: &UseItem) -> Option<(f64, f64)> {
-        let (group, at) = self.rest.get(&u.clip)?;
-        let same_shape = *group == u.group && at[..4] == u.matrix[..4];
+        let (_, at) = self.rest.get(&u.clip)?;
+        let same_shape = at[..4] == u.matrix[..4];
         (u.hold && same_shape && at != &u.matrix).then(|| (u.matrix[4] - at[4], u.matrix[5] - at[5]))
     }
 
@@ -168,7 +168,7 @@ impl World {
     }
 
     fn lifted(&self, u: &UseItem) -> bool {
-        u.hold && self.rest.get(&u.clip).is_none_or(|(group, matrix)| *group != u.group || *matrix != u.matrix)
+        u.hold && self.rest.get(&u.clip).is_none_or(|(_, matrix)| *matrix != u.matrix)
     }
 
     fn mark_scene(&mut self, rect: Option<Rect>) {
