@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,6 +80,21 @@ describe('the builder', () => {
     expect(worker.asked.every((a) => typeof a.source === 'string')).toBe(true);
     expect(a?.width).toBe(1);
     expect(b?.width).toBe(1);
+  });
+
+  it('writes a doc out once, not again when the frame rebuilds with sharper assets', async () => {
+    const worker = echo();
+    const build = frameBuilder(() => worker);
+    const written = vi.spyOn(JSON, 'stringify');
+    const doc = structuredClone(shapeDoc);
+
+    await build({ ...source(doc), assets: { a: 'small' } }, Smoothing.Plain);
+    await build({ ...source(doc), assets: { a: 'large' } }, Smoothing.Plain);
+    const docWrites = written.mock.calls.filter(([value]) => value === doc || (value as { doc?: unknown })?.doc === doc).length;
+    written.mockRestore();
+
+    expect(docWrites).toBe(1);
+    expect(worker.asked.map((a) => JSON.parse(a.source))).toEqual([{ ...source(doc), assets: { a: 'small' } }, { ...source(doc), assets: { a: 'large' } }].map((x) => JSON.parse(JSON.stringify(x))));
   });
 
   it('spreads builds over its workers, so frames build side by side instead of in one queue', async () => {

@@ -42,6 +42,14 @@ export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('contours' in 
 
 type Lane = { worker: BuildWorker; busy: number };
 
+const docTexts = new WeakMap<MotionDoc, string>();
+
+function sourceText({ doc, ...rest }: FrameDoc): string {
+  const text = docTexts.get(doc) ?? JSON.stringify(doc);
+  docTexts.set(doc, text);
+  return `{"doc":${text},${JSON.stringify(rest).slice(1)}`;
+}
+
 export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
   const pool: Lane[] = [];
   let dead = false;
@@ -91,7 +99,7 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (sourc
     }
     const id = next++;
     lane.busy++;
-    lane.worker.postMessage({ id, source: JSON.stringify(source), smoothing, locals: localFilesSnapshot() });
+    lane.worker.postMessage({ id, source: sourceText(source), smoothing, locals: localFilesSnapshot() });
     return new Promise((resolve, reject) => waiting.set(id, { lane, resolve, reject }));
   };
 }
