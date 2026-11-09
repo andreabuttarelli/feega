@@ -3,6 +3,7 @@ import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { DataCheck, listMainDependents, listNodesByIds, patchNodeData } from '$lib/server/repos/canvas';
 import { latestHeads, readHead, type MotionHead } from '$lib/server/repos/motion-revisions';
+import { headPointer } from './head-pointer';
 import { linkedMains, mainHomesOf, mainsSignature } from '$lib/motion/linked-mains';
 
 const MAX_DEPTH = 8;
@@ -40,8 +41,8 @@ export async function linkedHeads(db: Db, input: { orgId: string; heads: Map<str
       break;
     }
 
-    const alive = (await listNodesByIds(db, { orgId: input.orgId, nodeIds: missing })).map((n) => n.id);
-    const heads = await latestHeads(db, { orgId: input.orgId, nodeIds: alive });
+    const alive = await listNodesByIds(db, { orgId: input.orgId, nodeIds: missing });
+    const heads = await latestHeads(db, { orgId: input.orgId, frames: alive.map(headPointer) });
     missing.forEach((home) => loaded.set(home, heads.get(home)?.doc ?? null));
     docs.forEach((doc, nodeId) => docs.set(nodeId, linkedMains(doc, nodeId, loaded)));
   }
