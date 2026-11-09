@@ -1,5 +1,6 @@
 import { AssetKind } from '@feega/motion-core/motion/components';
 import { latestHeads, readHead, type MotionHead } from '$lib/server/repos/motion-revisions';
+import { headPointer } from './head-pointer';
 import { listNodesByIds } from '$lib/server/repos/canvas';
 import { motionOf } from '$lib/canvas/motion-node';
 import { linkedHead, linkedHeads } from './linked-mains';
@@ -32,9 +33,11 @@ export async function motionSource(scope: MotionScope): Promise<MotionSource | n
 type FramesScope = SourceScope & { canvasId: string; nodeIds: string[]; phases?: Phases };
 
 async function headsOf(scope: FramesScope, phases: Phases): Promise<Map<string, MotionHead>> {
-  const [records, saved] = await phases.time('heads', Promise.all([listNodesByIds(scope.db, { orgId: scope.orgId, nodeIds: scope.nodeIds }), latestHeads(scope.db, { orgId: scope.orgId, nodeIds: scope.nodeIds })]));
-  const frames = new Set(records.filter((record) => record.canvasId === scope.canvasId && motionOf(record)).map((record) => record.id));
-  const mine = new Map([...saved].filter(([nodeId]) => frames.has(nodeId)));
+  const mine = await phases.time('heads', (async () => {
+    const records = await listNodesByIds(scope.db, { orgId: scope.orgId, nodeIds: scope.nodeIds });
+    const frames = records.filter((record) => record.canvasId === scope.canvasId && motionOf(record));
+    return latestHeads(scope.db, { orgId: scope.orgId, frames: frames.map(headPointer) });
+  })());
   return phases.time('linked', linkedHeads(scope.db, { orgId: scope.orgId, heads: mine }));
 }
 

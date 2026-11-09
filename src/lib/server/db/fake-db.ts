@@ -17,11 +17,12 @@ export type Call = {
   filters: [string, unknown][];
   order?: [string, unknown];
   limit?: number;
+  ors?: string[];
 };
 
 export type FakeDb = { db: Db; calls: Call[] };
 
-export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; store?: boolean; newId?: () => string; files?: Record<string, Uint8Array>; latencyMs?: number };
+export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; store?: boolean; newId?: () => string; files?: Record<string, Uint8Array>; latencyMs?: number; maxRows?: number };
 
 export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {}): FakeDb {
   const calls: Call[] = [];
@@ -53,11 +54,24 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
     return made;
   };
 
+  const anyOf = (row: Record<string, unknown>, ors: string[]): boolean =>
+    !ors.length || ors.some((group) => [...group.matchAll(/(\w+)\.eq\.([^,)]+)/g)].every(([, column, value]) => String(row[column]) === value));
+
+  const paged = (call: Call, found: unknown[]): unknown[] => {
+    if (!options.maxRows) {
+      return found;
+    }
+    const kept = (found as Record<string, unknown>[]).filter((row) => anyOf(row, call.ors ?? []));
+    const [column, opts] = call.order ?? [];
+    const sorted = column ? [...kept].sort((a, b) => (Number(a[column as string]) - Number(b[column as string])) * ((opts as { ascending?: boolean })?.ascending === false ? -1 : 1)) : kept;
+    return sorted.slice(0, Math.min(call.limit ?? options.maxRows, options.maxRows));
+  };
+
   const resolved = (call: Call): unknown[] => {
     if (options.store && call.op === 'insert' && call.payload) {
       return store(call);
     }
-    const found = rowsFor(call.op, call.table, call.filters);
+    const found = paged(call, rowsFor(call.op, call.table, call.filters));
     if (!options.mutate || call.op !== 'update' || !call.payload) {
       return found;
     }
@@ -98,7 +112,8 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
       neq() {
         return chain;
       },
-      or() {
+      or(filter: string) {
+        call.ors = filter.match(/and\([^)]*\)/g) ?? [filter];
         return chain;
       },
       gte(column: string, value: unknown) {
