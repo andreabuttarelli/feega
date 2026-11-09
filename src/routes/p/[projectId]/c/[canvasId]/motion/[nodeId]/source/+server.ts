@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { listMemberships } from '$lib/server/repos/orgs';
@@ -8,22 +7,12 @@ import { findMotionNode, motionTokens } from '$lib/server/motion/editor';
 import { listProjects } from '$lib/server/repos/projects';
 import { motionSource } from '$lib/server/motion/sources';
 import { MEDIA_UUID_RE } from '$lib/media-url';
+import { revalidated } from '$lib/server/revalidated';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
-const HTTP_NOT_MODIFIED = 304;
-const REVALIDATE = 'private, no-cache';
-
-function revalidated(request: Request, body: string): Response {
-  const tag = `"${createHash('sha1').update(body).digest('base64url')}"`;
-  const headers = { etag: tag, 'cache-control': REVALIDATE };
-  if (request.headers.get('if-none-match') === tag) {
-    return new Response(null, { status: HTTP_NOT_MODIFIED, headers });
-  }
-  return new Response(body, { headers: { ...headers, 'content-type': 'application/json' } });
-}
 
 export const GET: RequestHandler = async ({ locals, params, request }) => {
   if (!MEDIA_UUID_RE.test(params.nodeId)) {
