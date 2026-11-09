@@ -494,6 +494,7 @@ pub struct DisplayList {
     pub width: u32,
     pub height: u32,
     pub background: Option<Rgba>,
+    #[serde(deserialize_with = "packed::items")]
     pub items: Vec<Item>,
     #[serde(default)]
     pub faces: Vec<FaceSpec>,
@@ -515,6 +516,7 @@ pub fn parse(json: &str) -> Result<DisplayList, serde_json::Error> {
 pub struct Splice {
     pub head: usize,
     pub tail: usize,
+    #[serde(deserialize_with = "packed::items")]
     pub items: Vec<Item>,
 }
 

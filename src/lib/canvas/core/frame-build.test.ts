@@ -12,7 +12,8 @@ import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
-import { builtAnswer, buildFrame, frameBuilder, type BuildAsk, type BuildWorker } from './frame-build';
+import { builtAnswer, buildFrame, frameBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
+import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -77,6 +78,14 @@ describe('the builder', () => {
     expect(b?.width).toBe(1);
   });
 
+  it('spreads builds over its workers, so frames build side by side instead of in one queue', async () => {
+    const workers = [echo(), echo(), echo()];
+    let spawned = 0;
+    const build = frameBuilder(() => workers[spawned++], 3);
+    await Promise.all([1, 2, 3].map(() => build(source(shapeDoc), Smoothing.Plain)));
+    expect(workers.map((w) => w.asked.length)).toEqual([1, 1, 1]);
+  });
+
   it('hands the worker the local font files it cannot see from its own thread', async () => {
     keepLocalFiles('Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]);
     const worker = echo();
@@ -99,7 +108,7 @@ describe('the builder', () => {
     const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
     const answer = builtAnswer(7, list);
 
-    expect(answer).toEqual({ id: 7, list, wires: list.items.map((i) => JSON.stringify(i)) });
+    expect(answer).toEqual({ id: 7, list, wires: list.items.map((i) => JSON.stringify(i)), packs: list.items.map(itemPack) });
   });
 
   it('the main thread keeps the wires the worker sent with the list', async () => {
@@ -113,6 +122,27 @@ describe('the builder', () => {
     const list = await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
 
     expect(itemWire(list!.items[0])).toBe('"from the worker"');
+  });
+
+  it('the main thread keeps the packs the worker sent with the list', async () => {
+    const item = { kind: 'path', clip: 'card', contours: [[1, 2]] } as never;
+    const pack = itemPack({ kind: 'path', clip: 'card', contours: [[7, 8]] } as never);
+    const worker = {
+      onerror: null,
+      onmessage: null as BuildWorker['onmessage'],
+      postMessage: (ask: BuildAsk) => queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, list: { width: 1, height: 1, background: null, items: [item], unsupported: [] }, wires: ['""'], packs: [pack] } } as never))
+    };
+
+    const list = await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
+
+    expect([...listPack(list!).floats]).toEqual([7, 8]);
+  });
+
+  it('lists the pack buffers so the worker can transfer them instead of copying', async () => {
+    const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
+    const answer = builtAnswer(7, list);
+
+    expect(transfers(answer)).toHaveLength(list.items.length * 2);
   });
 
   it('says it cannot build when no worker can start', async () => {

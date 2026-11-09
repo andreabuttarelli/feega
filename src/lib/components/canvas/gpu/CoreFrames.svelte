@@ -23,6 +23,7 @@
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
+  import { grabThumb, thumbClip, thumbList, thumbRect, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
@@ -31,7 +32,7 @@
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
-  import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
+  import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
@@ -78,7 +79,12 @@
   const domRead = readPool({ lanes: READ_LANES, timeoutMs: READ_TIMEOUT_MS });
   const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
   const customPictures = new Map<string, CustomFrame['picture']>();
-  const pictures: Pictures = (item) => [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
+  const thumbs = thumbStore();
+  const thumbPictures = new Map<string, Picture>();
+  const thumbAsked = new Set<string>();
+  const thumbTaken = new Set<string>();
+  const THUMB = ':thumb';
+  const pictures: Pictures = (item) => thumbPictures.get(item.clip) ?? [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
 
   async function readDom(f: FrameAt, source: FrameDoc, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
     const host = readsHost;
@@ -95,7 +101,9 @@
   }
 
   const smoothing = smoothingOf(navigator.userAgent);
-  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null));
+  const BUILD_LANES_MAX = 4;
+  const buildLanes = Math.max(1, Math.min(BUILD_LANES_MAX, (typeof navigator === 'object' ? navigator.hardwareConcurrency : 2) - 1));
+  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null), buildLanes);
 
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
@@ -175,7 +183,7 @@
 
   async function load(f: FrameAt) {
     const at = tier;
-    const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
+    const given = known(f) ?? (loaded.get(f.id)?.endsWith(THUMB) === false ? await awaitKnown(f) : null);
     const read = given ? null : await untilFound(() => fetchAndBuild(f, at), UNSAVED_SOURCE);
     const built = given ? await buildSource(f, given) : read;
     if (!built) {
@@ -192,6 +200,47 @@
     loaded.set(f.id, tieredKey(f, at));
     lists = listed(lists, f.id, tieredKey(f, at), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
   }
+
+  async function showThumb(f: FrameAt) {
+    const key = baseKey(f);
+    const blob = await thumbs.get(key);
+    if (!blob || loaded.has(f.id) || liveGroup.has(f.id)) {
+      return;
+    }
+    const bitmap = await createImageBitmap(blob).catch(() => null);
+    if (!bitmap || loaded.has(f.id) || liveGroup.has(f.id)) {
+      return;
+    }
+    thumbPictures.set(thumbClip(key), { source: bitmap, size: { width: bitmap.width, height: bitmap.height } });
+    const group = `${key}${THUMB}`;
+    loaded.set(f.id, group);
+    thumbTaken.add(key);
+    lists = listed(lists, f.id, group, thumbList(key, { width: f.box.w, height: f.box.h }), [groupOf(f)]);
+  }
+
+  function takeThumbs(into: HTMLCanvasElement | null, shown: readonly HeldFrame[]) {
+    if (!into) {
+      return;
+    }
+    const drawn = frames.map((f) => ({ id: f.id, key: baseKey(f), group: groupOf(f), box: f.box }));
+    for (const f of thumbsDue(shown, drawn, thumbTaken)) {
+      const rect = thumbRect(f.box, view, area, resolution);
+      if (!rect) {
+        continue;
+      }
+      thumbTaken.add(f.key);
+      void grabThumb(into, rect).then((blob) => blob && thumbs.put(f.key, blob));
+    }
+  }
+
+  $effect(() => {
+    for (const f of fillOrder(frames, view, area)) {
+      if (!thumbAsked.has(baseKey(f))) {
+        thumbAsked.add(baseKey(f));
+        void showThumb(f);
+      }
+    }
+  });
 
   let liveGroup = $state(new Map<string, string>());
   const liveBuilt = new Map<string, LiveDoc>();
@@ -690,6 +739,9 @@
     into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
     into.setCamera(at.x, at.y, at.zoom);
     const { outcome, pending, skipped } = into.frame(performance.now());
+    if (!pending && !gesture.active()) {
+      takeThumbs(canvas, shown);
+    }
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();

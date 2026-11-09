@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DisplayList, Item } from './display-list';
-import { itemWire, listWire, spliceWire, wiresKnown } from './wire';
+import { itemPack, itemWire, listPack, listWire, packsKnown, spliceWire, wiresKnown } from './wire';
 
 const bar = (n: number) => ({ kind: 'path', clip: `bar${n}`, contours: [[n, 0, n + 5, 0, n + 5, 5]], paint: { kind: 'solid', color: [1, 0, 0, 1] } }) as unknown as Item;
 const face = { family: 'Inter', italic: false, weight: [400, 700], url: 'https://fonts/inter.woff2', ranges: [[0, 255]] };
@@ -57,5 +57,33 @@ describe('the wire to the core', () => {
     expect(JSON.parse(listWire(listOf(items))).items).toEqual(items);
     expect(itemWire(items[1])).toBe(original(items[1]));
     expect(itemsRead).toBe(0);
+  });
+});
+
+describe('the packed wire to the core', () => {
+  it('sends contours as floats beside the json, each item counting its own from zero', () => {
+    const packed = listPack(listOf([bar(0), bar(10)]));
+    const json = JSON.parse(packed.json);
+
+    expect(json.items.map((i: { contours: number[] }) => i.contours)).toEqual([[0], [0]]);
+    expect([...packed.floats]).toEqual([0, 0, 5, 0, 5, 5, 10, 0, 15, 0, 15, 5]);
+    expect([...packed.ends]).toEqual([6, 12]);
+    expect(json.width).toBe(100);
+  });
+
+  it('packs an item once however often it is sent', () => {
+    const items = [bar(0), bar(1)];
+
+    listPack(listOf(items));
+    listPack(listOf(items));
+
+    expect(itemsRead).toBe(2);
+  });
+
+  it('reuses packs made in the worker', () => {
+    const items = [bar(0)];
+    packsKnown(items, [itemPack(bar(3))]);
+
+    expect([...listPack(listOf(items)).floats]).toEqual([3, 0, 8, 0, 8, 5]);
   });
 });
