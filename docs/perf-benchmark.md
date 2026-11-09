@@ -59,3 +59,22 @@ Hosted `ubuntu-latest` has no GPU. With SwiftShader WebGPU the adapter is grante
 and zoom runs at 1-2 fps with 3-15 s frames: the numbers measure software rasterization, not the
 app. The job is `continue-on-error` until it runs on a machine with a GPU (a self-hosted macOS
 runner); locally the benchmark is stable (spread below).
+
+## Landings case
+
+`BENCH_CASE=landings` runs `tests/perf/canvas-landings-bench.spec.ts` on six real landing pages
+(stripe.com, vercel.com, supabase.com, linear.app, notion.com, figma.com) imported through the
+app's URL import, each with its tablet and phone views. Per run it measures pan, zoom, fit-to-all
+(Shift+1 / Shift+0) and dragging a frame, plus time-to-sharp, and writes a CPU-profile hotspot
+table of the first run per gesture.
+
+```bash
+BENCH_CASE=landings BENCH_CPU=1 npx playwright test -c tests/perf/playwright.config.ts
+BENCH_CASE=landings BENCH_ENGINE=webkit npx playwright test -c tests/perf/playwright.config.ts
+```
+
+The fixture is not committed (third-party page content, ~19 MB). It lives at
+`~/Documents/feega-videos/perf/landings/landings.feega` (`BENCH_FIXTURE` overrides the path); when
+missing, `scripts/perf/landings-fixture.mjs` regenerates it by importing the pages into an empty
+local-mode canvas. The import calls no AI model; it needs the network, so pages change over time:
+compare runs on the same file. WebKit has no CDP: no CPU throttle, no CPU ms, no profile.

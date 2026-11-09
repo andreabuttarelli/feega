@@ -172,6 +172,10 @@ impl Painter for GpuPainter<'_> {
     }
 }
 
+fn utf8(bytes: &[u8]) -> Result<&str, JsValue> {
+    std::str::from_utf8(bytes).map_err(failed)
+}
+
 fn failed<E: std::fmt::Debug>(e: E) -> JsValue {
     JsValue::from_str(&format!("{e:?}"))
 }
@@ -317,22 +321,22 @@ impl WebCore {
         self.lost.load(Ordering::Relaxed)
     }
 
-    pub fn put_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
+    pub fn put_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
         self.compositor.touch(key, &self.library);
-        self.library.put_group(key, &parse(list_json).map_err(failed)?);
-        self.compositor.touch(key, &self.library);
-        Ok(())
-    }
-
-    pub fn append_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
-        self.library.append_group(key, &parse(list_json).map_err(failed)?);
+        self.library.put_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }
 
-    pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &str) -> Result<bool, JsValue> {
+    pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
+        self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
+        Ok(())
+    }
+
+    pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &[u8]) -> Result<bool, JsValue> {
         self.compositor.touch(to, &self.library);
-        let patched = self.library.patch_group(from, to, &parse_splice(splice_json).map_err(failed)?);
+        let patched = self.library.patch_group(from, to, &parse_splice(utf8(splice_json)?).map_err(failed)?);
         self.compositor.touch(to, &self.library);
         Ok(patched)
     }
@@ -346,18 +350,18 @@ impl WebCore {
         self.camera = Camera { x, y, zoom };
     }
 
-    pub fn patch_uses(&mut self, patch_json: &str) -> Result<(), JsValue> {
-        self.compositor.patch(parse_patch(patch_json).map_err(failed)?, &self.library);
+    pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.patch(parse_patch(utf8(patch_json)?).map_err(failed)?, &self.library);
         Ok(())
     }
 
-    pub fn set_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
-        self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(items_json).map_err(failed)?, &mut self.library);
+    pub fn set_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Fixed, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         Ok(())
     }
 
-    pub fn set_live_overlay(&mut self, items_json: &str) -> Result<(), JsValue> {
-        self.compositor.set_overlay(OverlayPart::Live, parse_overlay(items_json).map_err(failed)?, &mut self.library);
+    pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
+        self.compositor.set_overlay(OverlayPart::Live, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         Ok(())
     }
 
@@ -413,8 +417,8 @@ impl WebCore {
         self.engine.scratch_bytes() as f64
     }
 
-    pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
-        let plan = self.library.plan(&parse(list_json).map_err(failed)?, self.limits);
+    pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {
+        let plan = self.library.plan(&parse(utf8(list_json)?).map_err(failed)?, self.limits);
         self.pending = plan.pending;
         let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), v.clone())).collect();

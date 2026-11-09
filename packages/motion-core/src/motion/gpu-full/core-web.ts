@@ -22,7 +22,7 @@ export type UsePatch = { put: Use[]; drop: string[]; order?: string[] };
 export type Painted = { outcome: Outcome; pending: boolean; skipped: string[] };
 export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; behindPage?: boolean };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
-type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
+type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<object>> }; WebGlCore: { attach: Attach<object> } };
 
 type PictureItem = ImageItem | LayerItem;
 
@@ -94,6 +94,24 @@ export function warmCore(): Promise<CoreModule> {
     throw e;
   });
   return loading;
+}
+
+const utf8 = new TextEncoder();
+const WIRED_LAST = new Set(['draw', 'patch_uses', 'set_overlay', 'set_live_overlay', 'put_group', 'append_group', 'patch_group']);
+
+export function overBytes(core: object): Attached {
+  return new Proxy(core, {
+    get(target, name) {
+      const member = Reflect.get(target, name) as unknown;
+      if (typeof member !== 'function') {
+        return member;
+      }
+      if (typeof name !== 'string' || !WIRED_LAST.has(name)) {
+        return member.bind(target);
+      }
+      return (...args: unknown[]) => member.apply(target, [...args.slice(0, -1), utf8.encode(args.at(-1) as string)]);
+    }
+  }) as Attached;
 }
 
 type Fit = (size: Size) => Size;
@@ -304,7 +322,7 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
     throw new Error('webgpu unavailable');
   }
   const core = await warmCore();
-  const raster = fitting(await core.WebCore.attach(canvas, width, height), pictureSize(side));
+  const raster = fitting(overBytes(await core.WebCore.attach(canvas, width, height)), pictureSize(side));
   return releaseOnDispose(raster, canvas.getContext('webgpu') as GpuSurface | null);
 }
 
@@ -315,5 +333,5 @@ export async function createCoreGl(canvas: HTMLCanvasElement, width: number, hei
     throw new Error('webgl2 unavailable');
   }
   const core = await warmCore();
-  return fitting(core.WebGlCore.attach(canvas, width, height), pictureSize(Math.min(side, GL_PICTURE_SIDE)));
+  return fitting(overBytes(core.WebGlCore.attach(canvas, width, height)), pictureSize(Math.min(side, GL_PICTURE_SIDE)));
 }
