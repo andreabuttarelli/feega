@@ -1,0 +1,56 @@
+name: Perf
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'src/lib/canvas/**'
+      - 'src/lib/components/canvas/**'
+      - 'packages/gpu-core/**'
+      - 'packages/gpu-text/**'
+      - 'static/gpu-core/**'
+      - 'static/gpu-text/**'
+      - 'tests/perf/**'
+      - 'scripts/perf/**'
+      - '.github/workflows/perf.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: perf-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zoom:
+    if: github.event.action != 'labeled' || github.event.label.name == 'perf'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the local app
+        env:
+          PUBLIC_FEEGA_LOCAL: '1'
+        run: npm run build:node
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Zoom benchmark
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" npx playwright test -c tests/perf/playwright.config.ts
+
+      - name: Compare with baseline
+        run: node scripts/perf/zoom-compare.mjs perf-results/zoom-bench.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zoom-bench
+          path: perf-results
