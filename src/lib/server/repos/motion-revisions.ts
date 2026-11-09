@@ -113,6 +113,29 @@ export async function readHeads(db: Db, input: { orgId: string; heads: { nodeId:
   );
 }
 
+async function headVersions(db: Db, input: { orgId: string; nodeIds: string[] }): Promise<{ nodeId: string; version: number }[]> {
+  if (!input.nodeIds.length) {
+    return [];
+  }
+
+  const { data, error } = await db.from('motion_revisions').select('node_id, version').eq('org_id', input.orgId).in('node_id', input.nodeIds);
+  if (error) {
+    throw error;
+  }
+
+  const newest = new Map<string, number>();
+  for (const row of (data ?? []) as { node_id: string; version: number }[]) {
+    newest.set(row.node_id, Math.max(Number(row.version), newest.get(row.node_id) ?? 0));
+  }
+  return [...newest].map(([nodeId, version]) => ({ nodeId, version }));
+}
+
+export async function latestHeads(db: Db, input: { orgId: string; nodeIds: string[] }): Promise<Map<string, MotionHead>> {
+  const asked = new Set(input.nodeIds);
+  const heads = await readHeads(db, { orgId: input.orgId, heads: await headVersions(db, input) });
+  return new Map([...heads].filter(([nodeId]) => asked.has(nodeId)));
+}
+
 export async function readRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<MotionHead | null> {
   const { data, error } = await db
     .from('motion_revisions')

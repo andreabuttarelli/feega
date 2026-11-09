@@ -103,3 +103,6 @@ A/B on landings, CPU 1x, 5 interleaved runs, median [min–max], overlay fix onl
 (off n=4: one off run blanked mid-fit, a defect of the flag-off path.) After batched renders and
 drag reuse, one run: pan 59/18.6, zoom 56/18.7, fit 46/31.4, drag 47/18.6, drag-element 43/18.5;
 drag start worst 0.47–0.65 s. Open: idle prebuild of held textures, fit p95, sharp-at-rest time.
+
+Defect for later, flag off: one of five flag-off landings runs went blank mid-fit
+(`fit: a frame was blank mid-gesture`); not investigated.

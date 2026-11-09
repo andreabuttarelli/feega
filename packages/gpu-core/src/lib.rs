@@ -2,6 +2,7 @@ pub mod canvas;
 pub mod colour;
 pub mod compositor;
 pub mod display_list;
+pub mod packed;
 pub mod engine;
 pub mod filter_passes;
 #[cfg(not(target_arch = "wasm32"))]

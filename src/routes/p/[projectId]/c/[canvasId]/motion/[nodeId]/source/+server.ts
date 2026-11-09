@@ -1,4 +1,4 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
@@ -7,13 +7,14 @@ import { findMotionNode, motionTokens } from '$lib/server/motion/editor';
 import { listProjects } from '$lib/server/repos/projects';
 import { motionSource } from '$lib/server/motion/sources';
 import { MEDIA_UUID_RE } from '$lib/media-url';
+import { revalidated } from '$lib/server/revalidated';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
 
-export const GET: RequestHandler = async ({ locals, params }) => {
+export const GET: RequestHandler = async ({ locals, params, request }) => {
   if (!MEDIA_UUID_RE.test(params.nodeId)) {
     throw error(HTTP_BAD_REQUEST, 'Not a node id');
   }
@@ -38,5 +39,5 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     return new Response(null, { status: HTTP_NO_CONTENT });
   }
   const brandId = (await listProjects(db, found.orgId)).find((p) => p.id === params.projectId)?.brandId ?? null;
-  return json({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) });
+  return revalidated(request, JSON.stringify({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) }));
 };

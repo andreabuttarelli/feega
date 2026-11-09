@@ -9,7 +9,7 @@ use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap
 use vello::kurbo::Rect;
 
 use crate::compositor::{Compositor, Painter};
-use crate::display_list::{parse, parse_splice};
+use crate::display_list::{parse, parse_packed, parse_splice};
 use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Motion, Plan};
@@ -358,6 +358,19 @@ impl WebCore {
 
     pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
         self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
+        Ok(())
+    }
+
+    pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.compositor.touch(key, &self.library);
+        self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
+        self.compositor.touch(key, &self.library);
+        Ok(())
+    }
+
+    pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
+        self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }

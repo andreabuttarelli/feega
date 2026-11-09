@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VarType, type Collection } from '@feega/motion-core/motion/variables-model';
 import { VariableLibrary } from './variable-library.svelte';
 import type { LibraryStore } from './project-library-store';
@@ -6,6 +6,9 @@ import { LibraryOp, type LibraryAsk } from '$lib/motion/project-library-ops';
 
 const THEME: Collection = { modes: ['Light'], vars: { surface: { type: VarType.Colour, values: { Light: '#ffffff' } } } };
 const BRAND: Collection = { modes: ['Default'], vars: { ink: { type: VarType.Colour, values: { Default: '#111111' } } } };
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
 
 describe('the variables library of a canvas', () => {
   it('pushing a collection keeps it and tells the canvas', () => {
@@ -54,9 +57,22 @@ describe('the project variables library', () => {
     await library.open(backend);
 
     library.found({ Theme: THEME, Brand: { ...BRAND, active: 'Default' } });
+    await vi.runAllTimersAsync();
 
     expect(library.collections.Brand).toEqual(BRAND);
     expect(sent).toEqual([{ op: LibraryOp.Adopt, entries: { Brand: BRAND } }]);
+  });
+
+  it('frames arriving one after another adopt their collections in one request', async () => {
+    const library = new VariableLibrary();
+    const { backend, sent } = store({});
+    await library.open(backend);
+
+    library.found({ Theme: THEME });
+    library.found({ Theme: THEME, Brand: BRAND });
+    await vi.runAllTimersAsync();
+
+    expect(sent).toEqual([{ op: LibraryOp.Adopt, entries: { Theme: THEME, Brand: BRAND } }]);
   });
 
   it('a frame holding an older copy is brought up to date, its own mode aside', async () => {

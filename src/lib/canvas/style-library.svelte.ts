@@ -1,3 +1,4 @@
+import { adoptBatch } from './adopt-batch';
 import type { Library } from '$lib/motion/style-library';
 import { LibraryOp, type LibraryAsk } from '$lib/motion/project-library-ops';
 import type { LibraryStore } from './project-library-store';
@@ -19,6 +20,7 @@ export class StyleLibrary {
   private seen: Library = {};
   private queue: Promise<unknown> = Promise.resolve();
   private renamedTo = new Map<string, string>();
+  private adopt = adoptBatch<Style>((entries) => void this.send({ op: LibraryOp.Adopt, entries }));
 
   connect(sink: StyleSink | null) {
     this.sink = sink;
@@ -43,7 +45,7 @@ export class StyleLibrary {
     const fresh = Object.fromEntries(Object.entries(inDocs).filter(([name]) => !this.styles[name]));
     if (Object.keys(fresh).length) {
       this.styles = { ...this.styles, ...fresh };
-      void this.send({ op: LibraryOp.Adopt, entries: fresh });
+      this.adopt(fresh);
     }
     for (const [name, style] of Object.entries(inDocs)) {
       if (!sameValue(style, this.styles[name])) {
