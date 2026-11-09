@@ -14,7 +14,11 @@ export enum Step {
   Drawn = 'drawn',
   MainAsked = 'main-asked',
   MainBuild = 'main-build',
-  MainBuilt = 'main-built'
+  MainBuilt = 'main-built',
+  Thumb = 'thumb',
+  Images = 'images',
+  AllVectors = 'all-vectors',
+  Sharp = 'sharp'
 }
 
 export type FrameSteps = { id: string; steps: { step: Step; at: number; group: string }[] };
@@ -33,3 +37,16 @@ export function timeline(marks: readonly { name: string; startTime: number }[]):
   }
   return [...rows.values()];
 }
+
+type Listed = { kind: string; src?: string; items?: Listed[] };
+
+const noted = new Map<string, string[]>();
+
+const sourcesIn = (items: readonly Listed[]): string[] => items.flatMap((i) => [...(i.kind === 'image' && i.src ? [i.src] : []), ...sourcesIn(i.items ?? [])]);
+
+export function noteImages(id: string, list: { items: readonly Listed[] }) {
+  noted.set(id, [...new Set(sourcesIn(list.items))]);
+  markFrame(id, Step.Images);
+}
+
+export const imagesNoted = (): ReadonlyMap<string, readonly string[]> => noted;

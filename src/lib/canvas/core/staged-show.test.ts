@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
-import { OnScreen, showStaged } from './staged-show';
+import { OnScreen, VectorGate, showStaged } from './staged-show';
 
 const pending = () => {
   let settle: (r: Readiness) => void = () => {};
@@ -40,5 +40,32 @@ describe('showStaged', () => {
     await ready;
 
     expect(shown).toEqual([Readiness.Partial]);
+  });
+});
+
+describe('VectorGate', () => {
+  it('le immagini aspettano che ogni frame visibile abbia mostrato i vettori', () => {
+    const gate = new VectorGate();
+    const shown: string[] = [];
+
+    gate.after(() => shown.push('a'));
+    gate.settle(['a', 'b']);
+    gate.presented('a');
+    gate.settle(['a', 'b']);
+    expect(shown).toEqual([]);
+
+    gate.presented('b');
+    expect(gate.settle(['a', 'b'])).toBe(true);
+    expect(shown).toEqual(['a']);
+  });
+
+  it('una volta aperto resta aperto', () => {
+    const gate = new VectorGate();
+    gate.settle([]);
+    const shown: string[] = [];
+
+    gate.after(() => shown.push('x'));
+
+    expect(shown).toEqual(['x']);
   });
 });

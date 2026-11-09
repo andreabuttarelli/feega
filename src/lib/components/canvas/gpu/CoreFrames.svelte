@@ -35,9 +35,10 @@
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
-  import { OnScreen, showStaged } from '$lib/canvas/core/staged-show';
+  import { OnScreen, VectorGate, showStaged } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
-  import { Step, markFrame } from '$lib/canvas/core/frame-timeline';
+  import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
+  import LoadTimeline from './LoadTimeline.svelte';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
@@ -211,7 +212,8 @@
     logGaps(f.id, built.list);
     asking.set(f.id, key);
 
-    void showStaged(media.ready(built.list), held, (ready) => {
+    noteImages(f.id, built.list);
+    const present = (ready: Readiness) => {
       if (asking.get(f.id) !== key) {
         return;
       }
@@ -220,7 +222,8 @@
       loaded.set(f.id, group);
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
       lists = listed(lists, f.id, group, onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), shown, drawnLast.get(f.id)?.group]);
-    });
+    };
+    void showStaged(media.ready(built.list), held, (ready) => (ready === Readiness.Whole ? vectorsFirst.after(() => present(ready)) : present(ready)));
   }
 
   async function showThumb(f: FrameAt) {
@@ -236,6 +239,7 @@
     thumbPictures.set(thumbClip(key), { source: bitmap, size: { width: bitmap.width, height: bitmap.height } });
     const group = `${key}${THUMB}`;
     loaded.set(f.id, group);
+    markFrame(group, Step.Thumb);
     thumbTaken.add(key);
     lists = listed(lists, f.id, group, thumbList(key, { width: f.box.w, height: f.box.h }), [groupOf(f)]);
   }
@@ -280,6 +284,9 @@
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
   const loaded = new Map<string, string>();
   const asking = new Map<string, string>();
+  const VECTORS_FIRST_MAX_MS = 8000;
+  const vectorsFirst = new VectorGate();
+  setTimeout(() => vectorsFirst.settle([]), VECTORS_FIRST_MAX_MS);
   const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
@@ -595,6 +602,7 @@
   }
 
   const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
+  const TIMELINE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('loadTimeline');
   const TILED = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreTiles');
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
@@ -727,6 +735,8 @@
     }
   }
 
+  let sharpMarked = false;
+
   function paintOn(into: CoreRaster): boolean {
     const tails = nearTails();
     const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group).concat([...liftLists.keys()]));
@@ -761,6 +771,9 @@
     });
     for (const layer of shown) {
       if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
+        if (lists.has(layer.group)) {
+          vectorsFirst.presented(layer.id);
+        }
         if (drawnLast.get(layer.id)?.group !== layer.group) {
           markFrame(layer.group, Step.Drawn);
         }
@@ -784,6 +797,13 @@
     const { outcome, pending, skipped } = into.frame(performance.now());
     if (!pending && !gesture.active()) {
       takeThumbs(canvas, shown);
+    }
+    if (frames.length && vectorsFirst.settle(fillOrder(frames, view, area).map((f) => f.id))) {
+      markFrame('all', Step.AllVectors);
+    }
+    if (!pending && !sharpMarked && held.length && held.every((f) => pictured.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {
+      sharpMarked = true;
+      markFrame('all', Step.Sharp);
     }
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
@@ -851,6 +871,9 @@
 
 {#if DEBUG}
   <pre class="core-hud">{hud}</pre>
+{/if}
+{#if TIMELINE}
+  <LoadTimeline />
 {/if}
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 {#if !raster?.behindPage}

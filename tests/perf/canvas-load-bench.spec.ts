@@ -17,7 +17,7 @@ enum Cache {
 
 type Build = { name: string; root: string; port: number };
 type FrameLoad = { id: string; contentMs: number | null; steps?: FrameSteps['steps'] };
-type LoadRun = { build: string; cache: Cache; frames: FrameLoad[]; firstMs: number | null; allContentMs: number | null; sharpMs: number; requests: number; bytes: number; fixtureKept: boolean };
+type LoadRun = { build: string; cache: Cache; frames: FrameLoad[]; firstMs: number | null; allContentMs: number | null; allVectorsMs?: number | null; sharpMs: number; requests: number; bytes: number; fixtureKept: boolean };
 type Hotspot = { fn: string; url: string; selfMs: number };
 type ProfileNode = { id: number; callFrame: { functionName: string; url: string; lineNumber: number; columnNumber: number } };
 type Profile = { nodes: ProfileNode[]; samples: number[]; timeDeltas: number[] };
@@ -179,7 +179,8 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
   const watched = await watchLoad(page, from);
   const marks = timeline(await page.evaluate(() => performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime }))));
   console.log(marks.filter((m) => !watched.frames.some((f) => f.id === m.id)).map((m) => `offscreen ${m.id.slice(0, 8)} ${m.steps.map((x) => `${x.step}@${x.at}`).join(' ')}`).join('\n'));
-  const load = { ...watched, frames: watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] })), ...wire };
+  const allVectorsMs = marks.find((m) => m.id === 'all')?.steps.find((x) => x.step === Step.AllVectors)?.at ?? null;
+  const load = { ...watched, allVectorsMs, frames: watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] })), ...wire };
   const spots = profiled ? hotspots((await cdp.send('Profiler.stop')).profile as Profile) : [];
   if (video) {
     writeFileSync(join(OUT, `${video}-end.png`), await page.screenshot());
@@ -210,7 +211,7 @@ async function runOnce(browser: Browser, build: Build, cache: Cache, profiled: b
 }
 
 const WATERFALL_MS_PER_CHAR = 200;
-const LETTER: Record<Step, string> = { [Step.Asked]: 'a', [Step.Source]: 's', [Step.Built]: 'b', [Step.Vectors]: 'v', [Step.Whole]: 'w', [Step.Put]: 'p', [Step.Patched]: 'x', [Step.Pictured]: 'P', [Step.Drawn]: 'd', [Step.MainAsked]: 'm', [Step.MainBuild]: 'M', [Step.MainBuilt]: 'B' };
+const LETTER: Record<Step, string> = { [Step.Asked]: 'a', [Step.Source]: 's', [Step.Built]: 'b', [Step.Vectors]: 'v', [Step.Whole]: 'w', [Step.Put]: 'p', [Step.Patched]: 'x', [Step.Pictured]: 'P', [Step.Drawn]: 'd', [Step.MainAsked]: 'm', [Step.MainBuild]: 'M', [Step.MainBuilt]: 'B', [Step.Thumb]: 't', [Step.Images]: 'i', [Step.AllVectors]: 'V', [Step.Sharp]: 'S' };
 
 function waterfall(title: string, frames: FrameLoad[]): string {
   const rows = [...frames].sort((a, b) => (a.contentMs ?? GIVE_UP_MS) - (b.contentMs ?? GIVE_UP_MS));
@@ -242,7 +243,7 @@ function summary(runs: LoadRun[]) {
         const values = rs.map(f).filter((v): v is number => v !== null);
         return values.length === rs.length ? range(values) : { missing: rs.length - values.length, ...(values.length ? range(values) : {}) };
       };
-      return [key, { runs: rs.length, firstContentMs: pick((r) => r.firstMs), allContentMs: pick((r) => r.allContentMs), sharpMs: pick((r) => r.sharpMs), requests: pick((r) => r.requests), bytes: pick((r) => r.bytes), frameContentMs: pick((r) => (r.frames.length ? mid(r.frames.map((f) => f.contentMs ?? GIVE_UP_MS)) : null)) }];
+      return [key, { runs: rs.length, firstContentMs: pick((r) => r.firstMs), allContentMs: pick((r) => r.allContentMs), allVectorsMs: pick((r) => r.allVectorsMs ?? null), sharpMs: pick((r) => r.sharpMs), requests: pick((r) => r.requests), bytes: pick((r) => r.bytes), frameContentMs: pick((r) => (r.frames.length ? mid(r.frames.map((f) => f.contentMs ?? GIVE_UP_MS)) : null)) }];
     })
   );
 }
@@ -260,7 +261,7 @@ test('load benchmark: on-screen frames show content, then turn sharp', async () 
         runs.push(done.run);
         spots[key] ??= done.spots;
         console.log(waterfall(key, done.run.frames));
-        console.log(`run ${i + 1}/${RUNS} ${key} ${JSON.stringify({ first: done.run.firstMs, all: done.run.allContentMs, sharp: done.run.sharpMs, requests: done.run.requests, bytes: done.run.bytes, frames: done.run.frames.length, kept: done.run.fixtureKept })}`);
+        console.log(`run ${i + 1}/${RUNS} ${key} ${JSON.stringify({ first: done.run.firstMs, all: done.run.allContentMs, vectors: done.run.allVectorsMs, sharp: done.run.sharpMs, requests: done.run.requests, bytes: done.run.bytes, frames: done.run.frames.length, kept: done.run.fixtureKept })}`);
       }
     }
   }
