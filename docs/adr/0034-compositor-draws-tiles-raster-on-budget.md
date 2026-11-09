@@ -1,0 +1,59 @@
+# 0034 — The compositor draws cached tiles; raster runs on a budget
+
+Status: proposed 2026-11-09.
+
+## Context
+
+On a canvas of six imported landing pages (`BENCH_CASE=landings`), zoom ran at 25 fps with p95
+frames of ~270 ms at CPU 1x, and fit at ~35 fps. The profile put almost all of it inside one
+`WebCore::frame` call: during a zoom gesture `Retained::step` re-rasters the whole screen
+whenever the cached raster is stretched past √2 or cheap enough (`LIVE_FULL_MS`). A full raster
+is one vello render per 1024 px tile plus one per layer body (blur, mask, backdrop), each with its
+own `writeBuffer` / `createBindGroup`. Imported pages are full of layer bodies.
+
+Tried and measured (interleaved A/B, 5 runs, landings fixture) without a zoom gain:
+- caching layer bodies by content hash, position independent: zoom 25 → 24.5 fps;
+- frames taller than a texture cached in bands: zoom 25 → 19 fps;
+- layer bodies drawn scaled within a zoom step: zoom 25 → 25 fps;
+- 2048 px render tiles: frames come out undrawn (the bug behind the 1024 cap, #1063).
+
+## Prototype
+
+`Retained::step` forced to present the held raster, scaled by the camera, for the whole zoom
+gesture — zero vello work on the hot path. Same fixture, CPU 1x, one run:
+
+| gesture | today | present only |
+|---|---|---|
+| zoom fps | 25 | 60 |
+| zoom p95 / worst | 267 / 317 ms | 17.5 / 17.7 ms |
+| fit fps | 33 | 42 |
+| pan fps | 56 | 57 |
+
+The ceiling is the display rate once nothing is rastered during the gesture. What the prototype
+lacks is quality: one screen-sized raster scaled up goes soft and leaves empty margins when zooming
+out — the stale scaled raster that was rejected before.
+
+## Decision
+
+1. **The hot path only composites.** During a gesture each frame draws GPU textures through the
+   camera transform; it never calls vello.
+2. **Tiles per frame per zoom step.** Each frame (group) is cached as square tiles at power-of-
+   `2^(1/4)` steps (the existing `rung`), a mip-like pyramid. The compositor draws, per screen
+   region, the sharpest tile it holds, falling back to coarser steps — never a blank.
+3. **Raster on a budget.** After compositing, the frame spends at most ~4 ms rastering the
+   missing or too-coarse visible tiles, nearest the pointer first. Detail therefore sharpens
+   progressively during the gesture; at rest every visible tile reaches the exact step.
+4. **One encoding, many tiles.** A tile batch encodes the frame's items once and renders the tiles
+   from it, so per-render setup (`writeBuffer`, bind groups) is paid per batch, not per tile.
+5. **Invalidation by content.** Tiles are keyed by the group key (immutable per revision) and step;
+   a patch re-rasters only the tiles its damage touches. Frames held for a drag reuse the same
+   tiles, which also removes the drag-start raster (prebuilt in idle).
+6. **Worker later.** Moving the engine into an OffscreenCanvas worker is kept for after 1–5; it
+   moves the remaining raster off the main thread but does not by itself remove it.
+
+## Consequences
+
+The retained screen raster becomes a cache of composited output, not the source of truth. Memory
+is bounded by the existing texture budget, evicting the farthest and coarsest tiles first. The
+benchmark's mid-gesture screenshot must show tiles sharpening, and the at-rest shot must match the
+exact raster (pixel diff).

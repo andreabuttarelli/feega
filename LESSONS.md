@@ -3751,3 +3751,6 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### Effects that each submit block the main thread
 **Signal:** a CPU profile of a heavy canvas shows `queue.submit` as the top self-time entry under `FilterPasses::run`; textures created per session in the thousands. **Move:** record passes into one encoder and submit once before the render that reads them; size the pool so one screen-sized layer fits, or every pass allocates.
+
+### Many reprojector draws in one encoder draw nothing
+Signal: the core reports tiles drawn, the canvas stays empty, no WebGPU error. Cause: `Reprojector::draw` writes its uniforms with `queue.write_buffer` into a 4-slot ring; writes happen at once, passes run at submit, so every pass in one encoder reads the last values. Move: submit after each draw (or keep draws per encoder ≤ the ring size).

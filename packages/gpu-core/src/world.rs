@@ -56,11 +56,12 @@ pub struct World {
     uses: Vec<UseItem>,
     overlays: [Overlay; 2],
     damage: Damage,
+    scene_damage: Damage,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Vec::new(), overlays: Default::default(), damage: Damage::none() }
+        World { uses: Vec::new(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none() }
     }
 }
 
@@ -129,6 +130,7 @@ impl World {
     fn mark_if_sized(&mut self, rect: Option<Rect>) {
         if let Some(r) = rect {
             self.damage.add(r);
+            self.scene_damage.add(r);
         }
     }
 
@@ -204,6 +206,26 @@ impl World {
 
     pub fn take_damage(&mut self) -> Damage {
         std::mem::replace(&mut self.damage, Damage::none())
+    }
+
+    pub fn take_scene_damage(&mut self) -> Damage {
+        std::mem::replace(&mut self.scene_damage, Damage::none())
+    }
+
+    pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
+        let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }
+    }
+
+    pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
+        let items = OVERLAY_PARTS.iter().flat_map(|p| {
+            let part = &self.overlays[p.index()];
+            match &part.at {
+                Some(at) => vec![Item::Use(UseItem { matrix: times(camera, at.matrix), ..at.clone() })],
+                None => part.items.iter().map(|i| through(i, camera)).collect(),
+            }
+        });
+        DisplayList { width, height, background: None, items: items.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {

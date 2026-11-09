@@ -7,6 +7,7 @@ use crate::world::{OverlayPart, Patch, World};
 use crate::Skipped;
 
 const RENDER_TILE_PX: u32 = 1024;
+const TILE_DAMAGE_RECTS: usize = 256;
 
 pub fn render_tile(max_texture: u32) -> (u32, u32) {
     let side = max_texture.min(RENDER_TILE_PX);
@@ -41,11 +42,12 @@ pub struct Compositor {
     world: World,
     retained: Retained,
     pending: bool,
+    tile_damage: Damage,
 }
 
 impl Compositor {
     pub fn new(width: u32, height: u32) -> Self {
-        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false }
+        Compositor { world: World::new(), retained: Retained::new(width, height), pending: false, tile_damage: Damage::none() }
     }
 
     pub fn size(&self) -> (u32, u32) {
@@ -94,6 +96,34 @@ impl Compositor {
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
+    pub fn forget(&mut self) {
+        self.retained.forget();
+    }
+
+    pub fn pending_raster(&mut self) -> bool {
+        std::mem::take(&mut self.pending)
+    }
+
+    pub fn take_damage(&mut self) -> Damage {
+        let mut damage = std::mem::replace(&mut self.tile_damage, Damage::none());
+        damage.join(self.world.take_scene_damage());
+        self.world.take_damage();
+        damage
+    }
+
+    pub fn plan_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
+        let plan = library.plan(&self.world.scene(camera.matrix(), w, h), limits);
+        self.pending |= plan.pending || !plan.finished.is_empty();
+        for group in plan.finished.iter().chain(&plan.waiting) {
+            self.world.touch(group, library.size_of(group));
+        }
+        plan
+    }
+
+    pub fn overlay_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
+        library.plan(&self.world.overlay(camera.matrix(), w, h), limits)
+    }
+
     pub fn gpu_took(&mut self, ms: f64) {
         self.retained.gpu_took(ms);
     }
@@ -101,6 +131,10 @@ impl Compositor {
     pub fn frame<P: Painter>(&mut self, painter: &mut P, library: &mut Library, camera: Camera, now_ms: f64, clock: &mut dyn FnMut() -> f64) -> Result<Frame, P::Error> {
         self.pending = false;
         let damage: Damage = self.world.take_damage();
+        self.tile_damage.join(self.world.take_scene_damage());
+        if matches!(&self.tile_damage, Damage::Rects(rects) if rects.len() > TILE_DAMAGE_RECTS) {
+            self.tile_damage = Damage::All;
+        }
         let step = self.retained.step(camera, damage, now_ms);
         let mut skipped = Vec::new();
         let mut rastered_all = 0;

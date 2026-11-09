@@ -30,6 +30,7 @@ pub mod stroke;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod text;
 pub mod texture_budget;
+pub mod tiles;
 pub mod turbulence;
 #[cfg(target_arch = "wasm32")]
 pub mod web;

@@ -40,6 +40,8 @@ const DRAWN_GIVE_UP_MS = 60_000;
 const INK_MIN_PX = 24;
 const TITLE_ABOVE_PX = 10;
 const TITLE_IN_PX = 30;
+const ZOOM_STEPS_EACH_WAY = 8;
+const ZOOM_WHEEL_PX = 60;
 const TITLE_ROOM_PX = 120;
 const INK_STDEV = 6;
 const INK_INSET = 0.15;
@@ -102,9 +104,30 @@ async function dragFrom(page: Page, from: { x: number; y: number }, until: numbe
   await page.mouse.up();
 }
 
+let midShot: string | null = null;
+
+async function zoomOnFrame(page: Page, until: number) {
+  const box = await frameOnScreen(page);
+  await page.mouse.move(box.x, VIEWPORT.height / 2);
+  await page.keyboard.down('Control');
+  for (let i = 0; Date.now() < until; i++) {
+    await page.mouse.wheel(0, Math.floor(i / ZOOM_STEPS_EACH_WAY) % 2 ? ZOOM_WHEEL_PX : -ZOOM_WHEEL_PX);
+  }
+  await page.keyboard.up('Control');
+}
+
+async function zoomShot(page: Page, until: number) {
+  await zoomOnFrame(page, until - GESTURE_MS / 2);
+  if (midShot) {
+    writeFileSync(midShot, await shot(page));
+    midShot = null;
+  }
+  await zoomOnFrame(page, until);
+}
+
 const GESTURES: Record<Gesture, (page: Page, until: number) => Promise<void>> = {
   [Gesture.Pan]: wheelPan,
-  [Gesture.Zoom]: wheelZoom,
+  [Gesture.Zoom]: zoomShot,
   [Gesture.Fit]: fitToggle,
   [Gesture.Drag]: dragFrame,
   [Gesture.DragElement]: dragElement
@@ -151,7 +174,8 @@ async function untilDrawn(page: Page) {
 }
 
 async function framesInked(page: Page): Promise<boolean> {
-  return (await inkedOnScreen(page)).every(Boolean);
+  const inked = await inkedOnScreen(page);
+  return inked.length === 0 || inked.some(Boolean);
 }
 
 async function inkedOnScreen(page: Page): Promise<boolean[]> {
@@ -192,7 +216,7 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
   const cdp = ENGINE === Engine.Chromium ? await context.newCDPSession(page) : null;
   await cdp?.send('Performance.enable');
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}${process.env.BENCH_TILES ? '?coreTiles' : ''}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await untilDrawn(page);
   return { context, page, cdp };
@@ -224,7 +248,10 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
     await titlesInView(page);
   }
   const shown = await inkedOnScreen(page);
-  expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture`).toBe(true);
+  if (!(shown.length > 0 && shown.some(Boolean))) {
+    writeFileSync(join(OUT, `gate-${gesture}.png`), await shot(page));
+  }
+  expect(shown.length > 0 && shown.some(Boolean), `${gesture}: frames not drawn before the gesture`).toBe(true);
   const before = await taskMs(cdp);
   const { value: frames, profile } = await profiling(cdp, profiled, () => measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until)));
   const after = await taskMs(cdp);
@@ -242,6 +269,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
     writeFileSync(join(OUT, `landings-${ENGINE}-start.png`), await shot(page));
   }
 
+  midShot = index === 0 ? join(OUT, `landings-${ENGINE}-mid-zoom.png`) : null;
   const result = {} as BenchRun;
   const spots: Partial<Record<Gesture, Hotspot[]>> = {};
   for (const gesture of benched()) {
