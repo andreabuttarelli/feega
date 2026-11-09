@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{tiles_kept, TILE_GUTTER_PX, batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -32,10 +32,8 @@ const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
-const TILES_KEPT: usize = 320;
 const SPARE_TILES: usize = 32;
 const TILE_REFINE_EVERY_MS: f64 = 120.0;
-const TILE_GUTTER_PX: u32 = 2;
 const REST_AFTER_MS: f64 = 200.0;
 
 #[wasm_bindgen]
@@ -579,7 +577,8 @@ impl WebCore {
             exact = self.raster_rest(started, budget, rastered > 0)?;
         }
         self.present_tiles(&tiles.draw)?;
-        let evicted = self.tiles.evict_beyond(self.camera, screen, TILES_KEPT);
+        self.tiles.drawn(&tiles.draw);
+        let evicted = self.tiles.evict_beyond(self.camera, screen, tiles_kept(screen));
         self.drop_tiles(evicted);
         let waiting_rest = matches!(self.motion, CoreMotion::Still) && !exact;
         self.pending = !tiles.missing.is_empty() || waiting_rest || self.compositor.pending_raster();

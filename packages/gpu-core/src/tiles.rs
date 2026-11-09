@@ -4,6 +4,15 @@ use vello::kurbo::{Point, Rect};
 use crate::retained::Camera;
 
 pub const TILE_PX: u32 = 256;
+pub const TILE_GUTTER_PX: u32 = 2;
+pub const TILE_BYTES: u64 = ((TILE_PX + 2 * TILE_GUTTER_PX) as u64).pow(2) * 4;
+pub const TILE_BUDGET_BYTES: u64 = 384 << 20;
+const SCREENS_KEPT: u64 = 12;
+
+pub fn tiles_kept((w, h): (u32, u32)) -> usize {
+    let per_screen = (w as u64).div_ceil(TILE_PX as u64) * (h as u64).div_ceil(TILE_PX as u64);
+    (per_screen * SCREENS_KEPT).min(TILE_BUDGET_BYTES / TILE_BYTES) as usize
+}
 const STEPS_PER_DOUBLING: f64 = 4.0;
 const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
@@ -94,6 +103,8 @@ pub struct TileFrame {
 pub struct Tiles {
     held: FxHashSet<TileKey>,
     stale: FxHashSet<TileKey>,
+    last_drawn: rustc_hash::FxHashMap<TileKey, u64>,
+    tick: u64,
 }
 
 fn seen_world(camera: Camera, (w, h): (u32, u32)) -> Rect {
@@ -160,21 +171,42 @@ impl Tiles {
         self.stale.extend(self.held.iter().copied());
     }
 
+    pub fn drawn(&mut self, keys: &[TileKey]) {
+        self.tick += 1;
+        for key in keys {
+            self.last_drawn.insert(*key, self.tick);
+        }
+    }
+
+    fn pinned(camera: Camera, screen: (u32, u32), key: TileKey) -> bool {
+        let step = step_of(camera.zoom);
+        let world = seen_world(camera, screen);
+        let near = |reach: f64| world.inflate(reach, reach);
+        match key.step {
+            s if s == step => key.world().overlaps(near(key.side())),
+            s if s == step - RESERVE_STEPS_DOWN => key.world().overlaps(near(world.width().max(world.height()) * (RESERVE_REACH - 1.0) / 2.0)),
+            _ => false,
+        }
+    }
+
     pub fn evict_beyond(&mut self, camera: Camera, screen: (u32, u32), keep: usize) -> Vec<TileKey> {
         if self.held.len() <= keep {
             return vec![];
         }
         let step = step_of(camera.zoom);
         let centre = seen_world(camera, screen).center();
-        let mut all: Vec<TileKey> = self.held.iter().copied().collect();
-        all.sort_by(|a, b| {
-            let cost = |k: &TileKey| (if k.step <= step - RESERVE_STEPS_DOWN { 0 } else { (k.step - step).abs() }) as f64 * 1e9 + k.world().center().distance(centre);
-            cost(a).total_cmp(&cost(b))
+        let distance = |k: &TileKey| (k.step - step).abs() as f64 * 1e9 + k.world().center().distance(centre);
+        let mut loose: Vec<TileKey> = self.held.iter().copied().filter(|k| !Self::pinned(camera, screen, *k)).collect();
+        loose.sort_by(|a, b| {
+            let used = |k: &TileKey| self.last_drawn.get(k).copied().unwrap_or(0);
+            used(a).cmp(&used(b)).then(distance(b).total_cmp(&distance(a)))
         });
-        let gone = all.split_off(keep);
+        let excess = (self.held.len() - keep).min(loose.len());
+        let gone: Vec<TileKey> = loose.into_iter().take(excess).collect();
         gone.iter().for_each(|k| {
             self.held.remove(k);
             self.stale.remove(k);
+            self.last_drawn.remove(k);
         });
         gone
     }
