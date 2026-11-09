@@ -16,7 +16,7 @@
 </script>
 
 <section class="agents site-wide" id="mcp">
-  <h2>Let your agents do the work</h2>
+  <h2 data-agent-id="agents-title">Let your agents do the work</h2>
 
   <div class="box">
     <div class="tabs" role="tablist" aria-label="Code variants">

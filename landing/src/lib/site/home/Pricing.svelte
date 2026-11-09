@@ -5,7 +5,7 @@
 </script>
 
 <section class="pricing site-wide" id="pricing">
-  <h2>Free to run locally.<br />Pay only for speed in the cloud.</h2>
+  <h2 data-agent-id="pricing-title">Free to run locally.<br />Pay only for speed in the cloud.</h2>
 
   <article class="plan local">
     <h3>Local version</h3>

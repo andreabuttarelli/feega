@@ -4,7 +4,7 @@
 
 <section class="story" id="story">
   <div class="site-full inner">
-    <h2><span>Built by a designer, for designers.</span></h2>
+    <h2><span data-agent-id="story-title">Built by a designer, for designers.</span></h2>
     <p class="body">
       Feega didn’t start in a boardroom. It started with one designer, tired of paying for slow tools that were never
       built for working with AI. No VC money. No roadmap written for investors. Just a tool built by a designer, for
