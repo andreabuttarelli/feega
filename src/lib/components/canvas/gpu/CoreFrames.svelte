@@ -14,7 +14,7 @@
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
-  import { cached, uncached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
@@ -602,7 +602,7 @@
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileEdited(zooming.active() ? cached(shown, wide.view, wide.area, textureBytes) : uncached(shown), edited)));
+    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(shown, wide.view, wide.area, textureBytes) : uncached(shown), edited)));
     if (patch) {
       into.patchUses(patch);
     }
