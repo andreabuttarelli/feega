@@ -29,7 +29,8 @@ function event(nodeId: string, rows: Record<string, unknown[]>) {
   return {
     locals: { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => db },
     params: { projectId: 'p1', canvasId: 'c1', nodeId },
-    url: new URL('http://x/source?rev=3')
+    url: new URL('http://x/source?rev=3'),
+    request: new Request('http://x/source?rev=3')
   } as never;
 }
 
