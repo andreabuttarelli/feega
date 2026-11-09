@@ -9,6 +9,7 @@ const RUNS = Number(process.env.BENCH_RUNS ?? 5);
 const CPU_THROTTLE = Number(process.env.BENCH_CPU ?? 4);
 const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const TRACE_OVER_MS = Number(process.env.BENCH_TRACE_OVER_MS ?? 0);
+const CI_GPU_ARGS = ['--enable-unsafe-webgpu', '--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan', '--ignore-gpu-blocklist', '--disable-gpu-vsync'];
 const VIEWPORT = { width: 1440, height: 900 };
 const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = 0.5;
@@ -75,6 +76,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
 
+  console.log(`webgpu adapter: ${await page.evaluate(async () => !!(await (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu?.requestAdapter()))}`);
   const cpuBefore = await taskMs(cdp);
   const gesture = () => measure(page, GESTURE_MS, (until) => wheelZoom(page, until));
   const { result: zoom, events } = TRACE_OVER_MS ? await traced(cdp, gesture) : { result: await gesture(), events: [] };
@@ -96,7 +98,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
 
 test('zoom benchmark on the synthetic heavy canvas', async ({ baseURL }) => {
   mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch({ headless: false, args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ headless: false, args: process.env.CI ? CI_GPU_ARGS : ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] });
   const runs: BenchRun[] = [];
   for (let i = 0; i < RUNS; i++) {
     runs.push(await run(browser, baseURL!, i));
