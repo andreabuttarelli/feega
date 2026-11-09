@@ -541,15 +541,17 @@ impl WebCore {
     }
 
     fn tiled_frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
-        let gone = match self.compositor.take_damage() {
-            Damage::All => self.tiles.clear(),
-            Damage::Rects(rects) if rects.is_empty() => vec![],
+        match self.compositor.take_damage() {
+            Damage::Rects(rects) if rects.is_empty() => {}
+            Damage::All => {
+                self.forget_rest();
+                self.tiles.clear();
+            }
             Damage::Rects(rects) => {
                 self.forget_rest();
-                rects.iter().flat_map(|r| self.tiles.invalidate(*r)).collect()
+                rects.iter().for_each(|r| self.tiles.invalidate(*r));
             }
-        };
-        self.drop_tiles(gone);
+        }
         let screen = (self.target.width(), self.target.height());
         if !self.rest.as_ref().is_some_and(|r| r.shows(self.camera, screen)) {
             self.forget_rest();

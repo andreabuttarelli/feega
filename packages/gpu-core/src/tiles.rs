@@ -93,6 +93,7 @@ pub struct TileFrame {
 #[derive(Default)]
 pub struct Tiles {
     held: FxHashSet<TileKey>,
+    stale: FxHashSet<TileKey>,
 }
 
 fn seen_world(camera: Camera, (w, h): (u32, u32)) -> Rect {
@@ -112,7 +113,7 @@ impl Tiles {
         let world = seen_world(camera, screen);
         let centre = Point::new(screen.0 as f64 / 2.0, screen.1 as f64 / 2.0);
         let distance = |k: &TileKey| k.screen(camera).center().distance(centre);
-        let mut missing: Vec<TileKey> = keys_over(world, step).into_iter().filter(|k| !self.held.contains(k)).collect();
+        let mut missing: Vec<TileKey> = keys_over(world, step).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
         missing.sort_by(|a, b| distance(a).total_cmp(&distance(b)));
         let fallback = if missing.is_empty() { vec![] } else { (step - COARSER_STEPS..step).chain((step + 1..=step + FINER_STEPS).rev()).collect() };
         let draw = fallback.into_iter().chain([step]).flat_map(|s| self.held_over(world, s)).collect();
@@ -131,7 +132,7 @@ impl Tiles {
         let world = seen_world(camera, screen);
         let (dx, dy) = (world.width() * (RESERVE_REACH - 1.0) / 2.0, world.height() * (RESERVE_REACH - 1.0) / 2.0);
         let centre = world.center();
-        let mut keys: Vec<TileKey> = keys_over(world.inflate(dx, dy), step_of(camera.zoom) - RESERVE_STEPS_DOWN).into_iter().filter(|k| !self.held.contains(k)).collect();
+        let mut keys: Vec<TileKey> = keys_over(world.inflate(dx, dy), step_of(camera.zoom) - RESERVE_STEPS_DOWN).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
         keys.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
         keys
     }
@@ -143,22 +144,20 @@ impl Tiles {
 
     pub fn hold(&mut self, key: TileKey) {
         self.held.insert(key);
+        self.stale.remove(&key);
     }
 
     pub fn holds(&self, key: TileKey) -> bool {
         self.held.contains(&key)
     }
 
-    pub fn invalidate(&mut self, world: Rect) -> Vec<TileKey> {
-        let gone: Vec<TileKey> = self.held.iter().filter(|k| k.world().overlaps(world)).copied().collect();
-        gone.iter().for_each(|k| {
-            self.held.remove(k);
-        });
-        gone
+    pub fn invalidate(&mut self, world: Rect) {
+        let changed: Vec<TileKey> = self.held.iter().filter(|k| k.world().overlaps(world)).copied().collect();
+        self.stale.extend(changed);
     }
 
-    pub fn clear(&mut self) -> Vec<TileKey> {
-        self.held.drain().collect()
+    pub fn clear(&mut self) {
+        self.stale.extend(self.held.iter().copied());
     }
 
     pub fn evict_beyond(&mut self, camera: Camera, screen: (u32, u32), keep: usize) -> Vec<TileKey> {
@@ -175,6 +174,7 @@ impl Tiles {
         let gone = all.split_off(keep);
         gone.iter().for_each(|k| {
             self.held.remove(k);
+            self.stale.remove(k);
         });
         gone
     }

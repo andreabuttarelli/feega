@@ -46,6 +46,8 @@ const TITLE_ROOM_PX = 120;
 const PAPER_TOLERANCE = 9;
 const MID_CHECKED = new Set([Gesture.Pan, Gesture.Zoom, Gesture.Fit]);
 const BLANK_SHARE = 0.6;
+const BLANK_SAMPLE_MS = 150;
+const BLANK_WATCH_AFTER_MS = 2000;
 const INK_INSET = 0.15;
 const SHARP_POLL_MS = 60;
 const SHARP_GIVE_UP_MS = 15_000;
@@ -214,6 +216,19 @@ async function inkedOnScreen(page: Page): Promise<boolean[]> {
   return inked;
 }
 
+async function blanksAfter(page: Page, name: Gesture): Promise<number> {
+  const until = Date.now() + BLANK_WATCH_AFTER_MS;
+  let blanks = 0;
+  while (Date.now() < until) {
+    if (!(await framesInked(page))) {
+      blanks++;
+      writeFileSync(join(OUT, `blank-after-${name}-${blanks}.png`), await shot(page));
+    }
+    await page.waitForTimeout(BLANK_SAMPLE_MS);
+  }
+  return blanks;
+}
+
 async function fitThenZoomIn(page: Page) {
   await page.keyboard.press('Escape');
   await page.keyboard.press('Shift+Digit1');
@@ -283,8 +298,10 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
     if (blank) {
       writeFileSync(join(OUT, `blank-mid-${gesture}.png`), await shot(page));
     }
-    expect(blank, `${gesture}: a frame was blank mid-gesture`).toBe(false);
     await page.keyboard.up('Control');
+    const after = await blanksAfter(page, gesture);
+    expect(blank, `${gesture}: a frame was blank mid-gesture`).toBe(false);
+    expect(after, `${gesture}: frames went blank while the canvas settled`).toBe(0);
   }
   if (profile) {
     writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
