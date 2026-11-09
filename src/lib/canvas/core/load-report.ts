@@ -10,6 +10,9 @@ const EVERY_FRAME = 'all';
 const SOURCES = /\/sources\?ids=([^&]+)/;
 const CONTENT_STEPS = [Step.Vectors, Step.Whole];
 
+const STAND_INS = ['placeholder', '['];
+const standIn = (group: string) => STAND_INS.some((mark) => group.startsWith(mark) || group.includes(`:${mark}`));
+
 const bytesOf = (r: Resource) => r.transferSize || r.encodedBodySize;
 
 function firsts(steps: readonly { step: Step; at: number }[]): Partial<Record<Step, number>> {
@@ -26,9 +29,9 @@ export function loadReport({ marks, resources, images, navigation }: LoadInput) 
   const everyFrame = firsts(rows.find((r) => r.id === EVERY_FRAME)?.steps ?? []);
 
   const frames = rows
-    .filter((r) => r.id !== EVERY_FRAME)
+    .filter((r) => r.id !== EVERY_FRAME && !standIn(r.id))
     .map((r) => {
-      const steps = firsts(r.steps);
+      const steps = firsts(r.steps.filter((s) => !standIn(s.group)));
       const loaded = (images.get(r.id) ?? []).map((url) => byUrl.get(url)).filter((x): x is Resource => !!x);
       const content = Math.min(...CONTENT_STEPS.map((s) => steps[s] ?? Infinity));
       return { id: r.id, steps, content: Number.isFinite(content) ? content : null, images: { count: images.get(r.id)?.length ?? 0, bytes: loaded.reduce((n, x) => n + bytesOf(x), 0), lastEnd: loaded.length ? Math.round(Math.max(...loaded.map((x) => x.responseEnd))) : null } };

@@ -1,6 +1,7 @@
 const PREFIX = 'frame|';
 const SEPARATOR = '|';
 const GROUP_SEPARATOR = ':';
+const VIEW = '@bp:';
 
 export enum Step {
   Asked = 'asked',
@@ -31,7 +32,7 @@ export function timeline(marks: readonly { name: string; startTime: number }[]):
   const rows = new Map<string, FrameSteps>();
   for (const m of marks.filter((m) => m.name.startsWith(PREFIX))) {
     const [step, group] = m.name.slice(PREFIX.length).split(SEPARATOR);
-    const id = group.split(GROUP_SEPARATOR)[0];
+    const id = group.split(GROUP_SEPARATOR).slice(0, group.includes(VIEW) ? 2 : 1).join(GROUP_SEPARATOR);
     const row = rows.get(id) ?? rows.set(id, { id, steps: [] }).get(id)!;
     row.steps.push({ step: step as Step, at: Math.round(m.startTime), group });
   }
@@ -45,7 +46,7 @@ const noted = new Map<string, string[]>();
 const sourcesIn = (items: readonly Listed[]): string[] => items.flatMap((i) => [...(i.kind === 'image' && i.src ? [i.src] : []), ...sourcesIn(i.items ?? [])]);
 
 export function noteImages(id: string, list: { items: readonly Listed[] }) {
-  noted.set(id, [...new Set(sourcesIn(list.items))]);
+  noted.set(id, [...new Set(sourcesIn(list.items).map((src) => new URL(src, location.href).href))]);
   markFrame(id, Step.Images);
 }
 

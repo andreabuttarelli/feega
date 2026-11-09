@@ -2,6 +2,8 @@
   import { imagesNoted } from '$lib/canvas/core/frame-timeline';
   import { loadReport, type LoadReport } from '$lib/canvas/core/load-report';
 
+  const RESOURCE_ENTRIES = 5000;
+  performance.setResourceTimingBufferSize?.(RESOURCE_ENTRIES);
   const REFRESH_MS = 1000;
   const REFRESHES = 90;
   const KB = 1024;
@@ -34,8 +36,13 @@
   });
 
   const end = $derived(Math.max(1, ...(report?.frames ?? []).flatMap((f) => [f.content ?? 0, ...Object.values(f.steps)]), report?.totals.sharp ?? 0));
+  const label = (id: string) => `${id.slice(0, 8)}${id.includes('@bp:') ? ` ${id.split('@bp:')[1]}` : ''}`;
   const at = (ms: number | null | undefined) => (ms == null ? '' : `${Math.round(ms)}`);
   const left = (ms: number) => `${(100 * ms) / end}%`;
+
+  function onTop(node: HTMLElement) {
+    node.showPopover?.();
+  }
 
   async function copy() {
     await navigator.clipboard.writeText(JSON.stringify({ url: location.pathname, at: new Date().toISOString(), userAgent: navigator.userAgent, ...read() }, null, 2));
@@ -44,7 +51,7 @@
 </script>
 
 {#if report}
-  <section class="load-timeline" data-testid="load-timeline">
+  <section class="load-timeline" data-testid="load-timeline" popover="manual" use:onTop>
     <header>
       <strong>load timeline</strong>
       <span>page {at(report.totals.page)} · first {at(report.totals.firstContent)} · last {at(report.totals.lastContent)} · all vectors {at(report.totals.allVectors)} · sharp {at(report.totals.sharp)} ms</span>
@@ -58,7 +65,7 @@
       {/each}
       {#each report.frames as f}
         <li>
-          <span class="id">{f.id.slice(0, 8)}</span>
+          <span class="id">{label(f.id)}</span>
           <span class="track">
             {#if f.steps.asked !== undefined && f.content !== null}
               <span class="span load" style:left={left(f.steps.asked)} style:width={left(f.content - f.steps.asked)}></span>
@@ -78,7 +85,7 @@
       <thead><tr><th>frame</th>{#each COLUMNS as c}<th>{c}</th>{/each}<th>img end</th></tr></thead>
       <tbody>
         {#each report.frames as f}
-          <tr><td>{f.id.slice(0, 8)}</td>{#each COLUMNS as c}<td>{at(f.steps[c])}</td>{/each}<td>{at(f.images.lastEnd)}</td></tr>
+          <tr><td>{label(f.id)}</td>{#each COLUMNS as c}<td>{at(f.steps[c])}</td>{/each}<td>{at(f.images.lastEnd)}</td></tr>
         {/each}
       </tbody>
     </table>
@@ -88,9 +95,12 @@
 <style>
   .load-timeline {
     position: fixed;
+    inset: auto;
+    margin: 0;
+    border: 0;
     right: 12px;
     top: 56px;
-    z-index: 60;
+    z-index: 2147483000;
     width: min(720px, calc(100vw - 32px));
     max-height: 70vh;
     overflow: auto;
@@ -98,7 +108,7 @@
     border-radius: var(--ui-radius-lg);
     font: 11px/1.4 ui-monospace, monospace;
     color: #fff;
-    background: rgb(0 0 0 / 0.82);
+    background: #111;
   }
 
   header {

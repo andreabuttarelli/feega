@@ -801,7 +801,7 @@
     if (frames.length && vectorsFirst.settle(fillOrder(frames, view, area).map((f) => f.id))) {
       markFrame('all', Step.AllVectors);
     }
-    if (!pending && !sharpMarked && held.length && held.every((f) => pictured.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {
+    if (!pending && !sharpMarked && held.length && held.every((f) => pictured.has(f.group) && lists.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {
       sharpMarked = true;
       markFrame('all', Step.Sharp);
     }
