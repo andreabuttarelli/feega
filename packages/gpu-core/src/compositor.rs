@@ -3,7 +3,7 @@ use vello::kurbo::{Affine as Matrix, Rect};
 use crate::display_list::Item;
 use crate::groups::{Library, Limits, Plan, Sweep};
 use crate::retained::{tiles, Camera, Damage, Lookup, Outcome, Quality, Raster, Retained, Step};
-use crate::world::{OverlayPart, Patch, World};
+use crate::world::{Lift, OverlayPart, Patch, World};
 use crate::Skipped;
 
 const RENDER_TILE_PX: u32 = 1024;
@@ -94,6 +94,10 @@ impl Compositor {
             self.world.touch(group, library.size_of(group));
         }
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
+    }
+
+    pub fn lifts(&self, library: &Library) -> Vec<Lift> {
+        self.world.lifts(|g| library.size_of(g))
     }
 
     pub fn forget(&mut self) {
