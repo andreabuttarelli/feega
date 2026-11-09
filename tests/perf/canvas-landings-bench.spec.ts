@@ -82,6 +82,7 @@ async function dragFrame(page: Page, until: number) {
     const t = i / 10;
     await page.mouse.move(from.x + Math.sin(t) * 200, from.y + Math.cos(t * 0.7) * 150);
   }
+  await page.mouse.move(from.x, from.y);
   await page.mouse.up();
 }
 
@@ -100,7 +101,7 @@ async function taskMs(cdp: CDPSession | null): Promise<number | null> {
   return (metrics.find((m) => m.name === 'TaskDuration')?.value ?? 0) * MS_PER_S;
 }
 
-type ProfileNode = { id: number; callFrame: { functionName: string; url: string; lineNumber: number }; children?: number[] };
+type ProfileNode = { id: number; callFrame: { functionName: string; url: string; lineNumber: number; columnNumber: number }; children?: number[] };
 type Profile = { nodes: ProfileNode[]; samples: number[]; timeDeltas: number[] };
 
 function hotspots(profile: Profile): Hotspot[] {
@@ -108,8 +109,8 @@ function hotspots(profile: Profile): Hotspot[] {
   const self = new Map<string, Hotspot>();
   profile.samples.forEach((id, i) => {
     const frame = byId.get(id)!.callFrame;
-    const key = `${frame.functionName}@${frame.url}:${frame.lineNumber}`;
-    const spot = self.get(key) ?? { fn: frame.functionName || '(anonymous)', url: `${frame.url.split('/').pop()}:${frame.lineNumber}`, selfMs: 0 };
+    const key = `${frame.functionName}@${frame.url}:${frame.lineNumber}:${frame.columnNumber}`;
+    const spot = self.get(key) ?? { fn: frame.functionName || '(anonymous)', url: `${frame.url.split('/').pop()}:${frame.lineNumber}:${frame.columnNumber}`, selfMs: 0 };
     spot.selfMs += (profile.timeDeltas[i] ?? 0) / US_PER_MS;
     self.set(key, spot);
   });
@@ -176,9 +177,12 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
 
 async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture): Promise<GestureRun> {
   await fitThenZoomIn(page);
+  expect(await framesInked(page), `${gesture}: frames not drawn before the gesture`).toBe(true);
   const before = await taskMs(cdp);
   const frames: Frames = await measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until));
   const after = await taskMs(cdp);
+  await untilSharp(page);
+  expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
   return { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before) };
 }
 
