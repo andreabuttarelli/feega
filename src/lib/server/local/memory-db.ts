@@ -1,3 +1,6 @@
+import type { ImageTransform } from '$lib/server/media-thumbnails';
+import { transformQuery } from './transform-query';
+
 export type Row = Record<string, unknown>;
 export type Tables = Map<string, Row[]>;
 
@@ -489,8 +492,8 @@ export function createMemoryDb(options: MemoryDbOptions) {
         const names = [...blobs.keys()].filter((k) => k.startsWith(base)).map((k) => k.slice(base.length).split('/')[0]);
         return { data: [...new Set(names)].map((n) => ({ name: n, id: n, metadata: {} })), error: null };
       },
-      async createSignedUrl(path: string) {
-        return { data: { signedUrl: signed(path) }, error: null };
+      async createSignedUrl(path: string, _ttl?: number, opts?: { transform?: ImageTransform }) {
+        return { data: { signedUrl: `${signed(path)}${opts?.transform ? transformQuery(opts.transform) : ''}` }, error: null };
       },
       async createSignedUrls(paths: string[]) {
         return { data: paths.map((p) => ({ path: p, signedUrl: signed(p), error: null })), error: null };
