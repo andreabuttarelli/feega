@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { localStore } from '$lib/server/local/local-mode';
+import { transformed } from '$lib/server/local/local-transform';
 
 type Params = { bucket: string; path: string };
 
@@ -14,11 +15,13 @@ function local() {
   return store;
 }
 
-export const GET = async ({ params }: { params: Params }) => {
-  const blob = local().blob(params.bucket, params.path);
-  if (!blob) {
+export const GET = async ({ params, url }: { params: Params; url: URL }) => {
+  const found = local().blob(params.bucket, params.path);
+  if (!found) {
     error(NOT_FOUND);
   }
+
+  const blob = await transformed(found, url.searchParams);
   return new Response(blob.bytes as BodyInit, { headers: { 'content-type': blob.contentType, 'cache-control': 'private, max-age=3600' } });
 };
 

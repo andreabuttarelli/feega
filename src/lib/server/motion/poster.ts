@@ -6,7 +6,7 @@ import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
 import { storeAssetFile } from '$lib/server/repos/asset-storage';
 import { exportFolder, type ExportScope } from '$lib/motion/export-plan';
 
-const POSTER_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png' };
+const POSTER_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const POSTER_MAX_BYTES = 1_000_000;
 const HTTP_BAD_REQUEST = 400;
 
