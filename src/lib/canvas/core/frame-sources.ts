@@ -35,4 +35,4 @@ export function sourceReader(fetcher: (url: string) => Promise<Response>, kept =
   };
 }
 
-export const frameSources = sourceReader((url) => fetch(url, { cache: 'no-store' }));
+export const frameSources = sourceReader((url) => fetch(url, { cache: 'no-cache' }));

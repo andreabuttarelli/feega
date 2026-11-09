@@ -1,4 +1,5 @@
-import { error, json } from '@sveltejs/kit';
+import { createHash } from 'node:crypto';
+import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
@@ -12,8 +13,19 @@ const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
+const HTTP_NOT_MODIFIED = 304;
+const REVALIDATE = 'private, no-cache';
 
-export const GET: RequestHandler = async ({ locals, params }) => {
+function revalidated(request: Request, body: string): Response {
+  const tag = `"${createHash('sha1').update(body).digest('base64url')}"`;
+  const headers = { etag: tag, 'cache-control': REVALIDATE };
+  if (request.headers.get('if-none-match') === tag) {
+    return new Response(null, { status: HTTP_NOT_MODIFIED, headers });
+  }
+  return new Response(body, { headers: { ...headers, 'content-type': 'application/json' } });
+}
+
+export const GET: RequestHandler = async ({ locals, params, request }) => {
   if (!MEDIA_UUID_RE.test(params.nodeId)) {
     throw error(HTTP_BAD_REQUEST, 'Not a node id');
   }
@@ -38,5 +50,5 @@ export const GET: RequestHandler = async ({ locals, params }) => {
     return new Response(null, { status: HTTP_NO_CONTENT });
   }
   const brandId = (await listProjects(db, found.orgId)).find((p) => p.id === params.projectId)?.brandId ?? null;
-  return json({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) });
+  return revalidated(request, JSON.stringify({ ...source, tokens: await motionTokens(db, { orgId: found.orgId, brandId }) }));
 };
