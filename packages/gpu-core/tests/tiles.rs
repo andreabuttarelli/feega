@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{batches, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{batches, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::Rect;
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -156,4 +156,26 @@ fn missing_tiles_raster_together_by_block_nearest_block_first() {
         assert_eq!(b.world(), union);
         assert!(b.keys.iter().all(|k| k.step == b.step));
     }
+}
+
+#[test]
+fn at_rest_the_exact_picture_is_rastered_in_screen_blocks_nearest_the_centre_first() {
+    let rest = Rest::new(camera(1.3), SCREEN);
+    let blocks = rest.todo();
+
+    let area: f64 = blocks.iter().map(|b| b.area()).sum();
+    assert_eq!(area, (SCREEN.0 * SCREEN.1) as f64);
+    assert!(blocks.iter().all(|b| b.width() <= REST_BLOCK_PX as f64 && b.height() <= REST_BLOCK_PX as f64));
+    let centre = vello::kurbo::Point::new(SCREEN.0 as f64 / 2.0, SCREEN.1 as f64 / 2.0);
+    assert!(blocks.windows(2).all(|w| w[0].center().distance(centre) <= w[1].center().distance(centre)));
+}
+
+#[test]
+fn the_rest_picture_belongs_to_one_camera_and_one_screen() {
+    let rest = Rest::new(camera(1.3), SCREEN);
+
+    assert!(rest.shows(camera(1.3), SCREEN));
+    assert!(!rest.shows(camera(1.31), SCREEN));
+    assert!(!rest.shows(Camera { x: 0.5, ..camera(1.3) }, SCREEN));
+    assert!(!rest.shows(camera(1.3), (SCREEN.0 + 1, SCREEN.1)));
 }

@@ -179,3 +179,36 @@ impl Tiles {
         gone
     }
 }
+
+pub const REST_BLOCK_PX: u32 = 256;
+
+pub struct Rest {
+    camera: Camera,
+    screen: (u32, u32),
+    todo: Vec<Rect>,
+}
+
+impl Rest {
+    pub fn new(camera: Camera, screen: (u32, u32)) -> Rest {
+        let side = REST_BLOCK_PX as f64;
+        let (w, h) = (screen.0 as f64, screen.1 as f64);
+        let centre = Point::new(w / 2.0, h / 2.0);
+        let cols = (w / side).ceil() as u32;
+        let rows = (h / side).ceil() as u32;
+        let mut todo: Vec<Rect> = (0..rows).flat_map(|r| (0..cols).map(move |c| Rect::new(c as f64 * side, r as f64 * side, ((c + 1) as f64 * side).min(w), ((r + 1) as f64 * side).min(h)))).collect();
+        todo.sort_by(|a, b| a.center().distance(centre).total_cmp(&b.center().distance(centre)));
+        Rest { camera, screen, todo }
+    }
+
+    pub fn shows(&self, camera: Camera, screen: (u32, u32)) -> bool {
+        self.camera == camera && self.screen == screen
+    }
+
+    pub fn todo(&self) -> &[Rect] {
+        &self.todo
+    }
+
+    pub fn next(&mut self) -> Option<Rect> {
+        (!self.todo.is_empty()).then(|| self.todo.remove(0))
+    }
+}
