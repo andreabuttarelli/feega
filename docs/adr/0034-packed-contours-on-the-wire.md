@@ -37,12 +37,27 @@ contour ends. `parse_packed(json, floats, ends)` reads both; `parse` is
 unchanged and errors on an index. The `DisplayList` type does not change,
 so render code is untouched.
 
-## Next
+## Wiring
 
-1. wasm entry points taking `(json, Float64Array, Uint32Array)` beside
-   `put_group`/`append_group`/`patch_group`/`draw` (boundary change:
-   agreed with the gpu-core owner first).
-2. The frame-build worker packs and transfers the buffers; the cache by
-   revision keeps the packed form.
-3. Measure in wasm on the load benchmark; native numbers above are a
-   ratio, not the browser cost.
+The frame-build worker packs each item (`itemPack`: JSON with item-local
+contour indices, `Float64Array` floats, `Uint32Array` ends) and transfers
+the buffers. The main thread joins the item packs (`listPack`) and calls
+`put_group_packed`/`append_group_packed`; gpu-core offsets each top-level
+item's indices by the contours of the items before it. `draw` and
+`patch_group` stay on the string wire.
+
+## Measured in the browser
+
+`BENCH_CASE=load`, landings fixture, 4 on-screen frames, base = `dev`,
+interleaved, 5 runs each, time to all frames with content, median
+(min–max):
+
+| CPU | cache | base | packed |
+|---|---|---|---|
+| 1x | cold | 7403 ms (6032–11515) | 6972 ms (5076–7322) |
+| 1x | warm | 5294 ms (5194–5807) | 4789 ms (4201–5591) |
+| 4x | cold | 17849 ms (17029–26610) | 15678 ms (14631–16999) |
+| 4x | warm | 16305 ms (15958–21430) | 13917 ms (13258–15575) |
+
+Two 1x packed runs reached "sharp" late (24 s, 52 s) while content time
+was normal; not reproduced at 4x. Watch it.
