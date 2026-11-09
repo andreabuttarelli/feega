@@ -192,6 +192,10 @@ impl Tiles {
         self.stale.extend(self.held.iter().copied());
     }
 
+    pub fn len(&self) -> usize {
+        self.held.len()
+    }
+
     pub fn drawn(&mut self, keys: &[TileKey]) {
         self.tick += 1;
         for key in keys {
