@@ -7,7 +7,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: (...a: unknown[]) => lookup(...a) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
 
-const { POST } = await import('./+server');
+const { GET } = await import('./+server');
 
 const M1 = '00000000-0000-4000-8000-000000000001';
 const M2 = '00000000-0000-4000-8000-000000000002';
@@ -17,19 +17,20 @@ const doc = newMotionDoc(MotionFormat.Landscape);
 const node = (id: string, canvas = 'c1') => ({ id, org_id: 'org-a', canvas_id: canvas, project_id: 'p1', deleted_at: null, type: 'motion', data: { format: 'landscape', docHeadRevision: 3 }, position: { x: 0, y: 0 } });
 const head = (id: string) => ({ org_id: 'org-a', node_id: id, version: 3, doc, summary: null, actor_kind: 'user' });
 
-function ask(ids: unknown) {
+function ask(ids: string[] | string, headers: Record<string, string> = {}) {
   const { db, calls } = fakeDb({ assets: [], brands: [], nodes: [node(M1), node(M2), node(ELSEWHERE, 'c2')], motion_revisions: [head(M1), head(M2), head(ELSEWHERE)] }, { filter: true });
   const event = {
     locals: { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => db },
     params: { projectId: 'p1', canvasId: 'c1' },
-    request: new Request('http://x/sources', { method: 'POST', body: JSON.stringify({ ids }) })
+    url: new URL(`http://x/sources?ids=${[ids].flat().join(',')}`),
+    request: new Request('http://x/sources', { headers })
   } as never;
-  return { run: () => POST(event), calls };
+  return { run: () => GET(event), calls };
 }
 
 beforeEach(() => lookup.mockResolvedValue({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null }));
 
-describe('POST the sources of every frame on a canvas at once', () => {
+describe('GET the sources of every frame on a canvas at once', () => {
   it('answers each frame with its head, and the brand tokens once', async () => {
     const body = await (await ask([M1, M2]).run()).json();
 
@@ -57,6 +58,13 @@ describe('POST the sources of every frame on a canvas at once', () => {
     lookup.mockResolvedValue(null);
 
     await expect(ask([M1]).run()).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('answers 304 when the canvas sources did not change, so a reopen downloads nothing', async () => {
+    const first = await ask([M1, M2]).run();
+    const again = await ask([M1, M2], { 'if-none-match': first.headers.get('etag')! }).run();
+
+    expect(again.status).toBe(304);
   });
 
   it('is a 400 for ids that are not node ids', async () => {

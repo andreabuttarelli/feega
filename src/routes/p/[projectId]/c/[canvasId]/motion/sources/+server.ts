@@ -1,4 +1,4 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { RequestHandler } from './$types';
 import { listMemberships } from '$lib/server/repos/orgs';
@@ -7,18 +7,19 @@ import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-serv
 import { motionTokens } from '$lib/server/motion/editor';
 import { motionSources } from '$lib/server/motion/sources';
 import { MEDIA_UUID_RE } from '$lib/media-url';
+import { revalidated } from '$lib/server/revalidated';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const HTTP_BAD_REQUEST = 400;
-const MAX_FRAMES = 500;
+const MAX_FRAMES = 100;
 
 const askSchema = z.object({ ids: z.array(z.string().regex(MEDIA_UUID_RE)).min(1).max(MAX_FRAMES) });
 
-export const POST: RequestHandler = async ({ locals, params, request }) => {
-  const ask = askSchema.safeParse(await request.json().catch(() => null));
+export const GET: RequestHandler = async ({ locals, params, request, url }) => {
+  const ask = askSchema.safeParse({ ids: (url.searchParams.get('ids') ?? '').split(',').filter(Boolean) });
   if (!ask.success) {
-    throw error(HTTP_BAD_REQUEST, 'Send { ids: [node ids] }');
+    throw error(HTTP_BAD_REQUEST, 'Send ?ids=<node id>,<node id>');
   }
 
   const { user } = await locals.safeGetSession();
@@ -34,5 +35,5 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 
   const scope = { db, orgId: found.orgId, projectId: params.projectId, canvasId: found.canvas.id };
   const [sources, tokens] = await Promise.all([motionSources({ ...scope, nodeIds: [...new Set(ask.data.ids)] }), motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId })]);
-  return json({ tokens, frames: Object.fromEntries(sources) });
+  return revalidated(request, JSON.stringify({ tokens, frames: Object.fromEntries(sources) }));
 };

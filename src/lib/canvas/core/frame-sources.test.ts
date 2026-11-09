@@ -68,18 +68,17 @@ describe('reading the frames of a canvas in one request', () => {
 
     const [a, b] = await Promise.all([read(url(A)), read(url(B))]);
 
-    expect(asked.map((x) => x.url)).toEqual(['/p/p1/c/c1/motion/sources']);
-    expect(JSON.parse(String(asked[0].init?.body))).toEqual({ ids: [A, B] });
+    expect(asked.map((x) => x.url)).toEqual([`/p/p1/c/c1/motion/sources?ids=${A},${B}`]);
     expect(a).toEqual({ revision: 3, doc: { a: 1 }, assets: {}, tokens: { t: 1 } });
     expect(b?.doc).toEqual({ b: 1 });
   });
 
   it('falls back to the single source for a frame the batch left out', async () => {
     const asked: string[] = [];
-    const read = batchedSources(async (u) => (asked.push(u), u.endsWith('/sources') ? json({ tokens: {}, frames: {} }) : json({ revision: 3, doc: {}, assets: {}, tokens: {} })));
+    const read = batchedSources(async (u) => (asked.push(u), u.includes('/sources?') ? json({ tokens: {}, frames: {} }) : json({ revision: 3, doc: {}, assets: {}, tokens: {} })));
 
     expect(await read(url(A))).toEqual({ revision: 3, doc: {}, assets: {}, tokens: {} });
-    expect(asked).toEqual(['/p/p1/c/c1/motion/sources', url(A)]);
+    expect(asked).toEqual([`/p/p1/c/c1/motion/sources?ids=${A}`, url(A)]);
   });
 
   it('reads a url that is not a canvas frame source on its own', async () => {
