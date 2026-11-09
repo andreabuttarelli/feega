@@ -49,7 +49,7 @@ async function wavesToAnswer(): Promise<{ waves: number; body: { frames: Record<
   } as never;
 
   let answer: Response | null = null;
-  const asked = GET(event).then((res) => (answer = res));
+  const asked = Promise.resolve(GET(event)).then((res: Response) => (answer = res));
   let waves = 0;
   while (!answer) {
     await vi.advanceTimersByTimeAsync(LATENCY_MS);
