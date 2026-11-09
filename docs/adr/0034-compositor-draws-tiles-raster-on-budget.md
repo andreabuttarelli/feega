@@ -106,3 +106,11 @@ drag start worst 0.47–0.65 s. Open: idle prebuild of held textures, fit p95, s
 
 Defect for later, flag off: one of five flag-off landings runs went blank mid-fit
 (`fit: a frame was blank mid-gesture`); not investigated.
+
+## Status 2026-11-09 (rest blocks)
+
+The exact path at rest is gone from tiled mode: the exact picture is rastered in 256 px screen
+blocks on the still budget, 200 ms after the last move (`Rest` in `tiles.rs`). Zoom 57 fps p95
+18.7, fit 56 fps p95 33, worst frames ≤ 83 ms except drag start (≈ 0.6 s: the overlay rasters every
+held frame at once). Time to sharp 2.6 s vs 2.0 s. Next lever: vello per-render setup
+(`writeTexture`, `createBindGroup`), not more blocking.
