@@ -25,3 +25,9 @@ Discarded: hand-tagging every element (a selector covers nav and every section, 
 `display:none`/clip hiding, which causes layout shift.
 
 Known cost: hero LCP text is hidden until typed.
+
+Footer: agents build it like any section. The giant wordmark is the one declared exception, a row
+in `ELEMENT_RULES` (`live-agents.ts`): a standing crew of 4 with `TweakLimit.Unlimited` keeps editing
+it while it is in view. Beats are retype, font, colour, tracking, resize and select, one at a time,
+each settling back to the real wordmark. Every other element falls through to the default row
+(`TweakLimit.Once`).

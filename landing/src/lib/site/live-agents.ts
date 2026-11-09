@@ -1,4 +1,4 @@
-export type ActionKind = 'type' | 'font' | 'colour' | 'resize' | 'nudge' | 'select';
+export type ActionKind = 'type' | 'font' | 'colour' | 'resize' | 'nudge' | 'select' | 'tracking';
 export type TargetKind = 'text' | 'media' | 'block';
 export type Rng = () => number;
 export type Point = { x: number; y: number };
@@ -123,7 +123,8 @@ export const BUILD_SELECTOR = [
   '.bar .actions > a',
   '.bar > button',
   'main [data-agent-id]',
-  'main :is(h2, h3, p, li, img, video, pre, button, summary, input, label, [role="tablist"])'
+  'main :is(h2, h3, p, li, img, video, pre, button, summary, input, label, [role="tablist"])',
+  '.site-foot :is(h2, p, a)'
 ].join(', ');
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
@@ -153,14 +154,36 @@ export function createLedger<T>(): TweakLedger<T> {
   return { done: new Set(), active: new Set(), lastAt: -Infinity };
 }
 
-export function mayTweak<T>(ledger: TweakLedger<T>, el: T, now: number, gap: number): boolean {
-  return !ledger.done.has(el) && !ledger.active.has(el) && now - ledger.lastAt >= gap;
+export enum TweakLimit {
+  Once = 'once',
+  Unlimited = 'unlimited'
 }
 
-export function claimTweak<T>(ledger: TweakLedger<T>, el: T, now: number) {
+export type ElementRule = { selector: string; crew: number; limit: TweakLimit; beats: ActionKind[] };
+
+export const ELEMENT_RULES: ElementRule[] = [
+  { selector: '.site-foot .mark', crew: 4, limit: TweakLimit.Unlimited, beats: ['type', 'font', 'colour', 'tracking', 'resize', 'select'] },
+  { selector: '*', crew: 0, limit: TweakLimit.Once, beats: [] }
+];
+
+export function ruleFor(matches: (selector: string) => boolean): ElementRule {
+  return ELEMENT_RULES.find((rule) => matches(rule.selector)) ?? ELEMENT_RULES[ELEMENT_RULES.length - 1];
+}
+
+export function mayTweak<T>(ledger: TweakLedger<T>, el: T, now: number, gap: number, limit = TweakLimit.Once): boolean {
+  if (ledger.active.has(el)) {
+    return false;
+  }
+
+  return limit === TweakLimit.Unlimited || (!ledger.done.has(el) && now - ledger.lastAt >= gap);
+}
+
+export function claimTweak<T>(ledger: TweakLedger<T>, el: T, now: number, limit = TweakLimit.Once) {
   ledger.done.add(el);
   ledger.active.add(el);
-  ledger.lastAt = now;
+  if (limit === TweakLimit.Once) {
+    ledger.lastAt = now;
+  }
 }
 
 export function releaseTweak<T>(ledger: TweakLedger<T>, el: T) {

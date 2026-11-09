@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, BUILD_CLASS, BUILD_SELECTOR, PEER_COLOURS, claimTweak, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, rewriteFrom, thin, typeFrames, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, BUILD_CLASS, BUILD_SELECTOR, PEER_COLOURS, claimTweak, ruleFor, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, rewriteFrom, thin, typeFrames, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
   type View = { name: string; colour: string; x: number; y: number; box: Box | null; handles: boolean; marks: Box[]; caret: Box | null; tip: string | null; menu: Menu | null; live: boolean };
   type Anchor = { el: HTMLElement | null; fx: number; fy: number };
   type Step = { ms: number; move?: boolean; start?: () => void; tick?: (t: number) => void; end?: () => void };
-  type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; typing: boolean; grow: number; push: Point; seed: number };
+  type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; resident: HTMLElement | null; typing: boolean; grow: number; push: Point; seed: number };
 
   const DESKTOP_AGENTS = 24;
   const MOBILE_AGENTS = 8;
@@ -29,7 +29,7 @@
   const MEDIA_START_SCALE = 0.6;
   const FONTS = ['BDO Grotesk', 'Instrument Serif', 'DM Sans', 'Fragment Mono', 'Inter'];
   const SWATCHES = ['#ff4000', '#f0eee9', '#0090ff', '#ffc53d', '#30a46c'];
-  const STYLE_PROPS = ['min-height', 'font-family', 'color', 'scale', 'translate', 'transition', 'transform-origin', 'min-width'];
+  const STYLE_PROPS = ['min-height', 'font-family', 'color', 'scale', 'translate', 'transition', 'transform-origin', 'min-width', 'letter-spacing'];
 
   let agents = $state<View[]>([]);
   let paused = $state(false);
@@ -342,12 +342,56 @@
     return [shift(0, 1), wait(between(500, 900)), shift(1, 0)];
   }
 
+  function tracking(agent: Agent, el: HTMLElement): Step[] {
+    const base = getComputedStyle(el).letterSpacing;
+    const to = between(-0.08, 0.06);
+    const drag = (from: number, end: number): Step => ({
+      ms: between(350, 550),
+      tick(t) {
+        const k = from + (end - from) * t;
+        el.style.letterSpacing = `calc(${base === 'normal' ? '0px' : base} + ${k * to}em)`;
+        agent.view.tip = `Tracking ${Math.round(k * to * 100)}%`;
+      }
+    });
+
+    return [drag(0, 1), wait(between(250, 450)), drag(1, 0)];
+  }
+
+  const ruleOf = (el: HTMLElement) => ruleFor((selector) => el.matches(selector));
+  const crewOn = (el: HTMLElement) => running.filter((a) => a.resident === el).length;
+
+  function stayResident(agent: Agent, targets: HTMLElement[]): boolean {
+    if (agent.resident && !nearViewport(agent.resident)) {
+      agent.resident = null;
+    }
+
+    agent.resident ??= targets.find((el) => 'built' in el.dataset && ruleOf(el).crew > crewOn(el) && nearViewport(el)) ?? null;
+    const el = agent.resident;
+    if (!el) {
+      return false;
+    }
+
+    agent.view.live = true;
+    const rule = ruleOf(el);
+    if (!mayTweak(ledger, el, clock, TWEAK_GAP_MS, rule.limit)) {
+      agent.steps = [moveTo(agent, { el, fx: between(-0.05, 1.05), fy: between(0.1, 1) }), wait(between(400, 900))];
+      return true;
+    }
+
+    const kind = pick(rule.beats, rand);
+    claimTweak(ledger, el, clock, rule.limit);
+    busy.add(el);
+    agent.steps = [moveTo(agent, { el, fx: between(0.15, 0.85), fy: between(0.3, 0.8) }), select(agent, el, kind === 'resize'), ...ACTION_STEPS[kind](agent, el), release(agent, el)];
+    return true;
+  }
+
   const ACTION_STEPS: Record<ActionKind, (agent: Agent, el: HTMLElement) => Step[]> = {
     type: typing,
     font: fontSwap,
     colour: colourSwap,
     resize,
     nudge,
+    tracking,
     select: () => [wait(between(700, 1200))]
   };
 
@@ -362,6 +406,10 @@
       agent.view.live = true;
       batch.forEach((b) => busy.add(b));
       agent.steps = build(agent, el, batch);
+      return;
+    }
+
+    if (stayResident(agent, targets)) {
       return;
     }
 
@@ -439,6 +487,7 @@
       since: start,
       target: null,
       typing: false,
+      resident: null,
       grow: 1,
       push: { x: 0, y: 0 },
       seed: rand()

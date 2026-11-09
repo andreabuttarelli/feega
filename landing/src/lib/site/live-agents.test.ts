@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claimTweak, createLedger, curve, mayTweak, releaseTweak, rewriteFrom, thin, typeFrames } from './live-agents';
+import { ELEMENT_RULES, TweakLimit, claimTweak, ruleFor, createLedger, curve, mayTweak, releaseTweak, rewriteFrom, thin, typeFrames } from './live-agents';
 
 const always = (v: number) => () => v;
 
@@ -71,5 +71,26 @@ describe('tweak ledger', () => {
     expect(mayTweak(ledger, 'a', GAP, GAP)).toBe(false);
     expect(mayTweak(ledger, 'b', GAP - 1, GAP)).toBe(false);
     expect(mayTweak(ledger, 'b', GAP, GAP)).toBe(true);
+  });
+});
+
+describe('element rules', () => {
+  const GAP = 3000;
+
+  it('lets a resident element be tweaked again and again, one beat at a time', () => {
+    const ledger = createLedger<string>();
+    claimTweak(ledger, 'mark', 0);
+    expect(mayTweak(ledger, 'mark', 1, GAP, TweakLimit.Unlimited)).toBe(false);
+    releaseTweak(ledger, 'mark');
+    expect(mayTweak(ledger, 'mark', 1, GAP, TweakLimit.Unlimited)).toBe(true);
+    expect(mayTweak(ledger, 'mark', 1, GAP, TweakLimit.Once)).toBe(false);
+  });
+
+  it('declares the footer wordmark as resident with a standing crew', () => {
+    const rule = ruleFor((selector) => selector === '.site-foot .mark');
+    expect(rule.limit).toBe(TweakLimit.Unlimited);
+    expect(rule.crew).toBeGreaterThanOrEqual(3);
+    expect(rule.crew).toBeLessThanOrEqual(5);
+    expect(ELEMENT_RULES.at(-1)?.limit).toBe(TweakLimit.Once);
   });
 });
