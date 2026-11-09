@@ -19,7 +19,7 @@ enum Gesture {
   DragElement = 'drag-element'
 }
 
-type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null };
+type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null };
 type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number };
 type Hotspot = { fn: string; url: string; selfMs: number };
 
@@ -48,6 +48,7 @@ const MID_CHECKED = new Set([Gesture.Pan, Gesture.Zoom, Gesture.Fit]);
 const BLANK_SHARE = 0.6;
 const BLANK_SAMPLE_MS = 150;
 const BLANK_WATCH_AFTER_MS = 2000;
+const SWAP_SHARE = 0.001;
 const INK_INSET = 0.15;
 const SHARP_POLL_MS = 60;
 const SHARP_GIVE_UP_MS = 15_000;
@@ -216,17 +217,31 @@ async function inkedOnScreen(page: Page): Promise<boolean[]> {
   return inked;
 }
 
-async function blanksAfter(page: Page, name: Gesture): Promise<number> {
+async function changedShare(a: Buffer, b: Buffer): Promise<number> {
+  const [x, y] = await Promise.all([sharp(a).raw().toBuffer(), sharp(b).raw().toBuffer()]);
+  let changed = 0;
+  for (let i = 0; i < x.length; i += 4) {
+    changed += Math.abs(x[i] - y[i]) + Math.abs(x[i + 1] - y[i + 1]) + Math.abs(x[i + 2] - y[i + 2]) > PAPER_TOLERANCE ? 1 : 0;
+  }
+  return changed / (x.length / 4);
+}
+
+async function settling(page: Page, name: Gesture): Promise<{ blanks: number; swaps: number }> {
   const until = Date.now() + BLANK_WATCH_AFTER_MS;
   let blanks = 0;
+  let swaps = 0;
+  let last = await shot(page);
   while (Date.now() < until) {
+    await page.waitForTimeout(BLANK_SAMPLE_MS);
     if (!(await framesInked(page))) {
       blanks++;
       writeFileSync(join(OUT, `blank-after-${name}-${blanks}.png`), await shot(page));
     }
-    await page.waitForTimeout(BLANK_SAMPLE_MS);
+    const next = await shot(page);
+    swaps += (await changedShare(last, next)) > SWAP_SHARE ? 1 : 0;
+    last = next;
   }
-  return blanks;
+  return { blanks, swaps };
 }
 
 async function fitThenZoomIn(page: Page) {
@@ -291,6 +306,7 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   const after = await taskMs(cdp);
   await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
+  let swaps: number | null = null;
   if (MID_CHECKED.has(gesture)) {
     await fitThenZoomIn(page);
     await GESTURES[gesture](page, Date.now() + GESTURE_MS / 2);
@@ -299,14 +315,15 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
       writeFileSync(join(OUT, `blank-mid-${gesture}.png`), await shot(page));
     }
     await page.keyboard.up('Control');
-    const after = await blanksAfter(page, gesture);
+    const settled = await settling(page, gesture);
+    swaps = settled.swaps;
     expect(blank, `${gesture}: a frame was blank mid-gesture`).toBe(false);
-    expect(after, `${gesture}: frames went blank while the canvas settled`).toBe(0);
+    expect(settled.blanks, `${gesture}: frames went blank while the canvas settled`).toBe(0);
   }
   if (profile) {
     writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
-  return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before) }, spots: profile ? hotspots(profile) : [] };
+  return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps }, spots: profile ? hotspots(profile) : [] };
 }
 
 async function run(browser: Browser, base: string, index: number, profiled: boolean): Promise<{ run: BenchRun; spots: Partial<Record<Gesture, Hotspot[]>> }> {

@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::Rect;
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -235,4 +235,42 @@ fn eviction_drops_the_least_recently_drawn_tiles_first() {
 fn the_tile_budget_follows_the_screen_and_caps_at_the_memory_budget() {
     assert!(tiles_kept((1440, 900)) < tiles_kept((2880, 1800)));
     assert!(tiles_kept((100_000, 100_000)) as u64 * TILE_BYTES <= TILE_BUDGET_BYTES);
+}
+
+#[test]
+fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_screen() {
+    let mut tiles = Tiles::default();
+    let coarse = tiles.frame(camera(step_zoom(-2)), SCREEN).missing;
+    coarse.iter().for_each(|k| tiles.hold(*k));
+    let sharp = tiles.frame(camera(1.0), SCREEN).missing;
+    sharp.iter().take(sharp.len() / 2).for_each(|k| tiles.hold(*k));
+
+    let half = tiles.frame(camera(1.0), SCREEN);
+    assert!(half.draw.iter().all(|k| k.step != step_of(1.0)));
+
+    sharp.iter().for_each(|k| tiles.hold(*k));
+    let whole = tiles.frame(camera(1.0), SCREEN);
+    assert!(sharp.iter().all(|k| whole.draw.contains(k)));
+}
+
+#[test]
+fn during_a_gesture_a_tile_within_twice_its_sharpness_is_good_enough() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(-4)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+    assert!(tiles.covered_within(key, NEAR_STEPS));
+
+    let mut far = Tiles::default();
+    far.frame(camera(step_zoom(-8)), SCREEN).missing.iter().for_each(|k| far.hold(*k));
+    assert!(!far.covered_within(key, NEAR_STEPS));
+}
+
+#[test]
+fn while_idle_the_tiles_around_the_screen_and_one_step_sharper_are_fetched_ahead() {
+    let tiles = Tiles::default();
+    let ahead = tiles.ahead(camera(1.0), SCREEN);
+    let step = step_of(1.0);
+
+    assert!(ahead.iter().any(|k| k.step == step && !k.screen(camera(1.0)).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
+    assert!(ahead.iter().any(|k| k.step == step + 1));
 }

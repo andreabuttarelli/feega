@@ -17,6 +17,8 @@ const STEPS_PER_DOUBLING: f64 = 4.0;
 const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
+pub const NEAR_STEPS: i32 = 4;
+const AHEAD_RING: f64 = 0.5;
 const RESERVE_STEPS_DOWN: i32 = 8;
 const RESERVE_REACH: f64 = 3.0;
 
@@ -126,8 +128,13 @@ impl Tiles {
         let distance = |k: &TileKey| k.screen(camera).center().distance(centre);
         let mut missing: Vec<TileKey> = keys_over(world, step).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
         missing.sort_by(|a, b| distance(a).total_cmp(&distance(b)));
-        let fallback = if missing.is_empty() { vec![] } else { (step - COARSER_STEPS..step).chain((step + 1..=step + FINER_STEPS).rev()).collect() };
-        let draw = fallback.into_iter().chain([step]).flat_map(|s| self.held_over(world, s)).collect();
+        let fallback: Vec<i32> = if missing.is_empty() { vec![] } else { (step - COARSER_STEPS..step).chain((step + 1..=step + FINER_STEPS).rev()).collect() };
+        let whole = |s: i32| keys_over(world, s).iter().all(|k| self.held.contains(k));
+        let shown = if missing.is_empty() { Some(step) } else { ((step + 1..=step + FINER_STEPS).chain((step - COARSER_STEPS..step).rev())).find(|s| whole(*s)) };
+        let draw = match shown {
+            Some(top) => fallback.into_iter().filter(|s| *s < top).chain([top]).flat_map(|s| self.held_over(world, s)).collect(),
+            None => fallback.into_iter().chain([step]).flat_map(|s| self.held_over(world, s)).collect(),
+        };
         TileFrame { draw, missing }
     }
 
@@ -149,8 +156,22 @@ impl Tiles {
     }
 
     pub fn covered(&self, key: TileKey) -> bool {
+        self.covered_within(key, COARSER_STEPS)
+    }
+
+    pub fn covered_within(&self, key: TileKey, steps: i32) -> bool {
         let world = key.world();
-        (key.step - COARSER_STEPS..key.step).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
+        (key.step - steps..key.step).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
+    }
+
+    pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        let world = seen_world(camera, screen);
+        let step = step_of(camera.zoom);
+        let ring = world.inflate(world.width() * AHEAD_RING, world.height() * AHEAD_RING);
+        let centre = world.center();
+        let mut keys: Vec<TileKey> = keys_over(ring, step).into_iter().chain(keys_over(world, step + 1)).filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+        keys.sort_by(|a, b| (a.step != step).cmp(&(b.step != step)).then(a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre))));
+        keys
     }
 
     pub fn hold(&mut self, key: TileKey) {
