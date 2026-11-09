@@ -42,6 +42,49 @@ impl TileKey {
     }
 }
 
+pub const BATCH_TILES: i64 = 2;
+
+pub struct Batch {
+    pub step: i32,
+    pub keys: Vec<TileKey>,
+}
+
+impl Batch {
+    pub fn corner(&self) -> TileKey {
+        let tx = self.keys.iter().map(|k| k.tx).min().expect("a batch holds a tile");
+        let ty = self.keys.iter().map(|k| k.ty).min().expect("a batch holds a tile");
+        TileKey { step: self.step, tx, ty }
+    }
+
+    pub fn span(&self) -> (u32, u32) {
+        let corner = self.corner();
+        let cols = self.keys.iter().map(|k| k.tx - corner.tx + 1).max().unwrap_or(1);
+        let rows = self.keys.iter().map(|k| k.ty - corner.ty + 1).max().unwrap_or(1);
+        (cols as u32, rows as u32)
+    }
+
+    pub fn world(&self) -> Rect {
+        let corner = self.corner().world();
+        let side = corner.width();
+        let (cols, rows) = self.span();
+        Rect::new(corner.x0, corner.y0, corner.x0 + cols as f64 * side, corner.y0 + rows as f64 * side)
+    }
+}
+
+pub fn batches(missing: &[TileKey]) -> Vec<Batch> {
+    let mut out: Vec<Batch> = Vec::new();
+    let mut at: rustc_hash::FxHashMap<(i32, i64, i64), usize> = Default::default();
+    for key in missing {
+        let block = (key.step, key.tx.div_euclid(BATCH_TILES), key.ty.div_euclid(BATCH_TILES));
+        let index = *at.entry(block).or_insert_with(|| {
+            out.push(Batch { step: key.step, keys: Vec::new() });
+            out.len() - 1
+        });
+        out[index].keys.push(*key);
+    }
+    out
+}
+
 pub struct TileFrame {
     pub draw: Vec<TileKey>,
     pub missing: Vec<TileKey>,

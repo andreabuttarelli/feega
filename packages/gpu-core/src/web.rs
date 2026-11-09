@@ -14,9 +14,9 @@ use crate::engine::Engine;
 use crate::filter_passes::layer_texture;
 use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
-use crate::reproject::{Draw, Output, Reprojector};
+use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{step_zoom, TileKey, Tiles, TILE_PX};
+use crate::tiles::{batches, step_zoom, Batch, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -86,6 +86,7 @@ pub struct WebCore {
     tiles: Tiles,
     tile_textures: HashMap<TileKey, wgpu::Texture>,
     spare_tiles: Vec<wgpu::Texture>,
+    atlases: HashMap<(u32, u32), wgpu::Texture>,
 }
 
 struct GpuPainter<'a> {
@@ -119,6 +120,19 @@ fn held_texture(device: &wgpu::Device, (width, height): (u32, u32)) -> wgpu::Tex
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgba8Unorm,
         usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    })
+}
+
+fn tile_texture(device: &wgpu::Device, side: u32) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d { width: side, height: side, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     })
 }
@@ -268,7 +282,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, exact_shown: false, refined_at: f64::NEG_INFINITY, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, exact_shown: false, refined_at: f64::NEG_INFINITY, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -404,11 +418,11 @@ impl WebCore {
     fn fill_reserve(&mut self) -> Result<bool, JsValue> {
         let started = js_sys::Date::now();
         let reserve = self.tiles.reserve(self.camera, (self.target.width(), self.target.height()));
-        for key in &reserve {
+        for batch in batches(&reserve) {
             if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS {
                 return Ok(true);
             }
-            self.raster_tile(*key)?;
+            self.raster_batch(&batch)?;
         }
         Ok(false)
     }
@@ -429,19 +443,30 @@ impl WebCore {
         }
     }
 
-    fn raster_tile(&mut self, key: TileKey) -> Result<(), JsValue> {
-        let zoom = step_zoom(key.step);
-        let world = key.world();
+    fn raster_batch(&mut self, batch: &Batch) -> Result<(), JsValue> {
+        let zoom = step_zoom(batch.step);
+        let world = batch.world();
         let gutter = TILE_GUTTER_PX as f64;
         let camera = Camera { x: -world.x0 * zoom + gutter, y: -world.y0 * zoom + gutter, zoom };
-        let side = TILE_PX + 2 * TILE_GUTTER_PX;
-        let plan = self.compositor.plan_at(&mut self.library, camera, (side, side), self.limits);
+        let (cols, rows) = batch.span();
+        let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
+        let plan = self.compositor.plan_at(&mut self.library, camera, size, self.limits);
         let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
-        let texture = self.spare_tiles.pop().unwrap_or_else(|| layer_texture(&self.device, side, side));
-        self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
-        self.tile_textures.insert(key, texture);
-        self.tiles.hold(key);
+        let atlas = self.atlases.remove(&size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
+        self.engine.draw(&self.device, &self.queue, &list, &pictures, &atlas.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let corner = batch.corner();
+        let side = TILE_PX + 2 * TILE_GUTTER_PX;
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        for key in &batch.keys {
+            let texture = self.tile_textures.remove(key).or_else(|| self.spare_tiles.pop()).unwrap_or_else(|| tile_texture(&self.device, side));
+            let (x, y) = (((key.tx - corner.tx) as u32) * TILE_PX, ((key.ty - corner.ty) as u32) * TILE_PX);
+            encoder.copy_texture_to_texture(texel(&atlas, x, y), texel(&texture, 0, 0), wgpu::Extent3d { width: side, height: side, depth_or_array_layers: 1 });
+            self.tile_textures.insert(*key, texture);
+            self.tiles.hold(*key);
+        }
+        self.queue.submit([encoder.finish()]);
+        self.atlases.insert(size, atlas);
         Ok(())
     }
 
@@ -462,20 +487,19 @@ impl WebCore {
             multiview_mask: None,
         }));
         let c = self.camera;
-        for key in draw {
-            let Some(source) = self.tile_textures.get(key) else { continue };
+        let gutter = TILE_GUTTER_PX as f64;
+        let placed: Vec<Tile> = draw.iter().filter_map(|key| {
+            let source = self.tile_textures.get(key)?;
             let on = key.screen(c);
             let within = Rect::new(on.x0.floor(), on.y0.floor(), on.x1.ceil(), on.y1.ceil()).intersect(screen);
             if within.area() <= 0.0 {
-                continue;
+                return None;
             }
             let zoom = step_zoom(key.step);
             let world = key.world();
-            let gutter = TILE_GUTTER_PX as f64;
-            let look = Lookup { scale: zoom / c.zoom, x: (-c.x / c.zoom - world.x0) * zoom + gutter, y: (-c.y / c.zoom - world.y0) * zoom + gutter };
-            self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source, target: &out, format: self.format, look, within: Some(within), output: Output::Premultiplied });
-            self.queue.submit([std::mem::replace(&mut encoder, self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default())).finish()]);
-        }
+            Some(Tile { source, look: Lookup { scale: zoom / c.zoom, x: (-c.x / c.zoom - world.x0) * zoom + gutter, y: (-c.y / c.zoom - world.y0) * zoom + gutter }, within })
+        }).collect();
+        self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Premultiplied, &placed);
         if let Some(overlay) = self.overlay_texture()? {
             self.reprojector.draw(&self.device, &self.queue, &mut encoder, Draw { source: &overlay, target: &out, format: self.format, look: UNMOVED, within: Some(screen), output: Output::Over });
             self.overlay_tex = Some(overlay);
@@ -510,13 +534,13 @@ impl WebCore {
         let mut rastered = 0;
         let gesture = matches!(self.motion, CoreMotion::Gesture);
         let refine = !gesture || now_ms - self.refined_at >= TILE_REFINE_EVERY_MS;
-        for key in self.tiles.frame(self.camera, screen).missing {
-            let blank = !self.tiles.covered(key);
-            if (rastered > 0 && js_sys::Date::now() - started > budget) || !(blank || refine) {
-                continue;
+        let wanted: Vec<TileKey> = self.tiles.frame(self.camera, screen).missing.into_iter().filter(|k| refine || !self.tiles.covered(*k)).collect();
+        for batch in batches(&wanted) {
+            if rastered > 0 && js_sys::Date::now() - started > budget {
+                break;
             }
-            self.raster_tile(key)?;
-            rastered += 1;
+            self.raster_batch(&batch)?;
+            rastered += batch.keys.len();
         }
         if rastered > 0 {
             self.refined_at = now_ms;

@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{step_of, step_zoom, TileKey, Tiles, TILE_PX};
+use gpu_core::tiles::{batches, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::Rect;
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -140,4 +140,20 @@ fn eviction_never_leaves_a_drawn_tile_without_its_store_entry() {
 
     let frame = tiles.frame(camera(1.0), SCREEN);
     assert!(frame.draw.iter().all(|k| tiles.holds(*k) && !gone.contains(k)));
+}
+
+#[test]
+fn missing_tiles_raster_together_by_block_nearest_block_first() {
+    let tiles = Tiles::default();
+    let missing = tiles.frame(camera(1.0), SCREEN).missing;
+    let blocks = batches(&missing);
+
+    assert_eq!(blocks.iter().map(|b| b.keys.len()).sum::<usize>(), missing.len());
+    assert!(blocks.iter().all(|b| b.keys.len() <= (BATCH_TILES * BATCH_TILES) as usize));
+    assert!(blocks[0].keys.contains(&missing[0]));
+    for b in &blocks {
+        let union = b.keys.iter().map(|k| k.world()).reduce(|a, r| a.union(r)).unwrap();
+        assert_eq!(b.world(), union);
+        assert!(b.keys.iter().all(|k| k.step == b.step));
+    }
 }

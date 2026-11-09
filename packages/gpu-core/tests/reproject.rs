@@ -1,6 +1,6 @@
 #![cfg(feature = "gpu")]
 
-use gpu_core::reproject::{Draw, Output, Reprojector};
+use gpu_core::reproject::{Draw, Output, Reprojector, Tile};
 use gpu_core::retained::Lookup;
 use vello::wgpu;
 
@@ -139,4 +139,34 @@ fn an_overlay_drawn_over_the_tiles_keeps_them_where_it_is_transparent() {
     Reprojector::new(&device).draw(&device, &queue, &mut encoder, Draw { source: &source, target: &view, format: FORMAT, look: IDENTITY, within: None, output: Output::Over });
 
     assert_eq!(first_texel(&device, &queue, encoder, &target), [255; 4]);
+}
+
+fn filled(device: &wgpu::Device, queue: &wgpu::Queue, colour: [u8; 4]) -> wgpu::Texture {
+    let source = texture(device);
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture: &source, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        &colour.repeat((SIDE * SIDE) as usize),
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(SIDE * 4), rows_per_image: None },
+        source.size(),
+    );
+    source
+}
+
+#[test]
+fn many_tiles_composited_in_one_pass_each_keep_their_own_look() {
+    let (device, queue) = device();
+    let (red, blue) = ([255, 0, 0, 255], [0, 0, 255, 255]);
+    let (left, right) = (filled(&device, &queue, red), filled(&device, &queue, blue));
+    let target = texture(&device);
+    let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    let half = SIDE as f64 / 2.0;
+    let tiles = [
+        Tile { source: &left, look: IDENTITY, within: vello::kurbo::Rect::new(0.0, 0.0, half, SIDE as f64) },
+        Tile { source: &right, look: IDENTITY, within: vello::kurbo::Rect::new(half, 0.0, SIDE as f64, SIDE as f64) },
+        Tile { source: &right, look: AWAY, within: vello::kurbo::Rect::new(half, 0.0, SIDE as f64, SIDE as f64) },
+    ];
+    Reprojector::new(&device).draw_tiles(&device, &queue, &mut encoder, &view, FORMAT, Output::Straight, &tiles);
+
+    assert_eq!(first_texel(&device, &queue, encoder, &target), red);
 }
