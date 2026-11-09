@@ -26,6 +26,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### The zoom probe reports 0 zoom frames in headless Chromium
 **Signal:** `tests/e2e/canvas-zoom-profile-probe.spec.ts` prints `zoom frames 0` and fps from an empty list when launched headless. **Move:** headless Chromium does not run the WebGPU canvas frames the probe counts; launch headed (the spec does; never add `headless: true` to compare quicker), and keep the windows on screen while it runs.
 
+### GitHub-hosted runners cannot benchmark the WebGPU canvas
+**Signal:** the perf job on `ubuntu-latest` counts 0 zoom frames, or with SwiftShader (`--use-webgpu-adapter=swiftshader`) gets an adapter only in some runs and zooms at 1-2 fps with 3-15 s frames. **Move:** no GPU there, so the numbers measure software rasterization. Keep that job advisory; gate on a machine with a GPU (self-hosted runner), and never refresh the baseline from a GPU-less run.
+
+### Playwright `webServer` never sees the local app as ready
+**Signal:** `DEBUG=pw:webserver` loops on `Parse Error: Header overflow` for `/login` while `curl` answers 303. **Move:** the app's response headers exceed Node's client limit; point `webServer.url` at a static file (`/favicon-16.png`).
+
 ### Panning zoomed in stalls on `submit` and the wasm encoder: count layers per frame
 
 **Signal:** pan at 70%+ zoom falls under 20 fps with frames of 500 ms to 2 s, a CPU profile led by `GPUQueue.submit`, `createBindGroup` and `PathEncoder` inside `gpu_core_bg.wasm`, nothing in JS; zoomed out it holds 60. **Move:** read the inclusive time of `layers::body` and `layers::mask`, not the self time: every item with a mask, blur or filter is its own texture, vello render and queue submit, and one imported SVG carries about 600 masked paths. Hard path masks that only intersect are clips now (`clip_covers` in `scene.rs`); anything softer still costs a layer, so keep layers out of the frame being painted (`Layers::culled`). Run the harness at least three times: a run where the heavy frames are still caching while the pan starts looks fine or terrible at random.
