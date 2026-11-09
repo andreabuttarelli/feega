@@ -78,3 +78,21 @@ The fixture is not committed (third-party page content, ~19 MB). It lives at
 missing, `scripts/perf/landings-fixture.mjs` regenerates it by importing the pages into an empty
 local-mode canvas. The import calls no AI model; it needs the network, so pages change over time:
 compare runs on the same file. WebKit has no CDP: no CPU throttle, no CPU ms, no profile.
+
+## Load case
+
+`BENCH_CASE=load` runs `tests/perf/canvas-load-bench.spec.ts` on the landings fixture: time from
+navigation to the first non-white pixels of each on-screen frame, to all of them, and to a still
+screen (all sharp). A frame counts as content only when at least 0.5% of its pixels are neither
+white nor the canvas paper. Each run starts a fresh server on a fresh copy of the fixture (its hash
+is checked after the run); `cold` is a new browser context, `warm` opens the canvas once and
+measures the second open in the same context. The first run per build and cache case carries a
+CPU-profile hotspot table.
+
+```bash
+BENCH_CASE=load BENCH_BUILDS=base=../dazero-base,fix=. npx playwright test -c tests/perf/playwright.config.ts
+```
+
+`BENCH_BUILDS` interleaves builds (each root needs `npm run build:node`); without it the spec
+measures this checkout. `BENCH_RECORD=1` saves a video per case, `BENCH_DEBUG=1` the request
+timeline and the screenshot where each frame first showed content.

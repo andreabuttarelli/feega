@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BlendMode } from '@feega/motion-core/motion/blend';
-import { Stand, drawable, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from './placeholders';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
@@ -43,6 +43,11 @@ describe('fill order', () => {
   it('loads what is on screen first, nearest the centre first, and nothing off screen while the view has holes', () => {
     const items = [{ id: 'far', box: box(5000) }, { id: 'edge', box: box(700) }, { id: 'centre', box: box(300) }];
     expect(fillOrder(items, { x: 0, y: 0, zoom: 1 }, { width: 800, height: 600 }).map((i) => i.id)).toEqual(['centre', 'edge']);
+  });
+
+  it('sends the frames on screen to the GPU before the ones off screen, keeping every frame', () => {
+    const items = [{ id: 'far', box: box(5000) }, { id: 'edge', box: box(700) }, { id: 'centre', box: box(300) }];
+    expect(onScreenFirst(items, { x: 0, y: 0, zoom: 1 }, { width: 800, height: 600 }).map((i) => i.id)).toEqual(['centre', 'edge', 'far']);
   });
 });
 
