@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contourLength, cornerRadii, withCorner, ellipseOutline, flatten, parsePath, pathData, polygonOutline, rectOutline, starOutline, trimContour } from './geometry';
+import { contourLength, cornerRadii, withCorner, ellipseOutline, flatten, flattenPixels, parsePath, pathData, polygonOutline, rectOutline, starOutline, trimContour } from './geometry';
 
 const close = (a: number, b: number, digits = 3) => expect(a).toBeCloseTo(b, digits);
 
@@ -165,3 +165,25 @@ describe('ellipse arcs', () => {
   });
 });
 
+
+describe('flattenPixels sceglie i campioni dalla curvatura', () => {
+  const circle = (r: number) => ellipseOutline({ w: 2 * r, h: 2 * r })[0];
+
+  it('un pallino di 3 px non diventa 64 segmenti', () => {
+    expect(flattenPixels(circle(1.5)).length).toBeLessThanOrEqual(24);
+  });
+
+  it('un cerchio grande tiene i campioni di prima', () => {
+    expect(flattenPixels(circle(200)).length).toBe(64);
+  });
+
+  it('ogni corda resta entro 0.03 px dalla curva', () => {
+    for (const r of [1.5, 3, 6]) {
+      const points = flattenPixels(circle(r));
+      points.forEach(([x, y], i) => {
+        const [nx, ny] = points[(i + 1) % points.length];
+        expect(r - Math.hypot((x + nx) / 2 - r, (y + ny) / 2 - r)).toBeLessThan(0.03);
+      });
+    }
+  });
+});
