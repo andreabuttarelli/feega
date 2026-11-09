@@ -73,6 +73,8 @@ BENCH_CASE=landings BENCH_CPU=1 npx playwright test -c tests/perf/playwright.con
 BENCH_CASE=landings BENCH_ENGINE=webkit npx playwright test -c tests/perf/playwright.config.ts
 ```
 
+`BENCH_GESTURES=drag-element` (comma list) runs only those gestures; `BENCH_PROFILE=0` skips the CPU profile, which otherwise covers the gesture window only and is saved as `landings-<gesture>.cpuprofile`.
+
 The fixture is not committed (third-party page content, ~19 MB). It lives at
 `~/Documents/feega-videos/perf/landings/landings.feega` (`BENCH_FIXTURE` overrides the path); when
 missing, `scripts/perf/landings-fixture.mjs` regenerates it by importing the pages into an empty

@@ -48,6 +48,9 @@ const SHARP_GIVE_UP_MS = 15_000;
 const MS_PER_S = 1000;
 const US_PER_MS = 1000;
 const HOTSPOTS = 25;
+const ONLY = process.env.BENCH_GESTURES?.split(',') ?? null;
+const PROFILED = process.env.BENCH_PROFILE !== '0';
+const benched = () => Object.values(Gesture).filter((g) => !ONLY || ONLY.includes(g));
 
 const shot = (page: Page) => page.screenshot({ clip: { x: 0, y: 0, ...VIEWPORT } });
 
@@ -205,7 +208,17 @@ async function titlesInView(page: Page) {
   await untilDrawn(page);
 }
 
-async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture): Promise<GestureRun> {
+async function profiling<T>(cdp: CDPSession | null, on: boolean, work: () => Promise<T>): Promise<{ value: T; profile: Profile | null }> {
+  if (!on || !cdp) {
+    return { value: await work(), profile: null };
+  }
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.start');
+  const value = await work();
+  return { value, profile: (await cdp.send('Profiler.stop')).profile as Profile };
+}
+
+async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, profiled: boolean): Promise<{ frames: GestureRun; spots: Hotspot[] }> {
   await fitThenZoomIn(page);
   if (gesture === Gesture.Drag) {
     await titlesInView(page);
@@ -213,21 +226,14 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture):
   const shown = await inkedOnScreen(page);
   expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture`).toBe(true);
   const before = await taskMs(cdp);
-  const frames: Frames = await measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until));
+  const { value: frames, profile } = await profiling(cdp, profiled, () => measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until)));
   const after = await taskMs(cdp);
   await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
-  return { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before) };
-}
-
-async function profiledRun(page: Page, cdp: CDPSession | null, gesture: Gesture, profiled: boolean): Promise<{ frames: GestureRun; spots: Hotspot[] }> {
-  if (!profiled || !cdp) {
-    return { frames: await gestureRun(page, cdp, gesture), spots: [] };
+  if (profile) {
+    writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
-  await cdp.send('Profiler.enable');
-  await cdp.send('Profiler.start');
-  const frames = await gestureRun(page, cdp, gesture);
-  return { frames, spots: hotspots((await cdp.send('Profiler.stop')).profile as Profile) };
+  return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before) }, spots: profile ? hotspots(profile) : [] };
 }
 
 async function run(browser: Browser, base: string, index: number, profiled: boolean): Promise<{ run: BenchRun; spots: Partial<Record<Gesture, Hotspot[]>> }> {
@@ -238,8 +244,8 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
 
   const result = {} as BenchRun;
   const spots: Partial<Record<Gesture, Hotspot[]>> = {};
-  for (const gesture of Object.values(Gesture)) {
-    const done = await profiledRun(page, cdp, gesture, profiled);
+  for (const gesture of benched()) {
+    const done = await gestureRun(page, cdp, gesture, profiled);
     result[gesture] = done.frames;
     spots[gesture] = done.spots;
     await page.waitForTimeout(SETTLE_MS / 4);
@@ -269,7 +275,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
 
 function medianOf(runs: BenchRun[]) {
   const pick = (values: (number | null)[]) => (values.some((v) => v === null) ? null : mid(values as number[]));
-  const gestures = Object.fromEntries(Object.values(Gesture).map((g) => [g, Object.fromEntries((['fps', 'p95', 'worst', 'cpuMs'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
+  const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'p95', 'worst', 'cpuMs'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
   return { ...gestures, sharpMs: mid(runs.map((r) => r.sharpMs)) };
 }
 
@@ -279,7 +285,7 @@ test('landings benchmark: imported pages with responsive views', async ({ baseUR
   const runs: BenchRun[] = [];
   let spots: Partial<Record<Gesture, Hotspot[]>> = {};
   for (let i = 0; i < RUNS; i++) {
-    const done = await run(browser, baseURL!, i, i === 0);
+    const done = await run(browser, baseURL!, i, PROFILED && i === 0);
     runs.push(done.run);
     spots = i === 0 ? done.spots : spots;
     console.log(`run ${i + 1}/${RUNS} ${JSON.stringify(done.run)}`);
@@ -287,5 +293,5 @@ test('landings benchmark: imported pages with responsive views', async ({ baseUR
   await browser.close();
   const cpuThrottle = ENGINE === Engine.Chromium ? CPU_THROTTLE : null;
   writeFileSync(join(OUT, `landings-bench-${ENGINE}-${cpuThrottle ?? 'na'}x.json`), JSON.stringify({ engine: ENGINE, cpuThrottle, runs, median: medianOf(runs), hotspots: spots }, null, 2));
-  expect(runs.every((r) => r.pan.frames > 0)).toBe(true);
+  expect(runs.every((r) => benched().every((g) => r[g].frames > 0))).toBe(true);
 });
