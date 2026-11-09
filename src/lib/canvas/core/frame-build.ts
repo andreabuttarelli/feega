@@ -2,7 +2,7 @@ import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
-import { itemPack, itemWire, packsKnown, wiresKnown, type ItemPack } from '@feega/motion-core/motion/gpu-full/wire';
+import { stripContours, type ContourView } from '@feega/motion-core/motion/gpu-full/wire';
 import { localFilesSnapshot, type LocalFilesSnapshot } from '@feega/motion-core/motion/fonts/local-files';
 import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
 import type { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -15,7 +15,7 @@ export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: Bra
 
 export type BuildAsk = { id: number; source: FrameDoc; smoothing: Smoothing; locals: LocalFilesSnapshot };
 
-export type BuildAnswer = { id: number; list: DisplayList | null; wires: string[]; packs?: ItemPack[] } | { id: number; error: string };
+export type BuildAnswer = { id: number; list: DisplayList | null; contours?: ContourView } | { id: number; error: string };
 
 export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: ErrorEvent) => void) | null };
 
@@ -30,9 +30,15 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
   return drawFrame(prepared, frameOfLive(source));
 }
 
-export const builtAnswer = (id: number, list: DisplayList | null): BuildAnswer => ({ id, list, wires: list ? list.items.map(itemWire) : [], packs: list ? list.items.map(itemPack) : [] });
+export function builtAnswer(id: number, list: DisplayList | null): BuildAnswer {
+  if (!list) {
+    return { id, list };
+  }
+  const { items, contours } = stripContours(list.items);
+  return { id, list: { ...list, items }, contours };
+}
 
-export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('packs' in answer ? (answer.packs ?? []).flatMap((p) => [p.floats.buffer as ArrayBuffer, p.ends.buffer as ArrayBuffer]) : []);
+export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('contours' in answer && answer.contours ? [answer.contours.floats.buffer as ArrayBuffer, answer.contours.ends.buffer as ArrayBuffer] : []);
 
 type Lane = { worker: BuildWorker; busy: number };
 
@@ -51,10 +57,6 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (sourc
     if ('error' in e.data) {
       asked?.reject(new Error(e.data.error));
       return;
-    }
-    if (e.data.list) {
-      wiresKnown(e.data.list.items, e.data.wires);
-      packsKnown(e.data.list.items, e.data.packs ?? []);
     }
     asked?.resolve(e.data.list);
   };
