@@ -80,3 +80,19 @@ The fixture is not committed (third-party page content, ~19 MB). It lives at
 missing, `scripts/perf/landings-fixture.mjs` regenerates it by importing the pages into an empty
 local-mode canvas. The import calls no AI model; it needs the network, so pages change over time:
 compare runs on the same file. WebKit has no CDP: no CPU throttle, no CPU ms, no profile.
+
+## Heavy canvas case
+
+`BENCH_CASE=heavy` runs the same gestures as `landings` on a synthetic heavy canvas: 40 frames
+(12 landing pages 1280 wide and 5000–9000 tall, six with tablet/phone views; 14 posts 1080×1080;
+9 slides 1920×1080; the 5 `gpu-docs` motion docs) carrying ~2,000 elements with blur, drop
+shadows, background blur, masks, clipped cards, gradients, opacity, rotated groups, ~1,100 texts
+and 36 generated JPEGs. `scripts/perf/heavy-fixture.mjs` writes it to the temp dir (~3.5 MB),
+seeded and with fixed ids: no production data, no network.
+
+```bash
+PUBLIC_FEEGA_LOCAL=1 npm run build:node
+BENCH_CASE=heavy BENCH_PORT=5488 BENCH_RUNS=1 BENCH_CPU=1 npx playwright test -c tests/perf/playwright.config.ts
+```
+
+Outputs are prefixed `heavy-` (`heavy-chromium-start|fit|zoomed.png`, `heavy-bench-chromium-1x.json`).
