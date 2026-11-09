@@ -8,7 +8,7 @@ enum BenchFixture {
   Landings = 'landings'
 }
 
-const PORT = 5288;
+const PORT = Number(process.env.BENCH_PORT ?? 5288);
 const FIXTURE_KIND = process.env.BENCH_CASE === BenchFixture.Landings ? BenchFixture.Landings : BenchFixture.Zoom;
 const LANDINGS_FILE = process.env.BENCH_FIXTURE ?? join(homedir(), 'Documents/feega-videos/perf/landings/landings.feega');
 const FIXTURE: Record<BenchFixture, { file: string; make: string | null; spec: RegExp }> = {

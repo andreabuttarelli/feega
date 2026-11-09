@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CACHE_SHARE, cached, resident, heldWhileEdited, uncached } from './residency';
+import { CACHE_SHARE, cached, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -54,5 +54,20 @@ describe('a node under a live edit', () => {
   it('is cached even past the texture budget, so a heavy frame is not redrawn item by item each step', () => {
     const shown = cached([frame('a', 0, 1, 2000)], view, screen, 0);
     expect(heldWhileEdited(shown, new Set(['a']))[0]).toMatchObject({ cache: true, hold: true });
+  });
+});
+
+describe('a frame being dragged', () => {
+  it('holds every frame on screen as a texture, so the drag repaints textures instead of pages', () => {
+    const shown = cached([frame('a', 0, 0), frame('b', 200, 0)], view, screen, 1e9);
+    expect(heldWhileMoving(shown, new Set(['a'])).map((f) => [f.id, f.hold])).toEqual([
+      ['a', true],
+      ['b', true]
+    ]);
+  });
+
+  it('holds nothing while nothing moves', () => {
+    const shown = cached([frame('a', 0, 0)], view, screen, 1e9);
+    expect(heldWhileMoving(shown, new Set())[0].hold).toBeUndefined();
   });
 });
