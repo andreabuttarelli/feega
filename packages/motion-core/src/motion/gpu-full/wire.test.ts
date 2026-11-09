@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DisplayList, Item } from './display-list';
-import { itemPack, itemWire, listPack, listWire, packsKnown, spliceWire, wiresKnown } from './wire';
+import { itemPack, itemWire, listPack, listWire, packsKnown, spliceWire, wiresKnown, itemKey, stripContours } from './wire';
 
 const bar = (n: number) => ({ kind: 'path', clip: `bar${n}`, contours: [[n, 0, n + 5, 0, n + 5, 5]], paint: { kind: 'solid', color: [1, 0, 0, 1] } }) as unknown as Item;
 const face = { family: 'Inter', italic: false, weight: [400, 700], url: 'https://fonts/inter.woff2', ranges: [[0, 255]] };
@@ -85,5 +85,20 @@ describe('the packed wire to the core', () => {
     packsKnown(items, [itemPack(bar(3))]);
 
     expect([...listPack(listOf(items)).floats]).toEqual([3, 0, 8, 0, 8, 5]);
+  });
+});
+
+describe('telling items apart without spelling out their contours', () => {
+  it('gives items that differ only in contours different keys, and equal ones the same key', () => {
+    const [a, b, c] = [bar(0), bar(1), bar(0)];
+
+    expect(itemKey(a)).toBe(itemKey(c));
+    expect(itemKey(a)).not.toBe(itemKey(b));
+  });
+
+  it('keys an item whose contours arrived as buffers like the same item with arrays', () => {
+    const { items } = stripContours([bar(4)]);
+
+    expect(itemKey(items[0])).toBe(itemKey(bar(4)));
   });
 });

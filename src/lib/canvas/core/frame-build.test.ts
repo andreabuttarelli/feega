@@ -14,6 +14,9 @@ import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { builtAnswer, buildFrame, frameBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
 import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
+import { onStage } from './frame-source';
+import { withoutPictures } from './placeholders';
+import { FrameKind } from '$lib/canvas/motion-node';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -104,45 +107,25 @@ describe('the builder', () => {
     expect(spawned).toBe(1);
   });
 
-  it('the worker sends each item already wired, so the main thread never serialises it', async () => {
+  it('sends contours in transferred buffers, not as nested arrays (copying them cost 0.7 s at 4x on open)', async () => {
     const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
     const answer = builtAnswer(7, list);
+    const sent = JSON.stringify((answer as { list: DisplayList }).list.items, (key, value) => (key === 'contours' && Array.isArray(value) ? 'NESTED' : value));
 
-    expect(answer).toEqual({ id: 7, list, wires: list.items.map((i) => JSON.stringify(i)), packs: list.items.map(itemPack) });
+    expect(sent).not.toContain('NESTED');
+    expect(transfers(answer).length).toBeGreaterThan(0);
   });
 
-  it('the main thread keeps the wires the worker sent with the list', async () => {
-    const item = { kind: 'path', clip: 'card' };
-    const worker = {
-      onerror: null,
-      onmessage: null as BuildWorker['onmessage'],
-      postMessage: (ask: BuildAsk) => queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, list: { width: 1, height: 1, background: null, items: [item], unsupported: [] }, wires: ['"from the worker"'] } } as never))
-    };
-
-    const list = await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
-
-    expect(itemWire(list!.items[0])).toBe('"from the worker"');
-  });
-
-  it('the main thread keeps the packs the worker sent with the list', async () => {
-    const item = { kind: 'path', clip: 'card', contours: [[1, 2]] } as never;
-    const pack = itemPack({ kind: 'path', clip: 'card', contours: [[7, 8]] } as never);
-    const worker = {
-      onerror: null,
-      onmessage: null as BuildWorker['onmessage'],
-      postMessage: (ask: BuildAsk) => queueMicrotask(() => worker.onmessage?.({ data: { id: ask.id, list: { width: 1, height: 1, background: null, items: [item], unsupported: [] }, wires: ['""'], packs: [pack] } } as never))
-    };
-
-    const list = await frameBuilder(() => worker)(source(shapeDoc), Smoothing.Plain);
-
-    expect([...listPack(list!).floats]).toEqual([7, 8]);
-  });
-
-  it('lists the pack buffers so the worker can transfer them instead of copying', async () => {
+  it('a staged or placeholder-rebuilt item still draws its shapes after the trip', async () => {
     const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
+    const whole = listPack(structuredClone(list));
     const answer = builtAnswer(7, list);
+    const arrived = structuredClone(answer, { transfer: transfers(answer) }) as { list: DisplayList };
+    const rebuilt = onStage(withoutPictures({ ...arrived.list, bleed: 3 }, { paper: '#fff', line: '#eee' }), FrameKind.Frame);
 
-    expect(transfers(answer)).toHaveLength(list.items.length * 2);
+    expect([...listPack(rebuilt).floats].length).toBe([...whole.floats].length);
+    expect([...listPack(arrived.list).floats]).toEqual([...whole.floats]);
+    expect(itemWire(arrived.list.items[0])).toBe(itemWire(structuredClone(list).items[0]));
   });
 
   it('says it cannot build when no worker can start', async () => {
