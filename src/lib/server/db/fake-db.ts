@@ -130,7 +130,9 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         return chain;
       },
       single: async () => {
-        await travel();
+        if (options.latencyMs) {
+          await travel();
+        }
         const first = resolved(call)[0];
         if (first !== undefined) {
           return { data: first, error: null };
@@ -140,7 +142,12 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         }
         return { data: null, error: null };
       },
-      maybeSingle: async () => (await travel(), { data: resolved(call)[0] ?? null, error: null }),
+      maybeSingle: async () => {
+        if (options.latencyMs) {
+          await travel();
+        }
+        return { data: resolved(call)[0] ?? null, error: null };
+      },
       then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => (options.latencyMs ? travel().then(() => resolve({ data: resolved(call), error: null })) : resolve({ data: resolved(call), error: null }))
     };
     return chain;
@@ -162,7 +169,9 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
           return { data: { signedUrl: `https://signed.example/${bucket}/${path}` }, error: null };
         },
         createSignedUrls: async (paths: string[], _ttl?: number, transformOptions?: unknown) => {
-          await travel();
+          if (options.latencyMs) {
+            await travel();
+          }
           calls.push({ table: `storage:${bucket}`, op: 'sign', filters: [['paths', paths], ['transform', transformOptions]] });
           return {
             data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${bucket}/${path}` })),
