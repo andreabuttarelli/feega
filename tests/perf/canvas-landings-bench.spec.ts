@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { test, expect, chromium, webkit, type Browser, type BrowserContext, type CDPSession, type Page } from '@playwright/test';
 import { instrument, measure, wheelPan, wheelZoom, type Frames } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
+import { HEAVY_FIXTURE_CENTRE, HEAVY_FIXTURE_PLACE } from '../../scripts/perf/heavy-fixture.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
 
 enum Engine {
@@ -19,10 +20,22 @@ enum Gesture {
   DragElement = 'drag-element'
 }
 
+enum Case {
+  Landings = 'landings',
+  Heavy = 'heavy'
+}
+
+const CASES: Record<Case, { place: { projectId: string; canvasId: string }; centre: { x: number; y: number } }> = {
+  [Case.Landings]: { place: LANDINGS_FIXTURE_PLACE, centre: LANDINGS_FIXTURE_CENTRE },
+  [Case.Heavy]: { place: HEAVY_FIXTURE_PLACE, centre: HEAVY_FIXTURE_CENTRE }
+};
+
 type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null };
 type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number };
 type Hotspot = { fn: string; url: string; selfMs: number };
 
+const CASE = process.env.BENCH_CASE === Case.Heavy ? Case.Heavy : Case.Landings;
+const { place: PLACE, centre: CENTRE } = CASES[CASE];
 const ENGINE = (process.env.BENCH_ENGINE ?? Engine.Chromium) as Engine;
 const RUNS = Number(process.env.BENCH_RUNS ?? 5);
 const CPU_THROTTLE = Number(process.env.BENCH_CPU ?? 4);
@@ -30,8 +43,8 @@ const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const VIEWPORT = { width: 1440, height: 900 };
 const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = 0.12;
-const START_VIEW = { x: VIEWPORT.width / 2 - LANDINGS_FIXTURE_CENTRE.x * START_ZOOM, y: VIEWPORT.height / 2 - LANDINGS_FIXTURE_CENTRE.y * START_ZOOM, zoom: START_ZOOM };
-const VIEW_KEY = `feega:viewport:${LOCAL_USER_ID}:${LANDINGS_FIXTURE_PLACE.canvasId}`;
+const START_VIEW = { x: VIEWPORT.width / 2 - CENTRE.x * START_ZOOM, y: VIEWPORT.height / 2 - CENTRE.y * START_ZOOM, zoom: START_ZOOM };
+const VIEW_KEY = `feega:viewport:${LOCAL_USER_ID}:${PLACE.canvasId}`;
 const SETTLE_MS = 8000;
 const GESTURE_MS = 4000;
 const FIT_TOGGLE_MS = 700;
@@ -192,7 +205,7 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
   const cdp = ENGINE === Engine.Chromium ? await context.newCDPSession(page) : null;
   await cdp?.send('Performance.enable');
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${PLACE.projectId}/c/${PLACE.canvasId}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await untilDrawn(page);
   return { context, page, cdp };
@@ -231,7 +244,7 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
   if (profile) {
-    writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
+    writeFileSync(join(OUT, `${CASE}-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
   return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before) }, spots: profile ? hotspots(profile) : [] };
 }
@@ -239,7 +252,7 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
 async function run(browser: Browser, base: string, index: number, profiled: boolean): Promise<{ run: BenchRun; spots: Partial<Record<Gesture, Hotspot[]>> }> {
   const { context, page, cdp } = await open(browser, base);
   if (index === 0) {
-    writeFileSync(join(OUT, `landings-${ENGINE}-start.png`), await shot(page));
+    writeFileSync(join(OUT, `${CASE}-${ENGINE}-start.png`), await shot(page));
   }
 
   const result = {} as BenchRun;
@@ -256,7 +269,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
   await page.waitForTimeout(FIT_TOGGLE_MS);
   await untilSharp(page);
   if (index === 0) {
-    writeFileSync(join(OUT, `landings-${ENGINE}-fit.png`), await shot(page));
+    writeFileSync(join(OUT, `${CASE}-${ENGINE}-fit.png`), await shot(page));
   }
   const grip = await frameOnScreen(page);
   await page.mouse.click(grip.left + TITLE_IN_PX, grip.top - TITLE_ABOVE_PX);
@@ -267,7 +280,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
   await untilDrawn(page);
   result.sharpMs = Date.now() - zooming;
   if (index === 0) {
-    writeFileSync(join(OUT, `landings-${ENGINE}-zoomed.png`), await shot(page));
+    writeFileSync(join(OUT, `${CASE}-${ENGINE}-zoomed.png`), await shot(page));
   }
   await context.close();
   return { run: result, spots };
@@ -292,6 +305,6 @@ test('landings benchmark: imported pages with responsive views', async ({ baseUR
   }
   await browser.close();
   const cpuThrottle = ENGINE === Engine.Chromium ? CPU_THROTTLE : null;
-  writeFileSync(join(OUT, `landings-bench-${ENGINE}-${cpuThrottle ?? 'na'}x.json`), JSON.stringify({ engine: ENGINE, cpuThrottle, runs, median: medianOf(runs), hotspots: spots }, null, 2));
+  writeFileSync(join(OUT, `${CASE}-bench-${ENGINE}-${cpuThrottle ?? 'na'}x.json`), JSON.stringify({ engine: ENGINE, cpuThrottle, runs, median: medianOf(runs), hotspots: spots }, null, 2));
   expect(runs.every((r) => benched().every((g) => r[g].frames > 0))).toBe(true);
 });
