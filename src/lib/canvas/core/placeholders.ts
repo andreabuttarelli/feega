@@ -41,6 +41,12 @@ export function fillOrder<T extends { box: Box }>(items: readonly T[], view: Vie
   return items.filter((i) => seen(i.box)).sort((a, b) => distance(a.box) - distance(b.box));
 }
 
+export function onScreenFirst<T extends { box: Box }>(items: readonly T[], view: Viewport, screen: Screen): T[] {
+  const first = fillOrder(items, view, screen);
+  const seen = new Set(first);
+  return [...first, ...items.filter((i) => !seen.has(i))];
+}
+
 type Missing = (i: ImageItem) => boolean;
 
 const ALL: Missing = () => true;

@@ -29,7 +29,7 @@
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
@@ -135,8 +135,12 @@
       return null;
     }
 
+    return { ...(await builtOff(f, source)), source };
+  }
+
+  async function builtOff(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {
     const away = f.scenes ? null : await buildAway(source, smoothing).catch(() => null);
-    return { ...(away ? { list: away, custom: null } : await buildSource(f, source)), source };
+    return away ? { list: away, custom: null } : buildSource(f, source);
   }
 
   const HTTP_NO_CONTENT = 204;
@@ -186,7 +190,7 @@
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
     const generation = (liveGeneration.get(f.id) ?? 0) + 1;
     liveGeneration.set(f.id, generation);
-    const built = await buildSource(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
+    const built = await builtOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
     if (!built || liveGeneration.get(f.id) !== generation) {
       return;
     }
@@ -634,12 +638,12 @@
       }
     }
     let room = gesture.active() ? 0 : ITEMS_PER_FRAME;
-    for (const f of held) {
+    for (const f of onScreenFirst(held, view, area)) {
       while (room > 0 && !put.has(f.group)) {
         room -= putPart(into, f.group);
       }
     }
-    for (const f of [...tails, ...held].filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
+    for (const f of [...tails, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
       if (into.upload(listOf(f.group), pictures, 1)) {
         pictured.add(f.group);
       }
