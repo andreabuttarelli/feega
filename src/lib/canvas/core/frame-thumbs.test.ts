@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
-import { thumbClip, thumbList, thumbRect } from './frame-thumbs';
+import { thumbClip, thumbList, thumbRect, thumbsDue } from './frame-thumbs';
 
 const BOX = { x: 100, y: 50, w: 200, h: 400 };
 
@@ -20,5 +20,12 @@ describe('frame thumbnails', () => {
 
   it('skips a frame too small on screen to make a useful stand-in', () => {
     expect(thumbRect(BOX, { x: 0, y: 0, zoom: 0.01 }, { width: 800, height: 600 }, 1)).toBeNull();
+  });
+
+  it('takes every finished frame in the last paint, so views drawn last still leave a thumbnail', () => {
+    const frames = [{ id: 'a', key: 'a:1', group: 'a:1' }, { id: 'b@bp:tablet', key: 'b@bp:tablet:1', group: 'b@bp:tablet:live1' }, { id: 'c', key: 'c:1', group: 'c:1' }];
+    const shown = [{ id: 'a', group: 'a:1' }, { id: 'b@bp:tablet', group: 'b@bp:tablet:live1' }, { id: 'c', group: 'c:1:thumb' }];
+    expect(thumbsDue(shown, frames, new Set()).map((f) => f.id)).toEqual(['a', 'b@bp:tablet']);
+    expect(thumbsDue(shown, frames, new Set(['a:1'])).map((f) => f.id)).toEqual(['b@bp:tablet']);
   });
 });

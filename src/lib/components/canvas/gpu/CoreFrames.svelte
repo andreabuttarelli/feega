@@ -23,7 +23,7 @@
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
-  import { grabThumb, thumbClip, thumbList, thumbRect, thumbStore } from '$lib/canvas/core/frame-thumbs';
+  import { grabThumb, thumbClip, thumbList, thumbRect, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
@@ -202,20 +202,17 @@
   }
 
   function takeThumbs(into: HTMLCanvasElement | null, shown: readonly HeldFrame[]) {
-    const byId = new Map(frames.map((f) => [f.id, f]));
-    for (const layer of shown) {
-      const f = byId.get(layer.id);
-      const key = f && keyOf(f);
-      if (!into || !f || !key || thumbTaken.has(key) || layer.group !== groupOf(f)) {
-        continue;
-      }
+    if (!into) {
+      return;
+    }
+    const drawn = frames.map((f) => ({ id: f.id, key: keyOf(f), group: groupOf(f), box: f.box }));
+    for (const f of thumbsDue(shown, drawn, thumbTaken)) {
       const rect = thumbRect(f.box, view, area, resolution);
       if (!rect) {
         continue;
       }
-      thumbTaken.add(key);
-      void grabThumb(into, rect).then((blob) => blob && thumbs.put(key, blob));
-      return;
+      thumbTaken.add(f.key);
+      void grabThumb(into, rect).then((blob) => blob && thumbs.put(f.key, blob));
     }
   }
 
