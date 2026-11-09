@@ -3,8 +3,9 @@ import type { ImageTransform } from '$lib/server/media-thumbnails';
 
 type Blob = { bytes: Uint8Array; contentType: string };
 
+const DEFAULT_QUALITY = 80;
 const RESIZABLE = /^image\/(png|jpeg|webp|avif|gif)$/;
-const FIT: Record<ImageTransform['resize'], keyof sharp.FitEnum> = { contain: 'inside', cover: 'cover' };
+const FIT: Record<ImageTransform['resize'], 'inside' | 'cover'> = { contain: 'inside', cover: 'cover' };
 
 export async function transformed(blob: Blob, query: URLSearchParams): Promise<Blob> {
   const width = Number(query.get('width'));
@@ -14,6 +15,7 @@ export async function transformed(blob: Blob, query: URLSearchParams): Promise<B
   }
 
   const fit = FIT[(query.get('resize') ?? 'contain') as ImageTransform['resize']] ?? 'inside';
-  const bytes = await sharp(blob.bytes).resize({ width, height, fit, withoutEnlargement: true }).webp({ quality: Number(query.get('quality')) || undefined }).toBuffer();
+  const quality = Number(query.get('quality')) || DEFAULT_QUALITY;
+  const bytes = await sharp(Buffer.from(blob.bytes)).resize({ width, height, fit, withoutEnlargement: true }).webp({ quality }).toBuffer();
   return { bytes: new Uint8Array(bytes), contentType: 'image/webp' };
 }
