@@ -14,6 +14,7 @@
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
+  import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
   import { cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
@@ -471,6 +472,7 @@
         sent = new SentUses();
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
+        r.setTileBudget?.(budget.tileBytes);
         r.setTiles?.(TILED);
         raster = r;
       },
@@ -603,7 +605,7 @@
 
   const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
   const TIMELINE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('loadTimeline');
-  const TILED = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreTiles');
+  const TILED = typeof location !== 'undefined' && tilesOn(location.search, storedTiles());
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;

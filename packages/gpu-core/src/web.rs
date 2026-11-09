@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{NEAR_STEPS, tiles_kept, TILE_GUTTER_PX, batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -85,6 +85,7 @@ pub struct WebCore {
     spare_tiles: Vec<wgpu::Texture>,
     atlases: HashMap<(u32, u32), wgpu::Texture>,
     rest: Option<Rest>,
+    tile_budget: u64,
     snapshots: HashMap<String, Snapshot>,
     changed_at: f64,
     rest_shown: Vec<(Rect, wgpu::Texture)>,
@@ -313,7 +314,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -457,6 +458,10 @@ impl WebCore {
     fn frame_limits(&self, now_ms: f64) -> Limits {
         let waiting = matches!(self.motion, CoreMotion::Gesture) && !self.library.is_building() && now_ms - self.rastered_at < GESTURE_RASTER_EVERY_MS;
         Limits { rasters: if waiting { 0 } else { self.limits.rasters }, ..self.limits }
+    }
+
+    pub fn set_tile_budget(&mut self, bytes: f64) {
+        self.tile_budget = bytes as u64;
     }
 
     pub fn set_tiles(&mut self, on: bool) {
@@ -615,8 +620,9 @@ impl WebCore {
         }
         self.present_tiles(&tiles.draw)?;
         self.tiles.drawn(&tiles.draw);
-        if self.tiles.len() > tiles_kept(screen) {
-            let evicted = self.tiles.evict_beyond(self.camera, screen, tiles_kept(screen) * EVICT_DOWN_TO_PERCENT / 100);
+        let kept = tiles_kept(screen, self.tile_budget);
+        if self.tiles.len() > kept {
+            let evicted = self.tiles.evict_beyond(self.camera, screen, kept * EVICT_DOWN_TO_PERCENT / 100);
             self.drop_tiles(evicted);
         }
         let waiting_rest = matches!(self.motion, CoreMotion::Still) && !exact;

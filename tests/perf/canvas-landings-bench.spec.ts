@@ -20,7 +20,7 @@ enum Gesture {
 }
 
 type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null };
-type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number };
+type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number; editMs: number };
 type Hotspot = { fn: string; url: string; selfMs: number };
 
 const ENGINE = (process.env.BENCH_ENGINE ?? Engine.Chromium) as Engine;
@@ -49,6 +49,9 @@ const BLANK_SHARE = 0.6;
 const BLANK_SAMPLE_MS = 150;
 const BLANK_WATCH_AFTER_MS = 2000;
 const SWAP_SHARE = 0.001;
+const EDIT_STEPS = 5;
+const EDIT_STEP_PX = 40;
+const EDIT_GIVE_UP_MS = 2000;
 const INK_INSET = 0.15;
 const SHARP_POLL_MS = 60;
 const SHARP_GIVE_UP_MS = 15_000;
@@ -265,7 +268,7 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
   const cdp = ENGINE === Engine.Chromium ? await context.newCDPSession(page) : null;
   await cdp?.send('Performance.enable');
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}${process.env.BENCH_TILES ? '?coreTiles' : ''}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}?coreTiles=${process.env.BENCH_TILES ? 1 : 0}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await untilDrawn(page);
   return { context, page, cdp };
@@ -326,6 +329,34 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps }, spots: profile ? hotspots(profile) : [] };
 }
 
+async function untilChanged(page: Page, from: Buffer): Promise<number> {
+  const started = Date.now();
+  while (Date.now() - started < EDIT_GIVE_UP_MS) {
+    if ((await changedShare(from, await shot(page))) > SWAP_SHARE) {
+      return Date.now() - started;
+    }
+  }
+  return EDIT_GIVE_UP_MS;
+}
+
+async function editLatency(page: Page): Promise<number> {
+  await fitThenZoomIn(page);
+  const box = await frameOnScreen(page);
+  const at = { x: box.x, y: VIEWPORT.height / 2 };
+  await page.mouse.click(at.x, at.y);
+  await untilSharp(page);
+  await page.mouse.down();
+  const waits: number[] = [];
+  for (let i = 1; i <= EDIT_STEPS; i++) {
+    const before = await shot(page);
+    await page.mouse.move(at.x + i * EDIT_STEP_PX, at.y);
+    waits.push(await untilChanged(page, before));
+  }
+  await page.mouse.up();
+  await page.keyboard.press('Control+z');
+  return mid(waits);
+}
+
 async function run(browser: Browser, base: string, index: number, profiled: boolean): Promise<{ run: BenchRun; spots: Partial<Record<Gesture, Hotspot[]>> }> {
   const { context, page, cdp } = await open(browser, base);
   if (index === 0) {
@@ -342,6 +373,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
     await page.waitForTimeout(SETTLE_MS / 4);
   }
 
+  result.editMs = await editLatency(page);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Shift+Digit1');
   await page.waitForTimeout(FIT_TOGGLE_MS);
@@ -367,7 +399,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
 function medianOf(runs: BenchRun[]) {
   const pick = (values: (number | null)[]) => (values.some((v) => v === null) ? null : mid(values as number[]));
   const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'p95', 'worst', 'cpuMs'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
-  return { ...gestures, sharpMs: mid(runs.map((r) => r.sharpMs)) };
+  return { ...gestures, sharpMs: mid(runs.map((r) => r.sharpMs)), editMs: mid(runs.map((r) => r.editMs)) };
 }
 
 test('landings benchmark: imported pages with responsive views', async ({ baseURL }) => {
