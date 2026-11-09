@@ -71,3 +71,14 @@ export function thumbStore(): ThumbStore {
     put: (key, blob) => void store('readwrite').then((s) => s?.put(blob, key)).catch(() => undefined)
   };
 }
+
+type Shown = { id: string; group: string };
+type Drawn = { id: string; key: string; group: string };
+
+export function thumbsDue<T extends Drawn>(shown: readonly Shown[], frames: readonly T[], taken: ReadonlySet<string>): T[] {
+  const byId = new Map(frames.map((f) => [f.id, f]));
+  return shown.flatMap((layer) => {
+    const f = byId.get(layer.id);
+    return f && !taken.has(f.key) && layer.group === f.group ? [f] : [];
+  });
+}
