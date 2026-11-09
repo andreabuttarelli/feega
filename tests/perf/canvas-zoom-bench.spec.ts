@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { instrument, measure, wheelZoom } from '../e2e/fixtures/frame-sweeps';
 import { ZOOM_FIXTURE_CENTRE, ZOOM_FIXTURE_PLACE } from '../../scripts/perf/zoom-fixture.mjs';
-import { median, type BenchRun } from '../../scripts/perf/bench-stats.mjs';
+import { median } from '../../scripts/perf/bench-stats.mjs';
+
+type BenchRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number; sharpMs: number };
 
 enum BenchCase {
   Steady = 'steady',
