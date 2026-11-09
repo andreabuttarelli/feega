@@ -2,7 +2,7 @@ import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
-import { itemWire, wiresKnown } from '@feega/motion-core/motion/gpu-full/wire';
+import { itemPack, itemWire, packsKnown, wiresKnown, type ItemPack } from '@feega/motion-core/motion/gpu-full/wire';
 import { localFilesSnapshot, type LocalFilesSnapshot } from '@feega/motion-core/motion/fonts/local-files';
 import type { FaceBook } from '@feega/motion-core/motion/gpu-full/text/face';
 import type { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -15,7 +15,7 @@ export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: Bra
 
 export type BuildAsk = { id: number; source: FrameDoc; smoothing: Smoothing; locals: LocalFilesSnapshot };
 
-export type BuildAnswer = { id: number; list: DisplayList | null; wires: string[] } | { id: number; error: string };
+export type BuildAnswer = { id: number; list: DisplayList | null; wires: string[]; packs?: ItemPack[] } | { id: number; error: string };
 
 export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: ErrorEvent) => void) | null };
 
@@ -30,7 +30,9 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
   return drawFrame(prepared, frameOfLive(source));
 }
 
-export const builtAnswer = (id: number, list: DisplayList | null): BuildAnswer => ({ id, list, wires: list ? list.items.map(itemWire) : [] });
+export const builtAnswer = (id: number, list: DisplayList | null): BuildAnswer => ({ id, list, wires: list ? list.items.map(itemWire) : [], packs: list ? list.items.map(itemPack) : [] });
+
+export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('packs' in answer ? (answer.packs ?? []).flatMap((p) => [p.floats.buffer as ArrayBuffer, p.ends.buffer as ArrayBuffer]) : []);
 
 export function frameBuilder(spawn: () => BuildWorker | null): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
   let worker: BuildWorker | null = null;
@@ -47,6 +49,7 @@ export function frameBuilder(spawn: () => BuildWorker | null): (source: FrameDoc
     }
     if (e.data.list) {
       wiresKnown(e.data.list.items, e.data.wires);
+      packsKnown(e.data.list.items, e.data.packs ?? []);
     }
     asked?.resolve(e.data.list);
   };
