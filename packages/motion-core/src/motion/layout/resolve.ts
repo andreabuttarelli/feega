@@ -69,13 +69,29 @@ const visualClips = (tracks: readonly MotionTrack[]): MotionClip[] => tracks.fla
 
 const isContainer = (clip: MotionClip | undefined): clip is MotionClip & { autoLayout: AutoLayout } => !!clip?.autoLayout;
 
+type Kids = (parentId: string) => readonly MotionClip[];
+
+function kidsIndex(clips: readonly MotionClip[]): Kids {
+  const byParent = new Map<string, MotionClip[]>();
+  for (const clip of clips) {
+    if (!clip.parent) {
+      continue;
+    }
+    const siblings = byParent.get(clip.parent) ?? byParent.set(clip.parent, []).get(clip.parent)!;
+    siblings.push(clip);
+  }
+  return (parentId) => byParent.get(parentId) ?? [];
+}
+
+function inOrder(kids: readonly MotionClip[], container: MotionClip & { autoLayout: AutoLayout }): MotionClip[] {
+  const order = container.autoLayout.order;
+  const declared = new Map(order.map((id, i) => [id, i]));
+  const rank = new Map(kids.map((c, i) => [c, declared.get(c.id) ?? order.length + i]));
+  return [...kids].sort((a, b) => rank.get(a)! - rank.get(b)!);
+}
+
 export function childrenInOrder(clips: readonly MotionClip[], container: MotionClip & { autoLayout: AutoLayout }): MotionClip[] {
-  const kids = clips.filter((c) => c.parent === container.id);
-  const rank = (c: MotionClip) => {
-    const at = container.autoLayout.order.indexOf(c.id);
-    return at < 0 ? container.autoLayout.order.length + kids.indexOf(c) : at;
-  };
-  return [...kids].sort((a, b) => rank(a) - rank(b));
+  return inOrder(clips.filter((c) => c.parent === container.id), container);
 }
 
 function intrinsic(clip: MotionClip, size: Size, content: Content, measure: TextMeasure): Size {
@@ -111,7 +127,7 @@ function strokeInset(clip: MotionClip, size: Size): Padding {
 
 const withInset = (padding: Padding, inset: Padding): Padding => ({ top: padding.top + inset.top, right: padding.right + inset.right, bottom: padding.bottom + inset.bottom, left: padding.left + inset.left });
 
-function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, content: Content, measure: TextMeasure): Item {
+function itemOf(clip: MotionClip, kids: Kids, size: Size, content: Content, measure: TextMeasure): Item {
   const own = clip.layoutItem ?? DEFAULT_LAYOUT_ITEM;
   const base: Item = {
     id: clip.id,
@@ -134,7 +150,7 @@ function itemOf(clip: MotionClip, clips: readonly MotionClip[], size: Size, cont
   }
   const { order: _order, firstOnTop: _firstOnTop, strokesIncluded, ...rest } = clip.autoLayout;
   const flow = strokesIncluded ? { ...rest, padding: withInset(rest.padding, strokeInset(clip, size)) } : rest;
-  return { ...base, flow, children: childrenInOrder(clips, clip).filter((c) => !c.hidden).map((c) => itemOf(c, clips, size, content, measure)) };
+  return { ...base, flow, children: inOrder(kids(clip.id), clip).filter((c) => !c.hidden).map((c) => itemOf(c, kids, size, content, measure)) };
 }
 
 function isRoot(clip: MotionClip, byId: Clips): boolean {
@@ -157,9 +173,10 @@ const placedProps = (box: Box, size: Size) => ({
 function boxesOf(clips: readonly MotionClip[], size: Size, content: Content, measure: TextMeasure): Map<string, Box> {
   const byId: Clips = new Map(clips.map((c) => [c.id, c]));
   const boxes = new Map<string, Box>();
+  const kids = kidsIndex(clips);
   for (const root of clips.filter((c) => isRoot(c, byId))) {
     const { left, top } = pivotBox(root.props, size);
-    layoutTree(itemOf(root, clips, size, content, measure), { left, top }).forEach((box, id) => boxes.set(id, box));
+    layoutTree(itemOf(root, kids, size, content, measure), { left, top }).forEach((box, id) => boxes.set(id, box));
   }
   return boxes;
 }
