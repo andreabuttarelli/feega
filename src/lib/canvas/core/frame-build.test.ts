@@ -12,7 +12,7 @@ import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
-import { builtAnswer, buildFrame, frameBuilder, transfers, warmFonts, type BuildAsk, type BuildWorker } from './frame-build';
+import { builtAnswer, buildFrame, frameBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
 import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
 import { onStage } from './frame-source';
 import { withoutPictures } from './placeholders';
@@ -55,19 +55,6 @@ describe('building a frame away from the main thread', () => {
   it('the list survives the trip between threads unchanged', async () => {
     const list = await buildFrame(source(shapeDoc), Smoothing.Plain, fonts);
     expect(structuredClone(list)).toEqual(list);
-  });
-});
-
-describe('a fresh worker', () => {
-  it('loads the default faces before any frame asks, so the first build does not wait on them', async () => {
-    const asked: unknown[] = [];
-    await warmFonts(async (doc) => (asked.push(doc), boxBook()));
-
-    expect(asked).toHaveLength(1);
-  });
-
-  it('stays usable when the default faces cannot load', async () => {
-    await expect(warmFonts(async () => Promise.reject(new Error('offline')))).resolves.toBeUndefined();
   });
 });
 

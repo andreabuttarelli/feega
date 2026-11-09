@@ -1,5 +1,5 @@
-import { FEEGA_TOKENS, type BrandTokens } from '@feega/motion-core/motion/brand';
-import { MotionFormat, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
+import type { BrandTokens } from '@feega/motion-core/motion/brand';
+import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
 import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
 import { stripContours, type ContourView } from '@feega/motion-core/motion/gpu-full/wire';
@@ -28,10 +28,6 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
   const faces = await fonts(source.doc, source.assets, source.tokens);
   const prepared = prepare(source.doc, source.tokens, source.assets, { fonts: faces, smoothing });
   return drawFrame(prepared, frameOfLive(source));
-}
-
-export async function warmFonts(fonts: Fonts): Promise<void> {
-  await fonts(newMotionDoc(MotionFormat.Landscape), {}, FEEGA_TOKENS).catch(() => null);
 }
 
 export function builtAnswer(id: number, list: DisplayList | null): BuildAnswer {
