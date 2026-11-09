@@ -97,6 +97,9 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
       neq() {
         return chain;
       },
+      or() {
+        return chain;
+      },
       gte(column: string, value: unknown) {
         call.filters.push([`${column}>=`, value]);
         return chain;
