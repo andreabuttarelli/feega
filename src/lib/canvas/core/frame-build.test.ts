@@ -134,7 +134,7 @@ describe('the builder', () => {
     const list = (await buildFrame(source(shapeDoc), Smoothing.Plain, fonts)) as DisplayList;
     const answer = builtAnswer(7, list);
 
-    expect(transfers(answer)).toHaveLength(answer.packs!.length * 2);
+    expect(transfers(answer)).toHaveLength(list.items.length * 2);
   });
 
   it('says it cannot build when no worker can start', async () => {
