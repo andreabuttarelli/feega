@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use crate::fragments::Fragments;
+use crate::packed;
 
 pub type Rgba = [f32; 4];
 pub type Affine = [f64; 6];
@@ -31,6 +32,7 @@ pub enum Paint {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Within {
+    #[serde(deserialize_with = "packed::contours")]
     pub contours: Vec<Vec<f64>>,
     pub outside: bool,
 }
@@ -54,8 +56,17 @@ pub enum Ramp {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Cover {
-    Path { contours: Vec<Vec<f64>>, matrix: Affine },
-    Ramp { ramp: Ramp, contours: Vec<Vec<f64>>, matrix: Affine },
+    Path {
+        #[serde(deserialize_with = "packed::contours")]
+        contours: Vec<Vec<f64>>,
+        matrix: Affine,
+    },
+    Ramp {
+        ramp: Ramp,
+        #[serde(deserialize_with = "packed::contours")]
+        contours: Vec<Vec<f64>>,
+        matrix: Affine,
+    },
     Picture { src: String, luma: bool, matrix: Affine },
 }
 
@@ -135,6 +146,7 @@ pub struct Look {
 #[derive(Debug, Clone, Deserialize)]
 pub struct PathItem {
     pub clip: String,
+    #[serde(deserialize_with = "packed::contours")]
     pub contours: Vec<Vec<f64>>,
     pub rule: FillRule,
     pub paint: Paint,
@@ -508,4 +520,12 @@ pub struct Splice {
 
 pub fn parse_splice(json: &str) -> Result<Splice, serde_json::Error> {
     serde_json::from_str(json)
+}
+
+pub fn parse_packed(json: &str, floats: Vec<f64>, ends: Vec<u32>) -> Result<DisplayList, serde_json::Error> {
+    packed::within(floats, ends, || serde_json::from_str(json))
+}
+
+pub fn parse_splice_packed(json: &str, floats: Vec<f64>, ends: Vec<u32>) -> Result<Splice, serde_json::Error> {
+    packed::within(floats, ends, || serde_json::from_str(json))
 }
