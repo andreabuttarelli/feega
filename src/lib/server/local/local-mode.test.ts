@@ -112,7 +112,7 @@ describe('lo storage locale', () => {
   it('un file caricato dal browser si rilegge', async () => {
     const params = { bucket: 'canvas-assets', path: `${LOCAL_ORG_ID}/${store.place.projectId}/a.png` };
     await storage.PUT({ params, request: new Request('http://x', { method: 'PUT', body: new Uint8Array([7, 8]), headers: { 'content-type': 'image/png' } }) } as never);
-    const read = await storage.GET({ params } as never);
+    const read = await storage.GET({ params, url: new URL('http://x') } as never);
 
     expect(read.headers.get('content-type')).toBe('image/png');
     expect(new Uint8Array(await read.arrayBuffer())).toEqual(new Uint8Array([7, 8]));
