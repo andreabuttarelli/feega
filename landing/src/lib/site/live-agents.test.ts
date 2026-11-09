@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { curve, rewriteFrom, thin, typeFrames } from './live-agents';
+import { claimTweak, createLedger, curve, mayTweak, releaseTweak, rewriteFrom, thin, typeFrames } from './live-agents';
 
 const always = (v: number) => () => v;
 
@@ -51,5 +51,25 @@ describe('thinning typed frames', () => {
     const kept = thin(frames, 40);
     expect(kept.length).toBeLessThanOrEqual(41);
     expect(kept.at(-1)).toBe(299);
+  });
+});
+
+describe('tweak ledger', () => {
+  const GAP = 3000;
+
+  it('tweaks an element at most once, ever', () => {
+    const ledger = createLedger<string>();
+    expect(mayTweak(ledger, 'h1', 0, GAP)).toBe(true);
+    claimTweak(ledger, 'h1', 0);
+    releaseTweak(ledger, 'h1');
+    expect(mayTweak(ledger, 'h1', 1e9, GAP)).toBe(false);
+  });
+
+  it('never runs two tweaks on one element, nor two within the gap', () => {
+    const ledger = createLedger<string>();
+    claimTweak(ledger, 'a', 0);
+    expect(mayTweak(ledger, 'a', GAP, GAP)).toBe(false);
+    expect(mayTweak(ledger, 'b', GAP - 1, GAP)).toBe(false);
+    expect(mayTweak(ledger, 'b', GAP, GAP)).toBe(true);
   });
 });

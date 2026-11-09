@@ -6,7 +6,7 @@ export type Point = { x: number; y: number };
 export const PEER_COLOURS = ['#e5484d', '#0090ff', '#30a46c', '#f76b15', '#8e4ec6', '#d6409f', '#12a594', '#ffc53d'];
 
 export const ACTIONS_BY_TARGET: Record<TargetKind, ActionKind[]> = {
-  text: ['type', 'font', 'colour', 'select', 'nudge'],
+  text: ['font', 'colour', 'select', 'nudge'],
   media: ['resize', 'select', 'nudge'],
   block: ['select', 'nudge']
 };
@@ -34,7 +34,13 @@ export const AGENTS: { name: string; skills: ActionKind[] }[] = [
   { name: 'Growth agent', skills: WRITING },
   { name: 'Cursor', skills: ALL },
   { name: 'Video agent', skills: ['resize', 'nudge'] },
-  { name: 'Editor', skills: WRITING }
+  { name: 'Editor', skills: WRITING },
+  { name: 'Gemini', skills: ALL },
+  { name: 'Research agent', skills: WRITING },
+  { name: 'Docs agent', skills: WRITING },
+  { name: 'Social agent', skills: DESIGN },
+  { name: 'Product agent', skills: LAYOUT },
+  { name: 'Pricing agent', skills: WRITING }
 ];
 
 const TYPO_CHANCE = 0.06;
@@ -122,7 +128,7 @@ export const BUILD_SELECTOR = [
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
-export const BUILD_HEAD = `<style>.${BUILD_CLASS} :is(${BUILD_SELECTOR}):not([data-built]){opacity:0!important}</style><script>(()=>{if(matchMedia('${REDUCED_MOTION}').matches){return}const r=document.documentElement;r.classList.add('${BUILD_CLASS}');setTimeout(()=>{if(!r.dataset.agents){r.classList.remove('${BUILD_CLASS}')}},${BUILD_FALLBACK_MS})})()</script>`;
+export const BUILD_HEAD = `<style>.${BUILD_CLASS} :is(${BUILD_SELECTOR}){transition:opacity 250ms}.${BUILD_CLASS} :is(${BUILD_SELECTOR}):not([data-built]){opacity:0!important}</style><script>(()=>{if(matchMedia('${REDUCED_MOTION}').matches){return}const r=document.documentElement;r.classList.add('${BUILD_CLASS}');setTimeout(()=>{if(!r.dataset.agents){r.classList.remove('${BUILD_CLASS}')}},${BUILD_FALLBACK_MS})})()</script>`;
 
 export function outermost(els: HTMLElement[]): HTMLElement[] {
   const set = new Set(els);
@@ -139,4 +145,24 @@ export function outermost(els: HTMLElement[]): HTMLElement[] {
 export function thin<T>(frames: T[], max: number): T[] {
   const every = Math.ceil(frames.length / max);
   return frames.filter((_, i) => i % every === 0 || i === frames.length - 1);
+}
+
+export type TweakLedger<T> = { done: Set<T>; active: Set<T>; lastAt: number };
+
+export function createLedger<T>(): TweakLedger<T> {
+  return { done: new Set(), active: new Set(), lastAt: -Infinity };
+}
+
+export function mayTweak<T>(ledger: TweakLedger<T>, el: T, now: number, gap: number): boolean {
+  return !ledger.done.has(el) && !ledger.active.has(el) && now - ledger.lastAt >= gap;
+}
+
+export function claimTweak<T>(ledger: TweakLedger<T>, el: T, now: number) {
+  ledger.done.add(el);
+  ledger.active.add(el);
+  ledger.lastAt = now;
+}
+
+export function releaseTweak<T>(ledger: TweakLedger<T>, el: T) {
+  ledger.active.delete(el);
 }

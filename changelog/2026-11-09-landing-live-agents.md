@@ -1,10 +1,14 @@
 # Landing homepage built live by agents
 
 The homepage said "made for humans and agents" and showed a static page. Now it starts empty and
-about 16 simulated agent cursors (6 on mobile) build it in front of the visitor: navbar first, then
+up to 24 simulated agent cursors (8 on mobile) build it in front of the visitor: navbar first, then
 each section as it scrolls into view. Headlines and copy are typed in, blocks get a frame drawn
-before they appear, images are resized into place. Once built, agents keep making small reversible
-tweaks (font picker, colour swap, nudge, resize, retyping the last words of a line).
+before they appear, images are resized into place. Each section swarms: roughly one cursor per element,
+long lists in small batches, built within ~2 s. When nothing is left to build in view, agents glide
+off the nearest edge and the "N agents editing" count drops. Afterwards a rare single tweak (font,
+colour, nudge, resize; under 1 s) brings one agent back. A tweak ledger enforces readability: each
+element is tweaked at most once, never concurrently, never near the visitor's pointer, at most one
+every 3.5 s across all agents.
 
 Cursor and pill styling copy the canvas presence layer (`PeerLayer.svelte`, `PEER_COLOURS`).
 

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ACTIONS_BY_TARGET, AGENTS, BUILD_CLASS, BUILD_SELECTOR, PEER_COLOURS, curve, initials, outermost, pick, rewriteFrom, thin, typeFrames, type ActionKind, type Point, type TargetKind } from './live-agents';
+  import { ACTIONS_BY_TARGET, AGENTS, BUILD_CLASS, BUILD_SELECTOR, PEER_COLOURS, claimTweak, createLedger, mayTweak, releaseTweak, curve, initials, outermost, pick, rewriteFrom, thin, typeFrames, type ActionKind, type Point, type TargetKind } from './live-agents';
 
   type Box = { x: number; y: number; w: number; h: number };
   type Menu = { items: string[]; active: number };
@@ -9,8 +9,8 @@
   type Step = { ms: number; move?: boolean; start?: () => void; tick?: (t: number) => void; end?: () => void };
   type Agent = { skills: ActionKind[]; view: View; anchor: Anchor; from: Point; steps: Step[]; step: Step | null; since: number; target: HTMLElement | null; typing: boolean; grow: number; push: Point; seed: number };
 
-  const DESKTOP_AGENTS = 16;
-  const MOBILE_AGENTS = 6;
+  const DESKTOP_AGENTS = 24;
+  const MOBILE_AGENTS = 8;
   const MOBILE_QUERY = '(max-width: 809.98px)';
   const REDUCED_QUERY = '(prefers-reduced-motion: reduce)';
   const STAGGER_MS = 700;
@@ -22,8 +22,10 @@
   const EASE_PUSH = 0.12;
   const TEMPO = 2.6;
   const MAX_TYPE_FRAMES = 40;
-  const PARALLEL_FRONT = 4;
-  const IDLE_SHARE = 0.4;
+  const PARALLEL_FRONT = 24;
+  const OFFSCREEN_PX = 60;
+  const TWEAK_GAP_MS = 3500;
+  const READING_MARGIN = 120;
   const MEDIA_START_SCALE = 0.6;
   const FONTS = ['BDO Grotesk', 'Instrument Serif', 'DM Sans', 'Fragment Mono', 'Inter'];
   const SWATCHES = ['#ff4000', '#f0eee9', '#0090ff', '#ffc53d', '#30a46c'];
@@ -32,6 +34,8 @@
   let agents = $state<View[]>([]);
   let running: Agent[] = [];
   const busy = new Set<HTMLElement>();
+  const ledger = createLedger<HTMLElement>();
+  let clock = 0;
   const originals = new Map<HTMLElement, string>();
   const mouse: Point = { x: -1e4, y: -1e4 };
 
@@ -55,6 +59,25 @@
   function nearViewport(el: HTMLElement): boolean {
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.bottom > -NEAR_VIEWPORT_PX && r.top < innerHeight + NEAR_VIEWPORT_PX;
+  }
+
+  function underReader(el: HTMLElement): boolean {
+    const r = el.getBoundingClientRect();
+    return mouse.x > r.left - READING_MARGIN && mouse.x < r.right + READING_MARGIN && mouse.y > r.top - READING_MARGIN && mouse.y < r.bottom + READING_MARGIN;
+  }
+
+  function edgeOf(p: Point): Anchor {
+    const out = OFFSCREEN_PX;
+    const gaps = [p.x, innerWidth - p.x, innerHeight - p.y];
+    const nearest = gaps.indexOf(Math.min(...gaps));
+    const fy = p.y / innerHeight;
+    const fx = p.x / innerWidth;
+    const edges: Anchor[] = [
+      { el: null, fx: -out / innerWidth, fy },
+      { el: null, fx: 1 + out / innerWidth, fy },
+      { el: null, fx, fy: 1 + out / innerHeight }
+    ];
+    return edges[nearest];
   }
 
   function resolve(a: Anchor): Point {
@@ -131,6 +154,7 @@
     return wait(between(300, 700), () => {
       restore(el);
       busy.delete(el);
+      releaseTweak(ledger, el);
       agent.target = null;
       agent.typing = false;
       agent.grow = 1;
@@ -208,9 +232,13 @@
     ];
   }
 
-  function build(agent: Agent, el: HTMLElement): Step[] {
+  function build(agent: Agent, el: HTMLElement, batch: HTMLElement[]): Step[] {
     const start = { el, fx: 0, fy: 0.5 };
-    return [moveTo(agent, start), select(agent, el, false), ...(kindOf(el) === 'text' ? typeIn(agent, el) : place(agent, el)), release(agent, el)];
+    const dropBatch = wait(1, () => {
+      batch.forEach(reveal);
+      batch.forEach((b) => busy.delete(b));
+    });
+    return [moveTo(agent, start), select(agent, el, false), ...(kindOf(el) === 'text' ? typeIn(agent, el) : place(agent, el)), dropBatch, release(agent, el)];
   }
 
   function typing(agent: Agent, el: HTMLElement): Step[] {
@@ -249,7 +277,7 @@
     const current = 0;
     const tries = [1 + Math.floor(rand() * (FONTS.length - 1)), 1 + Math.floor(rand() * (FONTS.length - 1))];
     const hover = (i: number): Step => ({
-      ms: between(380, 600),
+      ms: between(250, 350),
       start() {
         agent.view.menu = { items: FONTS, active: i };
         el.style.minHeight = `${el.getBoundingClientRect().height}px`;
@@ -257,7 +285,7 @@
       }
     });
 
-    return [wait(300, () => (agent.view.menu = { items: FONTS, active: current })), hover(tries[0]), hover(tries[1]), wait(between(900, 1500)), hover(current), wait(350, () => (agent.view.menu = null))];
+    return [wait(300, () => (agent.view.menu = { items: FONTS, active: current })), hover(tries[0]), wait(between(400, 600)), hover(current), wait(350, () => (agent.view.menu = null))];
   }
 
   function colourSwap(agent: Agent, el: HTMLElement): Step[] {
@@ -268,7 +296,7 @@
         el.style.color = swatch;
         agent.view.tip = swatch.toUpperCase();
       }),
-      wait(between(1200, 2000), () => {
+      wait(between(700, 1000), () => {
         el.style.removeProperty('color');
         agent.view.tip = getComputedStyle(el).color.startsWith('rgb(255') ? '#FFFFFF' : '#F0EEE9';
       }),
@@ -280,7 +308,7 @@
     const target = between(0.82, 0.94);
     const base = boxOf(el);
     const scaleTo = (from: number, to: number): Step => ({
-      ms: between(800, 1200),
+      ms: between(500, 700),
       tick(t) {
         const s = from + (to - from) * t;
         el.style.scale = `${s}`;
@@ -292,7 +320,7 @@
       wait(1, () => (el.style.transformOrigin = 'top left')),
       moveTo(agent, { el, fx: 1, fy: 1 }),
       scaleTo(1, target),
-      wait(between(500, 900)),
+      wait(between(250, 400)),
       scaleTo(target, 1)
     ];
   }
@@ -318,32 +346,36 @@
     colour: colourSwap,
     resize,
     nudge,
-    select: () => [wait(between(900, 1800))]
+    select: () => [wait(between(700, 1200))]
   };
 
   function plan(agent: Agent, targets: HTMLElement[]) {
-    agent.view.live = true;
     const unbuilt = targets.filter((el) => !('built' in el.dataset) && !busy.has(el) && nearViewport(el));
     if (unbuilt.length > 0) {
       const el = unbuilt[Math.floor(rand() * Math.min(PARALLEL_FRONT, unbuilt.length))];
+      const section = el.closest('section');
+      const siblings = section ? unbuilt.filter((o) => o !== el && o.closest('section') === section) : [];
+      const batch = siblings.slice(0, Math.ceil(siblings.length / running.length));
       busy.add(el);
-      agent.steps = build(agent, el);
+      agent.view.live = true;
+      batch.forEach((b) => busy.add(b));
+      agent.steps = build(agent, el, batch);
       return;
     }
 
     const kind = pick(agent.skills, rand);
-    const idle = rand() < IDLE_SHARE;
-    const free = targets.filter((el) => !idle && 'built' in el.dataset && el.closest('main') && !busy.has(el) && ACTIONS_BY_TARGET[kindOf(el)].includes(kind) && nearViewport(el));
+    const free = targets.filter((el) => mayTweak(ledger, el, clock, TWEAK_GAP_MS) && 'built' in el.dataset && el.closest('main') && !underReader(el) && !busy.has(el) && ACTIONS_BY_TARGET[kindOf(el)].includes(kind) && nearViewport(el));
 
     if (free.length === 0) {
-      const near = targets.filter(nearViewport);
-      const anchor = near.length > 0 ? { el: pick(near, rand), fx: between(-0.1, 1.1), fy: between(0, 1.2) } : { el: null, fx: between(0.08, 0.92), fy: between(0.15, 0.9) };
-      agent.steps = [moveTo(agent, anchor), wait(between(600, 1800))];
+      agent.steps = agent.view.live ? [moveTo(agent, edgeOf(resolve(agent.anchor))), wait(1, () => (agent.view.live = false))] : [wait(between(300, 600))];
       return;
     }
 
+    agent.view.live = true;
+
     const el = pick(free, rand);
     busy.add(el);
+    claimTweak(ledger, el, clock);
     agent.steps = [moveTo(agent, { el, fx: between(0.15, 0.85), fy: between(0.3, 0.8) }), select(agent, el, kind === 'resize'), ...ACTION_STEPS[kind](agent, el), release(agent, el)];
   }
 
@@ -363,6 +395,7 @@
   }
 
   function frame(agent: Agent, now: number, targets: HTMLElement[]) {
+    clock = now;
     advance(agent, now, targets);
     const step = agent.step as Step;
     const t = Math.min(1, (now - agent.since) / step.ms);
@@ -397,7 +430,7 @@
     running = agents.map((view, i) => ({
       skills: AGENTS[i].skills,
       view,
-      anchor: { el: null, fx: rand(), fy: rand() },
+      anchor: edgeOf({ x: rand() * innerWidth, y: rand() * innerHeight }),
       from: { x: 0, y: 0 },
       steps: [wait(i * STAGGER_MS)],
       step: null,
@@ -478,13 +511,14 @@
     {/each}
   </div>
 
-  <div class="stack" aria-hidden="true">
+  {@const present = agents.filter((a) => a.live)}
+  <div class="stack" aria-hidden="true" class:gone={present.length === 0}>
     <div class="faces">
-      {#each agents.slice(0, 5) as a (a.name)}
+      {#each present.slice(0, 5) as a (a.name)}
         <span style:background={a.colour}>{initials(a.name)}</span>
       {/each}
     </div>
-    <span><i></i>{agents.length} agents editing</span>
+    <span><i></i>{present.length} agents editing</span>
   </div>
 {/if}
 
@@ -616,6 +650,14 @@
     line-height: 14px;
     color: #ddd;
     letter-spacing: 0;
+  }
+
+  .stack.gone {
+    opacity: 0;
+  }
+
+  .stack {
+    transition: opacity 300ms;
   }
 
   .faces {
