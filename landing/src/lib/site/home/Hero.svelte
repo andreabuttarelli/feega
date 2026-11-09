@@ -13,19 +13,19 @@
 </svelte:head>
 
 <section class="hero" id="hero">
-  <h1><span>The motion canvas</span> <span>for Claude Code</span></h1>
+  <h1><span data-agent-id="hero-title-a">The motion canvas</span> <span data-agent-id="hero-title-b">for Claude Code</span></h1>
 
-  <p class="lead">Paste any website. Claude rebuilds it as editable layers, animates it on a real timeline, and you ship it as video or code.</p>
+  <p class="lead" data-agent-id="hero-lead">Paste any website. Claude rebuilds it as editable layers, animates it on a real timeline, and you ship it as video or code.</p>
 
-  <div class="start">
+  <div class="start" data-agent-id="hero-start">
     <UrlField id="hero-url" />
   </div>
 
   <p class="run"><span>or run it locally:</span> <NpxChip /></p>
 
-  <video class="canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
+  <video class="canvas" data-agent-id="hero-canvas" data-src={CANVAS_VIDEO} muted loop playsinline preload="none" poster={POSTER} width="1920" height="1080" aria-label="Feega canvas overview" use:lazyPlay></video>
 
-  <div class="ticker" aria-label="Videos made with Feega">
+  <div class="ticker" data-agent-id="hero-ticker" aria-label="Videos made with Feega">
     {#each TICKER_VIDEOS as src (src)}
       <video data-src={src} muted loop playsinline preload="none" width="1920" height="1080" use:lazyPlay></video>
     {/each}

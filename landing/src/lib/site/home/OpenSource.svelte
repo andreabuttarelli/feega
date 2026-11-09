@@ -3,9 +3,9 @@
 </script>
 
 <section class="open site-wide">
-  <h2>Open source. <br />Apache-2.0.<br />Works with Claude Code, <br class="wide" />Codex, Cursor.</h2>
+  <h2 data-agent-id="open-title">Open source. <br />Apache-2.0.<br />Works with Claude Code, <br class="wide" />Codex, Cursor.</h2>
 
-  <ul class="logos">
+  <ul class="logos" data-agent-id="open-logos">
     {#each AGENT_LOGOS as logo (logo.file)}
       <li><img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" /></li>
     {/each}
