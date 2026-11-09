@@ -156,8 +156,19 @@ function paint(doc: MotionDoc, ids: readonly string[], style: Style, before?: St
   return { ok: true, doc: next };
 }
 
+function linkedByName(doc: MotionDoc): Map<string, string[]> {
+  const byName = new Map<string, string[]>();
+  for (const c of doc.tracks.flatMap((t) => t.clips)) {
+    for (const name of new Set(SLOTS.map((slot) => c[slot]).filter((n): n is string => typeof n === 'string'))) {
+      byName.set(name, [...(byName.get(name) ?? []), c.id]);
+    }
+  }
+  return byName;
+}
+
 export function stylesOf(doc: MotionDoc): NamedStyle[] {
-  return Object.entries(doc.styles ?? {}).map(([name, style]) => ({ name, style, clips: linked(doc, name) }));
+  const byName = linkedByName(doc);
+  return Object.entries(doc.styles ?? {}).map(([name, style]) => ({ name, style, clips: byName.get(name) ?? [] }));
 }
 
 export function defineStyle(doc: MotionDoc, name: string, input: unknown): OpResult {

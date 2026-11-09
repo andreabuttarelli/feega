@@ -32,16 +32,17 @@
   import { Stand, drawable, fillOrder, firstDrawn, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
-  import { withoutViews } from '$lib/canvas/breakpoint-views';
+  import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
   import { loadOnce, withScenes, type LoadScene } from '$lib/canvas/scene-sources';
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
+  import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
   import { AttachStep, afterAttachFailure, backendAfterLoss, isTrap } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onsource = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onsource = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onfallback: (why: string) => void } = $props();
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -203,6 +204,9 @@
   $effect(() => {
     for (const f of frames) {
       const source = live.get(f.id);
+      if (lift && !lift.landing && lift.id === baseNodeId(f.id)) {
+        continue;
+      }
       if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
         liveBuilt.set(f.id, source);
         liveStamp.set(f.id, f.scenes);
@@ -396,7 +400,57 @@
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
   let paintedLabel = $state('');
 
-  const listIfKnown = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list;
+  let lifting: { key: number; group: string; lifted: Lifted | null } | null = null;
+  const liftLists = new Map<string, DisplayList>();
+
+  function dropLift(into: CoreRaster) {
+    for (const group of liftLists.keys()) {
+      into.dropGroup(group);
+      put.delete(group);
+      pictured.delete(group);
+    }
+    liftLists.clear();
+    lifting = null;
+  }
+
+  function startLift(into: CoreRaster, now: Lift, group: string): Lifted | null {
+    const list = listIfKnown(group);
+    const lifted = list && put.has(group) ? liftOut(list, now.clips) : null;
+    const [rest, moving] = [restGroup(group), movingGroup(group)];
+    const patched = lifted !== null && into.patchGroup(group, rest, lifted.splice, pictures);
+    lifting = { key: now.key, group, lifted: patched ? lifted : null };
+    if (!patched) {
+      return null;
+    }
+    into.putGroup(moving, lifted.moving, pictures);
+    liftLists.set(rest, lifted.rest).set(moving, lifted.moving);
+    for (const g of [rest, moving]) {
+      put.add(g);
+      pictured.add(g);
+    }
+    return lifted;
+  }
+
+  const liftHeld = (drawn: HeldFrame[]): ReadonlySet<string> => (liftLists.size && lift ? new Set([...edited, ...drawn.filter((l) => liftLists.has(l.group)).map((l) => l.id)]) : edited);
+
+  function withLift(into: CoreRaster, shown: HeldFrame[]): HeldFrame[] {
+    const at = lift ? shown.findIndex((l) => l.id === lift.id) : -1;
+    const layer = shown[at];
+    const stale = lifting && (!lift || lift.key !== lifting.key || layer?.group !== lifting.group);
+    if (stale) {
+      dropLift(into);
+    }
+    if (!lift || !layer || (lift.landing && !lifting)) {
+      return shown;
+    }
+    const lifted = lifting ? lifting.lifted : startLift(into, lift, layer.group);
+    if (!lifted) {
+      return shown;
+    }
+    return [...shown.slice(0, at), { ...layer, group: restGroup(layer.group) }, liftedPut(layer, movingGroup(layer.group), lift.by), ...shown.slice(at + 1)];
+  }
+
+  const listIfKnown = (group: string) => liftLists.get(group) ?? cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list;
 
   function patchedFromSent(into: CoreRaster, group: string): number {
     const layers = chains.flat();
@@ -567,7 +621,7 @@
 
   function paintOn(into: CoreRaster): boolean {
     const tails = nearTails();
-    const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group));
+    const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group).concat([...liftLists.keys()]));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
       into.dropGroup(group);
       put.delete(group);
@@ -599,10 +653,11 @@
         drawnLast.set(layer.id, layer);
       }
     }
+    const drawn = withLift(into, shown);
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(shown, wide.view, wide.area, textureBytes) : uncached(shown), edited)));
+    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes) : uncached(drawn), liftHeld(drawn))));
     if (patch) {
       into.patchUses(patch);
     }
@@ -668,7 +723,7 @@
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
   $effect(() => {
-    void [raster, held, edited, overlay, view.x, view.y, view.zoom, area.width, area.height];
+    void [raster, held, edited, overlay, lift, view.x, view.y, view.zoom, area.width, area.height];
     pacer.invalidate();
   });
 

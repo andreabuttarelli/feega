@@ -10,7 +10,7 @@
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Depth, Gesture } from '$lib/motion/drill';
-  import { FrameFit, FramePickers, Reuse, shaped, type WorldRect } from '$lib/canvas/frame-pick';
+  import { FrameFit, FramePickers, Reuse, shaped, type FrameSpace, type WorldRect } from '$lib/canvas/frame-pick';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
   import { PickerSettle } from '$lib/canvas/picker-settle.svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
@@ -96,7 +96,7 @@
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
+  import { GRIP_SUMMARY, SelectionKind, SnapMode, dragClips, measuredGaps, clipsShift, nudgeClips, selectionKindOf } from '$lib/canvas/frame-transform';
   import { unionBounds } from '$lib/motion/multi-select';
   import { marqueeIds, primaryOf, spanOf, toggleId, type FrameStep } from '$lib/canvas/frame-multi';
   import { postFrameOps } from '$lib/canvas/frame-ops-send';
@@ -142,6 +142,7 @@
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import { subtreeOf, type Lift } from '$lib/canvas/core/lifted-drag';
   import type { FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { sceneRevision, sceneStamp } from '$lib/canvas/scene-sources';
   import { liveDocs, type LiveDoc } from '$lib/canvas/core/live-docs.svelte';
@@ -1362,7 +1363,8 @@
   let inside = $state<Inside | null>(null);
   const savers = new Map<string, FrameEditSession>();
   const settle = new PickerSettle();
-  const reuseOf = (nodeId: string) => (savers.get(nodeId)?.live.active() || settle.settling(nodeId) ? Reuse.Held : Reuse.Changed);
+  const liftedNow = (id: string) => elementLift?.id === id && !elementLift.landing;
+  const reuseOf = (nodeId: string) => (savers.get(nodeId)?.live.active() || settle.settling(nodeId) || liftedNow(nodeId) ? Reuse.Held : Reuse.Changed);
 
   $effect(() => {
     const warnUnsaved = (event: BeforeUnloadEvent) => {
@@ -2133,13 +2135,22 @@
     [TimelineAccess.Edit]: (nodeId) => (doc, summary) => commit(nodeId, { ok: true, doc }, summary)
   };
 
+  function liftShift(nodeId: string, space: FrameSpace): Point {
+    if (!liftedNow(nodeId) || !elementLift) {
+      return { x: 0, y: 0 };
+    }
+    const [from, to] = [space.pointToWorld([0, 0]), space.pointToWorld(elementLift.by)];
+    return { x: to.x - from.x, y: to.y - from.y };
+  }
+
   function selectionMarks(nodeId: string) {
     const at = inside?.nodeId === nodeId ? editPickerOf(nodeId) : null;
     if (!at) {
       return [];
     }
     const kind = selectionKindOf(picks.length, picks.length === 1 ? findClip(at.live.doc, picks[0])?.clip : null);
-    const onScreen = (p: Point): [number, number] => [(p.x - at.frame.box.x) * view.zoom, (p.y - at.frame.box.y) * view.zoom];
+    const shift = liftShift(nodeId, at.space);
+    const onScreen = (p: Point): [number, number] => [(p.x + shift.x - at.frame.box.x) * view.zoom, (p.y + shift.y - at.frame.box.y) * view.zoom];
     return picks.flatMap((clip) => {
       const quad = at.picker.outlineQuad(clip, at.space);
       const own = findClip(at.live.doc, clip)?.clip;
@@ -2262,7 +2273,7 @@
 
   function textMeasureOf(nodeId: string): TextMeasure | undefined {
     const live = liveOf(nodeId);
-    return live ? pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead).textMeasure() : undefined;
+    return live ? pickers.of(nodeId, live, () => liveOf(nodeId)?.playhead, reuseOf(nodeId)).textMeasure() : undefined;
   }
 
   function toolsOf(nodeId: string) {
@@ -2556,6 +2567,8 @@
     applyTextFit(fit, { amend: (fitted) => saver.amendRoot(fitted, 'Fitted text'), show: (fitted) => liveDocs.set(nodeId, { ...live, doc: fitted }), place: (node) => props.onPlace?.(nodeId, node.w, node.h) });
   }
 
+  let elementLift = $state<Lift | null>(null);
+  let liftKey = 0;
   let frameGuides = $state<{ nodeId: string; guides: Guide[]; gaps: Gap[]; drop?: DropLine | null } | null>(null);
 
   function frameReach(at: NonNullable<ReturnType<typeof pickerOf>>): number {
@@ -2707,6 +2720,8 @@
     const carry = (ev: PointerEvent): Carry => carryOf({ down, now: local(ev), started, frame: edited, world: toWorld(view, local(ev)) });
     const stackChild = grip === Grip.Move && work.ids.length === 1 && stackPlaced(work.doc, work.ids[0]) ? work.ids[0] : null;
     const joinable = grip === Grip.Move && work.ids.length === 1 && !stackChild;
+    const liftable = grip === Grip.Move && !stackChild && !shownView && work.doc === inScope.view && inScope.view === start;
+    const lift = liftable ? { id: nodeId, key: ++liftKey, clips: subtreeOf(work.doc, work.ids), landing: false } : null;
 
     const leaving = (ev: PointerEvent, now: Carry): ElementOut | null => {
       const [clipId] = work.ids;
@@ -2748,11 +2763,15 @@
       if (shown.ok) {
         liveDocs.set(nodeId, { ...(liveOf(nodeId) ?? at.live), doc: shown.doc });
       }
+      if (shown.ok && lift) {
+        elementLift = { ...lift, by: clipsShift(work.doc, shown.doc, work.ids, inScope.frame, boxes) };
+      }
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       frameGuides = null;
+      elementLift = elementLift && result?.ok ? { ...elementLift, landing: true } : null;
       if (!started) {
         pickOnRelease(nodeId, grip, ev);
         return;
@@ -4302,7 +4321,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>
