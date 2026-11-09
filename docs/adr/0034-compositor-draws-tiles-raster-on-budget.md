@@ -57,3 +57,28 @@ The retained screen raster becomes a cache of composited output, not the source 
 is bounded by the existing texture budget, evicting the farthest and coarsest tiles first. The
 benchmark's mid-gesture screenshot must show tiles sharpening, and the at-rest shot must match the
 exact raster (pixel diff).
+
+## Status 2026-11-09 (handoff)
+
+Built on `perf/tiles` (#1871, draft, behind `?coreTiles`): `packages/gpu-core/src/tiles.rs` (tile
+keys, visible/missing, coarse/fine fallback, reserve, eviction), `web.rs` (`tiled_frame`,
+`raster_tile`, `present_tiles`, `overlay_texture`, `fill_reserve`, exact path at rest),
+`compositor.rs` (`plan_at` draws uses uncached, `overlay_at`, `take_damage` incl. scene damage of
+exact frames), `world.rs` (`scene`/`overlay` split, `scene_damage`, `Patch::uncached`).
+
+Measured (landings, 1x, flag off vs on, 5 interleaved, first version): zoom 30 → 56 fps, p95
+199 → 32 ms; fit 37 → 49; pan 57 → 60; drags −2…−7 fps (no tile reuse yet).
+
+Open bug, reproducible with `BENCH_TILES=1 BENCH_CASE=landings BENCH_RUNS=1 BENCH_CPU=1 npx
+playwright test -c tests/perf/playwright.config.ts`: after the pan gesture and its mid-gesture
+check, the canvas presents fully blank at rest although the last tiled frame reports 104 tiles
+drawn, 0 missing, settled (then JS stops calling `frame`). Only after the store reached its cap
+(eviction active); a fresh page at the same camera renders. Suspects not yet ruled out: a texture
+reused from `spare_tiles` or destroyed while still referenced; eviction picking visible tiles
+(pin the last presented draw list); `settled()` switching to the exact path without a follow-up
+frame (the exact frame never runs, so the screen keeps the last tiled present — check that the
+last tiled present is not itself empty, e.g. by logging per-tile `within` rects). Next test to
+write: fill to cap, evict, assert every key in `TileFrame::draw` maps to a live texture.
+
+Then: A/B of the current version, batched tile renders (step 3), drag reuse + idle prebuild
+(step 4), default on (step 5).
