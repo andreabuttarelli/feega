@@ -552,6 +552,12 @@ pub struct Library {
     fonts: Fonts,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sweep {
+    Evict,
+    Keep,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Motion {
     #[default]
@@ -791,6 +797,10 @@ impl Library {
     }
 
     pub fn plan(&mut self, list: &DisplayList, limits: Limits) -> Plan {
+        self.plan_with(list, limits, Sweep::Evict)
+    }
+
+    pub fn plan_with(&mut self, list: &DisplayList, limits: Limits, sweep: Sweep) -> Plan {
         let mut missing = Vec::new();
         let mut rasters = Vec::new();
         let mut seen = FxHashSet::default();
@@ -885,8 +895,9 @@ impl Library {
                 None => self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded),
             }
         }
-        let gone: Vec<String> = self.held.keys().filter(|k| !seen.contains(*k)).cloned().collect();
-        let abandoned: Vec<String> = self.building.keys().filter(|k| !seen.contains(*k)).cloned().collect();
+        let swept = |k: &String| sweep == Sweep::Evict && !seen.contains(k);
+        let gone: Vec<String> = self.held.keys().filter(|k| swept(k)).cloned().collect();
+        let abandoned: Vec<String> = self.building.keys().filter(|k| swept(k)).cloned().collect();
         for key in &gone {
             self.held.remove(key);
         }

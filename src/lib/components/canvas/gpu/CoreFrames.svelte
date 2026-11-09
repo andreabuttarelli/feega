@@ -428,6 +428,7 @@
         sent = new SentUses();
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
+        r.setTiles?.(TILED);
         raster = r;
       },
       (e: unknown) => {
@@ -554,6 +555,7 @@
   }
 
   const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
+  const TILED = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreTiles');
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;

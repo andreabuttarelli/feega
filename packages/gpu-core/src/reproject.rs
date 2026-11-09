@@ -36,8 +36,22 @@ fn premultiplied(@builtin(position) at: vec4<f32>) -> @location(0) vec4<f32> {
 
 const UNIFORM_BYTES: u64 = 32;
 const IN_FLIGHT_SLOTS: usize = 4;
+const TILE_UNIFORM_STRIDE: u64 = 256;
 
-const ENTRY: [(Output, &str); 2] = [(Output::Straight, "straight"), (Output::Premultiplied, "premultiplied")];
+struct Mode {
+    entry: &'static str,
+    blend: Option<wgpu::BlendState>,
+}
+
+const MODES: [(Output, Mode); 3] = [
+    (Output::Straight, Mode { entry: "straight", blend: None }),
+    (Output::Premultiplied, Mode { entry: "premultiplied", blend: None }),
+    (Output::Over, Mode { entry: "premultiplied", blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING) }),
+];
+
+fn mode(output: Output) -> &'static Mode {
+    &MODES.iter().find(|(o, _)| *o == output).expect("every output has a mode").1
+}
 
 pub struct Reprojector {
     pipelines: Vec<((wgpu::TextureFormat, Output), wgpu::RenderPipeline)>,
@@ -45,12 +59,22 @@ pub struct Reprojector {
     module: wgpu::ShaderModule,
     uniforms: Vec<wgpu::Buffer>,
     next: usize,
+    tiles: Option<wgpu::Buffer>,
+    layout: wgpu::BindGroupLayout,
+    bound: std::collections::HashMap<wgpu::Texture, wgpu::BindGroup>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Output {
     Straight,
     Premultiplied,
+    Over,
+}
+
+pub struct Tile<'a> {
+    pub source: &'a wgpu::Texture,
+    pub look: Lookup,
+    pub within: Rect,
 }
 
 pub struct Draw<'a> {
@@ -67,7 +91,29 @@ impl Reprojector {
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source: wgpu::ShaderSource::Wgsl(SHADER.into()) });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor { mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, ..Default::default() });
         let uniforms = (0..IN_FLIGHT_SLOTS).map(|_| device.create_buffer(&wgpu::BufferDescriptor { label: None, size: UNIFORM_BYTES, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false })).collect();
-        Reprojector { pipelines: Vec::new(), sampler, module, uniforms, next: 0 }
+        let entry = |binding, ty| wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::FRAGMENT, ty, count: None };
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                entry(0, wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }),
+                entry(1, wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)),
+                entry(2, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: wgpu::BufferSize::new(UNIFORM_BYTES) }),
+            ],
+        });
+        Reprojector { pipelines: Vec::new(), sampler, module, uniforms, next: 0, tiles: None, layout, bound: Default::default() }
+    }
+
+    fn bind(&self, device: &wgpu::Device, source: &wgpu::Texture, uniform: &wgpu::Buffer) -> wgpu::BindGroup {
+        let view = source.create_view(&wgpu::TextureViewDescriptor::default());
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: uniform, offset: 0, size: wgpu::BufferSize::new(UNIFORM_BYTES) }) },
+            ],
+        })
     }
 
     pub fn uniform_bytes(&self) -> u64 {
@@ -85,15 +131,16 @@ impl Reprojector {
         if let Some(at) = self.pipelines.iter().position(|(key, _)| *key == (format, output)) {
             return &self.pipelines[at].1;
         }
-        let entry = ENTRY.iter().find(|(o, _)| *o == output).map(|(_, e)| *e);
+        let Mode { entry, blend } = mode(output);
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: None, bind_group_layouts: &[Some(&self.layout)], immediate_size: 0 });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
-            layout: None,
+            layout: Some(&layout),
             vertex: wgpu::VertexState { module: &self.module, entry_point: Some("vs"), compilation_options: Default::default(), buffers: &[] },
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState { module: &self.module, entry_point: entry, compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: None, write_mask: wgpu::ColorWrites::ALL })] }),
+            fragment: Some(wgpu::FragmentState { module: &self.module, entry_point: Some(entry), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: *blend, write_mask: wgpu::ColorWrites::ALL })] }),
             multiview_mask: None,
             cache: None,
         });
@@ -101,24 +148,58 @@ impl Reprojector {
         &self.pipelines.last().expect("just pushed").1
     }
 
+    fn tile_uniforms(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, tiles: &[Tile]) -> wgpu::Buffer {
+        let bytes: Vec<u8> = tiles.iter().flat_map(|t| {
+            let values: [f32; 8] = [t.look.scale as f32, t.look.scale as f32, t.look.x as f32, t.look.y as f32, t.source.width() as f32, t.source.height() as f32, 0.0, 0.0];
+            let mut slot = vec![0u8; TILE_UNIFORM_STRIDE as usize];
+            slot[..UNIFORM_BYTES as usize].copy_from_slice(&values.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>());
+            slot
+        }).collect();
+        let fits = self.tiles.as_ref().is_some_and(|b| b.size() >= bytes.len() as u64);
+        if !fits {
+            self.bound.clear();
+            self.tiles = Some(device.create_buffer(&wgpu::BufferDescriptor { label: None, size: (bytes.len() as u64).next_power_of_two(), usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false }));
+        }
+        let buffer = self.tiles.clone().expect("just sized");
+        queue.write_buffer(&buffer, 0, &bytes);
+        buffer
+    }
+
+    pub fn draw_tiles(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, target: &wgpu::TextureView, format: wgpu::TextureFormat, output: Output, tiles: &[Tile]) {
+        if tiles.is_empty() {
+            return;
+        }
+        let buffer = self.tile_uniforms(device, queue, tiles);
+        let pipeline = self.pipeline(device, format, output).clone();
+        let mut bound = std::mem::take(&mut self.bound);
+        let groups: Vec<wgpu::BindGroup> = tiles.iter().map(|t| bound.remove(t.source).unwrap_or_else(|| self.bind(device, t.source, &buffer))).collect();
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: target, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&pipeline);
+        for (i, (tile, group)) in tiles.iter().zip(&groups).enumerate() {
+            let r = tile.within;
+            pass.set_bind_group(0, group, &[(i as u64 * TILE_UNIFORM_STRIDE) as u32]);
+            pass.set_scissor_rect(r.x0 as u32, r.y0 as u32, r.width() as u32, r.height() as u32);
+            pass.draw(0..3, 0..1);
+        }
+        drop(pass);
+        self.bound = tiles.iter().zip(groups).map(|(t, g)| (t.source.clone(), g)).collect();
+    }
+
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, d: Draw) {
         let size = [d.source.width() as f32, d.source.height() as f32];
         let values: [f32; 8] = [d.look.scale as f32, d.look.scale as f32, d.look.x as f32, d.look.y as f32, size[0], size[1], 0.0, 0.0];
         let bytes: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
         let uniform = self.uniform(queue, &bytes);
-        let view = d.source.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = self.sampler.clone();
         let pipeline = self.pipeline(device, d.format, d.output).clone();
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&sampler) },
-                wgpu::BindGroupEntry { binding: 2, resource: uniform.as_entire_binding() },
-            ],
-        });
-        let load = if d.within.is_some() { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT) };
+        let group = self.bind(device, d.source, &uniform);
+        let load = if d.within.is_some() || mode(d.output).blend.is_some() { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT) };
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: d.target, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load, store: wgpu::StoreOp::Store } })],
@@ -128,7 +209,7 @@ impl Reprojector {
             multiview_mask: None,
         });
         pass.set_pipeline(&pipeline);
-        pass.set_bind_group(0, &group, &[]);
+        pass.set_bind_group(0, &group, &[0]);
         if let Some(r) = d.within {
             pass.set_scissor_rect(r.x0 as u32, r.y0 as u32, r.width() as u32, r.height() as u32);
         }

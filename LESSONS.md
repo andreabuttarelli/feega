@@ -3751,3 +3751,12 @@ Signal: after an action lands, `goto(newUrl)` resolves without error, no navigat
 
 ### Effects that each submit block the main thread
 **Signal:** a CPU profile of a heavy canvas shows `queue.submit` as the top self-time entry under `FilterPasses::run`; textures created per session in the thousands. **Move:** record passes into one encoder and submit once before the render that reads them; size the pool so one screen-sized layer fits, or every pass allocates.
+
+### Many reprojector draws in one encoder draw nothing
+Signal: the core reports tiles drawn, the canvas stays empty, no WebGPU error. Cause: `Reprojector::draw` writes its uniforms with `queue.write_buffer` into a 4-slot ring; writes happen at once, passes run at submit, so every pass in one encoder reads the last values. Move: one uniform buffer with a slot per draw and dynamic offsets (`Reprojector::draw_tiles`); never share a ring slot inside one encoder.
+
+### The perf bench measures the wasm of its first run
+Signal: a gpu-core change rebuilt with `npm run build:gpu-core` leaves the landings bench numbers and screenshots identical, or a debug log never appears. Cause: `scripts/local.mjs` builds the app only when `build/handler.js` is missing, so `static/gpu-core` changes never reach the served copy. Move: `rm -rf build` after every `build:gpu-core`, before the bench; check with a string from the change in the served wasm.
+
+### A layer drawn last over composited tiles erases them
+Signal: with `?coreTiles` the canvas is blank only when a selection or handle exists; the core reports every tile drawn and live. Cause: reprojector pipelines had no blending, so the screen-sized overlay replaced the tiles. Move: draw anything layered with `Output::Over`; test a transparent texel over an opaque target.

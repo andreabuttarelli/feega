@@ -40,8 +40,12 @@ const DRAWN_GIVE_UP_MS = 60_000;
 const INK_MIN_PX = 24;
 const TITLE_ABOVE_PX = 10;
 const TITLE_IN_PX = 30;
+const ZOOM_STEPS_EACH_WAY = 8;
+const ZOOM_WHEEL_PX = 60;
 const TITLE_ROOM_PX = 120;
-const INK_STDEV = 6;
+const PAPER_TOLERANCE = 9;
+const MID_CHECKED = new Set([Gesture.Pan, Gesture.Zoom, Gesture.Fit]);
+const BLANK_SHARE = 0.6;
 const INK_INSET = 0.15;
 const SHARP_POLL_MS = 60;
 const SHARP_GIVE_UP_MS = 15_000;
@@ -102,9 +106,30 @@ async function dragFrom(page: Page, from: { x: number; y: number }, until: numbe
   await page.mouse.up();
 }
 
+let midShot: string | null = null;
+
+async function zoomOnFrame(page: Page, until: number) {
+  const box = await frameOnScreen(page);
+  await page.mouse.move(box.x, VIEWPORT.height / 2);
+  await page.keyboard.down('Control');
+  for (let i = 0; Date.now() < until; i++) {
+    await page.mouse.wheel(0, Math.floor(i / ZOOM_STEPS_EACH_WAY) % 2 ? ZOOM_WHEEL_PX : -ZOOM_WHEEL_PX);
+  }
+  await page.keyboard.up('Control');
+}
+
+async function zoomShot(page: Page, until: number) {
+  await zoomOnFrame(page, until - GESTURE_MS / 2);
+  if (midShot) {
+    writeFileSync(midShot, await shot(page));
+    midShot = null;
+  }
+  await zoomOnFrame(page, until);
+}
+
 const GESTURES: Record<Gesture, (page: Page, until: number) => Promise<void>> = {
   [Gesture.Pan]: wheelPan,
-  [Gesture.Zoom]: wheelZoom,
+  [Gesture.Zoom]: zoomShot,
   [Gesture.Fit]: fitToggle,
   [Gesture.Drag]: dragFrame,
   [Gesture.DragElement]: dragElement
@@ -154,6 +179,19 @@ async function framesInked(page: Page): Promise<boolean> {
   return (await inkedOnScreen(page)).every(Boolean);
 }
 
+async function canvasPaper(page: Page): Promise<number[]> {
+  const colour = await page.locator('[data-canvas-surface]').first().evaluate((el) => {
+    for (let at: Element | null = el; at; at = at.parentElement) {
+      const bg = getComputedStyle(at).backgroundColor;
+      if (!/rgba\(.*,\s*0\)$/.test(bg) && bg !== 'transparent') {
+        return bg;
+      }
+    }
+    return 'rgb(255, 255, 255)';
+  });
+  return (colour.match(/\d+/g) ?? ['0', '0', '0']).slice(0, 3).map(Number);
+}
+
 async function inkedOnScreen(page: Page): Promise<boolean[]> {
   const boxes = await page.locator('[data-testid="gpu-node"]').evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
   const clips = boxes.map((b) => ({ x: b.x + b.w * INK_INSET, y: b.y + b.h * INK_INSET, w: b.w * (1 - 2 * INK_INSET), h: b.h * (1 - 2 * INK_INSET) })).flatMap((b) => {
@@ -163,10 +201,15 @@ async function inkedOnScreen(page: Page): Promise<boolean[]> {
     const height = Math.min(VIEWPORT.height, b.y + b.h) - y;
     return width > INK_MIN_PX && height > INK_MIN_PX ? [{ x, y, width, height }] : [];
   });
+  const paper = await canvasPaper(page);
   const inked: boolean[] = [];
   for (const clip of clips) {
-    const { channels } = await sharp(await page.screenshot({ clip })).stats();
-    inked.push(channels[0].stdev >= INK_STDEV);
+    const { data, info } = await sharp(await page.screenshot({ clip })).raw().toBuffer({ resolveWithObject: true });
+    let bare = 0;
+    for (let i = 0; i < data.length; i += info.channels) {
+      bare += Math.abs(data[i] - paper[0]) + Math.abs(data[i + 1] - paper[1]) + Math.abs(data[i + 2] - paper[2]) <= PAPER_TOLERANCE ? 1 : 0;
+    }
+    inked.push(bare / (data.length / info.channels) < BLANK_SHARE);
   }
   return inked;
 }
@@ -192,7 +235,7 @@ async function open(browser: Browser, base: string): Promise<{ context: BrowserC
   const cdp = ENGINE === Engine.Chromium ? await context.newCDPSession(page) : null;
   await cdp?.send('Performance.enable');
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}${process.env.BENCH_TILES ? '?coreTiles' : ''}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await untilDrawn(page);
   return { context, page, cdp };
@@ -224,12 +267,25 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
     await titlesInView(page);
   }
   const shown = await inkedOnScreen(page);
+  if (!(shown.length > 0 && shown.every(Boolean))) {
+    writeFileSync(join(OUT, `gate-${gesture}.png`), await shot(page));
+  }
   expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture`).toBe(true);
   const before = await taskMs(cdp);
   const { value: frames, profile } = await profiling(cdp, profiled, () => measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until)));
   const after = await taskMs(cdp);
   await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
+  if (MID_CHECKED.has(gesture)) {
+    await fitThenZoomIn(page);
+    await GESTURES[gesture](page, Date.now() + GESTURE_MS / 2);
+    const blank = !(await framesInked(page));
+    if (blank) {
+      writeFileSync(join(OUT, `blank-mid-${gesture}.png`), await shot(page));
+    }
+    expect(blank, `${gesture}: a frame was blank mid-gesture`).toBe(false);
+    await page.keyboard.up('Control');
+  }
   if (profile) {
     writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
@@ -242,6 +298,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
     writeFileSync(join(OUT, `landings-${ENGINE}-start.png`), await shot(page));
   }
 
+  midShot = index === 0 ? join(OUT, `landings-${ENGINE}-mid-zoom.png`) : null;
   const result = {} as BenchRun;
   const spots: Partial<Record<Gesture, Hotspot[]>> = {};
   for (const gesture of benched()) {
