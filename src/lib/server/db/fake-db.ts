@@ -21,11 +21,12 @@ export type Call = {
 
 export type FakeDb = { db: Db; calls: Call[] };
 
-export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; store?: boolean; newId?: () => string; files?: Record<string, Uint8Array> };
+export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; store?: boolean; newId?: () => string; files?: Record<string, Uint8Array>; latencyMs?: number };
 
 export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {}): FakeDb {
   const calls: Call[] = [];
   const updateRows = options.updateRows ?? {};
+  const travel = () => (options.latencyMs ? new Promise((done) => setTimeout(done, options.latencyMs)) : Promise.resolve());
 
   const allRowsFor = (op: string, table: string): unknown[] =>
     (op === 'update' ? (updateRows[table] ?? rows[table]) : rows[table]) ?? [];
@@ -129,6 +130,7 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         return chain;
       },
       single: async () => {
+        await travel();
         const first = resolved(call)[0];
         if (first !== undefined) {
           return { data: first, error: null };
@@ -138,8 +140,8 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         }
         return { data: null, error: null };
       },
-      maybeSingle: async () => ({ data: resolved(call)[0] ?? null, error: null }),
-      then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => resolve({ data: resolved(call), error: null })
+      maybeSingle: async () => (await travel(), { data: resolved(call)[0] ?? null, error: null }),
+      then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => (options.latencyMs ? travel().then(() => resolve({ data: resolved(call), error: null })) : resolve({ data: resolved(call), error: null }))
     };
     return chain;
   };
@@ -160,6 +162,7 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
           return { data: { signedUrl: `https://signed.example/${bucket}/${path}` }, error: null };
         },
         createSignedUrls: async (paths: string[], _ttl?: number, transformOptions?: unknown) => {
+          await travel();
           calls.push({ table: `storage:${bucket}`, op: 'sign', filters: [['paths', paths], ['transform', transformOptions]] });
           return {
             data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${bucket}/${path}` })),
