@@ -678,6 +678,10 @@ function __wbg_get_imports() {
             const ret = arg0.call(arg1, arg2);
             return ret;
         }, arguments); },
+        __wbg_call_6137034ef55c9d0f: function() { return handleError(function (arg0, arg1) {
+            const ret = arg0.call(arg1);
+            return ret;
+        }, arguments); },
         __wbg_clearBuffer_3d5a3057c3c8a9bf: function(arg0, arg1, arg2, arg3) {
             arg0.clearBuffer(arg1, arg2, arg3);
         },
@@ -927,6 +931,10 @@ function __wbg_get_imports() {
             const ret = arg0.getUniformLocation(arg1, getStringFromWasm0(arg2, arg3));
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
+        __wbg_get_31af05bd4842a84f: function() { return handleError(function (arg0, arg1) {
+            const ret = Reflect.get(arg0, arg1);
+            return ret;
+        }, arguments); },
         __wbg_get_fd12a9100976c296: function(arg0, arg1) {
             const ret = arg0[arg1 >>> 0];
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
