@@ -17,15 +17,17 @@ export type Call = {
   filters: [string, unknown][];
   order?: [string, unknown];
   limit?: number;
+  ors?: string[];
 };
 
 export type FakeDb = { db: Db; calls: Call[] };
 
-export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; store?: boolean; newId?: () => string; files?: Record<string, Uint8Array> };
+export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; store?: boolean; newId?: () => string; files?: Record<string, Uint8Array>; latencyMs?: number; maxRows?: number };
 
 export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {}): FakeDb {
   const calls: Call[] = [];
   const updateRows = options.updateRows ?? {};
+  const travel = () => (options.latencyMs ? new Promise((done) => setTimeout(done, options.latencyMs)) : Promise.resolve());
 
   const allRowsFor = (op: string, table: string): unknown[] =>
     (op === 'update' ? (updateRows[table] ?? rows[table]) : rows[table]) ?? [];
@@ -52,11 +54,24 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
     return made;
   };
 
+  const anyOf = (row: Record<string, unknown>, ors: string[]): boolean =>
+    !ors.length || ors.some((group) => [...group.matchAll(/(\w+)\.eq\.([^,)]+)/g)].every(([, column, value]) => String(row[column]) === value));
+
+  const paged = (call: Call, found: unknown[]): unknown[] => {
+    if (!options.maxRows) {
+      return found;
+    }
+    const kept = (found as Record<string, unknown>[]).filter((row) => anyOf(row, call.ors ?? []));
+    const [column, opts] = call.order ?? [];
+    const sorted = column ? [...kept].sort((a, b) => (Number(a[column as string]) - Number(b[column as string])) * ((opts as { ascending?: boolean })?.ascending === false ? -1 : 1)) : kept;
+    return sorted.slice(0, Math.min(call.limit ?? options.maxRows, options.maxRows));
+  };
+
   const resolved = (call: Call): unknown[] => {
     if (options.store && call.op === 'insert' && call.payload) {
       return store(call);
     }
-    const found = rowsFor(call.op, call.table, call.filters);
+    const found = paged(call, rowsFor(call.op, call.table, call.filters));
     if (!options.mutate || call.op !== 'update' || !call.payload) {
       return found;
     }
@@ -97,7 +112,8 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
       neq() {
         return chain;
       },
-      or() {
+      or(filter: string) {
+        call.ors = filter.match(/and\([^)]*\)/g) ?? [filter];
         return chain;
       },
       gte(column: string, value: unknown) {
@@ -129,6 +145,9 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         return chain;
       },
       single: async () => {
+        if (options.latencyMs) {
+          await travel();
+        }
         const first = resolved(call)[0];
         if (first !== undefined) {
           return { data: first, error: null };
@@ -138,8 +157,13 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
         }
         return { data: null, error: null };
       },
-      maybeSingle: async () => ({ data: resolved(call)[0] ?? null, error: null }),
-      then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => resolve({ data: resolved(call), error: null })
+      maybeSingle: async () => {
+        if (options.latencyMs) {
+          await travel();
+        }
+        return { data: resolved(call)[0] ?? null, error: null };
+      },
+      then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => (options.latencyMs ? travel().then(() => resolve({ data: resolved(call), error: null })) : resolve({ data: resolved(call), error: null }))
     };
     return chain;
   };
@@ -160,6 +184,9 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
           return { data: { signedUrl: `https://signed.example/${bucket}/${path}` }, error: null };
         },
         createSignedUrls: async (paths: string[], _ttl?: number, transformOptions?: unknown) => {
+          if (options.latencyMs) {
+            await travel();
+          }
           calls.push({ table: `storage:${bucket}`, op: 'sign', filters: [['paths', paths], ['transform', transformOptions]] });
           return {
             data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${bucket}/${path}` })),

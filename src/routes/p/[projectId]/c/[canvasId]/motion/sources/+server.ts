@@ -1,13 +1,13 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 import type { RequestHandler } from './$types';
-import { listMemberships } from '$lib/server/repos/orgs';
-import { findCanvasForUser } from '$lib/server/canvas/lookup';
+import { openCanvasForUser } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { motionTokens } from '$lib/server/motion/editor';
 import { motionSources } from '$lib/server/motion/sources';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { revalidated } from '$lib/server/revalidated';
+import { serverTiming } from '$lib/server/server-timing';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
@@ -22,18 +22,22 @@ export const GET: RequestHandler = async ({ locals, params, request, url }) => {
     throw error(HTTP_BAD_REQUEST, 'Send ?ids=<node id>,<node id>');
   }
 
-  const { user } = await locals.safeGetSession();
+  const phases = serverTiming();
+  const { user } = await phases.time('auth', locals.safeGetSession());
   const db = await locals.db();
   if (!user || !db) {
     throw error(HTTP_UNAUTHORIZED, 'Sign in first');
   }
 
-  const found = await findCanvasForUser(db, { canvasId: params.canvasId, memberships: await listMemberships(db, user.id) });
+  const { found } = await phases.time('canvas', openCanvasForUser(db, { userId: user.id, canvasId: params.canvasId }));
   if (!found || found.canvas.projectId !== params.projectId || !(await canvasReachable(db, found, user.id))) {
     throw error(HTTP_NOT_FOUND, 'This canvas does not exist, or is not yours');
   }
 
   const scope = { db, orgId: found.orgId, projectId: params.projectId, canvasId: found.canvas.id };
-  const [sources, tokens] = await Promise.all([motionSources({ ...scope, nodeIds: [...new Set(ask.data.ids)] }), motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId })]);
-  return revalidated(request, JSON.stringify({ tokens, frames: Object.fromEntries(sources) }));
+  const [sources, tokens] = await Promise.all([
+    motionSources({ ...scope, nodeIds: [...new Set(ask.data.ids)], phases }),
+    phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId }))
+  ]);
+  return revalidated(request, phases.span('stringify', () => JSON.stringify({ tokens, frames: Object.fromEntries(sources) })), phases);
 };
