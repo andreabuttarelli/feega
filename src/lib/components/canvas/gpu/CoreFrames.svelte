@@ -26,6 +26,9 @@
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
+  import { tieredAssets } from '$lib/canvas/core/tiered-assets';
+  import { assetTier } from '$lib/canvas/core/asset-tier';
+  import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
@@ -42,7 +45,7 @@
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onsource = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place, sourceUrl, onready, onsource = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place: { projectId: string; canvasId: string }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onfallback: (why: string) => void } = $props();
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -60,7 +63,11 @@
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
-  const keyOf = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
+  const tier = $derived(assetTier(view.zoom));
+  const imaged = new Set<string>();
+  const baseKey = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
+  const tieredKey = (f: FrameAt, at: AssetSize) => (imaged.has(f.id) ? `${baseKey(f)}:${at}` : baseKey(f));
+  const keyOf = (f: FrameAt) => tieredKey(f, tier);
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
@@ -131,10 +138,15 @@
 
   const sourceOf = (f: FrameAt) => `${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`;
 
-  async function fetchAndBuild(f: FrameAt) {
-    const source = await frameSources(sourceOf(f));
-    if (!source) {
+  async function fetchAndBuild(f: FrameAt, at: AssetSize) {
+    const fetched = await frameSources(sourceOf(f));
+    if (!fetched) {
       return null;
+    }
+    const source = tieredAssets(fetched, place, at);
+    if (source !== fetched && !imaged.has(f.id)) {
+      imaged.add(f.id);
+      asked.add(tieredKey(f, at));
     }
 
     return { ...(await builtOff(f, source)), source };
@@ -162,8 +174,9 @@
   }
 
   async function load(f: FrameAt) {
+    const at = tier;
     const given = known(f) ?? (loaded.has(f.id) ? await awaitKnown(f) : null);
-    const read = given ? null : await untilFound(() => fetchAndBuild(f), UNSAVED_SOURCE);
+    const read = given ? null : await untilFound(() => fetchAndBuild(f, at), UNSAVED_SOURCE);
     const built = given ? await buildSource(f, given) : read;
     if (!built) {
       return;
@@ -173,11 +186,11 @@
     }
     const ready = await media.ready(built.list);
     if (built.custom) {
-      customPictures.set(keyOf(f), built.custom.picture);
+      customPictures.set(tieredKey(f, at), built.custom.picture);
     }
     logGaps(f.id, built.list);
-    loaded.set(f.id, keyOf(f));
-    lists = listed(lists, f.id, keyOf(f), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
+    loaded.set(f.id, tieredKey(f, at));
+    lists = listed(lists, f.id, tieredKey(f, at), onStage(drawable(built.list, ready, look, (i) => !pictures(i)), f.kind), [groupOf(f), drawnLast.get(f.id)?.group]);
   }
 
   let liveGroup = $state(new Map<string, string>());
