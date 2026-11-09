@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BlendMode } from '@feega/motion-core/motion/blend';
 import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import type { Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-import { GL_PICTURE_SIDE, glPictureSize, pictureKey, pictureSize, wantedPictures, warmCore, rasterOf } from '@feega/motion-core/motion/gpu-full/core-web';
+import { GL_PICTURE_SIDE, glPictureSize, pictureKey, pictureSize, wantedPictures, warmCore, rasterOf, overBytes } from '@feega/motion-core/motion/gpu-full/core-web';
 
 describe('glPictureSize', () => {
   it('keeps a picture that fits the WebGL atlas as it is', () => {
@@ -162,5 +162,37 @@ describe('uploading a decoded still', () => {
     expect(raster.upload(one('small'), pictures, 1)).toBe(true);
     expect(copy).not.toHaveBeenCalled();
     expect(whole).toEqual([small]);
+  });
+});
+
+describe('the wasm core', () => {
+  const wasm = () => {
+    const got: unknown[][] = [];
+    const core = { put_group: (...a: unknown[]) => got.push(a), append_group: (...a: unknown[]) => got.push(a), patch_group: (...a: unknown[]) => got.push(a), set_overlay: (...a: unknown[]) => got.push(a), set_live_overlay: (...a: unknown[]) => got.push(a), patch_uses: (...a: unknown[]) => got.push(a), draw: (...a: unknown[]) => (got.push(a), ''), drop_group: (...a: unknown[]) => got.push(a) };
+    return { core, got };
+  };
+  const text = (bytes: unknown) => new TextDecoder().decode(bytes as Uint8Array);
+
+  it('takes every display list, splice, patch and overlay as utf-8 bytes, not a string copied char by char', () => {
+    const { core, got } = wasm();
+    const attached = overBytes(core);
+
+    attached.put_group('g', '{"a":"é"}');
+    attached.append_group('g', '[1]');
+    attached.patch_group('g', 'h', '{"head":0}');
+    attached.set_overlay('[2]');
+    attached.set_live_overlay('[3]');
+    attached.patch_uses('{"put":[]}');
+    attached.draw('{}');
+
+    expect(got.map((a) => [...a.slice(0, -1), text(a.at(-1))])).toEqual([['g', '{"a":"é"}'], ['g', '[1]'], ['g', 'h', '{"head":0}'], ['[2]'], ['[3]'], ['{"put":[]}'], ['{}']]);
+  });
+
+  it('passes a key alone through untouched', () => {
+    const { core, got } = wasm();
+
+    overBytes(core).drop_group('g');
+
+    expect(got).toEqual([['g']]);
   });
 });
