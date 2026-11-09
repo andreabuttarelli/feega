@@ -272,9 +272,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
-  const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
-
-  const [runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
+  const [connections, runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
+    canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed),
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
