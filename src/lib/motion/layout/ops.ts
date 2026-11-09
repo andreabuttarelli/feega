@@ -26,7 +26,14 @@ function withClip(doc: MotionDoc, clipId: string, edit: (clip: MotionClip) => Mo
 
 export const hasBox = (clip: MotionClip) => typeof clip.props.width === 'number' && typeof clip.props.height === 'number';
 
-export const laidClip = (doc: MotionDoc, clipId: string, measure: TextMeasure = estimatedText): MotionClip | null => (findClip(withAutoLayout(doc, measure), clipId)?.clip as MotionClip | undefined) ?? null;
+const laidDocs = new WeakMap<MotionDoc, WeakMap<TextMeasure, MotionDoc>>();
+
+function laidDoc(doc: MotionDoc, measure: TextMeasure): MotionDoc {
+  const byMeasure = laidDocs.get(doc) ?? laidDocs.set(doc, new WeakMap()).get(doc)!;
+  return byMeasure.get(measure) ?? byMeasure.set(measure, withAutoLayout(doc, measure)).get(measure)!;
+}
+
+export const laidClip = (doc: MotionDoc, clipId: string, measure: TextMeasure = estimatedText): MotionClip | null => (findClip(laidDoc(doc, measure), clipId)?.clip as MotionClip | undefined) ?? null;
 
 export function layoutParent(doc: MotionDoc, clip: MotionClip): (MotionClip & { autoLayout: AutoLayout }) | null {
   const parent = clip.parent ? findClip(doc, clip.parent)?.clip : undefined;

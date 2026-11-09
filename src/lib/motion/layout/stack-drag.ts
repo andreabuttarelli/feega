@@ -41,8 +41,8 @@ function within(doc: MotionDoc, id: string, ancestorId: string): boolean {
 function stackUnder(doc: MotionDoc, clipId: string, own: Stack | null, boxes: Record<string, Box>, to: Pt): Stack | null {
   const area = (c: MotionClip) => boxes[c.id].width * boxes[c.id].height;
   const hits = allClips(doc)
-    .filter((c): c is Stack => !!c.autoLayout && !!boxes[c.id] && c.id !== clipId && !within(doc, c.id, clipId))
-    .filter((c) => contains(boxes[c.id], to, c.id === own?.id ? LEAVE_MARGIN_PX : 0))
+    .filter((c): c is Stack => !!c.autoLayout && !!boxes[c.id] && c.id !== clipId)
+    .filter((c) => contains(boxes[c.id], to, c.id === own?.id ? LEAVE_MARGIN_PX : 0) && !within(doc, c.id, clipId))
     .sort((a, b) => area(a) - area(b));
   return hits[0] ?? null;
 }
