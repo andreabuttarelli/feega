@@ -32,16 +32,21 @@ struct Cached {
 struct LayerCache {
     entries: HashMap<String, Cached>,
     tick: u64,
-    cap: u64,
+    share: u64,
+    bodies: u64,
 }
 
 impl Default for LayerCache {
     fn default() -> Self {
-        LayerCache { entries: HashMap::new(), tick: 0, cap: LAYER_BYTES }
+        LayerCache { entries: HashMap::new(), tick: 0, share: LAYER_BYTES, bodies: LAYER_BYTES }
     }
 }
 
 impl LayerCache {
+    fn cap(&self) -> u64 {
+        self.share.min(self.bodies)
+    }
+
     fn holds(&self, image: &ImageData) -> bool {
         self.entries.values().any(|c| c.image.data.id() == image.data.id())
     }
@@ -57,7 +62,7 @@ impl LayerCache {
             stale.extend(rest.into_iter().take(excess).map(|(k, _)| k.clone()));
         }
         let rest: Vec<(String, u64, u64)> = self.entries.iter().filter(|(k, _)| !stale.contains(k)).map(|(k, c)| (k.clone(), c.used, bytes_of((c._texture.width(), c._texture.height())))).collect();
-        stale.extend(over_cap(&rest, self.cap));
+        stale.extend(over_cap(&rest, self.cap()));
         for key in stale {
             if let Some(gone) = self.entries.remove(&key) {
                 vello.unregister_texture(gone.image);
@@ -230,6 +235,21 @@ impl<'a> Surface for Gpu<'a> {
         }
     }
 
+    fn recall_body(&mut self, key: &str, origin: Point) -> Option<Placed> {
+        let tick = self.cache.tick;
+        let cached = self.cache.entries.get_mut(key)?;
+        cached.used = tick;
+        self.vello.mark_override_image_dirty(&cached.image);
+        Some(Placed { image: cached.image.clone(), origin })
+    }
+
+    fn remember_body(&mut self, key: &str, placed: &Placed) {
+        if let Some(texture) = self.last.take() {
+            let used = self.cache.tick;
+            self.cache.entries.insert(key.to_string(), Cached { image: placed.image.clone(), origin: placed.origin, _texture: texture, used });
+        }
+    }
+
     fn place(&mut self, texture: Pooled, region: Rect) -> Placed {
         let image = self.vello.register_texture((*texture).clone());
         self.last = Some(texture.clone());
@@ -252,7 +272,11 @@ impl Engine {
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
         self.filters.set_pool_bytes(pool);
-        self.cache.cap = layers;
+        self.cache.share = layers;
+    }
+
+    pub fn set_body_budget(&mut self, bytes: u64) {
+        self.cache.bodies = bytes;
     }
 
     pub fn take_tally(&mut self) -> Tally {

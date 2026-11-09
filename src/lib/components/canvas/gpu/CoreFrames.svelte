@@ -617,6 +617,7 @@
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
+        r.setBodyBudget?.(budget.bodyBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setTiles?.(TILED);
         raster = r;

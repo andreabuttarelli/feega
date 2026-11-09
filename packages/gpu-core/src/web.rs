@@ -491,6 +491,10 @@ impl WebCore {
         Limits { rasters: if waiting { 0 } else { self.limits.rasters }, ..self.limits }
     }
 
+    pub fn set_body_budget(&mut self, bytes: f64) {
+        self.engine.set_body_budget(bytes as u64);
+    }
+
     pub fn set_tile_budget(&mut self, bytes: f64) {
         self.tile_budget = bytes as u64;
     }

@@ -155,7 +155,7 @@ fn background(clip: &str, colour: crate::display_list::Rgba, frame: Rect, contou
         rule: FillRule::NonZero,
         paint: Paint::Solid { color: colour },
         within: None,
-        look: Look { opacity: 1.0, matrix: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None },
+        look: Look { opacity: 1.0, matrix: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None, key: None },
     })
 }
 
@@ -301,13 +301,13 @@ fn texture_image(u: &UseItem, group: &DisplayList, scale: f64, clip: String) -> 
     let (w, h) = texels(group, scale);
     let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
     let matrix = snapped(times(u.matrix, [1.0 / scale, 0.0, 0.0, 1.0 / scale, 0.0, 0.0]));
-    let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
+    let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None, key: None };
     let size = Size { width: w as f64, height: h as f64 };
     Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, crop: None, tile_turn: 0.0, clipped: true, inner: IDENTITY, look })
 }
 
 fn partial(group: &str, (w, h): (u32, u32)) -> Item {
-    let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
+    let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None, key: None };
     let size = Size { width: w as f64, height: h as f64 };
     Item::Image(ImageItem { clip: building_clip(group), src: building_clip(group), video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, crop: None, tile_turn: 0.0, clipped: true, inner: IDENTITY, look })
 }
@@ -648,13 +648,15 @@ impl Library {
     }
 
     pub fn put_group(&mut self, key: &str, list: &DisplayList) {
-        let (drawn, _) = self.drawable(list);
+        let (mut drawn, _) = self.drawable(list);
+        crate::content_key::stamp(&mut drawn.items);
         self.groups.put(key, drawn);
         self.forget(key);
     }
 
     pub fn append_group(&mut self, key: &str, list: &DisplayList) {
-        let (drawn, _) = self.drawable(list);
+        let (mut drawn, _) = self.drawable(list);
+        crate::content_key::stamp(&mut drawn.items);
         self.groups.append(key, drawn.items);
         self.forget(key);
     }
@@ -671,7 +673,8 @@ impl Library {
         if splice.head + splice.tail > base.items.len() {
             return false;
         }
-        let (drawn, _) = self.drawable(&DisplayList { items: splice.items.clone(), ..base.clone_empty() });
+        let (mut drawn, _) = self.drawable(&DisplayList { items: splice.items.clone(), ..base.clone_empty() });
+        crate::content_key::stamp(&mut drawn.items);
         let before = self.encodings.get(from).cloned().flatten().and_then(|cast| cast.whole().map(|span| span.encoded.clone()));
         let stable = splice.head + usize::from(base.background.is_some());
         self.groups.splice(from, to, splice.head, splice.tail, drawn.items);

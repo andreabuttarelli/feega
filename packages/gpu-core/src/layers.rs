@@ -1,4 +1,4 @@
-use vello::kurbo::Rect;
+use vello::kurbo::{Point, Rect};
 
 use crate::canvas::Canvas;
 use crate::display_list::{Cover, DisplayList, Filter, Item, Lens, Look, MaskMode, Rgba};
@@ -30,6 +30,38 @@ pub trait Surface {
     }
 
     fn remember(&mut self, _item: &Item, _placed: &Placed<Pic<Self>>) {}
+
+    fn recall_body(&mut self, _key: &str, _origin: Point) -> Option<Placed<Pic<Self>>> {
+        None
+    }
+
+    fn remember_body(&mut self, _key: &str, _placed: &Placed<Pic<Self>>) {}
+}
+
+const BODY_MAX_PX: f64 = 2048.0;
+
+fn pictures_ready<P>(item: &Item, pictures: &Shelf<P>) -> bool {
+    match item {
+        Item::Image(image) => pictures.contains_key(&image.src),
+        Item::Group(group) => group.items.iter().all(|i| pictures_ready(i, pictures)),
+        _ => true,
+    }
+}
+
+fn body_key<S: Surface>(item: &Item, pictures: &Shelf<Pic<S>>) -> Option<(String, Rect)> {
+    let look = item.look()?;
+    let content = look.key?;
+    if look.backdrop.is_some() || !pictures_ready(item, pictures) {
+        return None;
+    }
+    let spread = inflated::<S::Canvas>(item, look, pictures)?;
+    if spread.width() > BODY_MAX_PX || spread.height() > BODY_MAX_PX {
+        return None;
+    }
+    let region = Rect::new(spread.x0.floor(), spread.y0.floor(), spread.x1.ceil().max(spread.x0.floor() + 1.0), spread.y1.ceil().max(spread.y0.floor() + 1.0));
+    let [a, b, c, d, _, _] = look.matrix;
+    let key = format!("{content:x} {a:.6} {b:.6} {c:.6} {d:.6} {:.3} {:.3} {}x{}", spread.x0 - region.x0, spread.y0 - region.y0, region.width(), region.height());
+    Some((key, region))
 }
 
 fn reach(sigma: f64) -> f64 {
@@ -77,17 +109,26 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             layers.culled.insert(i);
             continue;
         }
-        let recalled = if layer_worthy(item) { surface.recall(item) } else { None };
+        let keyed = if layer_worthy(item) { body_key::<S>(item, pictures) } else { None };
+        let recalled = match &keyed {
+            Some((key, region)) => surface.recall_body(key, region.origin()),
+            None if layer_worthy(item) => surface.recall(item),
+            None => None,
+        };
         if let (Item::Group(group), None) = (item, &recalled) {
             let inner = prepare_items(surface, &group.items, None, pictures, blending, fragments)?;
             layers.groups.insert(i, inner);
         }
         if layer_worthy(item) {
+            let whole = keyed.filter(|_| layers.groups.get(&i).is_none_or(Layers::plain));
             let layer = match recalled {
                 Some(layer) => layer,
                 None => {
-                    let made = body(surface, item, pictures, layers.groups.get(&i))?;
-                    surface.remember(item, &made);
+                    let made = body(surface, item, pictures, layers.groups.get(&i), whole.as_ref().map(|(_, region)| *region))?;
+                    match &whole {
+                        Some((key, _)) => surface.remember_body(key, &made),
+                        None => surface.remember(item, &made),
+                    }
                     made
                 }
             };
@@ -167,10 +208,10 @@ fn shades_nothing(item: &Item) -> bool {
     group.items.is_empty() && css_only && group.look.backdrop.is_none()
 }
 
-fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inner: Option<&Layers<Pic<S>>>) -> Result<Placed<Pic<S>>, S::Error> {
-    let frame = surface.frame();
+fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inner: Option<&Layers<Pic<S>>>, whole: Option<Rect>) -> Result<Placed<Pic<S>>, S::Error> {
     let look = item.look().expect("a drawable item");
-    let region = region(surface, item, look, pictures);
+    let region = whole.unwrap_or_else(|| region(surface, item, look, pictures));
+    let frame = whole.unwrap_or_else(|| surface.frame());
     let drawn = surface.paint(Reason::Body, region, None, &|c| match (item, inner) {
         (Item::Group(group), Some(inner)) => {
             build_items(c, &group.items, frame, pictures, inner);

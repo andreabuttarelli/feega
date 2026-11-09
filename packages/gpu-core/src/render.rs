@@ -59,6 +59,10 @@ impl Renderer {
         self
     }
 
+    pub fn set_body_budget(&mut self, bytes: u64) {
+        self.engine.set_body_budget(bytes);
+    }
+
     pub fn cached_layers(&self) -> usize {
         self.engine.cached_layers()
     }
