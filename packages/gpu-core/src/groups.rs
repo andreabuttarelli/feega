@@ -306,6 +306,33 @@ fn texture_image(u: &UseItem, group: &DisplayList, scale: f64, clip: String) -> 
     Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, crop: None, tile_turn: 0.0, clipped: true, inner: IDENTITY, look })
 }
 
+struct Band {
+    key: String,
+    y0: f64,
+    rows: f64,
+}
+
+fn band_key(group: &str, rows: f64, index: usize) -> String {
+    format!("{group}#band{rows}:{index}")
+}
+
+fn band_raster(u: &UseItem, group: &DisplayList, band: &Band, scale: f64) -> Raster {
+    let placed = UseItem { matrix: [scale, 0.0, 0.0, scale, 0.0, -band.y0 * scale], ..u.clone() };
+    let size = ((group.width as f64 * scale).ceil() as u32, (band.rows * scale).ceil() as u32);
+    let inside = Rect::new(0.0, 0.0, size.0 as f64, size.1 as f64);
+    let list = DisplayList { width: size.0, height: size.1, background: None, items: used_within(&placed, group, 0, inside), faces: group.faces.clone(), fragments: Default::default() };
+    Raster { clip: cache_clip(&band.key), list }
+}
+
+fn band_image(u: &UseItem, group: &DisplayList, band: &Band, scale: f64) -> Item {
+    let (w, h) = ((group.width as f64 * scale).ceil(), (band.rows * scale).ceil());
+    let frame = screen_rect(u.matrix, Rect::new(0.0, band.y0, group.width as f64, band.y0 + band.rows));
+    let matrix = snapped(times(u.matrix, [1.0 / scale, 0.0, 0.0, 1.0 / scale, 0.0, band.y0]));
+    let clip = cache_clip(&band.key);
+    let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
+    Item::Image(ImageItem { clip: clip.clone(), src: clip, video: false, media_time: 0.0, size: Size { width: w, height: h }, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, crop: None, tile_turn: 0.0, clipped: true, inner: IDENTITY, look })
+}
+
 fn partial(group: &str, (w, h): (u32, u32)) -> Item {
     let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, origin: None, backdrop: None };
     let size = Size { width: w as f64, height: h as f64 };
@@ -790,6 +817,44 @@ impl Library {
         gone
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn banded(held_by: &mut FxHashMap<String, Held>, motion: Motion, u: &UseItem, group: &DisplayList, want: f64, view: Rect, limits: Limits, seen: &mut FxHashSet<String>, rasters: &mut Vec<Raster>, finished: &mut Vec<String>, waiting: &mut Vec<String>, pending: &mut bool) -> Option<Vec<Item>> {
+        let band_h = (limits.side as f64 / 2f64.powf(want.log2().ceil())).floor().max(1.0);
+        let height = group.height as f64;
+        let mut images = Vec::new();
+        let mut missing = false;
+        for (index, y0) in (0..).map(|i| i as f64 * band_h).take_while(|y0| *y0 < height).enumerate() {
+            let rows = band_h.min(height - y0);
+            let band = Band { key: band_key(&u.group, band_h, index), y0, rows };
+            seen.insert(band.key.clone());
+            if !screen_rect(u.matrix, Rect::new(0.0, y0, group.width as f64, y0 + rows)).overlaps(view) {
+                continue;
+            }
+            let held = held_by.get(&band.key).copied();
+            let shown = match held {
+                Some(h) if sharp_enough(motion, want, h.scale) => Some(h.scale),
+                _ if rasters.len() < limits.rasters => {
+                    let raster = band_raster(u, group, &band, want);
+                    let bytes = raster.list.width as u64 * raster.list.height as u64 * RGBA_BYTES;
+                    rasters.push(raster);
+                    held_by.insert(band.key.clone(), Held { scale: want, bytes });
+                    finished.push(band.key.clone());
+                    Some(want)
+                }
+                _ => {
+                    *pending = true;
+                    waiting.push(band.key.clone());
+                    held.map(|h| h.scale)
+                }
+            };
+            match shown.filter(|held| u.hold || !too_stretched(scale_of(u.matrix), *held)) {
+                Some(scale) => images.push(band_image(u, group, &band, scale)),
+                None => missing = true,
+            }
+        }
+        (!missing).then_some(images)
+    }
+
     pub fn plan(&mut self, list: &DisplayList, limits: Limits) -> Plan {
         let mut missing = Vec::new();
         let mut rasters = Vec::new();
@@ -833,6 +898,15 @@ impl Library {
                 seen.insert(u.group.clone());
                 if on_screen {
                     items.push(cached_image(u, group, kept.scale));
+                }
+                continue;
+            }
+            if u.cache && want > 0.0 && w <= limits.side && h > limits.side {
+                let shown = Self::banded(&mut self.held, self.motion, u, group, want, view, limits, &mut seen, &mut rasters, &mut finished, &mut waiting, &mut pending);
+                match shown {
+                    Some(bands) => items.extend(bands),
+                    None if on_screen => self.live(u, group, cast.as_deref(), view, &mut items, &mut encoded),
+                    None => {}
                 }
                 continue;
             }

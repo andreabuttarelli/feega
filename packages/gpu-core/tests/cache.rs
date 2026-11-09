@@ -357,3 +357,54 @@ fn a_held_use_is_rastered_whole_in_one_plan_so_a_drag_is_live_for_one_frame_only
     assert!(next.rasters.is_empty());
     assert_eq!(kinds(&next.screen), vec!["image", "image"]);
 }
+
+const TALL: &str = r#"{ "width": 10, "height": 300, "background": null, "items": [
+  { "kind": "path", "clip": "tall", "contours": [[0, 0, 10, 0, 10, 300, 0, 300]], "rule": "nonzero", "paint": { "kind": "solid", "color": [1, 0, 0, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" } ] }"#;
+
+const SMALL_SIDE: Limits = Limits { side: 100, rasters: 1, items: 1000 };
+
+fn tall_use(scale: f64) -> DisplayList {
+    parse(&format!(r#"{{ "width": 800, "height": 600, "background": null, "items": [{{ "kind": "use", "clip": "t", "group": "t", "matrix": [{scale}, 0, 0, {scale}, 0, 0], "cache": true }}] }}"#)).unwrap()
+}
+
+#[test]
+fn a_frame_taller_than_a_texture_is_cached_in_bands_one_raster_per_draw() {
+    let mut lib = Library::new();
+    lib.put_group("t", &parse(TALL).unwrap());
+
+    let plans: Vec<_> = (0..3).map(|_| lib.plan(&tall_use(1.0), SMALL_SIDE)).collect();
+    assert!(plans.iter().all(|p| p.rasters.len() == 1));
+    assert!(plans.iter().all(|p| p.rasters[0].list.height <= 100));
+
+    let settled = lib.plan(&tall_use(1.0), SMALL_SIDE);
+    assert!(settled.rasters.is_empty());
+    assert_eq!(kinds(&settled.screen), vec!["image", "image", "image"]);
+}
+
+#[test]
+fn a_banded_frame_off_screen_rasters_only_the_bands_on_screen() {
+    let mut lib = Library::new();
+    lib.put_group("t", &parse(TALL).unwrap());
+    let half_off = parse(r#"{ "width": 800, "height": 150, "background": null, "items": [{ "kind": "use", "clip": "t", "group": "t", "matrix": [1, 0, 0, 1, 0, 0], "cache": true }] }"#).unwrap();
+
+    for _ in 0..4 {
+        lib.plan(&half_off, SMALL_SIDE);
+    }
+    let settled = lib.plan(&half_off, SMALL_SIDE);
+    assert!(settled.rasters.is_empty());
+    assert_eq!(kinds(&settled.screen), vec!["image", "image"]);
+}
+
+#[test]
+fn zooming_a_banded_frame_shows_the_older_bands_scaled_until_the_new_rung_is_rastered() {
+    let mut lib = Library::new();
+    lib.put_group("t", &parse(TALL).unwrap());
+    for _ in 0..3 {
+        lib.plan(&tall_use(1.0), SMALL_SIDE);
+    }
+
+    let zoomed = lib.plan(&tall_use(0.7), SMALL_SIDE);
+    assert_eq!(zoomed.rasters.len(), 1);
+    assert!(zoomed.pending);
+    assert!(kinds(&zoomed.screen).iter().all(|k| *k == "image"));
+}
