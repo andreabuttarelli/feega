@@ -179,3 +179,18 @@ fn the_rest_picture_belongs_to_one_camera_and_one_screen() {
     assert!(!rest.shows(Camera { x: 0.5, ..camera(1.3) }, SCREEN));
     assert!(!rest.shows(camera(1.3), (SCREEN.0 + 1, SCREEN.1)));
 }
+
+#[test]
+fn a_changed_tile_stays_on_screen_until_its_replacement_is_rastered() {
+    let mut tiles = Tiles::default();
+    let keys = tiles.frame(camera(1.0), SCREEN).missing;
+    keys.iter().for_each(|k| tiles.hold(*k));
+
+    tiles.invalidate(Rect::new(0.0, 0.0, 10.0, 10.0));
+    tiles.clear();
+
+    let frame = tiles.frame(camera(1.0), SCREEN);
+    assert!(keys.iter().all(|k| frame.draw.contains(k) && frame.missing.contains(k)));
+    tiles.hold(keys[0]);
+    assert!(!tiles.frame(camera(1.0), SCREEN).missing.contains(&keys[0]));
+}
