@@ -78,4 +78,4 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
 
 export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT): ReadSource => sourceReader(frameBatcher(fetcher), kept);
 
-export const frameSources = batchedSources((url, init) => fetch(url, { cache: 'no-store', ...init }));
+export const frameSources = batchedSources((url, init) => fetch(url, { cache: 'no-cache', ...init }));

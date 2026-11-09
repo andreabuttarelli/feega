@@ -18,8 +18,10 @@ vi.mock('$lib/server/motion/sources', () => ({ motionSource: (...a: unknown[]) =
 
 const { GET } = await import('./+server');
 
-const ask = () =>
-  GET({ params: { projectId: 'p', canvasId: 'c', nodeId: NODE }, locals: { safeGetSession: async () => ({ user: { id: 'u' } }), db: async () => ({}) } } as never);
+const NOT_MODIFIED = 304;
+
+const ask = (headers: Record<string, string> = {}) =>
+  GET({ request: new Request('http://x/source', { headers }), params: { projectId: 'p', canvasId: 'c', nodeId: NODE }, locals: { safeGetSession: async () => ({ user: { id: 'u' } }), db: async () => ({}) } } as never);
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -42,5 +44,16 @@ describe('motion source', () => {
     motionSource.mockResolvedValue({ revision: 1, doc: {}, assets: {} });
 
     expect((await ask()).status).toBe(OK);
+  });
+
+  it('a source the browser already holds answers 304, so a reopened canvas does not download megabytes again', async () => {
+    findMotionNode.mockResolvedValue({ id: NODE });
+    motionSource.mockResolvedValue({ revision: 1, doc: {}, assets: {} });
+
+    const first = await ask();
+    const tag = first.headers.get('etag');
+    expect(tag).toBeTruthy();
+    expect(first.headers.get('cache-control')).toContain('no-cache');
+    expect((await ask({ 'if-none-match': tag! })).status).toBe(NOT_MODIFIED);
   });
 });
