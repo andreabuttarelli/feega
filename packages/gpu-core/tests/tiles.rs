@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{batches, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::Rect;
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -193,4 +193,46 @@ fn a_changed_tile_stays_on_screen_until_its_replacement_is_rastered() {
     assert!(keys.iter().all(|k| frame.draw.contains(k) && frame.missing.contains(k)));
     tiles.hold(keys[0]);
     assert!(!tiles.frame(camera(1.0), SCREEN).missing.contains(&keys[0]));
+}
+
+fn filled(tiles: &mut Tiles) {
+    for step in -12..=4 {
+        for key in tiles.frame(camera(step_zoom(step)), SCREEN).missing {
+            tiles.hold(key);
+        }
+    }
+}
+
+#[test]
+fn eviction_never_drops_the_tiles_on_screen_or_one_ring_around_it() {
+    let mut tiles = Tiles::default();
+    filled(&mut tiles);
+    let at = camera(1.0);
+    let ring = Rect::new(-(TILE_PX as f64), -(TILE_PX as f64), SCREEN.0 as f64 + TILE_PX as f64, SCREEN.1 as f64 + TILE_PX as f64);
+
+    let gone = tiles.evict_beyond(at, SCREEN, 0);
+
+    assert!(!gone.is_empty());
+    assert!(gone.iter().all(|k| k.step != step_of(1.0) || !k.screen(at).overlaps(ring)));
+}
+
+#[test]
+fn eviction_drops_the_least_recently_drawn_tiles_first() {
+    let mut tiles = Tiles::default();
+    let old = tiles.frame(camera(step_zoom(-20)), SCREEN).missing;
+    let recent = tiles.frame(camera(step_zoom(-16)), SCREEN).missing;
+    old.iter().chain(&recent).for_each(|k| tiles.hold(*k));
+    tiles.drawn(&old);
+    tiles.drawn(&recent);
+
+    let gone = tiles.evict_beyond(camera(1.0), SCREEN, recent.len());
+
+    assert_eq!(gone.len(), old.len());
+    assert!(old.iter().all(|k| gone.contains(k)));
+}
+
+#[test]
+fn the_tile_budget_follows_the_screen_and_caps_at_the_memory_budget() {
+    assert!(tiles_kept((1440, 900)) < tiles_kept((2880, 1800)));
+    assert!(tiles_kept((100_000, 100_000)) as u64 * TILE_BYTES <= TILE_BUDGET_BYTES);
 }
