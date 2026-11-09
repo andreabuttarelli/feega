@@ -37,6 +37,17 @@ describe('breakpoint views on the canvas', () => {
     expect(views([{ ...frame, box: { ...frame.box, x: 300 } }], () => page)[0]).not.toBe(first);
   });
 
+  it('moving a frame shifts its views without laying their pages out again', () => {
+    const page = landingDoc();
+    const views = heldViews();
+    const [first] = views([frame], () => page);
+
+    const [moved] = views([{ ...frame, box: { ...frame.box, x: 300 } }], () => page);
+
+    expect(moved.doc).toBe(first.doc);
+    expect(moved.frame.box.x).toBe(first.frame.box.x + 200);
+  });
+
   it('a frame without breakpoints has no views', () => {
     expect(heldViews()([frame], () => ({ ...doc, breakpoints: undefined }) as MotionDoc)).toEqual([]);
     expect(heldViews()([frame], () => null)).toEqual([]);
