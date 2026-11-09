@@ -94,7 +94,9 @@
   }
 
   const smoothing = smoothingOf(navigator.userAgent);
-  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null));
+  const BUILD_LANES_MAX = 4;
+  const buildLanes = Math.max(1, Math.min(BUILD_LANES_MAX, (typeof navigator === 'object' ? navigator.hardwareConcurrency : 2) - 1));
+  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null), buildLanes);
 
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);

@@ -34,15 +34,20 @@ export const builtAnswer = (id: number, list: DisplayList | null): BuildAnswer =
 
 export const transfers = (answer: BuildAnswer): ArrayBuffer[] => ('packs' in answer ? (answer.packs ?? []).flatMap((p) => [p.floats.buffer as ArrayBuffer, p.ends.buffer as ArrayBuffer]) : []);
 
-export function frameBuilder(spawn: () => BuildWorker | null): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
-  let worker: BuildWorker | null = null;
+type Lane = { worker: BuildWorker; busy: number };
+
+export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (source: FrameDoc, smoothing: Smoothing) => Promise<DisplayList | null> {
+  const pool: Lane[] = [];
   let dead = false;
   let next = 0;
-  const waiting = new Map<number, { resolve: (list: DisplayList | null) => void; reject: (e: Error) => void }>();
+  const waiting = new Map<number, { lane: Lane; resolve: (list: DisplayList | null) => void; reject: (e: Error) => void }>();
 
   const answer = (e: MessageEvent<BuildAnswer>) => {
     const asked = waiting.get(e.data.id);
     waiting.delete(e.data.id);
+    if (asked) {
+      asked.lane.busy--;
+    }
     if ('error' in e.data) {
       asked?.reject(new Error(e.data.error));
       return;
@@ -62,15 +67,29 @@ export function frameBuilder(spawn: () => BuildWorker | null): (source: FrameDoc
     waiting.clear();
   };
 
-  return (source, smoothing) => {
-    worker = dead ? null : (worker ?? spawn());
+  const laneFor = (): Lane | null => {
+    const idle = pool.find((l) => l.busy === 0);
+    if (idle || pool.length >= lanes) {
+      return idle ?? pool.reduce((a, b) => (b.busy < a.busy ? b : a));
+    }
+    const worker = spawn();
     if (!worker) {
-      return Promise.reject(new Error('no frame worker'));
+      return pool[0] ?? null;
     }
     worker.onmessage = answer;
     worker.onerror = die;
+    pool.push({ worker, busy: 0 });
+    return pool[pool.length - 1];
+  };
+
+  return (source, smoothing) => {
+    const lane = dead ? null : laneFor();
+    if (!lane) {
+      return Promise.reject(new Error('no frame worker'));
+    }
     const id = next++;
-    worker.postMessage({ id, source, smoothing, locals: localFilesSnapshot() });
-    return new Promise((resolve, reject) => waiting.set(id, { resolve, reject }));
+    lane.busy++;
+    lane.worker.postMessage({ id, source, smoothing, locals: localFilesSnapshot() });
+    return new Promise((resolve, reject) => waiting.set(id, { lane, resolve, reject }));
   };
 }

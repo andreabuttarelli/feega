@@ -78,6 +78,14 @@ describe('the builder', () => {
     expect(b?.width).toBe(1);
   });
 
+  it('spreads builds over its workers, so frames build side by side instead of in one queue', async () => {
+    const workers = [echo(), echo(), echo()];
+    let spawned = 0;
+    const build = frameBuilder(() => workers[spawned++], 3);
+    await Promise.all([1, 2, 3].map(() => build(source(shapeDoc), Smoothing.Plain)));
+    expect(workers.map((w) => w.asked.length)).toEqual([1, 1, 1]);
+  });
+
   it('hands the worker the local font files it cannot see from its own thread', async () => {
     keepLocalFiles('Avenir Next', [{ url: 'blob:x', weight: 400, italic: false }]);
     const worker = echo();
