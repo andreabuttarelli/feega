@@ -323,3 +323,19 @@ fn a_full_render_cheap_to_encode_but_slow_on_the_gpu_is_only_reprojected_while_z
     assert_eq!(frame.outcome, Some(Outcome::Reused));
     assert_eq!(fake.painted.len(), 1);
 }
+
+#[test]
+fn a_tile_plan_of_a_group_still_building_its_cache_damages_no_tile() {
+    let mut library = Library::new();
+    library.put_group("g", &parse(&busy_group()).unwrap());
+    let mut c = Compositor::new(800, 600);
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true }], "drop": [] }"#).unwrap(), &library);
+    c.take_damage();
+
+    let limits = Limits { side: 4096, rasters: 1, items: 1 };
+    for _ in 0..3 {
+        c.plan_at(&mut library, Camera { x: 0.0, y: 0.0, zoom: 1.0 }, (256, 256), limits);
+    }
+
+    assert_eq!(c.take_damage(), gpu_core::retained::Damage::none());
+}

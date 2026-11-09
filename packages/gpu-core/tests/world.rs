@@ -159,3 +159,12 @@ fn a_live_overlay_change_damages_only_the_live_items() {
     assert_eq!(rects(w.take_damage()), vec![Rect::new(50.0, 0.0, 60.0, 10.0), Rect::new(80.0, 0.0, 90.0, 10.0)]);
     assert_eq!(w.overlay_group(OverlayPart::Fixed).map(|(l, _)| l.items.len()), Some(1));
 }
+
+#[test]
+fn a_tiled_canvas_takes_every_use_uncached_so_no_group_cache_ever_damages_its_tiles() {
+    let patch = gpu_core::world::parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true }], "drop": [] }"#).unwrap();
+
+    let tiled = patch.uncached();
+
+    assert!(tiled.put.iter().all(|u| !u.cache && !u.hold));
+}

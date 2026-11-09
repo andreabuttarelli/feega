@@ -15,6 +15,12 @@ pub struct Patch {
     pub order: Option<Vec<String>>,
 }
 
+impl Patch {
+    pub fn uncached(self) -> Patch {
+        Patch { put: self.put.into_iter().map(|u| UseItem { cache: false, hold: false, ..u }).collect(), ..self }
+    }
+}
+
 pub fn parse_patch(json: &str) -> Result<Patch, serde_json::Error> {
     serde_json::from_str(json)
 }
@@ -213,7 +219,7 @@ impl World {
     }
 
     pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let uses = self.uses.iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
         DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 

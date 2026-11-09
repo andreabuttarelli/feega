@@ -106,3 +106,23 @@ fn the_reserve_is_a_coarse_level_around_the_screen_so_a_fast_zoom_never_shows_a_
     let reach = reserve.iter().map(|k| k.world()).reduce(|a, b| a.union(b)).unwrap();
     assert!(reach.contains(screen_world.origin()) && reach.width() > screen_world.width() * 2.0);
 }
+
+#[test]
+fn a_deep_fast_zoom_from_rest_always_finds_a_covering_tile_in_the_idle_set() {
+    let mut tiles = Tiles::default();
+    let rest = Camera { x: -200.0, y: -100.0, zoom: 0.3 };
+    for key in tiles.frame(rest, SCREEN).missing {
+        tiles.hold(key);
+    }
+    for key in tiles.reserve(rest, SCREEN) {
+        tiles.hold(key);
+    }
+
+    for zoom in [0.6, 1.1, 2.0, 3.7, 6.7] {
+        let pointer = (300.0, 400.0);
+        let world = ((pointer.0 - rest.x) / rest.zoom, (pointer.1 - rest.y) / rest.zoom);
+        let deep = Camera { x: pointer.0 - world.0 * zoom, y: pointer.1 - world.1 * zoom, zoom };
+        let frame = tiles.frame(deep, SCREEN);
+        assert!(frame.missing.iter().all(|k| tiles.covered(*k)), "blank at zoom {zoom}");
+    }
+}

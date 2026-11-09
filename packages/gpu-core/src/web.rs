@@ -32,7 +32,8 @@ const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
-const TILES_KEPT: usize = 768;
+const TILES_KEPT: usize = 320;
+const SPARE_TILES: usize = 32;
 const TILE_REFINE_EVERY_MS: f64 = 120.0;
 const TILE_GUTTER_PX: u32 = 2;
 
@@ -364,7 +365,9 @@ impl WebCore {
     }
 
     pub fn patch_uses(&mut self, patch_json: &[u8]) -> Result<(), JsValue> {
-        self.compositor.patch(parse_patch(utf8(patch_json)?).map_err(failed)?, &self.library);
+        let patch = parse_patch(utf8(patch_json)?).map_err(failed)?;
+        let patch = if self.tiled { patch.uncached() } else { patch };
+        self.compositor.patch(patch, &self.library);
         Ok(())
     }
 
@@ -417,7 +420,11 @@ impl WebCore {
     fn drop_tiles(&mut self, gone: Vec<TileKey>) {
         for key in gone {
             if let Some(texture) = self.tile_textures.remove(&key) {
-                self.spare_tiles.push(texture);
+                if self.spare_tiles.len() < SPARE_TILES {
+                    self.spare_tiles.push(texture);
+                } else {
+                    texture.destroy();
+                }
             }
         }
     }
