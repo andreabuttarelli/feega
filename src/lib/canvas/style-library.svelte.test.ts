@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StyleKind } from '@feega/motion-core/motion/styles-model';
 import { StyleLibrary } from './style-library.svelte';
 import type { LibraryStore } from './project-library-store';
 import { LibraryOp, type LibraryAsk } from '$lib/motion/project-library-ops';
 
 const HEADLINE = { kind: StyleKind.Text, size: 0.2, weight: 600 } as const;
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
 
 describe('the canvas style library a person edits', () => {
   it('renaming moves the style under its new name and tells every frame', () => {
@@ -94,11 +97,23 @@ describe('the project style library', () => {
     await library.open(backend);
 
     library.found({ Headline: { kind: StyleKind.Text, size: 0.9 }, Body: { kind: StyleKind.Text, size: 0.05 } });
-    await Promise.resolve();
+    await vi.runAllTimersAsync();
 
     expect(library.styles.Headline).toEqual(HEADLINE);
     expect(library.styles.Body).toMatchObject({ size: 0.05 });
     expect(sent).toEqual([{ op: LibraryOp.Adopt, entries: { Body: { kind: StyleKind.Text, size: 0.05 } } }]);
+  });
+
+  it('frames arriving one after another adopt their styles in one request', async () => {
+    const library = new StyleLibrary();
+    const { backend, sent } = store({});
+    await library.open(backend);
+
+    library.found({ A: HEADLINE });
+    library.found({ A: HEADLINE, B: HEADLINE });
+    await vi.runAllTimersAsync();
+
+    expect(sent).toEqual([{ op: LibraryOp.Adopt, entries: { A: HEADLINE, B: HEADLINE } }]);
   });
 
   it('a frame holding an older copy of a project style is brought up to date', async () => {
