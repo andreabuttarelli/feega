@@ -219,6 +219,21 @@ impl<'a> Surface for Gpu<'a> {
         }
     }
 
+    fn recall_body(&mut self, key: &str, origin: Point) -> Option<Placed> {
+        let tick = self.cache.tick;
+        let cached = self.cache.entries.get_mut(key)?;
+        cached.used = tick;
+        self.vello.mark_override_image_dirty(&cached.image);
+        Some(Placed { image: cached.image.clone(), origin })
+    }
+
+    fn remember_body(&mut self, key: &str, placed: &Placed) {
+        if let Some(texture) = self.last.take() {
+            let used = self.cache.tick;
+            self.cache.entries.insert(key.to_string(), Cached { image: placed.image.clone(), origin: placed.origin, _texture: texture, used });
+        }
+    }
+
     fn place(&mut self, texture: Pooled, region: Rect) -> Placed {
         let image = self.vello.register_texture((*texture).clone());
         self.last = Some(texture.clone());

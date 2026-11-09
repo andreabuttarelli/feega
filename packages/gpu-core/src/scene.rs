@@ -280,6 +280,10 @@ impl<P> Layers<P> {
         Self::default()
     }
 
+    pub fn plain(&self) -> bool {
+        self.bodies.is_empty() && self.behind.is_empty() && self.blended.is_empty() && self.culled.is_empty() && self.groups.values().all(Layers::plain)
+    }
+
     pub fn into_images(self) -> Vec<P> {
         let nested = self.groups.into_values().flat_map(Layers::into_images);
         self.bodies.into_values().chain(self.behind.into_values()).chain(self.blended.into_values()).map(|p| p.image).chain(nested).collect()

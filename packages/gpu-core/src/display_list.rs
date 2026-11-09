@@ -130,6 +130,8 @@ pub struct Look {
     pub origin: Option<[f64; 2]>,
     #[serde(default)]
     pub backdrop: Option<f64>,
+    #[serde(skip)]
+    pub key: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
