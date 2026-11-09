@@ -46,7 +46,21 @@ const boundsOf = (doc: MotionDoc, id: string, frame: number, boxes: Boxes): Boun
 
 const present = (doc: MotionDoc, boxes: Boxes) => (id: string) => Boolean(findClip(doc, id) && boxes[id]);
 
+const othersSeen = new WeakMap<Boxes, WeakMap<MotionDoc, { key: string; others: Bounds[] }>>();
+
 function othersOf(d: Drag): Bounds[] {
+  const byDoc = othersSeen.get(d.boxes) ?? othersSeen.set(d.boxes, new WeakMap()).get(d.boxes)!;
+  const key = `${d.frame}|${d.ids.join(',')}`;
+  const seen = byDoc.get(d.doc);
+  if (seen?.key === key) {
+    return seen.others;
+  }
+  const others = othersIn(d);
+  byDoc.set(d.doc, { key, others });
+  return others;
+}
+
+function othersIn(d: Drag): Bounds[] {
   return Object.keys(d.boxes)
     .filter((id) => !d.ids.includes(id) && findClip(d.doc, id))
     .map((id) => boundsOf(d.doc, id, d.frame, d.boxes));
@@ -104,6 +118,11 @@ export function dragClips(d: Drag): Dragged {
   const at = d.snap === SnapMode.Off ? { ...withLock(d), reach: 0 } : withLock(d);
   const others = othersOf(at);
   return onWholePixels(at, asGroup(at) ? dragGroup(at, others) : dragOne(at, others));
+}
+
+export function clipsShift(before: MotionDoc, after: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes): Pt {
+  const [was, now] = [before, after].map((doc) => unionBounds(ids.map((id) => boundsOf(doc, id, frame, boxes))));
+  return [now.left - was.left, now.top - was.top];
 }
 
 export function nudgeClips(doc: MotionDoc, ids: readonly string[], frame: number, by: Pt, mode: EditMode): OpResult {
