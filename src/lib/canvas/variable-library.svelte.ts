@@ -1,3 +1,4 @@
+import { adoptBatch } from './adopt-batch';
 import type { Collection, Variables } from '@feega/motion-core/motion/variables-model';
 import { LibraryOp, type LibraryAsk } from '$lib/motion/project-library-ops';
 import type { LibraryStore } from './project-library-store';
@@ -18,6 +19,7 @@ export class VariableLibrary {
   private sink: VariableSink | null = null;
   private store: LibraryStore | null = null;
   private seen: Variables = {};
+  private adopt = adoptBatch<Collection>((entries) => void this.store?.send({ op: LibraryOp.Adopt, entries }));
 
   connect(sink: VariableSink | null) {
     this.sink = sink;
@@ -42,7 +44,7 @@ export class VariableLibrary {
     const fresh = Object.fromEntries(Object.entries(inDocs).filter(([name]) => !this.collections[name]).map(([name, c]) => [name, shared(c)]));
     if (Object.keys(fresh).length) {
       this.collections = { ...this.collections, ...fresh };
-      void this.store.send({ op: LibraryOp.Adopt, entries: fresh });
+      this.adopt(fresh);
     }
     for (const [name, collection] of Object.entries(inDocs)) {
       if (!sameShape(collection, this.collections[name])) {
