@@ -1,13 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { copyFileSync, createReadStream, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createReadStream, mkdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
 import { test, expect, chromium, type Browser, type BrowserContext, type CDPSession, type Page } from '@playwright/test';
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
 import { localEnv } from '../../scripts/local.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
+import { fixtureCopy } from '../../scripts/perf/fixture-copy.mjs';
 import { Step, shownLate, timeline, type FrameSteps, type Late } from '../../src/lib/canvas/core/frame-timeline';
 import { startupWaterfall } from '../../src/lib/canvas/core/startup-marks';
 
@@ -58,18 +59,18 @@ const sha = (file: string) =>
     createReadStream(file).on('data', (b) => hash.update(b)).on('end', () => done(hash.digest('hex'))).on('error', fail);
   });
 
-async function serve(build: Build): Promise<{ server: ChildProcess; file: string }> {
-  const file = join(mkdtempSync(join(tmpdir(), 'feega-load-')), 'served.feega');
-  copyFileSync(FIXTURE, file);
+async function serve(build: Build): Promise<{ server: ChildProcess; file: string; dispose: () => void }> {
+  const { file, dispose } = fixtureCopy(FIXTURE);
   const server = spawn(process.execPath, [join(build.root, 'scripts/node-server.mjs')], { cwd: build.root, stdio: 'ignore', env: localEnv(file, String(build.port)) });
   const started = Date.now();
   while (Date.now() - started < SERVER_UP_MS) {
     if (await fetch(`http://127.0.0.1:${build.port}/favicon-16.png`).then((r) => r.ok).catch(() => false)) {
-      return { server, file };
+      return { server, file, dispose };
     }
     await new Promise((r) => setTimeout(r, POLL_MS * 4));
   }
   server.kill();
+  dispose();
   throw new Error(`${build.name} server never came up`);
 }
 
@@ -202,7 +203,7 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
 }
 
 async function runOnce(browser: Browser, build: Build, cache: Cache, profiled: boolean): Promise<{ run: LoadRun; spots: Hotspot[] }> {
-  const { server, file } = await serve(build);
+  const { server, file, dispose } = await serve(build);
   const before = await sha(file);
   const recordDir = RECORD ? join(OUT, `video-${build.name}-${cache}`) : null;
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block', ...(recordDir ? { recordVideo: { dir: recordDir, size: VIEWPORT } } : {}) });
@@ -219,6 +220,7 @@ async function runOnce(browser: Browser, build: Build, cache: Cache, profiled: b
   } finally {
     await context.close();
     server.kill();
+    dispose();
   }
 }
 
