@@ -9,6 +9,7 @@ import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/p
 import { localEnv } from '../../scripts/local.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
 import { Step, shownLate, timeline, type FrameSteps, type Late } from '../../src/lib/canvas/core/frame-timeline';
+import { startupWaterfall } from '../../src/lib/canvas/core/startup-marks';
 
 enum Cache {
   Cold = 'cold',
@@ -187,6 +188,8 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
   const watched = await watchLoad(page, from);
   const marks = timeline(await page.evaluate(() => performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime }))));
   console.log(marks.filter((m) => !watched.frames.some((f) => f.id === m.id)).map((m) => `offscreen ${m.id.slice(0, 8)} ${m.steps.map((x) => `${x.step}@${x.at}`).join(' ')}`).join('\n'));
+  const startup = startupWaterfall(...(await page.evaluate(() => [performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime })), performance.getEntriesByType('resource').map((r) => ({ name: r.name, startTime: r.startTime, responseEnd: (r as PerformanceResourceTiming).responseEnd }))] as const)));
+  console.log(`startup\n${startup}`);
   const allVectorsMs = marks.find((m) => m.id === 'all')?.steps.find((x) => x.step === Step.AllVectors)?.at ?? null;
   const frames = watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] }));
   const load = { ...watched, allVectorsMs, frames, late: shownLate(frames), ...wire };
