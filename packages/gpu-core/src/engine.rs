@@ -11,6 +11,7 @@ use crate::filter_passes::{layer_texture, FilterPasses, Pooled, WgpuRunner};
 use crate::layers::{prepare, Blending, Surface};
 use crate::pictures::Pictures;
 use crate::scene::{build_into, Placed};
+use crate::tally::{now_ms, Reason, Tally};
 use crate::texture_budget::{bytes_of, over_cap};
 use crate::Skipped;
 
@@ -106,6 +107,8 @@ pub struct Engine {
     held: HashMap<String, wgpu::Texture>,
     spare: Vec<wgpu::Texture>,
     scenes: Vec<Scene>,
+    tally: Tally,
+    drawing: Reason,
 }
 
 pub type EngineError = vello::Error;
@@ -119,6 +122,7 @@ struct Gpu<'a> {
     last: Option<Pooled>,
     cache: &'a mut LayerCache,
     scenes: &'a mut Vec<Scene>,
+    tally: &'a mut Tally,
 }
 
 fn borrowed(scenes: &mut Vec<Scene>) -> Scene {
@@ -159,7 +163,14 @@ fn base(colour: Option<Rgba>) -> Color {
 }
 
 impl Gpu<'_> {
-    fn render(&mut self, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
+    fn render(&mut self, reason: Reason, scene: &Scene, base: Color, target: &wgpu::TextureView, size: (u32, u32)) -> Result<(), EngineError> {
+        let started = now_ms();
+        let rendered = self.encode(scene, base, target, size);
+        self.tally.add(reason, now_ms() - started);
+        rendered
+    }
+
+    fn encode(&mut self, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
         self.runner.passes.flush(self.runner.queue);
         let params = RenderParams { base_color: base, width, height, antialiasing_method: AaConfig::Area };
         if !empties_the_atlas(scene) {
@@ -181,14 +192,14 @@ impl<'a> Surface for Gpu<'a> {
         Rect::new(0.0, 0.0, self.width as f64, self.height as f64)
     }
 
-    fn paint(&mut self, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<Pooled, EngineError> {
+    fn paint(&mut self, reason: Reason, region: Rect, colour: Option<Rgba>, draw: &dyn Fn(&mut Scene)) -> Result<Pooled, EngineError> {
         let size = (region.width() as u32, region.height() as u32);
         let texture = self.runner.passes.texture(self.runner.device, size.0, size.1);
         let mut scene = borrowed(self.scenes);
         draw(&mut scene);
         let mut moved = borrowed(self.scenes);
         moved.append(&scene, Some(Affine::translate((-region.x0, -region.y0))));
-        let rendered = self.render(&moved, base(colour), &texture.create_view(&wgpu::TextureViewDescriptor::default()), size);
+        let rendered = self.render(reason, &moved, base(colour), &texture.create_view(&wgpu::TextureViewDescriptor::default()), size);
         self.scenes.extend([scene, moved]);
         rendered.map(|_| texture)
     }
@@ -236,7 +247,7 @@ impl Gpu<'_> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new() })
+        Ok(Self { vello, blending: Blending::Native, filters: FilterPasses::new(device), cache: LayerCache::default(), held: HashMap::new(), spare: Vec::new(), scenes: Vec::new(), tally: Tally::default(), drawing: Reason::Screen })
     }
 
     pub fn set_budget(&mut self, pool: u64, layers: u64) {
@@ -244,16 +255,20 @@ impl Engine {
         self.cache.cap = layers;
     }
 
+    pub fn take_tally(&mut self) -> Tally {
+        std::mem::take(&mut self.tally)
+    }
+
     pub fn cached_layers(&self) -> usize {
         self.cache.entries.len()
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
-        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes };
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally };
         let layers = prepare(&mut gpu, list, pictures, self.blending)?;
         let mut scene = borrowed(gpu.scenes);
         let skipped = build_into(&mut scene, list, pictures, &layers);
-        let drawn = gpu.render(&scene, base(list.background), target, (list.width, list.height));
+        let drawn = gpu.render(self.drawing, &scene, base(list.background), target, (list.width, list.height));
         gpu.scenes.push(scene);
         for image in layers.into_images() {
             if !gpu.cache.holds(&image) {
@@ -266,7 +281,10 @@ impl Engine {
 
     fn raster(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(ImageData, wgpu::Texture, Vec<Skipped>), EngineError> {
         let texture = self.reused(list.width, list.height).unwrap_or_else(|| layer_texture(device, list.width, list.height));
-        let skipped = self.draw(device, queue, list, pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default()))?;
+        self.drawing = Reason::Raster;
+        let drawn = self.draw(device, queue, list, pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        self.drawing = Reason::Screen;
+        let skipped = drawn?;
         Ok((self.vello.register_texture(texture.clone()), texture, skipped))
     }
 

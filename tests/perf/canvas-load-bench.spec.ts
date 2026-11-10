@@ -29,7 +29,7 @@ const CPU_THROTTLE = Number(process.env.BENCH_CPU ?? 4);
 const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const FIXTURE = process.env.BENCH_FIXTURE ?? join(homedir(), 'Documents/feega-videos/perf/landings/landings.feega');
 const RECORD = process.env.BENCH_RECORD === '1';
-const FIRST_PORT = 5391;
+const FIRST_PORT = Number(process.env.BENCH_FIRST_PORT ?? 5391);
 const VIEWPORT = { width: 1440, height: 900 };
 const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = Number(process.env.BENCH_ZOOM ?? 0.12);
@@ -191,6 +191,8 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
   console.log(marks.filter((m) => !watched.frames.some((f) => f.id === m.id)).map((m) => `offscreen ${m.id.slice(0, 8)} ${m.steps.map((x) => `${x.step}@${x.at}`).join(' ')}`).join('\n'));
   const startup = startupWaterfall(...(await page.evaluate(() => [performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime })), performance.getEntriesByType('resource').map((r) => ({ name: r.name, startTime: r.startTime, responseEnd: (r as PerformanceResourceTiming).responseEnd }))] as const)));
   console.log(`startup\n${startup}`);
+  const tally = await page.evaluate(() => (window as Window & { __gpuCanvas?: { tally?: Record<string, { n: number; ms: number }> } }).__gpuCanvas?.tally ?? {});
+  console.log(`tally ${Object.entries(tally).filter(([, t]) => t.n).map(([r, t]) => `${r}=${t.n}/${t.ms.toFixed(0)}ms`).join(' ')}`);
   const allVectorsMs = marks.find((m) => m.id === 'all')?.steps.find((x) => x.step === Step.AllVectors)?.at ?? null;
   const frames = watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] }));
   const load = { ...watched, allVectorsMs, frames, late: shownLate(frames), ...wire };
