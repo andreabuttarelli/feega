@@ -1,7 +1,7 @@
 import { Step, timeline } from './frame-timeline';
 
 type Mark = { name: string; startTime: number };
-type Resource = { name: string; startTime: number; responseEnd: number; transferSize: number; encodedBodySize: number; initiatorType: string };
+type Resource = { name: string; startTime: number; responseEnd: number; transferSize: number; encodedBodySize: number; initiatorType: string; requestStart?: number; responseStart?: number; serverTiming?: readonly { name: string; duration: number }[] };
 type Navigation = { responseEnd: number; domContentLoadedEventEnd: number };
 
 export type LoadInput = { marks: readonly Mark[]; resources: readonly Resource[]; images: ReadonlyMap<string, readonly string[]>; navigation: Navigation | null };
@@ -40,7 +40,7 @@ export function loadReport({ marks, resources, images, navigation }: LoadInput) 
 
   const sources = resources.flatMap((r) => {
     const ids = SOURCES.exec(r.name)?.[1];
-    return ids ? [{ ids: ids.split(',').length, start: Math.round(r.startTime), end: Math.round(r.responseEnd), bytes: bytesOf(r) }] : [];
+    return ids ? [{ ids: ids.split(',').length, start: Math.round(r.startTime), end: Math.round(r.responseEnd), bytes: bytesOf(r), ttfb: Math.round((r.responseStart ?? 0) - (r.requestStart ?? 0)), phases: Object.fromEntries((r.serverTiming ?? []).map((p) => [p.name, Math.round(p.duration)])) }] : [];
   });
 
   const contents = frames.map((f) => f.content).filter((c): c is number => c !== null);

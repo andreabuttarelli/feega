@@ -99,3 +99,10 @@ BENCH_CASE=load BENCH_BUILDS=base=../dazero-base,fix=. npx playwright test -c te
 measures this checkout. An entry may carry its own query (`off=.?coreTiles=0,on=.?coreTiles=1`) to
 compare one build with a switch off and on. The spec fails when a frame is still blank in a
 screenshot taken more than a frame after its vectors were drawn (`shownLate`). `BENCH_RECORD=1` saves a video per case.
+
+`FEEGA_LOCAL_LATENCY_MS=<ms>` delays every local database query by that much, so the bench sees
+round trips like a remote Supabase (the user's canvas costs ~1.1–1.7 s per sources batch there,
+local answers in ~70 ms). Give both builds the same value.
+
+Resource Timing's `responseEnd` waits for the page's main thread: a long task during start makes
+a 5 ms body look like a 1 s download. Check `longtask` entries before reading it as network time.

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toFetch, untilFound } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toFetch, toWarm, untilFound } from './frame-source';
 import { ItemKind, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 import { BlendMode } from '@feega/motion-core/motion/blend';
@@ -229,5 +229,25 @@ describe('a frame whose source is not saved yet', () => {
 
     expect(await untilFound(attempt, { tries: 3, waitMs: 0 }, noWait)).toBeNull();
     expect(attempt).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('the sources warmed on open', () => {
+  const at = (id: string, x: number) => ({ id, kind: FrameKind.Frame, revision: 1, box: { x, y: 0, w: 10, h: 10 } });
+  const keyOf = (f: { id: string; revision: number }) => `${f.id}:${f.revision}`;
+  const view = { x: 0, y: 0, zoom: 1 };
+
+  it('warms every frame of the canvas, on-screen first, not only the ones in view (a real canvas asked its frames in five requests seconds apart)', () => {
+    const frames = [at('far', 5000), at('near', 0)];
+
+    expect(toWarm(frames, view, { width: 100, height: 100 }, keyOf, new Set(), new Set()).map((f) => f.id)).toEqual(['near', 'far']);
+  });
+
+  it('warms them before the screen is measured', () => {
+    expect(toWarm([at('a', 0), at('b', 5000)], view, { width: 0, height: 0 }, keyOf, new Set(), new Set())).toHaveLength(2);
+  });
+
+  it('leaves out frames already asked or drawn live', () => {
+    expect(toWarm([at('a', 0), at('b', 0), at('c', 0)], view, { width: 100, height: 100 }, keyOf, new Set(['a:1']), new Set(['b'])).map((f) => f.id)).toEqual(['c']);
   });
 });
