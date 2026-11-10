@@ -9,7 +9,7 @@ type Slot = Omit<FigmaImage, 'clipId'>;
 export type InstanceDiff = { overrides: Overrides; images: Slot[] };
 export type ImagesOf = { own: FigmaImage[]; main: FigmaImage[] };
 
-const IGNORED = new Set(['id', 'name', 'parent', 'props', ...CLIP_LEVEL_OVERRIDES]);
+const IGNORED = new Set(['id', 'name', 'parent', 'props', 'source', ...CLIP_LEVEL_OVERRIDES]);
 
 const PRECISION = 1e6;
 

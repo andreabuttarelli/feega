@@ -1,3 +1,4 @@
+import type { CodeSpot } from '$lib/canvas/code-look';
 import type { CapturedMotion } from './captured-motion';
 import { inflateSync } from 'fflate';
 import { decompress } from 'fzstd';
@@ -93,6 +94,7 @@ export type FigmaRawNode = {
   codeComponent?: CodeComponent;
   behaviour?: ClipBehaviour;
   motion?: CapturedMotion;
+  source?: CodeSpot;
   derivedSymbolData?: NodePatch[];
 };
 

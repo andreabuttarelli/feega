@@ -3,7 +3,7 @@ import type { FarmAccess } from '$lib/server/motion/vercel-farm';
 import { cloneUrl, DEV_ARGS, devServerOf, managerOf, namesIn, PackageManager, type RepoRef } from './repo';
 import { ORIGIN_PROXY } from './origin-proxy';
 
-export type RunningApp = { url: string; names: string[]; stop: () => Promise<void> };
+export type RunningApp = { url: string; names: string[]; sha: string | null; stop: () => Promise<void> };
 
 export enum RunFailure {
   Clone = 'clone_failed',
@@ -28,6 +28,7 @@ const GB_PER_VCPU = 2;
 
 export const sandboxUsd = (ms: number, vcpus: number = RUN_LIMITS.vcpus) => (ms / MS_PER_HOUR) * vcpus * (VCPU_HOUR_USD + GB_PER_VCPU * GB_HOUR_USD);
 const TAIL = 400;
+const SHA = /^[0-9a-f]{40}$/;
 const PROXY_FILE = '/tmp/feega-origin-proxy.cjs';
 
 const INSTALL: Record<PackageManager, string> = {
@@ -96,7 +97,8 @@ async function started(box: Box, limits: RunLimits): Promise<RunOutcome> {
   }
 
   const names = namesIn((await shell(box, NAMES)).out);
-  return { ok: true, app: { url: box.sandbox.domain(limits.port), names, stop: () => box.sandbox.stop().then(() => undefined) } };
+  const head = (await shell(box, 'git rev-parse HEAD')).out.trim();
+  return { ok: true, app: { url: box.sandbox.domain(limits.port), names, sha: SHA.test(head) ? head : null, stop: () => box.sandbox.stop().then(() => undefined) } };
 }
 
 const ARCHIVE_FILE = '/tmp/feega-repo.tgz';

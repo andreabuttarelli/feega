@@ -59,7 +59,9 @@ export type ComponentCount = { components: number; variants: number; instances: 
 
 type Refusal = { outcome: Exclude<CodeImportOutcome, CodeImportOutcome.Ok>; error?: string };
 
-export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; name: string; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[] } & ComponentCount) | Refusal;
+export type CodeOrigin = { repo: string; branch: string | null; sha: string | null };
+
+export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[] } & ComponentCount) | Refusal;
 
 export type CodePage = { label: string; url: string };
 
@@ -165,5 +167,7 @@ export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
   }
 
   const pages = routes.map((route) => ({ label: route, url: new URL(route, run.app.url).toString() }));
-  return importBoards({ ...ask, name: repo.repo, pages, names: run.app.names, crop: Crop.Page }).finally(() => run.app.stop().catch(() => undefined));
+  const origin = { repo: `${repo.owner}/${repo.repo}`, branch: repo.ref, sha: run.app.sha };
+  const done = await importBoards({ ...ask, name: repo.repo, pages, names: run.app.names, crop: Crop.Page }).finally(() => run.app.stop().catch(() => undefined));
+  return done.outcome === CodeImportOutcome.Ok ? { ...done, origin } : done;
 }

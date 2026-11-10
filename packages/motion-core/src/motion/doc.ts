@@ -136,7 +136,8 @@ const clipSchema = z.object({
   styleRef: z.string().min(1).optional(),
   paintStyleRef: z.string().min(1).optional(),
   effectStyleRef: z.string().min(1).optional(),
-  bind: bindSchema
+  bind: bindSchema,
+  source: z.object({ at: z.string().min(1).max(300), tag: z.string().max(40).optional(), cls: z.string().max(1000).optional(), was: z.record(z.string().max(20), z.union([z.string().max(2000), z.number()])) }).optional()
 });
 
 const trackSchema = z.object({
