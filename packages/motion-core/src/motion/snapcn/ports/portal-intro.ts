@@ -16,7 +16,7 @@ export const PORT: SnapcnPort = {
     lead: { type: 'string', title: 'Lead words', default: 'your launch video', group: 'Content', maxLength: 60 },
     trail: { type: 'string', title: 'Trailing words', default: 'in code', group: 'Content', maxLength: 60 },
     title: { type: 'string', title: 'Title', default: 'Introducing', group: 'Content', maxLength: 40 },
-    brand: { type: 'string', title: 'Brand', default: 'snapcn', group: 'Content', maxLength: 40 },
+    brand: { type: 'string', title: 'Brand', default: 'feega', group: 'Content', maxLength: 40 },
     image: { type: 'string', title: 'Portal image', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     chipImage: { type: 'string', title: 'Chip image', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     logoSrc: { type: 'string', title: 'Logo', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
@@ -94,7 +94,7 @@ export const PORT: SnapcnPort = {
     const MARK_OPACITY: Table = { from: 71, v: [0.642, 0.845, 0.916, 0.949, 0.975, 0.987, 0.998, 0.998, 0.997, 0.997, 1] };
     const BRAND_RISE: Table = { from: 0, v: [3.059, 2.205, 1.602, 1.188, 0.904, 0.693, 0.528, 0.388, 0.255, 0.13, 0.02, 0] };
     const OPENING: Record<number, number[]> = { 47: [108.9, 50.8, 637.35, 347.11, 13.1], 48: [38.69, 14.06, 698.6, 383.87, 15.9] };
-    const MARK_PATH = 'M589 3805 c-167 -41 -305 -149 -380 -297 -60 -120 -59 -84 -59 -1239 0 -1004 1 -1059 19 -1112 48 -147 148 -226 331 -262 100 -20 127 -33 186 -87 53 -49 74 -109 74 -212 1 -121 42 -196 133 -244 l52 -27 980 -3 c883 -3 986 -1 1042 13 75 21 133 67 171 139 l27 51 3 315 c2 173 2 342 0 374 l-3 60 -31 -50 c-36 -59 -101 -115 -170 -146 l-49 -23 -810 -3 c-591 -2 -825 0 -865 8 -128 28 -258 121 -325 234 -65 110 -66 128 -63 826 l3 625 24 58 c44 111 147 210 270 259 l56 23 830 3 c809 2 831 2 895 -18 80 -25 149 -74 198 -142 l37 -52 3 334 c3 367 -3 418 -56 494 -30 44 -98 91 -152 106 -22 6 -457 10 -1175 9 -923 -1 -1151 -3 -1196 -14z M3800 2983 c-327 -196 -598 -361 -602 -367 -4 -6 -7 -254 -5 -550 l2 -540 145 -91 c80 -50 208 -130 285 -177 77 -47 283 -174 457 -282 174 -108 326 -196 337 -196 11 0 27 7 35 16 14 14 16 141 16 1254 0 781 -4 1248 -10 1264 -7 20 -16 26 -37 26 -18 -1 -232 -123 -623 -357z';
+    const MARK_PATH = S.mark.d;
 
     const at = (tb: Table, x: number) => {
       const n = tb.v.length;
@@ -181,7 +181,7 @@ export const PORT: SnapcnPort = {
       const textAt = left + MARK_SIZE + BRAND_GAP;
       const logo = logoSrc
         ? S.h('img', { src: logoSrc, alt: '', style: { width: '100%', height: '100%', objectFit: 'contain' } })
-        : S.h('svg', { viewBox: '0 0 464 409', width: '100%', height: '100%', fill: 'currentColor' }, S.h('g', { transform: 'translate(0,409) scale(0.1,-0.1)' }, S.h('path', { d: MARK_PATH })));
+        : S.h('svg', { viewBox: `0 0 ${S.mark.width} ${S.mark.height}`, width: '100%', height: '100%', fill: 'currentColor' }, S.h('path', { d: MARK_PATH }));
       const mark = S.h('div', { style: { position: 'absolute', left, top: 0, transform: `translateY(${y - MARK_SIZE / 2}px)`, width: MARK_SIZE, height: MARK_SIZE, color: overlay, opacity: at(MARK_OPACITY, r), display: 'flex', alignItems: 'center', justifyContent: 'center' } }, logo);
       const letters = [...brand].map((c, i) => {
         const kk = r - BRAND_FROM - BRAND_STAGGER * i;

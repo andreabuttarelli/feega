@@ -47,4 +47,11 @@ describe('snapcn catalog', () => {
 
     expect(bad).toEqual([]);
   });
+
+  it('shows feega, never snapcn, in what a template draws or lists', () => {
+    const BRAND = /snapcn/i;
+    const shown = SNAPCN_PORTS.flatMap((port) => [port.title, port.about, ...Object.values(port.props).map((spec) => String(spec.default ?? '')), port.draw.toString()].filter((text) => BRAND.test(text)).map(() => port.id));
+
+    expect([...new Set(shown)]).toEqual([]);
+  });
 });

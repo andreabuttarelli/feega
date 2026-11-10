@@ -369,11 +369,36 @@ impl SharedScissor {
     }
 }
 
+struct SharedClips<'a> {
+    open: Vec<&'a Cover>,
+}
+
+impl<'a> SharedClips<'a> {
+    fn enter<C: Canvas>(&mut self, scene: &mut C, covers: Vec<&'a Cover>) {
+        if self.open == covers {
+            return;
+        }
+        self.close(scene);
+        for cover in &covers {
+            if let Cover::Path { contours, matrix } = cover {
+                scene.push_clip(Fill::NonZero, Affine::new(*matrix), &joined(contours));
+            }
+        }
+        self.open = covers;
+    }
+
+    fn close<C: Canvas>(&mut self, scene: &mut C) {
+        self.open.drain(..).for_each(|_| scene.pop());
+    }
+}
+
 pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
     let mut skipped = Vec::new();
     let mut shared = SharedScissor { open: None };
+    let mut clips = SharedClips { open: Vec::new() };
     for (i, item) in items.iter().enumerate() {
         if !matches!(item, Item::Path(_) | Item::Image(_) | Item::Layer(_)) || item.look().is_some_and(|l| needs_layer(l) || l.backdrop.is_some()) || layers.blended.contains_key(&i) {
+            clips.close(scene);
             shared.close(scene);
         }
         if let Item::Use(u) = item {
@@ -422,9 +447,14 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
             skip(&mut skipped, item.clip(), item.kind());
             continue;
         }
+        if shared.open != look.scissor {
+            clips.close(scene);
+        }
         shared.enter(scene, look.scissor);
-        layered(scene, &look.blend, look.opacity, frame, |s| clipped(s, look, |s| content(s, item, pictures, frame)));
+        clips.enter(scene, clip_covers(look).unwrap_or_default());
+        layered(scene, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame));
     }
+    clips.close(scene);
     shared.close(scene);
     skipped
 }

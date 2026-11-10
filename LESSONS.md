@@ -69,6 +69,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** a port renders in a unit test of `port.draw` but the frame is empty in the browser, with `ReferenceError` in the player. **Move:** the player runs `draw.toString()`, so module-scope constants are gone. Keep every value inside `draw`; `sweep.test.ts` executes `snapcnSource` and catches it.
 
+### A GPU export is black or empty while the HTML render is right
+
+**Signal:** `npm run bench:gpu-parity -- --doc=<doc.json>` shows SSIM ≈ 0 with the core side black, no gaps reported; worse at higher resolution. **Move:** vello dropped the frame for lack of tile buffer. Dump the display list (`listWire`) and render it with `packages/gpu-core/target/release/gpu-core-render` to reproduce natively, then look for many large paths or repeated full-frame clips. Rebuild the wasm with `npm run build:gpu-core` after changing the core.
+
+### Parity's HTML side is not the truth for Google fonts
+
+**Signal:** parity SSIM 0.3–0.9 with the HTML frames in a serif fallback while the core frames look right. **Move:** the headless harness does not load the template's Google fonts; compare the sheets by eye before calling the core wrong.
+
 ### A Playwright spec cannot import motion-core: build the page with vite-node first
 
 **Signal:** `Module ".../part-usage.json" needs an import attribute of "type: json"` the moment a spec or demo imports `bundle.ts` or the doc ops. **Move:** Playwright loads TypeScript through Node, not Vite. Build the fixture in a separate `npx vite-node tests/e2e/fixtures/build-lumen.ts <dir> <origin>` step and let the spec read the files (`tests/e2e/fixtures/interactive-routes.ts`).

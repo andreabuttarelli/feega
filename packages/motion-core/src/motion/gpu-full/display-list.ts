@@ -322,7 +322,7 @@ const boxed: Placement = (props, frame) => {
 
 const CONTENT_OF: Record<DrawnKind, (d: never, clip: string) => Content> = {
   [DrawnKind.Path]: (d: Extract<Drawn, { kind: DrawnKind.Path }>) => ({ ...d, kind: ItemKind.Path }),
-  [DrawnKind.Layer]: (d: Extract<Drawn, { kind: DrawnKind.Layer }>, clip) => ({ kind: ItemKind.Layer, source: `${clip}:${d.layer}`, size: { width: d.width, height: d.height }, opacity: d.opacity, matrix: d.matrix }),
+  [DrawnKind.Layer]: (d: Extract<Drawn, { kind: DrawnKind.Layer }>, clip) => ({ kind: ItemKind.Layer, source: `${clip}:${d.layer}`, size: { width: d.width, height: d.height }, opacity: d.opacity, matrix: d.matrix, ...(d.masks ? { masks: d.masks } : {}) }),
   [DrawnKind.Group]: (d: Extract<Drawn, { kind: DrawnKind.Group }>, clip) => ({ ...d, kind: ItemKind.Group, items: d.items.map((x) => contentOf(x, clip)) })
 };
 

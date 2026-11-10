@@ -16,7 +16,7 @@ export const PORT: SnapcnPort = {
   fonts: ['Source Serif 4', 'Libre Baskerville', 'Source Code Pro', 'Inter', 'Hind', 'VT323', 'Mona Sans', 'Pacifico', 'Zilla Slab', 'Bebas Neue', 'Playfair Display', 'UnifrakturMaguntia', 'Unbounded'],
   props: {
     lead: { type: 'string', title: 'Lead', default: 'Introducing', group: 'Content', maxLength: 40 },
-    subject: { type: 'string', title: 'Subject', default: 'snapcn Pro', group: 'Content', maxLength: 40 },
+    subject: { type: 'string', title: 'Subject', default: 'feega Pro', group: 'Content', maxLength: 40 },
     accent: { type: 'string', title: 'Accent colour', format: PropFormat.Color, default: '#9b8ed3', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'light', group: 'Style' },
     serif: face('Serif face', 'Source Serif 4'),

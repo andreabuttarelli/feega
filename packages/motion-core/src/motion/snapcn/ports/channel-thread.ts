@@ -14,7 +14,7 @@ export const PORT: SnapcnPort = {
   fonts: ['Barlow'],
   props: {
     avatars: { type: 'string', title: 'Avatars, one per person in order', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
-    messages: { type: 'string', title: 'Messages: name time > text | ...', default: '> rhea 9:41 AM > Launch video by Thursday? | We have nothing shot. | > sam 9:42 AM > Already done. | Built it out of snapcn.', group: 'Content', maxLength: 2000 },
+    messages: { type: 'string', title: 'Messages: name time > text | ...', default: '> rhea 9:41 AM > Launch video by Thursday? | We have nothing shot. | > sam 9:42 AM > Already done. | Made it in feega.', group: 'Content', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'sans', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'dark', group: 'Style' }
   },

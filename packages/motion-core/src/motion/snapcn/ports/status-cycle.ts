@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Inter'],
   props: {
-    prefix: { type: 'string', title: 'Prefix', default: 'snapcn is', group: 'Content', maxLength: 60 },
+    prefix: { type: 'string', title: 'Prefix', default: 'feega is', group: 'Content', maxLength: 60 },
     statuses: { type: 'string', title: 'Statuses, comma separated', default: 'animating, transitioning, rendering a scene, installed', group: 'Content', maxLength: 400 },
     chips: { type: 'string', title: 'Chips, comma separated', default: 'text-reveal, phone-frame, answer-stream, word-flip, orbit-gallery', group: 'Content', maxLength: 400 },
     fieldColor: { type: 'string', title: 'Field (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
