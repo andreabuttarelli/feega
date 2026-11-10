@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind } from '@feega/motion-core/motion/gpu-full/display-list';
-import { thumbClip, thumbList, thumbRect, thumbsDue } from './frame-thumbs';
+import { posterSize, thumbClip, thumbList, thumbRect, thumbsDue } from './frame-thumbs';
 
 const BOX = { x: 100, y: 50, w: 200, h: 400 };
 
@@ -27,5 +27,21 @@ describe('frame thumbnails', () => {
     const shown = [{ id: 'a', group: 'a:1' }, { id: 'b@bp:tablet', group: 'b@bp:tablet:live1' }, { id: 'c', group: 'c:1:thumb' }];
     expect(thumbsDue(shown, frames, new Set()).map((f) => f.id)).toEqual(['a', 'b@bp:tablet']);
     expect(thumbsDue(shown, frames, new Set(['a:1'])).map((f) => f.id)).toEqual(['b@bp:tablet']);
+  });
+});
+
+describe('posterSize', () => {
+  it('una pagina alta resta intera, larga 480 px', () => {
+    expect(posterSize({ x: 0, y: 0, w: 1280, h: 4800 })).toEqual({ width: 480, height: 1800, scale: 0.375 });
+  });
+
+  it('una pagina altissima si ferma al lato massimo', () => {
+    const size = posterSize({ x: 0, y: 0, w: 1280, h: 20000 });
+    expect(size.height).toBe(4096);
+    expect(size.width).toBe(262);
+  });
+
+  it('un frame piccolo non si ingrandisce', () => {
+    expect(posterSize({ x: 0, y: 0, w: 200, h: 100 })).toEqual({ width: 200, height: 100, scale: 1 });
   });
 });

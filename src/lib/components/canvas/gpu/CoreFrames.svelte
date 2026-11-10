@@ -22,9 +22,9 @@
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
-  import { postersFor } from '$lib/canvas/core/frame-poster';
+  import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
-  import { grabThumb, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
+  import { grabThumb, posterBlob, posterSize, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
@@ -249,12 +249,59 @@
     thumbShown = new Map(thumbShown).set(f.id, { id: f.id, group, box: f.box, size: { width: f.box.w, height: f.box.h }, bytes: 0, ...(f.turn ? { turn: f.turn } : {}) });
   }
 
+  type PosterJob = { id: string; key: string; group: string; box: FrameAt['box']; revision: number; saved: boolean };
+  const posterQueue: PosterJob[] = [];
+  let posterRunning = false;
+
+  function keepThumb(f: PosterJob, blob: Blob, size: { width: number; height: number }) {
+    thumbs.put(f.key, blob);
+    if (f.saved) {
+      onthumb(f.id, f.revision, blob, size);
+    }
+  }
+
+  function nextPoster() {
+    const into = raster;
+    const f = posterQueue[0];
+    if (!into?.poster || !f) {
+      posterRunning = false;
+      return;
+    }
+    if (gesture.active()) {
+      idle(nextPoster);
+      return;
+    }
+    posterQueue.shift();
+    const size = posterSize(f.box);
+    void into
+      .poster(f.group, size, size.scale)
+      .then(posterBlob)
+      .then((blob) => blob && keepThumb(f, blob, size))
+      .catch((e: unknown) => console.warn('[canvas] poster not drawn', f.id, e))
+      .finally(() => idle(nextPoster));
+  }
+
+  function startPosters() {
+    if (posterRunning || !posterQueue.length) {
+      return;
+    }
+    posterRunning = true;
+    idle(nextPoster);
+  }
+
   function takeThumbs(into: HTMLCanvasElement | null, shown: readonly HeldFrame[]) {
     if (!into) {
       return;
     }
     const drawn = frames.map((f) => ({ id: f.id, key: baseKey(f), group: groupOf(f), box: f.box, revision: f.revision, saved: !liveGroup.has(f.id) }));
+    const offscreen = raster?.poster;
     for (const f of thumbsDue(shown, drawn, thumbTaken)) {
+      if (offscreen) {
+        thumbTaken.add(f.key);
+        posterQueue.push(f);
+        startPosters();
+        continue;
+      }
       const rect = thumbRect(f.box, view, area, resolution);
       if (!rect) {
         continue;
@@ -778,7 +825,7 @@
     });
     for (const layer of shown) {
       if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
-        if (lists.has(layer.group) || thumbLists.has(layer.group)) {
+        if (lists.has(layer.group) || thumbLists.has(layer.group) || (posterIds.has(layer.id) && showsPoster(listOf(layer.group)))) {
           vectorsFirst.presented(layer.id);
         }
         if (lists.has(layer.group)) {
