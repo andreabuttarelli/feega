@@ -22,7 +22,7 @@
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
-  import { postersFor } from '$lib/canvas/core/frame-poster';
+  import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
   import { grabThumb, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
   import { listed } from '$lib/canvas/core/frame-lists';
@@ -778,7 +778,7 @@
     });
     for (const layer of shown) {
       if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
-        if (lists.has(layer.group) || thumbLists.has(layer.group)) {
+        if (lists.has(layer.group) || thumbLists.has(layer.group) || (posterIds.has(layer.id) && showsPoster(listOf(layer.group)))) {
           vectorsFirst.presented(layer.id);
         }
         if (lists.has(layer.group)) {
