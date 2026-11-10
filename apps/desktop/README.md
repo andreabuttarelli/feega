@@ -1,24 +1,17 @@
 # Feega desktop
 
-Electron shell for macOS, Windows and Linux (ADR 0021). It loads the hosted app; no UI of its own.
+Electron app for macOS (ADR 0021) running feega in local mode: a bundled node server per open
+`.feega` file, no account. `FEEGA_URL=<url>` runs the old shell over a hosted app instead.
 
 ```bash
 cd apps/desktop
 npm install
-npm test                                   # routing (node:test)
-FEEGA_URL=http://localhost:5173 npm start
-npm run build:mac                          # dist/mac-arm64/Feega.app, unsigned
-npm run build                              # this OS's installers, unsigned
+npm test
+npm run stage:server -- --arch=arm64       # builds the app (build:node) and stages server/
+FEEGA_SERVER_ROOT=$PWD/server npm start     # dev run on the staged server
+npm run build:mac:arm64                     # dist/feega-<v>-mac-arm64.{dmg,zip}, ad-hoc signed
+npm run build:mac                           # arm64 + x64
 ```
 
-Deep links (`feega://auth/callback?code=…`) need the packaged app registered with the OS: run it
-once from `dist/`. Supabase must list `feega://auth/callback` in its redirect URLs.
-
-## Before a release
-
-| Need | For |
-|---|---|
-| Apple Developer ID cert + notarisation (`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `CSC_LINK`) | macOS outside the store |
-| Windows code-signing cert (OV/EV or Azure Trusted Signing) | SmartScreen |
-| Bundle id `app.feega.desktop` confirmed | all |
-| Tag `desktop-v<version>` | release + update feed (`desktop-latest`) |
+Unsigned on purpose: no Apple Developer ID, `afterPack` ad-hoc signs. Install steps for users:
+`web-docs/src/content/docs/desktop/install-macos.md`. Release: the `desktop` job in `.github/workflows/app-release.yml`, same version as npm `feega`.
