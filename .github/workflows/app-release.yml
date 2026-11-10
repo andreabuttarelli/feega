@@ -109,13 +109,18 @@ jobs:
 
   desktop:
     needs: release
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
     env:
       PUBLIC_SUPABASE_URL: http://supabase.invalid
       PUBLIC_SUPABASE_ANON_KEY: local
-      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      V: ${{ needs.release.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -128,31 +133,51 @@ jobs:
 
       - name: Build the macOS app at the npm version
         working-directory: apps/desktop
+        env:
+          V: ${{ needs.release.outputs.version }}
         run: |
           npm ci
           npm test
           npm version --no-git-tag-version --allow-same-version "$V"
-          npm run build:mac
+          node scripts/stage-server.cjs --arch=${{ matrix.arch }}
+          npx electron-builder --mac --${{ matrix.arch }} --publish never
 
-      - name: Checksums
-        working-directory: apps/desktop/dist
-        run: shasum -a 256 *.dmg *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt
-
-      - name: Upload the app (manual runs)
-        if: env.PUBLISH != 'true'
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: feega-macos
+          name: feega-macos-${{ matrix.arch }}
           path: |
             apps/desktop/dist/*.dmg
             apps/desktop/dist/*.zip
-            apps/desktop/dist/SHA256SUMS.txt
+
+  desktop-release:
+    needs: [release, desktop]
+    runs-on: ubuntu-latest
+    env:
+      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+      V: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: feega-macos-*
+          merge-multiple: true
+          path: mac
+
+      - name: Checksums
+        working-directory: mac
+        run: sha256sum *.dmg *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Upload checksums (manual runs)
+        if: env.PUBLISH != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: feega-macos-sums
+          path: mac/SHA256SUMS.txt
 
       - name: Attach the app to the release
         if: env.PUBLISH == 'true'
-        working-directory: apps/desktop/dist
+        working-directory: mac
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "app-v$V" *.dmg *.zip SHA256SUMS.txt --clobber
-          gh release edit "app-v$V" --notes "Bundle for \`npx feega\`. macOS app (unsigned): [install guide](https://docs.feega.app/desktop/install-macos/), checksums in SHA256SUMS.txt."
+          gh release upload "app-v$V" *.dmg *.zip SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit "app-v$V" --repo "$GITHUB_REPOSITORY" --notes "Bundle for \`npx feega\`. macOS app (unsigned): [install guide](https://docs.feega.app/desktop/install-macos/), checksums in SHA256SUMS.txt."

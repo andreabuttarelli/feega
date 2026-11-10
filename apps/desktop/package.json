@@ -14,7 +14,7 @@
     "start:native": "FEEGA_NATIVE_CANVAS=1 electron .",
     "stage:server": "node scripts/stage-server.cjs",
     "build:mac:arm64": "node scripts/stage-server.cjs --arch=arm64 && electron-builder --mac --arm64 --publish never",
-    "build:mac:x64": "node scripts/stage-server.cjs --arch=x64 --skip-build && electron-builder --mac --x64 --publish never"
+    "build:mac:x64": "node scripts/stage-server.cjs --arch=x64 && electron-builder --mac --x64 --publish never"
   },
   "build": {
     "appId": "app.feega.desktop",
