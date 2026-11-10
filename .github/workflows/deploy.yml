@@ -67,3 +67,7 @@ jobs:
           npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
           npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
           npx --yes vercel@latest deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN"
+
+      - name: Notify IndexNow
+        if: steps.changed.outputs.deploy == 'true' && matrix.project == 'feega-landing'
+        run: node landing/scripts/indexnow.ts

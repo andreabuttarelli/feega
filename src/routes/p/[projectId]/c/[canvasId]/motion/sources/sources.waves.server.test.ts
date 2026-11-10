@@ -38,25 +38,25 @@ const rows = {
   motion_revisions: Array.from({ length: FRAMES }, (_, i) => ({ org_id: 'org-a', node_id: frameId(i), version: 3, doc: withPhoto, summary: null, actor_kind: 'user' }))
 };
 
-async function wavesToAnswer(): Promise<{ waves: number; body: { frames: Record<string, { assets: Record<string, string> }>; signed: Record<string, string> } }> {
+async function wavesToAnswer(query = ''): Promise<{ waves: number; status: number; body: { frames: Record<string, { assets: Record<string, string> }>; signed: Record<string, string> } }> {
   vi.useFakeTimers();
   const { db } = fakeDb(rows, { filter: true, latencyMs: LATENCY_MS });
   const event = {
     locals: { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => db },
     params: { projectId: 'p1', canvasId: 'c1' },
-    url: new URL(`http://x/sources?ids=${rows.nodes.map((n) => n.id).join(',')}`),
+    url: new URL(`http://x/sources?ids=${rows.nodes.map((n) => n.id).join(',')}${query}`),
     request: new Request('http://x/sources')
   } as never;
 
   let answer: Response | null = null;
-  const asked = Promise.resolve(GET(event)).then((res: Response) => (answer = res));
+  const asked = Promise.resolve(GET(event)).then((res: Response) => (answer = res), (e: { status: number }) => (answer = new Response('{}', { status: e.status })));
   let waves = 0;
   while (!answer) {
     await vi.advanceTimersByTimeAsync(LATENCY_MS);
     waves++;
   }
   await asked;
-  return { waves, body: await (answer as Response).json() };
+  return { waves, status: (answer as Response).status, body: await (answer as Response).json() };
 }
 
 afterEach(() => vi.useRealTimers());
@@ -68,5 +68,19 @@ describe('the sources of every frame, against a database one round trip away', (
     expect(body.frames[frameId(0)].assets).toEqual({ [PHOTO]: `/p/p1/c/c1/assets/${PHOTO}` });
     expect(body.signed).toEqual({ [PHOTO]: 'signed:org-a/p1/photo.png' });
     expect(waves).toBe(3);
+  });
+
+  it('answers in two waves when the page names the org and the revisions it holds: the canvas check runs beside the reads', async () => {
+    const { waves, body } = await wavesToAnswer(`&org=org-a&at=${rows.nodes.map(() => 3).join(',')}`);
+
+    expect(body.frames[frameId(0)].assets).toEqual({ [PHOTO]: `/p/p1/c/c1/assets/${PHOTO}` });
+    expect(body.signed).toEqual({ [PHOTO]: 'signed:org-a/p1/photo.png' });
+    expect(waves).toBe(2);
+  });
+
+  it('refuses an org the canvas does not belong to, even though the reads already ran', async () => {
+    const { status } = await wavesToAnswer(`&org=org-b&at=${rows.nodes.map(() => 3).join(',')}`);
+
+    expect(status).toBe(404);
   });
 });

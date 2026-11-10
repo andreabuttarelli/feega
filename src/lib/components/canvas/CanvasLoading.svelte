@@ -3,13 +3,12 @@
   import { PRIDE_FLAGS, flagGradient, nextFlag } from '$lib/canvas/pride-flags';
   import Wordmark from '$lib/components/app/Wordmark.svelte';
   import { FRAMES_SHOWN_EVENT, STARTUP_EVENT, StartupStep, startupMarks } from '$lib/canvas/core/startup-marks';
-  import { CanvasContent, startupProgress, type FramesShown } from '$lib/canvas/core/startup-progress';
+  import { CanvasContent, revealDue, startupProgress, type FramesShown } from '$lib/canvas/core/startup-progress';
 
   let { content }: { content: CanvasContent } = $props();
 
   const STATIC_SPLASH = 'canvas-splash';
-  const GIVE_UP_MS = 10_000;
-  const AFTER_ENGINE_MS = 4000;
+  const CHECK_MS = 200;
 
   let gradient = $state(flagGradient(PRIDE_FLAGS[0].stripes));
   let done = $state(new Set<StartupStep>());
@@ -35,29 +34,27 @@
     } catch {
       gradient = flagGradient(nextFlag({ getItem: () => null, setItem: () => undefined }).stripes);
     }
-    done = new Set(startupMarks(performance.getEntriesByType('mark')).map((m) => m.step));
-    const reached = (e: Event) => (done = new Set([...done, (e as CustomEvent<StartupStep>).detail]));
-    const timer = setTimeout(() => (gaveUp = true), GIVE_UP_MS);
-    let settle: ReturnType<typeof setTimeout> | undefined;
-    const capAfterEngine = () => (settle ??= setTimeout(() => (gaveUp = true), AFTER_ENGINE_MS));
-    if (done.has(StartupStep.GpuReady)) {
-      capAfterEngine();
-    }
-    const engineReady = (e: Event) => {
-      if ((e as CustomEvent<StartupStep>).detail === StartupStep.GpuReady) {
-        capAfterEngine();
+    const marks = startupMarks(performance.getEntriesByType('mark'));
+    done = new Set(marks.map((m) => m.step));
+    let engineAt = marks.find((m) => m.step === StartupStep.GpuReady)?.at ?? null;
+    const reached = (e: Event) => {
+      const step = (e as CustomEvent<StartupStep>).detail;
+      done = new Set([...done, step]);
+      if (step === StartupStep.GpuReady) {
+        engineAt ??= performance.now();
       }
     };
     const framesShown = (e: Event) => (frames = (e as CustomEvent<FramesShown>).detail);
-    window.addEventListener(STARTUP_EVENT, engineReady);
-    window.addEventListener(FRAMES_SHOWN_EVENT, framesShown);
+    const check = setInterval(() => {
+      const now = performance.now();
+      gaveUp = revealDue({ sinceStartMs: now, sinceEngineMs: engineAt === null ? null : now - engineAt });
+    }, CHECK_MS);
     window.addEventListener(STARTUP_EVENT, reached);
+    window.addEventListener(FRAMES_SHOWN_EVENT, framesShown);
     return () => {
-      clearTimeout(timer);
-      clearTimeout(settle);
-      window.removeEventListener(STARTUP_EVENT, engineReady);
-      window.removeEventListener(FRAMES_SHOWN_EVENT, framesShown);
+      clearInterval(check);
       window.removeEventListener(STARTUP_EVENT, reached);
+      window.removeEventListener(FRAMES_SHOWN_EVENT, framesShown);
     };
   });
 </script>

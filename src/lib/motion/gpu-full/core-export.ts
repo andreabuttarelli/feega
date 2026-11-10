@@ -27,14 +27,14 @@ async function ownRaster(backend: FullBackend, width: number, height: number): P
   return raster ? { canvas, raster: loseOnDispose(raster, canvas.getContext('webgl2')) } : null;
 }
 
-export async function renderOnCore(prepared: Prepared, backend: FullBackend, times: number[], onFrame: FrameSink, signal: AbortSignal, custom: CustomReads): Promise<boolean> {
+export async function renderOnCore(prepared: Prepared, backend: FullBackend, times: number[], onFrame: FrameSink, signal: AbortSignal, custom: CustomReads): Promise<number> {
   if (!coreExportable(prepared, times, new Set(readClips(prepared.doc, prepared.tokens.logoUrl).read))) {
-    return false;
+    return 0;
   }
   const { width, height } = prepared.doc;
   const owned = await ownRaster(backend, width, height);
   if (!owned) {
-    return false;
+    return 0;
   }
   const { canvas, raster } = owned;
   const media = createMedia({ frames: originalFrames() });
@@ -45,16 +45,16 @@ export async function renderOnCore(prepared: Prepared, backend: FullBackend, tim
       const read = await custom.readAt(frame);
       const list = drawFrame(prepared, frame, read.reads);
       if (list.unsupported.length) {
-        return false;
+        return index;
       }
       await media.ready(list);
       const skipped = raster.draw(list, (item) => read.picture(item) ?? media.pictures(item));
       if (skipped.length) {
-        return false;
+        return index;
       }
       await onFrame(await createImageBitmap(canvas), index);
     }
-    return true;
+    return times.length;
   } finally {
     raster.dispose();
     media.dispose();

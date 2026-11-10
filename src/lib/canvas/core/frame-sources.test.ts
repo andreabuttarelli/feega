@@ -123,3 +123,29 @@ describe('signed asset links beside the frames', () => {
     expect(source?.addresses).toEqual({ [P]: `/p/p1/c/c1/assets/${P}` });
   });
 });
+
+describe('naming the org and the revisions held', () => {
+  const A = '00000000-0000-4000-8000-00000000000a';
+  const B = '00000000-0000-4000-8000-00000000000b';
+  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+
+  it('passes the org and each revision on, so the server reads them beside the canvas check', async () => {
+    const asked: string[] = [];
+    const read = batchedSources(async (u) => (asked.push(u), json({ tokens: {}, frames: {} })));
+
+    read.warm([`/p/p1/c/c1/motion/${A}/source?revision=3&org=o1`, `/p/p1/c/c1/motion/${B}/source?revision=5&org=o1`]);
+    await new Promise((done) => setTimeout(done, 1));
+
+    expect(asked[0]).toBe(`/p/p1/c/c1/motion/sources?ids=${A},${B}&at=3,5&org=o1`);
+  });
+
+  it('leaves them out when a frame does not say', async () => {
+    const asked: string[] = [];
+    const read = batchedSources(async (u) => (asked.push(u), json({ tokens: {}, frames: {} })));
+
+    read.warm([`/p/p1/c/c1/motion/${A}/source?revision=3`, `/p/p1/c/c1/motion/${B}/source`]);
+    await new Promise((done) => setTimeout(done, 1));
+
+    expect(asked[0]).toBe(`/p/p1/c/c1/motion/sources?ids=${A},${B}`);
+  });
+});

@@ -4343,7 +4343,7 @@
   >
     {#if !failed}
       <svelte:boundary onerror={(e) => coreOff(e instanceof Error ? e.message : String(e))}>
-        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '' }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} />
+        <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
     <FrameOverlays {view} frames={overlayFrames}>

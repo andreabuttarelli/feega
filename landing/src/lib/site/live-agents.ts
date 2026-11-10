@@ -1,4 +1,4 @@
-export type ActionKind = 'type' | 'font' | 'colour' | 'resize' | 'nudge' | 'select' | 'tracking';
+export type ActionKind = 'font' | 'colour' | 'resize' | 'nudge' | 'select' | 'tracking';
 export type TargetKind = 'text' | 'media' | 'block';
 export type Rng = () => number;
 export type Point = { x: number; y: number };
@@ -11,21 +11,21 @@ export const ACTIONS_BY_TARGET: Record<TargetKind, ActionKind[]> = {
   block: ['select', 'nudge']
 };
 
-const WRITING: ActionKind[] = ['type', 'type', 'select'];
+const WRITING: ActionKind[] = ['select', 'colour', 'font'];
 const DESIGN: ActionKind[] = ['font', 'colour', 'resize', 'nudge'];
 const LAYOUT: ActionKind[] = ['nudge', 'resize', 'select'];
-const ALL: ActionKind[] = ['type', 'font', 'colour', 'resize', 'nudge', 'select'];
+const ALL: ActionKind[] = ['tracking', 'font', 'colour', 'resize', 'nudge', 'select'];
 
 export const AGENTS: { name: string; skills: ActionKind[] }[] = [
   { name: 'Copywriter', skills: WRITING },
   { name: 'Art director', skills: DESIGN },
   { name: 'Claude', skills: ALL },
-  { name: 'Brand agent', skills: ['colour', 'font', 'type'] },
+  { name: 'Brand agent', skills: ['colour', 'font', 'tracking'] },
   { name: 'Motion agent', skills: ['resize', 'nudge'] },
   { name: 'Codex', skills: ALL },
   { name: 'SEO agent', skills: WRITING },
   { name: 'Layout agent', skills: LAYOUT },
-  { name: 'Type agent', skills: ['font', 'font', 'type'] },
+  { name: 'Type agent', skills: ['font', 'tracking'] },
   { name: 'Colour agent', skills: ['colour'] },
   { name: 'Image agent', skills: ['resize', 'select'] },
   { name: 'QA agent', skills: ['select', 'select', 'nudge'] },
@@ -42,52 +42,6 @@ export const AGENTS: { name: string; skills: ActionKind[] }[] = [
   { name: 'Product agent', skills: LAYOUT },
   { name: 'Pricing agent', skills: WRITING }
 ];
-
-const TYPO_CHANCE = 0.06;
-const KEYS_NEAR = 'qwertyuiopasdfghjklzxcvbnm';
-const SHORT_TEXT = 40;
-const MAX_WORDS_REWRITTEN = 4;
-
-function strike(char: string, rng: Rng): string {
-  const lower = char.toLowerCase();
-  const at = KEYS_NEAR.indexOf(lower);
-  if (at < 0) {
-    return char;
-  }
-
-  return KEYS_NEAR[(at + (rng() < 0.5 ? 1 : KEYS_NEAR.length - 1)) % KEYS_NEAR.length];
-}
-
-export function rewriteFrom(text: string, rng: Rng): number {
-  if (text.length <= SHORT_TEXT) {
-    return 0;
-  }
-
-  const spaces = [...text.matchAll(/ /g)].map((m) => m.index + 1);
-  const words = 1 + Math.floor(rng() * MAX_WORDS_REWRITTEN);
-  return spaces[Math.max(0, spaces.length - words)] ?? 0;
-}
-
-export function typeFrames(text: string, keep: number, rng: Rng): string[] {
-  const frames: string[] = [];
-
-  if (keep > 0) {
-    for (let i = text.length - 1; i >= keep; i--) {
-      frames.push(text.slice(0, i));
-    }
-  }
-
-  for (let i = keep; i < text.length; i++) {
-    const typed = text.slice(0, i);
-    const wrong = strike(text[i], rng);
-    if (wrong !== text[i] && rng() < TYPO_CHANCE) {
-      frames.push(typed + wrong, typed + wrong + strike(text[i + 1] ?? 'e', rng), typed + wrong, typed);
-    }
-    frames.push(typed + text[i]);
-  }
-
-  return frames;
-}
 
 export function ease(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
@@ -115,8 +69,6 @@ export function initials(name: string): string {
     .toUpperCase();
 }
 
-export const BUILD_CLASS = 'agents-build';
-export const BUILD_FALLBACK_MS = 4000;
 export const BUILD_SELECTOR = [
   '.bar > a',
   '.bar .links > a',
@@ -126,10 +78,6 @@ export const BUILD_SELECTOR = [
   'main :is(h2, h3, p, li, img, video, pre, button, summary, input, label, [role="tablist"])',
   '.site-foot :is(h2, p, a)'
 ].join(', ');
-
-const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
-
-export const BUILD_HEAD = `<style>.${BUILD_CLASS} :is(${BUILD_SELECTOR}){transition:opacity 250ms}.${BUILD_CLASS} :is(${BUILD_SELECTOR}):not([data-built]){opacity:0!important}</style><script>(()=>{if(matchMedia('${REDUCED_MOTION}').matches){return}const r=document.documentElement;r.classList.add('${BUILD_CLASS}');setTimeout(()=>{if(!r.dataset.agents){r.classList.remove('${BUILD_CLASS}')}},${BUILD_FALLBACK_MS})})()</script>`;
 
 export function outermost(els: HTMLElement[]): HTMLElement[] {
   const set = new Set(els);
@@ -143,10 +91,6 @@ export function outermost(els: HTMLElement[]): HTMLElement[] {
   });
 }
 
-export function thin<T>(frames: T[], max: number): T[] {
-  const every = Math.ceil(frames.length / max);
-  return frames.filter((_, i) => i % every === 0 || i === frames.length - 1);
-}
 
 export type TweakLedger<T> = { done: Set<T>; active: Set<T>; lastAt: number };
 
@@ -159,11 +103,19 @@ export enum TweakLimit {
   Unlimited = 'unlimited'
 }
 
-export type ElementRule = { selector: string; crew: number; limit: TweakLimit; beats: ActionKind[] };
+export enum BuildMode {
+  Style = 'style',
+  Place = 'place'
+}
+
+export const TEXT_SELECTOR = ['h1 span', 'h2', 'h3', 'h4', 'p', 'li', 'a', 'button', 'summary', 'label', 'pre', '[role="tablist"]'].join(', ');
+
+export type ElementRule = { selector: string; crew: number; limit: TweakLimit; build: BuildMode; beats: ActionKind[] };
 
 export const ELEMENT_RULES: ElementRule[] = [
-  { selector: '.site-foot .mark', crew: 4, limit: TweakLimit.Unlimited, beats: ['type', 'font', 'colour', 'tracking', 'resize', 'select'] },
-  { selector: '*', crew: 0, limit: TweakLimit.Once, beats: [] }
+  { selector: '.site-foot .mark', crew: 4, limit: TweakLimit.Unlimited, build: BuildMode.Style, beats: ['font', 'colour', 'tracking', 'resize', 'select'] },
+  { selector: TEXT_SELECTOR, crew: 0, limit: TweakLimit.Once, build: BuildMode.Style, beats: ['select', 'select', 'colour', 'font', 'tracking'] },
+  { selector: '*', crew: 0, limit: TweakLimit.Once, build: BuildMode.Place, beats: ['select', 'resize'] }
 ];
 
 export function ruleFor(matches: (selector: string) => boolean): ElementRule {

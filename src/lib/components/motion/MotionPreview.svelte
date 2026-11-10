@@ -395,7 +395,7 @@
     }
   }
 
-  async function renderOnCoreOf(spec: Scene, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
+  async function renderOnCoreOf(spec: Scene, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<number> {
     const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }, { mountCustomReads }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('@feega/motion-core/motion/gpu-full/display-list'), import('@feega/motion-core/motion/gpu-full/text/load'), import('@feega/motion-core/motion/gpu-full/text/painter'), import('@feega/motion-core/motion/gpu-full/dom/custom')]);
     const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets, spec.tokens), smoothing: smoothingOf(navigator.userAgent) }, spec.analyses);
     const custom = await mountCustomReads(host ?? document.body, spec.compose ?? gpuCompose ?? (() => html), prepared);
@@ -409,18 +409,21 @@
   export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine, scene: Scene | null = source === html ? fullDoc : null): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
     const core = FULL_BACKEND[prefer];
-    if (core && core !== FullBackend.WebGl2 && scene && (await renderOnCoreOf(scene, core, times, onFrame, signal))) {
+    const onCore = core && core !== FullBackend.WebGl2 && scene ? await renderOnCoreOf(scene, core, times, onFrame, signal) : 0;
+    if (onCore === times.length) {
       exportedOn = prefer;
       return;
     }
     exportedOn = RenderEngine.Html;
+    const rest = times.slice(onCore);
+    const restFrame = (bitmap: ImageBitmap, index: number) => onFrame(bitmap, index + onCore);
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
     return borrowed(source, () => atFullSize(async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];
       const sharedWait = CAPTURE_TIMEOUT_MS * (extra.length + 1);
       try {
         const shooters = [(time: number) => shoot(time, request, sharedWait).then(frameOf), ...extra.map((p) => (time: number) => p.shoot(time, request, sharedWait).then(frameOf))];
-        await shootInLanes(times, shooters, onFrame, signal);
+        await shootInLanes(rest, shooters, restFrame, signal);
       } finally {
         extra.forEach((p) => p.dispose());
       }

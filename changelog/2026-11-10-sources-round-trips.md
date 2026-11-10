@@ -1,0 +1,3 @@
+# Sources batch in two round trips
+
+With 150 ms per database query (`FEEGA_LOCAL_LATENCY_MS`) the batch took ~710 ms: canvas check, then heads, then linked mains, then named assets, one after another. The page now names its org and the revision of each frame (`org`, `at`), so the server reads nodes, those revisions and the asset library beside the canvas check, and discards the reads with a 404 if the canvas is not in that org. Linked mains and named assets run together; a second named read happens only for mentions a linked main added. Tokens wait only for the canvas. Without `org` the route works as before.

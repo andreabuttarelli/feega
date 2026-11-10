@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { StartupStep } from './startup-marks';
-import { CanvasContent, startupProgress } from './startup-progress';
+import { CanvasContent, revealDue, startupProgress } from './startup-progress';
 
 const none = { shown: 0, total: 0 };
 
@@ -36,5 +36,17 @@ describe('startupProgress', () => {
 describe('startupProgress on a canvas without frames', () => {
   it('is complete once the renderer mounts', () => {
     expect(startupProgress(new Set([StartupStep.Mounted]), none, CanvasContent.Empty)).toBe(1);
+  });
+});
+
+describe('revealDue', () => {
+  it('waits up to 8 s after the engine is ready for frames and their breakpoint views to fill', () => {
+    expect(revealDue({ sinceStartMs: 9_000, sinceEngineMs: 7_999 })).toBe(false);
+    expect(revealDue({ sinceStartMs: 9_000, sinceEngineMs: 8_000 })).toBe(true);
+  });
+
+  it('gives up 12 s after start even when the engine never becomes ready', () => {
+    expect(revealDue({ sinceStartMs: 11_999, sinceEngineMs: null })).toBe(false);
+    expect(revealDue({ sinceStartMs: 12_000, sinceEngineMs: null })).toBe(true);
   });
 });
