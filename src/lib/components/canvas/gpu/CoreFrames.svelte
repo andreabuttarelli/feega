@@ -34,7 +34,7 @@
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
   import { OnScreen, VectorGate, showStaged } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
@@ -206,7 +206,7 @@
       onsource(f.id, { ...read.source, revision: f.revision });
     }
     const key = tieredKey(f, at);
-    const held = loaded.get(f.id)?.endsWith(THUMB) ? OnScreen.Thumb : OnScreen.Nothing;
+    const held = thumbShown.has(f.id) ? OnScreen.Thumb : OnScreen.Nothing;
     if (built.custom) {
       customPictures.set(key, built.custom.picture);
     }
@@ -227,22 +227,26 @@
     void showStaged(media.ready(built.list), held, (ready) => (ready === Readiness.Whole ? vectorsFirst.after(() => present(ready)) : present(ready)));
   }
 
+  const thumbLists = new Map<string, DisplayList>();
+  let thumbShown = $state(new Map<string, HeldFrame>());
+  const presented = new Set<string>();
+
   async function showThumb(f: FrameAt) {
     const key = baseKey(f);
     const blob = await thumbs.get(key);
-    if (!blob || loaded.has(f.id) || liveGroup.has(f.id)) {
+    if (!blob || presented.has(f.id) || liveGroup.has(f.id)) {
       return;
     }
     const bitmap = await createImageBitmap(blob).catch(() => null);
-    if (!bitmap || loaded.has(f.id) || liveGroup.has(f.id)) {
+    if (!bitmap || presented.has(f.id) || liveGroup.has(f.id)) {
       return;
     }
     thumbPictures.set(thumbClip(key), { source: bitmap, size: { width: bitmap.width, height: bitmap.height } });
     const group = `${key}${THUMB}`;
-    loaded.set(f.id, group);
     markFrame(group, Step.Thumb);
     thumbTaken.add(key);
-    lists = listed(lists, f.id, group, thumbList(key, { width: f.box.w, height: f.box.h }), [groupOf(f)]);
+    thumbLists.set(group, thumbList(key, { width: f.box.w, height: f.box.h }));
+    thumbShown = new Map(thumbShown).set(f.id, { id: f.id, group, box: f.box, size: { width: f.box.w, height: f.box.h }, bytes: 0, ...(f.turn ? { turn: f.turn } : {}) });
   }
 
   function takeThumbs(into: HTMLCanvasElement | null, shown: readonly HeldFrame[]) {
@@ -428,8 +432,8 @@
     return [...placeholders.values()].map((p) => {
       const before = holding.has(p.id) ? drawnLast.get(p.id) : undefined;
       const turned = p.turn ? { turn: p.turn } : {};
-      const layers = [ready.get(p.id), before && before.group !== ready.get(p.id)?.group && { ...before, box: bledBox(p.box, before.group), ...turned }, blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned }];
-      return layers.filter((l): l is HeldFrame => l != null);
+      const head = ready.get(p.id);
+      return layersOf<HeldFrame>({ ready: head && lists.has(head.group) ? head : null, poster: head && !lists.has(head.group) ? head : null, before: before && { ...before, box: bledBox(p.box, before.group), ...turned }, thumb: thumbShown.get(p.id), blocks: blocksById.get(p.id), placeholder: { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned } });
     });
   });
   const held = $derived(chains.map((c) => c[0]));
@@ -438,7 +442,7 @@
     const near = standIndex.visible(view, area);
     return chains.filter((c) => near.has(c[0].id)).map((c) => c[c.length - 1]);
   };
-  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
+  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? thumbLists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
 
   const waiting = $derived.by(() => {
     const ready = new Set(real.map((f) => f.id));
@@ -564,7 +568,7 @@
     return [...shown.slice(0, at), { ...layer, group: restGroup(layer.group) }, liftedPut(layer, movingGroup(layer.group), lift.by), ...shown.slice(at + 1)];
   }
 
-  const listIfKnown = (group: string) => liftLists.get(group) ?? cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list;
+  const listIfKnown = (group: string) => liftLists.get(group) ?? cardLists.get(group) ?? lists.get(group) ?? thumbLists.get(group) ?? cardBlocks.get(group)?.list;
 
   function patchedFromSent(into: CoreRaster, group: string): number {
     const layers = chains.flat();
@@ -748,7 +752,8 @@
       putting.delete(group);
       pictured.delete(group);
     }
-    for (const f of tails) {
+    const stopgaps = chains.flatMap((c) => (pictured.has(c[0].group) ? [] : c.filter((l) => thumbLists.has(l.group))));
+    for (const f of [...tails, ...stopgaps]) {
       while (!put.has(f.group)) {
         putPart(into, f.group);
       }
@@ -761,7 +766,7 @@
         room -= putPart(into, f.group);
       }
     }
-    const unpictured = [...new Set([...tails, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
+    const unpictured = [...new Set([...tails, ...stopgaps, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
     const quietUploads = !gesture.active();
     for (const group of uploadWithin(quietUploads ? unpictured : unpictured.slice(0, PICTURES_PER_FRAME), (g) => into.upload(listOf(g), pictures, 1), () => performance.now(), quietUploads ? UPLOAD_BUDGET_MS : 0)) {
       pictured.add(group);
@@ -773,8 +778,16 @@
     });
     for (const layer of shown) {
       if (!layer.group.startsWith('placeholder') && !layer.group.endsWith(BLOCKS)) {
-        if (lists.has(layer.group)) {
+        if (lists.has(layer.group) || thumbLists.has(layer.group)) {
           vectorsFirst.presented(layer.id);
+        }
+        if (lists.has(layer.group)) {
+          presented.add(layer.id);
+        }
+        if (lists.has(layer.group) && thumbShown.has(layer.id)) {
+          const next = new Map(thumbShown);
+          next.delete(layer.id);
+          thumbShown = next;
         }
         if (drawnLast.get(layer.id)?.group !== layer.group) {
           markFrame(layer.group, Step.Drawn);
