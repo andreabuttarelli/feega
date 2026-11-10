@@ -44,7 +44,7 @@ describe('drawFrame on a custom component', () => {
   });
 
   it('keeps the clip a picture was given, so a picture under a 3D lid stays inside its screen', () => {
-    const cut = { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[0, 0, 40, 0, 40, 40, 0, 40]], matrix: [1, 0, 0, 1, 0, 0] as Affine } };
+    const cut = { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path as const, contours: [[0, 0, 40, 0, 40, 40, 0, 40]], matrix: [1, 0, 0, 1, 0, 0] as Affine } };
     const masked: DomRead = { drawn: [{ kind: DrawnKind.Layer, layer: 1, width: 320, height: 180, opacity: 1, matrix: [1, 0, 0, 1, 0, 0], masks: [cut] }], gaps: [] };
 
     const [layer] = drawFrame(prepare(doc, FEEGA_TOKENS), 0, new Map([['poster', masked]])).items;
