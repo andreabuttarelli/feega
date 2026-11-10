@@ -37,13 +37,14 @@ export const PORT: SnapcnPort = {
     const shade = S.mixOklch(bg, '#000', 0.75);
     const videos: HTMLVideoElement[] = [];
 
+    const isVideo = (src: string) => S.videoOf(p.image1)(src) || S.videoOf(p.image2)(src);
     const media = (src: string) => {
       const fillStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' };
       const effective = src || `linear-gradient(135deg,${S.mixOklch(bg, card, 0.55)},${S.mixOklch(bg, card, 0.2)})`;
       if (effective.startsWith('linear-gradient')) {
         return S.h('div', { style: { ...fillStyle, background: effective } });
       }
-      if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(effective)) {
+      if (isVideo(effective)) {
         const v = S.h('video', { src: effective, muted: true, playsinline: true, preload: 'auto', style: fillStyle }) as HTMLVideoElement;
         videos.push(v);
         return v;

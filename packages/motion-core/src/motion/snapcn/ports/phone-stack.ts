@@ -1,8 +1,6 @@
 import { PropFormat } from '../../custom/component';
 import { SnapcnCategory, type SnapcnPort } from '../model';
 
-const EMPTY_SCREENS = 5;
-
 export const PORT: SnapcnPort = {
   id: 'phone-stack',
   title: 'Phone stack',
@@ -23,6 +21,7 @@ export const PORT: SnapcnPort = {
     speed: { type: 'number', title: 'Speed', default: 1, minimum: 0.25, maximum: 4, step: 0.05, group: 'Motion' }
   },
   draw: (S, view) => {
+    const EMPTY_SCREENS = 5;
     const p = view.props;
     const REF_W = 716;
     const REF_H = 398;
@@ -63,7 +62,7 @@ export const PORT: SnapcnPort = {
 
     const icons = `<svg viewBox="0 0 68 12" fill="currentColor" style="display:block;height:100%"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="6" width="3" height="6" rx="1"/><rect x="10" y="3.5" width="3" height="8.5" rx="1"/><rect x="15" y="1" width="3" height="11" rx="1"/><path d="M31 2.2c2.6 0 5 1 6.8 2.7l-1.3 1.4A7.9 7.9 0 0 0 31 4.1a7.9 7.9 0 0 0-5.5 2.2l-1.3-1.4A9.8 9.8 0 0 1 31 2.2Zm0 3.8c1.6 0 3 .6 4.1 1.6L33.8 9a3.9 3.9 0 0 0-5.6 0l-1.3-1.4A5.8 5.8 0 0 1 31 6Zm0 3.7 1.6 1.7L31 12l-1.6-1.6L31 9.7Z"/><rect x="43.5" y="1.5" width="21" height="9" rx="2.6" fill="none" stroke="currentColor" opacity="0.45"/><rect x="45.5" y="3.5" width="17" height="5" rx="1.3"/><rect x="65.5" y="4.3" width="1.6" height="3.4" rx="0.8" opacity="0.45"/></svg>`;
     const cover = { position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover' };
-    const isVideo = (src: string) => /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(src);
+    const isVideo = S.videoOf(p.videos);
 
     const screens = videos.map((src, i) => {
       const media = src ? (S.h(isVideo(src) ? 'video' : 'img', { src, muted: true, playsInline: true, preload: 'auto', style: cover }) as HTMLImageElement | HTMLVideoElement) : null;

@@ -75,7 +75,7 @@ export const PORT: SnapcnPort = {
 
     const slides = S.media(p.slides);
     const collage = S.media(p.collage);
-    const isVideo = (src: string) => /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(src);
+    const isVideo = S.videoOf(p.collage);
     const clipStart = (src: string) => {
       const m = /#t=([\d.]+)/.exec(src);
       return m ? Number(m[1]) : 0;
