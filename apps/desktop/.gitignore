@@ -1,3 +1,5 @@
 native/target/
 native/*.node
 bench/.build/
+server/
+dist/

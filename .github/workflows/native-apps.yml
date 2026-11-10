@@ -51,7 +51,7 @@ jobs:
       - run: npm ci
       - run: npm run build:native:universal
       - run: lipo -archs native/feega_native_canvas.node
-      - run: npm run build:mac:universal
+      - run: npx electron-builder --mac dir --universal --publish never
 
   ios:
     runs-on: macos-latest

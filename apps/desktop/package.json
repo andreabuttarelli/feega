@@ -8,11 +8,13 @@
     "start": "electron .",
     "test": "node --test",
     "build": "electron-builder --publish never",
-    "build:mac": "electron-builder --mac dir --publish never",
+    "build:mac": "npm run build:mac:arm64 && npm run build:mac:x64",
     "build:native": "node scripts/build-native.cjs",
     "build:native:universal": "node scripts/build-native.cjs --universal",
     "start:native": "FEEGA_NATIVE_CANVAS=1 electron .",
-    "build:mac:universal": "electron-builder --mac dir --universal --publish never"
+    "stage:server": "node scripts/stage-server.cjs",
+    "build:mac:arm64": "node scripts/stage-server.cjs --arch=arm64 && electron-builder --mac --arm64 --publish never",
+    "build:mac:x64": "node scripts/stage-server.cjs --arch=x64 --skip-build && electron-builder --mac --x64 --publish never"
   },
   "build": {
     "appId": "app.feega.desktop",
@@ -21,6 +23,8 @@
       "main.cjs",
       "routing.cjs",
       "updates.cjs",
+      "files.cjs",
+      "server.cjs",
       "chrome.cjs",
       "native-canvas.cjs",
       "preload.cjs",
@@ -39,25 +43,14 @@
       }
     ],
     "mac": {
-      "category": "public.app-category.productivity",
+      "category": "public.app-category.graphics-design",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
-      "hardenedRuntime": true,
-      "notarize": true
+      "identity": null,
+      "hardenedRuntime": false,
+      "notarize": false
     },
     "win": {
       "target": [
@@ -86,16 +79,19 @@
       ],
       "category": "Graphics"
     },
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://github.com/andreabuttarelli/feega/releases/download/desktop-latest"
-      }
-    ],
     "artifactName": "feega-${version}-${os}-${arch}.${ext}",
     "asarUnpack": [
       "native/*.node"
-    ]
+    ],
+    "fileAssociations": [
+      {
+        "ext": "feega",
+        "name": "feega canvas",
+        "role": "Editor",
+        "rank": "Owner"
+      }
+    ],
+    "afterPack": "scripts/after-pack.cjs"
   },
   "devDependencies": {
     "electron": "38.2.0",
@@ -103,8 +99,5 @@
   },
   "author": "feega <hello@feega.app>",
   "homepage": "https://feega.app",
-  "description": "feega desktop",
-  "dependencies": {
-    "electron-updater": "6.6.2"
-  }
+  "description": "feega desktop"
 }

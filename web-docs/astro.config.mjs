@@ -15,6 +15,7 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/andreabuttarelli/feega' }],
       sidebar: [
         { label: 'Getting started', autogenerate: { directory: 'getting-started' } },
+        { label: 'Desktop', autogenerate: { directory: 'desktop' } },
         { label: 'Canvas', autogenerate: { directory: 'canvas' } },
         { label: 'Motion', autogenerate: { directory: 'motion' } },
         { label: 'Audio', autogenerate: { directory: 'audio' } },
