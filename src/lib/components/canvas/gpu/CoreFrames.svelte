@@ -30,7 +30,7 @@
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
-  import { assetTier } from '$lib/canvas/core/asset-tier';
+  import { Reach, assetTier, keptTier, reachOf } from '$lib/canvas/core/asset-tier';
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { debugStart, gestureLog } from '$lib/canvas/core/debug-log';
@@ -38,7 +38,7 @@
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
-  import { OnScreen, VectorGate, showStaged } from '$lib/canvas/core/staged-show';
+  import { OnScreen, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
   import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
@@ -79,7 +79,9 @@
   const imaged = new Set<string>();
   const baseKey = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
   const tieredKey = (f: FrameAt, at: AssetSize) => (imaged.has(f.id) ? `${baseKey(f)}:${at}` : baseKey(f));
-  const keyOf = (f: FrameAt) => tieredKey(f, tier);
+  const bestTier = new Map<string, AssetSize>();
+  const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), reachOf(f.box, view, area));
+  const keyOf = (f: FrameAt) => tieredKey(f, tierOf(f));
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
   const RASTERED = new Set<Outcome>([Outcome.Full, Outcome.Partial]);
@@ -199,7 +201,7 @@
   }
 
   async function load(f: FrameAt) {
-    const at = tier;
+    const at = tierOf(f);
     markFrame(f.id, Step.Asked);
     const given = known(f) ?? (loaded.get(f.id)?.endsWith(THUMB) === false ? await awaitKnown(f) : null);
     const read = given ? null : await untilFound(() => fetchAndBuild(f, at), UNSAVED_SOURCE);
@@ -213,7 +215,7 @@
       onsource(f.id, { ...read.source, revision: f.revision });
     }
     const key = tieredKey(f, at);
-    const held = thumbShown.has(f.id) ? OnScreen.Thumb : OnScreen.Nothing;
+    const held = shownBefore({ thumb: thumbShown.has(f.id), drawn: presented.has(f.id) });
     if (built.custom) {
       customPictures.set(key, built.custom.picture);
     }
@@ -224,6 +226,9 @@
     const present = (ready: Readiness) => {
       if (asking.get(f.id) !== key) {
         return;
+      }
+      if (ready === Readiness.Whole) {
+        bestTier.set(f.id, keptTier(at, bestTier.get(f.id), Reach.Near));
       }
       const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
       const shown = loaded.get(f.id);
