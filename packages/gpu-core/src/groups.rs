@@ -519,7 +519,11 @@ impl Laying<'_> {
                     if !self.keeps(&items[*at], *own) {
                         continue;
                     }
-                    let kids = self.lay(inside, &g.items);
+                    let kids = match shade_reach(&g.look, *own, self.scale) {
+                        Some(0.0) => self.lay(inside, &g.items),
+                        Some(margin) => Laying { u: self.u, frame: self.frame, scale: self.scale, view: self.view.inflate(margin, margin), encoded: &mut *self.encoded }.lay(inside, &g.items),
+                        None => Laying { u: self.u, frame: self.frame, scale: self.scale, view: Rect::new(f64::MIN, f64::MIN, f64::MAX, f64::MAX), encoded: &mut *self.encoded }.lay(inside, &g.items),
+                    };
                     let look = placed_look(&g.look, self.u.matrix, self.frame, self.scale);
                     out.push(softened(Item::Group(Box::new(GroupItem { clip: g.clip.clone(), items: kids, look }))));
                 }
@@ -527,6 +531,15 @@ impl Laying<'_> {
         }
         out
     }
+}
+
+fn shade_reach(look: &Look, own: Option<Rect>, scale: f64) -> Option<f64> {
+    let feather = look.masks.iter().flatten().map(|l| l.feather).fold(0.0, f64::max);
+    let soft = (look.blur + feather) * BLUR_REACH;
+    let Some(filters) = &look.filters else { return Some(soft * scale) };
+    let reach = crate::filters::reach(filters, look.space.unwrap_or([1.0, 0.0, 0.0, 1.0]))?;
+    let side = own.map_or(0.0, |o| o.width().max(o.height()));
+    Some((soft + reach.px + side * reach.share) * scale)
 }
 
 fn laid(u: &UseItem, group: &DisplayList, cast: &Cast, view: Rect) -> (Vec<Item>, HashMap<String, Arc<Encoded>>) {
