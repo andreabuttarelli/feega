@@ -104,6 +104,13 @@ The spec runs headless, where WebGL is SwiftShader (CPU). Startup there carries 
 task of shader compiles and draws that headed Chrome on a real GPU does not have; a startup cost
 seen only here is the harness, not the product.
 
+`FEEGA_LOCAL_LATENCY_MS=<ms>` delays every local database query by that much, so the bench sees
+round trips like a remote Supabase (the user's canvas costs ~1.1–1.7 s per sources batch there,
+local answers in ~70 ms). Give both builds the same value.
+
+Resource Timing's `responseEnd` waits for the page's main thread: a long task during start makes
+a 5 ms body look like a 1 s download. Check `longtask` entries before reading it as network time.
+
 ## Debug log
 
 Off by default. Add `?debug` to the canvas URL, or run `localStorage.setItem('feega:debug', '1')`

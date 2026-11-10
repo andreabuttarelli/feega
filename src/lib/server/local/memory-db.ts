@@ -20,6 +20,7 @@ export type MemoryDbOptions = {
   user: { id: string; email: string; created_at: string };
   storageUrl: (bucket: string, path: string) => string;
   onChange: (change: Change) => void;
+  latencyMs?: number;
 };
 
 type DbError = { message: string; code: string; details: string | null; hint: string | null };
@@ -189,6 +190,8 @@ function singular(table: string): string {
 }
 
 export function createMemoryDb(options: MemoryDbOptions) {
+  const roundTrip = (): Promise<void> => (options.latencyMs ? new Promise((done) => setTimeout(done, options.latencyMs)) : Promise.resolve());
+
   const { tables, blobs } = options;
   const now = () => new Date().toISOString();
   const rows = (table: string): Row[] => {
@@ -429,7 +432,7 @@ export function createMemoryDb(options: MemoryDbOptions) {
       setHeader: () => builder,
       then<A, B>(resolve: (r: Result) => A, reject?: (e: unknown) => B) {
         try {
-          return Promise.resolve(run()).then(resolve, reject);
+          return roundTrip().then(run).then(resolve, reject);
         } catch (error) {
           return Promise.reject(error).then(resolve, reject);
         }

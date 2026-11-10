@@ -50,3 +50,5 @@ export class VectorGate {
     return true;
   }
 }
+
+export const shownBefore = ({ thumb, drawn }: { thumb: boolean; drawn: boolean }): OnScreen => (thumb || drawn ? OnScreen.Thumb : OnScreen.Nothing);

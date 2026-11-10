@@ -15,7 +15,20 @@ describe('loadReport', () => {
 
     expect(report.frames[0]).toMatchObject({ id: 'a', steps: { asked: 100, whole: 900, thumb: 50 }, images: { count: 1, bytes: 2000, lastEnd: 700 } });
     expect(report.frames[0].steps.put).toBeUndefined();
-    expect(report.sources).toEqual([{ ids: 2, start: 120, end: 400, bytes: 5000 }]);
+    expect(report.sources).toMatchObject([{ ids: 2, start: 120, end: 400, bytes: 5000 }]);
     expect(report.totals).toMatchObject({ frames: 1, sourceBytes: 5000, imageBytes: 2000, lastContent: 900, allVectors: 600, sharp: 1500 });
+  });
+});
+
+describe('the server phases of each sources request', () => {
+  it('lists what the server said it spent, and the wait before the first byte', () => {
+    const report = loadReport({
+      marks: [],
+      resources: [{ ...resource('https://x/p/1/c/2/motion/sources?ids=a', 100, 900, 10), requestStart: 110, responseStart: 600, serverTiming: [{ name: 'heads', duration: 310.4 }, { name: 'stringify', duration: 20 }] }],
+      images: new Map(),
+      navigation: null
+    });
+
+    expect(report.sources[0]).toMatchObject({ ttfb: 490, phases: { heads: 310, stringify: 20 } });
   });
 });
