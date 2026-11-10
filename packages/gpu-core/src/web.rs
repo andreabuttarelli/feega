@@ -23,6 +23,9 @@ use crate::Skipped;
 
 const CACHE_SIDE: u32 = 4096;
 const RASTERS_PER_DRAW: usize = 1;
+const POSTER_RASTERS: usize = 64;
+const POSTER_BYTES: u32 = 4;
+const POSTER_ROW_ALIGN: u32 = 256;
 const ITEMS_PER_RASTER: usize = 48;
 const FRAMES_IN_FLIGHT: u32 = 1;
 const GESTURE_RASTER_EVERY_MS: f64 = 80.0;
@@ -745,5 +748,42 @@ impl WebCore {
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(report(&[skipped, missing].concat()))
+    }
+
+    pub fn poster(&mut self, group: &str, width: u32, height: u32, scale: f64) -> Result<js_sys::Promise, JsValue> {
+        let screen = parse(&format!(r#"{{ "width": {width}, "height": {height}, "background": null, "items": [{{ "kind": "use", "clip": "poster", "group": {group:?}, "matrix": [{scale}, 0, 0, {scale}, 0, 0], "cache": false }}] }}"#)).map_err(failed)?;
+        let plan = self.library.plan(&screen, Limits { rasters: POSTER_RASTERS, ..self.limits });
+        let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let target = layer_texture(&self.device, width, height);
+        self.engine.draw(&self.device, &self.queue, &list, &pictures, &target.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let row = width * POSTER_BYTES;
+        let padded = row.div_ceil(POSTER_ROW_ALIGN) * POSTER_ROW_ALIGN;
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor { label: None, size: u64::from(padded * height), usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyBufferInfo { buffer: &buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded), rows_per_image: None } },
+            wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        );
+        self.queue.submit([encoder.finish()]);
+        Ok(js_sys::Promise::new(&mut |resolve, reject| {
+            let mapped = buffer.clone();
+            buffer.slice(..).map_async(wgpu::MapMode::Read, move |done| {
+                if let Err(e) = done {
+                    let _ = reject.call1(&JsValue::NULL, &failed(e));
+                    return;
+                }
+                let pixels: Vec<u8> = match mapped.slice(..).get_mapped_range() {
+                    Ok(view) => view.chunks(padded as usize).flat_map(|r| r[..row as usize].iter().copied()).collect(),
+                    Err(e) => {
+                        let _ = reject.call1(&JsValue::NULL, &failed(e));
+                        return;
+                    }
+                };
+                mapped.unmap();
+                let _ = resolve.call1(&JsValue::NULL, &js_sys::Uint8Array::from(&pixels[..]));
+            });
+        }))
     }
 }
