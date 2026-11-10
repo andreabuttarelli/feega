@@ -261,10 +261,17 @@ impl Tiles {
 
 pub const REST_BLOCK_PX: u32 = 256;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Drawn {
+    Whole,
+    Lacking,
+}
+
 pub struct Rest {
     camera: Camera,
     screen: (u32, u32),
     todo: Vec<Rect>,
+    lacking: bool,
 }
 
 impl Rest {
@@ -276,7 +283,7 @@ impl Rest {
         let rows = (h / side).ceil() as u32;
         let mut todo: Vec<Rect> = (0..rows).flat_map(|r| (0..cols).map(move |c| Rect::new(c as f64 * side, r as f64 * side, ((c + 1) as f64 * side).min(w), ((r + 1) as f64 * side).min(h)))).collect();
         todo.sort_by(|a, b| a.center().distance(centre).total_cmp(&b.center().distance(centre)));
-        Rest { camera, screen, todo }
+        Rest { camera, screen, todo, lacking: false }
     }
 
     pub fn shows(&self, camera: Camera, screen: (u32, u32)) -> bool {
@@ -289,6 +296,14 @@ impl Rest {
 
     pub fn next(&mut self) -> Option<Rect> {
         (!self.todo.is_empty()).then(|| self.todo.remove(0))
+    }
+
+    pub fn drew(&mut self, drawn: Drawn) {
+        self.lacking |= drawn == Drawn::Lacking;
+    }
+
+    pub fn adoptable(&self) -> bool {
+        self.todo.is_empty() && !self.lacking
     }
 }
 
