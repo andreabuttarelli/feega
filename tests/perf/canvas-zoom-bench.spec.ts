@@ -102,6 +102,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
 
   await page.goto(`${base}/p/${ZOOM_FIXTURE_PLACE.projectId}/c/${ZOOM_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
+  await page.getByTestId('canvas-loading').waitFor({ state: 'detached', timeout: 30_000 });
   await page.waitForTimeout(SETTLE_MS);
 
   console.log(`webgpu adapter: ${await page.evaluate(async () => !!(await (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu?.requestAdapter()))}`);

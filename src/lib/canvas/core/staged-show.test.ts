@@ -69,3 +69,12 @@ describe('VectorGate', () => {
     expect(shown).toEqual(['x']);
   });
 });
+
+describe('VectorGate.shownOf', () => {
+  it('counts the given frames that already showed content', () => {
+    const gate = new VectorGate();
+    gate.presented('a');
+    gate.presented('c');
+    expect(gate.shownOf(['a', 'b', 'c'])).toBe(2);
+  });
+});
