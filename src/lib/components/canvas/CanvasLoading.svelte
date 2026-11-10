@@ -17,6 +17,16 @@
   let gaveUp = $state(false);
   const progress = $derived(startupProgress(done, frames, content));
   const shown = $derived(progress < 1 && !gaveUp);
+  const FADE_MS = 240;
+  let removed = $state(false);
+
+  $effect(() => {
+    if (shown) {
+      return;
+    }
+    const timer = setTimeout(() => (removed = true), FADE_MS);
+    return () => clearTimeout(timer);
+  });
 
   onMount(() => {
     document.getElementById(STATIC_SPLASH)?.remove();
@@ -52,10 +62,12 @@
   });
 </script>
 
-<div class="loading" class:gone={!shown} role="progressbar" aria-label="Loading canvas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} data-testid="canvas-loading">
-  <span class="mark"><Wordmark /></span>
-  <div class="track"><div class="bar" style:background={gradient} style:clip-path="inset(0 {(1 - progress) * 100}% 0 0)"></div></div>
-</div>
+{#if !removed}
+  <div class="loading" class:gone={!shown} role="progressbar" aria-label="Loading canvas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} data-testid="canvas-loading" style:--fade-ms={FADE_MS}>
+    <span class="mark"><Wordmark /></span>
+    <div class="track"><div class="bar" style:background={gradient} style:clip-path="inset(0 {(1 - progress) * 100}% 0 0)"></div></div>
+  </div>
+{/if}
 
 <style>
   .loading {
@@ -68,7 +80,7 @@
     justify-content: center;
     gap: 16px;
     background: var(--paper, #fff);
-    transition: opacity 240ms ease-out;
+    transition: opacity calc(var(--fade-ms) * 1ms) ease-out;
   }
 
   .gone {
