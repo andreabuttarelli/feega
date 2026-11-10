@@ -279,6 +279,28 @@ impl Engine {
         drawn.map(|_| skipped)
     }
 
+    pub fn draw_parts(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, parts: &[(Rect, wgpu::TextureView)]) -> Result<Vec<Skipped>, EngineError> {
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, kept: Vec::new(), last: None, cache: &mut self.cache, scenes: &mut self.scenes, tally: &mut self.tally };
+        let layers = prepare(&mut gpu, list, pictures, self.blending)?;
+        let mut scene = borrowed(gpu.scenes);
+        let skipped = build_into(&mut scene, list, pictures, &layers);
+        let mut drawn = Ok(());
+        for (part, view) in parts {
+            let mut moved = borrowed(gpu.scenes);
+            moved.append(&scene, Some(Affine::translate((-part.x0, -part.y0))));
+            drawn = drawn.and(gpu.render(self.drawing, &moved, base(list.background), view, (part.width() as u32, part.height() as u32)));
+            gpu.scenes.push(moved);
+        }
+        gpu.scenes.push(scene);
+        for image in layers.into_images() {
+            if !gpu.cache.holds(&image) {
+                gpu.vello.unregister_texture(image);
+            }
+        }
+        gpu.cache.sweep(gpu.vello);
+        drawn.map(|_| skipped)
+    }
+
     fn raster(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<(ImageData, wgpu::Texture, Vec<Skipped>), EngineError> {
         let texture = self.reused(list.width, list.height).unwrap_or_else(|| layer_texture(device, list.width, list.height));
         self.drawing = Reason::Raster;

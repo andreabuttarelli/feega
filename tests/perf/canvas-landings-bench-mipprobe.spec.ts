@@ -7,6 +7,7 @@ const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const VIEW_KEY = `feega:viewport:${LOCAL_USER_ID}:${LANDINGS_FIXTURE_PLACE.canvasId}`;
 const ZOOMS = process.env.PROBE_PROFILE ? [1.5] : [0.12, 0.5, 1.5];
 const DSTEPS = [0, 4];
+const CHUNKS = [0, 3, 6, 8, 12];
 const CPU = Number(process.env.BENCH_CPU ?? 1);
 const IDLE_MS = 12_000;
 
@@ -30,8 +31,14 @@ test('raster cost per pyramid level', async ({ baseURL }) => {
         await cdp.send('Profiler.setSamplingInterval', { interval: 200 });
         await cdp.send('Profiler.start');
       }
-      for (let i = 0; i < 2; i++) {
-        runs.push(await page.evaluate(async (d) => JSON.parse(await (globalThis as unknown as { __coreProbe: { probe_raster: (d: number) => Promise<string> } }).__coreProbe.probe_raster(d)), d));
+      for (const side of CHUNKS) {
+        for (let i = 0; i < 2; i++) {
+          const run = await page.evaluate(async ([d, side]) => {
+            const core = (globalThis as unknown as { __coreProbe: { probe_raster: (d: number) => Promise<string>; probe_chunks: (d: number, s: bigint) => Promise<string> } }).__coreProbe;
+            return JSON.parse(side === 0 ? await core.probe_raster(d) : await core.probe_chunks(d, BigInt(side)));
+          }, [d, side]);
+          runs.push({ side, ...run });
+        }
       }
       if (process.env.PROBE_PROFILE && d === 4) {
         const { profile } = await cdp.send('Profiler.stop');

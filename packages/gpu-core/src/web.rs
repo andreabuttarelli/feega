@@ -744,6 +744,91 @@ impl WebCore {
         }))
     }
 
+    fn raster_chunk(&mut self, chunk: &Batch) -> Result<(), JsValue> {
+        let zoom = step_zoom(chunk.step);
+        let world = chunk.world();
+        let gutter = TILE_GUTTER_PX as f64;
+        let camera = Camera { x: -world.x0 * zoom + gutter, y: -world.y0 * zoom + gutter, zoom };
+        let (cols, rows) = chunk.span();
+        let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
+        let plan = self.compositor.plan_at(&mut self.library, camera, size, self.limits);
+        let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let corner = chunk.corner();
+        let subs = crate::tiles::batches_of(&chunk.keys, crate::tiles::PART_TILES);
+        let mut atlases = Vec::new();
+        for sub in &subs {
+            let c = sub.corner();
+            let (sc, sr) = sub.span();
+            let at = (((c.tx - corner.tx) as u32) * TILE_PX, ((c.ty - corner.ty) as u32) * TILE_PX);
+            let part_size = (sc * TILE_PX + 2 * TILE_GUTTER_PX, sr * TILE_PX + 2 * TILE_GUTTER_PX);
+            let atlas = self.atlases.remove(&part_size).unwrap_or_else(|| layer_texture(&self.device, part_size.0, part_size.1));
+            let rect = Rect::new(at.0 as f64, at.1 as f64, (at.0 + part_size.0) as f64, (at.1 + part_size.1) as f64);
+            atlases.push((rect, atlas));
+        }
+        let parts: Vec<(Rect, wgpu::TextureView)> = atlases.iter().map(|(r, a)| (*r, a.create_view(&wgpu::TextureViewDescriptor::default()))).collect();
+        self.engine.draw_parts(&self.device, &self.queue, &list, &pictures, &parts).map_err(failed)?;
+        let side = TILE_PX + 2 * TILE_GUTTER_PX;
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        for (sub, (_, atlas)) in subs.iter().zip(&atlases) {
+            let c = sub.corner();
+            for key in &sub.keys {
+                let texture = self.tile_textures.remove(key).or_else(|| self.spare_tiles.pop()).unwrap_or_else(|| tile_texture(&self.device, side));
+                let (x, y) = (((key.tx - c.tx) as u32) * TILE_PX, ((key.ty - c.ty) as u32) * TILE_PX);
+                encoder.copy_texture_to_texture(texel(atlas, x, y), texel(&texture, 0, 0), wgpu::Extent3d { width: side, height: side, depth_or_array_layers: 1 });
+                self.tile_textures.insert(*key, texture);
+                self.tiles.hold(*key);
+            }
+        }
+        self.queue.submit([encoder.finish()]);
+        for (_, atlas) in atlases {
+            self.atlases.insert((atlas.width(), atlas.height()), atlas);
+        }
+        Ok(())
+    }
+
+    pub fn probe_chunks(&mut self, dstep: i32, side: i64) -> Result<js_sys::Promise, JsValue> {
+        let screen = (self.target.width(), self.target.height());
+        let step = crate::tiles::step_of(self.camera.zoom) + dstep;
+        let keys = crate::tiles::keys_over(crate::tiles::seen_world(self.camera, screen), step);
+        let count = keys.len();
+        let _ = self.engine.take_tally();
+        let started = js_sys::Date::now();
+        for chunk in crate::tiles::batches_of(&keys, side) {
+            self.raster_chunk(&chunk)?;
+        }
+        let cpu = js_sys::Date::now() - started;
+        let tally = self.engine.take_tally().json();
+        let queue = self.queue.clone();
+        Ok(js_sys::Promise::new(&mut |resolve, _reject| {
+            let tally = tally.clone();
+            queue.on_submitted_work_done(move || {
+                let gpu = js_sys::Date::now() - started;
+                let _ = resolve.call1(&JsValue::NULL, &JsValue::from_str(&format!(r#"{{"step":{step},"tiles":{count},"cpu":{cpu},"gpu":{gpu},"plan":0,"hold":0,"draw":0,"tally":{tally}}}"#)));
+            });
+        }))
+    }
+
+    pub fn probe_chunk_present(&mut self, side: i64) -> Result<(), JsValue> {
+        let screen = (self.target.width(), self.target.height());
+        let step = crate::tiles::step_of(self.camera.zoom);
+        let keys = crate::tiles::keys_over(crate::tiles::seen_world(self.camera, screen), step);
+        for chunk in crate::tiles::batches_of(&keys, side) {
+            self.raster_chunk(&chunk)?;
+        }
+        self.present_tiles(&keys)
+    }
+
+    pub fn probe_present(&mut self, side: i64) -> Result<(), JsValue> {
+        let screen = (self.target.width(), self.target.height());
+        let step = crate::tiles::step_of(self.camera.zoom);
+        let keys = crate::tiles::keys_over(crate::tiles::seen_world(self.camera, screen), step);
+        for batch in crate::tiles::batches_of(&keys, side) {
+            self.raster_batch(&batch)?;
+        }
+        self.present_tiles(&keys)
+    }
+
     pub fn frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
         if self.tiled && self.adopted != Some(self.camera) {
             self.adopted = None;
