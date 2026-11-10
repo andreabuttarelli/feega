@@ -299,3 +299,13 @@ fn a_changed_tile_on_screen_is_queued_to_raster_again_even_while_it_still_shows(
     assert!(queue.stale.contains(&keys[0]));
     assert!(queue.blank.is_empty() && queue.blurry.is_empty());
 }
+
+#[test]
+fn tiles_warm_only_after_a_second_without_rasters_or_uploads() {
+    let mut warm = gpu_core::tiles::Warmup::default();
+    warm.stirred(0.0);
+    assert!(!warm.due(900.0));
+    warm.stirred(900.0);
+    assert!(!warm.due(1500.0));
+    assert!(warm.due(1900.0));
+}
