@@ -15,7 +15,7 @@ export const PORT: SnapcnPort = {
   props: {
     logoSrc: { type: 'string', title: 'Logo', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     brandName: { type: 'string', title: 'Brand name', default: 'feega', group: 'Content', maxLength: 60 },
-    middleText: { type: 'string', title: 'Middle text (\\n for lines)', default: 'Cinematic components\nfor React', group: 'Content', maxLength: 200 },
+    middleText: { type: 'string', title: 'Middle text (\\n for lines)', default: 'Motion videos\nfrom one prompt', group: 'Content', maxLength: 200 },
     images: { type: 'string', title: 'Ring images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     count: { type: 'number', title: 'Cards on the ring', default: 10, minimum: 1, maximum: 40, step: 1, group: 'Content' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },
@@ -56,7 +56,7 @@ export const PORT: SnapcnPort = {
       return S.h('div', { style: abs({ width: cardW, height: cardH, overflow: 'hidden', borderRadius: 4, boxShadow: `0 14px 34px ${cardShadow}`, background: src ? 'transparent' : String(t.muted) }) }, img) as HTMLElement;
     });
     const middle = S.h('div', { style: abs({ left: cx - R, top: cy - cardH, width: R * 2, height: cardH * 2, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: fg, fontSize: Math.round(short * 0.04), fontWeight: 600, lineHeight: 1.2, letterSpacing: '-0.02em', whiteSpace: 'pre-line' }) }, String(p.middleText)) as HTMLElement;
-    const logo = S.h(String(p.logoSrc) ? 'img' : 'div', { src: String(p.logoSrc) || null, style: abs({ top: cy - logoSize / 2, width: logoSize, height: logoSize, maxWidth: 'none', objectFit: 'contain', transformOrigin: 'center center', borderRadius: String(p.logoSrc) ? 0 : logoSize * 0.22, background: String(p.logoSrc) ? 'transparent' : fg }) }) as HTMLElement;
+    const logo = S.h('img', { src: String(p.logoSrc) || S.markSrc, style: abs({ top: cy - logoSize / 2, width: logoSize, height: logoSize, maxWidth: 'none', objectFit: 'contain', transformOrigin: 'center center', borderRadius: 0, background: 'transparent' }) }) as HTMLElement;
     const name = S.h('div', { style: abs({ left: cx - restX + logoSize / 2 + gap, top: cy - nameSize, height: nameSize * 2, display: 'flex', alignItems: 'center', color: fg, fontSize: nameSize, fontWeight: 600, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }) }, String(p.brandName)) as HTMLElement;
     view.root.replaceChildren(S.fill({ display: 'block', overflow: 'hidden', fontFamily: face, fontOpticalSizing: 'none', textRendering: 'geometricPrecision' }, cards, String(p.middleText) ? middle : null, logo, name));
 

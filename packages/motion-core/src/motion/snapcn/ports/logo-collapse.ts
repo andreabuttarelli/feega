@@ -54,7 +54,7 @@ export const PORT: SnapcnPort = {
     const sample = (hue: number) => svg(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,60%)"/><stop offset="1" stop-color="hsl(${(hue + 50) % 360},55%,25%)"/></linearGradient></defs><rect width="800" height="450" fill="url(#g)"/></svg>`);
     const given = S.media(p.images);
     const shots = given.length ? given : [20, 70, 140, 200, 260, 320].map(sample);
-    const mark = String(p.mark) || svg('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect x="8" y="8" width="84" height="84" rx="20" fill="#f26b1d"/></svg>');
+    const mark = String(p.mark) || S.markSrc;
     const size = String(p.sizes).split(',').map((s) => {
       const [w, hh] = s.trim().split('x');
       const sw = Number(w);

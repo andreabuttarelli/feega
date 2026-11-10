@@ -29,7 +29,7 @@ export const PORT: SnapcnPort = {
     const sample = (hue: number) => svg(`<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,55%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360},60%,20%)"/></linearGradient></defs><rect width="1280" height="720" fill="url(#g)"/></svg>`);
     const given = S.media(p.images);
     const images = given.length ? given : [12, 48, 96, 160, 205, 250, 290, 330].map(sample);
-    const logoSrc = String(p.logoSrc) || svg('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect x="10" y="10" width="80" height="80" rx="18" fill="#fff"/></svg>');
+    const logoSrc = String(p.logoSrc) || S.markSrc;
     const interval = Math.max(1, Number(p.flipInterval));
     const speed = Number(p.speed);
     const short = Math.min(view.width, view.height);
