@@ -116,6 +116,9 @@ a 5 ms body look like a 1 s download. Check `longtask` entries before reading it
 Off by default. Add `?debug` to the canvas URL, or run `localStorage.setItem('feega:debug', '1')`
 and reload, to print every load and render step to the browser console with the `[feega]` prefix,
 a time from navigation start and an area tag: `[startup]` `[sources]` `[build]` `[upload]`
-`[raster]` `[images]` `[posters]` `[camera]`. Sources lines carry bytes, ms and Server-Timing
+`[raster]` `[images]` `[posters]` `[camera]` `[tiles]`. Sources lines carry bytes, ms and Server-Timing
 phases; `[camera]` lines mark gesture start/end and any frame over 32 ms with the gesture name.
-Nothing is subscribed or built when off.
+Lines are buffered for 100 ms and printed in time order. Each frame gets a collapsed group with
+the asked, source, built, put and drawn durations once it is drawn. `[images]` logs asset tier
+switches; `[tiles]` logs gesture and rest render starts, raster passes per frame (from the render
+tally), cache evictions and settle. Nothing is subscribed or built when off.
