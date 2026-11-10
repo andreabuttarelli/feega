@@ -108,6 +108,10 @@ impl Compositor {
         self.retained.forget();
     }
 
+    pub fn held_look(&self, camera: Camera) -> Option<Lookup> {
+        self.retained.look(camera)
+    }
+
     pub fn retained_overscan(&self) -> u32 {
         self.retained.overscan()
     }

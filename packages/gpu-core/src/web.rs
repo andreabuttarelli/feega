@@ -559,7 +559,8 @@ impl WebCore {
             let frame = Rect::new(shot.rest.x0 * c.zoom + moved.x, shot.rest.y0 * c.zoom + moved.y, shot.rest.x1 * c.zoom + moved.x, shot.rest.y1 * c.zoom + moved.y).intersect(screen);
             shot.tiles.iter().filter_map(move |(key, source)| placed(*key, source, moved, frame))
         });
-        let placed: Vec<Tile> = still.chain(lifted).collect();
+        let under = self.compositor.held_look(c).map(|look| Tile { source: &self.retained, look, within: screen });
+        let placed: Vec<Tile> = under.into_iter().chain(still).chain(lifted).collect();
         let complete = self.rest.as_ref().is_some_and(Rest::adoptable);
         let exact = self.rest_shown.iter().filter(|_| complete).map(|(block, source)| Tile { source, look: Lookup { scale: 1.0, x: -block.x0, y: -block.y0 }, within: *block });
         let placed: Vec<Tile> = placed.into_iter().chain(exact).collect();
@@ -616,7 +617,8 @@ impl WebCore {
         let mut queue = queue;
         queue.stale.sort_by_key(|k| !self.snapshots.values().any(|shot| k.world().overlaps(shot.rest)));
         let blank = batches(&queue.blank);
-        let refresh = refreshed(queue, if gesture { Moving::Gesture } else { Moving::Still });
+        let far: Vec<TileKey> = queue.blurry.iter().filter(|k| !self.tiles.covered_within(**k, NEAR_STEPS)).copied().collect();
+        let refresh = refreshed(queue, &far, if gesture { Moving::Gesture } else { Moving::Still });
         let must = if gesture { 0 } else { blank.len() };
         for (i, batch) in blank.into_iter().chain(batches(&refresh)).enumerate() {
             if i >= must && rastered > 0 && js_sys::Date::now() - started > budget {

@@ -364,13 +364,14 @@ fn the_exact_screen_pans_only_after_a_full_raster_has_drawn_its_overscan() {
 
 
 #[test]
-fn blurry_tiles_never_sharpen_on_screen_and_a_gesture_refreshes_one_changed_tile() {
+fn a_gesture_rasters_tiles_only_covered_from_far_away_and_rest_rasters_every_blurry_one() {
     use gpu_core::tiles::{refreshed, Moving, Queue};
     let k = |tx: i64| TileKey { step: 0, tx, ty: 0 };
-    let queue = || Queue { blank: vec![k(0)], stale: vec![k(1), k(2)], blurry: vec![k(3)] };
+    let queue = || Queue { blank: vec![k(0)], stale: vec![k(1), k(2)], blurry: vec![k(3), k(4)] };
+    let far = [k(4)];
 
-    assert_eq!(refreshed(queue(), Moving::Gesture), vec![k(1)]);
-    assert_eq!(refreshed(queue(), Moving::Still), vec![k(1), k(2)]);
+    assert_eq!(refreshed(queue(), &far, Moving::Gesture), vec![k(1), k(4)]);
+    assert_eq!(refreshed(queue(), &far, Moving::Still), vec![k(1), k(2), k(3), k(4)]);
 }
 
 

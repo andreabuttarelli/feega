@@ -378,7 +378,9 @@ pub enum Moving {
     Still,
 }
 
-pub fn refreshed(queue: Queue, moving: Moving) -> Vec<TileKey> {
-    let cap = if moving == Moving::Gesture { 1 } else { usize::MAX };
-    queue.stale.into_iter().take(cap).collect()
+pub fn refreshed(queue: Queue, far: &[TileKey], moving: Moving) -> Vec<TileKey> {
+    if moving == Moving::Still {
+        return queue.stale.into_iter().chain(queue.blurry).collect();
+    }
+    queue.stale.into_iter().take(1).chain(queue.blurry.into_iter().filter(|k| far.contains(k))).collect()
 }

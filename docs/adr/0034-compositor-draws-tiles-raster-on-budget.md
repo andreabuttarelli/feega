@@ -138,3 +138,49 @@ Gestures, hybrid, 1x, p95 / worst ms: pan 18.2 / 33, zoom 18.7 / 83, fit 18.4 / 
 as a lift; not yet diagnosed). The load bench now fails when a frame stays blank more than a frame
 after its vectors were drawn; both paths pass. Open before default on: drag-element, and 4x first
 content (+5% median, ranges overlap).
+
+## Status 2026-11-11 (handoff: white frames during zoom)
+
+Branch `perf/hybrid-levers`, PR #1911, draft, do not merge. Default stays off.
+
+On the branch since #1902, each with a test in `packages/gpu-core/tests`:
+- `tiles::path_for`: gestures, lifts (any held use) and the settle after a gesture draw tiles; a
+  pan keeps the exact screen after a full raster (`pan_zoom_after`).
+- `Rest::adoptable` (#1908): a rest picture is shown or adopted only when its blocks were drawn
+  with no plan pending. Note: `plan.pending` only means a cached copy is still building, the
+  content is drawn live, so this rule probably only delays adoption; revisit.
+- Warm-up no longer holds `pending` (it kept the frame loop running during load).
+- `tiles::refreshed`: during a gesture, 1 stale tile plus the blurry tiles covered only from more
+  than `NEAR_STEPS` away; at rest, all stale and blurry tiles.
+- Fallback tiles reach 40 steps finer as well as coarser (`whole_over` guards the key count).
+- `Compositor::held_look`: the retained picture, scaled by the camera, is drawn under the tiles.
+- Reverted: tiles rastered while a plan was pending held as incomplete (made frames white).
+
+Per-frame logging (temporary, removed; re-add a `console.log` of `tiles.frame()` counts in
+`tiled_frame` and capture `page.on('console')` in `open()` of the landings bench). Findings:
+- White zoom came from a deadlock between the wider finer fallback and "blurry never refreshed":
+  missing tiles counted as covered, so 0 tiles rastered per frame (`rastered=0`, `held` flat at
+  392, `draw=4` coarse fallback tiles), and the rest picture never started. Fixed by
+  `refreshed` above.
+- Still open: during fast zoom-in, areas with no tile at any step show paper (grey) for several
+  frames while blank tiles raster on the 4 ms gesture budget. The retained underlay did not reduce
+  the blank samples (26 in the one run after it), so either the retained picture does not cover
+  those areas (it holds one screen plus overscan at the pre-gesture camera) or the underlay is not
+  drawn as intended; not verified.
+- No evictions occurred during the zoom gesture.
+
+Repro: `flock ~/Documents/feega-videos/perf/bench.lock env BENCH_FLICKER=1 BENCH_GESTURES=pan,zoom
+BENCH_TILES=1 BENCH_RUNS=1 BENCH_CPU=1 BENCH_CASE=landings npx playwright test -c
+tests/perf/playwright.config.ts`. Outputs under `BENCH_OUT`: `flicker-<g>.mp4`, `.pops.json`,
+`.blanks.json`, `.views.json` (camera samples and cast times, for offline checks),
+`-reference.png`. Look at the frames; the numbers have misled twice.
+
+Blank check (`missingInk` in `src/lib/canvas/core/screen-pops.ts`): each sample against the same
+camera drawn with `?coreTiles=0` in a second page, compared only within 2x zoom, camera searched
+±10 rAF samples. Not calibrated: tiles-off still flags about 2 samples at zoom start (frames lag
+the camera), and heavy blur can read as blank. Owed: ignore the first ~300 ms of a gesture on both
+arms, count blur as content where the coarse reference has ink, until tiles-off passes 5 of 5. The
+old `inkedOnScreen` gate counts a white frame as drawn (it only compares with the canvas paper);
+it cannot prove content.
+
+New requirement from the user (for the next agent): never blurry, never visible loading.
