@@ -100,6 +100,10 @@ measures this checkout. An entry may carry its own query (`off=.?coreTiles=0,on=
 compare one build with a switch off and on. The spec fails when a frame is still blank in a
 screenshot taken more than a frame after its vectors were drawn (`shownLate`). `BENCH_RECORD=1` saves a video per case.
 
+The spec runs headless, where WebGL is SwiftShader (CPU). Startup there carries a 0.9–2.3 s long
+task of shader compiles and draws that headed Chrome on a real GPU does not have; a startup cost
+seen only here is the harness, not the product.
+
 ## Debug log
 
 Off by default. Add `?debug` to the canvas URL, or run `localStorage.setItem('feega:debug', '1')`
