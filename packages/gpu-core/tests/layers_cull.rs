@@ -109,3 +109,32 @@ fn a_culled_item_is_not_reported_as_skipped() {
 
     assert!(skipped.is_empty());
 }
+
+fn empty_group(filter: &str) -> gpu_core::display_list::DisplayList {
+    parse(&format!(
+        r#"{{ "width": {FRAME_SIDE}, "height": {FRAME_SIDE}, "background": null, "items": [{{ "kind": "group", "clip": "card", "items": [],
+  "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "blur": 0, "filters": [{filter}] }}] }}"#
+    ))
+    .unwrap()
+}
+
+#[test]
+fn an_empty_group_whose_filters_only_shade_its_content_costs_no_layer() {
+    let mut surface = Counting::default();
+    let list = empty_group(r#"{ "kind": "css", "fns": [{ "name": "drop-shadow", "args": ["0px", "15px", "35px", "rgba(0,0,0,0.08)"] }] }"#);
+
+    let layers = prepare(&mut surface, &list, &Shelf::new(), Blending::Native).unwrap();
+
+    assert!(surface.painted.is_empty());
+    assert!(layers.bodies.is_empty());
+}
+
+#[test]
+fn an_empty_group_with_an_svg_filter_still_gets_a_layer() {
+    let mut surface = Counting::default();
+    let list = empty_group(r#"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [{ "tag": "feFlood", "attrs": { "flood-color": "red" }, "children": [] }] }] }"#);
+
+    let layers = prepare(&mut surface, &list, &Shelf::new(), Blending::Native).unwrap();
+
+    assert_eq!(layers.bodies.len(), 1);
+}
