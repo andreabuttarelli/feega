@@ -23,6 +23,21 @@ Open the insert menu (**+**), go to **Import**, choose **From code…**.
 - **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 12 stories, spread across components, become boards; stories that do not fit in about two and a half minutes are listed as left out. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
 
+## Edit the code from the canvas
+
+A frame imported from GitHub or a folder remembers where each layer comes from in the code. Change a text, a text colour or size, a fill, or the gap, padding or direction of a stack, then open **code mode** (the `</>` button): the **GitHub** (or **Folder**) section lists the files the edits touch and shows the patch.
+
+- **Patch** downloads it as a `.patch` file (`git apply` it in your checkout).
+- **Open pull request** creates a new `feega/…` branch on the repository and a pull request against its default branch. Nothing is ever committed to the default branch. It needs GitHub connected.
+- **Write to folder** (folder imports) writes the files and, when the folder is a git repository, also commits them on a new `feega/…` branch, leaving your current branch as it was. The app's dev server reloads, so the page shows the edit.
+- Styles land as an inline `style` on the element (`style={{ … }}` in JSX). Texts are replaced where the element holds them; texts that come from an inlang/Paraglide message (`{m.home_title()}`) are changed in the message file of the language shown. A text built by other code is listed as not written back.
+
+**Pull** brings the code back: new commits on the imported branch (or the branch you type), or file changes in the folder, are re-read and drawn into the same frame. Your canvas edits are kept; where the code changed the same property of the same element, the code wins and the conflict is listed. For a folder, code mode watches the files and pulls on its own while the frame is open.
+
+## Import a local folder
+
+In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here, the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
+
 ## What works
 
 - **React** apps (Vite, Next.js), including **Next.js App Router server components**, read from the debug information React 19 keeps for them.
@@ -50,13 +65,17 @@ feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <c
 feega canvas github $PROJECT connect      # prints a link to open in the browser
 feega canvas github $PROJECT repos
 feega canvas github $PROJECT branches owner/repo
+feega canvas import-code $PROJECT /path/to/app --route / --canvas <canvas>   # local mode: a folder
+feega canvas code-sync $PROJECT changes <frameId>   # prints the patch
+feega canvas code-sync $PROJECT publish <frameId>   # pull request, or write the folder
+feega canvas code-sync $PROJECT pull <frameId> --branch my-branch
 ```
 
 The import answers `frameId`, `pages` (the paths or stories that landed), `components`, `variants`, `instances` and `skipped` (what stayed plain layers, pages that could not be opened, and why).
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
 Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, x, y }` (`routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
 
