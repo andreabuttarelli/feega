@@ -3766,3 +3766,6 @@ Signal: a fetch shows `responseStart → responseEnd` of ~1 s on localhost, curl
 
 ### A wasm copied into build/ is served from its stale .br
 Signal: swapping `build/client/gpu-core/gpu_core_bg.wasm` by hand to try a gpu-core variant changes nothing in the load bench screenshots. Cause: the node server serves the precompressed `.br`/`.gz` next to it, written at build time. Move: after the copy, rewrite both (`gzip -kf9`, `brotli -f -o x.br x`), or rebuild.
+
+### The load bench draws on a software GPU
+Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start (CPU profile: `(program)`, `useProgram`), and fetches look slow because `responseEnd` waits behind it. Cause: headless Chromium renders WebGL with SwiftShader (`UNMASKED_RENDERER_WEBGL` says SwiftShader); shader compiles and draws run on the CPU. Headed Chrome on the Mac's GPU (ANGLE Metal) shows no long task over 200 ms on the same canvas. Move: read bench times as CPU-GL numbers; check the renderer string before chasing a long task, and confirm a startup cost in headed Chrome before fixing it.
