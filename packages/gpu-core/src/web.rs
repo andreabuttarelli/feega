@@ -90,6 +90,7 @@ pub struct WebCore {
     rest: Option<Rest>,
     adopted: Option<Camera>,
     drew_tiles: bool,
+    exact_zoom: Option<f64>,
     warmup: Warmup,
     tile_budget: u64,
     snapshots: HashMap<String, Snapshot>,
@@ -320,7 +321,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, exact_zoom: None, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -717,10 +718,12 @@ impl WebCore {
             self.adopted = None;
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all() };
+        let panning = self.exact_zoom == Some(self.camera.zoom);
+        let moment = || Moment { gesture: moving, panning, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all() };
         if self.tiled && path_for(moment()) == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
+            self.exact_zoom = None;
             let report = self.tiled_frame()?;
             if self.rest_done() {
                 self.adopt_rest(now_ms);
@@ -728,6 +731,7 @@ impl WebCore {
             return Ok(report);
         }
         self.drew_tiles = false;
+        self.exact_zoom = Some(self.camera.zoom);
         let limits = self.frame_limits(now_ms);
         let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
@@ -754,8 +758,6 @@ impl WebCore {
         let idle = self.warmup.due(js_sys::Date::now());
         if self.tiled && !frame.pending && idle {
             self.warm_tiles()?;
-        } else if self.tiled {
-            self.pending |= !idle;
         }
         Ok(frame.report())
     }

@@ -338,12 +338,19 @@ pub enum Path {
 #[derive(Clone, Copy)]
 pub struct Moment {
     pub gesture: bool,
+    pub panning: bool,
     pub lifting: bool,
     pub settling: bool,
 }
 
 pub fn path_for(m: Moment) -> Path {
-    if m.gesture || m.lifting || m.settling {
+    if m.lifting {
+        return Path::Tiles;
+    }
+    if m.gesture && m.panning {
+        return Path::Exact;
+    }
+    if m.gesture || m.settling {
         return Path::Tiles;
     }
     Path::Exact

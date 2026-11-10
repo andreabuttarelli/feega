@@ -313,7 +313,7 @@ fn tiles_warm_only_after_a_second_without_rasters_or_uploads() {
 #[test]
 fn a_lift_without_a_camera_move_draws_from_tiles() {
     use gpu_core::tiles::{path_for, Moment, Path};
-    let still = Moment { gesture: false, lifting: false, settling: false };
+    let still = Moment { gesture: false, panning: false, lifting: false, settling: false };
 
     assert_eq!(path_for(still), Path::Exact);
     assert_eq!(path_for(Moment { lifting: true, ..still }), Path::Tiles);
@@ -338,4 +338,14 @@ fn a_rest_picture_with_a_block_drawn_while_a_group_was_building_is_not_adopted()
     whole.next();
     whole.drew(Drawn::Whole);
     assert!(whole.adoptable());
+}
+
+#[test]
+fn a_pan_from_the_exact_screen_stays_exact_and_a_zoom_goes_to_tiles() {
+    use gpu_core::tiles::{path_for, Moment, Path};
+    let zoom = Moment { gesture: true, panning: false, lifting: false, settling: false };
+
+    assert_eq!(path_for(zoom), Path::Tiles);
+    assert_eq!(path_for(Moment { panning: true, ..zoom }), Path::Exact);
+    assert_eq!(path_for(Moment { panning: true, lifting: true, ..zoom }), Path::Tiles);
 }
