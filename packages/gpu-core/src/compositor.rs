@@ -127,6 +127,12 @@ impl Compositor {
         damage
     }
 
+    pub fn take_tile_damage(&mut self) -> Damage {
+        let mut damage = std::mem::replace(&mut self.tile_damage, Damage::none());
+        damage.join(self.world.take_scene_damage());
+        damage
+    }
+
     pub fn plan_at(&mut self, library: &mut Library, camera: Camera, (w, h): (u32, u32), limits: Limits) -> Plan {
         let plan = library.plan_with(&self.world.scene(camera.matrix(), w, h), limits, Sweep::Keep);
         self.pending |= plan.pending || !plan.finished.is_empty();
