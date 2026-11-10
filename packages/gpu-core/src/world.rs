@@ -167,6 +167,10 @@ impl World {
         }).collect()
     }
 
+    pub fn holding(&self) -> bool {
+        self.uses.iter().any(|u| u.hold)
+    }
+
     fn lifted(&self, u: &UseItem) -> bool {
         u.hold && self.rest.get(&u.clip).is_none_or(|(_, matrix)| *matrix != u.matrix)
     }

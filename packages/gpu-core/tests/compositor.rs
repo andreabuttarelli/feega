@@ -357,3 +357,26 @@ fn a_dragged_frame_stirs_the_screen_so_the_rest_picture_waits_though_no_tile_cha
     assert_eq!(c.take_damage(), gpu_core::retained::Damage::none());
     assert!(!c.stirred());
 }
+
+#[test]
+fn warming_tiles_leaves_the_edit_for_the_exact_screen_to_repaint() {
+    let (mut c, mut lib) = scene();
+    let mut fake = Fake::default();
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 10, 0] }], "drop": [] }"#).unwrap(), &lib);
+    assert_ne!(c.take_tile_damage(), gpu_core::retained::Damage::none());
+    let frame = c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 16.0, &mut || 0.0).unwrap();
+
+    assert_eq!(frame.outcome, Some(Outcome::Partial));
+}
+
+#[test]
+fn a_frame_held_in_place_for_an_edit_counts_as_held() {
+    let (mut c, lib) = scene();
+    assert!(!c.holding());
+
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true }], "drop": [] }"#).unwrap(), &lib);
+
+    assert!(c.holding());
+}

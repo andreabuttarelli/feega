@@ -96,12 +96,24 @@ impl Compositor {
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
+    pub fn holding(&self) -> bool {
+        self.world.holding()
+    }
+
     pub fn lifts(&self, library: &Library) -> Vec<Lift> {
         self.world.lifts(|g| library.size_of(g))
     }
 
     pub fn forget(&mut self) {
         self.retained.forget();
+    }
+
+    pub fn retained_overscan(&self) -> u32 {
+        self.retained.overscan()
+    }
+
+    pub fn adopt(&mut self, camera: Camera, now_ms: f64) {
+        self.retained.adopt(camera, now_ms);
     }
 
     pub fn pending_raster(&mut self) -> bool {
@@ -116,6 +128,12 @@ impl Compositor {
         let mut damage = std::mem::replace(&mut self.tile_damage, Damage::none());
         damage.join(self.world.take_scene_damage());
         self.world.take_damage();
+        damage
+    }
+
+    pub fn take_tile_damage(&mut self) -> Damage {
+        let mut damage = std::mem::replace(&mut self.tile_damage, Damage::none());
+        damage.join(self.world.take_scene_damage());
         damage
     }
 

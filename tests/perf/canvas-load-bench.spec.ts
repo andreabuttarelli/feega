@@ -8,16 +8,16 @@ import { test, expect, chromium, type Browser, type BrowserContext, type CDPSess
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
 import { localEnv } from '../../scripts/local.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
-import { Step, timeline, type FrameSteps } from '../../src/lib/canvas/core/frame-timeline';
+import { Step, shownLate, timeline, type FrameSteps, type Late } from '../../src/lib/canvas/core/frame-timeline';
 
 enum Cache {
   Cold = 'cold',
   Warm = 'warm'
 }
 
-type Build = { name: string; root: string; port: number };
-type FrameLoad = { id: string; contentMs: number | null; steps?: FrameSteps['steps'] };
-type LoadRun = { build: string; cache: Cache; frames: FrameLoad[]; firstMs: number | null; allContentMs: number | null; allVectorsMs?: number | null; sharpMs: number; requests: number; bytes: number; fixtureKept: boolean };
+type Build = { name: string; root: string; query: string; port: number };
+type FrameLoad = { id: string; contentMs: number | null; blankShotAt: number | null; steps?: FrameSteps['steps'] };
+type LoadRun = { build: string; cache: Cache; frames: FrameLoad[]; firstMs: number | null; allContentMs: number | null; allVectorsMs?: number | null; sharpMs: number; requests: number; bytes: number; fixtureKept: boolean; late: Late[] };
 type Hotspot = { fn: string; url: string; selfMs: number };
 type ProfileNode = { id: number; callFrame: { functionName: string; url: string; lineNumber: number; columnNumber: number } };
 type Profile = { nodes: ProfileNode[]; samples: number[]; timeDeltas: number[] };
@@ -33,7 +33,7 @@ const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = Number(process.env.BENCH_ZOOM ?? 0.12);
 const START_VIEW = { x: VIEWPORT.width / 2 - LANDINGS_FIXTURE_CENTRE.x * START_ZOOM, y: VIEWPORT.height / 2 - LANDINGS_FIXTURE_CENTRE.y * START_ZOOM, zoom: START_ZOOM };
 const VIEW_KEY = `feega:viewport:${LOCAL_USER_ID}:${LANDINGS_FIXTURE_PLACE.canvasId}`;
-const CANVAS_PATH = `/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}${process.env.BENCH_QUERY ?? ""}`;
+const CANVAS_PATH = `/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}`;
 const POLL_MS = 50;
 const STILL_MS = 1500;
 const GIVE_UP_MS = 60_000;
@@ -46,8 +46,9 @@ const HOTSPOTS = 25;
 
 const builds = (): Build[] =>
   (process.env.BENCH_BUILDS ?? `this=${resolve('.')}`).split(',').map((pair, i) => {
-    const [name, root] = pair.split('=');
-    return { name, root: resolve(root), port: FIRST_PORT + i };
+    const [name, at] = pair.split('=');
+    const [root, query] = at.split('?');
+    return { name, root: resolve(root), query: query ? `?${query}` : (process.env.BENCH_QUERY ?? ''), port: FIRST_PORT + i };
   });
 
 const sha = (file: string) =>
@@ -125,11 +126,14 @@ async function inked(png: Buffer, clip: Clip, scale: number, paper: Rgb): Promis
   return ink / (data.length / 3) >= INK_SHARE;
 }
 
-async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build' | 'cache' | 'fixtureKept' | 'requests' | 'bytes'>> {
+async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build' | 'cache' | 'fixtureKept' | 'requests' | 'bytes' | 'late'>> {
   const content = new Map<string, number | null>();
+  const blankShotAt = new Map<string, number>();
+  const origin = await page.evaluate(() => performance.timeOrigin).catch(() => from);
   let last: Buffer | null = null;
   let changedAt = 0;
   while (Date.now() - from < GIVE_UP_MS) {
+    const shotAt = Date.now() - origin;
     const png = await page.screenshot({ clip: { x: 0, y: 0, ...VIEWPORT } }).catch(() => null);
     if (!png) {
       await page.waitForTimeout(POLL_MS);
@@ -140,7 +144,11 @@ async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build
     const paper = await canvasPaper(png);
     for (const clip of await frameClips(page)) {
       if (content.get(clip.id) == null) {
-        content.set(clip.id, (await inked(png, clip, scale, paper)) ? at : null);
+        const ink = await inked(png, clip, scale, paper);
+        content.set(clip.id, ink ? at : null);
+        if (!ink) {
+          blankShotAt.set(clip.id, shotAt);
+        }
       }
     }
     if (!last || !png.equals(last)) {
@@ -153,7 +161,7 @@ async function watchLoad(page: Page, from: number): Promise<Omit<LoadRun, 'build
     }
     await page.waitForTimeout(POLL_MS);
   }
-  const frames = [...content.entries()].map(([id, contentMs]) => ({ id, contentMs }));
+  const frames = [...content.entries()].map(([id, contentMs]) => ({ id, contentMs, blankShotAt: blankShotAt.get(id) ?? null }));
   const times = frames.map((f) => f.contentMs);
   const known = times.filter((t): t is number => t !== null);
   return { frames, firstMs: known.length ? Math.min(...known) : null, allContentMs: known.length === times.length && known.length ? Math.max(...known) : null, sharpMs: changedAt };
@@ -175,12 +183,13 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
     await cdp.send('Profiler.start');
   }
   const from = Date.now();
-  await page.goto(`http://127.0.0.1:${build.port}${CANVAS_PATH}`, { waitUntil: 'commit' });
+  await page.goto(`http://127.0.0.1:${build.port}${CANVAS_PATH}${build.query}`, { waitUntil: 'commit' });
   const watched = await watchLoad(page, from);
   const marks = timeline(await page.evaluate(() => performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime }))));
   console.log(marks.filter((m) => !watched.frames.some((f) => f.id === m.id)).map((m) => `offscreen ${m.id.slice(0, 8)} ${m.steps.map((x) => `${x.step}@${x.at}`).join(' ')}`).join('\n'));
   const allVectorsMs = marks.find((m) => m.id === 'all')?.steps.find((x) => x.step === Step.AllVectors)?.at ?? null;
-  const load = { ...watched, allVectorsMs, frames: watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] })), ...wire };
+  const frames = watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] }));
+  const load = { ...watched, allVectorsMs, frames, late: shownLate(frames), ...wire };
   const spots = profiled ? hotspots((await cdp.send('Profiler.stop')).profile as Profile) : [];
   if (video) {
     writeFileSync(join(OUT, `${video}-end.png`), await page.screenshot());
@@ -261,7 +270,7 @@ test('load benchmark: on-screen frames show content, then turn sharp', async () 
         runs.push(done.run);
         spots[key] ??= done.spots;
         console.log(waterfall(key, done.run.frames));
-        console.log(`run ${i + 1}/${RUNS} ${key} ${JSON.stringify({ first: done.run.firstMs, all: done.run.allContentMs, vectors: done.run.allVectorsMs, sharp: done.run.sharpMs, requests: done.run.requests, bytes: done.run.bytes, frames: done.run.frames.length, kept: done.run.fixtureKept })}`);
+        console.log(`run ${i + 1}/${RUNS} ${key} ${JSON.stringify({ first: done.run.firstMs, all: done.run.allContentMs, vectors: done.run.allVectorsMs, sharp: done.run.sharpMs, requests: done.run.requests, bytes: done.run.bytes, frames: done.run.frames.length, late: done.run.late, kept: done.run.fixtureKept })}`);
       }
     }
   }
@@ -271,4 +280,5 @@ test('load benchmark: on-screen frames show content, then turn sharp', async () 
   console.log(JSON.stringify(result.summary, null, 2));
   expect(runs.every((r) => r.fixtureKept)).toBe(true);
   expect(runs.every((r) => r.frames.length > 0)).toBe(true);
+  expect(runs.flatMap((r) => r.late.map((l) => ({ build: r.build, cache: r.cache, ...l })))).toEqual([]);
 });

@@ -232,6 +232,14 @@ impl Retained {
         self.shown = None;
     }
 
+    pub fn adopt(&mut self, camera: Camera, now_ms: f64) {
+        let c = camera.snapped();
+        self.held = Some(Held { camera: c, quality: Quality::Sharp });
+        self.shown = None;
+        self.zoom_seen = c.zoom;
+        self.zoom_moved_at = now_ms - ZOOM_IDLE_MS;
+    }
+
     pub fn lookup(&self, camera: Camera) -> Lookup {
         let c = camera.snapped();
         let h = self.held.map_or(c, |h| h.camera);

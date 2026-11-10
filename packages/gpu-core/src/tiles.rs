@@ -291,3 +291,45 @@ impl Rest {
         (!self.todo.is_empty()).then(|| self.todo.remove(0))
     }
 }
+
+pub const WARM_AFTER_MS: f64 = 1000.0;
+
+pub struct Warmup {
+    stirred_at: f64,
+}
+
+impl Default for Warmup {
+    fn default() -> Self {
+        Warmup { stirred_at: f64::NEG_INFINITY }
+    }
+}
+
+impl Warmup {
+    pub fn stirred(&mut self, now_ms: f64) {
+        self.stirred_at = now_ms;
+    }
+
+    pub fn due(&self, now_ms: f64) -> bool {
+        now_ms - self.stirred_at >= WARM_AFTER_MS
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Path {
+    Exact,
+    Tiles,
+}
+
+#[derive(Clone, Copy)]
+pub struct Moment {
+    pub gesture: bool,
+    pub lifting: bool,
+    pub settling: bool,
+}
+
+pub fn path_for(m: Moment) -> Path {
+    if m.gesture || m.lifting || m.settling {
+        return Path::Tiles;
+    }
+    Path::Exact
+}

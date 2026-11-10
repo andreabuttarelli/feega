@@ -299,3 +299,24 @@ fn a_changed_tile_on_screen_is_queued_to_raster_again_even_while_it_still_shows(
     assert!(queue.stale.contains(&keys[0]));
     assert!(queue.blank.is_empty() && queue.blurry.is_empty());
 }
+
+#[test]
+fn tiles_warm_only_after_a_second_without_rasters_or_uploads() {
+    let mut warm = gpu_core::tiles::Warmup::default();
+    warm.stirred(0.0);
+    assert!(!warm.due(900.0));
+    warm.stirred(900.0);
+    assert!(!warm.due(1500.0));
+    assert!(warm.due(1900.0));
+}
+
+#[test]
+fn a_lift_without_a_camera_move_draws_from_tiles() {
+    use gpu_core::tiles::{path_for, Moment, Path};
+    let still = Moment { gesture: false, lifting: false, settling: false };
+
+    assert_eq!(path_for(still), Path::Exact);
+    assert_eq!(path_for(Moment { lifting: true, ..still }), Path::Tiles);
+    assert_eq!(path_for(Moment { gesture: true, ..still }), Path::Tiles);
+    assert_eq!(path_for(Moment { settling: true, ..still }), Path::Tiles);
+}
