@@ -8,6 +8,6 @@ A GPU-versus-HTML pixel sweep over all 61 snapcn templates (defaults, plus 21 wi
 - **laptop-frame's notch was hidden.** The reader stacks siblings only; its `z-index` sat under a static wrapper. The wrapper is now the stacking layer.
 - **sky-lockup with no sky failed the HTML capture** on a hidden `<img>` without a source; it now draws none. A sweep test checks every template for empty pictures.
 
-Templates that use effects the GPU reader declares unsupported (blend modes, CSS filters on some nodes, `background` with images, masks) still export through the HTML renderer, as designed: 17 of 61 at defaults.
+Templates that use effects the GPU reader declares unsupported (blend modes, CSS filters on some nodes, `background` with images, masks) still export through the HTML renderer, as designed: 15 of 61 at defaults.
 
 Branding: defaults showed the snapcn name, URL, handle, icon and wordmark. They show feega now: the mark traced from `static/icon-512.png`, shared through the kit (`S.mark`, `S.markSrc` as the default logo), a BDO Grotesk "feega" wordmark in cut-lockup, `feega.app` and feega copy. `builtin:snapcn-*` ids and internal names stay so saved documents resolve. A catalog test fails if "snapcn" reappears in a title, description, default or drawing code.
