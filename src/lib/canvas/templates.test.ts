@@ -11,6 +11,7 @@ import {
   templatesIn,
   templateThumbnail,
   TEMPLATE_NODE_HALF,
+  type TemplateFilter,
   type TemplateNode
 } from './templates';
 import { canvasAddedOn } from './template-added';
@@ -209,7 +210,7 @@ describe('the newest templates lead the gallery', () => {
   });
 
   it('lists templates newest first, in every filter', () => {
-    for (const filter of [ALL_TEMPLATES, ...TEMPLATE_CATEGORIES.map((c) => c.id)]) {
+    for (const filter of [ALL_TEMPLATES, ...TEMPLATE_CATEGORIES.map((c) => c.id)] as TemplateFilter[]) {
       const dates = templatesIn(filter).map((t) => canvasAddedOn(t.id));
 
       expect(dates).toEqual([...dates].sort((a, b) => b.localeCompare(a)));
