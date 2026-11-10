@@ -2,7 +2,9 @@ const KEEP = 600;
 
 export type TextureReport = { count: number; bytes: number; largest: string[] };
 
-type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; reveal?: { ms: number; missing: string[] }; settled?: number };
+type Tally = Record<string, { n: number; ms: number }>;
+
+type Stats = { render: number[]; textures?: () => TextureReport; pending?: number; loseDevice?: () => void; counts?: Record<string, number>; tally?: Tally; reveal?: { ms: number; missing: string[] }; settled?: number };
 
 declare global {
   interface Window {
@@ -55,4 +57,14 @@ export function count(name: Counter) {
 export function exposeTextures(report: () => TextureReport) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   stats.textures = report;
+}
+
+export function addTally(json: string) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  const tally = (stats.tally ??= {});
+  for (const [reason, { n, ms }] of Object.entries(JSON.parse(json) as Tally)) {
+    const sum = (tally[reason] ??= { n: 0, ms: 0 });
+    sum.n += n;
+    sum.ms += ms;
+  }
 }

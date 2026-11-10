@@ -18,7 +18,7 @@ const html = (over: Partial<ComponentProps<typeof AppSidebar>> = {}) => render(A
 
 describe('app sidebar', () => {
   it('shows the wordmark as text', () => {
-    expect(html()).toMatch(/class="wordmark[^"]*"[^>]*>feega<\/a>/);
+    expect(html()).toMatch(/<a class="wordmark[^"]*" href="\/app"><span class="wordmark[^"]*">feega<\/span>(<!---->)?<\/a>/);
   });
 
   it('is a simple nav: home, canvases, templates, tools, then New project; no tool rows, no badges', () => {
