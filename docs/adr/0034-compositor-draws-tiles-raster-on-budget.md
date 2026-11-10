@@ -114,3 +114,27 @@ blocks on the still budget, 200 ms after the last move (`Rest` in `tiles.rs`). Z
 18.7, fit 56 fps p95 33, worst frames ≤ 83 ms except drag start (≈ 0.6 s: the overlay rasters every
 held frame at once). Time to sharp 2.6 s vs 2.0 s. Next lever: vello per-render setup
 (`writeTexture`, `createBindGroup`), not more blocking.
+
+## Status 2026-11-10 (hybrid)
+
+Still views draw through the exact retained path; camera gestures, lifts (frame or element drags)
+and the settle after a gesture draw from tiles (`tiles::path_for`). The exact rest picture built
+after a gesture is adopted into the retained texture. Tiles warm up after one second without
+uploads, rasters or gestures (`tiles::Warmup`), taking only tile damage (`take_tile_damage`; the
+old `take_damage` also emptied the exact path's damage and left frames blank after their vectors
+were drawn).
+
+Landings, 3 interleaved runs, median [min–max], flag off vs hybrid (`?coreTiles=1`):
+
+| load | off | hybrid |
+|---|---|---|
+| 1x cold first / all / sharp | 2499 / 2737 / 3796 | 2167 / 2576 / 3725 |
+| 1x warm first / all / sharp | 1198 / 1756 / 3418 | 1161 / 2071 / 2476 |
+| 4x cold first / all / sharp | 5788 [5686–5948] / 7427 / 9262 | 6079 [5786–6141] / 7204 / 9338 |
+| 4x warm first / all / sharp | 4863 / 6366 / 8362 | 5056 / 6323 / 8467 |
+
+Gestures, hybrid, 1x, p95 / worst ms: pan 18.2 / 33, zoom 18.7 / 83, fit 18.4 / 35, drag 18.4 /
+117, drag-element 33.4 / 417 (one run in three at 18.5 / 83: the element lift is not always seen
+as a lift; not yet diagnosed). The load bench now fails when a frame stays blank more than a frame
+after its vectors were drawn; both paths pass. Open before default on: drag-element, and 4x first
+content (+5% median, ranges overlap).

@@ -309,3 +309,14 @@ fn tiles_warm_only_after_a_second_without_rasters_or_uploads() {
     assert!(!warm.due(1500.0));
     assert!(warm.due(1900.0));
 }
+
+#[test]
+fn a_lift_without_a_camera_move_draws_from_tiles() {
+    use gpu_core::tiles::{path_for, Moment, Path};
+    let still = Moment { gesture: false, lifting: false, settling: false };
+
+    assert_eq!(path_for(still), Path::Exact);
+    assert_eq!(path_for(Moment { lifting: true, ..still }), Path::Tiles);
+    assert_eq!(path_for(Moment { gesture: true, ..still }), Path::Tiles);
+    assert_eq!(path_for(Moment { settling: true, ..still }), Path::Tiles);
+}

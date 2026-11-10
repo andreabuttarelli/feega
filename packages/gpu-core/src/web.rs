@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{NEAR_STEPS, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{NEAR_STEPS, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -613,8 +613,10 @@ impl WebCore {
         stale.sort_by_key(|k| !self.snapshots.values().any(|shot| k.world().overlaps(shot.rest)));
         let one_at_a_time = |keys: Vec<TileKey>| if gesture { keys.into_iter().take(1).collect() } else { keys };
         let refresh: Vec<TileKey> = one_at_a_time(stale).into_iter().chain(one_at_a_time(queue.blurry)).collect();
-        for batch in batches(&queue.blank).into_iter().chain(batches(&refresh)) {
-            if rastered > 0 && js_sys::Date::now() - started > budget {
+        let blank = batches(&queue.blank);
+        let must = if gesture { 0 } else { blank.len() };
+        for (i, batch) in blank.into_iter().chain(batches(&refresh)).enumerate() {
+            if i >= must && rastered > 0 && js_sys::Date::now() - started > budget {
                 break;
             }
             self.raster_batch(&batch)?;
@@ -706,7 +708,8 @@ impl WebCore {
             self.adopted = None;
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        if self.tiled && (moving || (self.adopted.is_none() && self.drew_tiles && self.tiles_show_all())) {
+        let moment = || Moment { gesture: moving, lifting: !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all() };
+        if self.tiled && path_for(moment()) == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
             let report = self.tiled_frame()?;

@@ -313,3 +313,23 @@ impl Warmup {
         now_ms - self.stirred_at >= WARM_AFTER_MS
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Path {
+    Exact,
+    Tiles,
+}
+
+#[derive(Clone, Copy)]
+pub struct Moment {
+    pub gesture: bool,
+    pub lifting: bool,
+    pub settling: bool,
+}
+
+pub fn path_for(m: Moment) -> Path {
+    if m.gesture || m.lifting || m.settling {
+        return Path::Tiles;
+    }
+    Path::Exact
+}
