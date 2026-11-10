@@ -399,7 +399,7 @@ impl BufferSizes {
         // well as paris-30k. These should instead get derived from the scene layout using
         // reasonable heuristics.
         let bin_data = BufferSize::new(1 << 18);
-        let tiles = BufferSize::new(1 << 21);
+        let tiles = BufferSize::new(1 << 22);
         let lines = BufferSize::new(1 << 21);
         let seg_counts = BufferSize::new(1 << 21);
         let segments = BufferSize::new(1 << 21);

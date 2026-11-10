@@ -51,3 +51,4 @@ opt-level = 2
 
 [patch.crates-io]
 vello = { path = "vendor/vello" }
+vello_encoding = { path = "vendor/vello_encoding" }
