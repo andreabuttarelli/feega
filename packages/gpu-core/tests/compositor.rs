@@ -370,3 +370,13 @@ fn warming_tiles_leaves_the_edit_for_the_exact_screen_to_repaint() {
 
     assert_eq!(frame.outcome, Some(Outcome::Partial));
 }
+
+#[test]
+fn a_frame_held_in_place_for_an_edit_counts_as_held() {
+    let (mut c, lib) = scene();
+    assert!(!c.holding());
+
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 0, 0], "cache": true, "hold": true }], "drop": [] }"#).unwrap(), &lib);
+
+    assert!(c.holding());
+}

@@ -96,6 +96,10 @@ impl Compositor {
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
+    pub fn holding(&self) -> bool {
+        self.world.holding()
+    }
+
     pub fn lifts(&self, library: &Library) -> Vec<Lift> {
         self.world.lifts(|g| library.size_of(g))
     }
