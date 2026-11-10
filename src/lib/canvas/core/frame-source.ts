@@ -126,4 +126,4 @@ export async function untilFound<T>(attempt: () => Promise<T | null>, { tries, w
   }
 }
 
-export const frameSourceUrl = (sourceUrl: (id: string) => string, f: FrameAt): string => `${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}) })}`;
+export const frameSourceUrl = (sourceUrl: (id: string) => string, f: FrameAt, orgId?: string): string => `${sourceUrl(f.id)}?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}), ...(orgId ? { org: orgId } : {}) })}`;

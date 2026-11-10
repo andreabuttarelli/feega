@@ -29,7 +29,7 @@ function warmSources(page: CanvasPageData, params: { projectId: string; canvasId
   }
   const saved = userId ? loadViewport(userId, params.canvasId) : null;
   const screen = { width: window.innerWidth, height: window.innerHeight };
-  frameSources.warm(earlySourceUrls(page.nodes, params, saved, screen));
+  frameSources.warm(earlySourceUrls(page.nodes, { ...params, orgId: page.orgId }, saved, screen));
 }
 
 export const load: PageLoad = async ({ url, params, parent }) => {
