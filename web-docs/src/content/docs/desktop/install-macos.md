@@ -86,7 +86,7 @@ If the hash matches and the message still appears, run the Terminal command abov
 - Email and password sign in inside the app.
 - **Continue with Google** or **GitHub** opens your browser for the provider, then returns to
   the app on its own (it asks once to open Feega). You stay signed in across restarts.
-- **Sign out** is in the app menu, as on the web. **Feega → Settings…** (⌘,) opens the settings
+- **Sign out** is in the ☰ menu, as on the web. **Feega → Settings…** (⌘,) opens the settings
   of the project you are in.
 - Links to other sites open in your browser. Exports (MP4, PNG) ask where to save.
 - Offline, the app shows a retry screen and reconnects when the network returns.

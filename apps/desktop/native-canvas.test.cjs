@@ -29,9 +29,10 @@ function setup(trusted = () => true) {
   return { ipcMain, made, sender: fakeSender() };
 }
 
-test('the native canvas is opt-in and macOS only', () => {
+test('the native canvas is on by default on macOS, off with FEEGA_NATIVE_CANVAS=0', () => {
+  assert.ok(wanted({}, 'darwin'));
   assert.ok(wanted({ FEEGA_NATIVE_CANVAS: '1' }, 'darwin'));
-  assert.ok(!wanted({}, 'darwin'));
+  assert.ok(!wanted({ FEEGA_NATIVE_CANVAS: '0' }, 'darwin'));
   assert.ok(!wanted({ FEEGA_NATIVE_CANVAS: '1' }, 'win32'));
 });
 

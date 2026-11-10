@@ -13,3 +13,19 @@ dialog, offline page with retry, remembered window bounds.
 
 Kept the bundled server (~340 MB dmg): local mode and code-folder import need it. Shipping it as
 an on-demand download is the way to shrink the dmg; not done here.
+
+## Native canvas back in the build
+
+`desktop-native` CI had failed since 27/10: `Cargo.lock` was stale for `--locked`, and the addon
+no longer compiled against `gpu-core` (`Draw.output`, `Reprojector::draw` taking the queue,
+`set_overlay` taking an `OverlayPart`). Fixed to mirror `web.rs`; `native-apps.yml` now also
+runs on `packages/gpu-core/**` so the addon breaks in the PR that breaks it.
+
+The release builds the addon per arch and fails if it is missing from the app. It is on by
+default on macOS (`FEEGA_NATIVE_CANVAS=0` off). Fallback to web: addon fails to load, attach
+fails, or `NATIVE_PROTOCOL` differs between the web app and the app's preload — the hosted app
+deploys more often than the app releases. Bump both when the bridge commands change.
+
+Measured on one real canvas, 6 s pan, M-series: native 119.8 fps / worst frame 25 ms, web
+111.8 fps / 151 ms. The native worker still has 100–600 ms spikes on picture uploads (off the
+page thread).

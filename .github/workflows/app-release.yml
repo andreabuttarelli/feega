@@ -131,6 +131,8 @@ jobs:
 
       - run: npm ci
 
+      - uses: dtolnay/rust-toolchain@stable
+
       - name: Build the macOS app at the npm version
         working-directory: apps/desktop
         env:
@@ -140,7 +142,9 @@ jobs:
           npm test
           npm version --no-git-tag-version --allow-same-version "$V"
           node scripts/stage-server.cjs --arch=${{ matrix.arch }}
+          npm run build:native
           npx electron-builder --mac --${{ matrix.arch }} --publish never
+          test -f dist/mac*/Feega.app/Contents/Resources/app.asar.unpacked/native/feega_native_canvas.node
 
       - uses: actions/upload-artifact@v4
         with:

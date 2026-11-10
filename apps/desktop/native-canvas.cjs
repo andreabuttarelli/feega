@@ -1,7 +1,7 @@
 const path = require('node:path');
 
 const ENV_FLAG = 'FEEGA_NATIVE_CANVAS';
-const ENABLED = '1';
+const DISABLED = '0';
 const SUPPORTED_PLATFORM = 'darwin';
 const ADDON_FILE = path.join('native', 'feega_native_canvas.node');
 const ASAR = 'app.asar';
@@ -21,7 +21,7 @@ const DEBUG_FLAG = 'FEEGA_NATIVE_DEBUG';
 const SENDABLE = new Set(['picture', 'putGroup', 'appendGroup', 'patchGroup', 'dropGroup', 'patchUses', 'setOverlay', ...(process.env[DEBUG_FLAG] ? ['snapshot'] : [])]);
 
 function wanted(env, platform) {
-  return env[ENV_FLAG] === ENABLED && platform === SUPPORTED_PLATFORM;
+  return env[ENV_FLAG] !== DISABLED && platform === SUPPORTED_PLATFORM;
 }
 
 function addonPath(dir) {
