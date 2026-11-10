@@ -1,6 +1,6 @@
 import type { BrandTokens } from '@feega/motion-core/motion/brand';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
-import { drawFrame, prepare, type DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
+import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
 import { readClips } from '@feega/motion-core/motion/gpu-full/dom/custom';
 import { stripContours, type ContourView } from '@feega/motion-core/motion/gpu-full/wire';
 import { localFilesSnapshot, type LocalFilesSnapshot } from '@feega/motion-core/motion/fonts/local-files';
@@ -13,7 +13,7 @@ export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string
 
 export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>;
 
-export type BuildAsk = { id: number; source: string; smoothing: Smoothing; locals: LocalFilesSnapshot };
+export type BuildAsk = { id: number; source: string; playhead?: number; smoothing: Smoothing; locals: LocalFilesSnapshot };
 
 export type BuildAnswer = { id: number; list: DisplayList | null; contours?: ContourView } | { id: number; error: string };
 
@@ -30,6 +30,28 @@ export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: 
   return drawFrame(prepared, frameOfLive(source));
 }
 
+type Held = { key: string; frame: FrameDoc; prepared: Prepared | null };
+
+export function playingBuilder(fonts: Fonts): (ask: Omit<BuildAsk, 'id'>) => Promise<DisplayList | null> {
+  let held: Held | null = null;
+
+  const prepareHeld = async (key: string, source: string, smoothing: Smoothing): Promise<Held> => {
+    const frame = JSON.parse(source) as FrameDoc;
+    if (MAIN_THREAD_ONLY.some((needs) => needs(frame))) {
+      return { key, frame, prepared: null };
+    }
+    const faces = await fonts(frame.doc, frame.assets, frame.tokens);
+    return { key, frame, prepared: prepare(frame.doc, frame.tokens, frame.assets, { fonts: faces, smoothing }) };
+  };
+
+  return async ({ source, playhead, smoothing, locals }) => {
+    const key = `${smoothing}|${JSON.stringify(locals)}|${source}`;
+    const now: Held = held?.key === key ? held : await prepareHeld(key, source, smoothing);
+    held = now;
+    return now.prepared ? drawFrame(now.prepared, frameOfLive({ ...now.frame, playhead })) : null;
+  };
+}
+
 export function builtAnswer(id: number, list: DisplayList | null): BuildAnswer {
   if (!list) {
     return { id, list };
@@ -44,7 +66,7 @@ type Lane = { worker: BuildWorker; busy: number };
 
 const docTexts = new WeakMap<MotionDoc, string>();
 
-function sourceText({ doc, ...rest }: FrameDoc): string {
+function sourceText({ doc, playhead: _playhead, ...rest }: FrameDoc): string {
   const text = docTexts.get(doc) ?? JSON.stringify(doc);
   docTexts.set(doc, text);
   return `{"doc":${text},${JSON.stringify(rest).slice(1)}`;
@@ -99,7 +121,7 @@ export function frameBuilder(spawn: () => BuildWorker | null, lanes = 1): (sourc
     }
     const id = next++;
     lane.busy++;
-    lane.worker.postMessage({ id, source: sourceText(source), smoothing, locals: localFilesSnapshot() });
+    lane.worker.postMessage({ id, source: sourceText(source), playhead: source.playhead, smoothing, locals: localFilesSnapshot() });
     return new Promise((resolve, reject) => waiting.set(id, { lane, resolve, reject }));
   };
 }

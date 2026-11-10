@@ -12,7 +12,7 @@ import { sequenceScenes } from '$lib/motion/scenes';
 import { keepLocalFiles, forgetLocalFiles } from '@feega/motion-core/motion/fonts/local-files';
 import { itemWire } from '@feega/motion-core/motion/gpu-full/wire';
 import type { DisplayList } from '@feega/motion-core/motion/gpu-full/display-list';
-import { builtAnswer, buildFrame, frameBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
+import { builtAnswer, buildFrame, frameBuilder, playingBuilder, transfers, type BuildAsk, type BuildWorker } from './frame-build';
 import { itemPack, listPack } from '@feega/motion-core/motion/gpu-full/wire';
 import { onStage } from './frame-source';
 import { withoutPictures } from './placeholders';
@@ -147,6 +147,37 @@ describe('the builder', () => {
   it('says it cannot build when no worker can start', async () => {
     const build = frameBuilder(() => null);
     await expect(build(source(shapeDoc), Smoothing.Plain)).rejects.toThrow();
+  });
+});
+
+describe('playing a frame', () => {
+  const ask = (playhead: number) => ({ id: playhead, source: JSON.stringify(source(shapeDoc)), playhead, smoothing: Smoothing.Plain, locals: [] });
+
+  it('prepares a doc once and only draws each new playhead', async () => {
+    const faces = vi.fn(fonts);
+    const build = playingBuilder(faces);
+
+    await build(ask(0));
+    await build(ask(10));
+    await build(ask(20));
+
+    expect(faces).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares again when the doc changes', async () => {
+    const faces = vi.fn(fonts);
+    const build = playingBuilder(faces);
+
+    await build(ask(0));
+    await build({ ...ask(0), source: JSON.stringify(source(blank)) });
+
+    expect(faces).toHaveBeenCalledTimes(2);
+  });
+
+  it('draws the playhead it is asked for', async () => {
+    const build = playingBuilder(fonts);
+
+    expect(await build(ask(5))).toEqual(await buildFrame({ ...source(shapeDoc), playhead: 5 }, Smoothing.Plain, fonts));
   });
 });
 

@@ -28,6 +28,7 @@
   import { grabThumb, posterBlob, posterSize, thumbClip, thumbList, thumbRect, thumbSize, thumbStore, thumbsDue } from '$lib/canvas/core/frame-thumbs';
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
+  import { liveGenerations } from '$lib/canvas/core/live-generations';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
   import { Reach, assetTier, keptTier, reachOf } from '$lib/canvas/core/asset-tier';
@@ -344,7 +345,7 @@
   let liveGroup = $state(new Map<string, string>());
   const liveBuilt = new Map<string, LiveDoc>();
   const liveStamp = new Map<string, string | undefined>();
-  const liveGeneration = new Map<string, number>();
+  const liveGeneration = liveGenerations();
   const liveAtRevision = new Map<string, number>();
   const groupOf = (f: FrameAt) => liveGroup.get(f.id) ?? keyOf(f);
   const loaded = new Map<string, string>();
@@ -364,14 +365,13 @@
   const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
 
   async function rebuildLive(f: FrameAt, source: LiveDoc) {
-    const generation = (liveGeneration.get(f.id) ?? 0) + 1;
-    liveGeneration.set(f.id, generation);
+    const generation = liveGeneration.ask(f.id);
     const built = await builtOff(f, { revision: f.revision, ...source }).catch((e: unknown) => (console.warn('[canvas] core live frame failed', f.id, e), null));
-    if (!built || liveGeneration.get(f.id) !== generation) {
+    if (!built || !liveGeneration.newer(f.id, generation)) {
       return;
     }
     const ready = await media.ready(built.list);
-    if (liveGeneration.get(f.id) !== generation) {
+    if (!liveGeneration.land(f.id, generation)) {
       return;
     }
     const key = `${f.id}:live${generation}`;
