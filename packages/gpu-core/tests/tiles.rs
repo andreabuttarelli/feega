@@ -349,3 +349,23 @@ fn idle_baking_rasters_bigger_blocks_than_a_gesture() {
     assert!(baked.len() < batches(&missing).len());
     assert!(baked.iter().all(|b| b.keys.len() <= (BAKE_BATCH_TILES * BAKE_BATCH_TILES) as usize));
 }
+
+#[test]
+fn a_tile_drawn_before_its_frame_was_ready_is_dropped_where_other_tiles_cover_it() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(-1)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+
+    assert!(!tiles.hold_lacking(key));
+    assert!(!tiles.holds(key));
+}
+
+#[test]
+fn a_tile_drawn_before_its_frame_was_ready_is_shown_where_nothing_covers_it_and_drawn_again() {
+    let mut tiles = Tiles::default();
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+
+    assert!(tiles.hold_lacking(key));
+    assert!(tiles.holds(key));
+    assert!(tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).stale.contains(&key));
+}

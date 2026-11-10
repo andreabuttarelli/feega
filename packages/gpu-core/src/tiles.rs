@@ -196,6 +196,15 @@ impl Tiles {
         self.stale.remove(&key);
     }
 
+    pub fn hold_lacking(&mut self, key: TileKey) -> bool {
+        if self.covered(key) {
+            return false;
+        }
+        self.held.insert(key);
+        self.stale.insert(key);
+        true
+    }
+
     pub fn holds(&self, key: TileKey) -> bool {
         self.held.contains(&key)
     }
