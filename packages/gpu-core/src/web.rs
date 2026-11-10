@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -766,7 +766,8 @@ impl WebCore {
         if moving {
             self.warmup.stirred(js_sys::Date::now());
         }
-        let idle = self.warmup.due(js_sys::Date::now());
+        let building = if self.library.is_building() { Building::Frames } else { Building::Nothing };
+        let idle = self.warmup.due_when(js_sys::Date::now(), building);
         if self.tiled && !frame.pending && idle {
             self.warm_tiles()?;
         } else if self.tiled {

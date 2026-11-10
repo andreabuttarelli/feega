@@ -427,3 +427,13 @@ fn baked_ahead_a_zoom_out_to_a_sixteenth_shows_no_blank_tile() {
 
     assert!(queue.blank.is_empty(), "{} blank", queue.blank.len());
 }
+
+#[test]
+fn tiles_do_not_warm_while_frames_are_still_building() {
+    use gpu_core::tiles::{Building, Warmup};
+    let mut warm = Warmup::default();
+    warm.stirred(0.0);
+
+    assert!(!warm.due_when(500.0, Building::Frames));
+    assert!(warm.due_when(500.0, Building::Nothing));
+}

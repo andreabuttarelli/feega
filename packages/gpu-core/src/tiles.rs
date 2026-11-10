@@ -346,6 +346,12 @@ pub fn underlay_shows(stretch: f64) -> bool {
     stretch <= SHARP_STRETCH
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Building {
+    Frames,
+    Nothing,
+}
+
 pub struct Warmup {
     stirred_at: f64,
 }
@@ -363,6 +369,10 @@ impl Warmup {
 
     pub fn due(&self, now_ms: f64) -> bool {
         now_ms - self.stirred_at >= WARM_AFTER_MS
+    }
+
+    pub fn due_when(&self, now_ms: f64, building: Building) -> bool {
+        building == Building::Nothing && self.due(now_ms)
     }
 }
 
