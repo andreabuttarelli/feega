@@ -34,6 +34,19 @@ describe('loadFonts', () => {
     expect(fetched).toEqual(['https://g.test/latin.woff2']);
   });
 
+  it('warms the built-in latin faces before any frame asks, and a frame then reads them once', async () => {
+    const fetched: string[] = [];
+    const parsed: Uint8Array[] = [];
+    const load = fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array([1])) }, async () => (bytes) => (parsed.push(bytes), { axes: {}, covers: () => true, at: () => boxFace }));
+    await load.warm();
+
+    expect(fetched).toEqual(['https://g.test/latin.woff2']);
+    expect(parsed).toHaveLength(1);
+
+    await load(titled, {}, FEEGA_TOKENS);
+    expect(fetched).toHaveLength(1);
+  });
+
   it('reads the files with the face engine it is given', async () => {
     const read: Uint8Array[] = [];
     const engine = async () => (bytes: Uint8Array) => (read.push(bytes), { axes: {}, covers: () => true, at: () => boxFace });

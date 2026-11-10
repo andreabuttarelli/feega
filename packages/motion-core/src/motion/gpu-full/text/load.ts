@@ -22,6 +22,7 @@ export const webReader: Reader = {
 };
 
 const SPACE = 0x20;
+const LATIN_A = 0x41;
 
 function fallbackUrls(points: readonly number[]): string[] {
   const grouped = new Map<Fallback, number[]>();
@@ -59,12 +60,21 @@ const remembered = <T>(load: (url: string) => Promise<T>) => {
   };
 };
 
-export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEngine): (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook> {
+export type FontLoader = ((doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>) & { warm: () => Promise<void> };
+
+export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEngine): FontLoader {
   const sheet = remembered((url) => read.text(url).catch(() => ''));
   let made: ReturnType<Engine> | null = null;
   const source = remembered((url) => Promise.all([read.bytes(url), (made ??= engine())]).then(([bytes, make]): [string, Source] => [url, make(bytes)]).catch(() => null));
   const books = new Map<string, FaceBook>();
-  return async (raw, assets, tokens) => {
+
+  const warm = async () => {
+    const rules = faceRules(await sheet(BUILTIN_FONTS_URL));
+    const latin = rules.filter((r) => needed(r, [SPACE, LATIN_A]));
+    await Promise.all([...new Set(latin.map((r) => r.url))].map(source));
+  };
+
+  const load = async (raw: MotionDoc, assets: Record<string, string>, tokens: BrandTokens): Promise<FaceBook> => {
     const doc = preparedDoc({ doc: raw, tokens, assets });
     const google = googleFontsUrl(usedFaces(doc), doc.fonts);
     const points = codePointsOf(doc);
@@ -86,6 +96,8 @@ export function fontLoader(read: Reader = webReader, engine: Engine = fontkitEng
     books.set(key, book);
     return book;
   };
+
+  return Object.assign(load, { warm });
 }
 
 export const loadFonts = fontLoader();
