@@ -177,7 +177,8 @@ export function debugStart(search: string = typeof location === 'undefined' ? ''
   watch('mark', onMark);
   watch('resource', (e) => {
     if (/\/motion\/sources\?/.test(e.name)) {
-      out!.push(e.responseEnd, sourcesLine(e as PerformanceResourceTiming));
+      const timing = e as PerformanceResourceTiming;
+      out!.push(timing.responseEnd, sourcesLine(timing));
     }
   });
   return true;
