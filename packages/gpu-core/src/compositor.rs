@@ -104,6 +104,14 @@ impl Compositor {
         self.retained.forget();
     }
 
+    pub fn retained_overscan(&self) -> u32 {
+        self.retained.overscan()
+    }
+
+    pub fn adopt(&mut self, camera: Camera, now_ms: f64) {
+        self.retained.adopt(camera, now_ms);
+    }
+
     pub fn pending_raster(&mut self) -> bool {
         std::mem::take(&mut self.pending)
     }
