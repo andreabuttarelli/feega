@@ -40,7 +40,7 @@
   import { OnScreen, VectorGate, showStaged } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
-  import { StartupStep, markStartup } from '$lib/canvas/core/startup-marks';
+  import { StartupStep, markStartup, reportFramesShown } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
@@ -343,6 +343,15 @@
   const asking = new Map<string, string>();
   const VECTORS_FIRST_MAX_MS = 8000;
   const vectorsFirst = new VectorGate();
+  let lastShown = '';
+  function reportShownOnce(shown: number, total: number) {
+    const key = `${shown}/${total}`;
+    if (key === lastShown) {
+      return;
+    }
+    lastShown = key;
+    reportFramesShown(shown, total);
+  }
   setTimeout(() => vectorsFirst.settle([]), VECTORS_FIRST_MAX_MS);
   const shownOf = (f: FrameAt) => shownGroup(groupOf(f), loaded.get(f.id), (g) => lists.has(g));
 
@@ -868,7 +877,11 @@
     if (!pending && !gesture.active()) {
       takeThumbs(canvas, shown);
     }
-    if (frames.length && vectorsFirst.settle(fillOrder(frames, view, area).map((f) => f.id))) {
+    const onScreenIds = fillOrder(frames, view, area).map((f) => f.id);
+    if (frames.length) {
+      reportShownOnce(vectorsFirst.shownOf(onScreenIds), onScreenIds.length);
+    }
+    if (frames.length && vectorsFirst.settle(onScreenIds)) {
       markFrame('all', Step.AllVectors);
     }
     if (!pending && !sharpMarked && held.length && held.every((f) => pictured.has(f.group) && lists.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {

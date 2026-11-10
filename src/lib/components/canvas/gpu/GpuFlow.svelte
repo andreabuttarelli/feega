@@ -190,6 +190,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FitPurpose, fitView, restoreViewport } from '$lib/canvas/restore-viewport';
+  import { coreSourcePath } from '$lib/canvas/core/early-sources';
   import { loadViewport, rememberViewport } from '$lib/canvas/viewport-memory';
   import { FocusMode, Placement, centreIn, focusPlacement, focusSelects, inView, revealIn, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, watchPinch, type CanvasZoom } from '$lib/canvas/page-zoom';
@@ -515,7 +516,7 @@
     offerPoster({ id, revision, posterRevision: typeof posterRevision === 'number' ? posterRevision : undefined, blob, ...size });
   }
 
-  const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${baseNodeId(id)}/source`;
+  const coreSource = (id: string) => coreSourcePath({ projectId: page.params.projectId!, canvasId: page.params.canvasId! }, id);
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (!holdsDoc(t.kind ?? '') || domShows.has(t.id));
   $effect(() => {

@@ -3,6 +3,9 @@ import { loadPageData } from '$lib/api/page-action';
 import type { CanvasPageData } from '$lib/server/canvas/canvas-page';
 import { openCanvasOutbox } from '$lib/canvas/outbox';
 import { StartupStep, markStartup } from '$lib/canvas/core/startup-marks';
+import { earlySourceUrls } from '$lib/canvas/core/early-sources';
+import { frameSources } from '$lib/canvas/core/frame-sources';
+import { loadViewport } from '$lib/canvas/viewport-memory';
 
 export const ssr = false;
 
@@ -20,10 +23,23 @@ function warmRenderer(url: URL) {
     .catch(() => undefined);
 }
 
+function warmSources(page: CanvasPageData, params: { projectId: string; canvasId: string }, userId: string | undefined) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const saved = userId ? loadViewport(userId, params.canvasId) : null;
+  const screen = { width: window.innerWidth, height: window.innerHeight };
+  frameSources.warm(earlySourceUrls(page.nodes, params, saved, screen));
+}
+
 export const load: PageLoad = async ({ url, params, parent }) => {
   warmRenderer(url);
-  const kept = parent().then((shell) => openCanvasOutbox(shell.session?.user?.id, params.canvasId));
-  const [page, outbox] = await Promise.all([loadPageData<CanvasPageData>(url), kept]);
+  const shell = parent();
+  const kept = shell.then((s) => openCanvasOutbox(s.session?.user?.id, params.canvasId));
+  const [page, outbox, s] = await Promise.all([loadPageData<CanvasPageData>(url), kept, shell]);
   markStartup(StartupStep.PageData);
+  if (url.searchParams.get('renderer') !== DOM) {
+    warmSources(page, params, s.session?.user?.id);
+  }
   return { ...page, outbox };
 };
