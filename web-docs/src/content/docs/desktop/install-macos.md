@@ -65,6 +65,10 @@ Removing the download flag skips the dialogs entirely:
 xattr -dr com.apple.quarantine /Applications/Feega.app
 ```
 
+Run it before the first open. If it prints `Operation not permitted`, macOS is protecting the app
+after a blocked launch: give Terminal access in **System Settings → Privacy & Security → App
+Management**, or use the Open Anyway steps above.
+
 ## "Feega is damaged and can't be opened"
 
 This message means macOS found the app's signature broken, usually because the download was cut

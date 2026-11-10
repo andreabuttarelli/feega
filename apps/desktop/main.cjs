@@ -30,7 +30,7 @@ let port = null;
 let switching = Promise.resolve();
 
 function openFile(file) {
-  switching = switching.then(() => switchTo(file)).catch((error) => dialog.showErrorBox('feega could not open the file', `${file}\n\n${error.message}`));
+  switching = switching.then(() => switchTo(file)).catch((error) => dialog.showMessageBox(window, { type: 'error', message: 'feega could not open the file', detail: `${file}\n\n${error.message}` }));
   return switching;
 }
 

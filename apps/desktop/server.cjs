@@ -4,9 +4,11 @@ const { dirname, join } = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const LOOPBACK = '127.0.0.1';
-const READY_MS = 60_000;
+const READY_MS = 120_000;
 const POLL_MS = 200;
 const FLUSH_GRACE_MS = 1_500;
+
+const ended = (child) => child.exitCode !== null || child.signalCode !== null;
 const SHELL_TIMEOUT_MS = 5_000;
 
 function freePort() {
@@ -31,7 +33,7 @@ function loginPath(env) {
 async function ready(url, child) {
   const deadline = Date.now() + READY_MS;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
+    if (ended(child)) {
       throw new Error(`the local server exited with code ${child.exitCode}`);
     }
     const answered = await fetch(url, { redirect: 'manual' }).then(() => true, () => false);
@@ -46,13 +48,13 @@ async function ready(url, child) {
 function stopper(child) {
   return () =>
     new Promise((resolve) => {
-      if (child.exitCode !== null) {
+      if (ended(child)) {
         resolve();
         return;
       }
       child.once('exit', () => resolve());
       child.kill('SIGTERM');
-      setTimeout(() => child.kill('SIGKILL'), FLUSH_GRACE_MS);
+      setTimeout(() => child.kill('SIGKILL'), FLUSH_GRACE_MS).unref();
     });
 }
 
@@ -72,4 +74,4 @@ async function startServer({ root, file, port, env }) {
   return { url, stop };
 }
 
-module.exports = { startServer, freePort, LOOPBACK };
+module.exports = { startServer, freePort, stopper, LOOPBACK };
