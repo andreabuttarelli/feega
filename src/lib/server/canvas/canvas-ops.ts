@@ -91,6 +91,7 @@ import { insertComponentInto } from '$lib/server/registry-components/insert-comp
 import { findComponents } from '$lib/server/registry-components/find-components';
 import { sectioningOf, tokeningOf } from '$lib/server/url-import/url-doc';
 import { importCodeInto } from '$lib/server/code-import/canvas-import';
+import { codeChanges, codePublish, codePull } from '$lib/server/code-import/code-sync';
 import { askedRoutes, MAX_ROUTES, repoOf } from '$lib/server/code-import/repo';
 import { githubFor } from '$lib/server/code-import/github-runtime';
 import { libsOrigin } from '$lib/server/motion/libs-origin';
@@ -273,7 +274,11 @@ const importFigmaInput = z
   })
   .strict();
 
-const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), x: z.number().finite(), y: z.number().finite() }).strict();
+const importCodeInput = z.object({ canvasId: z.string(), repo: z.string().max(300).optional().describe('a https://github.com/<owner>/<repo> link, optionally /tree/<ref>; private repos need GitHub connected (github_connect)'), folder: z.string().max(1000).optional().describe('local mode only: an absolute path to a project folder on this computer; its dev server runs here and code_publish writes back to its files'), storybook: z.string().max(500).optional().describe('instead of repo: a public Storybook link; its stories become boards, no app to run'), stories: z.array(z.string().max(200)).max(MAX_STORIES).optional().describe('Storybook story ids to import, default the first stories across components'), route: z.string().max(300).optional().describe('the page of the app to import, default /'), routes: z.array(z.string().max(300)).max(MAX_ROUTES).optional().describe('several pages in one run: one frame, a board per page, components shared'), x: z.number().finite(), y: z.number().finite() }).strict();
+
+const codeFrameInput = z.object({ nodeId: z.string().describe('a frame made by import_code') }).strict();
+
+const codePullInput = z.object({ nodeId: z.string().describe('a frame made by import_code'), branch: z.string().max(200).regex(/^[A-Za-z0-9._/-]+$/).optional().describe('GitHub branch to pull, default the imported one') }).strict();
 
 const importUrlInput = z
   .object({ canvasId: z.string(), url: z.string().max(2000).describe('a public http(s) web page'), x: z.number().finite(), y: z.number().finite(), sections: z.boolean().default(true).describe('split the page into named section frames (Nav, Hero, Features, Footer…); false keeps one layer tree'), tokens: z.boolean().default(true).describe('turn the page colours, type, effects, radii and spacing into shared variables and styles bound to its layers; false keeps raw values'), breakpoints: z.boolean().default(true).describe('also read the page at tablet (768) and phone (390) width and add them to the frame as breakpoints, each view drawn as the page is at that width; false reads the desktop width only, faster, and keeps section frames') })
@@ -1063,7 +1068,25 @@ export const CANVAS_OPS = {
   import_code: op({
     access: Access.Write,
     input: importCodeInput,
-    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, routes: askedRoutes(input.route, input.routes), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
+    run: async (ctx, input) => importCodeInto(figmaScope(ctx), input.canvasId, { repo: input.repo, folder: input.folder, routes: askedRoutes(input.route, input.routes), storybook: input.storybook, stories: input.stories, at: { x: input.x, y: input.y } })
+  }),
+
+  code_changes: op({
+    access: Access.Read,
+    input: codeFrameInput,
+    run: async (ctx, input) => codeChanges(figmaScope(ctx), input.nodeId)
+  }),
+
+  code_publish: op({
+    access: Access.Write,
+    input: codeFrameInput,
+    run: async (ctx, input) => codePublish(figmaScope(ctx), input.nodeId)
+  }),
+
+  code_pull: op({
+    access: Access.Write,
+    input: codePullInput,
+    run: async (ctx, input) => codePull(figmaScope(ctx), input.nodeId, input.branch)
   }),
 
   github_status: op({

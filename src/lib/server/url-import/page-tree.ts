@@ -1014,11 +1014,24 @@ export async function pageTreeOf(limits: TreeLimits, kit: PageKit, patterns: Pat
     const press = pressOf(el);
     return { tag: el.tagName.toLowerCase(), ...(role ? { role } : {}), ...(hint ? { hint } : {}), ...(landmark ? { landmark } : {}), ...(press ? { press } : {}) };
   };
+  const sourceOf = (el: Element): RestNode['source'] => {
+    const svelte = (el as unknown as { __svelte_meta?: { loc?: { file?: string; line?: number; column?: number } } }).__svelte_meta?.loc;
+    const fiberKey = Object.keys(el).find((k) => k.startsWith('__reactFiber$'));
+    const react = fiberKey ? (el as unknown as Record<string, { _debugSource?: { fileName?: string; lineNumber?: number; columnNumber?: number } }>)[fiberKey]?._debugSource : undefined;
+    const [file, line, column] = svelte ? [svelte.file, svelte.line, svelte.column] : [react?.fileName, react?.lineNumber, (react?.columnNumber ?? 1) - 1];
+    const cls = (el.getAttribute('class') ?? '').split(/\s+/).filter((c) => c && !/^svelte-/.test(c)).join(' ');
+    return file && line && !/(^|\/)(node_modules|\.svelte-kit)\//.test(file) ? { at: `${file}:${line}:${column ?? 0}`, tag: el.tagName.toLowerCase(), cls } : undefined;
+  };
   const described = (el: Element, made: RestNode[]): RestNode[] => {
     const bare = made.filter((n) => !n.dom);
     if (bare.length) {
       const dom = domOf(el);
       bare.forEach((n) => (n.dom = dom));
+    }
+    const unsourced = made.filter((n) => !n.source);
+    const source = unsourced.length ? sourceOf(el) : undefined;
+    if (source) {
+      unsourced.forEach((n) => (n.source = source));
     }
     return made;
   };

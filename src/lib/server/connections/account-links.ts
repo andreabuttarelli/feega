@@ -8,7 +8,7 @@ export enum LinkStatus {
   Gone = 'gone'
 }
 
-export type ProviderCall = { endpoint: string; query?: Record<string, string> };
+export type ProviderCall = { endpoint: string; query?: Record<string, string>; method?: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown };
 
 export type ProviderAnswer = { status: number; data: unknown; headers: Record<string, string>; file: string | null };
 

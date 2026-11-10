@@ -1,3 +1,4 @@
+import type { CodeSpot } from '$lib/canvas/code-look';
 import type { CapturedMotion } from '$lib/canvas/figma/captured-motion';
 import type { ClipBehaviour, CodeComponent, ColorStop, Effect, FigmaMessage, FigmaRawNode, Guid, Matrix, Paint, Rgba, Vec } from '$lib/canvas/figma/archive';
 
@@ -85,6 +86,7 @@ export type RestNode = {
   codeComponent?: CodeComponent;
   behaviour?: ClipBehaviour;
   motion?: CapturedMotion;
+  source?: CodeSpot;
   children?: RestNode[];
 };
 
@@ -323,6 +325,7 @@ function add(n: RestNode, parent: { rest: RestNode | null; guid: Guid }, index: 
     ...(symbolID ? { symbolData: { symbolID } } : {}),
     ...(n.codeComponent ? { codeComponent: n.codeComponent } : {}),
     ...(n.behaviour ? { behaviour: n.behaviour } : {}),
+    ...(n.source ? { source: n.source } : {}),
     ...(n.motion ? { motion: n.motion } : {})
   });
   (n.children ?? []).forEach((child, i) => add(child, { rest: n, guid }, i, build));

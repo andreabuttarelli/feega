@@ -102,6 +102,10 @@ export type StoryboardLink = { canvasId: string; placed: string[] };
 
 const linkSchema = z.object({ canvasId: z.string().min(1), placed: z.array(z.string()) });
 
+export const codeOriginSchema = z.object({ kind: z.enum(['github', 'folder']).default('github'), repo: z.string().min(3).max(500), branch: z.string().max(200).nullable(), sha: z.string().max(64).nullable(), routes: z.array(z.string().max(300)).max(8) });
+
+export type CodeOriginData = z.infer<typeof codeOriginSchema>;
+
 export const motionNodeSchema = z.object({
   format: z.preprocess(formatOf, z.enum(MOTION_FORMATS)),
   docHeadRevision: z.number().int().min(0),
@@ -114,7 +118,8 @@ export const motionNodeSchema = z.object({
   versionNames: versionNamesSchema.optional(),
   interactive: z.boolean().default(false),
   mainHomes: z.array(z.string()).optional(),
-  linked: z.record(z.string(), z.string()).optional()
+  linked: z.record(z.string(), z.string()).optional(),
+  code: codeOriginSchema.optional()
 });
 
 export const elementNodeSchema = z.object({

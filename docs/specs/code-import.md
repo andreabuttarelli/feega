@@ -151,6 +151,16 @@ gap is the shared capture/mapping/renderer, not code import.
 Sandbox up and capture: 44–67 s per app (4 routes ~67 s); Storybook 16 stories ~110 s. Planning
 4 shadcn-admin routes in one frame: 10.7 s (1 400 uses).
 
+## Sync with the source
+
+Each clip drawn from a repo element carries `source = { at: "file:line:col", was }`: the location from the framework's dev metadata (Svelte 5 `__svelte_meta.loc`, React ≤18 `_debugSource`) and the look the import drew, taken after the whole plan (`baselined`). `LOOK` (`src/lib/canvas/code-look.ts`) is the one table of what syncs — text, colour, fill, font size, gap, padding, direction — with read, write and CSS per row.
+
+- **Changes**: a clip whose look differs from `was` is an edit at `at`. Style → inline `style`; text → the literal in the element, else the inlang catalogue entry (`m.key()` in the element, else a unique value). Everything else is reported.
+- **Publish** goes through the `CodeSource` port: GitHub = new `feega/<frame>-<time>` branch from the imported sha, one contents PUT per file, PR to the default branch (a branch equal to the default is refused); folder = write files, plus a commit on a `feega/…` branch via a temporary index when it is a git repo, then `was` is rebased onto what was written.
+- **Pull** re-imports at the new head into a scratch frame and `rebased` carries local edits to the element with the same file and original look (else same location). Same property changed on both sides: the code wins, reported as a conflict. The merged doc becomes a revision of the original node.
+- `nodes.data.code = { kind: github|folder, repo, branch, sha, routes }`; folder head = hash of file sizes and mtimes.
+- Folder sources exist in local mode only: the dev server is the user's own, on a loopback port, read by the local Chromium allowed only that origin.
+
 ## Rules
 
 - `https://github.com/<owner>/<repo>`, `ref` optional (branch, tag, sha); up to 8 routes.

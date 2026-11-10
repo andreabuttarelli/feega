@@ -1,10 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { env as publicEnv } from '$env/dynamic/public';
+  import { isLocalMode } from '$lib/local-user';
   import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, type CodeLanded, type CodeTarget, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
 
   let { projectId, canvasId, at, onimported, onclose }: { projectId: string; canvasId: string; at: { x: number; y: number }; onimported: (landed: CodeLanded) => void; onclose: () => void } = $props();
 
-  const Source = { Repo: 'repo', Storybook: 'storybook' } as const;
+  const Source = { Repo: 'repo', Folder: 'folder', Storybook: 'storybook' } as const;
+  const localMode = isLocalMode(publicEnv);
   type Source = (typeof Source)[keyof typeof Source];
 
   const REFUSALS: Record<string, string> = {
@@ -23,6 +26,7 @@
   let repo = $state('');
   let routes = $state('/');
   let storybook = $state('');
+  let folder = $state('');
   let busy = $state(false);
   let message = $state<string | null>(null);
   let detail = $state<string | null>(null);
@@ -36,10 +40,12 @@
 
   const TARGETS: Record<Source, () => CodeTarget> = {
     [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean) }),
+    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean) }),
     [Source.Storybook]: () => ({ storybook: linked(storybook) })
   };
 
-  const ready = $derived(source === Source.Repo ? Boolean(repo.trim()) : Boolean(storybook.trim()));
+  const READY: Record<Source, () => boolean> = { [Source.Repo]: () => Boolean(repo.trim()), [Source.Folder]: () => Boolean(folder.trim()), [Source.Storybook]: () => Boolean(storybook.trim()) };
+  const ready = $derived(READY[source]());
 
   async function refresh() {
     const status = await githubStatus(projectId);
@@ -110,6 +116,7 @@
     <h3>Import from code</h3>
     <div class="ui-tabs rounded-sm" role="tablist">
       <button class="rounded-sm" role="tab" aria-selected={source === Source.Repo} onclick={() => (source = Source.Repo)} data-testid="code-import-tab-repo">GitHub</button>
+      {#if localMode}<button class="rounded-sm" role="tab" aria-selected={source === Source.Folder} onclick={() => (source = Source.Folder)} data-testid="code-import-tab-folder">Folder</button>{/if}
       <button class="rounded-sm" role="tab" aria-selected={source === Source.Storybook} onclick={() => (source = Source.Storybook)} data-testid="code-import-tab-storybook">Storybook</button>
     </div>
     <form
@@ -149,12 +156,16 @@
             Private repositories need GitHub, which is not set up here yet.
           {/if}
         </p>
+      {:else if source === Source.Folder}
+        <p class="ui-note">A project folder on this computer: its dev server runs here, edits on the canvas are written back to its files, and changes to the files show up on the canvas.</p>
+        <input class="rounded-sm" type="text" placeholder="/Users/you/code/my-app" aria-label="Folder" bind:value={folder} data-testid="code-import-folder" />
+        <input class="rounded-sm" type="text" placeholder="/  /settings  /users" aria-label="Pages" bind:value={routes} data-testid="code-import-folder-route" />
       {:else}
         <p class="ui-note">A public Storybook: each story is read without running the app, its components become main components, their args variants.</p>
         <input class="rounded-sm" type="text" inputmode="url" placeholder="https://storybook.example.com" aria-label="Storybook" bind:value={storybook} data-testid="code-import-storybook" />
       {/if}
       <div class="ui-row ui-end">
-        <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !ready} data-testid="code-import-run">{busy ? (source === Source.Repo ? 'Starting the app…' : 'Reading the stories…') : 'Import'}</button>
+        <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !ready} data-testid="code-import-run">{busy ? (source !== Source.Storybook ? 'Starting the app…' : 'Reading the stories…') : 'Import'}</button>
       </div>
     </form>
     {#if message}
