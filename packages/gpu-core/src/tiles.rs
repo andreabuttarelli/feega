@@ -115,11 +115,11 @@ pub struct Tiles {
     tick: u64,
 }
 
-fn seen_world(camera: Camera, (w, h): (u32, u32)) -> Rect {
+pub fn seen_world(camera: Camera, (w, h): (u32, u32)) -> Rect {
     Rect::new(-camera.x / camera.zoom, -camera.y / camera.zoom, (w as f64 - camera.x) / camera.zoom, (h as f64 - camera.y) / camera.zoom)
 }
 
-fn keys_over(world: Rect, step: i32) -> Vec<TileKey> {
+pub fn keys_over(world: Rect, step: i32) -> Vec<TileKey> {
     let side = TILE_PX as f64 / step_zoom(step);
     let (x0, y0) = ((world.x0 / side).floor() as i64, (world.y0 / side).floor() as i64);
     let (x1, y1) = ((world.x1 / side).ceil() as i64, (world.y1 / side).ceil() as i64);

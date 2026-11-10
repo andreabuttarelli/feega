@@ -123,6 +123,7 @@ type Fit = (size: Size) => Size;
 const asIs: Fit = (size) => size;
 
 export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
+  (globalThis as unknown as { __coreProbe: Attached }).__coreProbe = attached;
   const decoded = new WeakMap<object, ImageBitmap | null | undefined>();
   let queues = new WeakMap<DisplayList, PictureItem[]>();
   const uploaded = new Map<string, Picture['source']>();

@@ -712,6 +712,25 @@ impl WebCore {
         }
     }
 
+    pub fn probe_raster(&mut self, dstep: i32) -> Result<js_sys::Promise, JsValue> {
+        let screen = (self.target.width(), self.target.height());
+        let step = crate::tiles::step_of(self.camera.zoom) + dstep;
+        let keys = crate::tiles::keys_over(crate::tiles::seen_world(self.camera, screen), step);
+        let count = keys.len();
+        let started = js_sys::Date::now();
+        for batch in batches(&keys) {
+            self.raster_batch(&batch)?;
+        }
+        let cpu = js_sys::Date::now() - started;
+        let queue = self.queue.clone();
+        Ok(js_sys::Promise::new(&mut |resolve, _reject| {
+            queue.on_submitted_work_done(move || {
+                let gpu = js_sys::Date::now() - started;
+                let _ = resolve.call1(&JsValue::NULL, &JsValue::from_str(&format!(r#"{{"step":{step},"tiles":{count},"cpu":{cpu},"gpu":{gpu}}}"#)));
+            });
+        }))
+    }
+
     pub fn frame(&mut self, now_ms: f64) -> Result<String, JsValue> {
         if self.tiled && self.adopted != Some(self.camera) {
             self.adopted = None;
