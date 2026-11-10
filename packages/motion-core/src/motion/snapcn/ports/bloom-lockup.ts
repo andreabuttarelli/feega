@@ -13,8 +13,8 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Poppins', 'Geist Mono'],
   props: {
-    wordmark: { type: 'string', title: 'Wordmark', default: 'snapcn', group: 'Content', maxLength: 60 },
-    tagline: { type: 'string', title: 'Tagline', default: 'snapcn.dev', group: 'Content', maxLength: 80 },
+    wordmark: { type: 'string', title: 'Wordmark', default: 'feega', group: 'Content', maxLength: 60 },
+    tagline: { type: 'string', title: 'Tagline', default: 'feega.app', group: 'Content', maxLength: 80 },
     images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     wordmarkFont: { type: 'string', title: 'Wordmark font', format: PropFormat.Font, default: 'Poppins', group: 'Style' },
     taglineFont: { type: 'string', title: 'Tagline font', format: PropFormat.Font, default: 'Geist Mono', group: 'Style' },
@@ -173,13 +173,8 @@ export const PORT: SnapcnPort = {
     11.9, 11.9, 11.9, 11.9, 11.9, 9.3, 5.9, 4.5, 2.2, 0.9, 0.2, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0,
     ];
-    const SNAPCN_MARK = { fill: 0.56,
-    width: 723,
-    height: 632,
-    shapes: [
-    "M92.2 44.6C66.0 51.0 44.4 67.9 32.7 91.1C23.3 109.8 23.5 104.2 23.5 284.9C23.5 442.1 23.6 450.7 26.4 459.0C34.0 482.0 49.6 494.3 78.2 500.0C93.9 503.1 98.1 505.1 107.3 513.6C115.6 521.2 118.9 530.6 118.9 546.7C119.1 565.7 125.5 577.4 139.7 584.9L147.9 589.1L301.2 589.6C439.4 590.1 455.5 589.8 464.3 587.6C476.0 584.3 485.1 577.1 491.0 565.8L495.3 557.8L495.7 508.6C496.0 481.5 496.0 455.0 495.7 450.0L495.3 440.6L490.4 448.5C484.8 457.7 474.6 466.5 463.8 471.3L456.1 474.9L329.4 475.4C236.9 475.7 200.3 475.4 194.0 474.1C174.0 469.8 153.7 455.2 143.2 437.5C133.0 420.3 132.9 417.5 133.3 308.3L133.8 210.5L137.5 201.4C144.4 184.0 160.5 168.5 179.8 160.9L188.6 157.3L318.4 156.8C445.0 156.5 448.5 156.5 458.5 159.6C471.0 163.5 481.8 171.2 489.5 181.8L495.3 190.0L495.7 137.7C496.2 80.3 495.3 72.3 487.0 60.4C482.3 53.5 471.6 46.2 463.2 43.8C459.7 42.9 391.7 42.2 279.3 42.4C134.9 42.6 99.2 42.9 92.2 44.6ZM594.6 173.2C543.5 203.9 501.0 229.7 500.4 230.7C499.8 231.6 499.3 270.4 499.6 316.7L500.0 401.2L522.6 415.5C535.2 423.3 555.2 435.8 567.2 443.1C579.3 450.5 611.5 470.4 638.7 487.3C666.0 504.2 689.8 517.9 691.5 517.9C693.2 517.9 695.7 516.9 697.0 515.4C699.1 513.3 699.5 493.4 699.5 319.2C699.5 197.0 698.8 123.9 697.9 121.4C696.8 118.3 695.4 117.4 692.1 117.4C689.3 117.5 655.8 136.6 594.6 173.2Z",
-    ],
-    };    const p = view.props;
+    const BRAND_MARK = { fill: 0.56, width: S.mark.width, height: S.mark.height, shapes: [S.mark.d] };
+    const p = view.props;
     const c = S.themeOf(String(p.mode));
     const STAGE_W = 1920;
     const STAGE_H = 1080;
@@ -190,7 +185,7 @@ export const PORT: SnapcnPort = {
     const images = S.media(p.images);
     const speed = Number(p.speed);
     const px = Math.max(view.width / STAGE_W, view.height / STAGE_H);
-    const logo = SNAPCN_MARK;
+    const logo = BRAND_MARK;
     const pickImage = (i: number) => images[i % Math.max(1, images.length)] ?? '';
 
     const sample = (table: readonly number[], seconds: number) => {

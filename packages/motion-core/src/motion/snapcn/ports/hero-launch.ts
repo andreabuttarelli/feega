@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#0a0a0b',
   fonts: ['Inter'],
   props: {
-    heading: { type: 'string', title: 'Heading', default: 'npx shadcn add @snapcn', group: 'Content', maxLength: 120 },
+    heading: { type: 'string', title: 'Heading', default: 'Make it move with feega', group: 'Content', maxLength: 120 },
     image1: { type: 'string', title: 'Left image or clip', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     image2: { type: 'string', title: 'Right image or clip', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },

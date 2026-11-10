@@ -77,10 +77,10 @@ export const PORT: SnapcnPort = {
       const W = view.width;
       const H = view.height;
       const reach = (driftPx: number) => Math.hypot(Math.max(Math.abs(driftPx), Math.abs(W / 2 + driftPx), Math.abs(W - driftPx), Math.abs(W - W / 2 - driftPx)), H / 2) * 1.05;
-      const MARK = 'M589 3805 c-167 -41 -305 -149 -380 -297 -60 -120 -59 -84 -59 -1239 0 -1004 1 -1059 19 -1112 48 -147 148 -226 331 -262 100 -20 127 -33 186 -87 53 -49 74 -109 74 -212 1 -121 42 -196 133 -244 l52 -27 980 -3 c883 -3 986 -1 1042 13 75 21 133 67 171 139 l27 51 3 315 c2 173 2 342 0 374 l-3 60 -31 -50 c-36 -59 -101 -115 -170 -146 l-49 -23 -810 -3 c-591 -2 -825 0 -865 8 -128 28 -258 121 -325 234 -65 110 -66 128 -63 826 l3 625 24 58 c44 111 147 210 270 259 l56 23 830 3 c809 2 831 2 895 -18 80 -25 149 -74 198 -142 l37 -52 3 334 c3 367 -3 418 -56 494 -30 44 -98 91 -152 106 -22 6 -457 10 -1175 9 -923 -1 -1151 -3 -1196 -14z M3800 2983 c-327 -196 -598 -361 -602 -367 -4 -6 -7 -254 -5 -550 l2 -540 145 -91 c80 -50 208 -130 285 -177 77 -47 283 -174 457 -282 174 -108 326 -196 337 -196 11 0 27 7 35 16 14 14 16 141 16 1254 0 781 -4 1248 -10 1264 -7 20 -16 26 -37 26 -18 -1 -232 -123 -623 -357z';
+      const MARK = S.mark.d;
       const logo = str('logoSrc')
         ? S.h('img', { src: str('logoSrc'), alt: '', style: { display: 'block', width: markSize, height: markSize, maxWidth: 'none', objectFit: 'contain' } })
-        : S.h('svg', { width: markSize, height: markSize, viewBox: '0 0 464 409', fill: 'none', style: { display: 'block' } }, S.h('g', { transform: 'translate(0,409) scale(0.1,-0.1)' }, S.h('path', { d: MARK, fill: accent })));
+        : S.h('svg', { width: markSize, height: markSize, viewBox: `0 ${(S.mark.height - S.mark.width) / 2} ${S.mark.width} ${S.mark.width}`, fill: 'none', style: { display: 'block' } }, S.h('path', { d: MARK, fill: accent }));
       const word = S.h('span', { style: { display: 'block', backgroundImage: `linear-gradient(90deg, ${accent}, ${emphasis})`, backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent' } }, highlight) as HTMLElement;
       const ink = S.h('div', { style: { position: 'absolute', left: '50%', top: '50%', borderRadius: '50%', background: S.pick(p.coverColor, accent) } }) as HTMLElement;
       const spin = S.h('div', { style: { transformOrigin: '50% 50%' } }, logo) as HTMLElement;

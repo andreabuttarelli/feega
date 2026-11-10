@@ -14,7 +14,7 @@ export const PORT: SnapcnPort = {
   fonts: ['Inter'],
   props: {
     logoSrc: { type: 'string', title: 'Logo', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
-    brandName: { type: 'string', title: 'Brand name', default: 'snapcn', group: 'Content', maxLength: 80 },
+    brandName: { type: 'string', title: 'Brand name', default: 'feega', group: 'Content', maxLength: 80 },
     images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     flipInterval: { type: 'number', title: 'Frames per image', default: 2, minimum: 1, maximum: 30, step: 1, group: 'Motion' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },

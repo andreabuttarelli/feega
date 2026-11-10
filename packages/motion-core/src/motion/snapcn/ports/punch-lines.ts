@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Inter'],
   props: {
-    script: { type: 'string', title: 'Script (| beats, / lines)', default: 'Ready-made scenes / for Remotion. | One command. Own it. | snapcn.', group: 'Content', maxLength: 400 },
+    script: { type: 'string', title: 'Script (| beats, / lines)', default: 'Videos from a prompt. / Edited on a canvas. | One frame. Every format. | feega.', group: 'Content', maxLength: 400 },
     styles: { type: 'string', title: 'Beat styles (slide,punch)', default: 'slide,punch', group: 'Content', maxLength: 120 },
     sizes: { type: 'string', title: 'Beat sizes', default: '1,0.945,2.7', group: 'Content', maxLength: 120 },
     holds: { type: 'string', title: 'Beat holds (frames)', default: '48', group: 'Motion', maxLength: 120 },

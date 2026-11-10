@@ -106,7 +106,7 @@ export const PORT: SnapcnPort = {
       S.h('div', { style: { position: 'absolute', top: 0, left: '50%', translate: '-50% 0px', width: 132, height: 8, borderRadius: '0 0 6px 6px', backgroundColor: S.withAlpha(sh('background'), 0.28) } }));
     const posed = S.h('div', {}, S.h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', perspective: PERSPECTIVE } }, lid, deck)) as HTMLElement;
     const camera = S.h('div', { style: { transformOrigin: 'center center', textRendering: 'geometricPrecision' } }, posed) as HTMLElement;
-    view.root.replaceChildren(S.h('style', {}, '.snapcn-laptop, .snapcn-laptop * { box-sizing: border-box; }'), S.h('div', { className: 'snapcn-laptop', style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: face, fontOpticalSizing: 'none' } }, camera));
+    view.root.replaceChildren(S.h('style', {}, '.laptop-frame-root, .laptop-frame-root * { box-sizing: border-box; }'), S.h('div', { className: 'laptop-frame-root', style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: face, fontOpticalSizing: 'none' } }, camera));
 
     const pose = (frame: number) => {
       if (entrance === 'none') {
