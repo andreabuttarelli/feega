@@ -96,6 +96,12 @@ pub fn batches(missing: &[TileKey]) -> Vec<Batch> {
     out
 }
 
+pub struct Queue {
+    pub blank: Vec<TileKey>,
+    pub blurry: Vec<TileKey>,
+    pub stale: Vec<TileKey>,
+}
+
 pub struct TileFrame {
     pub draw: Vec<TileKey>,
     pub missing: Vec<TileKey>,
@@ -192,6 +198,20 @@ impl Tiles {
 
     pub fn clear(&mut self) {
         self.stale.extend(self.held.iter().copied());
+    }
+
+    pub fn queue(&self, missing: Vec<TileKey>) -> Queue {
+        let mut queue = Queue { blank: vec![], blurry: vec![], stale: vec![] };
+        for key in missing {
+            let list = match () {
+                _ if self.stale.contains(&key) => &mut queue.stale,
+                _ if !self.covered(key) => &mut queue.blank,
+                _ if !self.covered_within(key, NEAR_STEPS) => &mut queue.blurry,
+                _ => continue,
+            };
+            list.push(key);
+        }
+        queue
     }
 
     pub fn len(&self) -> usize {

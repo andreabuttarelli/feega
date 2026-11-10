@@ -595,22 +595,18 @@ impl WebCore {
         let budget = if matches!(self.motion, CoreMotion::Gesture) { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS };
         let started = js_sys::Date::now();
         let mut rastered = 0;
-        let missing = self.tiles.frame(self.camera, screen).missing;
-        let (blurry, behind): (Vec<TileKey>, Vec<TileKey>) = missing.into_iter().partition(|k| !self.tiles.covered_within(*k, NEAR_STEPS));
-        let (blank, blurry): (Vec<TileKey>, Vec<TileKey>) = blurry.into_iter().partition(|k| !self.tiles.covered(*k));
+        let queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
         let gesture = matches!(self.motion, CoreMotion::Gesture);
-        let sharpen: Vec<TileKey> = if gesture { blurry.into_iter().take(1).collect() } else { blurry };
-        for batch in batches(&blank).into_iter().chain(batches(&sharpen)) {
+        let mut stale = queue.stale;
+        stale.sort_by_key(|k| !self.snapshots.values().any(|shot| k.world().overlaps(shot.rest)));
+        let one_at_a_time = |keys: Vec<TileKey>| if gesture { keys.into_iter().take(1).collect() } else { keys };
+        let refresh: Vec<TileKey> = one_at_a_time(stale).into_iter().chain(one_at_a_time(queue.blurry)).collect();
+        for batch in batches(&queue.blank).into_iter().chain(batches(&refresh)) {
             if rastered > 0 && js_sys::Date::now() - started > budget {
                 break;
             }
             self.raster_batch(&batch)?;
             rastered += batch.keys.len();
-        }
-        let left_behind = behind.into_iter().find(|k| self.snapshots.values().any(|shot| k.world().overlaps(shot.rest)));
-        if let (0, Some(key)) = (rastered, left_behind) {
-            self.raster_batch(&Batch { step: key.step, keys: vec![key] })?;
-            rastered += 1;
         }
         let tiles = self.tiles.frame(self.camera, screen);
         let resting = matches!(self.motion, CoreMotion::Still) && tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && js_sys::Date::now() - self.changed_at >= REST_AFTER_MS;
