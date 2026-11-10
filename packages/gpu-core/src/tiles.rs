@@ -29,7 +29,7 @@ impl Baked {
     }
 }
 
-const BAKED: [Baked; 3] = [Baked { steps: 0, reach: 2.0 }, Baked { steps: 4, reach: 1.0 }, Baked { steps: -4, reach: 2.5 }];
+const BAKED: [Baked; 5] = [Baked { steps: 0, reach: 1.5 }, Baked { steps: 4, reach: 1.0 }, Baked { steps: -4, reach: 2.5 }, Baked { steps: -12, reach: 9.0 }, Baked { steps: -16, reach: 17.0 }];
 const RESERVE_STEPS_DOWN: i32 = 8;
 const RESERVE_REACH: f64 = 3.0;
 
@@ -339,7 +339,12 @@ impl Rest {
     }
 }
 
-pub const WARM_AFTER_MS: f64 = 1000.0;
+pub const WARM_AFTER_MS: f64 = 150.0;
+const SHARP_STRETCH: f64 = 1.25;
+
+pub fn underlay_shows(stretch: f64) -> bool {
+    stretch <= SHARP_STRETCH
+}
 
 pub struct Warmup {
     stirred_at: f64,

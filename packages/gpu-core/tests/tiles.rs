@@ -291,13 +291,11 @@ fn a_changed_tile_on_screen_is_queued_to_raster_again_even_while_it_still_shows(
 }
 
 #[test]
-fn tiles_warm_only_after_a_second_without_rasters_or_uploads() {
+fn tiles_warm_a_moment_after_the_last_gesture() {
     let mut warm = gpu_core::tiles::Warmup::default();
     warm.stirred(0.0);
-    assert!(!warm.due(900.0));
-    warm.stirred(900.0);
-    assert!(!warm.due(1500.0));
-    assert!(warm.due(1900.0));
+    assert!(!warm.due(100.0));
+    assert!(warm.due(200.0));
 }
 
 #[test]
@@ -406,4 +404,26 @@ fn baked_levels_on_screen_survive_eviction() {
 
     assert!(baked.is_empty());
     assert!(wanted.iter().all(|k| !gone.contains(k)));
+}
+
+#[test]
+fn the_held_screen_shows_under_the_current_tiles_while_it_is_no_softer_than_a_quarter_stretch() {
+    use gpu_core::tiles::underlay_shows;
+
+    assert!(underlay_shows(1.0));
+    assert!(underlay_shows(1.2));
+    assert!(!underlay_shows(1.3));
+    assert!(underlay_shows(0.3));
+}
+
+#[test]
+fn baked_ahead_a_zoom_out_to_a_sixteenth_shows_no_blank_tile() {
+    let mut tiles = Tiles::default();
+    held_after_baking(&mut tiles, camera(1.0));
+    tiles.reserve(camera(1.0), SCREEN).iter().for_each(|k| tiles.hold(*k));
+    let far = Camera { x: SCREEN.0 as f64 * 15.0 / 32.0, y: SCREEN.1 as f64 * 15.0 / 32.0, zoom: 1.0 / 16.0 };
+
+    let queue = tiles.queue(tiles.frame(far, SCREEN).missing);
+
+    assert!(queue.blank.is_empty(), "{} blank", queue.blank.len());
 }

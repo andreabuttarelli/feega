@@ -96,6 +96,10 @@ impl Compositor {
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
+    pub fn held_look(&self, camera: Camera) -> Option<(Lookup, f64)> {
+        self.retained.held_look(camera)
+    }
+
     pub fn holding(&self) -> bool {
         self.world.holding()
     }

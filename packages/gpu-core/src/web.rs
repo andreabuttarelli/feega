@@ -324,7 +324,6 @@ impl WebCore {
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
         let source = external(source)?;
         let fits = self.textures.get(clip).is_some_and(|t| t.width() == width && t.height() == height);
         if !fits {
@@ -340,7 +339,6 @@ impl WebCore {
     }
 
     pub fn picture_rows(&mut self, clip: &str, source: JsValue, width: u32, height: u32, top: u32, rows: u32) -> Result<bool, JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
         let source = external(source)?;
         if top == 0 {
             self.arriving.insert(clip.into(), upload_target(&self.device, width, height));
@@ -390,7 +388,6 @@ impl WebCore {
     }
 
     pub fn put_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -398,14 +395,12 @@ impl WebCore {
     }
 
     pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
         self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }
 
     pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -413,14 +408,12 @@ impl WebCore {
     }
 
     pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
         self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }
 
     pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &[u8]) -> Result<bool, JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
         self.compositor.touch(to, &self.library);
         let patched = self.library.patch_group(from, to, &parse_splice(utf8(splice_json)?).map_err(failed)?);
         self.compositor.touch(to, &self.library);
@@ -562,7 +555,12 @@ impl WebCore {
             multiview_mask: None,
         }));
         let c = self.camera;
-        let still = draw.iter().filter_map(|key| placed(*key, self.tile_textures.get(key)?, c, screen));
+        let step = crate::tiles::step_of(c.zoom);
+        let tile_of = |key: &TileKey| placed(*key, self.tile_textures.get(key)?, c, screen);
+        let (rw, rh) = (self.retained.width() as f64, self.retained.height() as f64);
+        let covered = |look: Lookup| Rect::new((-look.x / look.scale).ceil(), (-look.y / look.scale).ceil(), ((rw - look.x) / look.scale).floor(), ((rh - look.y) / look.scale).floor()).intersect(screen);
+        let underlay = self.compositor.held_look(c).filter(|(_, stretch)| crate::tiles::underlay_shows(*stretch)).map(|(look, _)| Tile { source: &self.retained, look, within: covered(look) }).filter(|t| t.within.area() > 0.0);
+        let still = draw.iter().filter(|k| k.step != step).filter_map(tile_of).chain(underlay).chain(draw.iter().filter(|k| k.step == step).filter_map(tile_of));
         let lifted = self.snapshots.values().flat_map(|shot| {
             let moved = Camera { x: c.x + shot.by.0 * c.zoom, y: c.y + shot.by.1 * c.zoom, zoom: c.zoom };
             let frame = Rect::new(shot.rest.x0 * c.zoom + moved.x, shot.rest.y0 * c.zoom + moved.y, shot.rest.x1 * c.zoom + moved.x, shot.rest.y1 * c.zoom + moved.y).intersect(screen);
@@ -758,7 +756,7 @@ impl WebCore {
                 cost.store((js_sys::Date::now() - started).to_bits(), Ordering::Relaxed);
             }
         });
-        if frame.rastered > 0 || moving {
+        if moving {
             self.warmup.stirred(js_sys::Date::now());
         }
         let idle = self.warmup.due(js_sys::Date::now());
