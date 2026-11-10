@@ -30,7 +30,7 @@
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
-  import { assetTier, keptTier } from '$lib/canvas/core/asset-tier';
+  import { Reach, assetTier, keptTier, reachOf } from '$lib/canvas/core/asset-tier';
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
@@ -78,7 +78,7 @@
   const baseKey = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
   const tieredKey = (f: FrameAt, at: AssetSize) => (imaged.has(f.id) ? `${baseKey(f)}:${at}` : baseKey(f));
   const bestTier = new Map<string, AssetSize>();
-  const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id));
+  const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), reachOf(f.box, view, area));
   const keyOf = (f: FrameAt) => tieredKey(f, tierOf(f));
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
@@ -226,7 +226,7 @@
         return;
       }
       if (ready === Readiness.Whole) {
-        bestTier.set(f.id, keptTier(at, bestTier.get(f.id)));
+        bestTier.set(f.id, keptTier(at, bestTier.get(f.id), Reach.Near));
       }
       const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
       const shown = loaded.get(f.id);
