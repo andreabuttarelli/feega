@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Boot-minimal placeholders: the e2e smoke tier runs against `vite dev` with no real
       # Supabase (see tests/e2e/README.md). Unit tests do not depend on these values.
@@ -54,7 +54,7 @@ jobs:
           path: test-results/dbg
 
   gpu-core:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: packages/gpu-core
@@ -76,7 +76,7 @@ jobs:
         run: cargo build --locked --lib --target wasm32-unknown-unknown
 
   gpu-text:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: packages/gpu-text
@@ -98,7 +98,7 @@ jobs:
         run: cargo build --locked --lib --target wasm32-unknown-unknown
 
   web-docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -115,7 +115,7 @@ jobs:
         run: npm --prefix web-docs run build
 
   web-blog:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -131,7 +131,7 @@ jobs:
         run: npm --prefix web-blog run build
 
   landing:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -150,7 +150,7 @@ jobs:
         run: npm --prefix landing run build
 
   schema-drift:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     env:
       PUBLIC_SUPABASE_URL: ${{ secrets.DRIFT_SUPABASE_URL }}
