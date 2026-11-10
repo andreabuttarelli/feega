@@ -67,3 +67,16 @@ const blocked = (items: readonly Item[], look: Look, missing: Missing): Item[] =
 export const withoutPictures = (list: DisplayList, look: Look, missing: Missing = ALL): DisplayList => ({ ...list, items: blocked(list.items, look, missing) });
 
 export const drawable = (list: DisplayList, ready: Readiness, look: Look, missing: Missing): DisplayList => (ready === Readiness.Whole ? list : withoutPictures(list, look, missing));
+
+type Layers<T> = { ready: T | null | undefined; before: T | null | undefined; thumb: T | null | undefined; blocks: T | null | undefined; placeholder: T };
+
+export function layersOf<T extends { group: string }>({ ready, before, thumb, blocks, placeholder }: Layers<T>): T[] {
+  const seen = new Set<string>();
+  return [ready, before, thumb, blocks, placeholder].filter((l): l is T => {
+    if (!l || seen.has(l.group)) {
+      return false;
+    }
+    seen.add(l.group);
+    return true;
+  });
+}

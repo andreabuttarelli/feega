@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type DisplayList, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
 import { BlendMode } from '@feega/motion-core/motion/blend';
-import { Stand, drawable, fillOrder, firstDrawn, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from './placeholders';
+import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from './placeholders';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
 
 const LOOK: Look = { paper: '#ffffff', line: '#e5e5e5' };
@@ -85,5 +85,22 @@ describe('what is drawn while a better layer is not in the raster yet', () => {
 
   it('draws nothing only when no layer is in the raster', () => {
     expect(firstDrawn([layer('real')], new Set())).toBeNull();
+  });
+});
+
+describe('layersOf', () => {
+  const layer = (group: string) => ({ group });
+
+  it('la miniatura resta finché la versione vettoriale non è sulla GPU', () => {
+    const chain = layersOf({ ready: layer('f:1:256:vectors'), before: null, thumb: layer('f:1:thumb'), blocks: null, placeholder: layer('placeholder') });
+
+    expect(firstDrawn(chain, new Set(['f:1:thumb', 'placeholder']))?.group).toBe('f:1:thumb');
+    expect(firstDrawn(chain, new Set(['f:1:256:vectors', 'f:1:thumb', 'placeholder']))?.group).toBe('f:1:256:vectors');
+  });
+
+  it('senza miniatura cade sul segnaposto', () => {
+    const chain = layersOf({ ready: layer('f:1:256'), before: null, thumb: null, blocks: null, placeholder: layer('placeholder') });
+
+    expect(firstDrawn(chain, new Set(['placeholder']))?.group).toBe('placeholder');
   });
 });
