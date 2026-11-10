@@ -5,8 +5,9 @@ sidebar:
   order: 1
 ---
 
-The macOS app runs feega in [local mode](/getting-started/local-mode/): no account, no server, one
-canvas per `.feega` file on your Mac. It is **not signed with an Apple Developer ID**, so macOS
+The macOS app is feega itself: sign in and you get your orgs, projects, billing and AI, as on
+the web. It can also open a `.feega` file in [local mode](/getting-started/local-mode/), with no
+account. It is **not signed with an Apple Developer ID**, so macOS
 asks you to confirm it once. This page walks through that.
 
 ## 1. Download
@@ -80,22 +81,32 @@ short or the app was copied in a way that changed its files. It is not a feega a
 
 If the hash matches and the message still appears, run the Terminal command above and open the app.
 
-## Using it
+## Signing in
 
-- Feega opens your last canvas, or creates `~/Documents/Untitled.feega` the first time.
-- **File → New Canvas…**, **Open…** and **Save As…** work on `.feega` files. Every change is saved
-  to the open file as you work; there is no Save button to forget.
-- Double-click any `.feega` file in Finder to open it in Feega.
+- Email and password sign in inside the app.
+- **Continue with Google** or **GitHub** opens your browser for the provider, then returns to
+  the app on its own (it asks once to open Feega). You stay signed in across restarts.
+- **Sign out** is in the app menu, as on the web. **Feega → Settings…** (⌘,) opens the settings
+  of the project you are in.
+- Links to other sites open in your browser. Exports (MP4, PNG) ask where to save.
+- Offline, the app shows a retry screen and reconnects when the network returns.
+
+## Local files
+
+- **File → Open Local File…** (⌘O) or double-click a `.feega` file opens it in local mode: no
+  account, every change saved to the file. **File → New Local Canvas…** and **Save As…** work on
+  `.feega` files; dropping a `.feega` file on the window opens it too.
 - **Import code → Folder** takes a project folder on your Mac (it needs a `package.json` and a
   `dev` script, with Node and Google Chrome installed). Edits on the canvas are written back to its files.
-- AI generation needs your own provider keys: put a `.env` with them, as in
+- AI in local mode needs your own provider keys: put a `.env` with them, as in
   [local mode](/getting-started/local-mode/), in the same folder as the `.feega` file.
+- **File → Back to feega** returns to your account.
 
 ## Updates
 
 The app checks GitHub for a newer release when it starts and every 4 hours. When there is one, it
 offers **Download**, which opens the release page. Download the new `.dmg` and drag Feega to
-Applications to replace the old one; your `.feega` files are untouched. Unsigned apps cannot
+Applications to replace the old one; your account and `.feega` files are untouched. Unsigned apps cannot
 replace themselves on macOS, so updates are this one drag.
 
 ## Why it is unsigned
