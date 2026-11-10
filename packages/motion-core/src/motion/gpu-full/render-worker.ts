@@ -4,6 +4,7 @@ import { FromWorker, ToWorker, type Call, type Stats, type WorkerIn, type Worker
 type Scope = { postMessage: (message: WorkerOut, transfer?: Transferable[]) => void; onmessage: ((event: MessageEvent<WorkerIn>) => void) | null };
 type OffscreenCore = { WebCore: { attach_offscreen: (canvas: OffscreenCanvas, width: number, height: number) => Promise<object> } };
 
+const IDLE_POLL_MS = 2;
 const scope = self as unknown as Scope;
 let canvas: OffscreenCanvas | null = null;
 let core: Attached | null = null;
@@ -47,7 +48,34 @@ function replay(m: Extract<WorkerIn, { kind: ToWorker.Calls }>) {
   } catch (e) {
     why = e instanceof Error ? e.message : String(e);
   }
-  reply({ kind: FromWorker.Framed, frames: m.frames, stats: stats(outcome), at: performance.now(), why });
+  const now = stats(outcome);
+  reply({ kind: FromWorker.Framed, frames: m.frames, stats: now, at: performance.now(), why });
+  if (now.busy) {
+    untilIdle(outcome);
+  }
+}
+
+let watching = false;
+
+function untilIdle(outcome: string) {
+  if (watching) {
+    return;
+  }
+  watching = true;
+  const check = () => {
+    if (!core) {
+      watching = false;
+      return;
+    }
+    const now = stats(outcome);
+    if (now.busy) {
+      setTimeout(check, IDLE_POLL_MS);
+      return;
+    }
+    watching = false;
+    reply({ kind: FromWorker.Framed, frames: 0, stats: now, at: performance.now() });
+  };
+  setTimeout(check, IDLE_POLL_MS);
 }
 
 async function attach(width: number, height: number) {
