@@ -98,6 +98,26 @@ fn run(xy: vec2<i32>) -> vec4<f32> {
 }
 "#;
 
+const SHADOW: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let q = centre(xy) - vec2<f32>(p[0], p[1]);
+  let cover = select(0.0, bilinear(b, q).a, inside(q));
+  let ink = vec4<f32>(p[2] * p[5], p[3] * p[5], p[4] * p[5], p[5]) * cover;
+  let x = texel(a, xy);
+  return x + ink * (1.0 - x.a);
+}
+"#;
+
+const INNER_SHADOW: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let q = centre(xy) - vec2<f32>(p[0], p[1]);
+  let soft = select(0.0, bilinear(b, q).a, inside(q));
+  let x = texel(a, xy);
+  let ink = vec4<f32>(p[2] * p[5], p[3] * p[5], p[4] * p[5], p[5]) * (x.a * (1.0 - soft));
+  return ink + x * (1.0 - ink.a);
+}
+"#;
+
 const COMPOSITE: &str = r#"
 fn run(xy: vec2<i32>) -> vec4<f32> {
   let x = texel(a, xy);
@@ -513,9 +533,11 @@ pub enum Op {
     Fold,
     Lens,
     Warp,
+    Shadow,
+    InnerShadow,
 }
 
-const SOURCES: [(Op, &str); 15] = [
+const SOURCES: [(Op, &str); 17] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -531,6 +553,8 @@ const SOURCES: [(Op, &str); 15] = [
     (Op::Fold, FOLD),
     (Op::Lens, LENS),
     (Op::Warp, WARP),
+    (Op::Shadow, SHADOW),
+    (Op::InnerShadow, INNER_SHADOW),
 ];
 
 const POOL_BYTES: u64 = 32 * 1024 * 1024;

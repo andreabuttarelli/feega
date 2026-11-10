@@ -213,9 +213,8 @@ impl<R: Runner> Fx<'_, R> {
     }
 
     fn shadow(&self, src: &Img<R::Tex>, d: (f64, f64), sigma: f64, c: Rgba) -> Img<R::Tex> {
-        let soft = self.blur(self.alpha_of(src), sigma, sigma);
-        let ink = self.composite(&self.flood(src, c), &self.offset(&soft, d, false), "in", [0.0; 4]);
-        self.composite(src, &ink, "over", [0.0; 4])
+        let soft = self.blur(Self::plain(src.tex.clone()), sigma, sigma);
+        self.op(Op::Shadow, &src.tex, &soft.tex, &[d.0 as f32, d.1 as f32, c[0], c[1], c[2], c[3]])
     }
 
     fn morph(&self, src: Img<R::Tex>, r: (f64, f64), dilate: bool) -> Img<R::Tex> {
@@ -324,6 +323,19 @@ impl<R: Runner> Fx<'_, R> {
         self.op(Op::Warp, &src.tex, &src.tex, &[mode, at("cx"), at("cy"), (num(n.attrs.get("radius"), 1.0) * s) as f32, amount as f32, extra as f32])
     }
 
+    fn effect_shadow(&self, source: Img<R::Tex>, shadow: &EffectShadow, space: Linear) -> Img<R::Tex> {
+        let s = scale(space);
+        let grown = match shadow.spread {
+            Some((radius, dilate)) => self.morph(source.clone(), (radius * s, radius * s), dilate),
+            None => source.clone(),
+        };
+        let soft = self.blur(grown, shadow.sigma * s, shadow.sigma * s);
+        let (dx, dy) = vector(space, shadow.offset.0, shadow.offset.1);
+        let c = shadow.colour;
+        let op = if shadow.cast == Cast::Inside { Op::InnerShadow } else { Op::Shadow };
+        self.op(op, &source.tex, &soft.tex, &[dx as f32, dy as f32, c[0], c[1], c[2], c[3]])
+    }
+
     fn svg_graph(&self, source: Img<R::Tex>, filter: &SvgNode, space: Linear, origin: [f64; 2]) -> Img<R::Tex> {
         let mut results: HashMap<String, Img<R::Tex>> = HashMap::new();
         let mut last = source.clone();
@@ -413,7 +425,10 @@ impl<R: Runner> Fx<'_, R> {
         let start = Self::plain(src);
         let out = filters.iter().fold(start, |img, f| match f {
             Filter::Css { fns } => self.css_graph(img, fns, space),
-            Filter::Svg { nodes } => nodes.iter().fold(img, |i, node| self.svg_graph(i, node, space, origin)),
+            Filter::Svg { nodes } => nodes.iter().fold(img, |i, node| match effect_shadow(node) {
+                Some(shadow) => self.effect_shadow(i, &shadow, space),
+                None => self.svg_graph(i, node, space, origin),
+            }),
         });
         out.tex
     }
@@ -474,5 +489,78 @@ pub fn reach(filters: &[Filter], space: Linear) -> Option<Reach> {
             Filter::Svg { nodes } => nodes.iter().map(svg_reach).try_fold(Reach::default(), |a, r| r.map(|r| a.plus(r))),
         };
         own.map(|r| acc.plus(r))
+    })
+}
+
+#[derive(PartialEq)]
+enum Cast {
+    Outside,
+    Inside,
+}
+
+struct EffectShadow {
+    cast: Cast,
+    spread: Option<(f64, bool)>,
+    offset: (f64, f64),
+    sigma: f64,
+    colour: Rgba,
+}
+
+fn effect_shadow(filter: &SvgNode) -> Option<EffectShadow> {
+    let attr = |n: &SvgNode, k: &str| text(n.attrs.get(k));
+    if filter.children.iter().any(|n| SUBREGION.iter().any(|k| n.attrs.contains_key(*k))) {
+        return None;
+    }
+    if let Some(inner) = inner_shadow(filter) {
+        return Some(inner);
+    }
+    let (grown, rest) = match filter.children.split_first() {
+        Some((m, rest)) if m.tag == "feMorphology" && attr(m, "in") == SOURCE_ALPHA => (Some(m), rest),
+        _ => (None, filter.children.as_slice()),
+    };
+    let [offset, blur, flood, composite, merge] = rest else { return None };
+    let offset_from = grown.map_or(SOURCE_ALPHA.to_string(), |m| attr(m, "result"));
+    let shaped = offset.tag == "feOffset" && attr(offset, "in") == offset_from
+        && blur.tag == "feGaussianBlur" && attr(blur, "in") == attr(offset, "result")
+        && flood.tag == "feFlood"
+        && composite.tag == "feComposite" && attr(composite, "operator") == "in" && attr(composite, "in") == attr(flood, "result") && attr(composite, "in2") == attr(blur, "result")
+        && merge.tag == "feMerge" && merge.children.len() == 2 && attr(&merge.children[0], "in") == attr(composite, "result") && attr(&merge.children[1], "in") == SOURCE_GRAPHIC;
+    if !shaped {
+        return None;
+    }
+    let (sx, sy) = pair(blur.attrs.get("stdDeviation"));
+    if sx != sy {
+        return None;
+    }
+    let c = flood.attrs.get("flood-color").and_then(|v| rgba_of(&text(Some(v)))).unwrap_or(BLACK);
+    Some(EffectShadow {
+        cast: Cast::Outside,
+        spread: grown.map(|m| (pair(m.attrs.get("radius")).0, attr(m, "operator") == "dilate")),
+        offset: (num(offset.attrs.get("dx"), 0.0), num(offset.attrs.get("dy"), 0.0)),
+        sigma: sx,
+        colour: [c[0], c[1], c[2], c[3] * num(flood.attrs.get("flood-opacity"), 1.0) as f32],
+    })
+}
+
+fn inner_shadow(filter: &SvgNode) -> Option<EffectShadow> {
+    let attr = |n: &SvgNode, k: &str| text(n.attrs.get(k));
+    let [offset, blur, rim, flood, composite, merge] = filter.children.as_slice() else { return None };
+    let shaped = offset.tag == "feOffset" && attr(offset, "in") == SOURCE_ALPHA
+        && blur.tag == "feGaussianBlur" && attr(blur, "in") == attr(offset, "result")
+        && rim.tag == "feComposite" && attr(rim, "operator") == "out" && attr(rim, "in") == SOURCE_ALPHA && attr(rim, "in2") == attr(blur, "result")
+        && flood.tag == "feFlood"
+        && composite.tag == "feComposite" && attr(composite, "operator") == "in" && attr(composite, "in") == attr(flood, "result") && attr(composite, "in2") == attr(rim, "result")
+        && merge.tag == "feMerge" && merge.children.len() == 2 && attr(&merge.children[0], "in") == SOURCE_GRAPHIC && attr(&merge.children[1], "in") == attr(composite, "result");
+    let (sx, sy) = pair(blur.attrs.get("stdDeviation"));
+    if !shaped || sx != sy {
+        return None;
+    }
+    let c = flood.attrs.get("flood-color").and_then(|v| rgba_of(&text(Some(v)))).unwrap_or(BLACK);
+    Some(EffectShadow {
+        cast: Cast::Inside,
+        spread: None,
+        offset: (num(offset.attrs.get("dx"), 0.0), num(offset.attrs.get("dy"), 0.0)),
+        sigma: sx,
+        colour: [c[0], c[1], c[2], c[3] * num(flood.attrs.get("flood-opacity"), 1.0) as f32],
     })
 }
