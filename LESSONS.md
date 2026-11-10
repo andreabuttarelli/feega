@@ -61,6 +61,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 **Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
 
+### A worktree dev server runs the main checkout's `packages/`
+
+**Signal:** a fix in `packages/motion-core` passes its test but the browser on the worktree's dev server still shows the old behaviour. **Move:** the worktree has no `node_modules`, so `@feega/*` resolves to the main checkout's symlinks. Create `node_modules/@feega/*` in the worktree pointing at its own `packages/`, link the other top-level entries from the main `node_modules`, and start Vite with `server.fs.strict: false` (the Kit client lives outside the worktree's allow list).
+
+### A snapcn port that works in tests throws in the player
+
+**Signal:** a port renders in a unit test of `port.draw` but the frame is empty in the browser, with `ReferenceError` in the player. **Move:** the player runs `draw.toString()`, so module-scope constants are gone. Keep every value inside `draw`; `sweep.test.ts` executes `snapcnSource` and catches it.
+
 ### A Playwright spec cannot import motion-core: build the page with vite-node first
 
 **Signal:** `Module ".../part-usage.json" needs an import attribute of "type: json"` the moment a spec or demo imports `bundle.ts` or the doc ops. **Move:** Playwright loads TypeScript through Node, not Vite. Build the fixture in a separate `npx vite-node tests/e2e/fixtures/build-lumen.ts <dir> <origin>` step and let the spec read the files (`tests/e2e/fixtures/interactive-routes.ts`).
