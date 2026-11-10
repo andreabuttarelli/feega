@@ -27,6 +27,10 @@ export class VectorGate {
     this.#seen.add(id);
   }
 
+  shownOf(ids: readonly string[]): number {
+    return ids.filter((id) => this.#seen.has(id)).length;
+  }
+
   after(show: () => void) {
     if (this.#open) {
       show();

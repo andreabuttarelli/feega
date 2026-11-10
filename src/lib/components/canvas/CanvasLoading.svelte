@@ -2,18 +2,19 @@
   import { onMount } from 'svelte';
   import { PRIDE_FLAGS, flagGradient, nextFlag } from '$lib/canvas/pride-flags';
   import Wordmark from '$lib/components/app/Wordmark.svelte';
-  import { STARTUP_EVENT, StartupStep, startupMarks } from '$lib/canvas/core/startup-marks';
-  import { CanvasContent, startupProgress } from '$lib/canvas/core/startup-progress';
+  import { FRAMES_SHOWN_EVENT, STARTUP_EVENT, StartupStep, startupMarks } from '$lib/canvas/core/startup-marks';
+  import { CanvasContent, startupProgress, type FramesShown } from '$lib/canvas/core/startup-progress';
 
   let { content }: { content: CanvasContent } = $props();
 
   const GIVE_UP_MS = 10_000;
-  const AFTER_BUILT_MS = 1500;
+  const AFTER_ENGINE_MS = 4000;
 
   let gradient = $state(flagGradient(PRIDE_FLAGS[0].stripes));
   let done = $state(new Set<StartupStep>());
+  let frames = $state<FramesShown>({ shown: 0, total: 0 });
   let gaveUp = $state(false);
-  const progress = $derived(startupProgress(done, content));
+  const progress = $derived(startupProgress(done, frames, content));
   const shown = $derived(progress < 1 && !gaveUp);
 
   onMount(() => {
@@ -26,17 +27,24 @@
     const reached = (e: Event) => (done = new Set([...done, (e as CustomEvent<StartupStep>).detail]));
     const timer = setTimeout(() => (gaveUp = true), GIVE_UP_MS);
     let settle: ReturnType<typeof setTimeout> | undefined;
-    const built = (e: Event) => {
-      if ((e as CustomEvent<StartupStep>).detail === StartupStep.FirstBuilt) {
-        settle = setTimeout(() => (gaveUp = true), AFTER_BUILT_MS);
+    const capAfterEngine = () => (settle ??= setTimeout(() => (gaveUp = true), AFTER_ENGINE_MS));
+    if (done.has(StartupStep.GpuReady)) {
+      capAfterEngine();
+    }
+    const engineReady = (e: Event) => {
+      if ((e as CustomEvent<StartupStep>).detail === StartupStep.GpuReady) {
+        capAfterEngine();
       }
     };
-    window.addEventListener(STARTUP_EVENT, built);
+    const framesShown = (e: Event) => (frames = (e as CustomEvent<FramesShown>).detail);
+    window.addEventListener(STARTUP_EVENT, engineReady);
+    window.addEventListener(FRAMES_SHOWN_EVENT, framesShown);
     window.addEventListener(STARTUP_EVENT, reached);
     return () => {
       clearTimeout(timer);
       clearTimeout(settle);
-      window.removeEventListener(STARTUP_EVENT, built);
+      window.removeEventListener(STARTUP_EVENT, engineReady);
+      window.removeEventListener(FRAMES_SHOWN_EVENT, framesShown);
       window.removeEventListener(STARTUP_EVENT, reached);
     };
   });

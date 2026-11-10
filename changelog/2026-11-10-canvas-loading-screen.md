@@ -14,3 +14,13 @@ The centre shows the app wordmark (`Wordmark.svelte`, shared with
 storage is unavailable). The full-width gradient is revealed with
 `clip-path`, so stripes keep their width as the bar grows. Flags with
 symbols or chevrons were dropped: they don't read on a 3px bar.
+
+The screen now waits for every on-screen frame to show real content
+(vectors, poster or thumbnail: `VectorGate.shownOf` → `reportFramesShown`
+→ `all-shown` mark), with the bar tracking those frames. Cap: 4 s after
+the GPU is ready, 10 s hard. White flag stripes draw as #ECECEC. The
+canvas load also warms the on-screen frame sources (`early-sources.ts`),
+and the app already preloads page data on link hover, so hovering a
+canvas link fetches its sources too. Not cancelled on leave, posters not
+prefetched. A/B at 4x CPU, 2 cold runs: reveal 2.3 s → 6.0 s (the old
+one showed white placeholders), all on-screen content 7.3 s → 6.7 s.

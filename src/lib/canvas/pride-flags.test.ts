@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PRIDE_FLAGS, PrideFlag, nextFlag } from './pride-flags';
+import { PRIDE_FLAGS, PrideFlag, flagGradient, nextFlag } from './pride-flags';
 
 const memory = (start: string | null) => {
   let value = start;
@@ -24,5 +24,11 @@ describe('nextFlag', () => {
 
   it('falls back to the rainbow on a stored value it does not know', () => {
     expect(nextFlag(memory('banana')).flag).toBe(PrideFlag.Rainbow);
+  });
+});
+
+describe('flagGradient', () => {
+  it('draws white stripes light grey so they show on the white loading screen', () => {
+    expect(flagGradient(['#FFFFFF', '#000000'])).toBe('linear-gradient(to right, #ECECEC 0% 50%, #000000 50% 100%)');
   });
 });
