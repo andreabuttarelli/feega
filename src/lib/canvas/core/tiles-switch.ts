@@ -1,4 +1,4 @@
-export const TILES_BY_DEFAULT = true;
+export const TILES_BY_DEFAULT = false;
 
 const PARAM = 'coreTiles';
 const OFF = '0';
