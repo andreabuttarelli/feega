@@ -104,6 +104,9 @@ import { ElementPaste, elementPaste, pasteTargets } from '$lib/canvas/paste-into
   import { feedView, personView, productsView } from '$lib/canvas/source-thumbs';
 import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type NodeView } from '$lib/canvas/node-view';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
+  import { CanvasContent } from '$lib/canvas/core/startup-progress';
+  import { holdsDoc } from '$lib/canvas/motion-node';
+  import CanvasLoading from '$lib/components/canvas/CanvasLoading.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
   import type { ExportMode } from '$lib/canvas/code-frame';
@@ -4474,6 +4477,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
 <svelte:window onpointermovecapture={readResizeMode} onpointerupcapture={readResizeMode} />
 
 <div class="canvas" class:view-only={viewOnly}>
+  <CanvasLoading content={nodes.some((n) => holdsDoc(n.type)) ? CanvasContent.Frames : CanvasContent.Empty} />
   {#if peers.length || canvasPeers.length || presenting}
     {@const onspotlight = isOff(LocalOff.Present) || !presentControlsShown({ others: peers.length, presenting }) ? undefined : spotlight}
     {#if topPeers}

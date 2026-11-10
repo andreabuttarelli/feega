@@ -1,4 +1,6 @@
 const PREFIX = 'startup|';
+export const STARTUP_EVENT = 'feega:startup';
+export const FRAMES_SHOWN_EVENT = 'feega:frames-shown';
 
 export enum StartupStep {
   PageData = 'page-data',
@@ -13,7 +15,15 @@ export enum StartupStep {
   SourcesAsked = 'sources-asked',
   SourcesArrived = 'sources-arrived',
   FirstBuilt = 'first-built',
-  FirstDrawn = 'first-drawn'
+  FirstDrawn = 'first-drawn',
+  AllShown = 'all-shown'
+}
+
+export function reportFramesShown(shown: number, total: number) {
+  globalThis.dispatchEvent?.(new CustomEvent(FRAMES_SHOWN_EVENT, { detail: { shown, total } }));
+  if (shown === total) {
+    markStartup(StartupStep.AllShown);
+  }
 }
 
 export type StartupMark = { step: StartupStep; at: number };
@@ -33,6 +43,7 @@ export function markStartup(step: StartupStep) {
     return;
   }
   performance.mark(`${PREFIX}${step}`);
+  globalThis.dispatchEvent?.(new CustomEvent(STARTUP_EVENT, { detail: step }));
 }
 
 export function startupMarks(marks: readonly Mark[]): StartupMark[] {

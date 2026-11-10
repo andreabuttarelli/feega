@@ -79,3 +79,12 @@ describe('shownBefore', () => {
     expect(shownBefore({ thumb: false, drawn: false })).toBe(OnScreen.Nothing);
   });
 });
+
+describe('VectorGate.shownOf', () => {
+  it('counts the given frames that already showed content', () => {
+    const gate = new VectorGate();
+    gate.presented('a');
+    gate.presented('c');
+    expect(gate.shownOf(['a', 'b', 'c'])).toBe(2);
+  });
+});
