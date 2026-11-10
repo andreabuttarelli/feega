@@ -31,3 +31,10 @@ export function startupProgress(done: ReadonlySet<StartupStep>, frames: FramesSh
   const shown = frames.total ? (frames.shown / frames.total) * FRAMES_WEIGHT : 0;
   return Math.min(steps + shown, 0.99);
 }
+
+const REVEAL_AFTER_ENGINE_MS = 8_000;
+const REVEAL_HARD_MS = 12_000;
+
+export function revealDue(at: { sinceStartMs: number; sinceEngineMs: number | null }): boolean {
+  return at.sinceStartMs >= REVEAL_HARD_MS || (at.sinceEngineMs !== null && at.sinceEngineMs >= REVEAL_AFTER_ENGINE_MS);
+}
