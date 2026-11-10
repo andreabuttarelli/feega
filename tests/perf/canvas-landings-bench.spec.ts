@@ -19,7 +19,7 @@ enum Gesture {
   DragElement = 'drag-element'
 }
 
-type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null; longMs: number; longest: number; inputP95: number; inputWorst: number };
+type GestureRun = { fps: number; presentFps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null; longMs: number; longest: number; inputP95: number; inputWorst: number };
 type MainThread = { longMs: number; longest: number; inputP95: number; inputWorst: number };
 type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number; editMs: number };
 type Hotspot = { fn: string; url: string; selfMs: number };
@@ -70,6 +70,11 @@ function watchMainThread(threshold: number) {
   (window as unknown as { __mainThread: typeof seen }).__mainThread = seen;
   new PerformanceObserver((list) => list.getEntries().forEach((e) => seen.long.push(e.duration))).observe({ type: 'longtask', buffered: true });
   new PerformanceObserver((list) => list.getEntries().forEach((e) => seen.input.push(e.duration))).observe({ type: 'event', durationThreshold: threshold, buffered: true } as PerformanceObserverInit);
+}
+
+async function presents(page: Page): Promise<number> {
+  const painted = await page.locator('[data-testid="core-canvas"]').first().getAttribute('data-painted');
+  return (painted ?? '').split(',').map(Number).filter(Number.isFinite).reduce((a, b) => a + b, 0);
 }
 
 async function mainThreadSince(page: Page): Promise<MainThread> {
@@ -346,9 +351,11 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture ${JSON.stringify(shown)} ${JSON.stringify(await page.locator('[data-testid="gpu-node"]').evaluateAll((ns) => ns.map((n) => { const r = n.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; })))}`).toBe(true);
   const before = await taskMs(cdp);
   await mainThreadSince(page);
+  const presentedBefore = await presents(page);
   const { value: frames, profile } = await profiling(cdp, profiled, () => measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until)));
   const after = await taskMs(cdp);
   const main = await mainThreadSince(page);
+  const presented = (await presents(page)) - presentedBefore;
   await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
   let swaps: number | null = null;
@@ -368,7 +375,7 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   if (profile) {
     writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
-  return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps, ...main }, spots: profile ? hotspots(profile) : [] };
+  return { frames: { fps: frames.fpsAvg, presentFps: Math.round((presented * MS_PER_S) / GESTURE_MS), p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps, ...main }, spots: profile ? hotspots(profile) : [] };
 }
 
 async function untilChanged(page: Page, from: Buffer): Promise<number> {
@@ -440,7 +447,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
 
 function medianOf(runs: BenchRun[]) {
   const pick = (values: (number | null)[]) => (values.some((v) => v === null) ? null : mid(values as number[]));
-  const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'p95', 'worst', 'cpuMs', 'longMs', 'longest', 'inputP95', 'inputWorst'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
+  const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'presentFps', 'p95', 'worst', 'cpuMs', 'longMs', 'longest', 'inputP95', 'inputWorst'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
   return { ...gestures, sharpMs: mid(runs.map((r) => r.sharpMs)), editMs: mid(runs.map((r) => r.editMs)) };
 }
 

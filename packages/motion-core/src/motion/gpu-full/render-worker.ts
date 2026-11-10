@@ -1,4 +1,5 @@
 import { overBytes, warmCore, type Attached } from './core-web';
+import { AttachGate } from './render-ledger';
 import { FromWorker, ToWorker, type Call, type Stats, type WorkerIn, type WorkerOut } from './render-wire';
 
 type Scope = { postMessage: (message: WorkerOut, transfer?: Transferable[]) => void; onmessage: ((event: MessageEvent<WorkerIn>) => void) | null };
@@ -38,9 +39,11 @@ function stats(outcome: string): Stats {
   return { outcome, pending: c.cache_pending(), cacheBytes: c.cache_bytes(), pictureBytes: c.picture_bytes(), scratchBytes: c.scratch_bytes?.() ?? 0, wasmBytes: wasm?.buffer.byteLength ?? 0, lost: c.lost(), busy: c.busy?.() ?? false };
 }
 
-const waiting: Extract<WorkerIn, { kind: ToWorker.Calls }>[] = [];
+type Batch = Extract<WorkerIn, { kind: ToWorker.Calls }>;
 
-function replay(m: Extract<WorkerIn, { kind: ToWorker.Calls }>) {
+const gate = new AttachGate<Batch>();
+
+function replay(m: Batch) {
   let outcome = '';
   let why: string | undefined;
   try {
@@ -79,12 +82,13 @@ function untilIdle(outcome: string) {
 }
 
 async function attach(width: number, height: number) {
+  gate.close();
   core?.free();
   core = null;
   const module = (await warmCore()) as unknown as OffscreenCore;
   core = overBytes(await module.WebCore.attach_offscreen(canvas!, width, height));
   reply({ kind: FromWorker.Attached });
-  waiting.splice(0).forEach(replay);
+  gate.open(replay);
 }
 
 const HANDLERS: { [K in ToWorker]: (m: Extract<WorkerIn, { kind: K }>) => void | Promise<void> } = {
@@ -97,17 +101,14 @@ const HANDLERS: { [K in ToWorker]: (m: Extract<WorkerIn, { kind: K }>) => void |
     }
   },
   [ToWorker.Calls]: (m) => {
-    if (!core) {
-      waiting.push(m);
-      return;
-    }
-    replay(m);
+    gate.offer(m, replay);
   },
   [ToWorker.Poster]: async (m) => {
     const bytes = core?.poster ? await core.poster(m.group, m.width, m.height, m.scale).catch(() => null) : null;
     reply({ kind: FromWorker.Poster, id: m.id, bytes }, bytes ? [bytes.buffer] : []);
   },
   [ToWorker.Free]: () => {
+    gate.close();
     core?.free();
     core = null;
   }

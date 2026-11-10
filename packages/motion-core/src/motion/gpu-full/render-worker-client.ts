@@ -1,8 +1,7 @@
 import { rasterOf, pictureSize, type Attached, type CoreRaster } from './core-web';
-import { FromWorker, ToWorker, type Call, type Stats, type WorkerIn, type WorkerOut } from './render-wire';
+import { FromWorker, ToWorker, type Call, type WorkerIn, type WorkerOut } from './render-wire';
+import { FrameLedger } from './render-ledger';
 
-const MAX_IN_FLIGHT = 2;
-const IDLE_STATS: Stats = { outcome: 'reused', pending: true, cacheBytes: 0, pictureBytes: 0, scratchBytes: 0, wasmBytes: 0, lost: false, busy: false };
 
 type Link = { worker: Worker; canvas: HTMLCanvasElement };
 
@@ -24,9 +23,7 @@ function linkOf(canvas: HTMLCanvasElement): { link: Link; offscreen?: OffscreenC
 function workerAttached(worker: Worker, groups: Set<string>, side: number): Attached {
   const fit = pictureSize(side);
   let calls: Call[] = [];
-  let sent = 0;
-  let acked = 0;
-  let stats = IDLE_STATS;
+  const ledger = new FrameLedger();
   let flushing = false;
   let posterId = 0;
   const posters = new Map<number, (bytes: Uint8Array | null) => void>();
@@ -64,11 +61,10 @@ function workerAttached(worker: Worker, groups: Set<string>, side: number): Atta
   worker.addEventListener('message', (event: MessageEvent<WorkerOut>) => {
     const m = event.data;
     if (m.kind === FromWorker.Framed) {
-      acked += m.frames;
+      ledger.answered(m.frames, m.stats);
       if (m.why) {
         console.warn('[core] render worker call failed', m.why);
       }
-      stats = m.stats;
       return;
     }
     if (m.kind === FromWorker.Poster) {
@@ -77,7 +73,7 @@ function workerAttached(worker: Worker, groups: Set<string>, side: number): Atta
       return;
     }
     if (m.kind === FromWorker.Failed) {
-      stats = { ...stats, lost: true };
+      ledger.lost();
     }
   });
 
@@ -91,9 +87,9 @@ function workerAttached(worker: Worker, groups: Set<string>, side: number): Atta
     set_live_overlay: (items) => call('set_live_overlay', items),
     frame: (now) => {
       call('frame', now);
-      sent++;
+      ledger.sent();
       flush(1);
-      return stats.outcome;
+      return ledger.stats().outcome;
     },
     picture,
     put_group: (key, list) => (kept(key), call('put_group', key, list)),
@@ -109,15 +105,15 @@ function workerAttached(worker: Worker, groups: Set<string>, side: number): Atta
       return true;
     },
     drop_group: (key) => (groups.delete(key), call('drop_group', key)),
-    cache_pending: () => stats.pending || sent > acked,
-    cache_bytes: () => stats.cacheBytes,
-    scratch_bytes: () => stats.scratchBytes,
-    picture_bytes: () => stats.pictureBytes,
+    cache_pending: () => ledger.pending(),
+    cache_bytes: () => ledger.stats().cacheBytes,
+    scratch_bytes: () => ledger.stats().scratchBytes,
+    picture_bytes: () => ledger.stats().pictureBytes,
     forget_picture: (clip) => {
       pictures = pictures.then(() => post({ kind: ToWorker.Calls, calls: [{ name: 'forget_picture', args: [clip] }], frames: 0 }));
     },
-    lost: () => stats.lost,
-    busy: () => sent - acked >= MAX_IN_FLIGHT || stats.busy,
+    lost: () => ledger.stats().lost,
+    busy: () => ledger.busy(),
     set_motion: (motion) => call('set_motion', motion),
     set_budget: (bytes) => call('set_budget', bytes),
     set_tiles: (on) => call('set_tiles', on),
