@@ -65,11 +65,23 @@ const BATCH_MAX = 100;
 
 const answered = (body: FrameDoc): Response => ({ ok: true, status: HTTP_OK, json: async () => body }) as unknown as Response;
 
+const paramOf = (url: string, name: string) => new URLSearchParams(url.split('?')[1] ?? '').get(name);
+
+function batchUrl(base: string, waiting: Waiting[]): string {
+  const byId = new Map(waiting.map((w) => [w.id, w.url]));
+  const ids = [...byId.keys()];
+  const at = [...byId.values()].map((u) => paramOf(u, 'revision'));
+  const orgs = new Set([...byId.values()].map((u) => paramOf(u, 'org')));
+  const org = orgs.size === 1 ? [...orgs][0] : null;
+  const held = at.every(Boolean) && org ? `&at=${at.join(',')}&org=${org}` : '';
+  return `${base}/sources?ids=${ids.join(',')}${held}`;
+}
+
 function frameBatcher(fetcher: Fetcher): Fetcher {
   const queues = new Map<string, Waiting[]>();
 
   const ask = async (base: string, waiting: Waiting[]) => {
-    const batch = await fetcher(`${base}/sources?ids=${[...new Set(waiting.map((w) => w.id))].join(',')}`)
+    const batch = await fetcher(batchUrl(base, waiting))
       .then((res) => (res.ok ? (res.json() as Promise<Batch>) : null))
       .catch(() => null);
 
