@@ -30,7 +30,7 @@ const ROUTES: { route: LocalRoute; matches: (path: string, canvas: string) => bo
   { route: LocalRoute.Canvas, matches: (path, canvas) => path === canvas || path.startsWith(`${canvas}/`) },
   { route: LocalRoute.Api, matches: (path) => path.startsWith('/api/v1/') },
   { route: LocalRoute.Local, matches: (path) => path.startsWith('/local/') },
-  { route: LocalRoute.Runtime, matches: (path) => ['/motion-runtime', '/motion-libs', '/motion-env', '/render', '/embed.js'].some((p) => path === p || path.startsWith(`${p}/`)) },
+  { route: LocalRoute.Runtime, matches: (path) => ['/motion-runtime', '/motion-libs', '/motion-env', '/render', '/embed.js', '/motion-player.js'].some((p) => path === p || path.startsWith(`${p}/`)) },
   { route: LocalRoute.Home, matches: (path) => path === '/' || path.startsWith('/p/') || path.startsWith('/app') || path === '/login' }
 ];
 
