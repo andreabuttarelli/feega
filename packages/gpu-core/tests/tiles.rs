@@ -286,3 +286,16 @@ fn zooming_out_over_sharper_tiles_needs_no_raster_during_the_gesture() {
 
     assert!(tiles.covered_within(key, NEAR_STEPS));
 }
+
+#[test]
+fn a_changed_tile_on_screen_is_queued_to_raster_again_even_while_it_still_shows() {
+    let mut tiles = Tiles::default();
+    let keys = tiles.frame(camera(1.0), SCREEN).missing;
+    keys.iter().for_each(|k| tiles.hold(*k));
+    tiles.invalidate(keys[0].world());
+
+    let queue = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing);
+
+    assert!(queue.stale.contains(&keys[0]));
+    assert!(queue.blank.is_empty() && queue.blurry.is_empty());
+}
