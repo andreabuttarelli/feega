@@ -24,3 +24,9 @@ and the app already preloads page data on link hover, so hovering a
 canvas link fetches its sources too. Not cancelled on leave, posters not
 prefetched. A/B at 4x CPU, 2 cold runs: reveal 2.3 s → 6.0 s (the old
 one showed white placeholders), all on-screen content 7.3 s → 6.7 s.
+
+Bar moved under the wordmark (180px, full radius) with a smooth gradient
+across the flag colours. A static splash in `app.html` (inline CSS, shown
+only on `/p/*/c/*` by an inline path check, removed after 10 s as a
+guard) paints the wordmark and empty bar with the first paint, before
+any JS; `CanvasLoading` mounts in the same place and removes it.

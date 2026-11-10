@@ -28,7 +28,7 @@ describe('nextFlag', () => {
 });
 
 describe('flagGradient', () => {
-  it('draws white stripes light grey so they show on the white loading screen', () => {
-    expect(flagGradient(['#FFFFFF', '#000000'])).toBe('linear-gradient(to right, #ECECEC 0% 50%, #000000 50% 100%)');
+  it('blends the stripes smoothly, white drawn light grey on the white loading screen', () => {
+    expect(flagGradient(['#FFFFFF', '#000000', '#FF0000'])).toBe('linear-gradient(to right, #ECECEC 0%, #000000 50%, #FF0000 100%)');
   });
 });

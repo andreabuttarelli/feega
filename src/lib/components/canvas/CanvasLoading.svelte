@@ -7,6 +7,7 @@
 
   let { content }: { content: CanvasContent } = $props();
 
+  const STATIC_SPLASH = 'canvas-splash';
   const GIVE_UP_MS = 10_000;
   const AFTER_ENGINE_MS = 4000;
 
@@ -18,6 +19,7 @@
   const shown = $derived(progress < 1 && !gaveUp);
 
   onMount(() => {
+    document.getElementById(STATIC_SPLASH)?.remove();
     try {
       gradient = flagGradient(nextFlag(localStorage).stripes);
     } catch {
@@ -76,14 +78,13 @@
 
   .mark {
     --wordmark-size: 40px;
+    line-height: 1;
   }
 
   .track {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 3px;
+    width: 180px;
+    height: 4px;
+    border-radius: var(--ui-radius-full);
     overflow: hidden;
     background: color-mix(in srgb, var(--ink, #111) 10%, transparent);
   }

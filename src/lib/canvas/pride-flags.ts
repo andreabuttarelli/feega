@@ -49,6 +49,6 @@ const WHITE_ON_PAPER = '#ECECEC';
 const onPaper = (colour: string) => (colour.toUpperCase() === WHITE ? WHITE_ON_PAPER : colour);
 
 export function flagGradient(stripes: readonly string[]): string {
-  const step = 100 / stripes.length;
-  return `linear-gradient(to right, ${stripes.map((c, i) => `${onPaper(c)} ${i * step}% ${(i + 1) * step}%`).join(', ')})`;
+  const step = 100 / Math.max(stripes.length - 1, 1);
+  return `linear-gradient(to right, ${stripes.map((c, i) => `${onPaper(c)} ${i * step}%`).join(', ')})`;
 }
