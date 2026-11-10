@@ -1,5 +1,5 @@
 import { AssetKind } from '@feega/motion-core/motion/components';
-import { latestHeads, readHead, type MotionHead } from '$lib/server/repos/motion-revisions';
+import { latestHeads, readHead, readHeads, type MotionHead } from '$lib/server/repos/motion-revisions';
 import { headPointer } from './head-pointer';
 import { listNodesByIds } from '$lib/server/repos/canvas';
 import { motionOf } from '$lib/canvas/motion-node';
@@ -30,15 +30,18 @@ export async function motionSource(scope: MotionScope): Promise<MotionSource | n
   return { revision: head.version, doc: head.doc, assets: await sourceAssets(scope, head.doc) };
 }
 
-type FramesScope = SourceScope & { canvasId: string; nodeIds: string[]; phases?: Phases };
+type FramesScope = SourceScope & { canvasId: string; nodeIds: string[]; held?: Map<string, number>; phases?: Phases };
 
-async function headsOf(scope: FramesScope, phases: Phases): Promise<Map<string, MotionHead>> {
-  const mine = await phases.time('heads', (async () => {
-    const records = await listNodesByIds(scope.db, { orgId: scope.orgId, nodeIds: scope.nodeIds });
-    const frames = records.filter((record) => record.canvasId === scope.canvasId && motionOf(record));
-    return latestHeads(scope.db, { orgId: scope.orgId, frames: frames.map(headPointer) });
-  })());
-  return phases.time('linked', linkedHeads(scope.db, { orgId: scope.orgId, heads: mine }));
+async function ownHeads(scope: FramesScope): Promise<Map<string, MotionHead>> {
+  const held = [...(scope.held ?? [])].map(([nodeId, version]) => ({ nodeId, version }));
+  const [records, read] = await Promise.all([listNodesByIds(scope.db, { orgId: scope.orgId, nodeIds: scope.nodeIds }), readHeads(scope.db, { orgId: scope.orgId, heads: held })]);
+  const pointers = records.filter((record) => record.canvasId === scope.canvasId && motionOf(record)).map(headPointer);
+  const stale = pointers.filter((p) => !p.version || read.get(p.nodeId)?.version !== p.version);
+  const fresh = stale.length ? await latestHeads(scope.db, { orgId: scope.orgId, frames: stale }) : new Map<string, MotionHead>();
+  return new Map(pointers.flatMap((p) => {
+    const head = fresh.get(p.nodeId) ?? read.get(p.nodeId);
+    return head ? [[p.nodeId, head] as const] : [];
+  }));
 }
 
 export type MediaHint = { kind: AssetKind; width: number | null; height: number | null };
@@ -58,10 +61,16 @@ const mediaHints = (assets: MotionAsset[]): Record<string, MediaHint> =>
 
 export async function motionSources(scope: FramesScope): Promise<BatchedSources> {
   const phases = scope.phases ?? serverTiming();
-  const [heads, library] = await Promise.all([headsOf(scope, phases), phases.time('assets', motionAssets(scope))]);
-  const docs = [...heads.values()].map((h) => h.doc);
-  const beyond = [...new Set(docs.flatMap(mentionedIds))].filter((id) => !library.some((a) => a.id === id));
-  const named = await phases.time('named', beyond.length ? namedAssets(scope, beyond) : Promise.resolve([]));
+  const assets = phases.time('assets', motionAssets(scope));
+  const mine = await phases.time('heads', ownHeads(scope));
+  const namedFor = async (docs: MotionDoc[], skip: readonly MotionAsset[]) => {
+    const library = await assets;
+    const beyond = [...new Set(docs.flatMap(mentionedIds))].filter((id) => !library.some((a) => a.id === id) && !skip.some((a) => a.id === id));
+    return beyond.length ? namedAssets(scope, beyond) : [];
+  };
+  const [heads, library, early] = await Promise.all([phases.time('linked', linkedHeads(scope.db, { orgId: scope.orgId, heads: mine })), assets, phases.time('named', namedFor([...mine.values()].map((h) => h.doc), []))]);
+  const late = await namedFor([...heads.values()].map((h) => h.doc), early);
+  const named = [...early, ...late];
   const known = library.map((a) => ({ id: a.id, kind: a.kind, name: a.label }));
 
   const used = new Map<string, MotionAsset>();
