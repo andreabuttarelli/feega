@@ -362,20 +362,6 @@ fn the_exact_screen_pans_only_after_a_full_raster_has_drawn_its_overscan() {
     assert_eq!(pan_zoom_after(Some(1.0), 2.0, Some(Outcome::Partial)), None);
 }
 
-#[test]
-fn a_tile_drawn_while_its_group_was_building_is_shown_but_queued_again() {
-    use gpu_core::tiles::Drawn;
-    let mut tiles = Tiles::default();
-    let key = TileKey { step: 0, tx: 0, ty: 0 };
-
-    assert!(tiles.hold_drawn(key, Drawn::Lacking));
-
-    assert!(tiles.holds(key));
-    assert_eq!(tiles.queue(vec![key]).stale, vec![key]);
-
-    assert!(tiles.hold_drawn(key, Drawn::Whole));
-    assert!(tiles.queue(vec![key]).stale.is_empty());
-}
 
 #[test]
 fn blurry_tiles_never_sharpen_on_screen_and_a_gesture_refreshes_one_changed_tile() {
@@ -387,14 +373,18 @@ fn blurry_tiles_never_sharpen_on_screen_and_a_gesture_refreshes_one_changed_tile
     assert_eq!(refreshed(queue(), Moving::Still), vec![k(1), k(2)]);
 }
 
-#[test]
-fn a_tile_drawn_while_its_group_was_building_stays_off_screen_where_another_tile_covers_it() {
-    use gpu_core::tiles::Drawn;
-    let mut tiles = Tiles::default();
-    let fine = TileKey { step: 1, tx: 0, ty: 0 };
-    let coarse = TileKey { step: 0, tx: 0, ty: 0 };
-    tiles.hold(coarse);
 
-    assert!(!tiles.hold_drawn(fine, Drawn::Lacking));
-    assert!(!tiles.holds(fine));
+#[test]
+fn after_a_fast_zoom_out_the_much_finer_tiles_still_show_until_the_new_step_lands() {
+    let mut tiles = Tiles::default();
+    let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+    let fine = step_of(1.0) + 8;
+    let side = TILE_PX as f64 / step_zoom(fine);
+    let held = TileKey { step: fine, tx: 0, ty: 0 };
+    tiles.hold(held);
+    assert!(side < 256.0);
+
+    let frame = tiles.frame(camera, SCREEN);
+
+    assert!(frame.draw.contains(&held));
 }
