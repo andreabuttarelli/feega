@@ -99,3 +99,12 @@ BENCH_CASE=load BENCH_BUILDS=base=../dazero-base,fix=. npx playwright test -c te
 measures this checkout. An entry may carry its own query (`off=.?coreTiles=0,on=.?coreTiles=1`) to
 compare one build with a switch off and on. The spec fails when a frame is still blank in a
 screenshot taken more than a frame after its vectors were drawn (`shownLate`). `BENCH_RECORD=1` saves a video per case.
+
+## Debug log
+
+Off by default. Add `?debug` to the canvas URL, or run `localStorage.setItem('feega:debug', '1')`
+and reload, to print every load and render step to the browser console with the `[feega]` prefix,
+a time from navigation start and an area tag: `[startup]` `[sources]` `[build]` `[upload]`
+`[raster]` `[images]` `[posters]` `[camera]`. Sources lines carry bytes, ms and Server-Timing
+phases; `[camera]` lines mark gesture start/end and any frame over 32 ms with the gesture name.
+Nothing is subscribed or built when off.
