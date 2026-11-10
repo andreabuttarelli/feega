@@ -168,7 +168,7 @@ enum Reuse {
     Cleared,
 }
 
-const BUFFERS_PER_KIND: usize = 2;
+const BUFFERS_PER_KIND: usize = 16;
 const POOLED_IMAGES: usize = 8;
 const CACHED_BIND_GROUPS: usize = 512;
 

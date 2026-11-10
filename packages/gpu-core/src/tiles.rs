@@ -54,6 +54,7 @@ impl TileKey {
 }
 
 pub const BATCH_TILES: i64 = 2;
+pub const BAKE_BATCH_TILES: i64 = 3;
 
 pub struct Batch {
     pub step: i32,
@@ -83,10 +84,18 @@ impl Batch {
 }
 
 pub fn batches(missing: &[TileKey]) -> Vec<Batch> {
+    batches_of(missing, BATCH_TILES)
+}
+
+pub fn bake_batches(missing: &[TileKey]) -> Vec<Batch> {
+    batches_of(missing, BAKE_BATCH_TILES)
+}
+
+fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
     let mut out: Vec<Batch> = Vec::new();
     let mut at: rustc_hash::FxHashMap<(i32, i64, i64), usize> = Default::default();
     for key in missing {
-        let block = (key.step, key.tx.div_euclid(BATCH_TILES), key.ty.div_euclid(BATCH_TILES));
+        let block = (key.step, key.tx.div_euclid(side), key.ty.div_euclid(side));
         let index = *at.entry(block).or_insert_with(|| {
             out.push(Batch { step: key.step, keys: Vec::new() });
             out.len() - 1
