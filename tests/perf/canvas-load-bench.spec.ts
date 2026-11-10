@@ -48,7 +48,8 @@ const HOTSPOTS = 25;
 
 const builds = (): Build[] =>
   (process.env.BENCH_BUILDS ?? `this=${resolve('.')}`).split(',').map((pair, i) => {
-    const [name, at] = pair.split('=');
+    const name = pair.slice(0, pair.indexOf('='));
+    const at = pair.slice(pair.indexOf('=') + 1);
     const [root, query] = at.split('?');
     return { name, root: resolve(root), query: query ? `?${query}` : (process.env.BENCH_QUERY ?? ''), port: FIRST_PORT + i };
   });
