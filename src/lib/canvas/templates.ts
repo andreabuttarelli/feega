@@ -3,6 +3,7 @@ import type { ConnectorType } from './connectors';
 import type { DuplicatePlan } from './duplicate-plan';
 import { NANO_BANANA_2_MODEL, SEEDREAM_5_LITE_MODEL } from '$lib/image-models';
 import { DEFAULT_MODEL } from './default-models';
+import { canvasAddedOn } from './template-added';
 import { nodeSize } from './node-size';
 import { PLACEMENT_GAP } from './placement';
 import { DEFAULT_MODEL3D_MODEL } from '$lib/model3d-models';
@@ -465,10 +466,8 @@ export function templateById(id: string): CanvasTemplate | undefined {
 }
 
 export function templatesIn(filter: TemplateFilter): CanvasTemplate[] {
-  if (filter === ALL_TEMPLATES) {
-    return CANVAS_TEMPLATES;
-  }
-  return CANVAS_TEMPLATES.filter((t) => t.category === filter);
+  const listed = filter === ALL_TEMPLATES ? CANVAS_TEMPLATES : CANVAS_TEMPLATES.filter((t) => t.category === filter);
+  return [...listed].sort((a, b) => canvasAddedOn(b.id).localeCompare(canvasAddedOn(a.id)));
 }
 
 export function templateThumbnail(template: CanvasTemplate): string {
