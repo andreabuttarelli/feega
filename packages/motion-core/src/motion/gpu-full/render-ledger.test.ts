@@ -17,6 +17,19 @@ describe('FrameLedger', () => {
     expect(ledger.pending()).toBe(false);
   });
 
+  it('stays pending after a partial frame, until a frame finishes', () => {
+    const ledger = new FrameLedger();
+    ledger.sent();
+    ledger.answered(1, { ...settled, outcome: 'partial' });
+
+    expect(ledger.pending()).toBe(true);
+
+    ledger.sent();
+    ledger.answered(1, { ...settled, outcome: 'full' });
+
+    expect(ledger.pending()).toBe(false);
+  });
+
   it('clears busy once the worker re-reports a drained GPU', () => {
     const ledger = new FrameLedger();
     ledger.sent();

@@ -1,7 +1,8 @@
+import { Outcome } from './core-outcome';
 import type { Stats } from './render-wire';
 
 const MAX_IN_FLIGHT = 2;
-const UNANSWERED: Stats = { outcome: 'reused', pending: true, cacheBytes: 0, pictureBytes: 0, scratchBytes: 0, wasmBytes: 0, lost: false, busy: false };
+const UNANSWERED: Stats = { outcome: Outcome.Reused, pending: true, cacheBytes: 0, pictureBytes: 0, scratchBytes: 0, wasmBytes: 0, lost: false, busy: false };
 
 export class FrameLedger {
   #sent = 0;
@@ -26,7 +27,7 @@ export class FrameLedger {
   }
 
   pending(): boolean {
-    return this.#stats.pending || this.#sent > this.#acked;
+    return this.#stats.pending || this.#stats.outcome === Outcome.Partial || this.#sent > this.#acked;
   }
 
   busy(): boolean {
