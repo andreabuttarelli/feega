@@ -53,7 +53,7 @@ pub enum Ramp {
     Radial,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Cover {
     Path {

@@ -129,3 +129,22 @@ mod pixels {
         assert!(off.len() <= EDGE_PIXELS_ALLOWED, "{} pixels differ", off.len());
     }
 }
+
+#[test]
+fn neighbours_clipped_by_the_same_box_share_one_clip() {
+    let item = |y: u32| {
+        format!(
+            r#"{{ "kind": "path", "clip": "sq", "contours": [[0, {y}, 8, {y}, 8, {}, 0, {}]], "rule": "nonzero",
+    "paint": {{ "kind": "solid", "color": [1, 1, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "masks": [{}] }}"#,
+            y + 4,
+            y + 4,
+            mask("intersect", "")
+        )
+    };
+    let list = parse(&format!(r#"{{ "width": 64, "height": 64, "background": null, "items": [{}, {}, {}] }}"#, item(0), item(8), item(16))).unwrap();
+    let mut canvas = Counting::default();
+
+    build_into(&mut canvas, &list, &Shelf::new(), &Layers::new());
+
+    assert_eq!((canvas.clips, canvas.pops, canvas.fills), (1, 1, 3));
+}
