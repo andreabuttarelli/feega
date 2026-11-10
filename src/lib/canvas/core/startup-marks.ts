@@ -1,4 +1,5 @@
 const PREFIX = 'startup|';
+export const STARTUP_EVENT = 'feega:startup';
 
 export enum StartupStep {
   PageData = 'page-data',
@@ -33,6 +34,7 @@ export function markStartup(step: StartupStep) {
     return;
   }
   performance.mark(`${PREFIX}${step}`);
+  globalThis.dispatchEvent?.(new CustomEvent(STARTUP_EVENT, { detail: step }));
 }
 
 export function startupMarks(marks: readonly Mark[]): StartupMark[] {
