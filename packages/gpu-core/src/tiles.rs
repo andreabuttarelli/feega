@@ -295,6 +295,15 @@ impl Rest {
         Rest { camera, screen, todo, lacking: false }
     }
 
+    pub fn first(mut self, ahead: impl Fn(Rect) -> bool) -> Rest {
+        self.todo.sort_by_key(|r| !ahead(*r));
+        self
+    }
+
+    pub fn camera(&self) -> Camera {
+        self.camera
+    }
+
     pub fn shows(&self, camera: Camera, screen: (u32, u32)) -> bool {
         self.camera == camera && self.screen == screen
     }

@@ -1,6 +1,6 @@
 use gpu_core::retained::Camera;
 use gpu_core::tiles::{NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
-use vello::kurbo::Rect;
+use vello::kurbo::{Point, Rect};
 
 const SCREEN: (u32, u32) = (1024, 768);
 
@@ -348,4 +348,19 @@ fn idle_baking_rasters_bigger_blocks_than_a_gesture() {
     assert_eq!(baked.iter().map(|b| b.keys.len()).sum::<usize>(), missing.len());
     assert!(baked.len() < batches(&missing).len());
     assert!(baked.iter().all(|b| b.keys.len() <= (BAKE_BATCH_TILES * BAKE_BATCH_TILES) as usize));
+}
+
+#[test]
+fn a_rest_can_put_the_blocks_that_matter_first_keeping_the_rest_nearest_the_centre() {
+    let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+    let screen = (1024, 512);
+    let left_edge = |r: Rect| r.x0 == 0.0;
+
+    let rest = Rest::new(camera, screen).first(left_edge);
+
+    let lefts = rest.todo().iter().take_while(|r| left_edge(**r)).count();
+    assert_eq!(lefts, rest.todo().iter().filter(|r| left_edge(**r)).count());
+    assert_eq!(rest.camera(), camera);
+    let after = &rest.todo()[lefts..];
+    assert!(after.windows(2).all(|w| w[0].center().distance(Point::new(512.0, 256.0)) <= w[1].center().distance(Point::new(512.0, 256.0)) + 1e-9));
 }

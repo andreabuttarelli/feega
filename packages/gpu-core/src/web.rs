@@ -37,6 +37,8 @@ const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
 const TILE_BUDGET_STILL_MS: f64 = 12.0;
 const SPARE_TILES: usize = 32;
 const REST_AFTER_MS: f64 = 200.0;
+const SHARP_STRETCH: f64 = 1.25;
+const ZOOMING_MS: f64 = 150.0;
 const EVICT_DOWN_TO_PERCENT: usize = 90;
 
 #[wasm_bindgen]
@@ -77,6 +79,8 @@ pub struct WebCore {
     reprojector: Reprojector,
     lost: Arc<AtomicBool>,
     in_flight: Arc<AtomicU32>,
+    zoom_seen: f64,
+    zoom_moved_at: f64,
     scratch: Option<wgpu::Texture>,
     motion: CoreMotion,
     rastered_at: f64,
@@ -111,6 +115,27 @@ struct GpuPainter<'a> {
     spare: &'a mut wgpu::Texture,
     reprojector: &'a mut Reprojector,
     scratch: &'a mut Option<wgpu::Texture>,
+    sharper: Sharper<'a>,
+}
+
+struct Sharper<'a> {
+    camera: Camera,
+    rest: Option<Camera>,
+    blocks: &'a [(Rect, wgpu::Texture)],
+}
+
+impl Sharper<'_> {
+    fn tiles(&self, screen: Rect) -> Vec<Tile<'_>> {
+        let Some(r) = self.rest else { return Vec::new() };
+        let c = self.camera;
+        let scale = r.zoom / c.zoom;
+        let shown = |q: f64, from: f64, to: f64| (q - from) / r.zoom * c.zoom + to;
+        self.blocks.iter().filter_map(|(block, source)| {
+            let on = Rect::new(shown(block.x0, r.x, c.x), shown(block.y0, r.y, c.y), shown(block.x1, r.x, c.x), shown(block.y1, r.y, c.y));
+            let within = Rect::new(on.x0.ceil(), on.y0.ceil(), on.x1.floor(), on.y1.floor()).intersect(screen);
+            (within.area() > 0.0).then(|| Tile { source, look: Lookup { scale, x: r.x - block.x0 - c.x * scale, y: r.y - block.y0 - c.y * scale }, within })
+        }).collect()
+    }
 }
 
 fn scratch_of<'s>(device: &wgpu::Device, kept: &'s mut Option<wgpu::Texture>, (width, height): (u32, u32)) -> &'s wgpu::Texture {
@@ -232,6 +257,9 @@ impl Painter for GpuPainter<'_> {
         let out = frame.texture.create_view(&wgpu::TextureViewDescriptor { format: Some(self.format), ..Default::default() });
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         self.reprojector.draw(self.device, self.queue, &mut encoder, Draw { source: self.retained, target: &out, format: self.format, look, within: None, output: Output::Premultiplied });
+        let screen = Rect::new(0.0, 0.0, frame.texture.width() as f64, frame.texture.height() as f64);
+        let sharper = self.sharper.tiles(screen);
+        self.reprojector.draw_tiles(self.device, self.queue, &mut encoder, &out, self.format, Output::Premultiplied, &sharper);
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(())
@@ -320,7 +348,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -729,8 +757,15 @@ impl WebCore {
             return Ok(report);
         }
         self.drew_tiles = false;
+        if self.camera.zoom != self.zoom_seen {
+            self.zoom_seen = self.camera.zoom;
+            self.zoom_moved_at = now_ms;
+        }
+        if !self.tiled {
+            self.sharpen(moving || now_ms - self.zoom_moved_at < ZOOMING_MS)?;
+        }
         let limits = self.frame_limits(now_ms);
-        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch };
+        let mut painter = GpuPainter { device: &self.device, queue: &self.queue, surface: &self.surface, format: self.format, engine: &mut self.engine, pictures: &self.pictures, cached: &mut self.cached, limits, retained: &mut self.retained, spare: &mut self.spare, reprojector: &mut self.reprojector, scratch: &mut self.scratch, sharper: Sharper { camera: self.camera, rest: self.rest.as_ref().map(Rest::camera), blocks: &self.rest_shown } };
         let timed = self.gpu_full_ms.swap(NOT_TIMED, Ordering::Relaxed);
         if timed != NOT_TIMED {
             self.compositor.gpu_took(f64::from_bits(timed));
@@ -759,6 +794,49 @@ impl WebCore {
             self.pending |= !idle;
         }
         Ok(frame.report())
+    }
+
+    fn sharpen(&mut self, moving: bool) -> Result<(), JsValue> {
+        if !moving {
+            if self.rest.is_some() {
+                self.forget_rest();
+            }
+            return Ok(());
+        }
+        let screen = (self.target.width(), self.target.height());
+        let c = Camera { x: self.camera.x.round(), y: self.camera.y.round(), zoom: self.camera.zoom };
+        let drifted = self.rest.as_ref().is_none_or(|r| {
+            let s = c.zoom / r.camera().zoom;
+            !(1.0 / SHARP_STRETCH..=SHARP_STRETCH).contains(&s)
+        });
+        if drifted {
+            self.forget_rest();
+            let compositor = &self.compositor;
+            self.rest = Some(Rest::new(c, screen).first(|r| !compositor.shows_sharp(c, r)));
+        }
+        if self.in_flight.load(Ordering::Relaxed) > 0 {
+            self.pending = true;
+            return Ok(());
+        }
+        let r = self.rest.as_ref().expect("rest started").camera();
+        while let Some(block) = self.rest.as_mut().and_then(Rest::next) {
+            let shown = |q: f64, from: f64, to: f64| (q - from) / r.zoom * c.zoom + to;
+            let now = Rect::new(shown(block.x0, r.x, c.x), shown(block.y0, r.y, c.y), shown(block.x1, r.x, c.x), shown(block.y1, r.y, c.y));
+            if self.compositor.shows_sharp(c, now) {
+                continue;
+            }
+            let size = (block.width() as u32, block.height() as u32);
+            let plan = self.compositor.plan_at(&mut self.library, Camera { x: r.x - block.x0, y: r.y - block.y0, zoom: r.zoom }, size, self.limits);
+            let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+            let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
+            let texture = self.rest_spare.get_mut(&size).and_then(Vec::pop).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
+            self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+            self.rest_shown.push((block, texture));
+            self.compositor.reshow();
+            self.pending = true;
+            break;
+        }
+        Ok(())
     }
 
     fn tiles_show_all(&self) -> bool {

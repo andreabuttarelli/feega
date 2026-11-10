@@ -13,6 +13,7 @@ const TOO_MANY_RECTS: usize = 32;
 const AA_PX: f64 = 1.0;
 const EPSILON: f64 = 1e-6;
 const ROUGH_SCALE: f64 = 0.5;
+const SHARP_STRETCH: f64 = 1.25;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
@@ -132,6 +133,7 @@ pub struct Retained {
     zoom_seen: f64,
     zoom_moved_at: f64,
     gesturing: bool,
+    deferred: bool,
     full_ms: f64,
     gpu_ms: f64,
 }
@@ -195,7 +197,7 @@ pub fn tiles(rect: Rect, width: u32, height: u32) -> Vec<Rect> {
 impl Retained {
     pub fn new(width: u32, height: u32) -> Self {
         let overscan = (width.min(height) / OVERSCAN_SHARE).min(OVERSCAN_MAX);
-        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, gesturing: false, full_ms: 0.0, gpu_ms: 0.0 }
+        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, gesturing: false, deferred: false, full_ms: 0.0, gpu_ms: 0.0 }
     }
 
     pub fn overscan(&self) -> u32 {
@@ -246,6 +248,17 @@ impl Retained {
         let scale = h.zoom / c.zoom;
         let o = self.overscan as f64;
         Lookup { scale, x: h.x + o - c.x * scale, y: h.y + o - c.y * scale }
+    }
+
+    pub fn shows_sharp(&self, camera: Camera, region: Rect) -> bool {
+        let Some(held) = self.held else { return false };
+        let look = self.lookup(camera);
+        if 1.0 / (look.scale * held.quality.scale()) > SHARP_STRETCH {
+            return false;
+        }
+        let (w, h) = self.size();
+        let texels = Rect::new(region.x0 * look.scale + look.x, region.y0 * look.scale + look.y, region.x1 * look.scale + look.x, region.y1 * look.scale + look.y);
+        texels.x0 >= -EPSILON && texels.y0 >= -EPSILON && texels.x1 <= w as f64 + EPSILON && texels.y1 <= h as f64 + EPSILON
     }
 
     fn covers(&self, camera: Camera) -> bool {
@@ -299,6 +312,10 @@ impl Retained {
         Step::Present
     }
 
+    pub fn reshow(&mut self) {
+        self.shown = None;
+    }
+
     pub fn set_gesture(&mut self, on: bool) {
         self.gesturing = on;
     }
@@ -313,6 +330,15 @@ impl Retained {
         let Some(held) = self.held else {
             return self.full(c, Quality::Sharp);
         };
+        let damaged_any = !matches!(&damage, Damage::Rects(r) if r.is_empty());
+        if gesture && self.cost() > LIVE_FULL_MS && damaged_any {
+            self.deferred = true;
+            return self.present(c);
+        }
+        if !gesture && self.deferred {
+            self.deferred = false;
+            return self.full(c, self.refined());
+        }
         let Damage::Rects(damaged) = damage else {
             return self.full(c, Quality::Sharp);
         };

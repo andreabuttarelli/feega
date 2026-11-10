@@ -275,3 +275,41 @@ fn a_gesture_in_progress_keeps_presenting_when_frames_arrive_slower_than_the_zoo
     r.set_gesture(false);
     assert!(matches!(rendered(&mut r, at(0.0, 0.0, 2.0), 1100.0), Step::Raster(_)));
 }
+
+#[test]
+fn the_held_picture_shows_a_region_sharp_only_where_it_covers_it_within_a_quarter_stretch() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    let middle = Rect::new(300.0, 200.0, 500.0, 400.0);
+    let corner = Rect::new(0.0, 0.0, 100.0, 100.0);
+
+    assert!(r.shows_sharp(at(0.0, 0.0, 1.2), middle));
+    assert!(!r.shows_sharp(at(0.0, 0.0, 1.3), middle));
+    assert!(r.shows_sharp(at(200.0, 150.0, 0.5), middle));
+    assert!(!r.shows_sharp(at(200.0, 150.0, 0.5), corner));
+}
+
+#[test]
+fn a_reshow_presents_again_at_an_unchanged_camera() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.0), 16.0), Step::Idle));
+
+    r.reshow();
+
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.0), 32.0), Step::Present));
+}
+
+#[test]
+fn damage_during_a_zoom_gesture_on_a_slow_screen_waits_for_rest() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(40.0);
+    r.set_gesture(true);
+
+    assert!(matches!(r.step(at(0.0, 0.0, 1.5), Damage::All, 16.0), Step::Present));
+    assert!(matches!(r.step(at(0.0, 0.0, 1.6), Damage::Rects(vec![Rect::new(0.0, 0.0, 10.0, 10.0)]), 32.0), Step::Present));
+
+    r.set_gesture(false);
+    assert_eq!(outcome(&rendered(&mut r, at(0.0, 0.0, 1.6), 400.0)), Some(Outcome::Full));
+}

@@ -96,6 +96,14 @@ impl Compositor {
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
+    pub fn shows_sharp(&self, camera: Camera, region: Rect) -> bool {
+        self.retained.shows_sharp(camera, region)
+    }
+
+    pub fn reshow(&mut self) {
+        self.retained.reshow();
+    }
+
     pub fn set_gesture(&mut self, on: bool) {
         self.retained.set_gesture(on);
     }
