@@ -240,6 +240,10 @@ impl Retained {
         self.zoom_moved_at = now_ms - ZOOM_IDLE_MS;
     }
 
+    pub fn look(&self, camera: Camera) -> Option<Lookup> {
+        self.held.map(|_| self.lookup(camera))
+    }
+
     pub fn lookup(&self, camera: Camera) -> Lookup {
         let c = camera.snapped();
         let h = self.held.map_or(c, |h| h.camera);

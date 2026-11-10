@@ -313,7 +313,7 @@ fn tiles_warm_only_after_a_second_without_rasters_or_uploads() {
 #[test]
 fn a_lift_without_a_camera_move_draws_from_tiles() {
     use gpu_core::tiles::{path_for, Moment, Path};
-    let still = Moment { gesture: false, lifting: false, settling: false };
+    let still = Moment { gesture: false, panning: false, lifting: false, settling: false };
 
     assert_eq!(path_for(still), Path::Exact);
     assert_eq!(path_for(Moment { lifting: true, ..still }), Path::Tiles);
@@ -338,4 +338,54 @@ fn a_rest_picture_with_a_block_drawn_while_a_group_was_building_is_not_adopted()
     whole.next();
     whole.drew(Drawn::Whole);
     assert!(whole.adoptable());
+}
+
+#[test]
+fn a_pan_from_the_exact_screen_stays_exact_and_a_zoom_goes_to_tiles() {
+    use gpu_core::tiles::{path_for, Moment, Path};
+    let zoom = Moment { gesture: true, panning: false, lifting: false, settling: false };
+
+    assert_eq!(path_for(zoom), Path::Tiles);
+    assert_eq!(path_for(Moment { panning: true, ..zoom }), Path::Exact);
+    assert_eq!(path_for(Moment { panning: true, lifting: true, ..zoom }), Path::Tiles);
+}
+
+#[test]
+fn the_exact_screen_pans_only_after_a_full_raster_has_drawn_its_overscan() {
+    use gpu_core::retained::Outcome;
+    use gpu_core::tiles::pan_zoom_after;
+
+    assert_eq!(pan_zoom_after(None, 1.0, Some(Outcome::Reused)), None);
+    assert_eq!(pan_zoom_after(None, 1.0, Some(Outcome::Partial)), None);
+    assert_eq!(pan_zoom_after(None, 1.0, Some(Outcome::Full)), Some(1.0));
+    assert_eq!(pan_zoom_after(Some(1.0), 1.0, Some(Outcome::Partial)), Some(1.0));
+    assert_eq!(pan_zoom_after(Some(1.0), 2.0, Some(Outcome::Partial)), None);
+}
+
+
+#[test]
+fn a_gesture_rasters_tiles_only_covered_from_far_away_and_rest_rasters_every_blurry_one() {
+    use gpu_core::tiles::{refreshed, Moving, Queue};
+    let k = |tx: i64| TileKey { step: 0, tx, ty: 0 };
+    let queue = || Queue { blank: vec![k(0)], stale: vec![k(1), k(2)], blurry: vec![k(3), k(4)] };
+    let far = [k(4)];
+
+    assert_eq!(refreshed(queue(), &far, Moving::Gesture), vec![k(1), k(4)]);
+    assert_eq!(refreshed(queue(), &far, Moving::Still), vec![k(1), k(2), k(3), k(4)]);
+}
+
+
+#[test]
+fn after_a_fast_zoom_out_the_much_finer_tiles_still_show_until_the_new_step_lands() {
+    let mut tiles = Tiles::default();
+    let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+    let fine = step_of(1.0) + 8;
+    let side = TILE_PX as f64 / step_zoom(fine);
+    let held = TileKey { step: fine, tx: 0, ty: 0 };
+    tiles.hold(held);
+    assert!(side < 256.0);
+
+    let frame = tiles.frame(camera, SCREEN);
+
+    assert!(frame.draw.contains(&held));
 }

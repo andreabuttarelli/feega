@@ -304,3 +304,13 @@ fn a_picture_built_elsewhere_is_adopted_so_the_next_change_rasters_only_its_dama
     let damaged = r.step(camera, Damage::Rects(vec![Rect::new(0.0, 0.0, 10.0, 10.0)]), 1016.0);
     assert_eq!(outcome(&damaged), Some(Outcome::Partial));
 }
+
+#[test]
+fn the_held_picture_can_underlay_tiles_only_once_something_is_held() {
+    let mut r = Retained::new(W, H);
+    assert!(r.look(at(0.0, 0.0, 1.0)).is_none());
+
+    r.adopt(at(0.0, 0.0, 1.0), 0.0);
+
+    assert!(r.look(at(10.0, 0.0, 2.0)).is_some());
+}

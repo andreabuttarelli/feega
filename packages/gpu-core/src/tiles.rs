@@ -16,7 +16,7 @@ pub fn tiles_kept((w, h): (u32, u32), budget: u64) -> usize {
 const STEPS_PER_DOUBLING: f64 = 4.0;
 const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
-const FINER_STEPS: i32 = 4;
+const FINER_STEPS: i32 = 40;
 pub const NEAR_STEPS: i32 = 4;
 const AHEAD_RING: f64 = 0.5;
 const RESERVE_STEPS_DOWN: i32 = 8;
@@ -135,13 +135,21 @@ impl Tiles {
         let mut missing: Vec<TileKey> = keys_over(world, step).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
         missing.sort_by(|a, b| distance(a).total_cmp(&distance(b)));
         let fallback: Vec<i32> = if missing.is_empty() { vec![] } else { (step - COARSER_STEPS..step).chain((step + 1..=step + FINER_STEPS).rev()).collect() };
-        let whole = |s: i32| keys_over(world, s).iter().all(|k| self.held.contains(k));
+        let whole = |s: i32| self.whole_over(world, s);
         let shown = if missing.is_empty() { Some(step) } else { ((step + 1..=step + FINER_STEPS).chain((step - COARSER_STEPS..step).rev())).find(|s| whole(*s)) };
         let draw = match shown {
             Some(top) => fallback.into_iter().filter(|s| *s < top).chain([top]).flat_map(|s| self.held_over(world, s)).collect(),
             None => fallback.into_iter().chain([step]).flat_map(|s| self.held_over(world, s)).collect(),
         };
         TileFrame { draw, missing }
+    }
+
+    fn whole_over(&self, world: Rect, step: i32) -> bool {
+        let side = TILE_PX as f64 / step_zoom(step);
+        if (world.width() / side).ceil() * (world.height() / side).ceil() > self.held.len() as f64 {
+            return false;
+        }
+        keys_over(world, step).iter().all(|k| self.held.contains(k))
     }
 
     fn held_over(&self, world: Rect, step: i32) -> Vec<TileKey> {
@@ -169,7 +177,7 @@ impl Tiles {
         let world = key.world();
         let coarser = key.step - steps..key.step;
         let finer = key.step + 1..=key.step + steps.min(FINER_STEPS);
-        coarser.chain(finer).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
+        coarser.chain(finer).any(|step| self.whole_over(world, step))
     }
 
     pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
@@ -186,6 +194,7 @@ impl Tiles {
         self.held.insert(key);
         self.stale.remove(&key);
     }
+
 
     pub fn holds(&self, key: TileKey) -> bool {
         self.held.contains(&key)
@@ -338,13 +347,40 @@ pub enum Path {
 #[derive(Clone, Copy)]
 pub struct Moment {
     pub gesture: bool,
+    pub panning: bool,
     pub lifting: bool,
     pub settling: bool,
 }
 
 pub fn path_for(m: Moment) -> Path {
-    if m.gesture || m.lifting || m.settling {
+    if m.lifting {
+        return Path::Tiles;
+    }
+    if m.gesture && m.panning {
+        return Path::Exact;
+    }
+    if m.gesture || m.settling {
         return Path::Tiles;
     }
     Path::Exact
+}
+
+pub fn pan_zoom_after(before: Option<f64>, zoom: f64, outcome: Option<crate::retained::Outcome>) -> Option<f64> {
+    if outcome == Some(crate::retained::Outcome::Full) {
+        return Some(zoom);
+    }
+    before.filter(|z| *z == zoom)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Moving {
+    Gesture,
+    Still,
+}
+
+pub fn refreshed(queue: Queue, far: &[TileKey], moving: Moving) -> Vec<TileKey> {
+    if moving == Moving::Still {
+        return queue.stale.into_iter().chain(queue.blurry).collect();
+    }
+    queue.stale.into_iter().take(1).chain(queue.blurry.into_iter().filter(|k| far.contains(k))).collect()
 }
