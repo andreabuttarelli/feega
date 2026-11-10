@@ -1,6 +1,8 @@
 import { PropFormat } from '../../custom/component';
 import { SnapcnCategory, type SnapcnPort } from '../model';
 
+const EMPTY_SCREENS = 5;
+
 export const PORT: SnapcnPort = {
   id: 'phone-stack',
   title: 'Phone stack',
@@ -13,7 +15,7 @@ export const PORT: SnapcnPort = {
   background: '#f3f3ee',
   fonts: [],
   props: {
-    videos: { type: 'string', title: 'Clips (comma-separated URLs)', default: ',,,,', group: 'Content', maxLength: 2000 },
+    videos: { type: 'string', title: 'Clips', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     time: { type: 'string', title: 'Status bar time', default: '9:41', group: 'Content', maxLength: 10 },
     glowColor: { type: 'string', title: 'Glow colour', format: PropFormat.Color, default: '#cdb4e6', group: 'Style' },
     statusColor: { type: 'string', title: 'Status bar colour', format: PropFormat.Color, default: '#ffffff', group: 'Style' },
@@ -39,7 +41,8 @@ export const PORT: SnapcnPort = {
     const tick = (Number(p.speed) * 30) / fps;
     const u = width / REF_W;
     const dy = (height - REF_H * u) / 2;
-    const videos = String(p.videos).split(/,(?=\s*(?:https?:|data:|\/|,|$))/).map((s) => s.trim());
+    const clips = S.media(p.videos);
+    const videos = Array.from({ length: Math.max(clips.length, EMPTY_SCREENS) }, (_, i) => clips[i] ?? '');
     const n = videos.length;
 
     const slot = (depth: number) => {

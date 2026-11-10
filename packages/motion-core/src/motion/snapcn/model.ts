@@ -41,8 +41,9 @@ export const componentName = (id: string) => `${SNAPCN_NAME_PREFIX}${id.replace(
 export function snapcnSource(port: Pick<SnapcnPort, 'draw' | 'frames' | 'width' | 'height'>): string {
   return [
     `const S = (${snapcnKit.toString()})();`,
-    'root.style.background = String(props.background);',
-    `const render = (${port.draw.toString()})(S, { root, width: root.clientWidth || ${port.width}, height: root.clientHeight || ${port.height}, fps, frames: Math.round(duration * fps) || ${port.frames}, props });`,
+    'const P = Object.fromEntries(Object.entries(props).map(([key, value]) => [key, value ?? ""]));',
+    'root.style.background = String(P.background);',
+    `const render = (${port.draw.toString()})(S, { root, width: root.clientWidth || ${port.width}, height: root.clientHeight || ${port.height}, fps, frames: Math.round(duration * fps) || ${port.frames}, props: P });`,
     'render(0);',
     "tl.to({}, { duration, ease: 'none', onUpdate() { render(Math.round(this.time() * fps)); } }, 0);"
   ].join('\n');

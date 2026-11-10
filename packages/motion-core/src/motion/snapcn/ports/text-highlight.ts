@@ -18,7 +18,7 @@ export const PORT: SnapcnPort = {
     after: { type: 'string', title: 'Text after', default: '', group: 'Content', maxLength: 120 },
     replaceWith: { type: 'string', title: 'Strikethrough replacement', default: '', group: 'Content', maxLength: 120 },
     preset: { type: 'string', title: 'Preset', enum: ['logo-wipe', 'marker', 'color', 'underline', 'strikethrough', 'shimmer'], default: 'logo-wipe', group: 'Content' },
-    logoSrc: { type: 'string', title: 'Logo image URL (empty = built-in mark)', default: '', group: 'Content', maxLength: 500 },
+    logoSrc: { type: 'string', title: 'Logo', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     fontSize: { type: 'number', title: 'Font size (px)', default: 56, minimum: 12, maximum: 300, step: 1, group: 'Style' },
     fontWeight: { type: 'number', title: 'Font weight', default: 600, minimum: 100, maximum: 900, step: 100, group: 'Style' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },

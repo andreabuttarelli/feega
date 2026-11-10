@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Inter'],
   props: {
-    screenSrc: { type: 'string', title: 'Screenshot URL (empty = demo)', default: '', group: 'Content', maxLength: 2000 },
+    screenSrc: { type: 'string', title: 'Screenshot', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     variant: { type: 'string', title: 'Variant', enum: ['flat', 'tilt', 'showcase'], default: 'flat', group: 'Motion' },
     entrance: { type: 'string', title: 'Entrance', enum: ['rise', 'rotate-in', 'float'], default: 'rise', group: 'Motion' },
     bezelColor: { type: 'string', title: 'Bezel (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },

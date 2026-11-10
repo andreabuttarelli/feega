@@ -16,7 +16,7 @@ export const PORT: SnapcnPort = {
     from: { type: 'string', title: 'Count before', default: '5', group: 'Content', maxLength: 20 },
     to: { type: 'string', title: 'Count after', default: '500', group: 'Content', maxLength: 20 },
     noun: { type: 'string', title: 'Noun', default: 'clips', group: 'Content', maxLength: 40 },
-    images: { type: 'string', title: 'Image URLs, comma separated (empty = cards)', default: '', group: 'Content', maxLength: 2000 },
+    images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     inkFrom: { type: 'string', title: 'Label ink left (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
     inkTo: { type: 'string', title: 'Label ink right (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'sans', group: 'Style' },
@@ -48,7 +48,7 @@ export const PORT: SnapcnPort = {
     const PITCH_AT = [0, 7, 9, 11, 13, 15, 17, 19, 22, 26, 29, 31, 36, 37, 38, 39, 40, 41, 42, 43, 45, 46];
     const PITCH = [174, 138.5, 132, 128, 125, 124, 122.5, 121.5, 120, 119.6, 119, 118.5, 118, 117.9, 113, 106, 104, 102, 99.5, 97.5, 96.6, 96.5];
     const { width, height, fps } = view;
-    const cards = String(p.images).split(',').map((s) => s.trim()).filter(Boolean);
+    const cards = S.media(p.images);
     const ink0 = S.pick(p.inkFrom, S.mixOklch(String(t.primary), String(t.foreground), 0.5));
     const ink1 = S.pick(p.inkTo, String(t.primary));
     const cardEdge = S.mixOklch(String(t.card), String(t.border), 0.5);

@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Inter'],
   props: {
-    screenSrc: { type: 'string', title: 'Screen image or video (empty = sample)', default: '', group: 'Content', maxLength: 2000 },
+    screenSrc: { type: 'string', title: 'Screen image or clip', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     notchLabel: { type: 'string', title: 'Notch label', default: 'AirPods Connected', group: 'Content', maxLength: 60 },
     batteryLevel: { type: 'number', title: 'Battery level (%)', default: 85, minimum: 0, maximum: 100, step: 1, group: 'Content' },
     showNotch: { type: 'string', title: 'Notch', enum: ['on', 'off'], default: 'on', group: 'Content' },
@@ -61,7 +61,7 @@ export const PORT: SnapcnPort = {
     const lidColor = S.pick(p.bezelColor, S.mixOklch(sh('background'), sh('foreground'), 0.09));
     const glass = S.pick(p.screenColor, c('card'));
     const indicator = S.pick(p.indicatorColor, '#30D158');
-    const src = String(p.screenSrc ?? '');
+    const src = S.media(p.screenSrc)[0] ?? '';
 
     const risers: [HTMLElement, number][] = [];
     const rise = (el: Element, delay: number) => {

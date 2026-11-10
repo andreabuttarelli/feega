@@ -16,7 +16,7 @@ export const PORT: SnapcnPort = {
     title: { type: 'string', title: 'Title', default: 'A whole new universe', group: 'Content', maxLength: 120 },
     subtitle: { type: 'string', title: 'Subtitle', default: 'Article — The Design Process', group: 'Content', maxLength: 120 },
     buttonLabel: { type: 'string', title: 'Button label (empty hides)', default: 'Explore', group: 'Content', maxLength: 40 },
-    images: { type: 'string', title: 'Image URLs, comma separated (empty = tiles)', default: '', group: 'Content', maxLength: 2000 },
+    images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     footerLeft: { type: 'string', title: 'Footer left', default: '', group: 'Content', maxLength: 60 },
     footerCenter: { type: 'string', title: 'Footer centre', default: '', group: 'Content', maxLength: 60 },
     footerRight: { type: 'string', title: 'Footer right', default: '', group: 'Content', maxLength: 60 },
@@ -53,7 +53,7 @@ export const PORT: SnapcnPort = {
     const title = String(p.title);
     const subtitle = String(p.subtitle);
     const buttonLabel = String(p.buttonLabel);
-    const artwork = String(p.images).split(',').map((s) => s.trim()).filter(Boolean);
+    const artwork = S.media(p.images);
     const FILLS = ['linear-gradient(135deg, #2b5fd9, #14306e)', 'linear-gradient(135deg, #c96f2f, #7a3c12)', 'linear-gradient(135deg, #e8e4da, #b6ad99)', 'linear-gradient(135deg, #c8332b, #6e1511)', 'linear-gradient(135deg, #b9a0d0, #6f5590)', 'linear-gradient(135deg, #4c6b3c, #24361a)', 'linear-gradient(135deg, #1f4dd8, #0d2262)', 'linear-gradient(135deg, #d9d2c5, #a09684)'];
     const TWO_PI = Math.PI * 2;
     const ARC_SAMPLES = 1024;

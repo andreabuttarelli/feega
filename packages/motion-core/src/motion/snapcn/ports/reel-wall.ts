@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#0e0e0e',
   fonts: [],
   props: {
-    videos: { type: 'string', title: 'Clip URLs (comma separated)', default: '', group: 'Content', maxLength: 2000 },
+    videos: { type: 'string', title: 'Clips', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     cardColor: { type: 'string', title: 'Card colour', format: PropFormat.Color, default: '#1a1a1a', group: 'Style' },
     speed: { type: 'number', title: 'Speed', default: 1, minimum: 0.25, maximum: 4, step: 0.05, group: 'Motion' }
   },
@@ -35,7 +35,7 @@ export const PORT: SnapcnPort = {
     const veil = (f: number) => (f >= 9 ? 0 : 0.142 * (1 - Math.max(f, 0) / 9) ** 3.7);
     const onTwos = (f: number) => (f < 1 ? 0 : Math.floor((f - 1) / 2) * 2 + 1);
 
-    const videos = String(p.videos ?? '').split(',').map((v) => v.trim()).filter(Boolean);
+    const videos = S.media(p.videos);
     const speed = Number(p.speed);
     const cardColor = String(p.cardColor);
     const u = view.width / REF_W;

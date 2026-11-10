@@ -16,7 +16,7 @@ export const PORT: SnapcnPort = {
     wordmark: { type: 'string', title: 'Wordmark', default: 'snapcn', group: 'Content', maxLength: 40 },
     before: { type: 'string', title: 'Words left of the mark', default: 'your animations', group: 'Content', maxLength: 120 },
     after: { type: 'string', title: 'Words right of the mark', default: 'as one install', group: 'Content', maxLength: 120 },
-    sky: { type: 'string', title: 'Sky image URL', default: '', group: 'Content', maxLength: 2000 },
+    sky: { type: 'string', title: 'Sky image', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Tagline font', format: PropFormat.Font, default: 'Geist', group: 'Style' },
     fontWeight: { type: 'number', title: 'Tagline weight', default: 500, minimum: 100, maximum: 900, step: 100, group: 'Style' },
     fontSize: { type: 'number', title: 'Tagline size (1080p px)', default: 90.5, minimum: 10, maximum: 300, step: 0.5, group: 'Style' },

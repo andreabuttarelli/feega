@@ -13,9 +13,9 @@ export const PORT: SnapcnPort = {
   background: '#0a0a0b',
   fonts: ['Inter'],
   props: {
-    logoSrc: { type: 'string', title: 'Logo image URL', default: '', group: 'Content', maxLength: 2000 },
+    logoSrc: { type: 'string', title: 'Logo', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     brandName: { type: 'string', title: 'Brand name', default: 'snapcn', group: 'Content', maxLength: 80 },
-    images: { type: 'string', title: 'Flicker image URLs (comma separated)', default: '', group: 'Content', maxLength: 2000 },
+    images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     flipInterval: { type: 'number', title: 'Frames per image', default: 2, minimum: 1, maximum: 30, step: 1, group: 'Motion' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'dark', group: 'Style' },
@@ -27,7 +27,7 @@ export const PORT: SnapcnPort = {
     const face = S.pick(p.fontFamily, 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif');
     const svg = (markup: string) => 'data:image/svg+xml,' + encodeURIComponent(markup);
     const sample = (hue: number) => svg(`<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,55%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360},60%,20%)"/></linearGradient></defs><rect width="1280" height="720" fill="url(#g)"/></svg>`);
-    const given = String(p.images).split(',').map((s) => s.trim()).filter(Boolean);
+    const given = S.media(p.images);
     const images = given.length ? given : [12, 48, 96, 160, 205, 250, 290, 330].map(sample);
     const logoSrc = String(p.logoSrc) || svg('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect x="10" y="10" width="80" height="80" rx="18" fill="#fff"/></svg>');
     const interval = Math.max(1, Number(p.flipInterval));

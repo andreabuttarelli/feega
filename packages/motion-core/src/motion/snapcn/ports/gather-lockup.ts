@@ -14,7 +14,7 @@ export const PORT: SnapcnPort = {
   fonts: ['Inter Tight'],
   props: {
     lines: { type: 'string', title: 'Title words (lines by newline)', default: 'Ship\nyour demo\nin code', group: 'Content', maxLength: 200 },
-    images: { type: 'string', title: 'Fifteen image URLs, one per line', default: '', group: 'Content', maxLength: 2000 },
+    images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     captions: { type: 'string', title: 'Seven captions, one per line', default: 'Launch film\nProduct demo\nFeature drop\nChangelog\nPricing reel\nFounder intro\nLogo outro', group: 'Content', maxLength: 600 },
     wordmark: { type: 'string', title: 'Wordmark', default: 'snapcn', group: 'Content', maxLength: 40 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'sans', group: 'Style' },
@@ -45,7 +45,7 @@ export const PORT: SnapcnPort = {
     const family = S.pick(p.fontFamily, `"${FACE}", "Inter Tight"`);
     const lines = (s: unknown) => String(s ?? '').split('\n').map((x) => x.trim()).filter(Boolean);
     const words = lines(p.lines).flatMap((l) => l.split(/\s+/));
-    const images = lines(p.images);
+    const images = S.media(p.images);
     const captions = lines(p.captions);
     const wordmark = String(p.wordmark);
     const tracking = Number(p.wordmarkTracking);

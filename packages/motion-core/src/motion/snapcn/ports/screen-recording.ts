@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: [],
   props: {
-    src: { type: 'string', title: 'Screenshot URL', default: '', group: 'Content', maxLength: 2000 },
+    src: { type: 'string', title: 'Screenshot', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     sourceAspect: { type: 'number', title: 'Source aspect (0 = frame)', default: 0, minimum: 0, maximum: 4, step: 0.01, group: 'Content' },
     fit: { type: 'string', title: 'Fit', enum: ['cover', 'contain'], default: 'cover', group: 'Content' },
     cropTop: { type: 'number', title: 'Crop top (fraction)', default: 0, minimum: 0, maximum: 0.9, step: 0.01, group: 'Content' },

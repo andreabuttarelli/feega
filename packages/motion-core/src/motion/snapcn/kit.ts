@@ -439,9 +439,15 @@ export function snapcnKit() {
     host.appendChild(typeof child === 'object' ? child : document.createTextNode(String(child)));
   };
 
+  const CROSS_ORIGIN_TAGS = new Set(['img', 'video']);
+
   const h = (tag: string, attrs: Attrs | null = null, ...children: Child[]): Element => {
     const svg = SVG_TAGS.has(tag);
     const node = svg ? document.createElementNS(SVG_NS, tag) : document.createElement(tag);
+    if (CROSS_ORIGIN_TAGS.has(tag)) {
+      node.setAttribute('crossorigin', 'anonymous');
+    }
+
     for (const [key, value] of Object.entries(attrs ?? {})) {
       if (value === undefined || value === null || value === false) {
         continue;
@@ -472,7 +478,9 @@ export function snapcnKit() {
 
   const pick = <T>(value: unknown, fallback: T): T => (value === undefined || value === null || THEME_VALUE.has(String(value)) || BUILTIN_SANS.test(String(value)) ? fallback : (value as T));
 
-  return { pick, clamp, interpolate, spring, measureSpring, Easing, random, parseColor, toCss, rgbToOklch: rgbToOklchColor, oklchToRgb: (l: number, c: number, hue: number) => toCss(oklchToRgb(l, c, hue)), mixOklch, withAlpha, interpolateColors, light, dark, themeOf, easings, springs, clamp01, stateTransition, css, h, fill };
+  const media = (value: unknown): string[] => (Array.isArray(value) ? value.map((item) => String((item as { src?: unknown })?.src ?? '')).filter(Boolean) : []);
+
+  return { media, pick, clamp, interpolate, spring, measureSpring, Easing, random, parseColor, toCss, rgbToOklch: rgbToOklchColor, oklchToRgb: (l: number, c: number, hue: number) => toCss(oklchToRgb(l, c, hue)), mixOklch, withAlpha, interpolateColors, light, dark, themeOf, easings, springs, clamp01, stateTransition, css, h, fill };
 }
 
 export type SnapcnKit = ReturnType<typeof snapcnKit>;

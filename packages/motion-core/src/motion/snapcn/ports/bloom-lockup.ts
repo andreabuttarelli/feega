@@ -15,7 +15,7 @@ export const PORT: SnapcnPort = {
   props: {
     wordmark: { type: 'string', title: 'Wordmark', default: 'snapcn', group: 'Content', maxLength: 60 },
     tagline: { type: 'string', title: 'Tagline', default: 'snapcn.dev', group: 'Content', maxLength: 80 },
-    images: { type: 'string', title: 'Image URLs, comma separated (empty = tiles)', default: '', group: 'Content', maxLength: 2000 },
+    images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     wordmarkFont: { type: 'string', title: 'Wordmark font', format: PropFormat.Font, default: 'Poppins', group: 'Style' },
     taglineFont: { type: 'string', title: 'Tagline font', format: PropFormat.Font, default: 'Geist Mono', group: 'Style' },
     wordmarkWeight: { type: 'number', title: 'Wordmark weight', default: 600, minimum: 100, maximum: 900, step: 100, group: 'Style' },
@@ -187,7 +187,7 @@ export const PORT: SnapcnPort = {
     const MAP_W = 240;
     const MAP_H = 135;
     const SVG_NS = 'http://www.w3.org/2000/svg';
-    const images = String(p.images).split(/,(?=\s*(?:https?:|data:|\/))/).map((s) => s.trim()).filter(Boolean);
+    const images = S.media(p.images);
     const speed = Number(p.speed);
     const px = Math.max(view.width / STAGE_W, view.height / STAGE_H);
     const logo = SNAPCN_MARK;

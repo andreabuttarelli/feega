@@ -14,12 +14,14 @@ export const PORT: SnapcnPort = {
   fonts: ['Figtree'],
   props: {
     heading: { type: 'string', title: 'Heading', default: 'Browse scenes', group: 'Content', maxLength: 80 },
-    cards: { type: 'string', title: 'Cards (image>title>note>tag | ...)', default: '>Orbit Gallery>Scene · 300 frames>@snapcn/orbit-gallery|>Moodboard Reveal>Scene · 150 frames>@snapcn/moodboard-reveal|>Hero Launch>Scene · 170 frames>@snapcn/hero-launch|>Phone Frame>Scene · 240 frames>@snapcn/phone-frame|>Count Grid>Scene · 47 frames>@snapcn/count-grid|>Terminal Simulator>Scene · 200 frames>@snapcn/terminal-simulator|>Logo Flicker>Scene · 100 frames>@snapcn/logo-flicker|>Laptop Frame>Scene · 240 frames>@snapcn/laptop-frame|>Announce Title>Scene · 170 frames>@snapcn/announce-title', group: 'Content', maxLength: 2000 },
+    cards: { type: 'string', title: 'Cards (title>note>tag | ...)', default: 'Orbit Gallery>Scene · 300 frames>@snapcn/orbit-gallery|Moodboard Reveal>Scene · 150 frames>@snapcn/moodboard-reveal|Hero Launch>Scene · 170 frames>@snapcn/hero-launch|Phone Frame>Scene · 240 frames>@snapcn/phone-frame|Count Grid>Scene · 47 frames>@snapcn/count-grid|Terminal Simulator>Scene · 200 frames>@snapcn/terminal-simulator|Logo Flicker>Scene · 100 frames>@snapcn/logo-flicker|Laptop Frame>Scene · 240 frames>@snapcn/laptop-frame|Announce Title>Scene · 170 frames>@snapcn/announce-title', group: 'Content', maxLength: 2000 },
     from: { type: 'number', title: 'First flick (frame)', default: 0, minimum: 0, maximum: 600, step: 1, group: 'Motion' },
     flicks: { type: 'number', title: 'Flicks', default: 3, minimum: 1, maximum: 20, step: 1, group: 'Motion' },
     every: { type: 'number', title: 'Frames between flicks', default: 30, minimum: 1, maximum: 300, step: 1, group: 'Motion' },
     offset: { type: 'number', title: 'Rail offset (px at 396p)', default: 0, minimum: -2000, maximum: 2000, step: 1, group: 'Motion' },
-    backdrop: { type: 'string', title: 'Backdrop (colour | colour, or image)', default: '', group: 'Style', maxLength: 2000 },
+    backdropImage: { type: 'string', title: 'Backdrop image', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Style', maxLength: 2000 },
+    cardImages: { type: 'string', title: 'Card images, in card order', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
+    backdrop: { type: 'string', title: 'Backdrop (colour | colour)', default: '', group: 'Style', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Figtree', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'light', group: 'Style' }
   },
@@ -66,14 +68,14 @@ export const PORT: SnapcnPort = {
     const offset = Number(p.offset);
     const face = S.pick(p.fontFamily, 'Figtree');
     const split = (s: string, sep: string) => s.split(sep).map((v) => v.trim());
-    const deck = String(p.cards).split('|').filter((c) => c.trim()).map((c) => {
-      const [image = '', title = '', note = '', tag = ''] = split(c, '>');
-      return { image, title, note, tag };
+    const pictures = S.media(p.cardImages);
+    const deck = String(p.cards).split('|').filter((c) => c.trim()).map((c, i) => {
+      const [title = '', note = '', tag = ''] = split(c, '>');
+      return { image: pictures[i] ?? '', title, note, tag };
     });
     const count = Math.max(1, deck.length);
     const stops = split(String(p.backdrop), '|').filter(Boolean);
-    const only = stops.length === 1 ? stops[0] : '';
-    const plateSrc = /^(data:|\/|https?:)/.test(only) ? only : '';
+    const plateSrc = String(p.backdropImage);
     const from0 = plateSrc ? '' : (stops[0] ?? S.mixOklch(String(t.primary), '#0b1f3d', 0.55));
     const to0 = plateSrc ? S.mixOklch(String(t.primary), '#dceaff', 0.78) : (stops[1] ?? S.mixOklch(String(t.primary), '#dceaff', 0.78));
     const pitch = CARD_W + GAP;
