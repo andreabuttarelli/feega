@@ -878,8 +878,7 @@
     if (patch) {
       into.patchUses(patch);
     }
-    const quiet = !gesture.active();
-    for (const part of quiet ? sentOverlay.changed(overlay) : []) {
+    for (const part of sentOverlay.changed(overlay)) {
       into.setOverlay(part, overlay[part]);
     }
     into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
@@ -912,7 +911,7 @@
       (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
-    return pending || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
+    return pending || zooming.active() || sentOverlay.waiting(overlay) || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;
