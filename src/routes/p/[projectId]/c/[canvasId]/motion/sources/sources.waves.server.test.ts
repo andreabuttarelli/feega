@@ -5,9 +5,11 @@ import { addClip } from '@feega/motion-core/motion/timeline';
 
 const LATENCY_MS = 40;
 
+let signed = 0;
 vi.mock('$lib/server/canvas/sign-media', () => ({
   createAssetSigningDb: () => ({}),
   signAssetPaths: async (_db: unknown, _service: unknown, paths: { uploaded: string[] }) => {
+    signed++;
     await new Promise((done) => setTimeout(done, LATENCY_MS));
     return new Map(paths.uploaded.map((p) => [p, `signed:${p}`]));
   }
@@ -38,7 +40,7 @@ const rows = {
   motion_revisions: Array.from({ length: FRAMES }, (_, i) => ({ org_id: 'org-a', node_id: frameId(i), version: 3, doc: withPhoto, summary: null, actor_kind: 'user' }))
 };
 
-async function wavesToAnswer(): Promise<{ waves: number; body: { frames: Record<string, { assets: Record<string, string> }> } }> {
+async function wavesToAnswer(): Promise<{ waves: number; body: { frames: Record<string, { assets: Record<string, string>; media: Record<string, unknown> }> } }> {
   vi.useFakeTimers();
   const { db } = fakeDb(rows, { filter: true, latencyMs: LATENCY_MS });
   const event = {
@@ -62,10 +64,12 @@ async function wavesToAnswer(): Promise<{ waves: number; body: { frames: Record<
 afterEach(() => vi.useRealTimers());
 
 describe('the sources of every frame, against a database one round trip away', () => {
-  it('answers in three waves of round trips: the canvas, then frames and library together, then signing', async () => {
+  it('answers in three waves of round trips and signs nothing: assets point at their stable canvas address', async () => {
     const { waves, body } = await wavesToAnswer();
 
-    expect(body.frames[frameId(0)].assets).toEqual({ [PHOTO]: 'signed:org-a/p1/photo.png' });
+    expect(body.frames[frameId(0)].assets).toEqual({ [PHOTO]: `/p/p1/c/c1/assets/${PHOTO}` });
     expect(waves).toBe(3);
+    expect(signed).toBe(0);
+    expect(body.frames[frameId(0)].media).toEqual({ [PHOTO]: { kind: 'image', width: 640, height: 480 } });
   });
 });

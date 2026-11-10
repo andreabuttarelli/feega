@@ -47,22 +47,26 @@ export type BatchedSource = MotionSource & { media: Record<string, MediaHint> };
 
 const PREFETCHED = new Set<AssetKind>([AssetKind.Image]);
 
+const unsigned: AssetSigner = async () => new Map();
+
+const stableUrls = (assets: MotionAsset[]): Record<string, string> => Object.fromEntries(assets.map((a) => [a.id, a.url ?? a.previewUrl]));
+
 const mediaHints = (assets: MotionAsset[]): Record<string, MediaHint> =>
-  Object.fromEntries(assets.filter((a) => a.url && PREFETCHED.has(a.kind)).map((a) => [a.id, { kind: a.kind, width: a.width ?? null, height: a.height ?? null }]));
+  Object.fromEntries(assets.filter((a) => PREFETCHED.has(a.kind)).map((a) => [a.id, { kind: a.kind, width: a.width ?? null, height: a.height ?? null }]));
 
 export async function motionSources(scope: FramesScope): Promise<Map<string, BatchedSource>> {
   const phases = scope.phases ?? serverTiming();
-  const [heads, library] = await Promise.all([headsOf(scope, phases), phases.time('assets', motionAssets(scope))]);
+  const [heads, library] = await Promise.all([headsOf(scope, phases), phases.time('assets', motionAssets({ ...scope, sign: unsigned }))]);
   const docs = [...heads.values()].map((h) => h.doc);
   const beyond = [...new Set(docs.flatMap(mentionedIds))].filter((id) => !library.some((a) => a.id === id));
-  const named = await phases.time('named', beyond.length ? namedAssets(scope, beyond) : Promise.resolve([]));
+  const named = await phases.time('named', beyond.length ? namedAssets({ ...scope, sign: unsigned }, beyond) : Promise.resolve([]));
   const known = library.map((a) => ({ id: a.id, kind: a.kind, name: a.label }));
 
   return new Map(
     [...heads].map(([nodeId, head]) => {
       const used = new Set([...referencedAssets(head.doc, known).map((a) => a.id), ...mentionedIds(head.doc)]);
       const mine = [...library, ...named].filter((a) => used.has(a.id));
-      return [nodeId, { revision: head.version, doc: head.doc, assets: assetUrls(mine), media: mediaHints(mine) }];
+      return [nodeId, { revision: head.version, doc: head.doc, assets: stableUrls(mine), media: mediaHints(mine) }];
     })
   );
 }
