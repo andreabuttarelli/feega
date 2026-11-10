@@ -68,11 +68,11 @@ export const withoutPictures = (list: DisplayList, look: Look, missing: Missing 
 
 export const drawable = (list: DisplayList, ready: Readiness, look: Look, missing: Missing): DisplayList => (ready === Readiness.Whole ? list : withoutPictures(list, look, missing));
 
-type Layers<T> = { ready: T | null | undefined; before: T | null | undefined; thumb: T | null | undefined; blocks: T | null | undefined; placeholder: T };
+type Layers<T> = { ready: T | null | undefined; poster?: T | null; before: T | null | undefined; thumb: T | null | undefined; blocks: T | null | undefined; placeholder: T };
 
-export function layersOf<T extends { group: string }>({ ready, before, thumb, blocks, placeholder }: Layers<T>): T[] {
+export function layersOf<T extends { group: string }>({ ready, poster, before, thumb, blocks, placeholder }: Layers<T>): T[] {
   const seen = new Set<string>();
-  return [ready, thumb, before, blocks, placeholder].filter((l): l is T => {
+  return [ready, thumb, poster, before, blocks, placeholder].filter((l): l is T => {
     if (!l || seen.has(l.group)) {
       return false;
     }

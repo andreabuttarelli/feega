@@ -432,7 +432,8 @@
     return [...placeholders.values()].map((p) => {
       const before = holding.has(p.id) ? drawnLast.get(p.id) : undefined;
       const turned = p.turn ? { turn: p.turn } : {};
-      return layersOf<HeldFrame>({ ready: ready.get(p.id), before: before && { ...before, box: bledBox(p.box, before.group), ...turned }, thumb: thumbShown.get(p.id), blocks: blocksById.get(p.id), placeholder: { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned } });
+      const head = ready.get(p.id);
+      return layersOf<HeldFrame>({ ready: head && lists.has(head.group) ? head : null, poster: head && !lists.has(head.group) ? head : null, before: before && { ...before, box: bledBox(p.box, before.group), ...turned }, thumb: thumbShown.get(p.id), blocks: blocksById.get(p.id), placeholder: { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...turned } });
     });
   });
   const held = $derived(chains.map((c) => c[0]));
