@@ -72,7 +72,7 @@ type Layers<T> = { ready: T | null | undefined; before: T | null | undefined; th
 
 export function layersOf<T extends { group: string }>({ ready, before, thumb, blocks, placeholder }: Layers<T>): T[] {
   const seen = new Set<string>();
-  return [ready, before, thumb, blocks, placeholder].filter((l): l is T => {
+  return [ready, thumb, before, blocks, placeholder].filter((l): l is T => {
     if (!l || seen.has(l.group)) {
       return false;
     }

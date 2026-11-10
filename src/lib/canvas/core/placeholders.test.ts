@@ -104,3 +104,11 @@ describe('layersOf', () => {
     expect(firstDrawn(chain, new Set(['placeholder']))?.group).toBe('placeholder');
   });
 });
+
+describe('layersOf con un poster già disegnato', () => {
+  it('la miniatura vince sul poster disegnato prima', () => {
+    const chain = layersOf({ ready: { group: 'f:1:256' }, before: { group: 'f:[poster]' }, thumb: { group: 'f:1:thumb' }, blocks: null, placeholder: { group: 'placeholder' } });
+
+    expect(firstDrawn(chain, new Set(['f:[poster]', 'f:1:thumb', 'placeholder']))?.group).toBe('f:1:thumb');
+  });
+});

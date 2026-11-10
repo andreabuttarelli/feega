@@ -751,7 +751,8 @@
       putting.delete(group);
       pictured.delete(group);
     }
-    for (const f of tails) {
+    const stopgaps = chains.flatMap((c) => (pictured.has(c[0].group) ? [] : c.filter((l) => thumbLists.has(l.group))));
+    for (const f of [...tails, ...stopgaps]) {
       while (!put.has(f.group)) {
         putPart(into, f.group);
       }
@@ -764,7 +765,7 @@
         room -= putPart(into, f.group);
       }
     }
-    const unpictured = [...new Set([...tails, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
+    const unpictured = [...new Set([...tails, ...stopgaps, ...onScreenFirst(held, view, area)].filter((f) => put.has(f.group) && !pictured.has(f.group)).map((f) => f.group))];
     const quietUploads = !gesture.active();
     for (const group of uploadWithin(quietUploads ? unpictured : unpictured.slice(0, PICTURES_PER_FRAME), (g) => into.upload(listOf(g), pictures, 1), () => performance.now(), quietUploads ? UPLOAD_BUDGET_MS : 0)) {
       pictured.add(group);
