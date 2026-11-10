@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { PRIDE_FLAGS, flagGradient, nextFlag } from '$lib/canvas/pride-flags';
+  import Wordmark from '$lib/components/app/Wordmark.svelte';
   import { STARTUP_EVENT, StartupStep, startupMarks } from '$lib/canvas/core/startup-marks';
   import { CanvasContent, startupProgress } from '$lib/canvas/core/startup-progress';
 
@@ -8,12 +10,18 @@
   const GIVE_UP_MS = 10_000;
   const AFTER_BUILT_MS = 1500;
 
+  let gradient = $state(flagGradient(PRIDE_FLAGS[0].stripes));
   let done = $state(new Set<StartupStep>());
   let gaveUp = $state(false);
   const progress = $derived(startupProgress(done, content));
   const shown = $derived(progress < 1 && !gaveUp);
 
   onMount(() => {
+    try {
+      gradient = flagGradient(nextFlag(localStorage).stripes);
+    } catch {
+      gradient = flagGradient(nextFlag({ getItem: () => null, setItem: () => undefined }).stripes);
+    }
     done = new Set(startupMarks(performance.getEntriesByType('mark')).map((m) => m.step));
     const reached = (e: Event) => (done = new Set([...done, (e as CustomEvent<StartupStep>).detail]));
     const timer = setTimeout(() => (gaveUp = true), GIVE_UP_MS);
@@ -35,9 +43,8 @@
 </script>
 
 <div class="loading" class:gone={!shown} role="progressbar" aria-label="Loading canvas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} data-testid="canvas-loading">
-  <img src="/favicon-48.png" alt="" width="40" height="40" />
-  <span class="word">Feega</span>
-  <div class="track"><div class="bar" style:transform="scaleX({progress})"></div></div>
+  <span class="mark"><Wordmark /></span>
+  <div class="track"><div class="bar" style:background={gradient} style:clip-path="inset(0 {(1 - progress) * 100}% 0 0)"></div></div>
 </div>
 
 <style>
@@ -59,11 +66,8 @@
     pointer-events: none;
   }
 
-  .word {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.04em;
-    color: var(--ink, #111);
+  .mark {
+    --wordmark-size: 40px;
   }
 
   .track {
@@ -78,8 +82,6 @@
 
   .bar {
     height: 100%;
-    background: var(--ink, #111);
-    transform-origin: left;
-    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: clip-path 300ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 </style>
