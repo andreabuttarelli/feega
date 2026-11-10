@@ -1,38 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ELEMENT_RULES, TweakLimit, claimTweak, ruleFor, createLedger, curve, mayTweak, releaseTweak, rewriteFrom, thin, typeFrames } from './live-agents';
-
-const always = (v: number) => () => v;
-
-describe('live agents typing', () => {
-  const text = 'The motion canvas for Claude Code';
-
-  it('always ends on the real text', () => {
-    for (const v of [0, 0.03, 0.5, 0.99]) {
-      expect(typeFrames(text, 0, always(v)).at(-1)).toBe(text);
-      expect(typeFrames(text, 11, always(v)).at(-1)).toBe(text);
-    }
-  });
-
-  it('corrects the typos it makes', () => {
-    const frames = typeFrames('canvas', 0, always(0.01));
-    expect(frames.some((f) => !'canvas'.startsWith(f))).toBe(true);
-    expect(frames.at(-1)).toBe('canvas');
-  });
-
-  it('backspaces to the kept prefix before retyping', () => {
-    const frames = typeFrames(text, 22, always(0.9));
-    expect(frames).toContain(text.slice(0, 22));
-    expect(frames.every((f) => f.startsWith(text.slice(0, 22)))).toBe(true);
-  });
-
-  it('rewrites whole trailing words of long text only', () => {
-    expect(rewriteFrom('Short headline', always(0.5))).toBe(0);
-    const long = 'Paste any website. Claude rebuilds it as editable layers, animates it.';
-    const at = rewriteFrom(long, always(0));
-    expect(long[at - 1]).toBe(' ');
-    expect(long.slice(at)).toBe('it.');
-  });
-});
+import * as live from './live-agents';
+import { BuildMode, ELEMENT_RULES, TEXT_SELECTOR, TweakLimit, claimTweak, createLedger, curve, mayTweak, releaseTweak, ruleFor } from './live-agents';
 
 describe('cursor path', () => {
   it('starts and lands on its endpoints', () => {
@@ -42,15 +10,6 @@ describe('cursor path', () => {
     const end = curve(a, b, 1, 40);
     expect(end.x).toBeCloseTo(100);
     expect(end.y).toBeCloseTo(50);
-  });
-});
-
-describe('thinning typed frames', () => {
-  it('caps the frame count and keeps the final text', () => {
-    const frames = Array.from({ length: 300 }, (_, i) => i);
-    const kept = thin(frames, 40);
-    expect(kept.length).toBeLessThanOrEqual(41);
-    expect(kept.at(-1)).toBe(299);
   });
 });
 
@@ -72,25 +31,41 @@ describe('tweak ledger', () => {
     expect(mayTweak(ledger, 'b', GAP - 1, GAP)).toBe(false);
     expect(mayTweak(ledger, 'b', GAP, GAP)).toBe(true);
   });
-});
-
-describe('element rules', () => {
-  const GAP = 3000;
 
   it('lets a resident element be tweaked again and again, one beat at a time', () => {
     const ledger = createLedger<string>();
-    claimTweak(ledger, 'mark', 0);
+    claimTweak(ledger, 'mark', 0, TweakLimit.Unlimited);
     expect(mayTweak(ledger, 'mark', 1, GAP, TweakLimit.Unlimited)).toBe(false);
     releaseTweak(ledger, 'mark');
     expect(mayTweak(ledger, 'mark', 1, GAP, TweakLimit.Unlimited)).toBe(true);
     expect(mayTweak(ledger, 'mark', 1, GAP, TweakLimit.Once)).toBe(false);
   });
+});
 
-  it('declares the footer wordmark as resident with a standing crew', () => {
+describe('element rules', () => {
+  it('keeps a standing crew on the footer wordmark', () => {
     const rule = ruleFor((selector) => selector === '.site-foot .mark');
     expect(rule.limit).toBe(TweakLimit.Unlimited);
     expect(rule.crew).toBeGreaterThanOrEqual(3);
     expect(rule.crew).toBeLessThanOrEqual(5);
-    expect(ELEMENT_RULES.at(-1)?.limit).toBe(TweakLimit.Once);
+  });
+
+  it('only styles text, so every word is visible from first paint', () => {
+    const text = ruleFor((selector) => selector === TEXT_SELECTOR);
+    expect(text.build).toBe(BuildMode.Style);
+    for (const tag of ['h1 span', 'h2', 'h3', 'p', 'li', 'a', 'button', 'summary']) {
+      expect(TEXT_SELECTOR.split(', ')).toContain(tag);
+    }
+  });
+
+  it('never retypes text and never hides anything with CSS', () => {
+    for (const rule of ELEMENT_RULES) {
+      expect(rule.beats).not.toContain('type');
+    }
+    expect('BUILD_HEAD' in live).toBe(false);
+  });
+
+  it('places only the remaining visuals', () => {
+    expect(ELEMENT_RULES.at(-1)).toMatchObject({ selector: '*', build: BuildMode.Place });
   });
 });
