@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{NEAR_STEPS, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -487,11 +487,11 @@ impl WebCore {
         let started = js_sys::Date::now();
         let screen = (self.target.width(), self.target.height());
         let wanted: Vec<TileKey> = self.tiles.reserve(self.camera, screen).into_iter().chain(self.tiles.ahead(self.camera, screen)).collect();
-        for key in wanted {
+        for batch in bake_batches(&wanted) {
             if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
                 return Ok(true);
             }
-            self.raster_batch(&Batch { step: key.step, keys: vec![key] })?;
+            self.raster_batch(&batch)?;
         }
         Ok(false)
     }
@@ -559,7 +559,7 @@ impl WebCore {
             shot.tiles.iter().filter_map(move |(key, source)| placed(*key, source, moved, frame))
         });
         let placed: Vec<Tile> = still.chain(lifted).collect();
-        let complete = self.rest.as_ref().is_some_and(|r| r.todo().is_empty());
+        let complete = self.rest.as_ref().is_some_and(Rest::adoptable);
         let exact = self.rest_shown.iter().filter(|_| complete).map(|(block, source)| Tile { source, look: Lookup { scale: 1.0, x: -block.x0, y: -block.y0 }, within: *block });
         let placed: Vec<Tile> = placed.into_iter().chain(exact).collect();
         self.reprojector.draw_tiles(&self.device, &self.queue, &mut encoder, &out, self.format, Output::Premultiplied, &placed);
@@ -685,6 +685,9 @@ impl WebCore {
 
     fn raster_rest(&mut self, started: f64, budget: f64, spent: bool) -> Result<bool, JsValue> {
         let screen = (self.target.width(), self.target.height());
+        if self.rest.as_ref().is_some_and(|r| r.todo().is_empty() && !r.adoptable()) {
+            self.forget_rest();
+        }
         if self.rest.is_none() {
             self.rest = Some(Rest::new(self.camera, screen));
         }
@@ -693,11 +696,14 @@ impl WebCore {
             if spent && js_sys::Date::now() - started > budget {
                 return Ok(false);
             }
-            let Some(block) = self.rest.as_mut().and_then(Rest::next) else { return Ok(true) };
+            let Some(block) = self.rest.as_mut().and_then(Rest::next) else { return Ok(self.rest.as_ref().is_some_and(Rest::adoptable)) };
             let size = (block.width() as u32, block.height() as u32);
             let c = Camera { x: self.camera.x.round(), y: self.camera.y.round(), zoom: self.camera.zoom };
             let plan = self.compositor.plan_at(&mut self.library, Camera { x: c.x - block.x0, y: c.y - block.y0, zoom: c.zoom }, size, self.limits);
-            let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+            let building = plan.pending;
+            let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+            let drawn = if building || !missing.is_empty() { Drawn::Lacking } else { Drawn::Whole };
+            self.rest.as_mut().expect("rest started").drew(drawn);
             let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
             let texture = self.rest_spare.get_mut(&size).and_then(Vec::pop).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
             self.engine.draw(&self.device, &self.queue, &list, &pictures, &texture.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
@@ -760,7 +766,7 @@ impl WebCore {
     }
 
     fn rest_done(&self) -> bool {
-        self.rest.as_ref().is_some_and(|r| r.shows(self.camera, (self.target.width(), self.target.height())) && r.todo().is_empty())
+        self.rest.as_ref().is_some_and(|r| r.shows(self.camera, (self.target.width(), self.target.height())) && r.adoptable())
     }
 
     fn adopt_rest(&mut self, now_ms: f64) {
@@ -786,12 +792,12 @@ impl WebCore {
         let started = js_sys::Date::now();
         let queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
         let wanted: Vec<TileKey> = queue.blank.into_iter().chain(queue.stale).chain(queue.blurry).collect();
-        for key in wanted {
+        for batch in bake_batches(&wanted) {
             if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
                 self.pending = true;
                 return Ok(());
             }
-            self.raster_batch(&Batch { step: key.step, keys: vec![key] })?;
+            self.raster_batch(&batch)?;
         }
         self.pending |= self.fill_reserve()?;
         Ok(())
@@ -807,6 +813,10 @@ impl WebCore {
 
     pub fn scratch_bytes(&self) -> f64 {
         self.engine.scratch_bytes() as f64
+    }
+
+    pub fn render_tally(&mut self) -> String {
+        self.engine.take_tally().json()
     }
 
     pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {

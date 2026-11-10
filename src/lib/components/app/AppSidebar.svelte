@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Wordmark from './Wordmark.svelte';
   import { signOutForm } from '$lib/auth/sign-out-form';
   import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { chooseWorkspace, createWorkspace } from '$lib/dashboard/api';
@@ -146,7 +147,7 @@
 
 <nav class="app-sidebar" aria-label="App" data-testid="app-sidebar">
   <div class="scroll">
-    <a class="wordmark" href="/app">feega</a>
+    <a class="wordmark" href="/app"><Wordmark /></a>
 
     <div class="group">
       {#each inSection(NavSection.Main) as item (item.id)}
@@ -235,10 +236,6 @@
 
   .wordmark {
     padding: var(--ui-space-2) var(--ui-space-2) 0;
-    font-size: var(--ui-text-lg);
-    font-weight: var(--ui-weight-semibold);
-    letter-spacing: -0.02em;
-    color: var(--ui-text);
     text-decoration: none;
   }
 

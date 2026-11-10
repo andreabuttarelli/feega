@@ -27,6 +27,10 @@ export class VectorGate {
     this.#seen.add(id);
   }
 
+  shownOf(ids: readonly string[]): number {
+    return ids.filter((id) => this.#seen.has(id)).length;
+  }
+
   after(show: () => void) {
     if (this.#open) {
       show();
@@ -46,3 +50,5 @@ export class VectorGate {
     return true;
   }
 }
+
+export const shownBefore = ({ thumb, drawn }: { thumb: boolean; drawn: boolean }): OnScreen => (thumb || drawn ? OnScreen.Thumb : OnScreen.Nothing);

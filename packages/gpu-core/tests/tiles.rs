@@ -1,5 +1,5 @@
 use gpu_core::retained::Camera;
-use gpu_core::tiles::{NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
+use gpu_core::tiles::{NEAR_STEPS, tiles_kept, TILE_BUDGET_BYTES, TILE_BYTES, batches, bake_batches, BAKE_BATCH_TILES, Rest, REST_BLOCK_PX, step_of, step_zoom, TileKey, Tiles, BATCH_TILES, TILE_PX};
 use vello::kurbo::Rect;
 
 const SCREEN: (u32, u32) = (1024, 768);
@@ -319,4 +319,33 @@ fn a_lift_without_a_camera_move_draws_from_tiles() {
     assert_eq!(path_for(Moment { lifting: true, ..still }), Path::Tiles);
     assert_eq!(path_for(Moment { gesture: true, ..still }), Path::Tiles);
     assert_eq!(path_for(Moment { settling: true, ..still }), Path::Tiles);
+}
+
+#[test]
+fn a_rest_picture_with_a_block_drawn_while_a_group_was_building_is_not_adopted() {
+    use gpu_core::tiles::Drawn;
+    let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+    let mut rest = Rest::new(camera, (REST_BLOCK_PX, REST_BLOCK_PX * 2));
+    rest.next();
+    rest.drew(Drawn::Lacking);
+    rest.next();
+    rest.drew(Drawn::Whole);
+
+    assert!(rest.todo().is_empty());
+    assert!(!rest.adoptable());
+
+    let mut whole = Rest::new(camera, (REST_BLOCK_PX, REST_BLOCK_PX));
+    whole.next();
+    whole.drew(Drawn::Whole);
+    assert!(whole.adoptable());
+}
+
+#[test]
+fn idle_baking_rasters_bigger_blocks_than_a_gesture() {
+    let missing = Tiles::default().frame(camera(1.0), SCREEN).missing;
+    let baked = bake_batches(&missing);
+
+    assert_eq!(baked.iter().map(|b| b.keys.len()).sum::<usize>(), missing.len());
+    assert!(baked.len() < batches(&missing).len());
+    assert!(baked.iter().all(|b| b.keys.len() <= (BAKE_BATCH_TILES * BAKE_BATCH_TILES) as usize));
 }

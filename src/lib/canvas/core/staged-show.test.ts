@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Readiness } from '@feega/motion-core/motion/gpu-full/media';
-import { OnScreen, VectorGate, showStaged } from './staged-show';
+import { OnScreen, VectorGate, showStaged, shownBefore } from './staged-show';
 
 const pending = () => {
   let settle: (r: Readiness) => void = () => {};
@@ -67,5 +67,24 @@ describe('VectorGate', () => {
     gate.after(() => shown.push('x'));
 
     expect(shown).toEqual(['x']);
+  });
+});
+
+describe('shownBefore', () => {
+  it('un frame già disegnato a un altro livello non ripassa dai soli vettori', () => {
+    expect(shownBefore({ thumb: false, drawn: true })).toBe(OnScreen.Thumb);
+  });
+
+  it('un frame mai mostrato parte dai vettori', () => {
+    expect(shownBefore({ thumb: false, drawn: false })).toBe(OnScreen.Nothing);
+  });
+});
+
+describe('VectorGate.shownOf', () => {
+  it('counts the given frames that already showed content', () => {
+    const gate = new VectorGate();
+    gate.presented('a');
+    gate.presented('c');
+    expect(gate.shownOf(['a', 'b', 'c'])).toBe(2);
   });
 });

@@ -9,6 +9,7 @@ use crate::canvas::{brush, Canvas};
 use crate::compositor::{Compositor, Painter};
 use crate::display_list::{parse, parse_packed, parse_splice, DisplayList, Paint, Rgba, Size};
 use crate::groups::{report, Library, Limits, Plan};
+use crate::tally::Reason;
 use crate::gl_passes::{texture, GlRunner, Tex};
 use crate::gl_reproject::{held, smooth, GlReprojector, Held, Target};
 use crate::retained::{Camera, Lookup, Quality};
@@ -107,7 +108,7 @@ impl Surface for GlSurface<'_> {
         Rect::new(0.0, 0.0, self.width as f64, self.height as f64)
     }
 
-    fn paint(&mut self, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut GlCanvas)) -> Result<Tex, JsValue> {
+    fn paint(&mut self, _reason: crate::tally::Reason, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut GlCanvas)) -> Result<Tex, JsValue> {
         self.render(base, Affine::translate((-region.x0, -region.y0)), draw)?;
         let (w, h) = (region.width() as u32, region.height() as u32);
         let gl = self.renderer.gl_context().clone();
@@ -364,7 +365,7 @@ impl WebGlCore {
         let layers = prepare(&mut surface, list, &pictures, Blending::Composited)?;
         let skipped = std::cell::RefCell::new(Vec::new());
         let region = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
-        let tex = surface.paint(region, list.background, &|c| skipped.borrow_mut().extend(build_into(c, list, &pictures, &layers)))?;
+        let tex = surface.paint(Reason::Screen, region, list.background, &|c| skipped.borrow_mut().extend(build_into(c, list, &pictures, &layers)))?;
         for id in std::mem::take(&mut surface.placed) {
             surface.renderer.destroy_image(surface.resources, id);
         }

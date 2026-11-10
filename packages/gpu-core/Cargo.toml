@@ -48,3 +48,6 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 2
+
+[patch.crates-io]
+vello = { path = "vendor/vello" }

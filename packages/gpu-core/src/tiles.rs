@@ -54,6 +54,7 @@ impl TileKey {
 }
 
 pub const BATCH_TILES: i64 = 2;
+pub const BAKE_BATCH_TILES: i64 = 3;
 
 pub struct Batch {
     pub step: i32,
@@ -83,10 +84,18 @@ impl Batch {
 }
 
 pub fn batches(missing: &[TileKey]) -> Vec<Batch> {
+    batches_of(missing, BATCH_TILES)
+}
+
+pub fn bake_batches(missing: &[TileKey]) -> Vec<Batch> {
+    batches_of(missing, BAKE_BATCH_TILES)
+}
+
+fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
     let mut out: Vec<Batch> = Vec::new();
     let mut at: rustc_hash::FxHashMap<(i32, i64, i64), usize> = Default::default();
     for key in missing {
-        let block = (key.step, key.tx.div_euclid(BATCH_TILES), key.ty.div_euclid(BATCH_TILES));
+        let block = (key.step, key.tx.div_euclid(side), key.ty.div_euclid(side));
         let index = *at.entry(block).or_insert_with(|| {
             out.push(Batch { step: key.step, keys: Vec::new() });
             out.len() - 1
@@ -261,10 +270,17 @@ impl Tiles {
 
 pub const REST_BLOCK_PX: u32 = 256;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Drawn {
+    Whole,
+    Lacking,
+}
+
 pub struct Rest {
     camera: Camera,
     screen: (u32, u32),
     todo: Vec<Rect>,
+    lacking: bool,
 }
 
 impl Rest {
@@ -276,7 +292,7 @@ impl Rest {
         let rows = (h / side).ceil() as u32;
         let mut todo: Vec<Rect> = (0..rows).flat_map(|r| (0..cols).map(move |c| Rect::new(c as f64 * side, r as f64 * side, ((c + 1) as f64 * side).min(w), ((r + 1) as f64 * side).min(h)))).collect();
         todo.sort_by(|a, b| a.center().distance(centre).total_cmp(&b.center().distance(centre)));
-        Rest { camera, screen, todo }
+        Rest { camera, screen, todo, lacking: false }
     }
 
     pub fn shows(&self, camera: Camera, screen: (u32, u32)) -> bool {
@@ -289,6 +305,14 @@ impl Rest {
 
     pub fn next(&mut self) -> Option<Rect> {
         (!self.todo.is_empty()).then(|| self.todo.remove(0))
+    }
+
+    pub fn drew(&mut self, drawn: Drawn) {
+        self.lacking |= drawn == Drawn::Lacking;
+    }
+
+    pub fn adoptable(&self) -> bool {
+        self.todo.is_empty() && !self.lacking
     }
 }
 

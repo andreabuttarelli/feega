@@ -3763,3 +3763,6 @@ Signal: with `?coreTiles` the canvas is blank only when a selection or handle ex
 
 ### A slow "download" in Resource Timing is a busy main thread
 Signal: a fetch shows `responseStart → responseEnd` of ~1 s on localhost, curl gets the same body in 5 ms, and the same fetch on a blank page takes 12 ms. Cause: the page's renderer stamps `responseEnd` only when its main thread is free; a ~1 s long task during canvas start covers the window. Not the harness (plain Chromium without CDP or interception shows it), not connection limits. Move: before blaming the network or server, list `longtask` entries overlapping the request; moving the fetch to a worker does not help if the result is consumed on the main thread.
+
+### A wasm copied into build/ is served from its stale .br
+Signal: swapping `build/client/gpu-core/gpu_core_bg.wasm` by hand to try a gpu-core variant changes nothing in the load bench screenshots. Cause: the node server serves the precompressed `.br`/`.gz` next to it, written at build time. Move: after the copy, rewrite both (`gzip -kf9`, `brotli -f -o x.br x`), or rebuild.

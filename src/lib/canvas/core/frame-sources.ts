@@ -1,4 +1,5 @@
 import type { FrameDoc } from './frame-build';
+import { StartupStep, markStartup } from './startup-marks';
 
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
@@ -81,9 +82,11 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
   const queues = new Map<string, Waiting[]>();
 
   const ask = async (base: string, waiting: Waiting[]) => {
+    markStartup(StartupStep.SourcesAsked);
     const batch = await fetcher(batchUrl(base, waiting))
       .then((res) => (res.ok ? (res.json() as Promise<Batch>) : null))
       .catch(() => null);
+    markStartup(StartupStep.SourcesArrived);
 
     for (const w of waiting) {
       const frame = batch?.frames[w.id];
