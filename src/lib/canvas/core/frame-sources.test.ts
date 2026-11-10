@@ -123,3 +123,47 @@ describe('signed asset links beside the frames', () => {
     expect(source?.addresses).toEqual({ [P]: `/p/p1/c/c1/assets/${P}` });
   });
 });
+
+describe('a frame kept from an earlier open', () => {
+  const A = '00000000-0000-4000-8000-00000000000a';
+  const url = `/p/p1/c/c1/motion/${A}/source?revision=3`;
+  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+  const memory = () => {
+    const kept = new Map<string, unknown>();
+    return { kept, get: async (key: string) => (kept.get(key) ?? null) as never, put: (key: string, source: unknown) => void kept.set(key, source) };
+  };
+
+  it('draws from what was kept without waiting for the network, and keeps the fresh answer for next time', async () => {
+    const store = memory();
+    store.kept.set(`${A}@3`, { revision: 3, doc: { old: 1 }, assets: {}, tokens: {} });
+    let answer: (r: Response) => void = () => undefined;
+    const read = batchedSources(() => new Promise((r) => (answer = r)), undefined, store);
+
+    const drawn = await read(url);
+    await new Promise((r) => setTimeout(r, 0));
+    answer(json({ tokens: { t: 2 }, frames: { [A]: { revision: 3, doc: { new: 1 }, assets: {} } } }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(drawn).toEqual({ revision: 3, doc: { old: 1 }, assets: {}, tokens: {} });
+    expect(store.kept.get(`${A}@3`)).toEqual({ revision: 3, doc: { new: 1 }, assets: {}, tokens: { t: 2 } });
+  });
+
+  it('keeps the stable addresses, never a signed link that expires', async () => {
+    const store = memory();
+    const P = '00000000-0000-4000-8000-0000000000f1';
+    const read = batchedSources(async () => json({ tokens: {}, signed: { [P]: 'https://signed/p' }, frames: { [A]: { revision: 3, doc: {}, assets: { [P]: `/a/${P}` } } } }), undefined, store);
+
+    await read(url);
+
+    expect((store.kept.get(`${A}@3`) as { assets: unknown }).assets).toEqual({ [P]: `/a/${P}` });
+  });
+
+  it('keeps what a first open fetched', async () => {
+    const store = memory();
+    const read = batchedSources(async () => json({ tokens: {}, frames: { [A]: { revision: 3, doc: { a: 1 }, assets: {} } } }), undefined, store);
+
+    await read(url);
+
+    expect(store.kept.get(`${A}@3`)).toEqual({ revision: 3, doc: { a: 1 }, assets: {}, tokens: {} });
+  });
+});

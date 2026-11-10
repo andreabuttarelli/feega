@@ -1,4 +1,5 @@
 import type { FrameDoc } from './frame-build';
+import { sourceStore } from './frame-source-store';
 
 const SOURCES_KEPT = 8;
 const HTTP_NO_CONTENT = 204;
@@ -103,6 +104,43 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
   };
 }
 
-export const batchedSources = (fetcher: Fetcher, kept = SOURCES_KEPT): ReadSource => sourceReader(frameBatcher(fetcher), kept);
+export type SourceStore = { get: (key: string) => Promise<FrameDoc | null>; put: (key: string, source: FrameDoc) => void };
 
-export const frameSources = batchedSources((url, init) => fetch(url, { cache: 'no-cache', ...init }));
+const NO_STORE: SourceStore = { get: async () => null, put: () => undefined };
+const NOTHING: Response = { ok: false, status: HTTP_NO_CONTENT, json: async () => null } as unknown as Response;
+
+function storeKey(url: string): string | null {
+  const id = FRAME_SOURCE.exec(url)?.[2];
+  const revision = new URL(url, 'http://x').searchParams.get('revision');
+  return id && revision ? `${id}@${revision}` : null;
+}
+
+function kept(fetch: Fetcher, store: SourceStore): Fetcher {
+  return async (url, init) => {
+    const key = storeKey(url);
+    if (!key) {
+      return fetch(url, init);
+    }
+
+    const held = await store.get(key).catch(() => null);
+    const fresh = fetch(url, init)
+      .then((res) => (res.ok && res.status !== HTTP_NO_CONTENT ? (res.json() as Promise<FrameDoc>) : null))
+      .catch(() => null)
+      .then((source) => {
+        if (source?.addresses) {
+          const { addresses, ...rest } = source;
+          store.put(key, { ...rest, assets: addresses });
+        }
+        return source;
+      });
+    if (held) {
+      return answered(held);
+    }
+    const source = await fresh;
+    return source ? answered(source) : NOTHING;
+  };
+}
+
+export const batchedSources = (fetcher: Fetcher, held = SOURCES_KEPT, store: SourceStore = NO_STORE): ReadSource => sourceReader(kept(frameBatcher(fetcher), store), held);
+
+export const frameSources = batchedSources((url, init) => fetch(url, { cache: 'no-cache', ...init }), SOURCES_KEPT, sourceStore());
