@@ -21,7 +21,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, toWarm, untilFound, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -408,8 +408,11 @@
   let settledFrames = $state(new Set<string>());
 
   $effect(() => {
+    frameSources.warm(toWarm(withoutViews(frames), view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
+  });
+
+  $effect(() => {
     const waiting = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup);
-    frameSources.warm(waiting.filter((f) => !known(f)).map(sourceOf));
 
     const room = IN_FLIGHT[currentDevice()] - inFlight;
     if (room <= 0) {

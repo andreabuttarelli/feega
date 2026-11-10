@@ -61,7 +61,7 @@
     </header>
     <ol class="bars">
       {#each report.sources as s}
-        <li><span class="id">sources ×{s.ids}</span><span class="track"><span class="span source" style:left={left(s.start)} style:width={left(s.end - s.start)}></span></span><span class="num">{Math.round(s.bytes / KB)} KB</span></li>
+        <li><span class="id">sources ×{s.ids}</span><span class="track"><span class="span source" style:left={left(s.start)} style:width={left(s.end - s.start)}></span></span><span class="num">{Math.round(s.bytes / KB)} KB</span><span class="phases">{s.start}→{s.end} · ttfb {s.ttfb} · {Object.entries(s.phases).map(([name, ms]) => `${name} ${ms}`).join(' · ')}</span></li>
       {/each}
       {#each report.frames as f}
         <li>
@@ -176,6 +176,11 @@
 
   .num {
     text-align: right;
+  }
+
+  .phases {
+    grid-column: 1 / -1;
+    opacity: 0.7;
   }
 
   table {

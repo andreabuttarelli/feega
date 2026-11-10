@@ -7,6 +7,7 @@ type Env = Record<string, string | undefined>;
 type Resolve = (event: RequestEvent, opts?: ResolveOptions) => Response | Promise<Response>;
 
 export const LOCAL_FILE_ENV = 'FEEGA_LOCAL_FILE';
+export const LOCAL_LATENCY_ENV = 'FEEGA_LOCAL_LATENCY_MS';
 export const LOCAL_TOKEN = 'local';
 export const LOCAL_AI_MESSAGE = 'AI generation runs on feega cloud. Import this .feega file at feega.app to generate.';
 
@@ -93,7 +94,7 @@ export function localStore(env: Env = process.env): FeegaStore | null {
   if (refusal) {
     throw new Error(refusal);
   }
-  const opened = openFeegaStore(path, { origin: env.PUBLIC_APP_URL ?? 'http://localhost:5173' });
+  const opened = openFeegaStore(path, { origin: env.PUBLIC_APP_URL ?? 'http://localhost:5173', latencyMs: Number(env[LOCAL_LATENCY_ENV] ?? 0) });
   process.once('exit', () => opened.flushNow());
   store = opened;
   if (hasAiKey(env)) {
