@@ -187,6 +187,13 @@ impl Tiles {
         self.stale.remove(&key);
     }
 
+    pub fn hold_drawn(&mut self, key: TileKey, drawn: Drawn) {
+        self.hold(key);
+        if drawn == Drawn::Lacking {
+            self.stale.insert(key);
+        }
+    }
+
     pub fn holds(&self, key: TileKey) -> bool {
         self.held.contains(&key)
     }
@@ -354,4 +361,22 @@ pub fn path_for(m: Moment) -> Path {
         return Path::Tiles;
     }
     Path::Exact
+}
+
+pub fn pan_zoom_after(before: Option<f64>, zoom: f64, outcome: Option<crate::retained::Outcome>) -> Option<f64> {
+    if outcome == Some(crate::retained::Outcome::Full) {
+        return Some(zoom);
+    }
+    before.filter(|z| *z == zoom)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Moving {
+    Gesture,
+    Still,
+}
+
+pub fn refreshed(queue: Queue, moving: Moving) -> Vec<TileKey> {
+    let cap = if moving == Moving::Gesture { 1 } else { usize::MAX };
+    queue.stale.into_iter().take(cap).collect()
 }

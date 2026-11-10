@@ -5,6 +5,8 @@ import { test, expect, chromium, webkit, type Browser, type BrowserContext, type
 import { instrument, measure, wheelPan, wheelZoom, type Frames } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
+import { popShare, type Shot, type View } from '../../src/lib/canvas/core/screen-pops';
+import { execFileSync } from 'node:child_process';
 
 enum Engine {
   Chromium = 'chromium',
@@ -19,7 +21,7 @@ enum Gesture {
   DragElement = 'drag-element'
 }
 
-type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null };
+type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null; pops?: number | null };
 type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number; editMs: number };
 type Hotspot = { fn: string; url: string; selfMs: number };
 
@@ -56,6 +58,15 @@ const INK_INSET = 0.15;
 const SHARP_POLL_MS = 60;
 const SHARP_GIVE_UP_MS = 15_000;
 const MS_PER_S = 1000;
+const FLICKER = process.env.BENCH_FLICKER === '1';
+const FLICKERED = new Set([Gesture.Pan, Gesture.Zoom]);
+const FLICKER_REST_MS = 1500;
+const CAST_WIDTH = 720;
+const POP_WIDTH = 360;
+const POP_SHARE = 0.01;
+const CHROME = { left: 100, top: 80, right: 100, bottom: 110 };
+const VIDEO_FPS = 30;
+const VIEW_LAG = 3;
 const US_PER_MS = 1000;
 const HOTSPOTS = 25;
 const ONLY = process.env.BENCH_GESTURES?.split(',') ?? null;
@@ -294,6 +305,89 @@ async function profiling<T>(cdp: CDPSession | null, on: boolean, work: () => Pro
   return { value, profile: (await cdp.send('Profiler.stop')).profile as Profile };
 }
 
+
+type Cast = { at: number; jpeg: Buffer };
+type ViewAt = { at: number; view: View };
+
+async function recordViews(page: Page) {
+  await page.evaluate(() => {
+    const w = window as Window & { __views?: { at: number; view: string }[] };
+    w.__views = [];
+    const tick = () => {
+      const v = document.querySelector('[data-canvas-surface]')?.getAttribute('data-view');
+      if (v && w.__views) {
+        w.__views.push({ at: Date.now(), view: v });
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+async function takeViews(page: Page): Promise<ViewAt[]> {
+  const raw = await page.evaluate(() => {
+    const w = window as Window & { __views?: { at: number; view: string }[] };
+    const views = w.__views ?? [];
+    w.__views = undefined;
+    return views;
+  });
+  return raw.map((r) => {
+    const [x, y, zoom] = r.view.split(',').map(Number);
+    return { at: r.at, view: { x, y, zoom } };
+  });
+}
+
+async function popShot(jpeg: Buffer, view: View): Promise<Shot> {
+  const f = POP_WIDTH / VIEWPORT.width;
+  const crop = { left: CHROME.left, top: CHROME.top, width: VIEWPORT.width - CHROME.left - CHROME.right, height: VIEWPORT.height - CHROME.top - CHROME.bottom };
+  const cast = CAST_WIDTH / VIEWPORT.width;
+  const { data, info } = await sharp(jpeg).extract({ left: Math.round(crop.left * cast), top: Math.round(crop.top * cast), width: Math.round(crop.width * cast), height: Math.round(crop.height * cast) }).resize(Math.round(crop.width * f)).greyscale().raw().toBuffer({ resolveWithObject: true });
+  return { width: info.width, height: info.height, gray: new Uint8Array(data), view: { x: (view.x - crop.left) * f, y: (view.y - crop.top) * f, zoom: view.zoom * f } };
+}
+
+const viewsNear = (views: ViewAt[], at: number): View[] => {
+  const i = views.findLastIndex((v) => v.at <= at);
+  return views.slice(Math.max(0, i - VIEW_LAG), i + VIEW_LAG + 1).map((v) => v.view);
+};
+
+async function flicker(page: Page, cdp: CDPSession, gesture: Gesture, video: string | null): Promise<number> {
+  const casts: Cast[] = [];
+  const onFrame = (e: { data: string; sessionId: number; metadata: { timestamp?: number } }) => {
+    casts.push({ at: (e.metadata.timestamp ?? Date.now() / MS_PER_S) * MS_PER_S, jpeg: Buffer.from(e.data, 'base64') });
+    void cdp.send('Page.screencastFrameAck', { sessionId: e.sessionId }).catch(() => {});
+  };
+  cdp.on('Page.screencastFrame', onFrame);
+  await recordViews(page);
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 80, maxWidth: CAST_WIDTH, maxHeight: Math.round((CAST_WIDTH * VIEWPORT.height) / VIEWPORT.width), everyNthFrame: 1 });
+  await GESTURES[gesture](page, Date.now() + GESTURE_MS / 2);
+  await page.keyboard.up('Control');
+  await page.waitForTimeout(FLICKER_REST_MS);
+  await cdp.send('Page.stopScreencast');
+  cdp.off('Page.screencastFrame', onFrame);
+  const views = await takeViews(page);
+  let pops = 0;
+  const popped: { frame: number; share: number }[] = [];
+  let last: Shot[] | null = null;
+  for (const [i, cast] of casts.entries()) {
+    const shots = await Promise.all(viewsNear(views, cast.at).map((v) => popShot(cast.jpeg, v)));
+    if (last && shots.length) {
+      const share = Math.min(...last.flatMap((b) => shots.map((a) => popShare(b, a))));
+      if (share > POP_SHARE) {
+        pops++;
+        popped.push({ frame: i, share: Math.round(share * 1000) / 1000 });
+      }
+    }
+    last = shots.length ? shots : last;
+  }
+  if (video) {
+    mkdirSync(video, { recursive: true });
+    writeFileSync(`${video}.pops.json`, JSON.stringify(popped));
+    casts.forEach((c, i) => writeFileSync(join(video, `${String(i).padStart(5, '0')}.jpg`), c.jpeg));
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(VIDEO_FPS), '-i', join(video, '%05d.jpg'), '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', `${video}.mp4`]);
+  }
+  return pops;
+}
+
 async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, profiled: boolean): Promise<{ frames: GestureRun; spots: Hotspot[] }> {
   await fitThenZoomIn(page);
   if (gesture === Gesture.Drag) {
@@ -323,10 +417,15 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
     expect(blank, `${gesture}: a frame was blank mid-gesture`).toBe(false);
     expect(settled.blanks, `${gesture}: frames went blank while the canvas settled`).toBe(0);
   }
+  let pops: number | null = null;
+  if (FLICKER && cdp && FLICKERED.has(gesture)) {
+    await fitThenZoomIn(page);
+    pops = await flicker(page, cdp, gesture, profiled ? join(OUT, `flicker-${gesture}`) : null);
+  }
   if (profile) {
     writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
-  return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps }, spots: profile ? hotspots(profile) : [] };
+  return { frames: { pops, fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps }, spots: profile ? hotspots(profile) : [] };
 }
 
 async function untilChanged(page: Page, from: Buffer): Promise<number> {

@@ -349,3 +349,40 @@ fn a_pan_from_the_exact_screen_stays_exact_and_a_zoom_goes_to_tiles() {
     assert_eq!(path_for(Moment { panning: true, ..zoom }), Path::Exact);
     assert_eq!(path_for(Moment { panning: true, lifting: true, ..zoom }), Path::Tiles);
 }
+
+#[test]
+fn the_exact_screen_pans_only_after_a_full_raster_has_drawn_its_overscan() {
+    use gpu_core::retained::Outcome;
+    use gpu_core::tiles::pan_zoom_after;
+
+    assert_eq!(pan_zoom_after(None, 1.0, Some(Outcome::Reused)), None);
+    assert_eq!(pan_zoom_after(None, 1.0, Some(Outcome::Partial)), None);
+    assert_eq!(pan_zoom_after(None, 1.0, Some(Outcome::Full)), Some(1.0));
+    assert_eq!(pan_zoom_after(Some(1.0), 1.0, Some(Outcome::Partial)), Some(1.0));
+    assert_eq!(pan_zoom_after(Some(1.0), 2.0, Some(Outcome::Partial)), None);
+}
+
+#[test]
+fn a_tile_drawn_while_its_group_was_building_is_shown_but_queued_again() {
+    use gpu_core::tiles::Drawn;
+    let mut tiles = Tiles::default();
+    let key = TileKey { step: 0, tx: 0, ty: 0 };
+
+    tiles.hold_drawn(key, Drawn::Lacking);
+
+    assert!(tiles.holds(key));
+    assert_eq!(tiles.queue(vec![key]).stale, vec![key]);
+
+    tiles.hold_drawn(key, Drawn::Whole);
+    assert!(tiles.queue(vec![key]).stale.is_empty());
+}
+
+#[test]
+fn blurry_tiles_never_sharpen_on_screen_and_a_gesture_refreshes_one_changed_tile() {
+    use gpu_core::tiles::{refreshed, Moving, Queue};
+    let k = |tx: i64| TileKey { step: 0, tx, ty: 0 };
+    let queue = || Queue { blank: vec![k(0)], stale: vec![k(1), k(2)], blurry: vec![k(3)] };
+
+    assert_eq!(refreshed(queue(), Moving::Gesture), vec![k(1)]);
+    assert_eq!(refreshed(queue(), Moving::Still), vec![k(1), k(2)]);
+}
