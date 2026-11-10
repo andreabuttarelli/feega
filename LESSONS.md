@@ -49,6 +49,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A fresh core raster per still costs seconds, whatever its size
 **Signal:** a batch of small stills (component thumbnails, posters) takes 1–2 s each; timings show `raster.draw` in a few ms and the first `createImageBitmap(canvas)` eating the rest, the same at 1920×1080 and at 192×50. **Move:** the cost is the new GL context compiling its shaders on first readback, not pixels. Create one raster (`stillRaster` in `core-export.ts`) and reuse it for the whole batch; dispose it when idle.
 
+### A hover outline drawn by the core grows and shrinks during a zoom
+Signal: with the pointer still over a frame, a wheel zoom makes its hover outline 2px, 4px, 6px thick and its gap wider than the node, then snaps back when the gesture ends; the DOM pick box of an element stays right. Cause: core overlay items are world-space strokes built at the zoom of the last quiet moment, and `CoreFrames` only re-sends overlay parts when no gesture is active, so the retained screen scales them with the camera. Move: anything that must keep a screen-space size through a gesture (hover outlines, 1px gaps) is a DOM element placed from `view` (`hover-ring.ts`), not a core overlay item. Measure it with the colour run at a fixed column in screenshots taken mid-zoom, not at rest.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
