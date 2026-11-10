@@ -37,12 +37,26 @@ function stats(outcome: string): Stats {
   return { outcome, pending: c.cache_pending(), cacheBytes: c.cache_bytes(), pictureBytes: c.picture_bytes(), scratchBytes: c.scratch_bytes?.() ?? 0, wasmBytes: wasm?.buffer.byteLength ?? 0, lost: c.lost(), busy: c.busy?.() ?? false };
 }
 
+const waiting: Extract<WorkerIn, { kind: ToWorker.Calls }>[] = [];
+
+function replay(m: Extract<WorkerIn, { kind: ToWorker.Calls }>) {
+  let outcome = '';
+  let why: string | undefined;
+  try {
+    outcome = run(m.calls);
+  } catch (e) {
+    why = e instanceof Error ? e.message : String(e);
+  }
+  reply({ kind: FromWorker.Framed, frames: m.frames, stats: stats(outcome), at: performance.now(), why });
+}
+
 async function attach(width: number, height: number) {
   core?.free();
   core = null;
   const module = (await warmCore()) as unknown as OffscreenCore;
   core = overBytes(await module.WebCore.attach_offscreen(canvas!, width, height));
   reply({ kind: FromWorker.Attached });
+  waiting.splice(0).forEach(replay);
 }
 
 const HANDLERS: { [K in ToWorker]: (m: Extract<WorkerIn, { kind: K }>) => void | Promise<void> } = {
@@ -56,14 +70,10 @@ const HANDLERS: { [K in ToWorker]: (m: Extract<WorkerIn, { kind: K }>) => void |
   },
   [ToWorker.Calls]: (m) => {
     if (!core) {
+      waiting.push(m);
       return;
     }
-    try {
-      const outcome = run(m.calls);
-      reply({ kind: FromWorker.Framed, frames: m.frames, stats: stats(outcome), at: performance.now() });
-    } catch (e) {
-      reply({ kind: FromWorker.Failed, why: e instanceof Error ? e.message : String(e) });
-    }
+    replay(m);
   },
   [ToWorker.Poster]: async (m) => {
     const bytes = core?.poster ? await core.poster(m.group, m.width, m.height, m.scale).catch(() => null) : null;

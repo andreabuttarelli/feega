@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { test, expect, chromium, webkit, type Browser, type BrowserContext, type CDPSession, type Page } from '@playwright/test';
@@ -19,7 +19,8 @@ enum Gesture {
   DragElement = 'drag-element'
 }
 
-type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null };
+type GestureRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null; longMs: number; longest: number; inputP95: number; inputWorst: number };
+type MainThread = { longMs: number; longest: number; inputP95: number; inputWorst: number };
 type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number; editMs: number };
 type Hotspot = { fn: string; url: string; selfMs: number };
 
@@ -58,9 +59,35 @@ const SHARP_GIVE_UP_MS = 15_000;
 const MS_PER_S = 1000;
 const US_PER_MS = 1000;
 const HOTSPOTS = 25;
+const EXTRA_QUERY = process.env.BENCH_QUERY ?? '';
+const INPUT_THRESHOLD_MS = 16;
 const ONLY = process.env.BENCH_GESTURES?.split(',') ?? null;
 const PROFILED = process.env.BENCH_PROFILE !== '0';
 const benched = () => Object.values(Gesture).filter((g) => !ONLY || ONLY.includes(g));
+
+function watchMainThread(threshold: number) {
+  const seen = { long: [] as number[], input: [] as number[] };
+  (window as unknown as { __mainThread: typeof seen }).__mainThread = seen;
+  new PerformanceObserver((list) => list.getEntries().forEach((e) => seen.long.push(e.duration))).observe({ type: 'longtask', buffered: true });
+  new PerformanceObserver((list) => list.getEntries().forEach((e) => seen.input.push(e.duration))).observe({ type: 'event', durationThreshold: threshold, buffered: true } as PerformanceObserverInit);
+}
+
+async function mainThreadSince(page: Page): Promise<MainThread> {
+  const seen = await page.evaluate(() => {
+    const at = (window as unknown as { __mainThread: { long: number[]; input: number[] } }).__mainThread;
+    const copy = { long: [...at.long], input: [...at.input] };
+    at.long.length = 0;
+    at.input.length = 0;
+    return copy;
+  });
+  const input = [...seen.input].sort((a, b) => a - b);
+  return {
+    longMs: Math.round(seen.long.reduce((a, b) => a + b, 0)),
+    longest: Math.round(Math.max(0, ...seen.long)),
+    inputP95: Math.round(input[Math.floor(input.length * 0.95)] ?? 0),
+    inputWorst: Math.round(input.at(-1) ?? 0)
+  };
+}
 
 const shot = (page: Page) => page.screenshot({ clip: { x: 0, y: 0, ...VIEWPORT } });
 
@@ -181,6 +208,16 @@ async function untilDrawn(page: Page) {
   await untilSharp(page);
 }
 
+async function inkedWithin(page: Page, ms: number): Promise<boolean[]> {
+  const started = Date.now();
+  let shown = await inkedOnScreen(page);
+  while (!(shown.length > 0 && shown.every(Boolean)) && Date.now() - started < ms) {
+    await page.waitForTimeout(SHARP_POLL_MS);
+    shown = await inkedOnScreen(page);
+  }
+  return shown;
+}
+
 async function framesInked(page: Page): Promise<boolean> {
   return (await inkedOnScreen(page)).every(Boolean);
 }
@@ -263,12 +300,15 @@ async function fitThenZoomIn(page: Page) {
 async function open(browser: Browser, base: string): Promise<{ context: BrowserContext; page: Page; cdp: CDPSession | null }> {
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block' });
   const page = await context.newPage();
+  page.on('console', (m) => m.type() !== 'log' && appendFileSync(join(OUT, 'console.txt'), `${m.type()} ${m.text()}\n`));
+  page.on('pageerror', (e) => appendFileSync(join(OUT, 'console.txt'), `pageerror ${e.message}\n`));
   await page.addInitScript(instrument);
+  await page.addInitScript(watchMainThread, INPUT_THRESHOLD_MS);
   await page.addInitScript(({ key, view }) => localStorage.setItem(key, JSON.stringify(view)), { key: VIEW_KEY, view: START_VIEW });
   const cdp = ENGINE === Engine.Chromium ? await context.newCDPSession(page) : null;
   await cdp?.send('Performance.enable');
   await cdp?.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
-  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}?coreTiles=${process.env.BENCH_TILES ? 1 : 0}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${LANDINGS_FIXTURE_PLACE.projectId}/c/${LANDINGS_FIXTURE_PLACE.canvasId}?coreTiles=${process.env.BENCH_TILES ? 1 : 0}${EXTRA_QUERY}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await untilDrawn(page);
   return { context, page, cdp };
@@ -299,14 +339,16 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   if (gesture === Gesture.Drag) {
     await titlesInView(page);
   }
-  const shown = await inkedOnScreen(page);
+  const shown = await inkedWithin(page, DRAWN_GIVE_UP_MS);
   if (!(shown.length > 0 && shown.every(Boolean))) {
     writeFileSync(join(OUT, `gate-${gesture}.png`), await shot(page));
   }
-  expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture`).toBe(true);
+  expect(shown.length > 0 && shown.every(Boolean), `${gesture}: frames not drawn before the gesture ${JSON.stringify(shown)} ${JSON.stringify(await page.locator('[data-testid="gpu-node"]').evaluateAll((ns) => ns.map((n) => { const r = n.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; })))}`).toBe(true);
   const before = await taskMs(cdp);
+  await mainThreadSince(page);
   const { value: frames, profile } = await profiling(cdp, profiled, () => measure(page, GESTURE_MS, (until) => GESTURES[gesture](page, until)));
   const after = await taskMs(cdp);
+  const main = await mainThreadSince(page);
   await untilDrawn(page);
   expect(await framesInked(page), `${gesture}: frames not drawn after the gesture`).toBe(true);
   let swaps: number | null = null;
@@ -326,7 +368,7 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   if (profile) {
     writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
-  return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps }, spots: profile ? hotspots(profile) : [] };
+  return { frames: { fps: frames.fpsAvg, p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps, ...main }, spots: profile ? hotspots(profile) : [] };
 }
 
 async function untilChanged(page: Page, from: Buffer): Promise<number> {
@@ -398,7 +440,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
 
 function medianOf(runs: BenchRun[]) {
   const pick = (values: (number | null)[]) => (values.some((v) => v === null) ? null : mid(values as number[]));
-  const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'p95', 'worst', 'cpuMs'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
+  const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'p95', 'worst', 'cpuMs', 'longMs', 'longest', 'inputP95', 'inputWorst'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
   return { ...gestures, sharpMs: mid(runs.map((r) => r.sharpMs)), editMs: mid(runs.map((r) => r.editMs)) };
 }
 

@@ -25,5 +25,5 @@ export type WorkerIn =
 export type WorkerOut =
   | { kind: FromWorker.Attached }
   | { kind: FromWorker.Failed; why: string }
-  | { kind: FromWorker.Framed; frames: number; stats: Stats; at: number }
+  | { kind: FromWorker.Framed; frames: number; stats: Stats; at: number; why?: string }
   | { kind: FromWorker.Poster; id: number; bytes: Uint8Array | null };

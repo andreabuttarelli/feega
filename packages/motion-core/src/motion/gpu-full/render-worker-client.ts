@@ -65,6 +65,9 @@ function workerAttached(worker: Worker, groups: Set<string>, side: number): Atta
     const m = event.data;
     if (m.kind === FromWorker.Framed) {
       acked += m.frames;
+      if (m.why) {
+        console.warn('[core] render worker call failed', m.why);
+      }
       stats = m.stats;
       return;
     }
@@ -106,7 +109,7 @@ function workerAttached(worker: Worker, groups: Set<string>, side: number): Atta
       return true;
     },
     drop_group: (key) => (groups.delete(key), call('drop_group', key)),
-    cache_pending: () => stats.pending,
+    cache_pending: () => stats.pending || sent > acked,
     cache_bytes: () => stats.cacheBytes,
     scratch_bytes: () => stats.scratchBytes,
     picture_bytes: () => stats.pictureBytes,
