@@ -320,3 +320,22 @@ fn a_lift_without_a_camera_move_draws_from_tiles() {
     assert_eq!(path_for(Moment { gesture: true, ..still }), Path::Tiles);
     assert_eq!(path_for(Moment { settling: true, ..still }), Path::Tiles);
 }
+
+#[test]
+fn a_rest_picture_with_a_block_drawn_while_a_group_was_building_is_not_adopted() {
+    use gpu_core::tiles::Drawn;
+    let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
+    let mut rest = Rest::new(camera, (REST_BLOCK_PX, REST_BLOCK_PX * 2));
+    rest.next();
+    rest.drew(Drawn::Lacking);
+    rest.next();
+    rest.drew(Drawn::Whole);
+
+    assert!(rest.todo().is_empty());
+    assert!(!rest.adoptable());
+
+    let mut whole = Rest::new(camera, (REST_BLOCK_PX, REST_BLOCK_PX));
+    whole.next();
+    whole.drew(Drawn::Whole);
+    assert!(whole.adoptable());
+}
