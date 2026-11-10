@@ -100,14 +100,13 @@ measures this checkout. An entry may carry its own query (`off=.?coreTiles=0,on=
 compare one build with a switch off and on. The spec fails when a frame is still blank in a
 screenshot taken more than a frame after its vectors were drawn (`shownLate`). `BENCH_RECORD=1` saves a video per case.
 
-<<<<<<< HEAD
 `FEEGA_LOCAL_LATENCY_MS=<ms>` delays every local database query by that much, so the bench sees
 round trips like a remote Supabase (the user's canvas costs ~1.1–1.7 s per sources batch there,
 local answers in ~70 ms). Give both builds the same value.
 
 Resource Timing's `responseEnd` waits for the page's main thread: a long task during start makes
 a 5 ms body look like a 1 s download. Check `longtask` entries before reading it as network time.
-=======
+
 ## Debug log
 
 Off by default. Add `?debug` to the canvas URL, or run `localStorage.setItem('feega:debug', '1')`
@@ -116,4 +115,3 @@ a time from navigation start and an area tag: `[startup]` `[sources]` `[build]` 
 `[raster]` `[images]` `[posters]` `[camera]`. Sources lines carry bytes, ms and Server-Timing
 phases; `[camera]` lines mark gesture start/end and any frame over 32 ms with the gesture name.
 Nothing is subscribed or built when off.
->>>>>>> origin/dev
