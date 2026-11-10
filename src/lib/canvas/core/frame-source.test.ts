@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toFetch, toWarm, untilFound } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toFetch, toWarm, untilFound, openingSources, frameSourceUrl } from './frame-source';
 import { ItemKind, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 import { BlendMode } from '@feega/motion-core/motion/blend';
@@ -249,5 +249,17 @@ describe('the sources warmed on open', () => {
 
   it('leaves out frames already asked or drawn live', () => {
     expect(toWarm([at('a', 0), at('b', 0), at('c', 0)], view, { width: 100, height: 100 }, keyOf, new Set(['a:1']), new Set(['b'])).map((f) => f.id)).toEqual(['c']);
+  });
+});
+
+describe('the sources asked before the canvas mounts', () => {
+  const place = { projectId: 'p1', canvasId: 'c1', orgId: 'o1' };
+  const node = (id: string, x: number, data: Record<string, unknown>) => ({ id, type: 'motion', position: { x, y: 0 }, size: { width: 100, height: 100 }, data });
+
+  it('asks every frame with a saved revision, on-screen first, under the same url the canvas will read', () => {
+    const urls = openingSources([node('far', 9000, { docHeadRevision: 2 }), node('near', 0, { docHeadRevision: 4, linked: { m: 'x' } }), node('unsaved', 0, {})], place, { x: 0, y: 0, zoom: 1 }, { width: 800, height: 600 });
+
+    expect(urls).toEqual([frameSourceUrl(place, { id: 'near', revision: 4, linked: '{"m":"x"}' }), frameSourceUrl(place, { id: 'far', revision: 2 })]);
+    expect(urls[1]).toBe('/p/p1/c/c1/motion/far/source?revision=2&org=o1');
   });
 });

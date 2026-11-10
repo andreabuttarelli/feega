@@ -47,6 +47,19 @@ export const toFetch = <F extends { id: string }>(frames: readonly F[], keyOf: (
 export const toWarm = <F extends { id: string; box: Box }>(frames: readonly F[], view: Viewport, screen: Screen, keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
   toFetch(onScreenFirst(frames, view, screen), keyOf, asked, drawnLive);
 
+export type SourcePlace = { projectId: string; canvasId: string; orgId?: string };
+
+export const frameSourceUrl = (place: SourcePlace, f: { id: string; revision: number; linked?: string }): string =>
+  `/p/${place.projectId}/c/${place.canvasId}/motion/${f.id}/source?${new URLSearchParams({ revision: String(f.revision), ...(f.linked ? { linked: f.linked } : {}), ...(place.orgId ? { org: place.orgId } : {}) })}`;
+
+type PageNode = { id: string; type: string; position: { x: number; y: number }; size: { width?: number | null; height?: number | null }; data: FrameData };
+
+export function openingSources(nodes: readonly PageNode[], place: SourcePlace, view: Viewport, screen: Screen): string[] {
+  const tiles = nodes.map((n) => ({ id: n.id, kind: n.type, x: n.position.x, y: n.position.y, w: n.size.width ?? 0, h: n.size.height ?? 0 }));
+  const data = new Map(nodes.map((n) => [n.id, n.data]));
+  return onScreenFirst(framesOnCanvas(tiles, (id) => data.get(id) ?? {}), view, screen).map((f) => frameSourceUrl(place, f));
+}
+
 export const fetchKey = (f: { id: string; revision: number }) => `${f.id}:${f.revision}`;
 
 export const pickedToFetch = <F extends { id: string; revision: number }>(frames: readonly F[], picked: readonly string[], fetched: ReadonlyMap<string, number>, rushed: ReadonlySet<string>): F[] =>
