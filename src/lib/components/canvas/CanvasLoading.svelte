@@ -6,6 +6,7 @@
   let { content }: { content: CanvasContent } = $props();
 
   const GIVE_UP_MS = 10_000;
+  const AFTER_BUILT_MS = 1500;
 
   let done = $state(new Set<StartupStep>());
   let gaveUp = $state(false);
@@ -16,9 +17,18 @@
     done = new Set(startupMarks(performance.getEntriesByType('mark')).map((m) => m.step));
     const reached = (e: Event) => (done = new Set([...done, (e as CustomEvent<StartupStep>).detail]));
     const timer = setTimeout(() => (gaveUp = true), GIVE_UP_MS);
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const built = (e: Event) => {
+      if ((e as CustomEvent<StartupStep>).detail === StartupStep.FirstBuilt) {
+        settle = setTimeout(() => (gaveUp = true), AFTER_BUILT_MS);
+      }
+    };
+    window.addEventListener(STARTUP_EVENT, built);
     window.addEventListener(STARTUP_EVENT, reached);
     return () => {
       clearTimeout(timer);
+      clearTimeout(settle);
+      window.removeEventListener(STARTUP_EVENT, built);
       window.removeEventListener(STARTUP_EVENT, reached);
     };
   });
@@ -57,9 +67,11 @@
   }
 
   .track {
-    width: 160px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     height: 3px;
-    border-radius: 9999px;
     overflow: hidden;
     background: color-mix(in srgb, var(--ink, #111) 10%, transparent);
   }
