@@ -368,12 +368,12 @@ fn a_tile_drawn_while_its_group_was_building_is_shown_but_queued_again() {
     let mut tiles = Tiles::default();
     let key = TileKey { step: 0, tx: 0, ty: 0 };
 
-    tiles.hold_drawn(key, Drawn::Lacking);
+    assert!(tiles.hold_drawn(key, Drawn::Lacking));
 
     assert!(tiles.holds(key));
     assert_eq!(tiles.queue(vec![key]).stale, vec![key]);
 
-    tiles.hold_drawn(key, Drawn::Whole);
+    assert!(tiles.hold_drawn(key, Drawn::Whole));
     assert!(tiles.queue(vec![key]).stale.is_empty());
 }
 
@@ -385,4 +385,16 @@ fn blurry_tiles_never_sharpen_on_screen_and_a_gesture_refreshes_one_changed_tile
 
     assert_eq!(refreshed(queue(), Moving::Gesture), vec![k(1)]);
     assert_eq!(refreshed(queue(), Moving::Still), vec![k(1), k(2)]);
+}
+
+#[test]
+fn a_tile_drawn_while_its_group_was_building_stays_off_screen_where_another_tile_covers_it() {
+    use gpu_core::tiles::Drawn;
+    let mut tiles = Tiles::default();
+    let fine = TileKey { step: 1, tx: 0, ty: 0 };
+    let coarse = TileKey { step: 0, tx: 0, ty: 0 };
+    tiles.hold(coarse);
+
+    assert!(!tiles.hold_drawn(fine, Drawn::Lacking));
+    assert!(!tiles.holds(fine));
 }

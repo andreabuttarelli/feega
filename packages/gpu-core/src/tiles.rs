@@ -187,11 +187,15 @@ impl Tiles {
         self.stale.remove(&key);
     }
 
-    pub fn hold_drawn(&mut self, key: TileKey, drawn: Drawn) {
+    pub fn hold_drawn(&mut self, key: TileKey, drawn: Drawn) -> bool {
+        if drawn == Drawn::Lacking && !self.held.contains(&key) && self.covered(key) {
+            return false;
+        }
         self.hold(key);
         if drawn == Drawn::Lacking {
             self.stale.insert(key);
         }
+        true
     }
 
     pub fn holds(&self, key: TileKey) -> bool {

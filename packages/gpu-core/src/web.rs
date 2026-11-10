@@ -527,7 +527,7 @@ impl WebCore {
         let side = TILE_PX + 2 * TILE_GUTTER_PX;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         for key in &batch.keys {
-            if drawn == Drawn::Lacking && self.tile_textures.contains_key(key) {
+            if drawn == Drawn::Lacking && (self.tile_textures.contains_key(key) || self.tiles.covered(*key)) {
                 self.tiles.hold_drawn(*key, drawn);
                 continue;
             }
