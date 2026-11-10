@@ -55,6 +55,8 @@ mod gpu {
     use gpu_core::pictures::Pictures;
     use gpu_core::render::Renderer;
 
+    const EXPECTED_SHADOW: [[u8; 4]; 6] = [[83, 0, 0, 255], [34, 0, 0, 255], [4, 0, 0, 255], [57, 0, 0, 255], [255, 255, 255, 255], [0, 0, 0, 255]];
+
     fn render(json: &str) -> Vec<u8> {
         let mut renderer = Renderer::new().expect("a GPU adapter");
         let rendered = renderer.render(&parse(json).unwrap(), &Pictures::new()).unwrap();
@@ -130,6 +132,55 @@ mod gpu {
 
         assert_eq!(px(&pixels, 52, 32), [255, 0, 0, 255]);
         assert_eq!(px(&pixels, 32, 32), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn a_blurred_drop_shadow_keeps_its_falloff() {
+        let pixels = render(&square(r##"{ "kind": "css", "fns": [{ "name": "drop-shadow", "args": ["6px", "4px", "8px", "rgba(255,0,0,0.5)"] }] }"##));
+        let seen: Vec<[u8; 4]> = [(52, 32), (56, 40), (60, 50), (32, 52), (32, 32), (10, 10)].iter().map(|&(x, y)| px(&pixels, x, y)).collect();
+
+        let expected: [[u8; 4]; 6] = EXPECTED_SHADOW;
+        for (got, want) in seen.iter().zip(expected) {
+            assert!(got.iter().zip(want).all(|(g, w)| (*g as i32 - w as i32).abs() <= 2), "{seen:?}");
+        }
+    }
+
+    #[test]
+    fn an_svg_effect_shadow_keeps_its_falloff() {
+        let filter = r##"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+          { "tag": "feMorphology", "attrs": { "in": "SourceAlpha", "operator": "dilate", "radius": 2, "result": "grown" }, "children": [] },
+          { "tag": "feOffset", "attrs": { "in": "grown", "dx": 5, "dy": 3, "result": "moved" }, "children": [] },
+          { "tag": "feGaussianBlur", "attrs": { "in": "moved", "stdDeviation": 4, "result": "soft" }, "children": [] },
+          { "tag": "feFlood", "attrs": { "flood-color": "#ff0000", "flood-opacity": 0.6, "result": "ink" }, "children": [] },
+          { "tag": "feComposite", "attrs": { "in": "ink", "in2": "soft", "operator": "in", "result": "shade" }, "children": [] },
+          { "tag": "feMerge", "attrs": {}, "children": [{ "tag": "feMergeNode", "attrs": { "in": "shade" }, "children": [] }, { "tag": "feMergeNode", "attrs": { "in": "SourceGraphic" }, "children": [] }] }
+        ] }] }"##;
+        let pixels = render(&square(filter));
+        let seen: Vec<[u8; 4]> = [(52, 32), (56, 40), (60, 50), (32, 52), (32, 32), (10, 10), (50, 50)].iter().map(|&(x, y)| px(&pixels, x, y)).collect();
+
+        let expected: [[u8; 4]; 7] = [[112, 0, 0, 255], [0, 0, 0, 255], [0, 0, 0, 255], [84, 0, 0, 255], [255, 255, 255, 255], [0, 0, 0, 255], [98, 0, 0, 255]];
+        for (got, want) in seen.iter().zip(expected) {
+            assert!(got.iter().zip(want).all(|(g, w)| (*g as i32 - w as i32).abs() <= 2), "{seen:?}");
+        }
+    }
+
+    #[test]
+    fn an_svg_inner_shadow_keeps_its_rim() {
+        let filter = r##"{ "kind": "svg", "nodes": [{ "tag": "filter", "attrs": {}, "children": [
+          { "tag": "feOffset", "attrs": { "in": "SourceAlpha", "dx": 3, "dy": -4, "result": "moved" }, "children": [] },
+          { "tag": "feGaussianBlur", "attrs": { "in": "moved", "stdDeviation": 3, "result": "soft" }, "children": [] },
+          { "tag": "feComposite", "attrs": { "in": "SourceAlpha", "in2": "soft", "operator": "out", "result": "rim" }, "children": [] },
+          { "tag": "feFlood", "attrs": { "flood-color": "#0000ff", "flood-opacity": 0.7, "result": "ink" }, "children": [] },
+          { "tag": "feComposite", "attrs": { "in": "ink", "in2": "rim", "operator": "in", "result": "shade" }, "children": [] },
+          { "tag": "feMerge", "attrs": {}, "children": [{ "tag": "feMergeNode", "attrs": { "in": "SourceGraphic" }, "children": [] }, { "tag": "feMergeNode", "attrs": { "in": "shade" }, "children": [] }] }
+        ] }] }"##;
+        let pixels = render(&square(filter));
+        let seen: Vec<[u8; 4]> = [(17, 46), (20, 44), (24, 40), (32, 32), (46, 18), (40, 46), (10, 10)].iter().map(|&(x, y)| px(&pixels, x, y)).collect();
+
+        let expected: [[u8; 4]; 7] = [[88, 88, 255, 255], [131, 131, 255, 255], [228, 228, 255, 255], [255, 255, 255, 255], [241, 241, 255, 255], [113, 113, 255, 255], [0, 0, 0, 255]];
+        for (got, want) in seen.iter().zip(expected) {
+            assert!(got.iter().zip(want).all(|(g, w)| (*g as i32 - w as i32).abs() <= 2), "{seen:?}");
+        }
     }
 
     #[test]
