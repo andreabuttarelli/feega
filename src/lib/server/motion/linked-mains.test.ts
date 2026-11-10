@@ -83,7 +83,7 @@ describe('an instance on another canvas depends on its main', () => {
     await save(db, a.id, 1, relabel(main, compId, 'Order'));
     const batch = await motionSources({ db, orgId: ORG, projectId: 'p', canvasId: 'canvas-b', nodeIds: [b.id], sign: async () => new Map<string, string>() });
 
-    expect(innerText(batch.get(b.id)!.doc, compId)).toBe('Order');
+    expect(innerText(batch.frames.get(b.id)!.doc, compId)).toBe('Order');
   });
 
   it('serves a frame whose node lags its head inside the batch, at the newest revision', async () => {
@@ -92,7 +92,7 @@ describe('an instance on another canvas depends on its main', () => {
     await patchNodeData(db, { orgId: ORG, nodeId: a.id, patch: { docHeadRevision: 0 }, check: DataCheck.None, actor: USER });
     const batch = await motionSources({ db, orgId: ORG, projectId: 'p', canvasId: 'canvas-a', nodeIds: [a.id], sign: async () => new Map<string, string>() });
 
-    expect(batch.get(a.id)?.revision).toBe(1);
+    expect(batch.frames.get(a.id)?.revision).toBe(1);
   });
 
   it('exports code from the resolved instance', async () => {

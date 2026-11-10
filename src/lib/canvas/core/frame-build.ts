@@ -9,7 +9,7 @@ import type { Smoothing } from '@feega/motion-core/motion/gpu-full/text/painter'
 import { sceneNodeIds } from '$lib/motion/scenes';
 import { frameOfLive } from './frame-source';
 
-export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens; playhead?: number };
+export type FrameDoc = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens; playhead?: number; addresses?: Record<string, string> };
 
 export type Fonts = (doc: MotionDoc, assets: Record<string, string>, tokens: BrandTokens) => Promise<FaceBook>;
 

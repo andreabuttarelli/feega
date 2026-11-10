@@ -21,8 +21,8 @@ describe('the head of a frame with a long history', () => {
 
     const sources = await motionSources({ db, orgId: 'org-a', projectId: 'p1', canvasId: 'c1', nodeIds: [POINTED, UNPOINTED], sign: async () => new Map() });
 
-    expect(sources.get(POINTED)?.revision).toBe(REVISIONS);
-    expect(sources.get(UNPOINTED)?.revision).toBe(REVISIONS);
+    expect(sources.frames.get(POINTED)?.revision).toBe(REVISIONS);
+    expect(sources.frames.get(UNPOINTED)?.revision).toBe(REVISIONS);
     expect(calls.filter((c) => c.table === 'motion_revisions' && !c.limit && !c.ors)).toHaveLength(0);
   });
 });

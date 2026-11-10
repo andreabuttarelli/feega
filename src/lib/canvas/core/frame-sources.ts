@@ -54,7 +54,10 @@ export function sourceReader(fetcher: (url: string) => Promise<Response>, kept =
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 type Waiting = { id: string; url: string; settle: (res: Response | Promise<Response>) => void };
-type Batch = { tokens: unknown; frames: Record<string, Omit<FrameDoc, 'tokens'>> };
+type Batch = { tokens: unknown; signed?: Record<string, string>; frames: Record<string, Omit<FrameDoc, 'tokens'>> };
+
+const signedFrame = (batch: Batch, frame: Omit<FrameDoc, 'tokens'>): FrameDoc =>
+  ({ ...frame, tokens: batch.tokens, addresses: frame.assets, assets: Object.fromEntries(Object.entries(frame.assets).map(([id, at]) => [id, batch.signed?.[id] ?? at])) }) as FrameDoc;
 
 const FRAME_SOURCE = /^(\/p\/[^/]+\/c\/[^/]+\/motion)\/([0-9a-f-]{36})\/source(?:\?|$)/i;
 const HTTP_OK = 200;
@@ -72,7 +75,7 @@ function frameBatcher(fetcher: Fetcher): Fetcher {
 
     for (const w of waiting) {
       const frame = batch?.frames[w.id];
-      w.settle(frame ? answered({ ...frame, tokens: batch.tokens } as FrameDoc) : fetcher(w.url));
+      w.settle(frame ? answered(signedFrame(batch, frame)) : fetcher(w.url));
     }
   };
 
