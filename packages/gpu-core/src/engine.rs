@@ -172,6 +172,9 @@ impl Gpu<'_> {
 
     fn encode(&mut self, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
         self.runner.passes.flush(self.runner.queue);
+        if crate::probe_off(crate::PROBE_NO_VELLO) {
+            return Ok(());
+        }
         let params = RenderParams { base_color: base, width, height, antialiasing_method: AaConfig::Area };
         if !empties_the_atlas(scene) {
             return self.vello.render_to_texture(self.runner.device, self.runner.queue, scene, target, &params);

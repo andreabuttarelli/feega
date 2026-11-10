@@ -666,6 +666,16 @@ impl FilterPasses {
     pub fn run(&self, device: &wgpu::Device, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
         let pipeline = &self.pipelines.iter().find(|(o, _)| *o == op).expect("every op has a pipeline").1;
         let [a, b] = inputs;
+        let index = SOURCES.iter().position(|(o, _)| *o == op).unwrap_or(0);
+        let skip = crate::PROBE_MODE.with(|m| m.get() >> 2);
+        if crate::probe_off(crate::PROBE_NO_FX) || skip == index as u32 + 1 {
+            return a.clone();
+        }
+        crate::PROBE_OPS.with(|o| {
+            let mut o = o.borrow_mut();
+            o[index].0 += 1;
+            o[index].1 += a.width() as f64 * a.height() as f64 / 1e6;
+        });
         let out = self.texture(device, a.width(), a.height());
         let padded: Vec<u8> = params.iter().chain(std::iter::once(&0.0)).flat_map(|v| v.to_le_bytes()).collect();
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: None, contents: &padded, usage: wgpu::BufferUsages::STORAGE });

@@ -45,3 +45,15 @@ pub struct Skipped {
     pub clip: String,
     pub what: String,
 }
+
+thread_local! {
+    pub static PROBE_MODE: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+pub const PROBE_NO_FX: u32 = 1;
+pub const PROBE_NO_VELLO: u32 = 2;
+pub fn probe_off(bit: u32) -> bool {
+    PROBE_MODE.with(|m| m.get() & bit != 0)
+}
+thread_local! {
+    pub static PROBE_OPS: std::cell::RefCell<[(u32, f64); 15]> = const { std::cell::RefCell::new([(0, 0.0); 15]) };
+}

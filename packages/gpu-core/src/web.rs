@@ -819,6 +819,17 @@ impl WebCore {
         self.present_tiles(&keys)
     }
 
+    pub fn probe_ops(&mut self) -> String {
+        crate::PROBE_OPS.with(|o| {
+            let taken = std::mem::take(&mut *o.borrow_mut());
+            format!("{taken:?}")
+        })
+    }
+
+    pub fn probe_mode(&mut self, mode: u32) {
+        crate::PROBE_MODE.with(|m| m.set(mode));
+    }
+
     pub fn probe_present(&mut self, side: i64) -> Result<(), JsValue> {
         let screen = (self.target.width(), self.target.height());
         let step = crate::tiles::step_of(self.camera.zoom);
