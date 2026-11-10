@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use vello::wgpu;
 use wasm_bindgen::prelude::*;
-use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap};
+use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap, OffscreenCanvas};
 
 use vello::kurbo::Rect;
 
@@ -301,8 +301,20 @@ impl WebCore {
     pub async fn attach(canvas: HtmlCanvasElement, width: u32, height: u32) -> Result<WebCore, JsValue> {
         canvas.set_width(width);
         canvas.set_height(height);
+        WebCore::attach_to(wgpu::SurfaceTarget::Canvas(canvas), width, height).await
+    }
+
+    pub async fn attach_offscreen(canvas: OffscreenCanvas, width: u32, height: u32) -> Result<WebCore, JsValue> {
+        canvas.set_width(width);
+        canvas.set_height(height);
+        WebCore::attach_to(wgpu::SurfaceTarget::OffscreenCanvas(canvas), width, height).await
+    }
+}
+
+impl WebCore {
+    async fn attach_to(target: wgpu::SurfaceTarget<'static>, width: u32, height: u32) -> Result<WebCore, JsValue> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::BROWSER_WEBGPU, ..wgpu::InstanceDescriptor::new_without_display_handle() });
-        let surface = instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas)).map_err(failed)?;
+        let surface = instance.create_surface(target).map_err(failed)?;
         let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&surface), ..Default::default() }).await.map_err(failed)?;
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(failed)?;
         let lost = Arc::new(AtomicBool::new(false));
@@ -323,6 +335,10 @@ impl WebCore {
         Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
     }
 
+}
+
+#[wasm_bindgen]
+impl WebCore {
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
         self.warmup.stirred(js_sys::Date::now());
         let source = external(source)?;

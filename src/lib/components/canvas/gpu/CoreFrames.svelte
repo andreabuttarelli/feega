@@ -6,6 +6,7 @@
   import { loadFonts } from '@feega/motion-core/motion/gpu-full/text/load';
   import { CoreMotion, createCore, createCoreGl, dropCore, type CoreRaster } from '@feega/motion-core/motion/gpu-full/core-web';
   import { createCoreNative, nativeCanvasOffered } from '@feega/motion-core/motion/gpu-full/core-native';
+  import { createCoreWorker, renderWorkerOffered } from '@feega/motion-core/motion/gpu-full/render-worker-client';
   import { createMedia, Readiness, VideoPreload, videoUses } from '@feega/motion-core/motion/gpu-full/media';
   import { createRamPreview, type FrameRange } from '@feega/motion-core/motion/gpu-full/ram-preview';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
@@ -58,7 +59,8 @@
   markStartup(StartupStep.Mounted);
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
-  const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
+  const RENDER_WORKER = typeof location !== 'undefined' && new URLSearchParams(location.search).has('renderWorker') && renderWorkerOffered();
+  const BACKENDS = RENDER_WORKER ? [createCoreWorker] : nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
   const budget = BUDGET[currentDevice()];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
