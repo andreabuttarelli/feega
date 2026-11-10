@@ -162,7 +162,7 @@ export const PORT: SnapcnPort = {
     };
 
     const sky = String(p.sky ?? '');
-    const img = S.h('img', { src: sky || null, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover', display: sky ? null : 'none' } }) as HTMLElement;
+    const img = sky ? (S.h('img', { src: sky, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover' } }) as HTMLElement) : null;
     const host = S.h('div', { style: { position: 'absolute', inset: 0 } }) as HTMLElement;
     view.root.replaceChildren(S.fill({ background: card, overflow: 'hidden' }, img, host));
     const tileStroke = S.mixOklch(String(t.border), card, TILE_LINE);
@@ -188,7 +188,9 @@ export const PORT: SnapcnPort = {
       const logoScale = LOCKUP_MARK / Math.max(logo.width, logo.height);
       const lineScale = sample(LINE_SCALE, s);
       const lineDrift = sample(LINE_X, s);
-      img.style.transform = `scale(${1 + SKY_ZOOM.from * Math.exp(-s / SKY_ZOOM.tau)})`;
+      if (img) {
+        img.style.transform = `scale(${1 + SKY_ZOOM.from * Math.exp(-s / SKY_ZOOM.tau)})`;
+      }
       const swing = sample(WIPE_LEAN, s);
       const lean = 1 + swing * swing;
       const wipe = sample(WIPE, s);
