@@ -87,3 +87,17 @@ export function thumbsDue<T extends Drawn>(shown: readonly Shown[], frames: read
     return f && !taken.has(f.key) && layer.group === f.group ? [f] : [];
   });
 }
+
+const POSTER_WIDTH_PX = 480;
+const POSTER_MAX_SIDE_PX = 4096;
+
+export function posterSize(box: Box): Size & { scale: number } {
+  const scale = Math.min(1, POSTER_WIDTH_PX / box.w, POSTER_MAX_SIDE_PX / box.h);
+  return { width: Math.max(1, Math.round(box.w * scale)), height: Math.max(1, Math.round(box.h * scale)), scale };
+}
+
+export async function posterBlob(pixels: ImageData): Promise<Blob | null> {
+  const out = new OffscreenCanvas(pixels.width, pixels.height);
+  out.getContext('2d')?.putImageData(pixels, 0, 0);
+  return out.convertToBlob({ type: THUMB_TYPE, quality: THUMB_QUALITY }).catch(() => null);
+}
