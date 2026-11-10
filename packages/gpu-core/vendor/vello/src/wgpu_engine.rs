@@ -109,18 +109,67 @@ struct BindMap {
     buf_map: HashMap<ResourceId, BindMapBuffer>,
     image_map: HashMap<ResourceId, (Texture, TextureView)>,
     pending_clears: HashSet<ResourceId>,
+    bind_groups: HashMap<BindGroupKey, BindGroup>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
-struct BufferProperties {
-    size: u64,
+struct BindGroupKey {
+    layout: BindGroupLayout,
+    resources: Vec<BoundResource>,
+}
+
+#[derive(Hash, PartialEq, Eq)]
+enum BoundResource {
+    Range(Buffer, u64, u64),
+    View(TextureView),
+}
+
+#[derive(Hash, PartialEq, Eq)]
+struct BufferKind {
     usages: BufferUsages,
     name: &'static str,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+struct ImageKind {
+    width: u32,
+    height: u32,
+    format: wgpu::TextureFormat,
+}
+
+impl ImageKind {
+    fn of(proxy: &ImageProxy) -> Self {
+        Self {
+            width: proxy.width,
+            height: proxy.height,
+            format: proxy.format.to_wgpu(),
+        }
+    }
+}
+
+impl BindGroupKey {
+    fn binds_buffer(&self, buf: &Buffer) -> bool {
+        self.resources.iter().any(|r| match r {
+            BoundResource::Range(b, _, _) => b == buf,
+            BoundResource::View(_) => false,
+        })
+    }
+
+    fn binds_view(&self, view: &TextureView) -> bool {
+        self.resources
+            .iter()
+            .any(|r| matches!(r, BoundResource::View(v) if v == view))
+    }
+}
+
+const BUFFERS_PER_KIND: usize = 2;
+const POOLED_IMAGES: usize = 8;
+const CACHED_BIND_GROUPS: usize = 512;
+
 #[derive(Default)]
 struct ResourcePool {
-    bufs: HashMap<BufferProperties, Vec<Buffer>>,
+    bufs: HashMap<BufferKind, Vec<Buffer>>,
+    images: Vec<(ImageKind, Texture, TextureView)>,
 }
 
 /// The transient bind map contains short-lifetime resources.
@@ -430,31 +479,14 @@ impl WgpuEngine {
                     let block_size = format
                         .block_copy_size(None)
                         .expect("ImageFormat must have a valid block size");
-                    let texture = device.create_texture(&wgpu::TextureDescriptor {
-                        label: None,
-                        size: wgpu::Extent3d {
+                    let (texture, texture_view) = self.pool.take_image(
+                        ImageKind {
                             width: image_proxy.width,
                             height: image_proxy.height,
-                            depth_or_array_layers: 1,
+                            format,
                         },
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: wgpu::TextureDimension::D2,
-                        usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-                        format,
-                        view_formats: &[],
-                    });
-                    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                        label: None,
-                        dimension: Some(TextureViewDimension::D2),
-                        usage: None,
-                        aspect: TextureAspect::All,
-                        mip_level_count: None,
-                        base_mip_level: 0,
-                        base_array_layer: 0,
-                        array_layer_count: None,
-                        format: Some(format),
-                    });
+                        device,
+                    );
                     queue.write_texture(
                         wgpu::TexelCopyTextureInfo {
                             texture: &texture,
@@ -478,7 +510,8 @@ impl WgpuEngine {
                         .insert_image(image_proxy.id, texture, texture_view);
                 }
                 Command::WriteImage(proxy, [x, y], image) => {
-                    let (texture, _) = self.bind_map.get_or_create_image(*proxy, device);
+                    let (texture, _) = self.bind_map
+                        .get_or_create_image(*proxy, &mut self.pool, device);
                     let format = proxy.format.to_wgpu();
                     let block_size = format
                         .block_copy_size(None)
@@ -759,18 +792,14 @@ impl WgpuEngine {
             if let Some(buf) = self.bind_map.buf_map.remove(&id)
                 && let MaterializedBuffer::Gpu(gpu_buf) = buf.buffer
             {
-                let props = BufferProperties {
-                    size: gpu_buf.size(),
-                    usages: gpu_buf.usage(),
-                    name: buf.label,
-                };
-                self.pool.bufs.entry(props).or_default().push(gpu_buf);
+                self.pool
+                    .recycle_buf(gpu_buf, buf.label, &mut self.bind_map.bind_groups);
             }
         }
         for id in free_images {
-            if let Some((texture, _view)) = self.bind_map.image_map.remove(&id) {
-                // TODO: have a pool to avoid needless re-allocation
-                texture.destroy();
+            if let Some((texture, view)) = self.bind_map.image_map.remove(&id) {
+                self.pool
+                    .recycle_image(texture, view, &mut self.bind_map.bind_groups);
             }
         }
         Ok(())
@@ -932,47 +961,18 @@ impl BindMap {
     fn get_or_create_image(
         &mut self,
         proxy: ImageProxy,
+        pool: &mut ResourcePool,
         device: &Device,
     ) -> &(Texture, TextureView) {
-        match self.image_map.entry(proxy.id) {
-            Entry::Occupied(occupied) => occupied.into_mut(),
-            Entry::Vacant(vacant) => {
-                let format = proxy.format.to_wgpu();
-                let texture = device.create_texture(&wgpu::TextureDescriptor {
-                    label: None,
-                    size: wgpu::Extent3d {
-                        width: proxy.width,
-                        height: proxy.height,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-                    format,
-                    view_formats: &[],
-                });
-                let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                    label: None,
-                    usage: None,
-                    dimension: Some(TextureViewDimension::D2),
-                    aspect: TextureAspect::All,
-                    mip_level_count: None,
-                    base_mip_level: 0,
-                    base_array_layer: 0,
-                    array_layer_count: None,
-                    format: Some(proxy.format.to_wgpu()),
-                });
-                vacant.insert((texture, texture_view))
-            }
-        }
+        self.image_map
+            .entry(proxy.id)
+            .or_insert_with(|| pool.take_image(ImageKind::of(&proxy), device))
     }
 }
 
 const SIZE_CLASS_BITS: u32 = 1;
 
 impl ResourcePool {
-    /// Get a buffer from the pool or create one.
     fn get_buf(
         &mut self,
         size: u64,
@@ -981,15 +981,14 @@ impl ResourcePool {
         device: &Device,
     ) -> Buffer {
         let rounded_size = Self::size_class(size, SIZE_CLASS_BITS);
-        let props = BufferProperties {
-            size: rounded_size,
+        let kind = BufferKind {
             usages: usage,
             name,
         };
-        if let Some(buf_vec) = self.bufs.get_mut(&props)
-            && let Some(buf) = buf_vec.pop()
+        if let Some(bufs) = self.bufs.get_mut(&kind)
+            && let Some(i) = Self::best_fit(bufs, rounded_size)
         {
-            return buf;
+            return bufs.swap_remove(i);
         }
         device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(name),
@@ -997,6 +996,91 @@ impl ResourcePool {
             usage,
             mapped_at_creation: false,
         })
+    }
+
+    fn best_fit(bufs: &[Buffer], size: u64) -> Option<usize> {
+        bufs.iter()
+            .enumerate()
+            .filter(|(_, b)| b.size() >= size)
+            .min_by_key(|(_, b)| b.size())
+            .map(|(i, _)| i)
+    }
+
+    fn recycle_buf(
+        &mut self,
+        buf: Buffer,
+        name: &'static str,
+        bind_groups: &mut HashMap<BindGroupKey, BindGroup>,
+    ) {
+        let kind = BufferKind {
+            usages: buf.usage(),
+            name,
+        };
+        let bufs = self.bufs.entry(kind).or_default();
+        bufs.push(buf);
+        if bufs.len() <= BUFFERS_PER_KIND {
+            return;
+        }
+
+        let smallest = (0..bufs.len()).min_by_key(|&i| bufs[i].size()).unwrap();
+        let evicted = bufs.swap_remove(smallest);
+        bind_groups.retain(|key, _| !key.binds_buffer(&evicted));
+        evicted.destroy();
+    }
+
+    fn take_image(&mut self, kind: ImageKind, device: &Device) -> (Texture, TextureView) {
+        if let Some(i) = self.images.iter().position(|(k, _, _)| *k == kind) {
+            let (_, texture, view) = self.images.remove(i);
+            return (texture, view);
+        }
+
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            size: wgpu::Extent3d {
+                width: kind.width,
+                height: kind.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+            format: kind.format,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: None,
+            usage: None,
+            dimension: Some(TextureViewDimension::D2),
+            aspect: TextureAspect::All,
+            mip_level_count: None,
+            base_mip_level: 0,
+            base_array_layer: 0,
+            array_layer_count: None,
+            format: Some(kind.format),
+        });
+        (texture, view)
+    }
+
+    fn recycle_image(
+        &mut self,
+        texture: Texture,
+        view: TextureView,
+        bind_groups: &mut HashMap<BindGroupKey, BindGroup>,
+    ) {
+        let kind = ImageKind {
+            width: texture.width(),
+            height: texture.height(),
+            format: texture.format(),
+        };
+        self.images.push((kind, texture, view));
+        if self.images.len() <= POOLED_IMAGES {
+            return;
+        }
+
+        let (_, evicted, evicted_view) = self.images.remove(0);
+        bind_groups.retain(|key, _| !key.binds_view(&evicted_view));
+        evicted.destroy();
     }
 
     /// Quantize a size up to the nearest size class.
@@ -1007,6 +1091,20 @@ impl ResourcePool {
             b + 1
         } else {
             1 << bits
+        }
+    }
+}
+
+impl BoundResource {
+    fn of(entry: &wgpu::BindGroupEntry<'_>) -> Self {
+        match &entry.resource {
+            wgpu::BindingResource::Buffer(b) => Self::Range(
+                b.buffer.clone(),
+                b.offset,
+                b.size.map_or(0, |s| s.get()),
+            ),
+            wgpu::BindingResource::TextureView(v) => Self::View((*v).clone()),
+            _ => unreachable!("vello binds only buffers and texture views"),
         }
     }
 }
@@ -1125,35 +1223,10 @@ impl<'a> TransientBindMap<'a> {
                     if self.images.contains_key(&proxy.id) {
                         continue;
                     }
-                    if let Entry::Vacant(v) = bind_map.image_map.entry(proxy.id) {
-                        let format = proxy.format.to_wgpu();
-                        let texture = device.create_texture(&wgpu::TextureDescriptor {
-                            label: None,
-                            size: wgpu::Extent3d {
-                                width: proxy.width,
-                                height: proxy.height,
-                                depth_or_array_layers: 1,
-                            },
-                            mip_level_count: 1,
-                            sample_count: 1,
-                            dimension: wgpu::TextureDimension::D2,
-                            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-                            format,
-                            view_formats: &[],
-                        });
-                        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-                            label: None,
-                            usage: None,
-                            dimension: Some(TextureViewDimension::D2),
-                            aspect: TextureAspect::All,
-                            mip_level_count: None,
-                            base_mip_level: 0,
-                            base_array_layer: 0,
-                            array_layer_count: None,
-                            format: Some(proxy.format.to_wgpu()),
-                        });
-                        v.insert((texture, texture_view));
-                    }
+                    bind_map
+                        .image_map
+                        .entry(proxy.id)
+                        .or_insert_with(|| pool.take_image(ImageKind::of(proxy), device));
                 }
             }
         }
@@ -1203,11 +1276,24 @@ impl<'a> TransientBindMap<'a> {
                 }
             })
             .collect::<Vec<_>>();
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let key = BindGroupKey {
+            layout: layout.clone(),
+            resources: entries.iter().map(BoundResource::of).collect(),
+        };
+        if let Some(group) = bind_map.bind_groups.get(&key) {
+            return group.clone();
+        }
+
+        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout,
             entries: &entries,
-        })
+        });
+        if bind_map.bind_groups.len() >= CACHED_BIND_GROUPS {
+            bind_map.bind_groups.clear();
+        }
+        bind_map.bind_groups.insert(key, group.clone());
+        group
     }
 
     fn create_cpu_resources(
