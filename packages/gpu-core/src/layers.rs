@@ -1,7 +1,7 @@
 use vello::kurbo::Rect;
 
 use crate::canvas::Canvas;
-use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
+use crate::display_list::{Cover, DisplayList, Filter, Item, Lens, Look, MaskMode, Rgba};
 use crate::fragments::Fragments;
 use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
 use crate::canvas::shader_only;
@@ -73,7 +73,7 @@ fn prepare_items<S: Surface>(surface: &mut S, items: &[Item], background: Option
             let layer = behind(surface, items, i, background, &layers, pictures, sigma)?;
             layers.behind.insert(i, layer);
         }
-        if layer_worthy(item) && !composited_blend(item, blending) && off_frame(surface, item, pictures) {
+        if layer_worthy(item) && !composited_blend(item, blending) && (off_frame(surface, item, pictures) || shades_nothing(item)) {
             layers.culled.insert(i);
             continue;
         }
@@ -159,6 +159,12 @@ fn region<S: Surface>(surface: &S, item: &Item, look: &Look, pictures: &Shelf<Pi
 fn off_frame<S: Surface>(surface: &S, item: &Item, pictures: &Shelf<Pic<S>>) -> bool {
     let Some(look) = item.look() else { return false };
     look.backdrop.is_none() && inflated::<S::Canvas>(item, look, pictures).is_some_and(|r| !r.overlaps(surface.frame()))
+}
+
+fn shades_nothing(item: &Item) -> bool {
+    let Item::Group(group) = item else { return false };
+    let css_only = group.look.filters.iter().flatten().all(|f| matches!(f, Filter::Css { .. }));
+    group.items.is_empty() && css_only && group.look.backdrop.is_none()
 }
 
 fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inner: Option<&Layers<Pic<S>>>) -> Result<Placed<Pic<S>>, S::Error> {
