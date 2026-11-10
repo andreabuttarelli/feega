@@ -137,7 +137,7 @@ function snapshot(tables: Tables, storage: Blobs, place: LocalPlace): Uint8Array
   return packFeega({ manifest: { format: 'feega', version: FEEGA_VERSION, exportedAt: new Date().toISOString(), canvasName: name, source: place }, canvas: { ...body, assets } }, blobs);
 }
 
-export type FeegaStoreOptions = { origin: string; saveDelayMs?: number };
+export type FeegaStoreOptions = { origin: string; saveDelayMs?: number; latencyMs?: number };
 
 export function openFeegaStore(path: string, options: FeegaStoreOptions) {
   const { file, blobs } = readFile(path);
@@ -166,6 +166,7 @@ export function openFeegaStore(path: string, options: FeegaStoreOptions) {
     tables,
     blobs: storage,
     user: LOCAL_USER,
+    latencyMs: options.latencyMs,
     storageUrl: (bucket, key) => `${options.origin}/local/storage/${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`,
     onChange: (change) => {
       if (PERSISTED.has(change.table)) {

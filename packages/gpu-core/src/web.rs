@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -487,11 +487,11 @@ impl WebCore {
         let started = js_sys::Date::now();
         let screen = (self.target.width(), self.target.height());
         let wanted: Vec<TileKey> = self.tiles.reserve(self.camera, screen).into_iter().chain(self.tiles.ahead(self.camera, screen)).collect();
-        for key in wanted {
+        for batch in bake_batches(&wanted) {
             if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
                 return Ok(true);
             }
-            self.raster_batch(&Batch { step: key.step, keys: vec![key] })?;
+            self.raster_batch(&batch)?;
         }
         Ok(false)
     }
@@ -792,12 +792,12 @@ impl WebCore {
         let started = js_sys::Date::now();
         let queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
         let wanted: Vec<TileKey> = queue.blank.into_iter().chain(queue.stale).chain(queue.blurry).collect();
-        for key in wanted {
+        for batch in bake_batches(&wanted) {
             if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
                 self.pending = true;
                 return Ok(());
             }
-            self.raster_batch(&Batch { step: key.step, keys: vec![key] })?;
+            self.raster_batch(&batch)?;
         }
         self.pending |= self.fill_reserve()?;
         Ok(())
