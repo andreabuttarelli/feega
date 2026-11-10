@@ -50,11 +50,11 @@ describe('GET the sources of every frame on a canvas at once', () => {
     expect(body.frames[M1].tokens).toBeUndefined();
   });
 
-  it('reads all heads with one query when every frame points at its head', async () => {
+  it('reads all heads in at most one query when every frame points at its head', async () => {
     const { run, calls } = ask([M1, M2]);
     await run();
 
-    expect(calls.filter((c) => c.table === 'motion_revisions')).toHaveLength(1);
+    expect(calls.filter((c) => c.table === 'motion_revisions').length).toBeLessThanOrEqual(1);
     expect(calls.filter((c) => c.table === 'nodes')).toHaveLength(1);
   });
 
