@@ -45,12 +45,18 @@ export type MediaHint = { kind: AssetKind; width: number | null; height: number 
 
 export type BatchedSource = MotionSource & { media: Record<string, MediaHint> };
 
+export type BatchedSources = { frames: Map<string, BatchedSource>; signed: Record<string, string> };
+
+const addresses = (assets: MotionAsset[]): Record<string, string> => Object.fromEntries(assets.flatMap((a) => (a.stored ? [[a.id, a.previewUrl]] : a.url ? [[a.id, a.url]] : [])));
+
+const signedUrls = (assets: MotionAsset[]): Record<string, string> => Object.fromEntries(assets.flatMap((a) => (a.stored && a.url ? [[a.id, a.url]] : [])));
+
 const PREFETCHED = new Set<AssetKind>([AssetKind.Image]);
 
 const mediaHints = (assets: MotionAsset[]): Record<string, MediaHint> =>
   Object.fromEntries(assets.filter((a) => a.url && PREFETCHED.has(a.kind)).map((a) => [a.id, { kind: a.kind, width: a.width ?? null, height: a.height ?? null }]));
 
-export async function motionSources(scope: FramesScope): Promise<Map<string, BatchedSource>> {
+export async function motionSources(scope: FramesScope): Promise<BatchedSources> {
   const phases = scope.phases ?? serverTiming();
   const [heads, library] = await Promise.all([headsOf(scope, phases), phases.time('assets', motionAssets(scope))]);
   const docs = [...heads.values()].map((h) => h.doc);
@@ -58,11 +64,14 @@ export async function motionSources(scope: FramesScope): Promise<Map<string, Bat
   const named = await phases.time('named', beyond.length ? namedAssets(scope, beyond) : Promise.resolve([]));
   const known = library.map((a) => ({ id: a.id, kind: a.kind, name: a.label }));
 
-  return new Map(
+  const used = new Map<string, MotionAsset>();
+  const frames = new Map(
     [...heads].map(([nodeId, head]) => {
-      const used = new Set([...referencedAssets(head.doc, known).map((a) => a.id), ...mentionedIds(head.doc)]);
-      const mine = [...library, ...named].filter((a) => used.has(a.id));
-      return [nodeId, { revision: head.version, doc: head.doc, assets: assetUrls(mine), media: mediaHints(mine) }];
+      const ids = new Set([...referencedAssets(head.doc, known).map((a) => a.id), ...mentionedIds(head.doc)]);
+      const mine = [...library, ...named].filter((a) => ids.has(a.id));
+      mine.forEach((a) => used.set(a.id, a));
+      return [nodeId, { revision: head.version, doc: head.doc, assets: addresses(mine), media: mediaHints(mine) }];
     })
   );
+  return { frames, signed: signedUrls([...used.values()]) };
 }

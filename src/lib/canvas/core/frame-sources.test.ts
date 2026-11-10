@@ -69,7 +69,7 @@ describe('reading the frames of a canvas in one request', () => {
     const [a, b] = await Promise.all([read(url(A)), read(url(B))]);
 
     expect(asked.map((x) => x.url)).toEqual([`/p/p1/c/c1/motion/sources?ids=${A},${B}`]);
-    expect(a).toEqual({ revision: 3, doc: { a: 1 }, assets: {}, tokens: { t: 1 } });
+    expect(a).toEqual({ revision: 3, doc: { a: 1 }, assets: {}, addresses: {}, tokens: { t: 1 } });
     expect(b?.doc).toEqual({ b: 1 });
   });
 
@@ -106,5 +106,20 @@ describe('warming the sources of every frame on open', () => {
     }
 
     expect(asked).toEqual([`/p/p1/c/c1/motion/sources?ids=${ids.join(',')}`]);
+  });
+});
+
+describe('signed asset links beside the frames', () => {
+  const A = '00000000-0000-4000-8000-00000000000a';
+  const P = '00000000-0000-4000-8000-0000000000f1';
+  const json = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as Response;
+
+  it('draws with the signed link, and keeps the stable address beside it', async () => {
+    const read = batchedSources(async () => json({ tokens: {}, signed: { [P]: 'https://signed/p' }, frames: { [A]: { revision: 3, doc: {}, assets: { [P]: `/p/p1/c/c1/assets/${P}` } } } }));
+
+    const source = await read(`/p/p1/c/c1/motion/${A}/source?revision=3`);
+
+    expect(source?.assets).toEqual({ [P]: 'https://signed/p' });
+    expect(source?.addresses).toEqual({ [P]: `/p/p1/c/c1/assets/${P}` });
   });
 });

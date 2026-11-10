@@ -38,7 +38,7 @@ const rows = {
   motion_revisions: Array.from({ length: FRAMES }, (_, i) => ({ org_id: 'org-a', node_id: frameId(i), version: 3, doc: withPhoto, summary: null, actor_kind: 'user' }))
 };
 
-async function wavesToAnswer(): Promise<{ waves: number; body: { frames: Record<string, { assets: Record<string, string> }> } }> {
+async function wavesToAnswer(): Promise<{ waves: number; body: { frames: Record<string, { assets: Record<string, string> }>; signed: Record<string, string> } }> {
   vi.useFakeTimers();
   const { db } = fakeDb(rows, { filter: true, latencyMs: LATENCY_MS });
   const event = {
@@ -65,7 +65,8 @@ describe('the sources of every frame, against a database one round trip away', (
   it('answers in three waves of round trips: the canvas, then frames and library together, then signing', async () => {
     const { waves, body } = await wavesToAnswer();
 
-    expect(body.frames[frameId(0)].assets).toEqual({ [PHOTO]: 'signed:org-a/p1/photo.png' });
+    expect(body.frames[frameId(0)].assets).toEqual({ [PHOTO]: `/p/p1/c/c1/assets/${PHOTO}` });
+    expect(body.signed).toEqual({ [PHOTO]: 'signed:org-a/p1/photo.png' });
     expect(waves).toBe(3);
   });
 });

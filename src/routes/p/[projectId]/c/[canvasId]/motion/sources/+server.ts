@@ -39,5 +39,5 @@ export const GET: RequestHandler = async ({ locals, params, request, url }) => {
     motionSources({ ...scope, nodeIds: [...new Set(ask.data.ids)], phases }),
     phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId }))
   ]);
-  return revalidated(request, phases.span('stringify', () => JSON.stringify({ tokens, frames: Object.fromEntries(sources) })), phases);
+  return revalidated(request, phases.span('stringify', () => JSON.stringify({ tokens, frames: Object.fromEntries(sources.frames), signed: sources.signed })), phases);
 };

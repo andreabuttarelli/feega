@@ -19,7 +19,7 @@ import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { fontsFrom } from '@feega/motion-core/motion/fonts/model';
 import { fontFileOf } from '$lib/motion/fonts/library';
 
-export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; seconds?: number | null; width?: number | null; height?: number | null };
+export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; stored?: boolean; seconds?: number | null; width?: number | null; height?: number | null };
 
 export type MotionScope = { db: Db; orgId: string; projectId: string; canvasId: string; nodeId: string };
 
@@ -125,6 +125,7 @@ async function signAssets(scope: AssetScope, usable: Asset[], ttlSeconds?: numbe
       seconds: asset.durationS,
       width: asset.width,
       height: asset.height,
+      stored: !/^https?:\/\//.test(path),
       url: /^https?:\/\//.test(path) ? path : (signed.get(path) ?? null)
     };
   });
