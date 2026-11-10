@@ -96,6 +96,10 @@ impl Compositor {
         Ok((painter.paint(plan, rect, raster.quality)?, rastered))
     }
 
+    pub fn set_gesture(&mut self, on: bool) {
+        self.retained.set_gesture(on);
+    }
+
     pub fn holding(&self) -> bool {
         self.world.holding()
     }

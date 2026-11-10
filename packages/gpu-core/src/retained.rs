@@ -13,7 +13,6 @@ const TOO_MANY_RECTS: usize = 32;
 const AA_PX: f64 = 1.0;
 const EPSILON: f64 = 1e-6;
 const ROUGH_SCALE: f64 = 0.5;
-const MAX_STRETCH: f64 = std::f64::consts::SQRT_2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
@@ -132,6 +131,7 @@ pub struct Retained {
     shown: Option<Camera>,
     zoom_seen: f64,
     zoom_moved_at: f64,
+    gesturing: bool,
     full_ms: f64,
     gpu_ms: f64,
 }
@@ -195,7 +195,7 @@ pub fn tiles(rect: Rect, width: u32, height: u32) -> Vec<Rect> {
 impl Retained {
     pub fn new(width: u32, height: u32) -> Self {
         let overscan = (width.min(height) / OVERSCAN_SHARE).min(OVERSCAN_MAX);
-        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, full_ms: 0.0, gpu_ms: 0.0 }
+        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, gesturing: false, full_ms: 0.0, gpu_ms: 0.0 }
     }
 
     pub fn overscan(&self) -> u32 {
@@ -299,13 +299,17 @@ impl Retained {
         Step::Present
     }
 
+    pub fn set_gesture(&mut self, on: bool) {
+        self.gesturing = on;
+    }
+
     pub fn step(&mut self, camera: Camera, damage: Damage, now_ms: f64) -> Step {
         let c = camera.snapped();
         if c.zoom != self.zoom_seen {
             self.zoom_seen = c.zoom;
             self.zoom_moved_at = now_ms;
         }
-        let gesture = now_ms - self.zoom_moved_at < ZOOM_IDLE_MS;
+        let gesture = self.gesturing || now_ms - self.zoom_moved_at < ZOOM_IDLE_MS;
         let Some(held) = self.held else {
             return self.full(c, Quality::Sharp);
         };
@@ -316,15 +320,10 @@ impl Retained {
             if gesture && self.cost() <= LIVE_FULL_MS {
                 return self.full(c, Quality::Sharp);
             }
-            let stretch = c.zoom / (held.camera.zoom * held.quality.scale());
-            if gesture && stretch > MAX_STRETCH {
-                return self.full(c, Quality::Sharp);
-            }
-            if gesture && self.covers(c) {
+            if gesture {
                 return self.present(c);
             }
-            let quality = if gesture { Quality::Rough } else { self.refined() };
-            return self.full(c, quality);
+            return self.full(c, self.refined());
         }
         if held.quality == Quality::Rough {
             if gesture && self.cost() > LIVE_FULL_MS {

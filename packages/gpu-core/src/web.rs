@@ -461,6 +461,7 @@ impl WebCore {
             self.warmup.stirred(self.changed_at);
         }
         self.motion = motion;
+        self.compositor.set_gesture(matches!(motion, CoreMotion::Gesture));
         self.library.set_motion(motion.into());
     }
 

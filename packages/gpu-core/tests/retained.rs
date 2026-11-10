@@ -157,14 +157,6 @@ fn a_slow_full_render_refines_at_quarter_resolution_first() {
 }
 
 #[test]
-fn a_zoom_out_that_uncovers_the_view_rasters_even_mid_gesture() {
-    let mut r = Retained::new(W, H);
-    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
-
-    assert!(matches!(rendered(&mut r, at(200.0, 150.0, 0.5), 16.0), Step::Raster(_)));
-}
-
-#[test]
 fn full_damage_always_rasters_everything() {
     let mut r = Retained::new(W, H);
     rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
@@ -222,19 +214,6 @@ fn a_region_larger_than_the_scratch_target_is_split_into_tiles() {
 }
 
 #[test]
-fn a_zoom_out_that_uncovers_the_view_rasters_rough_while_the_gesture_runs() {
-    let mut r = Retained::new(W, H);
-    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
-    r.took(20.0);
-
-    let Step::Raster(mid) = rendered(&mut r, at(200.0, 150.0, 0.5), 16.0) else { panic!("a raster") };
-    assert_eq!(mid.quality, Quality::Rough);
-
-    let Step::Raster(settled) = rendered(&mut r, at(200.0, 150.0, 0.5), 300.0) else { panic!("a raster") };
-    assert_eq!(settled.quality, Quality::Sharp);
-}
-
-#[test]
 fn during_a_zoom_gesture_a_cheap_scene_is_redrawn_sharp_every_frame() {
     let mut r = Retained::new(W, H);
     rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
@@ -259,40 +238,6 @@ fn a_scene_that_misses_the_live_budget_falls_back_to_the_reprojected_texture() {
     assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.1), 32.0), Step::Present));
 }
 
-fn stretch(r: &Retained, camera: Camera, quality: Quality) -> f64 {
-    1.0 / (r.lookup(camera).scale * quality.scale())
-}
-
-#[test]
-fn during_a_zoom_in_a_slow_scene_is_re_rastered_sharp_before_it_stretches_past_root_two() {
-    let mut r = Retained::new(W, H);
-    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
-    r.took(20.0);
-
-    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.3), 16.0), Step::Present));
-    let Step::Raster(sharper) = rendered(&mut r, at(0.0, 0.0, 1.5), 32.0) else { panic!("a raster") };
-
-    assert_eq!((sharper.quality, sharper.camera.zoom), (Quality::Sharp, 1.5));
-    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.6), 48.0), Step::Present));
-}
-
-#[test]
-fn a_zoom_from_fit_to_four_hundred_percent_never_shows_the_retained_texture_stretched_past_root_two() {
-    let mut r = Retained::new(W, H);
-    rendered(&mut r, at(0.0, 0.0, 0.05), 0.0);
-    r.took(40.0);
-    let mut quality = Quality::Sharp;
-
-    for i in 1..=40 {
-        let camera = at(0.0, 0.0, 0.05 * 80f64.powf(i as f64 / 40.0));
-        if let Step::Raster(raster) = rendered(&mut r, camera, 16.0 * i as f64) {
-            quality = raster.quality;
-        }
-        let shown = stretch(&r, camera, quality);
-        assert!(shown <= std::f64::consts::SQRT_2 + 1e-9, "stretched {shown} at zoom {}", camera.zoom);
-    }
-}
-
 #[test]
 fn a_picture_built_elsewhere_is_adopted_so_the_next_change_rasters_only_its_damage() {
     let mut r = Retained::new(W, H);
@@ -303,4 +248,30 @@ fn a_picture_built_elsewhere_is_adopted_so_the_next_change_rasters_only_its_dama
     assert!(matches!(r.step(camera, Damage::none(), 1000.0), Step::Present));
     let damaged = r.step(camera, Damage::Rects(vec![Rect::new(0.0, 0.0, 10.0, 10.0)]), 1016.0);
     assert_eq!(outcome(&damaged), Some(Outcome::Partial));
+}
+
+#[test]
+fn during_a_zoom_gesture_a_slow_scene_only_presents_however_far_the_camera_goes() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(40.0);
+
+    for (i, camera) in [at(0.0, 0.0, 1.6), at(0.0, 0.0, 3.0), at(200.0, 150.0, 0.5), at(300.0, 200.0, 0.2)].into_iter().enumerate() {
+        assert!(matches!(rendered(&mut r, camera, 16.0 * (i + 1) as f64), Step::Present), "rastered at {camera:?}");
+    }
+    assert!(r.pending());
+}
+
+#[test]
+fn a_gesture_in_progress_keeps_presenting_when_frames_arrive_slower_than_the_zoom_idle_time() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
+    r.took(40.0);
+    r.set_gesture(true);
+
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 1.5), 400.0), Step::Present));
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 2.0), 900.0), Step::Present));
+
+    r.set_gesture(false);
+    assert!(matches!(rendered(&mut r, at(0.0, 0.0, 2.0), 1100.0), Step::Raster(_)));
 }
