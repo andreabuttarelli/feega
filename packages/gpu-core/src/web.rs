@@ -77,6 +77,7 @@ pub struct WebCore {
     reprojector: Reprojector,
     lost: Arc<AtomicBool>,
     in_flight: Arc<AtomicU32>,
+    probe_ms: [f64; 3],
     scratch: Option<wgpu::Texture>,
     motion: CoreMotion,
     rastered_at: f64,
@@ -320,7 +321,7 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new(), probe_ms: [0.0; 3] })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -515,11 +516,18 @@ impl WebCore {
         let camera = Camera { x: -world.x0 * zoom + gutter, y: -world.y0 * zoom + gutter, zoom };
         let (cols, rows) = batch.span();
         let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
+        let t0 = js_sys::Date::now();
         let plan = self.compositor.plan_at(&mut self.library, camera, size, self.limits);
+        let t1 = js_sys::Date::now();
         let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let t2 = js_sys::Date::now();
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
         let atlas = self.atlases.remove(&size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
         self.engine.draw(&self.device, &self.queue, &list, &pictures, &atlas.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
+        let t3 = js_sys::Date::now();
+        self.probe_ms[0] += t1 - t0;
+        self.probe_ms[1] += t2 - t1;
+        self.probe_ms[2] += t3 - t2;
         let corner = batch.corner();
         let side = TILE_PX + 2 * TILE_GUTTER_PX;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
@@ -717,16 +725,21 @@ impl WebCore {
         let step = crate::tiles::step_of(self.camera.zoom) + dstep;
         let keys = crate::tiles::keys_over(crate::tiles::seen_world(self.camera, screen), step);
         let count = keys.len();
+        let _ = self.engine.take_tally();
+        self.probe_ms = [0.0; 3];
         let started = js_sys::Date::now();
         for batch in batches(&keys) {
             self.raster_batch(&batch)?;
         }
         let cpu = js_sys::Date::now() - started;
+        let tally = self.engine.take_tally().json();
+        let [plan, hold, draw] = self.probe_ms;
         let queue = self.queue.clone();
         Ok(js_sys::Promise::new(&mut |resolve, _reject| {
+            let tally = tally.clone();
             queue.on_submitted_work_done(move || {
                 let gpu = js_sys::Date::now() - started;
-                let _ = resolve.call1(&JsValue::NULL, &JsValue::from_str(&format!(r#"{{"step":{step},"tiles":{count},"cpu":{cpu},"gpu":{gpu}}}"#)));
+                let _ = resolve.call1(&JsValue::NULL, &JsValue::from_str(&format!(r#"{{"step":{step},"tiles":{count},"cpu":{cpu},"gpu":{gpu},"plan":{plan},"hold":{hold},"draw":{draw},"tally":{tally}}}"#)));
             });
         }))
     }

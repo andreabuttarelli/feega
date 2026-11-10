@@ -53,7 +53,7 @@ impl TileKey {
     }
 }
 
-pub const BATCH_TILES: i64 = 2;
+pub const BATCH_TILES: i64 = 3;
 
 pub struct Batch {
     pub step: i32,
