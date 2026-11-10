@@ -5,6 +5,7 @@ import PREVIEWED from './previews.json';
 import { DocMode, docMode } from '@feega/motion-core/motion/still';
 import { SectionRole } from './card';
 import { templateCard } from './cards';
+import { addedOn } from './added';
 
 export enum ComponentKind {
   Component = 'component',
@@ -109,7 +110,7 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
     preview: previewOf(e.id, docMode(e.template.doc))
   }));
-  return items.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+  return items.sort((a, b) => addedOn(b.id).localeCompare(addedOn(a.id)) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }
 
 const searchable = (i: CatalogueItem) => `${i.name} ${i.description} ${i.roles.join(' ')}`.toLowerCase();
@@ -165,7 +166,7 @@ export function libraryFormat(item: Pick<CatalogueItem, 'mode' | 'format'>, want
 }
 
 export function posterShelf(items: readonly CatalogueItem[]): CatalogueItem[] {
-  return matching(items, '', null, DocMode.Still).sort((a, b) => a.name.localeCompare(b.name));
+  return matching(items, '', null, DocMode.Still).sort((a, b) => addedOn(b.id).localeCompare(addedOn(a.id)) || a.name.localeCompare(b.name));
 }
 
 export function starterDoc(entry: TemplateEntry, format: MotionFormat, newId: () => string): Inserted {

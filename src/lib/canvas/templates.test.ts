@@ -11,8 +11,10 @@ import {
   templatesIn,
   templateThumbnail,
   TEMPLATE_NODE_HALF,
+  type TemplateFilter,
   type TemplateNode
 } from './templates';
+import { canvasAddedOn } from './template-added';
 import { validateNewNodeData } from './node-data';
 import { nodeSize } from './node-size';
 import { PLACEMENT_GAP } from './placement';
@@ -168,7 +170,7 @@ describe('la galleria dei template', () => {
   });
 
   it('il filtro "all" mostra tutti i template', () => {
-    expect(templatesIn(ALL_TEMPLATES)).toEqual(CANVAS_TEMPLATES);
+    expect(templatesIn(ALL_TEMPLATES)).toHaveLength(CANVAS_TEMPLATES.length);
   });
 
   it.each(CANVAS_TEMPLATES)('$id: ha una miniatura WebP fra gli asset statici', (t) => {
@@ -199,5 +201,19 @@ describe('la galleria dei template', () => {
     const types = templateNodeTypes(t);
     expect(new Set(types).size).toBe(types.length);
     expect(types).toEqual([...new Set(t.nodes.map((n) => n.type))]);
+  });
+});
+
+describe('the newest templates lead the gallery', () => {
+  it('every template has an added date', () => {
+    expect(CANVAS_TEMPLATES.filter((t) => !canvasAddedOn(t.id)).map((t) => t.id)).toEqual([]);
+  });
+
+  it('lists templates newest first, in every filter', () => {
+    for (const filter of [ALL_TEMPLATES, ...TEMPLATE_CATEGORIES.map((c) => c.id)] as TemplateFilter[]) {
+      const dates = templatesIn(filter).map((t) => canvasAddedOn(t.id));
+
+      expect(dates).toEqual([...dates].sort((a, b) => b.localeCompare(a)));
+    }
   });
 });
