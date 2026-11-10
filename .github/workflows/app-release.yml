@@ -1,5 +1,6 @@
 # Every push to main ships `npx feega`: a GitHub release app-v<version> carrying the bundle,
-# then the npm package at the same version. The version lives in the app-v* tags only: the
+# then the npm package at the same version, then the macOS app (dmg + zip, both arches,
+# ad-hoc signed) and SHA256SUMS.txt on that same release; the app updates from these releases. The version lives in the app-v* tags only: the
 # next one is the newest tag with its patch bumped (npx/package.json seeds the first). Nothing
 # is committed back to main. A rerun on the same commit reuses that commit's tag and skips
 # whatever already landed; the asset is uploaded before npm publish, so a failure never leaves
@@ -21,6 +22,8 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       PUBLIC_SUPABASE_URL: http://supabase.invalid
       PUBLIC_SUPABASE_ANON_KEY: local
@@ -103,3 +106,53 @@ jobs:
           fi
           npm version --no-git-tag-version --allow-same-version "$V"
           npm publish --access public
+
+  desktop:
+    needs: release
+    runs-on: macos-latest
+    env:
+      PUBLIC_SUPABASE_URL: http://supabase.invalid
+      PUBLIC_SUPABASE_ANON_KEY: local
+      PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      V: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the macOS app at the npm version
+        working-directory: apps/desktop
+        run: |
+          npm ci
+          npm test
+          npm version --no-git-tag-version --allow-same-version "$V"
+          npm run build:mac
+
+      - name: Checksums
+        working-directory: apps/desktop/dist
+        run: shasum -a 256 *.dmg *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Upload the app (manual runs)
+        if: env.PUBLISH != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: feega-macos
+          path: |
+            apps/desktop/dist/*.dmg
+            apps/desktop/dist/*.zip
+            apps/desktop/dist/SHA256SUMS.txt
+
+      - name: Attach the app to the release
+        if: env.PUBLISH == 'true'
+        working-directory: apps/desktop/dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "app-v$V" *.dmg *.zip SHA256SUMS.txt --clobber
+          gh release edit "app-v$V" --notes "Bundle for \`npx feega\`. macOS app (unsigned): [install guide](https://docs.feega.app/desktop/install-macos/), checksums in SHA256SUMS.txt."

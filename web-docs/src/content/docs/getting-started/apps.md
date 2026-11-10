@@ -13,7 +13,7 @@ The apps run the same feega you use in the browser: same canvas, same account, s
 | Install as app | Chrome or Edge: install icon in the address bar. Safari: Share → Add to Dock / Add to Home Screen |
 | iPhone, iPad | Preview, not yet on the App Store |
 | Android | Preview, not yet on Google Play |
-| macOS | [Download](https://github.com/andreabuttarelli/feega/releases?q=desktop-v&expanded=true), then follow the [install guide](/desktop/install-macos/) |
+| macOS | [Download](https://github.com/andreabuttarelli/feega/releases/latest), then follow the [install guide](/desktop/install-macos/) |
 
 **Signing in.** Google and GitHub open in your system browser and return to the app.
 
@@ -40,4 +40,4 @@ Windows and Linux builds are not published right now.
 
 ### Releasing (maintainers)
 
-Push a tag `desktop-v<version>` (e.g. `desktop-v0.2.0`). The *Desktop release* workflow builds the macOS app for arm64 and x64 on a macOS runner, ad-hoc signs it, and attaches the `.dmg`, `.zip` and `SHA256SUMS.txt` to the `desktop-v<version>` release. No Apple secrets are used.
+The macOS app ships with `npx feega`: every push to `main` runs *App release (npx feega)*, which publishes the npm package as `app-v<version>` and then builds the macOS app at that same version for arm64 and x64 on a macOS runner, ad-hoc signs it, and attaches the `.dmg`, `.zip` and `SHA256SUMS.txt` to the same release. No Apple secrets are used. Run the workflow by hand on a branch for a dry run: it uploads the files as a build artifact and publishes nothing.

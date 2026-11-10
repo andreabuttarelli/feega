@@ -17,9 +17,12 @@ unsigned, and Apple silicon called it "damaged".
   and ad-hoc signs with `codesign --force --deep -s -`. `identity: null`, no hardened runtime,
   no notarisation: Gatekeeper shows "unidentified developer" instead of "damaged".
 - Updates: Squirrel.Mac refuses an ad-hoc signed update, so electron-updater is gone.
-  `updates.cjs` reads GitHub releases (`desktop-v*`) and offers the download page.
-- Release workflow: macOS only (arm64 + x64), no secrets, uploads `SHA256SUMS.txt`.
-  Windows/Linux dropped: the bundled server is staged for darwin only.
+  `updates.cjs` reads GitHub releases (`app-v*` with a `.dmg`) and offers the download page.
+- Release: the `desktop` job of `app-release.yml`, after the `npx feega` release on push to
+  `main`, builds at the same `app-v<version>` (no separate desktop version) and uploads dmg,
+  zip and `SHA256SUMS.txt` to that release; `workflow_dispatch` on a branch is the dry run.
+  `desktop-release.yml` (tag `desktop-v*`) is gone. The updater only picks `app-v*` releases
+  that carry a `.dmg`. Windows/Linux dropped: the bundled server is staged for darwin only.
 - `FEEGA_URL` still runs the old hosted shell, for development.
 - Discarded: a universal build (two arch-specific `node_modules` trees do not merge); embedding
   the server in the main process (a server crash would take the window down).

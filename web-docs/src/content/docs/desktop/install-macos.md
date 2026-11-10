@@ -11,7 +11,7 @@ asks you to confirm it once. This page walks through that.
 
 ## 1. Download
 
-Open the [latest desktop release](https://github.com/andreabuttarelli/feega/releases?q=desktop-v&expanded=true)
+Open the [latest release](https://github.com/andreabuttarelli/feega/releases/latest)
 and download the file for your Mac:
 
 | Mac | File |
@@ -24,7 +24,7 @@ A `.zip` of the same app sits next to each `.dmg` if you prefer it.
 
 ## 2. Check the download (optional, recommended)
 
-Each release publishes `SHA256SUMS.txt`. In Terminal:
+Each release publishes `SHA256SUMS.txt`, and the release version is the same as the `feega` npm package. In Terminal:
 
 ```bash
 cd ~/Downloads

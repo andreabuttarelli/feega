@@ -1,5 +1,6 @@
 const RELEASES_URL = 'https://api.github.com/repos/andreabuttarelli/feega/releases?per_page=50';
-const TAG_PREFIX = 'desktop-v';
+const TAG_PREFIX = 'app-v';
+const MAC_BUILD = /\.dmg$/;
 const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
 const DOWNLOAD = 0;
 const BUTTONS = ['Download', 'Later'];
@@ -20,7 +21,8 @@ function newer(a, b) {
 function latestRelease(releases) {
   let best = null;
   for (const release of releases) {
-    if (release.draft || release.prerelease || !release.tag_name.startsWith(TAG_PREFIX)) {
+    const hasMacBuild = (release.assets ?? []).some((asset) => MAC_BUILD.test(asset.name));
+    if (release.draft || release.prerelease || !hasMacBuild || !release.tag_name.startsWith(TAG_PREFIX)) {
       continue;
     }
     const version = release.tag_name.slice(TAG_PREFIX.length);

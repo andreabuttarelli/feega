@@ -14,4 +14,4 @@ npm run build:mac                           # arm64 + x64
 ```
 
 Unsigned on purpose: no Apple Developer ID, `afterPack` ad-hoc signs. Install steps for users:
-`web-docs/src/content/docs/desktop/install-macos.md`. Release: tag `desktop-v<version>`.
+`web-docs/src/content/docs/desktop/install-macos.md`. Release: the `desktop` job in `.github/workflows/app-release.yml`, same version as npm `feega`.

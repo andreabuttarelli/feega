@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { latestRelease, newer, watchUpdates, CHECK_EVERY_MS, DOWNLOAD } = require('./updates.cjs');
 
-const release = (tag, extra = {}) => ({ tag_name: tag, html_url: `https://github.com/r/${tag}`, draft: false, prerelease: false, ...extra });
+const release = (tag, extra = {}) => ({ tag_name: tag, html_url: `https://github.com/r/${tag}`, draft: false, prerelease: false, assets: [{ name: 'feega-1-mac-arm64.dmg' }], ...extra });
 
 test('versions compare by number, not by text', () => {
   assert.ok(newer('0.10.0', '0.9.1'));
@@ -10,9 +10,9 @@ test('versions compare by number, not by text', () => {
   assert.ok(!newer('1.0.0', '1.0.0'));
 });
 
-test('the latest release is the highest desktop tag, drafts and the feed tag aside', () => {
-  const releases = [release('desktop-latest'), release('desktop-v0.3.0', { draft: true }), release('desktop-v0.2.0'), release('cli-v9.0.0'), release('desktop-v0.10.0', { prerelease: true }), release('desktop-v0.1.5')];
-  assert.deepEqual(latestRelease(releases), { version: '0.2.0', url: 'https://github.com/r/desktop-v0.2.0' });
+test('the latest release is the highest app tag that carries a mac build', () => {
+  const releases = [release('app-v0.3.0', { draft: true }), release('app-v0.2.0'), release('cli-v9.0.0'), release('app-v0.10.0', { prerelease: true }), release('app-v0.9.0', { assets: [{ name: 'feega-app.tar.gz' }] }), release('app-v0.1.5')];
+  assert.deepEqual(latestRelease(releases), { version: '0.2.0', url: 'https://github.com/r/app-v0.2.0' });
   assert.equal(latestRelease([]), null);
 });
 
@@ -43,15 +43,15 @@ function fakes({ releases, choice = DOWNLOAD, fails = false }) {
 const settle = () => new Promise(setImmediate);
 
 test('a newer release opens its download page when the user agrees', async () => {
-  const f = fakes({ releases: [release('desktop-v0.2.0')] });
+  const f = fakes({ releases: [release('app-v0.2.0')] });
   watchUpdates(f);
   await settle();
-  assert.deepEqual(f.opened, ['https://github.com/r/desktop-v0.2.0']);
+  assert.deepEqual(f.opened, ['https://github.com/r/app-v0.2.0']);
   assert.equal(f.timers[0].ms, CHECK_EVERY_MS);
 });
 
 test('the same release is offered once per run', async () => {
-  const f = fakes({ releases: [release('desktop-v0.2.0')], choice: DOWNLOAD + 1 });
+  const f = fakes({ releases: [release('app-v0.2.0')], choice: DOWNLOAD + 1 });
   watchUpdates(f);
   await settle();
   await f.timers[0].fn();
@@ -61,7 +61,7 @@ test('the same release is offered once per run', async () => {
 });
 
 test('no prompt when the app is current', async () => {
-  const f = fakes({ releases: [release('desktop-v0.1.0')] });
+  const f = fakes({ releases: [release('app-v0.1.0')] });
   watchUpdates(f);
   await settle();
   assert.equal(f.asked.length, 0);
