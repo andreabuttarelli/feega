@@ -162,6 +162,12 @@ impl BindGroupKey {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum Reuse {
+    FullyWritten,
+    Cleared,
+}
+
 const BUFFERS_PER_KIND: usize = 2;
 const POOLED_IMAGES: usize = 8;
 const CACHED_BIND_GROUPS: usize = 512;
@@ -485,7 +491,9 @@ impl WgpuEngine {
                             height: image_proxy.height,
                             format,
                         },
+                        Reuse::FullyWritten,
                         device,
+                        queue,
                     );
                     queue.write_texture(
                         wgpu::TexelCopyTextureInfo {
@@ -511,7 +519,7 @@ impl WgpuEngine {
                 }
                 Command::WriteImage(proxy, [x, y], image) => {
                     let (texture, _) = self.bind_map
-                        .get_or_create_image(*proxy, &mut self.pool, device);
+                        .get_or_create_image(*proxy, &mut self.pool, device, queue);
                     let format = proxy.format.to_wgpu();
                     let block_size = format
                         .block_copy_size(None)
@@ -963,10 +971,11 @@ impl BindMap {
         proxy: ImageProxy,
         pool: &mut ResourcePool,
         device: &Device,
+        queue: &Queue,
     ) -> &(Texture, TextureView) {
-        self.image_map
-            .entry(proxy.id)
-            .or_insert_with(|| pool.take_image(ImageKind::of(&proxy), device))
+        self.image_map.entry(proxy.id).or_insert_with(|| {
+            pool.take_image(ImageKind::of(&proxy), Reuse::Cleared, device, queue)
+        })
     }
 }
 
@@ -1028,9 +1037,18 @@ impl ResourcePool {
         evicted.destroy();
     }
 
-    fn take_image(&mut self, kind: ImageKind, device: &Device) -> (Texture, TextureView) {
+    fn take_image(
+        &mut self,
+        kind: ImageKind,
+        reuse: Reuse,
+        device: &Device,
+        queue: &Queue,
+    ) -> (Texture, TextureView) {
         if let Some(i) = self.images.iter().position(|(k, _, _)| *k == kind) {
             let (_, texture, view) = self.images.remove(i);
+            if reuse == Reuse::Cleared {
+                Self::zero(&texture, queue);
+            }
             return (texture, view);
         }
 
@@ -1060,6 +1078,26 @@ impl ResourcePool {
             format: Some(kind.format),
         });
         (texture, view)
+    }
+
+    fn zero(texture: &Texture, queue: &Queue) {
+        let block_size = texture
+            .format()
+            .block_copy_size(None)
+            .expect("ImageFormat must have a valid block size");
+        let size = texture.size();
+        let bytes_per_row = size.width * block_size;
+        let zeros = vec![0_u8; (bytes_per_row * size.height) as usize];
+        queue.write_texture(
+            texture.as_image_copy(),
+            &zeros,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(bytes_per_row),
+                rows_per_image: None,
+            },
+            size,
+        );
     }
 
     fn recycle_image(
@@ -1226,7 +1264,9 @@ impl<'a> TransientBindMap<'a> {
                     bind_map
                         .image_map
                         .entry(proxy.id)
-                        .or_insert_with(|| pool.take_image(ImageKind::of(proxy), device));
+                        .or_insert_with(|| {
+                            pool.take_image(ImageKind::of(proxy), Reuse::Cleared, device, queue)
+                        });
                 }
             }
         }
