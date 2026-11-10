@@ -3,14 +3,20 @@ import { restoreViewport } from '$lib/canvas/restore-viewport';
 import { baseNodeId } from '$lib/canvas/breakpoint-views';
 import { frameSourceUrl, framesOnCanvas, type FrameTile } from './frame-source';
 import { fillOrder } from './placeholders';
+import { nodeSize } from '$lib/canvas/node-size';
 
 type Row = { id: string; type: string; position: { x: number; y: number }; size: { width: number | null; height: number | null }; data: Record<string, unknown> };
-type Place = { projectId: string; canvasId: string };
+type Place = { projectId: string; canvasId: string; orgId?: string };
 type Screen = { width: number; height: number };
 
 export const coreSourcePath = (place: Place, id: string) => `/p/${place.projectId}/c/${place.canvasId}/motion/${baseNodeId(id)}/source`;
 
-const tileOf = (r: Row): FrameTile[] => (r.size.width && r.size.height ? [{ id: r.id, kind: r.type, x: r.position.x, y: r.position.y, w: r.size.width, h: r.size.height }] : []);
+const tileOf = (r: Row): FrameTile[] => {
+  const placed = nodeSize(r.type, r.data);
+  const w = r.size.width ?? placed.w;
+  const h = r.size.height ?? placed.h;
+  return w && h ? [{ id: r.id, kind: r.type, x: r.position.x, y: r.position.y, w, h }] : [];
+};
 
 function boundsOf(tiles: FrameTile[]) {
   if (!tiles.length) {
@@ -26,5 +32,5 @@ export function earlySourceUrls(rows: readonly Row[], place: Place, saved: Viewp
   const data = new Map(rows.map((r) => [r.id, r.data]));
   const view = restoreViewport(saved, boundsOf(tiles), screen);
   const frames = framesOnCanvas(tiles, (id) => data.get(id) ?? {});
-  return fillOrder(frames, view, screen).map((f) => frameSourceUrl((id) => coreSourcePath(place, id), f));
+  return fillOrder(frames, view, screen).map((f) => frameSourceUrl((id) => coreSourcePath(place, id), f, place.orgId));
 }

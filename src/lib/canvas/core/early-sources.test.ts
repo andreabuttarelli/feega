@@ -15,4 +15,13 @@ describe('earlySourceUrls', () => {
   it('skips rows that hold no saved doc', () => {
     expect(earlySourceUrls([row('draft', 0, 0)], place, null, screen)).toEqual([]);
   });
+
+  it('asks a frame whose size comes from its format, as the canvas places it (a real canvas asked nothing early: its frames store no size)', () => {
+    const unsized = { ...row('sized-by-format', 0), size: { width: null, height: null }, data: { docHeadRevision: 3, format: 'landscape' } };
+    expect(earlySourceUrls([unsized], place, { x: 0, y: 0, zoom: 0.1 }, screen)).toEqual(['/p/p/c/c/motion/sized-by-format/source?revision=3']);
+  });
+
+  it('names the org, so the url is the one the canvas reads and the batch reads beside the canvas check', () => {
+    expect(earlySourceUrls([row('a', 150)], { ...place, orgId: 'o' }, { x: 0, y: 0, zoom: 1 }, screen)).toEqual(['/p/p/c/c/motion/a/source?revision=3&org=o']);
+  });
 });
