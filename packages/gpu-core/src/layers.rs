@@ -5,6 +5,7 @@ use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
 use crate::fragments::Fragments;
 use crate::filters::{reach as filter_reach, Fold, Fx, Reach, Runner};
 use crate::canvas::shader_only;
+use crate::tally::Reason;
 use crate::scene::{alone, bounds, build_items, cover, layer_worthy, plain, silhouette, unblended, Layers, Placed, Shelf};
 
 const UNIT_SPACE: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
@@ -20,7 +21,7 @@ pub trait Surface {
     type Error;
 
     fn frame(&self) -> Rect;
-    fn paint(&mut self, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut Self::Canvas)) -> Result<Tex<Self>, Self::Error>;
+    fn paint(&mut self, reason: Reason, region: Rect, base: Option<Rgba>, draw: &dyn Fn(&mut Self::Canvas)) -> Result<Tex<Self>, Self::Error>;
     fn runner(&self) -> &Self::Runner;
     fn place(&mut self, texture: Tex<Self>, region: Rect) -> Placed<Pic<Self>>;
 
@@ -104,10 +105,10 @@ fn composited<S: Surface>(surface: &mut S, items: &[Item], at: usize, background
     let frame = surface.frame();
     let look = items[at].look().expect("a drawable item");
     let region = region(surface, &items[at], look, pictures);
-    let below = surface.paint(region, background, &|c| {
+    let below = surface.paint(Reason::Composited, region, background, &|c| {
         build_items(c, &items[..at], frame, pictures, layers);
     })?;
-    let top = surface.paint(region, None, &|c| unblended(c, items, at, frame, pictures, layers))?;
+    let top = surface.paint(Reason::Composited, region, None, &|c| unblended(c, items, at, frame, pictures, layers))?;
     let fx = Fx { runner: surface.runner() };
     let texture = fx.blended(top, &below, &look.blend, look.opacity);
     Ok(surface.place(texture, region))
@@ -118,10 +119,10 @@ fn behind<S: Surface>(surface: &mut S, items: &[Item], at: usize, background: Op
     let item = &items[at];
     let margin = reach(sigma);
     let region = snapped(bounds::<S::Canvas>(item, pictures).unwrap_or(frame).inflate(margin, margin), frame);
-    let below = surface.paint(region, background, &|c| {
+    let below = surface.paint(Reason::Backdrop, region, background, &|c| {
         build_items(c, &items[..at], frame, pictures, layers);
     })?;
-    let shape = surface.paint(region, None, &|c| silhouette(c, item, pictures, frame))?;
+    let shape = surface.paint(Reason::Backdrop, region, None, &|c| silhouette(c, item, pictures, frame))?;
     let fx = Fx { runner: surface.runner() };
     let texture = fx.masked(&fx.blurred(below, sigma), &shape);
     Ok(surface.place(texture, region))
@@ -129,7 +130,7 @@ fn behind<S: Surface>(surface: &mut S, items: &[Item], at: usize, background: Op
 
 fn refracted<S: Surface>(surface: &mut S, under: &[Item], layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>, lens: &Lens) -> Result<Placed<Pic<S>>, S::Error> {
     let frame = surface.frame();
-    let content = surface.paint(frame, None, &|c| {
+    let content = surface.paint(Reason::Lens, frame, None, &|c| {
         build_items(c, under, frame, pictures, layers);
     })?;
     let fx = Fx { runner: surface.runner() };
@@ -164,7 +165,7 @@ fn body<S: Surface>(surface: &mut S, item: &Item, pictures: &Shelf<Pic<S>>, inne
     let frame = surface.frame();
     let look = item.look().expect("a drawable item");
     let region = region(surface, item, look, pictures);
-    let drawn = surface.paint(region, None, &|c| match (item, inner) {
+    let drawn = surface.paint(Reason::Body, region, None, &|c| match (item, inner) {
         (Item::Group(group), Some(inner)) => {
             build_items(c, &group.items, frame, pictures, inner);
         }
@@ -191,13 +192,13 @@ fn mask<S: Surface>(surface: &mut S, look: &Look, pictures: &Shelf<Pic<S>>, regi
     let frame = surface.frame();
     let mut acc: Option<Tex<S>> = None;
     for layer in look.masks.iter().flatten() {
-        let covered = surface.paint(region, None, &|c| cover(c, &layer.cover, pictures))?;
+        let covered = surface.paint(Reason::Mask, region, None, &|c| cover(c, &layer.cover, pictures))?;
         let fx = Fx { runner: surface.runner() };
         let luma = matches!(layer.cover, Cover::Picture { luma: true, .. });
         acc = Some(fx.folded(acc.as_ref(), &fx.blurred(covered, layer.feather), Fold { mode: layer.mode, level: layer.level, invert: layer.invert, luma }));
     }
     if let Some(matte) = &look.matte {
-        let covered = surface.paint(region, None, &|c| plain(c, &matte.items, pictures, frame))?;
+        let covered = surface.paint(Reason::Matte, region, None, &|c| plain(c, &matte.items, pictures, frame))?;
         let fx = Fx { runner: surface.runner() };
         acc = Some(fx.folded(acc.as_ref(), &covered, Fold { mode: MaskMode::Intersect, level: 1.0, invert: matte.invert, luma: matte.luma }));
     }

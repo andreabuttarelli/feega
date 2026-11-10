@@ -26,6 +26,7 @@ pub mod retained;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+pub mod tally;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod stroke;
 #[cfg(not(target_arch = "wasm32"))]

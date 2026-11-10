@@ -1,14 +1,16 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { copyFileSync, createReadStream, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createReadStream, mkdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import sharp from 'sharp';
 import { test, expect, chromium, type Browser, type BrowserContext, type CDPSession, type Page } from '@playwright/test';
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
 import { localEnv } from '../../scripts/local.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
+import { fixtureCopy } from '../../scripts/perf/fixture-copy.mjs';
 import { Step, shownLate, timeline, type FrameSteps, type Late } from '../../src/lib/canvas/core/frame-timeline';
+import { startupWaterfall } from '../../src/lib/canvas/core/startup-marks';
 
 enum Cache {
   Cold = 'cold',
@@ -27,7 +29,7 @@ const CPU_THROTTLE = Number(process.env.BENCH_CPU ?? 4);
 const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const FIXTURE = process.env.BENCH_FIXTURE ?? join(homedir(), 'Documents/feega-videos/perf/landings/landings.feega');
 const RECORD = process.env.BENCH_RECORD === '1';
-const FIRST_PORT = 5391;
+const FIRST_PORT = Number(process.env.BENCH_FIRST_PORT ?? 5391);
 const VIEWPORT = { width: 1440, height: 900 };
 const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
 const START_ZOOM = Number(process.env.BENCH_ZOOM ?? 0.12);
@@ -57,18 +59,18 @@ const sha = (file: string) =>
     createReadStream(file).on('data', (b) => hash.update(b)).on('end', () => done(hash.digest('hex'))).on('error', fail);
   });
 
-async function serve(build: Build): Promise<{ server: ChildProcess; file: string }> {
-  const file = join(mkdtempSync(join(tmpdir(), 'feega-load-')), 'served.feega');
-  copyFileSync(FIXTURE, file);
+async function serve(build: Build): Promise<{ server: ChildProcess; file: string; dispose: () => void }> {
+  const { file, dispose } = fixtureCopy(FIXTURE);
   const server = spawn(process.execPath, [join(build.root, 'scripts/node-server.mjs')], { cwd: build.root, stdio: 'ignore', env: localEnv(file, String(build.port)) });
   const started = Date.now();
   while (Date.now() - started < SERVER_UP_MS) {
     if (await fetch(`http://127.0.0.1:${build.port}/favicon-16.png`).then((r) => r.ok).catch(() => false)) {
-      return { server, file };
+      return { server, file, dispose };
     }
     await new Promise((r) => setTimeout(r, POLL_MS * 4));
   }
   server.kill();
+  dispose();
   throw new Error(`${build.name} server never came up`);
 }
 
@@ -187,6 +189,10 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
   const watched = await watchLoad(page, from);
   const marks = timeline(await page.evaluate(() => performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime }))));
   console.log(marks.filter((m) => !watched.frames.some((f) => f.id === m.id)).map((m) => `offscreen ${m.id.slice(0, 8)} ${m.steps.map((x) => `${x.step}@${x.at}`).join(' ')}`).join('\n'));
+  const startup = startupWaterfall(...(await page.evaluate(() => [performance.getEntriesByType('mark').map((m) => ({ name: m.name, startTime: m.startTime })), performance.getEntriesByType('resource').map((r) => ({ name: r.name, startTime: r.startTime, responseEnd: (r as PerformanceResourceTiming).responseEnd }))] as const)));
+  console.log(`startup\n${startup}`);
+  const tally = await page.evaluate(() => (window as Window & { __gpuCanvas?: { tally?: Record<string, { n: number; ms: number }> } }).__gpuCanvas?.tally ?? {});
+  console.log(`tally ${Object.entries(tally).filter(([, t]) => t.n).map(([r, t]) => `${r}=${t.n}/${t.ms.toFixed(0)}ms`).join(' ')}`);
   const allVectorsMs = marks.find((m) => m.id === 'all')?.steps.find((x) => x.step === Step.AllVectors)?.at ?? null;
   const frames = watched.frames.map((f) => ({ ...f, steps: marks.find((m) => m.id === f.id)?.steps ?? [] }));
   const load = { ...watched, allVectorsMs, frames, late: shownLate(frames), ...wire };
@@ -199,7 +205,7 @@ async function openOnce(context: BrowserContext, build: Build, profiled: boolean
 }
 
 async function runOnce(browser: Browser, build: Build, cache: Cache, profiled: boolean): Promise<{ run: LoadRun; spots: Hotspot[] }> {
-  const { server, file } = await serve(build);
+  const { server, file, dispose } = await serve(build);
   const before = await sha(file);
   const recordDir = RECORD ? join(OUT, `video-${build.name}-${cache}`) : null;
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2, serviceWorkers: 'block', ...(recordDir ? { recordVideo: { dir: recordDir, size: VIEWPORT } } : {}) });
@@ -216,6 +222,7 @@ async function runOnce(browser: Browser, build: Build, cache: Cache, profiled: b
   } finally {
     await context.close();
     server.kill();
+    dispose();
   }
 }
 
