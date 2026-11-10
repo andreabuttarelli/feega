@@ -23,7 +23,7 @@ concurrency:
 jobs:
   zoom:
     if: github.event.action != 'labeled' || github.event.label.name == 'perf'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     continue-on-error: true
     steps:
