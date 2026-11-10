@@ -38,4 +38,12 @@ describe('readTree', () => {
     expect(contours.length).toBeGreaterThan(0);
     expect(contours.flat().every(Number.isFinite)).toBe(true);
   });
+
+  it('a video a component draws itself paints its current frame, like a picture', () => {
+    const tree = { width: 100, height: 60, defs: {}, nodes: [node({ size: [100, 60] }), node({ parent: 0, tag: 'video', size: [100, 60], layer: 0 })] };
+
+    const drawn = JSON.stringify(readTree(tree, { fonts: () => ({ face: SQUARE, skew: 0 }), smoothing: Smoothing.Plain }).drawn);
+
+    expect(drawn).toContain(`"kind":"${DrawnKind.Layer}"`);
+  });
 });

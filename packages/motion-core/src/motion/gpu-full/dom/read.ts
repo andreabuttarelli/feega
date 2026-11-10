@@ -1680,7 +1680,7 @@ const PAINTERS: Record<string, Painter> = {
   text: groupPainter,
   tspan: groupPainter,
   img: layerPainter,
-  video: mediaPainter,
+  video: layerPainter,
   picture: mediaPainter,
   iframe: mediaPainter,
   object: mediaPainter,

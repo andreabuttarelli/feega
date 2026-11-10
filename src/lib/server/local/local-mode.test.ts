@@ -66,6 +66,10 @@ describe('le route della modalità locale', () => {
     }
   });
 
+  it('il player che Play on canvas carica passa', async () => {
+    expect((await served('/motion-player.js')).body).toBe('resolved');
+  });
+
   it('la tela e le sue sottoroute passano', async () => {
     expect((await served(canvas)).body).toBe('resolved');
     expect((await served(`${canvas}/asset-urls`)).body).toBe('resolved');

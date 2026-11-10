@@ -73,9 +73,9 @@
     <span>Play</span>
     <button type="button" class="toggle" role="switch" aria-checked={live} aria-label="Play this frame live on the canvas" data-testid="frame-live-toggle" onclick={() => frameLive.toggle(nodeId)}><span class="knob"></span></button>
   </div>
-  {#if live}
-    <iframe bind:this={frame} class="live-frame nodrag nopan nowheel" data-testid="frame-live" title="Interactive frame" {src} sandbox="allow-scripts" allow="accelerometer; gyroscope"></iframe>
-  {/if}
+{/if}
+{#if live}
+  <iframe bind:this={frame} class="live-frame nodrag nopan nowheel" data-testid="frame-live" title="Interactive frame" {src} sandbox="allow-scripts" allow="accelerometer; gyroscope"></iframe>
 {/if}
 
 <style>

@@ -83,7 +83,7 @@ export const PORT: SnapcnPort = {
             S.h('div', { style: { padding: '11px 20px', borderRadius: 10, border: `1px solid ${c('border')}`, backgroundColor: c('card'), fontSize: 14.5, fontWeight: 600 } }, 'Watch demo')), 24)));
 
     const mediaStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover' };
-    const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(src);
+    const isVideo = S.videoOf(p.screenSrc)(src);
     const media = src ? (S.h(isVideo ? 'video' : 'img', isVideo ? { src, muted: true, playsinline: true, preload: 'auto', style: mediaStyle } : { src, alt: '', style: mediaStyle }) as HTMLElement) : null;
     const screenContent = media ?? placeholder();
 

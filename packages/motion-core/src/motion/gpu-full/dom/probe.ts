@@ -474,6 +474,42 @@ export function domProbe(cfg: ProbeConfig) {
       pen.drawImage(image, (size[0] - w) / 2, (size[1] - h) / 2, w, h);
     });
 
+  const HAVE_CURRENT_DATA = 2;
+  const VIDEO_WAIT_MS = 3000;
+
+  const settled = (video: HTMLVideoElement) =>
+    video.readyState >= HAVE_CURRENT_DATA && !video.seeking
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          const done = () => resolve();
+          video.addEventListener("seeked", done, { once: true });
+          video.addEventListener("loadeddata", done, { once: true });
+          video.addEventListener("error", done, { once: true });
+          setTimeout(done, VIDEO_WAIT_MS);
+        });
+
+  const videoLayer = (
+    video: HTMLVideoElement,
+    computed: CSSStyleDeclaration,
+    size: [number, number],
+  ) =>
+    bitmapOf(size, async (pen) => {
+      await settled(video);
+      const [vw, vh] = [video.videoWidth, video.videoHeight];
+      if (!vw || !vh) {
+        return;
+      }
+      const fit = computed.objectFit;
+      const scale =
+        fit === "cover"
+          ? Math.max(size[0] / vw, size[1] / vh)
+          : fit === "contain"
+            ? Math.min(size[0] / vw, size[1] / vh)
+            : NaN;
+      const [w, h] = Number.isNaN(scale) ? size : [vw * scale, vh * scale];
+      pen.drawImage(video, (size[0] - w) / 2, (size[1] - h) / 2, w, h);
+    });
+
   const SLICE = /\bslice\b/;
   const NONE = /^none\b/;
 
@@ -704,6 +740,10 @@ export function domProbe(cfg: ProbeConfig) {
       const computed = getComputedStyle(el);
       if (el instanceof HTMLImageElement) {
         node.layer = layers.push(imageLayer(el, computed, node.size)) - 1;
+        return;
+      }
+      if (el instanceof HTMLVideoElement) {
+        node.layer = layers.push(videoLayer(el, computed, node.size)) - 1;
         return;
       }
       if (URL_IMAGE.test(computed.backgroundImage)) {

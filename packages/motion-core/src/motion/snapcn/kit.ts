@@ -480,7 +480,14 @@ export function snapcnKit() {
 
   const media = (value: unknown): string[] => (Array.isArray(value) ? value.map((item) => String((item as { src?: unknown })?.src ?? '')).filter(Boolean) : []);
 
-  return { media, pick, clamp, interpolate, spring, measureSpring, Easing, random, parseColor, toCss, rgbToOklch: rgbToOklchColor, oklchToRgb: (l: number, c: number, hue: number) => toCss(oklchToRgb(l, c, hue)), mixOklch, withAlpha, interpolateColors, light, dark, themeOf, easings, springs, clamp01, stateTransition, css, h, fill };
+  const CLIP_FILE = /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i;
+
+  const videoOf = (value: unknown) => {
+    const picked = new Set(Array.isArray(value) ? value.filter((item) => (item as { kind?: unknown })?.kind === 'video').map((item) => String((item as { src?: unknown }).src)) : []);
+    return (src: string) => picked.has(src) || CLIP_FILE.test(src);
+  };
+
+  return { media, videoOf, pick, clamp, interpolate, spring, measureSpring, Easing, random, parseColor, toCss, rgbToOklch: rgbToOklchColor, oklchToRgb: (l: number, c: number, hue: number) => toCss(oklchToRgb(l, c, hue)), mixOklch, withAlpha, interpolateColors, light, dark, themeOf, easings, springs, clamp01, stateTransition, css, h, fill };
 }
 
 export type SnapcnKit = ReturnType<typeof snapcnKit>;

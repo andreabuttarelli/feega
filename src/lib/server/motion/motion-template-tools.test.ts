@@ -155,6 +155,20 @@ describe('motion agent template library tools', () => {
     expect(JSON.stringify(session.doc)).toContain('"assetId":"clip1"');
   });
 
+  it('add_template places a snapcn port and set_template_fields fills its logo, ring images and clip with asset ids', async () => {
+    const { run, session } = withLibrary();
+
+    const logo = await run('add_template', { id: 'builtin:snapcn-logo-assemble', at: 0 });
+    expect(await run('set_template_fields', { clip_id: String(logo.clip_id), values: { logo_src: 'pic1', images: 'pic2, pic3' } })).toMatchObject({ ok: true });
+    const laptop = await run('add_template', { id: 'builtin:snapcn-laptop-frame', at: 4 });
+    expect(await run('set_template_fields', { clip_id: String(laptop.clip_id), values: { screen_src: 'video:clip1' } })).toMatchObject({ ok: true });
+
+    const doc = JSON.stringify(session.doc);
+    expect(doc).toContain('"logoSrc":"pic1"');
+    expect(doc).toContain('"assetId":"pic3"');
+    expect(doc).toMatch(/"assetId":"clip1","kind":"video"/);
+  });
+
   it('add_template places the feature scroll with its titles and list', async () => {
     const { run, session } = withLibrary(vi.fn() as never);
 
