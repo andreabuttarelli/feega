@@ -13,11 +13,11 @@ export const PORT: SnapcnPort = {
   background: '#0a0a0b',
   fonts: ['Inter'],
   props: {
-    leadIn: { type: 'string', title: 'Text before the image', default: 'that lets you', group: 'Content', maxLength: 60 },
+    leadIn: { type: 'string', title: 'Lead-in text', default: 'that lets you', group: 'Content', maxLength: 60 },
     emphasis: { type: 'string', title: 'Bold word', default: 'filter', group: 'Content', maxLength: 40 },
     tailIn: { type: 'string', title: 'Text after the bold word', default: 'out AI.', group: 'Content', maxLength: 60 },
-    images: { type: 'string', title: 'Image URLs, comma separated (empty = tiles)', default: '', group: 'Content', maxLength: 2000 },
-    heroImage: { type: 'string', title: 'Hero image URL (empty = 4th image)', default: '', group: 'Content', maxLength: 500 },
+    images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
+    heroImage: { type: 'string', title: 'Hero image', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     darkColor: { type: 'string', title: 'Start background (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
     lightColor: { type: 'string', title: 'End background (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },
@@ -56,7 +56,7 @@ export const PORT: SnapcnPort = {
     ];
     const TILES = ['#c56b4f', '#3d5a80', '#7a9e7e', '#d9a441', '#6d597a', '#b56576', '#457b9d', '#8d6e63'];
 
-    const listed = String(p.images ?? '').split(/,(?=\s*(?:https?:|data:|\/))/).map((s) => s.trim()).filter(Boolean);
+    const listed = S.media(p.images);
     const images = listed.length ? listed : TILES.map((_, i) => `tile:${i}`);
     const hero = String(p.heroImage || '') || images[3] || images[0];
     const dark = S.themeOf('dark');

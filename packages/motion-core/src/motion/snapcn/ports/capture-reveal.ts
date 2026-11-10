@@ -16,7 +16,7 @@ export const PORT: SnapcnPort = {
     headline: { type: 'string', title: 'Headline (| breaks lines)', default: 'no more | keyframes', group: 'Content', maxLength: 120 },
     capturing: { type: 'string', title: 'Toast while counting', default: 'Capturing selection...', group: 'Content', maxLength: 60 },
     copied: { type: 'string', title: 'Toast once landed', default: 'Copied to clipboard.', group: 'Content', maxLength: 60 },
-    src: { type: 'string', title: 'Window screenshot URL (empty = blank)', default: '', group: 'Content', maxLength: 500 },
+    src: { type: 'string', title: 'Window screenshot', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'DM Sans', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'light', group: 'Style' }
   },

@@ -14,8 +14,8 @@ export const PORT: SnapcnPort = {
   fonts: ['Inter'],
   props: {
     heading: { type: 'string', title: 'Heading', default: 'npx shadcn add @snapcn', group: 'Content', maxLength: 120 },
-    image1: { type: 'string', title: 'Left media (image, video or gradient)', default: '', group: 'Content', maxLength: 2000 },
-    image2: { type: 'string', title: 'Right media (image, video or gradient)', default: '', group: 'Content', maxLength: 2000 },
+    image1: { type: 'string', title: 'Left image or clip', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
+    image2: { type: 'string', title: 'Right image or clip', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'dark', group: 'Style' }
   },
@@ -64,11 +64,11 @@ export const PORT: SnapcnPort = {
 
     const leftBox = box();
     const leftZoom = S.h('div', { style: { width: '100%', height: '100%', transformOrigin: 'center center' } }) as HTMLElement;
-    const leftTilt = tilt('100% 50%', imageCard(String(p.image1)));
+    const leftTilt = tilt('100% 50%', imageCard(S.media(p.image1)[0] ?? ''));
     leftZoom.append(leftTilt);
     leftBox.append(leftZoom);
     const rightBox = box();
-    const rightTilt = tilt('0% 50%', imageCard(String(p.image2)));
+    const rightTilt = tilt('0% 50%', imageCard(S.media(p.image2)[0] ?? ''));
     rightTilt.style.transform = `perspective(${PERSP * s}px) rotateY(${TILT}deg)`;
     rightBox.append(rightTilt);
     const group = S.fill({}, leftBox, rightBox) as HTMLElement;

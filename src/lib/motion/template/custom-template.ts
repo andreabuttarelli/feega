@@ -28,7 +28,7 @@ const GROUP: Record<NonNullable<PropSpec['group']>, string> = { Content: 'Text',
 
 const MEDIA_GROUP = 'Media';
 
-const MEDIA_FORMATS: ReadonlySet<string | undefined> = new Set([PropFormat.Media, PropFormat.MediaItem]);
+const MEDIA_FORMATS: ReadonlySet<string | undefined> = new Set([PropFormat.Media, PropFormat.MediaItem, PropFormat.Asset]);
 
 const groupOf = (spec: PropSpec) => (MEDIA_FORMATS.has(spec.format) ? MEDIA_GROUP : GROUP[spec.group ?? 'Style']);
 
@@ -41,7 +41,7 @@ function fieldShape(spec: PropSpec, fonts: readonly string[]): FieldShape {
   if (spec.format === PropFormat.Media) {
     return { type: FieldType.MediaList };
   }
-  if (spec.format === PropFormat.MediaItem) {
+  if (spec.format === PropFormat.MediaItem || spec.format === PropFormat.Asset) {
     return { type: FieldType.Asset };
   }
   if (spec.enum) {

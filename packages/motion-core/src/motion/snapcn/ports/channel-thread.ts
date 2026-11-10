@@ -13,7 +13,8 @@ export const PORT: SnapcnPort = {
   background: '#0a0a0b',
   fonts: ['Barlow'],
   props: {
-    messages: { type: 'string', title: 'Messages: avatar > name time > text | ...', default: '> rhea 9:41 AM > Launch video by Thursday? | We have nothing shot. | > sam 9:42 AM > Already done. | Built it out of snapcn.', group: 'Content', maxLength: 2000 },
+    avatars: { type: 'string', title: 'Avatars, one per person in order', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
+    messages: { type: 'string', title: 'Messages: name time > text | ...', default: '> rhea 9:41 AM > Launch video by Thursday? | We have nothing shot. | > sam 9:42 AM > Already done. | Built it out of snapcn.', group: 'Content', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'sans', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'dark', group: 'Style' }
   },
@@ -87,7 +88,9 @@ export const PORT: SnapcnPort = {
       });
     };
 
-    const said = toMessages(String(p.messages)).filter((m) => m.text.trim());
+    const portraits = S.media(p.avatars);
+    const people = [...new Set(toMessages(String(p.messages)).map((m) => m.author))];
+    const said = toMessages(String(p.messages)).filter((m) => m.text.trim()).map((m) => ({ ...m, avatar: portraits[people.indexOf(m.author)] ?? m.avatar }));
     const groups: { person: string; time: string; avatar: string; lines: string[] }[] = [];
     for (const m of said) {
       const g = groups[groups.length - 1];

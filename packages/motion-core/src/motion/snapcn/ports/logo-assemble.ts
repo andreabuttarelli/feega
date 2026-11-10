@@ -13,16 +13,10 @@ export const PORT: SnapcnPort = {
   background: '#0a0a0b',
   fonts: ['Inter'],
   props: {
-    logoSrc: { type: 'string', title: 'Logo image URL', default: '', group: 'Content', maxLength: 2000 },
+    logoSrc: { type: 'string', title: 'Logo', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     brandName: { type: 'string', title: 'Brand name', default: 'snapcn', group: 'Content', maxLength: 60 },
     middleText: { type: 'string', title: 'Middle text (\\n for lines)', default: 'Cinematic components\nfor React', group: 'Content', maxLength: 200 },
-    images: {
-      type: 'string',
-      title: 'Ring image URLs (one per line)',
-      default: '',
-      group: 'Content',
-      maxLength: 2000
-    },
+    images: { type: 'string', title: 'Ring images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     count: { type: 'number', title: 'Cards on the ring', default: 10, minimum: 1, maximum: 40, step: 1, group: 'Content' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },
     color: { type: 'string', title: 'Text colour (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
@@ -37,7 +31,7 @@ export const PORT: SnapcnPort = {
     const fg = S.pick(p.color, String(t.foreground));
     const stage = S.pick(p.background, String(t.background));
     const cardShadow = S.withAlpha(S.mixOklch(stage, '#000', 0.75), 0.4);
-    const images = String(p.images).split('\n').map((s) => s.trim()).filter(Boolean);
+    const images = S.media(p.images);
     const CLAMP = { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } as const;
     const EASE = S.Easing.bezier(0.2, 0.6, 0.35, 1);
     const EASE_IN = S.Easing.bezier(0.5, 0, 0.75, 0.4);

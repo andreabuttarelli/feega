@@ -17,8 +17,8 @@ export const PORT: SnapcnPort = {
     bottomLine: { type: 'string', title: 'Caption below the reel', default: 'That you ship', group: 'Content', maxLength: 60 },
     swapTop: { type: 'string', title: 'First line after the swap', default: 'Especially on', group: 'Content', maxLength: 60 },
     swapBottom: { type: 'string', title: 'Second line after the swap', default: 'Launch day', group: 'Content', maxLength: 60 },
-    slides: { type: 'string', title: 'Reel image URLs, comma separated (empty = tiles)', default: '', group: 'Content', maxLength: 2000 },
-    collage: { type: 'string', title: 'Collage image/video URLs, comma separated', default: '', group: 'Content', maxLength: 2000 },
+    slides: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
+    collage: { type: 'string', title: 'Collage images and clips', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     glowColor: { type: 'string', title: 'Glow', format: PropFormat.Color, default: '#dfe7e3', group: 'Style' },
     flushColor: { type: 'string', title: 'Flush', format: PropFormat.Color, default: '#fdc7bc', group: 'Style' },
     textColor: { type: 'string', title: 'Caption colour (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
@@ -73,9 +73,8 @@ export const PORT: SnapcnPort = {
     const flushOpacity = (f: number) => S.interpolate(f, [48, 56, 57.5, 73.5], [0, 1, 1, 0], CLAMP);
     const slideAt = (f: number) => CUTS.reduce((k, cut, i) => (f >= cut ? i : k), 0);
 
-    const list = (v: unknown) => String(v ?? '').split(/,(?=\s*(?:https?:|data:|\/))/).map((s) => s.trim()).filter(Boolean);
-    const slides = list(p.slides);
-    const collage = list(p.collage);
+    const slides = S.media(p.slides);
+    const collage = S.media(p.collage);
     const isVideo = (src: string) => /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(src);
     const clipStart = (src: string) => {
       const m = /#t=([\d.]+)/.exec(src);

@@ -13,12 +13,12 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Inter Tight'],
   props: {
-    images: { type: 'string', title: 'Shot image URLs (split by |)', default: '', group: 'Content', maxLength: 2000 },
+    images: { type: 'string', title: 'Images', format: PropFormat.Media, default: '', group: 'Content', maxLength: 2000 },
     sizes: { type: 'string', title: 'Card sizes (share of height, WxH)', default: '0.82x0.461,0.72x0.405,0.63x0.354,0.55x0.309,0.46x0.259,0.36x0.203', group: 'Content', maxLength: 400 },
     holds: { type: 'string', title: 'Frames per shot', default: '1,5,5,4,2,5', group: 'Motion', maxLength: 200 },
-    mark: { type: 'string', title: 'Mark image URL', default: '', group: 'Content', maxLength: 2000 },
+    mark: { type: 'string', title: 'Mark', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     wordmark: { type: 'string', title: 'Wordmark', default: 'snapcn', group: 'Content', maxLength: 60 },
-    plate: { type: 'string', title: 'Backdrop image URL', default: '', group: 'Content', maxLength: 2000 },
+    plate: { type: 'string', title: 'Backdrop', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     accent: { type: 'string', title: 'Accent (transparent = theme)', format: PropFormat.Color, default: 'transparent', group: 'Style' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
     mode: { type: 'string', title: 'Theme', enum: ['light', 'dark'], default: 'light', group: 'Style' }
@@ -52,7 +52,7 @@ export const PORT: SnapcnPort = {
 
     const svg = (markup: string) => 'data:image/svg+xml,' + encodeURIComponent(markup);
     const sample = (hue: number) => svg(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,60%)"/><stop offset="1" stop-color="hsl(${(hue + 50) % 360},55%,25%)"/></linearGradient></defs><rect width="800" height="450" fill="url(#g)"/></svg>`);
-    const given = String(p.images).split('|').map((s) => s.trim()).filter(Boolean);
+    const given = S.media(p.images);
     const shots = given.length ? given : [20, 70, 140, 200, 260, 320].map(sample);
     const mark = String(p.mark) || svg('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect x="8" y="8" width="84" height="84" rx="20" fill="#f26b1d"/></svg>');
     const size = String(p.sizes).split(',').map((s) => {
