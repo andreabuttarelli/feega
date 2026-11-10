@@ -21,6 +21,7 @@ export type GithubAccess = {
   repos: () => Promise<GithubRepo[] | null>;
   branches: (repo: RepoRef) => Promise<string[] | null>;
   archive: (repo: RepoRef) => Promise<Uint8Array | null>;
+  call: () => Promise<GithubCall | null>;
 };
 
 export function sealConnectState(state: ConnectState, now = Date.now()): string {
@@ -96,6 +97,7 @@ export function githubAccess(links: AccountLinks | null, store: AccountStore, sc
         return null;
       }
       return archiveOf(call, repo, fetchFn);
-    }
+    },
+    call: caller
   };
 }

@@ -98,8 +98,8 @@ export function originHeaders(method: string, headers: Record<string, string>, p
   return { ...headers, origin: new URL(pageUrl).origin };
 }
 
-async function gate(request: HTTPRequest): Promise<void> {
-  const verdict = await requestVerdict(request.url());
+async function gate(request: HTTPRequest, allowed: string | null): Promise<void> {
+  const verdict = allowed && URL.canParse(request.url()) && new URL(request.url()).origin === allowed ? RequestVerdict.Continue : await requestVerdict(request.url());
   if (verdict !== RequestVerdict.Continue) {
     await request.abort('blockedbyclient').catch(() => undefined);
     return;
@@ -140,14 +140,14 @@ function lightOnly(): void {
   }).observe(document, { childList: true });
 }
 
-async function fenced(page: Page): Promise<void> {
+async function fenced(page: Page, allowed: string | null = null): Promise<void> {
   await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 });
   await page.emulateMediaFeatures(LIGHT_SCHEME);
   await page.evaluateOnNewDocument(lightOnly);
   await page.setExtraHTTPHeaders(LIGHT_HINT);
   await page.setBypassCSP(true);
   await page.setRequestInterception(true);
-  page.on('request', (request) => void gate(request));
+  page.on('request', (request) => void gate(request, allowed));
   const cdp = await page.createCDPSession();
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' }).catch(() => undefined);
   await cdp.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => undefined);
@@ -505,10 +505,10 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
   };
 }
 
-export function localBrowser(newPage: () => Promise<Page>): OpenAppBrowser {
+export function localBrowser(newPage: () => Promise<Page>, allowed: string | null = null): OpenAppBrowser {
   return async () => {
     const page = await newPage();
-    await fenced(page);
+    await fenced(page, allowed);
     return tabOf(
       page,
       async () => {

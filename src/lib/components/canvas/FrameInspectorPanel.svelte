@@ -6,6 +6,8 @@
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import DevInspector from '$lib/components/canvas/DevInspector.svelte';
   import DevCode from '$lib/components/canvas/DevCode.svelte';
+  import RepoSync from '$lib/components/canvas/RepoSync.svelte';
+  import { page } from '$app/state';
   import { frameProperties } from './frame-properties.svelte';
   import HeaderActions from '$lib/components/motion/HeaderActions.svelte';
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
@@ -133,6 +135,7 @@
     {:else if !shown?.clip}
       <p class="empty" data-testid="dev-empty">Select one layer to read its CSS.</p>
     {/if}
+    {#if frameProperties.nodeId && page.params.projectId}<RepoSync projectId={page.params.projectId} nodeId={frameProperties.nodeId} revision={doc} />{/if}
   </aside>
 {:else if session && doc && frameProperties.panel === FramePanel.Group && !session.selection.length}
   <GroupInspector />
