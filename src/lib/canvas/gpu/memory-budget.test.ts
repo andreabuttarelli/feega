@@ -42,3 +42,11 @@ describe('memory budget', () => {
     expect(previewHtml(html, MOTION)).toBe(html);
   });
 });
+
+describe('tile memory', () => {
+  it('a phone or a low-memory machine keeps at most 128 MB of canvas tiles, a desktop more', () => {
+    expect(BUDGET[deviceOf({ touch: false, memoryGb: 4 })].tileBytes).toBeLessThanOrEqual(128 * 1024 * 1024);
+    expect(BUDGET[deviceOf({ touch: true })].tileBytes).toBeLessThanOrEqual(128 * 1024 * 1024);
+    expect(BUDGET[deviceOf({ touch: false, memoryGb: 16 })].tileBytes).toBeGreaterThan(128 * 1024 * 1024);
+  });
+});

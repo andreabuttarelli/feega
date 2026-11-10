@@ -9,9 +9,9 @@ pub const TILE_BYTES: u64 = ((TILE_PX + 2 * TILE_GUTTER_PX) as u64).pow(2) * 4;
 pub const TILE_BUDGET_BYTES: u64 = 384 << 20;
 const SCREENS_KEPT: u64 = 12;
 
-pub fn tiles_kept((w, h): (u32, u32)) -> usize {
+pub fn tiles_kept((w, h): (u32, u32), budget: u64) -> usize {
     let per_screen = (w as u64).div_ceil(TILE_PX as u64) * (h as u64).div_ceil(TILE_PX as u64);
-    (per_screen * SCREENS_KEPT).min(TILE_BUDGET_BYTES / TILE_BYTES) as usize
+    (per_screen * SCREENS_KEPT).min(budget / TILE_BYTES) as usize
 }
 const STEPS_PER_DOUBLING: f64 = 4.0;
 const STEP_SLACK: f64 = 1e-9;

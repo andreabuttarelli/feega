@@ -233,8 +233,10 @@ fn eviction_drops_the_least_recently_drawn_tiles_first() {
 
 #[test]
 fn the_tile_budget_follows_the_screen_and_caps_at_the_memory_budget() {
-    assert!(tiles_kept((1440, 900)) < tiles_kept((2880, 1800)));
-    assert!(tiles_kept((100_000, 100_000)) as u64 * TILE_BYTES <= TILE_BUDGET_BYTES);
+    assert!(tiles_kept((1440, 900), TILE_BUDGET_BYTES) < tiles_kept((2880, 1800), TILE_BUDGET_BYTES));
+    assert!(tiles_kept((100_000, 100_000), TILE_BUDGET_BYTES) as u64 * TILE_BYTES <= TILE_BUDGET_BYTES);
+    let phone = 128 << 20;
+    assert!(tiles_kept((100_000, 100_000), phone) as u64 * TILE_BYTES <= phone);
 }
 
 #[test]
