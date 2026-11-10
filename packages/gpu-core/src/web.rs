@@ -822,6 +822,10 @@ impl WebCore {
         self.engine.scratch_bytes() as f64
     }
 
+    pub fn render_tally(&mut self) -> String {
+        self.engine.take_tally().json()
+    }
+
     pub fn draw(&mut self, list_json: &[u8]) -> Result<String, JsValue> {
         let plan = self.library.plan(&parse(utf8(list_json)?).map_err(failed)?, self.limits);
         self.pending = plan.pending;

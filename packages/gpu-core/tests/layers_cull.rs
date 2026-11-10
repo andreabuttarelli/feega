@@ -57,7 +57,7 @@ impl Surface for Counting {
         Rect::new(0.0, 0.0, FRAME_SIDE as f64, FRAME_SIDE as f64)
     }
 
-    fn paint(&mut self, region: Rect, _: Option<Rgba>, _: &dyn Fn(&mut Nothing)) -> Result<(u32, u32), ()> {
+    fn paint(&mut self, _: gpu_core::tally::Reason, region: Rect, _: Option<Rgba>, _: &dyn Fn(&mut Nothing)) -> Result<(u32, u32), ()> {
         self.painted.push(region);
         Ok((region.width() as u32, region.height() as u32))
     }

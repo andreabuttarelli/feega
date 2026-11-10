@@ -3760,3 +3760,6 @@ Signal: a gpu-core change rebuilt with `npm run build:gpu-core` leaves the landi
 
 ### A layer drawn last over composited tiles erases them
 Signal: with `?coreTiles` the canvas is blank only when a selection or handle exists; the core reports every tile drawn and live. Cause: reprojector pipelines had no blending, so the screen-sized overlay replaced the tiles. Move: draw anything layered with `Output::Over`; test a transparent texel over an opaque target.
+
+### A wasm copied into build/ is served from its stale .br
+Signal: swapping `build/client/gpu-core/gpu_core_bg.wasm` by hand to try a gpu-core variant changes nothing in the load bench screenshots. Cause: the node server serves the precompressed `.br`/`.gz` next to it, written at build time. Move: after the copy, rewrite both (`gzip -kf9`, `brotli -f -o x.br x`), or rebuild.

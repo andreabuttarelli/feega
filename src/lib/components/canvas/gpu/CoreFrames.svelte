@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { addTally } from '$lib/canvas/gpu/frame-stats';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -39,6 +40,7 @@
   import { OnScreen, VectorGate, showStaged } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
+  import { StartupStep, markStartup } from '$lib/canvas/core/startup-marks';
   import LoadTimeline from './LoadTimeline.svelte';
   import type { LiveDoc } from '$lib/canvas/core/live-docs.svelte';
   import { baseNodeId, withoutViews } from '$lib/canvas/breakpoint-views';
@@ -52,6 +54,8 @@
 
 
   let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void } = $props();
+
+  markStartup(StartupStep.Mounted);
 
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
@@ -109,7 +113,7 @@
   const smoothing = smoothingOf(navigator.userAgent);
   const BUILD_LANES_MAX = 4;
   const buildLanes = Math.max(1, Math.min(BUILD_LANES_MAX, (typeof navigator === 'object' ? navigator.hardwareConcurrency : 2) - 1));
-  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null), buildLanes);
+  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? (markStartup(StartupStep.WorkerSpawned), new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' })) : null), buildLanes);
 
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
@@ -202,6 +206,7 @@
       return;
     }
     markFrame(f.id, Step.Built);
+    markStartup(StartupStep.FirstBuilt);
     if (read) {
       onsource(f.id, { ...read.source, revision: f.revision });
     }
@@ -510,6 +515,7 @@
     let gone = false;
     let made: CoreRaster | null = null;
     const tried = backend;
+    markStartup(StartupStep.GpuAsked);
     void BACKENDS[tried](target, width, height, budget.pictureSide).then(
       (r) => {
         made = r;
@@ -526,6 +532,7 @@
         r.setTileBudget?.(budget.tileBytes);
         r.setTiles?.(TILED);
         raster = r;
+        markStartup(StartupStep.GpuReady);
       },
       (e: unknown) => {
         if (gone) {
@@ -838,6 +845,7 @@
         }
         if (drawnLast.get(layer.id)?.group !== layer.group) {
           markFrame(layer.group, Step.Drawn);
+          markStartup(StartupStep.FirstDrawn);
         }
         drawnLast.set(layer.id, layer);
       }
@@ -870,6 +878,7 @@
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
+    addTally(into.renderTally?.() ?? '{}');
     crashes.tick({ x: view.x, y: view.y, zoom: view.zoom, now: performance.now(), motion: gesture.active() ? Motion.Moving : Motion.Still, rastered: RASTERED.has(outcome) }, { cacheBytes, pictureBytes: into.pictureBytes(), scratchBytes: into.scratchBytes?.() ?? 0, wasmBytes: into.wasmBytes?.() ?? 0, width: canvas?.width ?? 0, height: canvas?.height ?? 0 });
     if (DEBUG) {
       (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
