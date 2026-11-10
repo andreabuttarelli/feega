@@ -21,8 +21,9 @@ no longer compiled against `gpu-core` (`Draw.output`, `Reprojector::draw` taking
 `set_overlay` taking an `OverlayPart`). Fixed to mirror `web.rs`; `native-apps.yml` now also
 runs on `packages/gpu-core/**` so the addon breaks in the PR that breaks it.
 
-The release builds the addon per arch and fails if it is missing from the app. It is on by
-default on macOS (`FEEGA_NATIVE_CANVAS=0` off). Fallback to web: addon fails to load, attach
+The release builds the addon per arch and fails if it is missing from the app. It stays opt-in
+(`FEEGA_NATIVE_CANVAS=1`): a user trial found the web overlay out of sync with the native
+layer during pan/zoom, stuttering gestures, and camera drift after zoom. Fallback to web: addon fails to load, attach
 fails, or `NATIVE_PROTOCOL` differs between the web app and the app's preload — the hosted app
 deploys more often than the app releases. Bump both when the bridge commands change.
 
