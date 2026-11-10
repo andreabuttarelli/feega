@@ -39,6 +39,25 @@ export function timeline(marks: readonly { name: string; startTime: number }[]):
   return [...rows.values()];
 }
 
+const ONE_FRAME_MS = 1000 / 60;
+const THUMB_GROUP = ':thumb';
+const PLACEHOLDER_GROUP = ':[';
+
+export type ScreenWatch = FrameSteps & { blankShotAt: number | null };
+export type Late = { id: string; drawnAt: number; blankShotAt: number };
+
+const vectorsDrawnAt = (steps: FrameSteps['steps']) => steps.find((s) => s.step === Step.Drawn && !s.group.endsWith(THUMB_GROUP) && !s.group.includes(PLACEHOLDER_GROUP))?.at ?? null;
+
+export function shownLate(frames: readonly ScreenWatch[]): Late[] {
+  return frames.flatMap(({ id, steps, blankShotAt }) => {
+    const drawnAt = vectorsDrawnAt(steps);
+    if (drawnAt === null || blankShotAt === null || blankShotAt <= drawnAt + ONE_FRAME_MS) {
+      return [];
+    }
+    return [{ id, drawnAt, blankShotAt }];
+  });
+}
+
 type Listed = { kind: string; src?: string; items?: Listed[] };
 
 const noted = new Map<string, string[]>();
