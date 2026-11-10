@@ -91,26 +91,47 @@ async function readFullHead(db: Db, input: { orgId: string; nodeId: string }): P
   return data ? headOf(data as RevisionRow) : null;
 }
 
+const PARSED_KEPT = 32;
+
+const parsedRevisions = new Map<string, MotionHead>();
+
+const revisionKey = (orgId: string, head: { nodeId: string; version: number }) => `${orgId}:${head.nodeId}:${head.version}`;
+
+function keepParsed(key: string, head: MotionHead) {
+  parsedRevisions.set(key, head);
+  if (parsedRevisions.size > PARSED_KEPT) {
+    parsedRevisions.delete(parsedRevisions.keys().next().value!);
+  }
+}
+
 export async function readHeads(db: Db, input: { orgId: string; heads: { nodeId: string; version: number }[] }): Promise<Map<string, MotionHead>> {
-  if (!input.heads.length) {
-    return new Map();
+  const known = input.heads.flatMap((h) => {
+    const parsed = parsedRevisions.get(revisionKey(input.orgId, h));
+    return parsed ? [[h.nodeId, parsed] as const] : [];
+  });
+  const missing = input.heads.filter((h) => !parsedRevisions.has(revisionKey(input.orgId, h)));
+  if (!missing.length) {
+    return new Map(known);
   }
 
   const { data, error } = await db
     .from('motion_revisions')
     .select('node_id, version, doc, summary, actor_kind')
     .eq('org_id', input.orgId)
-    .or(input.heads.map((h) => `and(node_id.eq.${h.nodeId},version.eq.${h.version})`).join(','));
+    .or(missing.map((h) => `and(node_id.eq.${h.nodeId},version.eq.${h.version})`).join(','));
 
   if (error) {
     throw error;
   }
-  return new Map(
-    ((data ?? []) as (RevisionRow & { node_id: string })[]).flatMap((row) => {
-      const head = headOf(row);
-      return head ? [[row.node_id, head] as const] : [];
-    })
-  );
+  const read = ((data ?? []) as (RevisionRow & { node_id: string })[]).flatMap((row) => {
+    const head = headOf(row);
+    if (!head) {
+      return [];
+    }
+    keepParsed(revisionKey(input.orgId, { nodeId: row.node_id, version: head.version }), head);
+    return [[row.node_id, head] as const];
+  });
+  return new Map([...known, ...read]);
 }
 
 export type HeadPointer = { nodeId: string; version: number | null };
