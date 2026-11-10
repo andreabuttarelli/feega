@@ -18,7 +18,18 @@ const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
 pub const NEAR_STEPS: i32 = 4;
-const AHEAD_RING: f64 = 0.5;
+struct Baked {
+    steps: i32,
+    reach: f64,
+}
+
+impl Baked {
+    fn area(&self, world: Rect) -> Rect {
+        world.inflate(world.width() * (self.reach - 1.0) / 2.0, world.height() * (self.reach - 1.0) / 2.0)
+    }
+}
+
+const BAKED: [Baked; 5] = [Baked { steps: 0, reach: 1.5 }, Baked { steps: 4, reach: 1.0 }, Baked { steps: -4, reach: 2.5 }, Baked { steps: -12, reach: 9.0 }, Baked { steps: -16, reach: 17.0 }];
 const RESERVE_STEPS_DOWN: i32 = 8;
 const RESERVE_REACH: f64 = 3.0;
 
@@ -184,16 +195,26 @@ impl Tiles {
     pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
         let world = seen_world(camera, screen);
         let step = step_of(camera.zoom);
-        let ring = world.inflate(world.width() * AHEAD_RING, world.height() * AHEAD_RING);
         let centre = world.center();
-        let mut keys: Vec<TileKey> = keys_over(ring, step).into_iter().chain(keys_over(world, step + 1)).filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
-        keys.sort_by(|a, b| (a.step != step).cmp(&(b.step != step)).then(a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre))));
-        keys
+        BAKED.iter().flat_map(|level| {
+            let mut keys: Vec<TileKey> = keys_over(level.area(world), step + level.steps).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+            keys.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
+            keys
+        }).collect()
     }
 
     pub fn hold(&mut self, key: TileKey) {
         self.held.insert(key);
         self.stale.remove(&key);
+    }
+
+    pub fn hold_lacking(&mut self, key: TileKey) -> bool {
+        if self.covered(key) {
+            return false;
+        }
+        self.held.insert(key);
+        self.stale.insert(key);
+        true
     }
 
     pub fn holds(&self, key: TileKey) -> bool {
@@ -238,11 +259,13 @@ impl Tiles {
         let step = step_of(camera.zoom);
         let world = seen_world(camera, screen);
         let near = |reach: f64| world.inflate(reach, reach);
-        match key.step {
-            s if s == step => key.world().overlaps(near(key.side())),
-            s if s == step - RESERVE_STEPS_DOWN => key.world().overlaps(near(world.width().max(world.height()) * (RESERVE_REACH - 1.0) / 2.0)),
-            _ => false,
+        if key.step == step && key.world().overlaps(near(key.side())) {
+            return true;
         }
+        if key.step == step - RESERVE_STEPS_DOWN {
+            return key.world().overlaps(near(world.width().max(world.height()) * (RESERVE_REACH - 1.0) / 2.0));
+        }
+        BAKED.iter().any(|level| key.step == step + level.steps && key.world().overlaps(level.area(world)))
     }
 
     pub fn evict_beyond(&mut self, camera: Camera, screen: (u32, u32), keep: usize) -> Vec<TileKey> {
@@ -316,7 +339,12 @@ impl Rest {
     }
 }
 
-pub const WARM_AFTER_MS: f64 = 1000.0;
+pub const WARM_AFTER_MS: f64 = 150.0;
+const SHARP_STRETCH: f64 = 1.25;
+
+pub fn underlay_shows(stretch: f64) -> bool {
+    stretch <= SHARP_STRETCH
+}
 
 pub struct Warmup {
     stirred_at: f64,

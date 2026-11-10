@@ -516,7 +516,9 @@ impl WebCore {
         let (cols, rows) = batch.span();
         let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
         let plan = self.compositor.plan_at(&mut self.library, camera, size, self.limits);
-        let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let building = plan.pending;
+        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let lacking = building || !missing.is_empty();
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
         let atlas = self.atlases.remove(&size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
         self.engine.draw(&self.device, &self.queue, &list, &pictures, &atlas.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
@@ -524,11 +526,19 @@ impl WebCore {
         let side = TILE_PX + 2 * TILE_GUTTER_PX;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         for key in &batch.keys {
+            if lacking && self.tile_textures.contains_key(key) {
+                continue;
+            }
+            if lacking && !self.tiles.hold_lacking(*key) {
+                continue;
+            }
             let texture = self.tile_textures.remove(key).or_else(|| self.spare_tiles.pop()).unwrap_or_else(|| tile_texture(&self.device, side));
             let (x, y) = (((key.tx - corner.tx) as u32) * TILE_PX, ((key.ty - corner.ty) as u32) * TILE_PX);
             encoder.copy_texture_to_texture(texel(&atlas, x, y), texel(&texture, 0, 0), wgpu::Extent3d { width: side, height: side, depth_or_array_layers: 1 });
             self.tile_textures.insert(*key, texture);
-            self.tiles.hold(*key);
+            if !lacking {
+                self.tiles.hold(*key);
+            }
         }
         self.queue.submit([encoder.finish()]);
         self.atlases.insert(size, atlas);
@@ -552,7 +562,12 @@ impl WebCore {
             multiview_mask: None,
         }));
         let c = self.camera;
-        let still = draw.iter().filter_map(|key| placed(*key, self.tile_textures.get(key)?, c, screen));
+        let step = crate::tiles::step_of(c.zoom);
+        let tile_of = |key: &TileKey| placed(*key, self.tile_textures.get(key)?, c, screen);
+        let (rw, rh) = (self.retained.width() as f64, self.retained.height() as f64);
+        let covered = |look: Lookup| Rect::new((-look.x / look.scale).ceil(), (-look.y / look.scale).ceil(), ((rw - look.x) / look.scale).floor(), ((rh - look.y) / look.scale).floor()).intersect(screen);
+        let underlay = self.compositor.held_look(c).filter(|(_, stretch)| crate::tiles::underlay_shows(*stretch)).map(|(look, _)| Tile { source: &self.retained, look, within: covered(look) }).filter(|t| t.within.area() > 0.0);
+        let still = draw.iter().filter(|k| k.step != step).filter_map(tile_of).chain(underlay).chain(draw.iter().filter(|k| k.step == step).filter_map(tile_of));
         let lifted = self.snapshots.values().flat_map(|shot| {
             let moved = Camera { x: c.x + shot.by.0 * c.zoom, y: c.y + shot.by.1 * c.zoom, zoom: c.zoom };
             let frame = Rect::new(shot.rest.x0 * c.zoom + moved.x, shot.rest.y0 * c.zoom + moved.y, shot.rest.x1 * c.zoom + moved.x, shot.rest.y1 * c.zoom + moved.y).intersect(screen);
@@ -748,7 +763,7 @@ impl WebCore {
                 cost.store((js_sys::Date::now() - started).to_bits(), Ordering::Relaxed);
             }
         });
-        if frame.rastered > 0 || moving {
+        if moving {
             self.warmup.stirred(js_sys::Date::now());
         }
         let idle = self.warmup.due(js_sys::Date::now());
