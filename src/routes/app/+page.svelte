@@ -23,7 +23,8 @@
   import PromptSources from '$lib/components/app/PromptSources.svelte';
   import type { PromptSource, SourcePick } from '$lib/home/prompt-sources';
   import { DEFAULT_KIND } from '$lib/home/prompt-kinds';
-  import { takeDraft } from '$lib/home/home-draft';
+  import { page } from '$app/state';
+  import { handoffOf } from '$lib/home/handoff';
 
   let { data, form } = $props();
 
@@ -35,7 +36,6 @@
   const sending = $derived(phase !== BriefPhase.Idle);
   let brief = $state('');
   let kind = $state(DEFAULT_KIND);
-  let resuming = $state(false);
   let pick = $state<SourcePick | null>(null);
   let pickAgain = $state<PromptSource | null>(null);
   let turn = $state(0);
@@ -56,30 +56,19 @@
       field?.focus();
     }
     const timer = setInterval(() => (turn += 1), EXAMPLE_TURN_MS);
-    void resumeDraft();
+    prefillHandoff();
     return () => clearInterval(timer);
   });
 
-  async function resumeDraft() {
-    const draft = await takeDraft(sessionStorage).catch(() => null);
-    if (!draft) {
+  function prefillHandoff() {
+    const handoff = handoffOf(page.url.searchParams);
+    if (!handoff) {
       return;
     }
-    brief = draft.text;
-    kind = draft.kind;
-    pick = draft.pick;
-    pickAgain = draft.pickAgain;
-    uploads?.add(draft.files);
-    resuming = !draft.pickAgain;
+    brief = handoff.text;
+    kind = handoff.kind;
+    pickAgain = handoff.source;
   }
-
-  $effect(() => {
-    if (!resuming || !canSend || !composer) {
-      return;
-    }
-    resuming = false;
-    composer.requestSubmit();
-  });
 
   $effect(() => {
     void brief;
@@ -296,6 +285,7 @@
     width: 100%;
     max-width: 720px;
     margin: var(--ui-space-8) auto 0;
+    padding-bottom: var(--ui-space-8);
     animation: rise var(--ui-dur-slow) var(--ui-ease) both;
   }
 

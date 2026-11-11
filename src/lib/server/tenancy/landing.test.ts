@@ -145,6 +145,15 @@ describe('a home prompt typed while signed out', () => {
     expect(jar).not.toHaveProperty(HOME_DRAFT_COOKIE);
   });
 
+  it('a handoff query survives the login and lands on /app with it', async () => {
+    const jar: Record<string, string> = { [HOME_DRAFT_COOKIE]: '?prompt=launch&kind=motion' };
+
+    const path = await landingPath(DB, USER, cookies(jar), null, deps({ outcome: 'invalid' }));
+
+    expect(path).toBe('/app?prompt=launch&kind=motion');
+    expect(jar).not.toHaveProperty(HOME_DRAFT_COOKIE);
+  });
+
   it('without it, the usual canvas', async () => {
     expect(await landingPath(DB, USER, cookies(), null, deps({ outcome: 'invalid' }))).toBe('/p/proj/c/canvas');
   });

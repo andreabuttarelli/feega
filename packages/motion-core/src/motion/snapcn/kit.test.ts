@@ -46,4 +46,13 @@ describe('snapcn kit', () => {
     expect(S.pick("'DM Sans', system-ui, sans-serif", 'Inter')).toBe('Inter');
     expect(S.pick('#ff0000', '#141414')).toBe('#ff0000');
   });
+
+  it('loops a css animation by its duration and delay', () => {
+    expect(S.cycle(15, 30, 2)).toBeCloseTo(0.25, 6);
+    expect(S.cycle(60, 30, 2)).toBe(0);
+    expect(S.cycle(75, 30, 2)).toBeCloseTo(0.25, 6);
+    expect(S.cycle(15, 30, 2, 1)).toBe(0);
+    expect(S.cycle(45, 30, 2, 1)).toBeCloseTo(0.25, 6);
+    expect(S.cycle(0, 30, 2, -1)).toBeCloseTo(0.5, 6);
+  });
 });

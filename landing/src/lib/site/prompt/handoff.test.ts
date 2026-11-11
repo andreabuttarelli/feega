@@ -3,7 +3,7 @@ import { HANDOFF_PROMPT_MAX, handoffLink, sourceTrigger, PROMPT_KINDS, PromptKin
 
 function params(link: string): URLSearchParams {
   const url = new URL(link);
-  expect(url.origin + url.pathname).toBe('https://oh.feega.app/new');
+  expect(url.origin + url.pathname).toBe('https://oh.feega.app/app');
   return url.searchParams;
 }
 
