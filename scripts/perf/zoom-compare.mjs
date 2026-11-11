@@ -1,5 +1,5 @@
 import { appendFileSync, copyFileSync, readFileSync } from 'node:fs';
-import { METRICS } from './bench-stats.mjs';
+import { METRICS, softwareAdapter } from './bench-stats.mjs';
 
 const BASELINE = 'tests/perf/zoom-baseline.json';
 const TOLERANCE = JSON.parse(readFileSync('tests/perf/zoom-tolerance.json', 'utf8'));
@@ -12,8 +12,17 @@ if (mode === '--refresh') {
   process.exit(0);
 }
 
+const measured = JSON.parse(readFileSync(result, 'utf8'));
+if (softwareAdapter(measured.adapter ?? null)) {
+  const note = `### Canvas zoom benchmark\n\nNot measured: the runner has no GPU (${measured.adapter.description || measured.adapter.architecture}), so WebGPU runs in software. Compare on a machine with a GPU.`;
+  console.log(note);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${note}\n`);
+  }
+  process.exit(0);
+}
 const base = JSON.parse(readFileSync(BASELINE, 'utf8')).median;
-const now = JSON.parse(readFileSync(result, 'utf8')).median;
+const now = measured.median;
 
 const worse = (key) => {
   const delta = METRICS[key].better === 'higher' ? base[key] - now[key] : now[key] - base[key];
