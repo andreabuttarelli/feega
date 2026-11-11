@@ -54,6 +54,18 @@ function browsable(target) {
   return URL.canParse(target) && BROWSABLE_SCHEMES.includes(new URL(target).protocol);
 }
 
+function heldLink() {
+  let held = null;
+  return {
+    keep: (link) => { held = link; },
+    take: () => {
+      const link = held;
+      held = null;
+      return link;
+    }
+  };
+}
+
 function droppedCanvas(target) {
   const url = new URL(target);
   if (url.protocol !== 'file:' || !url.pathname.endsWith(CANVAS_EXTENSION)) {
@@ -62,4 +74,4 @@ function droppedCanvas(target) {
   return decodeURIComponent(url.pathname);
 }
 
-module.exports = { browsable, settingsUrl, droppedCanvas, PRODUCTION_URL, DEEP_LINK_SCHEME, start, authReturn, staysInside, keepInside };
+module.exports = { heldLink, browsable, settingsUrl, droppedCanvas, PRODUCTION_URL, DEEP_LINK_SCHEME, start, authReturn, staysInside, keepInside };

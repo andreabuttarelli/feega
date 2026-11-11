@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { EventEmitter } = require('node:events');
-const { start, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, browsable, PRODUCTION_URL } = require('./routing.cjs');
+const { start, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, browsable, heldLink, PRODUCTION_URL } = require('./routing.cjs');
 
 test('production is the default start', () => {
   assert.equal(start(undefined).href, new URL(PRODUCTION_URL).href);
@@ -70,4 +70,12 @@ test('only web and mail links leave for the system, never file or app schemes', 
   assert.ok(!browsable('smb://host/share'));
   assert.ok(!browsable('vscode://x'));
   assert.ok(!browsable('not a url'));
+});
+
+test('a link that arrives before the window exists is kept for the first window', () => {
+  const held = heldLink();
+  assert.equal(held.take(), null);
+  held.keep('feega://auth/callback?code=x');
+  assert.equal(held.take(), 'feega://auth/callback?code=x');
+  assert.equal(held.take(), null);
 });

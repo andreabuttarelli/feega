@@ -5,7 +5,7 @@ const { watchUpdates } = require('./updates.cjs');
 const { fileIn, withExtension, savedBounds, saveBounds, EXTENSION } = require('./files.cjs');
 const { startServer, freePort, LOOPBACK } = require('./server.cjs');
 const { frameless, overlay, offlinePage, unreachable } = require('./chrome.cjs');
-const { start, browsable, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, DEEP_LINK_SCHEME } = require('./routing.cjs');
+const { start, browsable, heldLink, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, DEEP_LINK_SCHEME } = require('./routing.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
 const hosted = start(process.env[START_URL_ENV]);
@@ -30,6 +30,7 @@ let current = null;
 let pending = null;
 let port = null;
 let switching = Promise.resolve();
+const earlyLink = heldLink();
 
 function queue(step) {
   switching = switching.then(step).catch((error) => dialog.showMessageBox(window, { type: 'error', message: 'feega could not open that', detail: error.message }));
@@ -262,6 +263,10 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('open-url', (event, url) => {
     event.preventDefault();
+    if (!window) {
+      earlyLink.keep(url);
+      return;
+    }
     follow(url);
   });
 
@@ -273,7 +278,7 @@ if (!app.requestSingleInstanceLock()) {
     if (app.isPackaged) {
       watchUpdates({ fetch, current: app.getVersion(), ask: (options) => dialog.showMessageBox(window, options), open: (url) => shell.openExternal(url), every: setInterval });
     }
-    const deep = deepLinkIn(process.argv);
+    const deep = earlyLink.take() ?? deepLinkIn(process.argv);
     if (deep) {
       follow(deep);
     }
