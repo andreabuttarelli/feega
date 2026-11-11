@@ -46,10 +46,12 @@ function isSessionCookie(name: string): boolean {
   return name === SESSION_COOKIE_NAME || name.startsWith(SESSION_COOKIE_PREFIX);
 }
 
+const SIGNED_OUT_PROMPT = '/new';
+
 async function rootRedirectTarget(event: RequestEvent): Promise<string> {
   const { session, user } = await event.locals.safeGetSession();
   if (!session || !user) {
-    return '/login';
+    return SIGNED_OUT_PROMPT;
   }
 
   const db = await event.locals.db();
@@ -165,7 +167,7 @@ async function refuseSignedOutDashboard(event: RequestEvent): Promise<void> {
   }
   const { session } = await event.locals.safeGetSession();
   if (!session) {
-    throw redirect(303, '/login');
+    throw redirect(303, path === DASHBOARD_PREFIX ? SIGNED_OUT_PROMPT : '/login');
   }
 }
 

@@ -202,10 +202,10 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		}
 	};
 
-	it('senza sessione va al login', async () => {
+	it('senza sessione va al prompt senza account', async () => {
 		mockSession = { session: null, user: null };
 		const redirected = await rootRequestTo();
-		expect(redirected?.location).toBe('/login');
+		expect(redirected?.location).toBe('/new');
 	});
 
 	it('con sessione va dove homePathFor decide', async () => {
@@ -220,7 +220,38 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		mockSession = { session: null, user: null };
 		const redirected = await rootRequestTo('https://www.feega.app');
 		Object.assign(env, { VERCEL_ENV: 'production' });
-		expect(redirected?.location).toBe('/login');
+		expect(redirected?.location).toBe('/new');
+	});
+});
+
+describe('a signed-out /app opens the prompt, deeper pages the login', () => {
+	const requestTo = async (path: string) => {
+		try {
+			await handle({
+				event: {
+					request: new Request(`http://localhost${path}`),
+					url: new URL(`http://localhost${path}`),
+					route: { id: path },
+					params: {},
+					cookies: { getAll: () => [], get: () => undefined, set: vi.fn() },
+					locals: {}
+				},
+				resolve: async () => new Response('never')
+			} as any);
+			return null;
+		} catch (e) {
+			return e as Error & { location?: string };
+		}
+	};
+
+	it('/app goes to /new', async () => {
+		mockSession = { session: null, user: null };
+		expect((await requestTo('/app'))?.location).toBe('/new');
+	});
+
+	it('/app/credits goes to the login', async () => {
+		mockSession = { session: null, user: null };
+		expect((await requestTo('/app/credits'))?.location).toBe('/login');
 	});
 });
 

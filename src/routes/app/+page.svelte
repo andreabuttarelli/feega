@@ -19,6 +19,11 @@
   import FeegaFile from '$lib/components/canvas/FeegaFile.svelte';
   import { isFeegaFile } from '$lib/canvas/feega-file';
   import { DashboardPage, EDITOR_PRELOAD, PAGE_PATH } from '$lib/dashboard/pages';
+  import PromptKinds from '$lib/components/app/PromptKinds.svelte';
+  import PromptSources from '$lib/components/app/PromptSources.svelte';
+  import type { PromptSource, SourcePick } from '$lib/home/prompt-sources';
+  import { DEFAULT_KIND } from '$lib/home/prompt-kinds';
+  import { takeDraft } from '$lib/home/home-draft';
 
   let { data, form } = $props();
 
@@ -29,6 +34,10 @@
   let phase = $state(BriefPhase.Idle);
   const sending = $derived(phase !== BriefPhase.Idle);
   let brief = $state('');
+  let kind = $state(DEFAULT_KIND);
+  let resuming = $state(false);
+  let pick = $state<SourcePick | null>(null);
+  let pickAgain = $state<PromptSource | null>(null);
   let turn = $state(0);
   let dragging = $state(false);
   let field = $state<HTMLTextAreaElement | null>(null);
@@ -47,7 +56,29 @@
       field?.focus();
     }
     const timer = setInterval(() => (turn += 1), EXAMPLE_TURN_MS);
+    void resumeDraft();
     return () => clearInterval(timer);
+  });
+
+  async function resumeDraft() {
+    const draft = await takeDraft(sessionStorage).catch(() => null);
+    if (!draft) {
+      return;
+    }
+    brief = draft.text;
+    kind = draft.kind;
+    pick = draft.pick;
+    pickAgain = draft.pickAgain;
+    uploads?.add(draft.files);
+    resuming = !draft.pickAgain;
+  }
+
+  $effect(() => {
+    if (!resuming || !canSend || !composer) {
+      return;
+    }
+    resuming = false;
+    composer.requestSubmit();
   });
 
   $effect(() => {
@@ -146,6 +177,68 @@
 
   <div class="scroll" data-testid="home-scroll">
     <div class="column">
+      <section class="prompt" aria-labelledby="prompt-heading">
+        <h1 id="prompt-heading">what do you want to make?</h1>
+        <PromptKinds bind:kind />
+
+        <form
+          method="POST"
+          action="?/video"
+          class="composer"
+          class:dragging
+          aria-busy={sending}
+          bind:this={composer}
+          use:apiEnhance={submit}
+          ondragover={dragged}
+          ondragleave={() => (dragging = false)}
+          ondrop={dropped}
+        >
+          {#if uploads?.items.length}
+            <ChatAttachments items={uploads.items} onremove={(id) => uploads?.remove(id)} />
+          {/if}
+          {#if dragging}
+            <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
+          {/if}
+          <textarea
+            name="brief"
+            id="video-brief"
+            data-testid="video-brief"
+            placeholder={PLACEHOLDER}
+            aria-label={PLACEHOLDER}
+            maxlength={BRIEF_MAX}
+            rows="3"
+            enterkeyhint="send"
+            bind:value={brief}
+            bind:this={field}
+            onkeydown={keyed}
+            onpaste={pasted}
+            onfocus={preloadEditor}
+            readonly={sending}
+          ></textarea>
+          <input type="hidden" name="kind" value={kind} />
+          {#if pick}<input type="hidden" name="source" value={pick.source} /><input type="hidden" name="sourceValue" value={pick.value} />{/if}
+          <PromptSources bind:pick projectId={data.attachProjectId} {pickAgain} />
+          {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
+          {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
+          <div class="row">
+            {#if uploads}
+              <IconButton action={Tool.Attach} label={$_('chat.panel.attach.button')} data-testid="chat-attach" onclick={() => picker?.click()} />
+            {/if}
+            {#if sending}<span class="progress" role="status" data-testid="brief-progress">{briefProgress(phase)}</span>{/if}
+            <button type="submit" class="send" class:busy={sending} data-testid="brief-send" disabled={!canSend} aria-label="Start" title="Start">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
+            </button>
+          </div>
+        </form>
+        {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
+
+        <div class="examples" data-testid="brief-examples" aria-label="Suggestions">
+          {#each examples as template (template.id)}
+            <button type="button" data-brief={template.brief} onclick={() => fill(template.brief)}>{template.name}</button>
+          {/each}
+        </div>
+      </section>
+
       {#if recents.length}
         <section class="recents" aria-labelledby="recents-heading">
           <h2 id="recents-heading">recents</h2>
@@ -158,62 +251,6 @@
       {/if}
       <AgentCard />
     </div>
-  </div>
-
-  <div class="dock">
-    <div class="examples" data-testid="brief-examples" aria-label="Suggestions">
-      {#each examples as template (template.id)}
-        <button type="button" data-brief={template.brief} onclick={() => fill(template.brief)}>{template.name}</button>
-      {/each}
-    </div>
-
-    <form
-      method="POST"
-      action="?/video"
-      class="composer"
-      class:dragging
-      aria-busy={sending}
-      bind:this={composer}
-      use:apiEnhance={submit}
-      ondragover={dragged}
-      ondragleave={() => (dragging = false)}
-      ondrop={dropped}
-    >
-      {#if uploads?.items.length}
-        <ChatAttachments items={uploads.items} onremove={(id) => uploads?.remove(id)} />
-      {/if}
-      {#if dragging}
-        <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
-      {/if}
-      <textarea
-        name="brief"
-        id="video-brief"
-        data-testid="video-brief"
-        placeholder={PLACEHOLDER}
-        aria-label={PLACEHOLDER}
-        maxlength={BRIEF_MAX}
-        rows="2"
-        enterkeyhint="send"
-        bind:value={brief}
-        bind:this={field}
-        onkeydown={keyed}
-        onpaste={pasted}
-        onfocus={preloadEditor}
-        readonly={sending}
-      ></textarea>
-      {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
-      {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
-      <div class="row">
-        {#if uploads}
-          <IconButton action={Tool.Attach} label={$_('chat.panel.attach.button')} data-testid="chat-attach" onclick={() => picker?.click()} />
-        {/if}
-        {#if sending}<span class="progress" role="status" data-testid="brief-progress">{briefProgress(phase)}</span>{/if}
-        <button type="submit" class="send" class:busy={sending} data-testid="brief-send" disabled={!canSend} aria-label="Start" title="Start">
-          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
-        </button>
-      </div>
-    </form>
-    {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
   </div>
 </div>
 
@@ -306,22 +343,28 @@
     text-underline-offset: 3px;
   }
 
-  .dock {
-    flex: none;
+  .prompt {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-2);
-    width: 100%;
-    max-width: 720px;
-    margin: 0 auto;
-    padding-top: var(--ui-space-4);
+    gap: var(--ui-space-4);
+    padding: var(--ui-space-8) 0 var(--ui-space-4);
+  }
+
+  h1 {
+    margin: 0 0 var(--ui-space-2);
+    text-align: center;
+    font-size: clamp(40px, 4.5vw, 72px);
+    font-weight: 600;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    color: var(--ui-text);
   }
 
   .examples {
     display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
     gap: var(--ui-space-1);
-    overflow-x: auto;
-    scrollbar-width: none;
   }
 
   .examples button {
@@ -330,7 +373,7 @@
     padding: 0 var(--ui-space-3);
     border: 0;
     border-radius: var(--ui-radius-full);
-    background: var(--ui-input);
+    background: transparent;
     color: var(--ui-text-secondary);
     font: inherit;
     font-size: var(--ui-type-label);
@@ -372,8 +415,8 @@
 
   textarea {
     width: 100%;
-    min-height: 48px;
-    max-height: 200px;
+    min-height: 72px;
+    max-height: 240px;
     padding: var(--ui-space-1) 0 0;
     border: 0;
     resize: none;
@@ -474,8 +517,12 @@
       margin-top: var(--ui-space-6);
     }
 
-    .dock {
-      padding-top: var(--ui-space-3);
+    .prompt {
+      padding-top: var(--ui-space-4);
+    }
+
+    h1 {
+      font-size: clamp(36px, 10vw, 64px);
     }
 
     textarea {

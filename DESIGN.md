@@ -116,10 +116,9 @@ between the two is the point.
 
 - `/app` and its tools live in one shell: a **220px sidebar always open from 1024px**, a drawer
   behind a hamburger below. Its entries are one table, `src/lib/app-nav.ts`.
-- The home holds three things and nothing else: a **hero** (mega slogan + one small subline over a
-  dark, low-opacity backdrop cut from our own library, poster first, clip on idle, still under
-  reduced motion), **recents** as a compact list (thumb · name · project · time), and **one prompt
-  dock** anchored at the bottom with three suggestions. Top right: `new canvas` (the one accent
+- The home holds two things and nothing else: **one prompt** first (mega title *what do you want
+  to make?*, kind chips above the composer, three suggestions under it) and **recents** as a
+  compact list (thumb · name · project · time). Top right: `new canvas` (the one accent
   button) and `import`. Catalogues live on their own page (templates), never as rows on the home.
 - The account entries (settings, billing, changelog, theme, sign out…) sit in a menu behind the
   avatar at the foot of the sidebar, not in the sidebar itself.

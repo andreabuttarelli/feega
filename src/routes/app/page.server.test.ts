@@ -47,6 +47,18 @@ const importStoredCanvasFile = vi.fn(async (_db: unknown, input: { path: string;
 );
 vi.mock('$lib/server/canvas/feega-file', async (original) => ({ ...(await original<object>()), importStoredCanvasFile }));
 
+const importUrlInto = vi.fn(async (_scope: unknown, _canvasId: string, _ask: { url: string }) => ({ outcome: 'ok', frameId: 'f-site', name: 'acme.com', undo: [], skipped: [], truncated: false }));
+vi.mock('$lib/server/url-import/canvas-import', () => ({ importUrlInto }));
+vi.mock('$lib/server/tool-guard', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
+
+const importCodeInto = vi.fn(async (_scope: unknown, _canvasId: string, _ask: { repo?: string; folder?: string }) => ({ outcome: 'ok', frameId: 'f-code', name: 'acme/web' }));
+vi.mock('$lib/server/code-import/canvas-import', () => ({ importCodeInto }));
+const importFigmaInto = vi.fn(async (_scope: unknown, _canvasId: string, _ask: { url: string }) => ({ outcome: 'ok', frameIds: ['f-fig1', 'f-fig2'], undo: [], skipped: [] }));
+vi.mock('$lib/server/figma/canvas-import', () => ({ importFigmaInto }));
+
+const moveAssets = vi.fn(async () => {});
+vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), moveAssets }));
+
 const { load, actions } = await import('$lib/server/dashboard/pages/home');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
@@ -131,19 +143,99 @@ describe('/app is the dashboard for a returning user', () => {
     expect(out).toMatchObject({ status: 400, data: { error: expect.stringContaining('damaged') } });
   });
 
-  it('a prompt opens a new canvas of its own and hands the words to the canvas chat', async () => {
-    const brief = 'https://acme.com';
-    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief }) } as never));
+  it('a bare URL is imported onto the new canvas before the chat starts from its frame', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'https://acme.com' }) } as never));
 
-    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', name: 'acme.com' });
-    expect(createNode).not.toHaveBeenCalled();
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=Make+a+launch+film+of+https%3A%2F%2Facme.com' });
+    expect(createProject).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-a', name: 'acme.com' }));
+    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p-new', name: 'acme.com' });
+    expect(importUrlInto).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org-a', projectId: 'p-new', userId: 'u1' }), 'c-new', expect.objectContaining({ url: 'https://acme.com' }));
+    expect(redirected.location).toMatch(/^\/p\/p-new\/c\/c-new\?/);
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('Make a launch film of https://acme.com');
+    expect(prompt).toContain('f-site');
   });
 
-  it('a described idea reaches the chat with the words as typed', async () => {
+  it('a URL inside a sentence is imported too, and the words stay as typed', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Redo https://acme.com/pricing in dark mode', kind: 'website' }) } as never));
+
+    expect(importUrlInto).toHaveBeenCalledWith(expect.anything(), 'c-new', expect.objectContaining({ url: 'https://acme.com/pricing' }));
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt.startsWith('Redo https://acme.com/pricing in dark mode')).toBe(true);
+    expect(prompt).toContain('website');
+    expect(prompt).toContain('Desktop');
+  });
+
+  it('a failed import still hands the brief to the chat', async () => {
+    importUrlInto.mockResolvedValueOnce({ outcome: 'failed' } as never);
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'https://acme.com' }) } as never));
+
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('Make a launch film of https://acme.com');
+    expect(prompt).not.toContain('f-site');
+  });
+
+  it('a described idea reaches the chat with the words first and the motion chip as default', async () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
 
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal' });
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt.startsWith('A logo reveal')).toBe(true);
+    expect(prompt).toContain('motion video');
+    expect(prompt).toContain('Presentation');
+    expect(importUrlInto).not.toHaveBeenCalled();
+  });
+
+  it('a user with no project still gets a new project and canvas', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
+
+    expect(redirected.location).toMatch(/^\/p\/p-new\/c\/c-new\?/);
+    expect(listProjects).not.toHaveBeenCalled();
+  });
+
+  it('a GitHub source is imported onto the new canvas and the agent works from its frame', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Polish the pricing page', kind: 'website', source: 'github', sourceValue: 'https://github.com/acme/web' }) } as never));
+
+    expect(importCodeInto).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p-new' }), 'c-new', expect.objectContaining({ repo: 'https://github.com/acme/web' }));
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('f-code');
+    expect(importUrlInto).not.toHaveBeenCalled();
+  });
+
+  it('a folder source runs the folder importer', async () => {
+    await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Animate the onboarding', source: 'folder', sourceValue: '/Users/me/code/app' }) } as never));
+
+    expect(importCodeInto).toHaveBeenCalledWith(expect.anything(), 'c-new', expect.objectContaining({ folder: '/Users/me/code/app' }));
+  });
+
+  it('a Figma source imports its frames and names all of them to the agent', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Make it move', source: 'figma', sourceValue: 'https://www.figma.com/design/abc/Landing' }) } as never));
+
+    expect(importFigmaInto).toHaveBeenCalledWith(expect.anything(), 'c-new', expect.objectContaining({ url: 'https://www.figma.com/design/abc/Landing' }));
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('f-fig1');
+    expect(prompt).toContain('f-fig2');
+  });
+
+  it('Figma without a token still opens the canvas and tells the agent to ask for the connection', async () => {
+    importFigmaInto.mockResolvedValueOnce({ outcome: 'no_token' } as never);
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'Make it move', source: 'figma', sourceValue: 'https://www.figma.com/design/abc/Landing' }) } as never));
+
+    const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
+    expect(prompt).toContain('Figma');
+    expect(prompt).toContain('no_token');
+  });
+
+  it('a source outside the table is refused before anything is created', async () => {
+    const refused = (await actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'x', source: 'dropbox', sourceValue: 'y' }) } as never)) as { status: number };
+
+    expect(refused.status).toBe(400);
+    expect(createProject).not.toHaveBeenCalled();
+  });
+
+  it('a kind outside the chip table is refused before anything is created', async () => {
+    const refused = (await actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A deck', kind: 'spreadsheet' }) } as never)) as { status: number };
+
+    expect(refused.status).toBe(400);
+    expect(createCanvas).not.toHaveBeenCalled();
   });
 
   it('attachments uploaded on the home ride with the brief into the first turn', async () => {
@@ -156,12 +248,14 @@ describe('/app is the dashboard for a returning user', () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request } as never));
 
     expect(loadAttachments).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', ids: ['a1', 'stranger', 'a2'] });
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal&attach=a1%2Ca2' });
+    expect(moveAssets).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p-new', ids: ['a1', 'a2'] });
+    expect(redirected.location).toContain('&attach=a1%2Ca2');
   });
 
   it('files alone are a brief', async () => {
     const fd = new FormData();
     fd.set('brief', '');
+    fd.set('projectId', 'p1');
     fd.append('attachment', 'a1');
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: new Request('http://x/app', { method: 'POST', body: fd }) } as never));
 
