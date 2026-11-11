@@ -108,8 +108,8 @@ impl Compositor {
         self.world.holding()
     }
 
-    pub fn extent(&self, library: &Library) -> Option<Rect> {
-        self.world.extent(|g| library.size_of(g))
+    pub fn extent(&self) -> Option<Rect> {
+        self.world.extent()
     }
 
     pub fn lifts(&self, library: &Library) -> Vec<Lift> {

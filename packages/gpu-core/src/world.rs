@@ -1,10 +1,12 @@
+use std::cell::Cell;
+
 use serde::Deserialize;
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, Item, Look, PathItem, UseItem};
-use crate::lod::BLUR_REACH;
+use crate::lod::{BLUR_REACH, VIEW_SLACK_PX};
 use crate::retained::Damage;
-use crate::uses::Uses;
+use crate::uses::{Plus, Uses};
 
 const OVERLAY_SLACK_PX: f64 = 2.0;
 
@@ -71,11 +73,12 @@ pub struct World {
     damage: Damage,
     scene_damage: Damage,
     rest: std::collections::HashMap<String, (String, Affine)>,
+    visited: Cell<usize>,
 }
 
 impl Default for World {
     fn default() -> Self {
-        World { uses: Uses::default(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default() }
+        World { uses: Uses::default(), overlays: Default::default(), damage: Damage::none(), scene_damage: Damage::none(), rest: Default::default(), visited: Cell::new(0) }
     }
 }
 
@@ -98,6 +101,16 @@ fn extent(item: &Item) -> Option<Rect> {
         Item::Path(p) => hull(p.look.matrix, p.contours.iter().flat_map(|c| c.chunks_exact(2).map(|xy| (xy[0], xy[1])))),
         _ => None,
     }
+}
+
+fn sighted(camera: Affine, width: u32, height: u32) -> Option<Rect> {
+    let [a, b, c, d, _, _] = camera;
+    if b != 0.0 || c != 0.0 || a == 0.0 || d == 0.0 {
+        return None;
+    }
+    let view = Rect::new(0.0, 0.0, width as f64, height as f64);
+    let slack = VIEW_SLACK_PX / a.abs().min(d.abs());
+    Some(Matrix::new(camera).inverse().transform_rect_bbox(view).inflate(slack, slack))
 }
 
 fn same(a: &Item, b: &Item) -> bool {
@@ -168,8 +181,8 @@ impl World {
         }).collect()
     }
 
-    pub fn extent(&self, sizes: impl Fn(&str) -> Option<(f64, f64)>) -> Option<Rect> {
-        self.uses.all().into_iter().filter_map(|u| reach(u, sizes(&u.group))).reduce(|a, b| a.union(b))
+    pub fn extent(&self) -> Option<Rect> {
+        self.uses.extent()
     }
 
     pub fn holding(&self) -> bool {
@@ -202,7 +215,7 @@ impl World {
                 self.rest.insert(u.clip.clone(), (u.group.clone(), u.matrix));
             }
             let now_scene = !self.lifted(&u);
-            let old = self.uses.put(u);
+            let old = self.uses.put(u, fresh);
             let Some((old, was_scene)) = old.zip(was_scene) else {
                 self.mark_use(fresh, now_scene);
                 continue;
@@ -227,6 +240,7 @@ impl World {
     }
 
     pub fn touch(&mut self, group: &str, size: Option<(f64, f64)>) {
+        self.uses.reach_group(group, |u| reach(u, size));
         let reaches: Vec<Option<Rect>> = self.uses.of_group(group).into_iter().map(|u| reach(u, size)).collect();
         reaches.into_iter().for_each(|r| self.mark_if_sized(r));
     }
@@ -272,8 +286,17 @@ impl World {
         std::mem::replace(&mut self.scene_damage, Damage::none())
     }
 
+    pub fn take_visited(&self) -> usize {
+        self.visited.replace(0)
+    }
+
+    fn visit<'a>(&self, uses: Vec<&'a UseItem>) -> Vec<&'a UseItem> {
+        self.visited.set(self.visited.get() + uses.len());
+        uses
+    }
+
     pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let uses = self.uses.all().into_iter().filter(|u| !self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
+        let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Nothing)).into_iter().filter(|u| !self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
         DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }
     }
 
@@ -290,7 +313,7 @@ impl World {
     }
 
     pub fn screen(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let uses = self.uses.all().into_iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let uses = self.visit(self.uses.meeting(sighted(camera, width, height), Plus::Flagged)).into_iter().map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let overlay = OVERLAY_PARTS.iter().flat_map(|p| {
             let part = &self.overlays[p.index()];
             match &part.at {

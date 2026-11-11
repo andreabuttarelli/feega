@@ -845,7 +845,7 @@ impl WebCore {
     }
 
     fn fill_canvas(&mut self) -> Result<bool, JsValue> {
-        let Some(extent) = self.compositor.extent(&self.library) else { return Ok(false) };
+        let Some(extent) = self.compositor.extent() else { return Ok(false) };
         self.tiles.set_canvas(extent);
         let started = js_sys::Date::now();
         let screen = (self.target.width(), self.target.height());
