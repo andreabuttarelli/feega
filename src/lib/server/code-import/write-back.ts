@@ -34,7 +34,7 @@ const LOOK_OF_BINDING: Record<string, LookKey> = {
   'autoLayout.padding': LookKey.Padding
 };
 
-function unbound(clip: MotionClip, look: Look): Look {
+export function unbound(clip: MotionClip, look: Look): Look {
   const owned = new Set(Object.keys(clip.bind ?? {}).map((target) => LOOK_OF_BINDING[target]));
   return Object.fromEntries(Object.entries(look).filter(([key]) => !owned.has(key as LookKey)));
 }

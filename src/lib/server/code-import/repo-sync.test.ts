@@ -26,6 +26,16 @@ describe('rebased', () => {
   });
 });
 
+describe('rebased e i token', () => {
+  it('un colore che viene da una variabile non è una modifica del livello: niente conflitto, lo porta il token', () => {
+    const bound = { id: 'a', component: 'Text', props: { text: 'Ciao', color: '#1565c0' }, bind: { color: 'app Colors/primary' }, source: { at: 'p.svelte:5:2', was: { text: 'Ciao', color: '#111111' } } };
+    const upstream = docOf({ id: 'x', component: 'Text', props: { text: 'Ciao', color: '#222222' }, source: { at: 'p.svelte:5:2', was: { text: 'Ciao', color: '#222222' } } });
+    const done = rebased(docOf(bound), upstream);
+    expect(done.conflicts).toEqual([]);
+    expect(done.carried).toBe(0);
+  });
+});
+
 describe('rebased con condizioni', () => {
   it('una modifica fatta sotto dark torna sul clip dark, non su quello chiaro con la stessa riga', () => {
     const fill = (id: string, at: string, color: string, cond?: string) => ({ id, component: 'Rectangle', props: { fills: [{ type: 'solid', color }] }, source: { at, ...(cond ? { cond } : {}), was: { fill: '#ffffff' } } });
