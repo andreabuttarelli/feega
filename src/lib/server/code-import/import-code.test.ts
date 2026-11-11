@@ -211,7 +211,7 @@ describe('importBoards images', () => {
     const tree = structuredClone(TREE);
     tree.url = `${origin}/`;
     tree.root.children = [{ id: '9', type: 'RECTANGLE', absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 }, fills: [{ type: 'IMAGE', imageRef: `${origin}/hero.png`, scaleMode: 'FILL' }] } as never];
-    tab.tree.mockResolvedValue(tree);
+    vi.mocked(tab.tree).mockResolvedValue(tree);
 
     await importBoards({ ...ask, name: 'app', pages: [{ label: '/', url: `${origin}/` }], names: [], crop: Crop.Page }).finally(() => server.close());
 
