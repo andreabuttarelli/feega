@@ -4,7 +4,7 @@ export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[];
 
 export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
-export type CodeTarget = { repo: string; routes: string[]; conditions?: RenderCondition[] } | { folder: string; routes: string[]; conditions?: RenderCondition[] } | { storybook: string };
+export type CodeTarget = { repo: string; routes: string[]; conditions?: RenderCondition[] } | { folder: string; routes: string[]; conditions?: RenderCondition[] } | { upload: string; routes: string[]; conditions?: RenderCondition[] } | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 
@@ -44,11 +44,11 @@ export const githubBranches = (projectId: string, repo: string, fetchFn: typeof 
 
 export const repoLink = (fullName: string, branch: string | null) => `https://github.com/${fullName}${branch ? `/tree/${branch}` : ''}`;
 
-export type RepoChanges = { kind: 'github' | 'folder'; repo: string; sha: string; patch: string; files: string[]; skipped: string[] };
+export type RepoChanges = { kind: 'github' | 'folder' | 'upload'; repo: string; sha: string; patch: string; files: string[]; skipped: string[] };
 
 export type RepoPublished = { url: string | null; branch: string | null; files: string[]; skipped: string[] };
 
-export type RepoHead = { kind: 'github' | 'folder'; sha: string | null; head: string | null };
+export type RepoHead = { kind: 'github' | 'folder' | 'upload'; sha: string | null; head: string | null };
 
 export type RepoPulled = { outcome: 'ok' | 'up_to_date'; sha: string; carried: number; conflicts: string[]; skipped: string[] };
 
@@ -61,3 +61,14 @@ export const repoPublish = (projectId: string, nodeId: string, fetchFn: typeof f
 export const repoHead = (projectId: string, nodeId: string, fetchFn: typeof fetch = fetch) => asked<RepoHead>(syncPath(projectId, nodeId, 'head'), {}, fetchFn);
 
 export const repoPull = (projectId: string, nodeId: string, branch: string, fetchFn: typeof fetch = fetch) => asked<RepoPulled>(syncPath(projectId, nodeId, 'pull'), JSON_POST(branch ? { branch } : {}), fetchFn);
+
+export type FolderUpload = { path: string; uploadUrl: string; mimeType: string };
+
+export async function uploadFolder(projectId: string, name: string, archive: Uint8Array, fetchFn: typeof fetch = fetch): Promise<Answer<string>> {
+  const signed = await asked<FolderUpload>(`/api/v1/projects/${projectId}/code-uploads`, JSON_POST({ name }), fetchFn);
+  if (!signed.ok) {
+    return signed;
+  }
+  const put = await fetchFn(signed.value.uploadUrl, { method: 'PUT', headers: { 'content-type': signed.value.mimeType }, body: new Blob([archive as BlobPart]) }).catch(() => null);
+  return put?.ok ? { ok: true, value: signed.value.path } : { ok: false, error: UNAVAILABLE };
+}
