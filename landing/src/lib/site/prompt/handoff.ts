@@ -34,7 +34,7 @@ export function handoffLink(handoff: Handoff): string {
   if (handoff.images > 0) {
     params.set('attach', '1');
   }
-  return `${APP_URL}/new?${params}`;
+  return `${APP_URL}/app?${params}`;
 }
 
 export const SOURCE_TRIGGER_EMPTY = 'Import';
