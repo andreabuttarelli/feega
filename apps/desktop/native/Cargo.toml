@@ -26,3 +26,7 @@ napi-build = "2"
 
 [profile.release]
 opt-level = 3
+
+[patch.crates-io]
+vello = { path = "../../../packages/gpu-core/vendor/vello" }
+vello_encoding = { path = "../../../packages/gpu-core/vendor/vello_encoding" }
