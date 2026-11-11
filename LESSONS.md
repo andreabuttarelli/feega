@@ -3815,3 +3815,7 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## Local mode must resolve before any Supabase key check
 
 **Signal:** 500 `SUPABASE_SERVICE_ROLE_KEY not configured` in local mode with no `.env`, only on routes that use the service-role or admin client. **Move:** `createClient` already routes to `localStore()`, but a key guard placed before it throws first; check `localStore()` ahead of every env-key guard in `db/client.ts` and `supabase-admin.ts`. Test: `src/lib/server/db/client.local.test.ts`.
+
+## A canvas that changes without touching the DOM is never re-read by the stage
+
+**Signal:** a template draws into a `<canvas>` and plays fine in the unit harness and in the export, but the editor stage shows one frozen picture while the playhead moves; the canvas pixels do change (hash them) and the MP4 is correct. **Move:** the stage re-reads a node only when its markup changes, and canvas pixels are not markup. Stamp the canvas on every draw (`pixelStage` sets `data-drawn` in `begin`); the test `marks its canvas on every frame` fails for any canvas port that forgets.

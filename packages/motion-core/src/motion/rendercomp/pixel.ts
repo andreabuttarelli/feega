@@ -247,7 +247,10 @@ export const pixelKit = ((S: SnapcnKit) => {
       }
     };
 
+    let drawn = 0;
+
     const begin = () => {
+      canvas.dataset.drawn = String(++drawn);
       ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, o.iw, o.ih);
     };
