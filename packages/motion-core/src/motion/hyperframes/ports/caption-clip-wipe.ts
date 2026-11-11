@@ -19,7 +19,7 @@ export const PORT: HfPort = {
     emphasis: { type: 'string', title: 'Emphasised words', default: 'Feega,HTML,professional,code,cinema', group: 'Content', maxLength: 200 },
     color: { type: 'string', title: 'Text', format: PropFormat.Color, default: '#ffffff', group: 'Style' },
     key: { type: 'string', title: 'Keyword colour', format: PropFormat.Color, default: '#FFD700', group: 'Style' },
-    dim: { type: 'string', title: 'Spoken colour', format: PropFormat.Color, default: 'rgba(255,255,255,0.4)', group: 'Style' }
+    dim: { type: 'string', title: 'Spoken colour', format: PropFormat.Color, default: '#6d6e71', group: 'Style' }
   },
   draw: (S, view) => {
     const p = view.props;

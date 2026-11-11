@@ -19,3 +19,11 @@ describe('hyperframes templates expose media props with the media pickers', () =
     expect(wrong).toEqual([]);
   });
 });
+
+describe('hyperframes templates build a doc that passes the custom code lint', () => {
+  it.each(HF_PORTS.map((p) => [p.id, p]))('%s', (_, port) => {
+    const entry = HF_TEMPLATES.find((t) => t.id === `${HF_PREFIX}${port.id}`)!;
+
+    expect(() => entry.template.doc).not.toThrow();
+  });
+});

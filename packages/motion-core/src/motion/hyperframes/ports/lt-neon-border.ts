@@ -48,7 +48,7 @@ export const PORT: HfPort = {
       for (let s = 16; s >= 0; s -= 8) {
         const c = (v >> s) & 255;
         const m = Math.round(c + (255 - c) * amount);
-        out += (m < 16 ? '0' : '') + m.toString(16);
+        out += '0123456789abcdef'.charAt(m >> 4) + '0123456789abcdef'.charAt(m & 15);
       }
       return out;
     };

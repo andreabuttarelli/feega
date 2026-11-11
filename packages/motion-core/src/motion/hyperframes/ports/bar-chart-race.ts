@@ -99,7 +99,7 @@ export const PORT: HfPort = {
       const e = smooth(clamp(m - m0, 0, 1));
       return ranks[m0][j] + (ranks[m0 + 1][j] - ranks[m0][j]) * e;
     };
-    const fmt = (v: number) => prefix + v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix;
+    const fmt = (v: number) => prefix + v.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + suffix;
     const niceStep = (x: number) => {
       const e = Math.pow(10, Math.floor(Math.log10(x)));
       const f = x / e;

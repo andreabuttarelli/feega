@@ -19,7 +19,7 @@ export const PORT: HfPort = {
     role: { type: 'string', title: 'Role', default: 'Host · Neuroscientist', group: 'Content', maxLength: 80 },
     block: { type: 'string', title: 'Block', format: PropFormat.Color, default: '#2756ff', group: 'Style' },
     nameColor: { type: 'string', title: 'Name colour', format: PropFormat.Color, default: '#ffffff', group: 'Style' },
-    roleColor: { type: 'string', title: 'Role colour', format: PropFormat.Color, default: '#ffffffdb', group: 'Style' }
+    roleColor: { type: 'string', title: 'Role colour', format: PropFormat.Color, default: '#e1e7ff', group: 'Style' }
   },
   draw: (S, view) => {
     const p = view.props;

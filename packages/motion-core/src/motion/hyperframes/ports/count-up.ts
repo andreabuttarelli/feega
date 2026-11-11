@@ -37,7 +37,7 @@ export const PORT: HfPort = {
     const prefix = String(p.prefix ?? '');
     const suffix = String(p.suffix ?? '');
     const exit = p.exit === 'fade' || p.exit === 'up' ? String(p.exit) : 'none';
-    const format = (v: number) => Math.round(v).toLocaleString('en-US');
+    const format = (v: number) => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     const lift = (text: string) => {
       if (/^[$€£¥₹₩]$/.test(text)) {
         return '-0.31em';

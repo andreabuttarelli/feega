@@ -16,7 +16,7 @@ export const PORT: HfPort = {
   fonts: ['Inter'],
   props: {
     word: { type: 'string', title: 'Word', default: 'Emphasis', group: 'Content', maxLength: 24 },
-    color: { type: 'string', title: 'Colour', format: PropFormat.Color, default: 'rgba(29, 29, 31, 0.07)', group: 'Style' }
+    color: { type: 'string', title: 'Colour', format: PropFormat.Color, default: '#e6e6e8', group: 'Style' }
   },
   draw: (S, view) => {
     const p = view.props;
