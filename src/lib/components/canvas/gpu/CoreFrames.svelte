@@ -619,7 +619,7 @@
         r.setTileBudget?.(budget.tileBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setTiles?.(TILED);
-        disk = TILED && DISK_CACHE && place && r.heldTiles ? tileDisk({ store: diskStore, codec: diskCodec, raster: r.heldTiles, look: () => ({ canvasId: place.canvasId, paper: look.paper, line: look.line, resolution }), layers: tileLayers, busy: () => gesture.active() || edited.size > 0, viewStep: () => stepOf(view.zoom * resolution), encoded: logEncoded }) : null;
+        disk = TILED && DISK_CACHE && place && r.heldTiles ? tileDisk({ store: diskStore, codec: diskCodec, raster: r.heldTiles, look: () => ({ canvasId: place.canvasId, paper: look.paper, line: look.line, resolution }), layers: tileLayers, busy: () => gesture.active() || edited.size > 0 || (raster?.warming?.() ?? false), viewStep: () => stepOf(view.zoom * resolution), encoded: logEncoded }) : null;
         restored = '';
         raster = r;
         markStartup(StartupStep.GpuReady);
@@ -957,7 +957,7 @@
   }
 
   function saveTiles() {
-    if (saving || !disk) {
+    if (saving || !disk || !sharpMarked) {
       return;
     }
     saving = true;
