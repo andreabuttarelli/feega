@@ -18,7 +18,7 @@ const PREVIEW_FPS = 12;
 const PREVIEW_FRAMES = 48;
 const MAX_WINDOW_S = 8;
 const POSTER_AT = 0.6;
-const POSTER_BEFORE_TITLE: Record<string, number> = { 'builtin:particle-ribbon': 0.2 };
+const POSTER_BEFORE_TITLE: Record<string, number> = { 'builtin:particle-ribbon': 0.2, 'builtin:magicui-morphing-text': 0.72 };
 const LAYOUT_SAMPLES = join('static', 'compose-templates');
 const LAYOUT_PREFIX = 'builtin:composition-';
 
