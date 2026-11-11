@@ -41,6 +41,7 @@ targets = []
 
 [features]
 bump_estimate = []
+glyphless = []
 
 [lib]
 name = "vello_encoding"

@@ -3,6 +3,7 @@ import { withOverride } from '@feega/motion-core/motion/precomp';
 import { componentSlice } from './canvas-components';
 import type { Overrides } from './main-component';
 import { compBox, reframed, type Point, type Size } from './comp-frame';
+import { resolveVariables } from './variables';
 
 export type HomeDocs = ReadonlyMap<string, MotionDoc | null>;
 
@@ -92,7 +93,7 @@ function followed(doc: MotionDoc, compId: string, home: string, homeDoc: MotionD
 }
 
 export function linkedMains(doc: MotionDoc, frameId: string, homes: HomeDocs): MotionDoc {
-  return Object.keys(doc.comps)
+  const linked = Object.keys(doc.comps)
     .sort()
     .reduce((current, compId) => {
       const comp = current.comps[compId];
@@ -103,6 +104,7 @@ export function linkedMains(doc: MotionDoc, frameId: string, homes: HomeDocs): M
       const homeDoc = homes.get(home);
       return homeDoc ? followed(current, compId, home, homeDoc) : detached(current, compId);
     }, doc);
+  return linked === doc ? doc : resolveVariables(linked);
 }
 
 const FNV_OFFSET = 0x811c9dc5;

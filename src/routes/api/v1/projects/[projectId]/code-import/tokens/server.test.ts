@@ -33,6 +33,15 @@ describe('GET /api/v1/projects/:id/code-import/tokens', () => {
     expect(tokensFound.mock.calls[0][1]).toEqual({ folder: '/code/app' });
   });
 
+  it('conta anche i token di una cartella caricata', async () => {
+    tokensFound.mockResolvedValue(17);
+
+    const { body } = await call('upload=o1%2Fp1%2Fcode-uploads%2Fx%2Ftraidue');
+
+    expect(body).toEqual({ tokens: 17 });
+    expect(tokensFound.mock.calls.at(-1)![1]).toEqual({ upload: 'o1/p1/code-uploads/x/traidue' });
+  });
+
   it('senza repo né cartella è una richiesta sbagliata', async () => {
     const { res } = await call('');
     expect(res.status).toBe(400);

@@ -1,4 +1,5 @@
-import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
+import { compOf, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { withOverride } from '@feega/motion-core/motion/precomp';
 import { ShapeKind } from '@feega/motion-core/motion/shape/schema';
 import { VarType, splitKey, type VarAlias, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 import { LOOK, LookKey } from '$lib/canvas/code-look';
@@ -7,7 +8,7 @@ import { bindableTargets, resolveVariables } from '$lib/motion/variables';
 import { sameColour } from '$lib/server/url-import/page-tokens';
 import { uniformRadius } from '$lib/server/url-import/corner-radius';
 import type { VarRule } from './css-tokens';
-import type { TokenMap } from './design-tokens';
+import { SPACING_BASE, tokenId, type TokenMap } from './design-tokens';
 import { parseKey } from './render-conditions';
 
 export enum Evidence {
@@ -16,7 +17,7 @@ export enum Evidence {
   Value = 'byValue'
 }
 
-export type BoundCount = Record<Evidence, number> & { unbound: number; otherMode: number };
+export type BoundCount = Record<Evidence, number> & { unbound: number };
 
 export type BindAsk = { variables: Variables; map: TokenMap; rules: VarRule[]; base: string; boards: Record<string, string> };
 
@@ -74,6 +75,14 @@ const TARGETS: Target[] = [
   { key: 'autoLayout.gap', type: VarType.Number, utility: /^gap-(.+)$/, token: (n) => `--spacing-${n}`, properties: ['gap'], read: (c) => c.autoLayout?.gap },
   { key: 'autoLayout.padding', type: VarType.Number, utility: /^p-(.+)$/, token: (n) => `--spacing-${n}`, properties: ['padding'], read: evenPadding }
 ];
+
+const MULTIPLE = /^\d+(?:\.\d+)?$/;
+
+export function spacingMultiples(classes: Iterable<string>): number[] {
+  const scaled = TARGETS.filter((t) => t.token('').startsWith(`${SPACING_BASE}-`));
+  const found = [...classes].flatMap((c) => scaled.map((t) => t.utility.exec(c)?.[1]).filter((n): n is string => Boolean(n) && MULTIPLE.test(n!)));
+  return [...new Set(found.map(Number))].sort((a, b) => a - b);
+}
 
 const BINDABLE_KEY: Record<string, (clip: MotionClip) => boolean> = {
   radius: isShape
@@ -183,10 +192,6 @@ function boundClip(ctx: Context, clip: MotionClip, view: View, mode: string, cou
     if (value === undefined || !allowed || bind[target.key]) {
       continue;
     }
-    if (mode !== ctx.base) {
-      count.otherMode++;
-      continue;
-    }
     const found = EVIDENCE.map((e) => ({ e, key: e.find(ctx, target, clip, mode, value) })).find(({ key }) => key && typeOf(ctx.variables, key) === target.type && consistent(ctx, target, key, mode, value));
     if (!found) {
       count.unbound++;
@@ -199,11 +204,70 @@ function boundClip(ctx: Context, clip: MotionClip, view: View, mode: string, cou
   return Object.keys(bind).length ? { ...next, bind } : next;
 }
 
+function modesFor(variables: Variables, mode: string): Record<string, string> {
+  return Object.fromEntries(Object.entries(variables).filter(([, c]) => c.modes.includes(mode)).map(([name]) => [name, mode]));
+}
+
+function boardModes(doc: MotionDoc, ctx: Context): MotionDoc {
+  const clips = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
+  const onRoot = (clip: MotionClip) => !clip.parent || !clips.get(clip.parent)?.parent;
+  const modeOf = (clip: MotionClip) => (clip.name && onRoot(clip) ? ctx.boards[clip.name] : undefined);
+  const tracks = doc.tracks.map((t) => ({
+    ...t,
+    clips: (t.clips as MotionClip[]).map((c) => {
+      const mode = modeOf(c);
+      const modes = mode && mode !== ctx.base ? modesFor(ctx.variables, mode) : {};
+      return Object.keys(modes).length ? { ...c, modes } : c;
+    })
+  }));
+  return { ...doc, tracks } as MotionDoc;
+}
+
+type Overrides = Record<string, Record<string, unknown>>;
+
+const OWNED_KEYS: Record<string, string[]> = { fill: ['fill', 'fills'], color: ['color', 'fills'], stroke: ['stroke', 'strokes'], radius: ['roundness', 'corners', 'shape', 'path'] };
+
+function keptOverride(inner: MotionClip, own: Record<string, unknown>, moded: Record<string, unknown>, view: View): Record<string, unknown> {
+  let kept = own;
+  for (const target of TARGETS.filter((t) => inner.bind?.[t.key])) {
+    const shown = (c: MotionClip) => target.read(c, view) ?? (target.type === VarType.Colour ? lower(c.props[target.key]) : undefined);
+    const [mine, theirs] = [shown(withOverride(inner, kept)), shown(withOverride(inner, moded))];
+    if (mine === undefined || theirs === undefined || !same(target.type, mine, theirs)) {
+      continue;
+    }
+    const owned = OWNED_KEYS[target.key] ?? [target.key];
+    kept = Object.fromEntries(Object.entries(kept).filter(([k]) => !owned.includes(k)));
+  }
+  return kept;
+}
+
+function hostWithout(doc: MotionDoc, host: MotionClip): MotionClip {
+  const comp = doc.comps[compOf(host) ?? ''];
+  const [overrides, moded] = [host.props.overrides as Overrides | undefined, host.props.modeValues as Overrides | undefined];
+  if (!comp || !overrides || !moded) {
+    return host;
+  }
+  const inner = new Map(comp.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
+  const view = { ...doc, ...(comp.frame ?? {}) } as View;
+  const next = Object.fromEntries(
+    Object.entries(overrides)
+      .map(([id, own]) => [id, inner.has(id) && moded[id] ? keptOverride(inner.get(id)!, own, moded[id], view) : own] as const)
+      .filter(([, own]) => Object.keys(own).length)
+  );
+  const { overrides: _old, ...props } = host.props;
+  return { ...host, props: Object.keys(next).length ? { ...props, overrides: next } : props };
+}
+
+function withoutModeLiterals(doc: MotionDoc): MotionDoc {
+  const strip = (tracks: MotionTrack[]) => tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (compOf(c) ? hostWithout(doc, c) : c)) })) as MotionTrack[];
+  return { ...doc, tracks: strip(doc.tracks), comps: Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: strip(comp.tracks) }])) };
+}
+
 export function boundToTokens(doc: MotionDoc, ask: BindAsk): { doc: MotionDoc; bound: BoundCount } {
-  const byName = new Map(Object.entries(ask.map).map(([key, entry]) => [entry.name, key]));
+  const byName = new Map(Object.entries(ask.map).map(([key, entry]) => [tokenId(entry), key]));
   const keys = Object.entries(ask.variables).flatMap(([c, col]) => Object.keys(col.vars).map((v) => `${c}/${v}`));
   const ctx: Context = { ...ask, byName, allModes: modesOf(ask.variables), keys };
-  const count: BoundCount = { [Evidence.Class]: 0, [Evidence.Rule]: 0, [Evidence.Value]: 0, unbound: 0, otherMode: 0 };
+  const count: BoundCount = { [Evidence.Class]: 0, [Evidence.Rule]: 0, [Evidence.Value]: 0, unbound: 0 };
   const withVars = { ...doc, variables: { ...doc.variables, ...ask.variables } };
 
   const done = inEveryScope(withVars, (view) => {
@@ -212,5 +276,6 @@ export function boundToTokens(doc: MotionDoc, ask: BindAsk): { doc: MotionDoc; b
     const tracks = view.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (c.source || !c.bind ? boundClip(ctx, c, view, modeOfClip(ctx, c, parents), count) : c)) }));
     return { ok: true, doc: { ...view, tracks } as MotionDoc };
   });
-  return { doc: resolveVariables(done.ok ? done.doc : withVars), bound: count };
+  const moded = resolveVariables(boardModes(done.ok ? done.doc : withVars, ctx));
+  return { doc: withoutModeLiterals(moded), bound: count };
 }

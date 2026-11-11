@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
@@ -17,9 +18,10 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
-  import { cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
-  import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { NO_SIGHT, sameSight, sightOf, widened, type Sight } from '$lib/canvas/core/sight';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { memoSources } from '$lib/canvas/core/source-memo';
@@ -36,7 +38,7 @@
   import { heldBuilds } from '$lib/canvas/core/held-build';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
-  import { Reach, assetTier, keptTier, reachOf } from '$lib/canvas/core/asset-tier';
+  import { Reach, assetTier, keptTier } from '$lib/canvas/core/asset-tier';
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { backendLog, debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
@@ -81,14 +83,14 @@
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
-  const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const tier = $derived(assetTier(view.zoom));
-  $effect(() => tierLog(tier, view.zoom));
+  $effect(() => tierLog(tier, untrack(() => view.zoom)));
+  let sight = $state.raw<Sight>(NO_SIGHT);
   const imaged = new Set<string>();
   const baseKey = (f: FrameAt) => `${f.id}:${f.revision}${f.linked ? `:${f.linked}` : ''}${f.scenes ? `:${f.scenes}` : ''}`;
   const tieredKey = (f: FrameAt, at: AssetSize) => (imaged.has(f.id) ? `${baseKey(f)}:${at}` : baseKey(f));
   const bestTier = new Map<string, AssetSize>();
-  const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), reachOf(f.box, view, area));
+  const tierOf = (f: FrameAt) => keptTier(tier, bestTier.get(f.id), sight.near.has(f.id) ? Reach.Near : Reach.Far);
   const keyOf = (f: FrameAt) => tieredKey(f, tierOf(f));
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, budget.resolution);
   const crashes = watchCrashes({ device: currentDevice(), dpr: typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, resolution });
@@ -385,7 +387,7 @@
   }
 
   $effect(() => {
-    for (const f of fillOrder(frames, view, area)) {
+    for (const f of fillOrder(frames, sight.view, area)) {
       if (!thumbAsked.has(baseKey(f))) {
         thumbAsked.add(baseKey(f));
         void showThumb(f);
@@ -464,11 +466,11 @@
   let settledFrames = $state(new Set<string>());
 
   $effect(() => {
-    frameSources.warm(toWarm(withoutViews(frames), view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
+    frameSources.warm(toWarm(withoutViews(frames), sight.view, area, keyOf, asked, liveGroup).filter((f) => !known(f)).map(sourceOf));
   });
 
   $effect(() => {
-    const waiting = toBuild(withoutViews(frames), view, area, keyOf, asked, liveGroup);
+    const waiting = toBuild(withoutViews(frames), sight.view, area, keyOf, asked, liveGroup);
 
     const room = budget.framesInFlight - inFlight;
     if (room <= 0) {
@@ -503,7 +505,7 @@
   const cardIndex = $derived(new SpatialIndex(shownCards.map((c) => ({ id: c.key, ...c.frame.box }))));
 
   $effect(() => {
-    const onScreen = cardIndex.visible(view, area);
+    const onScreen = cardIndex.visible(sight.view, area);
     for (const c of [...shownCards].sort((a, b) => Number(onScreen.has(b.key)) - Number(onScreen.has(a.key)))) {
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
@@ -516,7 +518,7 @@
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const textureBytes = $derived(textureBudget(budget.textureBytes, { width: area.width * resolution, height: area.height * resolution }));
-  const real = $derived(resident(whole, view, area, textureBytes, budget.offscreen));
+  const real = $derived(resident(whole, sight.view, area, textureBytes, budget.offscreen));
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
   const stacking = (id: string) => rank.get(id) ?? 0;
@@ -532,7 +534,7 @@
   const lastSeen = new Map<string, number>();
   const placeIndex = $derived(new SpatialIndex([...placeholders.values()].map((p) => ({ id: p.id, ...p.box }))));
   const retained = (now: number) => {
-    for (const id of placeIndex.visible(view, area)) {
+    for (const id of sight.onScreen) {
       lastSeen.set(id, now);
     }
     const keep = new Set<string>();
@@ -572,7 +574,7 @@
 
   const waiting = $derived.by(() => {
     const ready = new Set(real.map((f) => f.id));
-    return fillOrder([...placeholders.values()], view, area).filter((p) => !ready.has(p.id) && !(p.stand === Stand.Frame && settledFrames.has(p.id) && !posterIds.has(p.id))).length;
+    return fillOrder([...placeholders.values()], sight.view, area).filter((p) => !ready.has(p.id) && !(p.stand === Stand.Frame && settledFrames.has(p.id) && !posterIds.has(p.id))).length;
   });
 
   $effect(() => {
@@ -892,7 +894,9 @@
 
   let sharpMarked = false;
 
-  function paintOn(into: CoreRaster): boolean {
+  const deviceView = (): Viewport => ({ x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution });
+
+  function stage(into: CoreRaster): HeldFrame[] {
     const tails = nearTails();
     const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group).concat([...liftLists.keys()]));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
@@ -946,10 +950,10 @@
       }
     }
     const drawn = withLift(into, shown);
-    const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
+    const at = deviceView();
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes) : uncached(drawn), liftHeld(drawn))));
+    const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes, cacheZoom(view.zoom) * resolution) : uncached(drawn), liftHeld(drawn))));
     if (patch) {
       into.patchUses(patch);
     }
@@ -957,14 +961,26 @@
     for (const part of quiet ? sentOverlay.changed(overlay) : []) {
       into.setOverlay(part, overlay[part]);
     }
-    into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
-    into.setCamera(at.x, at.y, at.zoom);
-    const began = performance.now();
-    const { outcome, pending, skipped } = into.frame(began);
-    countFrame(began, into.frameCounts?.(), gesture.active(), pending);
-    if (!pending && !gesture.active()) {
-      takeThumbs(canvas, shown);
-    }
+    return shown;
+  }
+
+  let staleScene = true;
+  let sceneBusy = true;
+  let stagedCache = 0;
+  let shown: HeldFrame[] = [];
+  let thumbsOwed = false;
+  let sharpOwed = false;
+
+  const cacheAt = () => (zooming.active() || edited.size ? cacheZoom(view.zoom) : 0);
+  const sceneDue = (quiet: boolean) => staleScene || sceneBusy || cacheAt() !== stagedCache || (quiet && sentOverlay.waiting(overlay));
+
+  function restage(into: CoreRaster) {
+    staleScene = false;
+    stagedCache = cacheAt();
+    shown = stage(into);
+    sceneBusy = held.some((f) => !pictured.has(f.group));
+    thumbsOwed = true;
+    sharpOwed = !sharpMarked;
     const onScreenIds = fillOrder(frames, view, area).map((f) => f.id);
     if (frames.length) {
       reportShownOnce(vectorsFirst.shownOf(onScreenIds), onScreenIds.length);
@@ -972,10 +988,28 @@
     if (frames.length && vectorsFirst.settle(onScreenIds)) {
       markFrame('all', Step.AllVectors);
     }
-    if (!pending && !sharpMarked && held.length && held.every((f) => pictured.has(f.group) && lists.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {
+  }
+
+  function paintOn(into: CoreRaster): boolean {
+    const quiet = !gesture.active();
+    if (sceneDue(quiet)) {
+      restage(into);
+    }
+    const at = deviceView();
+    into.setMotion?.(quiet ? CoreMotion.Still : CoreMotion.Gesture);
+    into.setCamera(at.x, at.y, at.zoom);
+    const began = performance.now();
+    const { outcome, pending, skipped } = into.frame(began);
+    countFrame(began, into.frameCounts?.(), gesture.active(), pending);
+    if (thumbsOwed && !pending && quiet) {
+      thumbsOwed = false;
+      takeThumbs(canvas, shown);
+    }
+    if (sharpOwed && !pending && held.length && held.every((f) => pictured.has(f.group) && lists.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {
       sharpMarked = true;
       markFrame('all', Step.Sharp);
     }
+    sharpOwed &&= pending;
     painted[outcome]++;
     paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
@@ -989,7 +1023,7 @@
       (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
-    return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
+    return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || sceneBusy;
   }
 
   let ahead = false;
@@ -1037,7 +1071,16 @@
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
   $effect(() => {
-    void [raster, held, edited, overlay, lift, view.x, view.y, view.zoom, area.width, area.height];
+    const next = sightOf(placeIndex, view, area);
+    if (!sameSight(untrack(() => sight), next)) {
+      sight = next;
+    }
+    pacer.invalidate();
+  });
+
+  $effect(() => {
+    void [raster, held, whole, edited, overlay, lift, sight, area.width, area.height];
+    staleScene = true;
     pacer.invalidate();
   });
 

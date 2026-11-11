@@ -210,7 +210,7 @@ describe('importCodeAt design system', () => {
     const done = await importCodeAt(ask);
 
     const doc = docs.get('frame-1')!.doc as Doc;
-    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/'], design: { tokens: 13 } });
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/'], design: { tokens: 14 } });
     expect(doc.variables!['app Colors']).toMatchObject({ modes: ['Light', 'Dark'], active: 'Light' });
     expect(doc.tracks.flatMap((t) => t.clips).some((c) => c.name === DESIGN_BOARD)).toBe(true);
     expect(done.outcome === CodeImportOutcome.Ok && done.tokenMap!['app Colors/primary'].origins).toEqual({ Light: 'src/app.css:6:1', Dark: 'src/app.css:22:1' });

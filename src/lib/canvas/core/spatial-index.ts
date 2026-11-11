@@ -6,13 +6,15 @@ export type Area = { x: number; y: number; w: number; h: number };
 const CELL = 1024;
 
 const cellOf = (v: number) => Math.floor(v / CELL);
-const keyOf = (cx: number, cy: number) => `${cx},${cy}`;
+const ROW = 2 ** 26;
+
+const keyOf = (cx: number, cy: number) => cx * ROW + cy;
 const contains = (r: Rect, p: Point) => p.x >= r.x && p.y >= r.y && p.x <= r.x + r.w && p.y <= r.y + r.h;
 const overlaps = (r: Rect, a: Area) => r.x <= a.x + a.w && r.y <= a.y + a.h && r.x + r.w >= a.x && r.y + r.h >= a.y;
 
 export class SpatialIndex {
   readonly #items: readonly Rect[];
-  readonly #cells = new Map<string, number[]>();
+  readonly #cells = new Map<number, number[]>();
 
   constructor(items: readonly Rect[]) {
     this.#items = items;
@@ -37,6 +39,10 @@ export class SpatialIndex {
   }
 
   within(area: Area): string[] {
+    const cells = (cellOf(area.x + area.w) - cellOf(area.x) + 1) * (cellOf(area.y + area.h) - cellOf(area.y) + 1);
+    if (cells > this.#items.length) {
+      return this.#items.filter((r) => overlaps(r, area)).map((r) => r.id);
+    }
     const found = new Set<number>();
     for (let cx = cellOf(area.x); cx <= cellOf(area.x + area.w); cx++) {
       for (let cy = cellOf(area.y); cy <= cellOf(area.y + area.h); cy++) {
