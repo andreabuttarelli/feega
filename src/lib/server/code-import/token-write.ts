@@ -84,6 +84,16 @@ function replaced(text: string, line: number, name: string, was: string, next: s
   return lines.join('\n');
 }
 
+type Declaration = { file: string; mode: string; name: string; was: string; hint: number };
+
+function located(text: string, d: Declaration): number | null {
+  const lines = parseSheets([{ path: d.file, text }])
+    .declared.filter((found) => found.name === d.name && found.mode === d.mode && found.raw.trim() === d.was.trim())
+    .map((found) => found.at.line);
+  const distance = (line: number) => Math.abs(line - d.hint);
+  return lines.reduce<number | null>((best, line) => (best === null || distance(line) <= distance(best) ? line : best), null);
+}
+
 type Appended = { text: string; line: number; column: number; inserted: boolean };
 
 const INDENT = /^\s*/;
@@ -202,7 +212,8 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
         next[key].raw[mode] = already;
         continue;
       }
-      const changed = text === null || file === null ? null : replaced(file, at.line, entry.name, raw, text);
+      const line = file === null ? null : located(file, { file: at.file, mode, name: entry.name, was: raw, hint: at.line });
+      const changed = text === null || file === null || line === null ? null : replaced(file, line, entry.name, raw, text);
       if (text === null) {
         skipped.push(`${entry.name} (${mode}): ${shown(now)} cannot be written as CSS`);
         continue;
@@ -213,6 +224,7 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
       }
       after.set(at.file, changed);
       written.set(spot, text);
+      next[key].origins[mode] = `${at.file}:${line}:${at.column}`;
       next[key].raw[mode] = text;
     }
   }
