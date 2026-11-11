@@ -19,7 +19,8 @@
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
   import { cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
-  import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { widened } from '$lib/canvas/core/sight';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { memoSources } from '$lib/canvas/core/source-memo';
@@ -78,7 +79,6 @@
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
-  const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const tier = $derived(assetTier(view.zoom));
   $effect(() => tierLog(tier, view.zoom));
   const imaged = new Set<string>();
@@ -881,7 +881,9 @@
 
   let sharpMarked = false;
 
-  function paintOn(into: CoreRaster): boolean {
+  const deviceView = (): Viewport => ({ x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution });
+
+  function stage(into: CoreRaster): HeldFrame[] {
     const tails = nearTails();
     const keep = new Set([...whole, ...chains.flat(), ...tails].map((f) => f.group).concat([...liftLists.keys()]));
     for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
@@ -935,7 +937,7 @@
       }
     }
     const drawn = withLift(into, shown);
-    const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
+    const at = deviceView();
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
     const patch = sent.patch(worldUses(heldWhileMoving(zooming.active() || edited.size ? cached(drawn, wide.view, wide.area, textureBytes) : uncached(drawn), liftHeld(drawn))));
@@ -946,6 +948,13 @@
     for (const part of quiet ? sentOverlay.changed(overlay) : []) {
       into.setOverlay(part, overlay[part]);
     }
+    return shown;
+  }
+
+  function paintOn(into: CoreRaster): boolean {
+    const shown = stage(into);
+    const quiet = !gesture.active();
+    const at = deviceView();
     into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
     into.setCamera(at.x, at.y, at.zoom);
     const began = performance.now();
