@@ -529,3 +529,17 @@ fn a_smaller_whole_canvas_allowance_bakes_at_most_that_many_tiles() {
 
     assert!(!keys.is_empty() && keys.len() <= 40);
 }
+
+#[test]
+fn evicting_thousands_of_tiles_zoomed_in_on_a_wide_canvas_takes_milliseconds() {
+    let canvas = Rect::new(0.0, 0.0, 40000.0, 20000.0);
+    let mut tiles = Tiles::default();
+    tiles.set_canvas(canvas);
+    let step = step_of(4.0);
+    (0..4000).for_each(|i| tiles.hold(TileKey { step, tx: i % 200, ty: i / 200 }));
+
+    let started = std::time::Instant::now();
+    tiles.evict_beyond(camera(4.0), SCREEN, 100);
+
+    assert!(started.elapsed().as_millis() < 200, "evicting took {:?}", started.elapsed());
+}
