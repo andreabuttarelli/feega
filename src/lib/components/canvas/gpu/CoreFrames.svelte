@@ -23,6 +23,7 @@
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { memoSources } from '$lib/canvas/core/source-memo';
+  import { retiered, retiers } from '$lib/canvas/core/retier';
   import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
@@ -201,6 +202,8 @@
 
   const readSource = memoSources((f: FrameAt) => frameSources(sourceOf(f)));
 
+  const builtTiers = new Map<string, { revision: number; at: AssetSize; list: DisplayList; custom: boolean }>();
+
   async function fetchAndBuild(f: FrameAt, at: AssetSize) {
     const fetched = await readSource(f);
     if (!fetched) {
@@ -213,7 +216,17 @@
       asked.add(tieredKey(f, at));
     }
 
-    return { ...(await builtOff(f, source)), source };
+    const prior = builtTiers.get(f.id);
+    if (place && prior && prior.revision === f.revision && prior.at !== at && !prior.custom) {
+      const was = tieredAssets(fetched, place, prior.at).assets;
+      const swap = new Map(Object.entries(source.assets).flatMap(([id, url]) => (was[id] && was[id] !== url ? [[was[id], url] as const] : [])));
+      if (retiers(prior.list, swap)) {
+        return { list: retiered(prior.list, swap), custom: null, source };
+      }
+    }
+    const built = await builtOff(f, source);
+    builtTiers.set(f.id, { revision: f.revision, at, list: built.list, custom: built.custom !== null });
+    return { ...built, source };
   }
 
   async function builtOff(f: FrameAt, source: FrameDoc): Promise<{ list: DisplayList; custom: CustomFrame | null }> {

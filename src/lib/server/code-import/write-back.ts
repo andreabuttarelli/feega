@@ -1,11 +1,12 @@
 import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
-import { changedLook, LOOK, LookKey, minSideOf, type Look } from '$lib/canvas/code-look';
+import { changedLook, LOOK, LookKey, minSideOf, type Look, type LookValue } from '$lib/canvas/code-look';
+import { BASE_CONDITIONS, parseKey, Scheme } from './render-conditions';
 
 export type SourceAt = { file: string; line: number; column: number };
 
 export type Spot = { tag: string; cls: string };
 
-export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot };
+export type SourceEdit = { at: SourceAt; look: Look; was: Look; spot?: Spot; cond?: string };
 
 export type FileChange = { path: string; before: string; after: string };
 
@@ -34,11 +35,12 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
   for (const clip of allClips(doc)) {
     const at = clip.source ? atOf(clip.source.at) : null;
     const look = at ? changedLook(clip, side) : {};
-    if (!at || !Object.keys(look).length || byAt.has(clip.source!.at)) {
+    const key = `${clip.source?.at}|${clip.source?.cond ?? ''}`;
+    if (!at || !Object.keys(look).length || byAt.has(key)) {
       continue;
     }
-    const { tag, cls } = clip.source!;
-    byAt.set(clip.source!.at, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}) });
+    const { tag, cls, cond } = clip.source!;
+    byAt.set(key, { at, look, was: clip.source!.was, ...(tag ? { spot: { tag, cls: cls ?? '' } } : {}), ...(cond ? { cond } : {}) });
   }
   return [...byAt.values()];
 }
@@ -190,11 +192,103 @@ async function textInCatalogue(files: Files, from: string, to: string, key: stri
   return false;
 }
 
+type ClassRule = { make: (value: LookValue) => string; family: RegExp };
+
+const arbitrary = (value: LookValue) => String(value).replace(/\s+/g, '_');
+const TEXT_SIZES = /^text-(xs|sm|base|lg|[2-9]?xl|\[[\d.]+px\])$/;
+const TEXT_OTHER = /^text-(left|right|center|justify|start|end|wrap|nowrap|balance|pretty|ellipsis|clip)$/;
+
+const CLASS_OF: Partial<Record<LookKey, ClassRule>> = {
+  [LookKey.Fill]: { make: (v) => `bg-[${arbitrary(v)}]`, family: /^bg-(?!\[url|gradient)/ },
+  [LookKey.Color]: { make: (v) => `text-[${arbitrary(v)}]`, family: /^text-/ },
+  [LookKey.Size]: { make: (v) => `text-[${v}px]`, family: TEXT_SIZES },
+  [LookKey.Gap]: { make: (v) => `gap-[${v}px]`, family: /^gap-(?!x-|y-)/ },
+  [LookKey.Direction]: { make: (v) => (v === 'column' ? 'flex-col' : 'flex-row'), family: /^flex-(row|col)(-reverse)?$/ }
+};
+
+const VARIANT_PREFIX: Record<Scheme, string> = { [Scheme.Light]: '', [Scheme.Dark]: 'dark:' };
+
+const sameFamily = (token: string, key: LookKey, prefix: string) => {
+  if (!token.startsWith(prefix)) {
+    return false;
+  }
+  const bare = token.slice(prefix.length);
+  const rule = CLASS_OF[key]!;
+  const isColor = key === LookKey.Color && !TEXT_SIZES.test(bare) && !TEXT_OTHER.test(bare);
+  return !bare.includes(':') && (key === LookKey.Color ? isColor : rule.family.test(bare));
+};
+
+const CLASS_LITERAL = /(\s(?:class|className)=")([^"{}]*)"/;
+
+function classed(text: string, tag: Tag, look: Look, prefix: string): string | null {
+  const open = text.slice(tag.start, tag.end + 1);
+  const found = open.match(CLASS_LITERAL);
+  if (!found) {
+    return null;
+  }
+  let tokens = found[2].split(/\s+/).filter(Boolean);
+  for (const [key, value] of Object.entries(look)) {
+    tokens = [...tokens.filter((t) => !sameFamily(t, key as LookKey, prefix)), `${prefix}${CLASS_OF[key as LookKey]!.make(value)}`];
+  }
+  const next = open.replace(CLASS_LITERAL, `$1${tokens.join(' ')}"`);
+  return text.slice(0, tag.start) + next + text.slice(tag.end + 1);
+}
+
+const TAILWIND = /"tailwindcss"/;
+
+async function usesTailwind(files: Files): Promise<boolean> {
+  return TAILWIND.test((await current(files, 'package.json')) ?? '');
+}
+
 const cssOf = (look: Look): [string, string][] =>
   Object.entries(look).flatMap(([key, value]) => {
     const css = LOOK[key as LookKey]?.css;
     return css ? [css(value)] : [];
   });
+
+async function styledFor(files: Files, text: string, tag: Tag, edit: SourceEdit, skipped: string[]): Promise<string> {
+  const cond = parseKey(edit.cond);
+  const where = label(edit.at);
+  if (cond.width !== BASE_CONDITIONS.width) {
+    skipped.push(`${where}: edited at ${cond.width}px, a rule for one width is not written`);
+    return text;
+  }
+
+  const prefix = VARIANT_PREFIX[cond.scheme];
+  const tailwind = await usesTailwind(files);
+  if (prefix && !tailwind) {
+    skipped.push(`${where}: edited under ${cond.scheme}, which needs Tailwind to be written as a ${prefix} class`);
+    return text;
+  }
+
+  const visual = Object.fromEntries(Object.entries(edit.look).filter(([key]) => LOOK[key as LookKey]?.css)) as Look;
+  const onClass = tailwind ? Object.fromEntries(Object.entries(visual).filter(([key]) => CLASS_OF[key as LookKey])) : {};
+  const onStyle = Object.fromEntries(Object.entries(visual).filter(([key]) => !(key in onClass))) as Look;
+
+  let next = text;
+  const withClass = Object.keys(onClass).length ? classed(next, tag, onClass, prefix) : next;
+  if (withClass === null) {
+    skipped.push(`${where}: class is not a literal, ${Object.keys(onClass).join(', ')} not written`);
+  } else {
+    next = withClass;
+  }
+
+  const css = cssOf(onStyle);
+  if (!css.length) {
+    return next;
+  }
+  if (prefix) {
+    skipped.push(`${where}: ${Object.keys(onStyle).join(', ')} has no ${prefix} class, not written`);
+    return next;
+  }
+  const moved = tagFrom(next, tag.start)!;
+  const withStyle = styled(next, moved, css, JSX_FILE.test(edit.at.file));
+  if (withStyle) {
+    return withStyle;
+  }
+  skipped.push(`${where}: style already set in code, not merged`);
+  return next;
+}
 
 async function applyOne(files: Files, edit: SourceEdit, skipped: string[]): Promise<void> {
   const text = await current(files, edit.at.file);
@@ -204,16 +298,7 @@ async function applyOne(files: Files, edit: SourceEdit, skipped: string[]): Prom
     return;
   }
 
-  let next = text;
-  const css = cssOf(edit.look);
-  if (css.length) {
-    const withStyle = styled(next, tag, css, JSX_FILE.test(edit.at.file));
-    if (withStyle) {
-      next = withStyle;
-    } else {
-      skipped.push(`${label(edit.at)}: style already set in code, not merged`);
-    }
-  }
+  let next = await styledFor(files, text, tag, edit, skipped);
 
   const to = edit.look[LookKey.Text];
   const from = edit.was[LookKey.Text];

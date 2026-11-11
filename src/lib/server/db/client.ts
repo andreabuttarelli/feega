@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '$lib/server/db/connect';
+import { localStore } from '$lib/server/local/local-mode';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
 import { markRlsScoped } from '$lib/server/rls-client';
@@ -65,6 +66,11 @@ export function createAnonDb(): Db {
  * si ottiene, e una voce nuova è una riga in un file solo — visibile accanto a tutte le altre.
  */
 export function createServiceRoleDb(use: ServiceRoleUse): Db {
+  const local = localStore();
+  if (local) {
+    return local.db as unknown as Db;
+  }
+
   const key = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');

@@ -26,6 +26,18 @@ describe('rebased', () => {
   });
 });
 
+describe('rebased con condizioni', () => {
+  it('una modifica fatta sotto dark torna sul clip dark, non su quello chiaro con la stessa riga', () => {
+    const fill = (id: string, at: string, color: string, cond?: string) => ({ id, component: 'Rectangle', props: { fills: [{ type: 'solid', color }] }, source: { at, ...(cond ? { cond } : {}), was: { fill: '#ffffff' } } });
+    const local = docOf(fill('a', 'p.svelte:5:2', '#ffffff'), fill('b', 'p.svelte:5:2', '#101010', 'dark@1280'));
+    const upstream = docOf(fill('y', 'p.svelte:8:2', '#ffffff', 'dark@1280'), fill('x', 'p.svelte:8:2', '#ffffff'));
+    const done = rebased(local, upstream);
+    const colours = done.doc.tracks[0].clips.map((c) => (c.props.fills as { color: string }[])[0].color);
+    expect(colours).toEqual(['#101010', '#ffffff']);
+    expect(done.carried).toBe(1);
+  });
+});
+
 describe('openPullRequest', () => {
   it('apre un branch nuovo e la PR verso il default, mai un commit sul default', async () => {
     const calls: ProviderCall[] = [];
