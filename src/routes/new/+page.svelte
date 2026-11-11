@@ -1,5 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
+  import { onMount } from 'svelte';
+  import { handoffOf } from '$lib/home/handoff';
   import PromptKinds from '$lib/components/app/PromptKinds.svelte';
   import { DEFAULT_KIND } from '$lib/home/prompt-kinds';
   import PromptSources from '$lib/components/app/PromptSources.svelte';
@@ -18,8 +21,22 @@
   let pick = $state<SourcePick | null>(null);
   const repickFolder = $derived(pick !== null && PROMPT_SOURCES[pick.source].overLogin === OverLogin.PickAgain);
   let saving = $state(false);
+  let asksImages = $state(false);
   let picker = $state<HTMLInputElement | null>(null);
   const canSend = $derived(!saving && (!!brief.trim() || files.length > 0));
+
+  onMount(() => {
+    const handoff = handoffOf(page.url.searchParams);
+    if (!handoff) {
+      return;
+    }
+    brief = handoff.text;
+    kind = handoff.kind;
+    asksImages = handoff.waitsForImages;
+    if (!asksImages) {
+      void send();
+    }
+  });
 
   function picked(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
@@ -74,6 +91,9 @@
         </button>
       </div>
     </form>
+    {#if asksImages}
+      <p class="note" data-testid="new-asks-images">Attach your images again, then start.</p>
+    {/if}
     <p class="note">You sign in next; your prompt waits and starts as soon as you are in.</p>
     {#if repickFolder}<p class="note" data-testid="folder-repick">A folder can't travel through sign-in: you'll pick it again once you're in.</p>{/if}
   </section>
