@@ -5,7 +5,7 @@ sidebar:
   order: 14
 ---
 
-The macOS desktop app can draw the canvas with the same engine as the browser, compiled natively and running on Metal, instead of WebGPU. It is off by default; `FEEGA_NATIVE_CANVAS=1` turns it on.
+The macOS desktop app can draw the canvas with the same engine as the browser, compiled natively and running on Metal, instead of WebGPU. It is a developer preview: the downloadable app does not include it and ignores `FEEGA_NATIVE_CANVAS`. It runs only from source, with `FEEGA_NATIVE_CANVAS=1`.
 
 ```bash
 cd apps/desktop

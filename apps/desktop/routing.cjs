@@ -5,6 +5,7 @@ const AUTH_CALLBACK_PATH = '/callback';
 const PROJECT_PATH = /^\/p\/([^/]+)/;
 const APP_PATH = '/app';
 const CANVAS_EXTENSION = '.feega';
+const BROWSABLE_SCHEMES = ['http:', 'https:', 'mailto:'];
 const SHELL_SCHEMES = ['about:', 'data:', 'devtools:'];
 
 function start(configured) {
@@ -49,6 +50,10 @@ function settingsUrl(current, app) {
   return new URL(project ? `/p/${project[1]}/settings` : APP_PATH, app).href;
 }
 
+function browsable(target) {
+  return URL.canParse(target) && BROWSABLE_SCHEMES.includes(new URL(target).protocol);
+}
+
 function droppedCanvas(target) {
   const url = new URL(target);
   if (url.protocol !== 'file:' || !url.pathname.endsWith(CANVAS_EXTENSION)) {
@@ -57,4 +62,4 @@ function droppedCanvas(target) {
   return decodeURIComponent(url.pathname);
 }
 
-module.exports = { settingsUrl, droppedCanvas, PRODUCTION_URL, DEEP_LINK_SCHEME, start, authReturn, staysInside, keepInside };
+module.exports = { browsable, settingsUrl, droppedCanvas, PRODUCTION_URL, DEEP_LINK_SCHEME, start, authReturn, staysInside, keepInside };

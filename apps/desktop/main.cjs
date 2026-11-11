@@ -5,7 +5,7 @@ const { watchUpdates } = require('./updates.cjs');
 const { fileIn, withExtension, savedBounds, saveBounds, EXTENSION } = require('./files.cjs');
 const { startServer, freePort, LOOPBACK } = require('./server.cjs');
 const { frameless, overlay, offlinePage, unreachable } = require('./chrome.cjs');
-const { start, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, DEEP_LINK_SCHEME } = require('./routing.cjs');
+const { start, browsable, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, DEEP_LINK_SCHEME } = require('./routing.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
 const hosted = start(process.env[START_URL_ENV]);
@@ -167,10 +167,9 @@ function leave(url) {
     openFile(canvas);
     return;
   }
-  if (url.startsWith('file:')) {
-    return;
+  if (browsable(url)) {
+    shell.openExternal(url);
   }
-  shell.openExternal(url);
 }
 
 function windowOptions() {

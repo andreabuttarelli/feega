@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { EventEmitter } = require('node:events');
-const { start, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, PRODUCTION_URL } = require('./routing.cjs');
+const { start, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, browsable, PRODUCTION_URL } = require('./routing.cjs');
 
 test('production is the default start', () => {
   assert.equal(start(undefined).href, new URL(PRODUCTION_URL).href);
@@ -61,4 +61,13 @@ test('a dropped .feega file is opened, any other file is left to the page', () =
   assert.equal(droppedCanvas('file:///Users/a/site.feega'), '/Users/a/site.feega');
   assert.equal(droppedCanvas('file:///Users/a/photo.png'), null);
   assert.equal(droppedCanvas('https://example.com/x.feega'), null);
+});
+
+test('only web and mail links leave for the system, never file or app schemes', () => {
+  assert.ok(browsable('https://github.com/x'));
+  assert.ok(browsable('mailto:hi@feega.app'));
+  assert.ok(!browsable('file:///Applications/Calculator.app'));
+  assert.ok(!browsable('smb://host/share'));
+  assert.ok(!browsable('vscode://x'));
+  assert.ok(!browsable('not a url'));
 });
