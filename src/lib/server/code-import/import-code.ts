@@ -6,6 +6,7 @@ import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
 import { boardsOf, conditioned, cropped, type Capture } from './boards';
 import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions } from './render-conditions';
+import { ownImages } from './page-images';
 import { repoOf, routesOf, type RepoRef } from './repo';
 import type { RepoRunner } from './sandbox-runner';
 
@@ -143,7 +144,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const boards = boardsOf(ask.name, captures.map(CROPS[ask.crop]));
   const [tree, uses] = [await withSheetFonts(ask, boards.tree), boards.uses];
-  const done = await landPlan(ask, codePlan(tree, uses, ask.newId, await fontsFor(ask, tree)), tree.truncated);
+  const done = await landPlan({ ...ask, importImage: ownImages(ask.importImage, ask.pages.map((p) => p.url)) }, codePlan(tree, uses, ask.newId, await fontsFor(ask, tree)), tree.truncated);
   if (done.outcome !== UrlImportOutcome.Ok) {
     return refused(FROM_URL_IMPORT[done.outcome], done.error);
   }
@@ -153,6 +154,8 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
   const skipped = [...done.skipped, ...missed];
   return { ...done, outcome: CodeImportOutcome.Ok, skipped, pages: captures.map((c) => c.label), ...count };
 }
+
+export type RunAsk = LandAsk & { repo: RepoRef; routes: string[]; conditions?: RenderConditions[]; runner: RepoRunner | null; archive: Uint8Array | null };
 
 export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
   const repo = repoOf(ask.repo);
@@ -165,13 +168,25 @@ export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
   }
 
   const archive = ask.archive ? await ask.archive(repo).catch(() => null) : null;
-  const run = await ask.runner(repo, archive);
+  return importRepoAt({ ...ask, repo, routes, archive });
+}
+
+export async function importRepoAt(ask: RunAsk): Promise<CodeImported> {
+  const routes = routesOf(ask.routes);
+  if (!routes) {
+    return refused(CodeImportOutcome.Invalid);
+  }
+  if (!ask.runner) {
+    return refused(CodeImportOutcome.NoSandbox);
+  }
+
+  const run = await ask.runner(ask.repo, ask.archive);
   if (!run.ok) {
     return refused(CodeImportOutcome.RunFailed, `${run.failure}: ${run.detail}`);
   }
 
   const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), conditions: v.conditions }));
-  const origin = { repo: `${repo.owner}/${repo.repo}`, branch: repo.ref, sha: run.app.sha };
-  const done = await importBoards({ ...ask, name: repo.repo, pages, names: run.app.names, crop: Crop.Page }).finally(() => run.app.stop().catch(() => undefined));
+  const origin = { repo: `${ask.repo.owner}/${ask.repo.repo}`, branch: ask.repo.ref, sha: run.app.sha };
+  const done = await importBoards({ ...ask, name: ask.repo.repo, pages, names: run.app.names, crop: Crop.Page }).finally(() => run.app.stop().catch(() => undefined));
   return done.outcome === CodeImportOutcome.Ok ? { ...done, origin } : done;
 }

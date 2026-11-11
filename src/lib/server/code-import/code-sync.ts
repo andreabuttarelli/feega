@@ -14,6 +14,7 @@ import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
 import { githubSource, SourceKind, type CodeSource } from './code-source';
 import { folderOf, folderSource } from './folder-source';
+import { uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { conditionsOf } from './render-conditions';
 
 export enum SyncOutcome {
@@ -24,7 +25,8 @@ export enum SyncOutcome {
   PublishFailed = 'publish_failed',
   UpToDate = 'up_to_date',
   Unreachable = 'unreachable',
-  Conflict = 'conflict'
+  Conflict = 'conflict',
+  NoSync = 'no_sync'
 }
 
 export type SyncRefusal = Exclude<SyncOutcome, SyncOutcome.Ok | SyncOutcome.UpToDate>;
@@ -35,10 +37,17 @@ export const SYNC_STATUS: Record<SyncRefusal, number> = {
   [SyncOutcome.NoGithub]: 412,
   [SyncOutcome.PublishFailed]: 502,
   [SyncOutcome.Unreachable]: 502,
-  [SyncOutcome.Conflict]: 409
+  [SyncOutcome.Conflict]: 409,
+  [SyncOutcome.NoSync]: 409
 };
 
-type Linked = { origin: CodeOriginData; source: CodeSource; link: (rev: string) => Pick<CodeImportAsk, 'repo' | 'folder'> };
+const UNPUBLISHED: Record<SourceKind, SyncRefusal> = {
+  [SourceKind.Github]: SyncOutcome.NoGithub,
+  [SourceKind.Folder]: SyncOutcome.PublishFailed,
+  [SourceKind.Upload]: SyncOutcome.NoSync
+};
+
+type Linked = { origin: CodeOriginData; source: CodeSource; link: (rev: string) => Pick<CodeImportAsk, 'repo' | 'folder' | 'upload'> };
 
 const BRANCH_PREFIX = 'feega/';
 const TITLE = 'UI edits from feega';
@@ -58,6 +67,11 @@ const SOURCES: Record<SourceKind, SourceOf> = {
   [SourceKind.Folder]: async (_scope, origin) => {
     const root = localModeRefusal(env) === null ? folderOf(origin.repo) : null;
     return root ? { origin, source: folderSource(root), link: () => ({ folder: root }) } : null;
+  },
+  [SourceKind.Upload]: async (scope, origin) => {
+    const upload = uploadOf(scope.orgId, origin.repo);
+    const archive = upload ? await uploadedArchive(scope.db, upload) : null;
+    return upload && archive ? { origin, source: uploadSource(archive), link: () => ({ upload: upload.path }) } : null;
   }
 };
 
@@ -108,7 +122,7 @@ export async function codePublish(scope: CodeScope, nodeId: string, now = Date.n
   const body = `Edited on the feega canvas, from ${done.linked.origin.repo}@${done.rev.slice(0, 7)}.${notes}`;
   const out = await done.linked.source.publish(done.rev, done.files, { branch, title: TITLE, body });
   if (!out) {
-    return { outcome: done.linked.origin.kind === SourceKind.Github ? SyncOutcome.NoGithub : SyncOutcome.PublishFailed };
+    return { outcome: UNPUBLISHED[done.linked.origin.kind as SourceKind] };
   }
   if (done.linked.origin.kind === SourceKind.Folder) {
     await settle(scope, nodeId, done.linked);
