@@ -2,6 +2,8 @@ export type AddedRow = { on: string; ids: readonly string[] };
 
 export const SNAPCN_ADDED_ON = '2026-11-10';
 const SNAPCN_ID_PREFIX = 'builtin:snapcn-';
+export const REMOCN_ADDED_ON = '2026-11-11';
+const REMOCN_ID_PREFIX = 'builtin:remocn-';
 
 export const ADDED: readonly AddedRow[] = [
   { on: '2026-10-15', ids: [
@@ -150,6 +152,9 @@ export const ADDED: readonly AddedRow[] = [
 const addedById = new Map(ADDED.flatMap((row) => row.ids.map((id) => [id, row.on] as const)));
 
 export function addedOn(id: string): string {
+  if (id.startsWith(REMOCN_ID_PREFIX)) {
+    return REMOCN_ADDED_ON;
+  }
   if (id.startsWith(SNAPCN_ID_PREFIX)) {
     return SNAPCN_ADDED_ON;
   }

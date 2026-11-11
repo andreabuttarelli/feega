@@ -3815,3 +3815,11 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## Local mode must resolve before any Supabase key check
 
 **Signal:** 500 `SUPABASE_SERVICE_ROLE_KEY not configured` in local mode with no `.env`, only on routes that use the service-role or admin client. **Move:** `createClient` already routes to `localStore()`, but a key guard placed before it throws first; check `localStore()` ahead of every env-key guard in `db/client.ts` and `supabase-admin.ts`. Test: `src/lib/server/db/client.local.test.ts`.
+
+## A ported template fails only when its template is built, not in the port's own test
+
+**Signal:** `catalog.test.ts` is green, but `template/remocn.test.ts` throws `the code breaks the authoring contract: toLocaleString ...` or `Custom: name a custom component name` when the lazy template is read. **Move:** the authoring contract lints the port source: format numbers with an inline grouping helper, never `toLocaleString`; and a prop called `name` collides with the custom component's own `name` (rename it, e.g. `email`). Run `template/remocn.test.ts` after every port, not only the catalog test.
+
+## `component-previews.ts` given many ids exits 0 and writes nothing
+
+**Signal:** `vite-node scripts/component-previews.ts id1 id2 ... id60` prints nothing and `static/component-previews` is unchanged. **Move:** run it once per id (a loop); one or two ids work.
