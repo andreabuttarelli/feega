@@ -42,8 +42,8 @@ const SERVED: Record<string, () => Blob> = {
   '/css2': () => new Blob([FONT_CSS], { type: 'text/css' }),
   '/s/dmsans/v1/dm.woff2': () => new Blob([WASM_BYTES.slice(0, 64)], { type: 'font/woff2' }),
   [GPU_PLAYER_ROUTE]: () => new Blob([PLAYER_CODE], { type: 'text/javascript' }),
-  '/gpu-core/gpu_core.js': () => new Blob([CORE_CODE], { type: 'text/javascript' }),
-  '/gpu-core/gpu_core_bg.wasm': () => new Blob([WASM_BYTES], { type: 'application/wasm' })
+  '/gpu-core/gpu_core_gl.js': () => new Blob([CORE_CODE], { type: 'text/javascript' }),
+  '/gpu-core/gpu_core_gl_bg.wasm': () => new Blob([WASM_BYTES], { type: 'application/wasm' })
 };
 const fetchBlob = async (url: string) => (SERVED[new URL(url).pathname]?.() ?? new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
 
@@ -177,7 +177,7 @@ describe('a self-contained file', () => {
   });
 
   it('refuses to export when the engine cannot be fetched, instead of inlining the error page', async () => {
-    const broken = async (url: string) => (new URL(url).pathname === '/gpu-core/gpu_core.js' ? new Blob(['<!doctype html><h1>404</h1>'], { type: 'text/html' }) : fetchBlob(url));
+    const broken = async (url: string) => (new URL(url).pathname === '/gpu-core/gpu_core_gl.js' ? new Blob(['<!doctype html><h1>404</h1>'], { type: 'text/html' }) : fetchBlob(url));
     const offline = async (url: string) => (new URL(url).pathname === GPU_PLAYER_ROUTE ? Promise.reject(new TypeError('Failed to fetch')) : fetchBlob(url));
 
     await expect(bundled(card(), broken)).rejects.toThrow(/gpu-core could not be loaded/);

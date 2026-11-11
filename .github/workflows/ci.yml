@@ -77,6 +77,9 @@ jobs:
       - name: Web build compiles
         run: cargo build --locked --lib --target wasm32-unknown-unknown
 
+      - name: WebGL fallback build compiles
+        run: cargo build --locked --lib --target wasm32-unknown-unknown --features webgl
+
   gpu-text:
     runs-on: ubuntu-24.04
     defaults:

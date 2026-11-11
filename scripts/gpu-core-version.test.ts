@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { coreVersionOf } from './gpu-core-version.mjs';
-import { CORE_VERSION } from '../packages/motion-core/src/motion/gpu-full/core-version';
+import { BUILDS, builtVersion } from './gpu-core-version.mjs';
+import * as versions from '../packages/motion-core/src/motion/gpu-full/core-version';
 
 describe('gpu-core version', () => {
-  it('names the shipped wasm, so a rebuilt engine gets a new immutable URL', () => {
-    expect(CORE_VERSION).toBe(coreVersionOf(readFileSync('static/gpu-core/gpu_core_bg.wasm'), readFileSync('static/gpu-core/gpu_core.js')));
+  it.each(Object.entries(BUILDS))('%s names the shipped %s, so a rebuilt engine gets a new immutable URL', (constant, name) => {
+    expect((versions as Record<string, string>)[constant]).toBe(builtVersion(name));
   });
 });

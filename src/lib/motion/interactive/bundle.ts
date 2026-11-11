@@ -245,8 +245,8 @@ export function hostedPage(page: string, origin: string): string | null {
 }
 
 export const GPU_PLAYER_ROUTE = '/motion-player.js';
-export const GPU_CORE_ROUTE = '/gpu-core/gpu_core.js';
-export const GPU_WASM_ROUTE = '/gpu-core/gpu_core_bg.wasm';
+export const GPU_CORE_ROUTE = '/gpu-core/gpu_core_gl.js';
+export const GPU_WASM_ROUTE = '/gpu-core/gpu_core_gl_bg.wasm';
 const GPU_SOURCE_ID = 'feega-source';
 const HYPERFRAMES_STAGE = '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>';
 
