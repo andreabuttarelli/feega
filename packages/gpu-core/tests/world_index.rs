@@ -201,7 +201,7 @@ fn camera(rng: &mut Seeded) -> (Affine, u32, u32) {
 }
 
 fn random_world(seed: u64, composes: bool, check: impl Fn(&World, &mut Twin, &Model, (Affine, u32, u32), String)) {
-    let mut rng = Seeded(seed * 0x9E37_79B9_7F4A_7C15 + 1);
+    let mut rng = Seeded(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) + 1);
     let mut world = World::new();
     let mut twin = Twin::new(composes);
     let mut model = Model::default();
