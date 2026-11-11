@@ -425,6 +425,9 @@ impl Resolver {
                         extend: *extend,
                     });
                 }
+                #[cfg(feature = "glyphless")]
+                Patch::GlyphRun { .. } => continue,
+                #[cfg(not(feature = "glyphless"))]
                 Patch::GlyphRun { index } => {
                     let mut run_sizes = StreamOffsets::default();
                     let run = &resources.glyph_runs[*index];

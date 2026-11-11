@@ -42,6 +42,7 @@ targets = []
 [features]
 bump_estimate = ["vello_encoding/bump_estimate"]
 debug_layers = []
+glyphless = ["vello_encoding/glyphless"]
 default = [
     "wgpu",
     "wgpu_default",
