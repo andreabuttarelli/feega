@@ -100,6 +100,10 @@ impl Compositor {
         self.retained.held_look(camera)
     }
 
+    pub fn held_painted(&self) -> Rect {
+        self.retained.painted()
+    }
+
     pub fn holding(&self) -> bool {
         self.world.holding()
     }
@@ -131,7 +135,9 @@ impl Compositor {
     pub fn take_damage(&mut self) -> Damage {
         let mut damage = std::mem::replace(&mut self.tile_damage, Damage::none());
         damage.join(self.world.take_scene_damage());
-        self.world.take_damage();
+        if !matches!(self.world.take_damage(), Damage::Rects(r) if r.is_empty()) {
+            self.retained.forget();
+        }
         damage
     }
 

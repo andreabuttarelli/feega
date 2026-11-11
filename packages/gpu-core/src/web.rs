@@ -578,8 +578,8 @@ impl WebCore {
         let c = self.camera;
         let step = crate::tiles::step_of(c.zoom);
         let tile_of = |key: &TileKey| placed(*key, self.tile_textures.get(key)?, c, screen);
-        let (rw, rh) = (self.retained.width() as f64, self.retained.height() as f64);
-        let covered = |look: Lookup| Rect::new((-look.x / look.scale).ceil(), (-look.y / look.scale).ceil(), ((rw - look.x) / look.scale).floor(), ((rh - look.y) / look.scale).floor()).intersect(screen);
+        let painted = self.compositor.held_painted();
+        let covered = |look: Lookup| Rect::new(((painted.x0 - look.x) / look.scale).ceil(), ((painted.y0 - look.y) / look.scale).ceil(), ((painted.x1 - look.x) / look.scale).floor(), ((painted.y1 - look.y) / look.scale).floor()).intersect(screen);
         let underlay = self.compositor.held_look(c).filter(|(_, stretch)| crate::tiles::underlay_shows(*stretch)).map(|(look, _)| Tile { source: &self.retained, look, within: covered(look) }).filter(|t| t.within.area() > 0.0);
         let still = draw.iter().filter(|k| k.step != step).filter_map(tile_of).chain(underlay).chain(draw.iter().filter(|k| k.step == step).filter_map(tile_of));
         let lifted = self.snapshots.values().flat_map(|shot| {
