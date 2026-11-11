@@ -10,7 +10,9 @@ import { releaseOnDispose, type GpuSurface } from './gpu-release';
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Size = { width: number; height: number };
-export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; put_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; append_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; cache_pending: () => boolean; cache_bytes: () => number; render_tally?: () => string; frame_counts?: () => Float64Array; warming?: () => boolean; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; set_tiles?: (on: boolean) => void; set_tile_budget?: (bytes: number) => void; set_canvas_tiles?: (allowed: number) => void; poster?: (group: string, width: number, height: number, scale: number) => Promise<Uint8Array>; free: () => void };
+export type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; set_live_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; picture_rows?: (clip: string, source: unknown, width: number, height: number, top: number, rows: number) => boolean; put_group: (key: string, list: string) => void; patch_group: (from: string, to: string, splice: string) => boolean; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; put_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; append_group_packed?: (key: string, list: string, floats: Float64Array, ends: Uint32Array) => void; cache_pending: () => boolean; cache_bytes: () => number; render_tally?: () => string; frame_counts?: () => Float64Array; warming?: () => boolean; scratch_bytes?: () => number; forget_picture: (clip: string) => void; picture_bytes: () => number; lost: () => boolean; busy?: () => boolean; set_motion?: (motion: CoreMotion) => void; set_budget?: (bytes: number) => void; set_tiles?: (on: boolean) => void; set_tile_budget?: (bytes: number) => void; set_canvas_tiles?: (allowed: number) => void; poster?: (group: string, width: number, height: number, scale: number) => Promise<Uint8Array>; fresh_tiles?: () => Float64Array; read_tile?: (step: number, tx: number, ty: number) => Promise<Uint8Array> | undefined; put_tile?: (step: number, tx: number, ty: number, pixels: Uint8Array) => boolean; settle_tile?: (step: number, tx: number, ty: number) => void; forget_tile?: (step: number, tx: number, ty: number) => void; release_tiles?: () => void; free: () => void };
+
+export type HeldTiles = { freshTiles: () => number[]; readTile: (step: number, tx: number, ty: number) => Promise<Uint8Array> | null; putTile: (step: number, tx: number, ty: number, pixels: Uint8Array) => boolean; settleTile: (step: number, tx: number, ty: number) => void; forgetTile: (step: number, tx: number, ty: number) => void; releaseTiles: () => void };
 
 export enum CoreMotion {
   Still = 0,
@@ -20,7 +22,7 @@ export enum CoreMotion {
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean; hold?: boolean };
 export type UsePatch = { put: Use[]; drop: string[]; order?: string[] };
 export type Painted = { outcome: Outcome; pending: boolean; skipped: string[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; renderTally?: () => string; frameCounts?: () => Float64Array; warming?: () => boolean; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; setTiles?: (on: boolean) => void; setTileBudget?: (bytes: number) => void; setCanvasTiles?: (allowed: number) => void; poster?: (group: string, size: { width: number; height: number }, scale: number) => Promise<ImageData>; behindPage?: boolean };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; patchGroup: (from: string, to: string, splice: Splice, pictures?: Pictures) => boolean; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (part: OverlayPart, items: readonly Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number; renderTally?: () => string; frameCounts?: () => Float64Array; warming?: () => boolean; pictureBytes: () => number; scratchBytes?: () => number; wasmBytes?: () => number; lost: () => boolean; busy?: () => boolean; setMotion?: (motion: CoreMotion) => void; setBudget?: (bytes: number) => void; setTiles?: (on: boolean) => void; setTileBudget?: (bytes: number) => void; setCanvasTiles?: (allowed: number) => void; poster?: (group: string, size: { width: number; height: number }, scale: number) => Promise<ImageData>; heldTiles?: HeldTiles; behindPage?: boolean };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<object>> }; WebGlCore: { attach: Attach<object> } };
 
@@ -295,6 +297,7 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
       const [outcome, ...skipped] = attached.frame(now).split('\n');
       return { outcome: outcome as Outcome, pending: attached.cache_pending(), skipped: skipped.filter(Boolean) };
     },
+    ...(attached.put_tile ? { heldTiles: heldTiles(attached) } : {}),
     ...(attached.poster ? { poster: (group: string, size: { width: number; height: number }, scale: number) => attached.poster!(group, size.width, size.height, scale).then((bytes) => new ImageData(Uint8ClampedArray.from(bytes), size.width, size.height)) } : {}),
     cacheBytes: () => attached.cache_bytes(),
     renderTally: () => attached.render_tally?.() ?? '{}',
@@ -313,6 +316,15 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     dispose: () => attached.free()
   };
 }
+
+const heldTiles = (attached: Attached): HeldTiles => ({
+  freshTiles: () => Array.from(attached.fresh_tiles!()),
+  readTile: (step, tx, ty) => attached.read_tile!(step, tx, ty) ?? null,
+  putTile: (step, tx, ty, pixels) => attached.put_tile!(step, tx, ty, pixels),
+  settleTile: (step, tx, ty) => attached.settle_tile!(step, tx, ty),
+  forgetTile: (step, tx, ty) => attached.forget_tile!(step, tx, ty),
+  releaseTiles: () => attached.release_tiles!()
+});
 
 export const pictureSize =
   (side: number): Fit =>

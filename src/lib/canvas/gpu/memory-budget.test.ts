@@ -56,7 +56,7 @@ describe('device profile', () => {
   const MB = 1024 * 1024;
 
   it('a desktop keeps the values it had before phones got their own profile', () => {
-    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident });
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, diskTileBytes: 500 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident });
   });
 
   it('a desktop builds frames on one lane per spare core, up to four', () => {
