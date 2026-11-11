@@ -1,6 +1,7 @@
 <script lang="ts">
   import { handoffLink, PROMPT_KINDS, PROMPT_SOURCES, PromptKind, PromptSource } from '../prompt/handoff';
   import Icon, { type IconName } from '../prompt/Icon.svelte';
+  import SourceMenu from '../prompt/SourceMenu.svelte';
 
   const MODEL = 'Opus 5.5';
   const KIND_ICONS: Record<PromptKind, IconName> = { [PromptKind.Motion]: 'motion', [PromptKind.Website]: 'website' };
@@ -80,6 +81,10 @@
             <span class="label">{row.label}</span>
           </button>
         {/each}
+      </div>
+
+      <div class="compact">
+        <SourceMenu bind:source icons={SOURCE_ICONS} />
       </div>
 
       <span class="model">{MODEL}</span>
@@ -269,6 +274,12 @@
     color: #fff;
   }
 
+  .compact {
+    display: none;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   .model {
     flex: none;
     margin-right: 6px;
@@ -313,13 +324,17 @@
     white-space: nowrap;
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 809.98px) {
     .composer {
       border-radius: 16px;
     }
 
-    .label {
+    .sources {
       display: none;
+    }
+
+    .compact {
+      display: block;
     }
 
     .tool {

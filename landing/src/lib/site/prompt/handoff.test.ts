@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HANDOFF_PROMPT_MAX, handoffLink, PROMPT_KINDS, PromptKind, PromptSource } from './handoff';
+import { HANDOFF_PROMPT_MAX, handoffLink, sourceTrigger, PROMPT_KINDS, PromptKind, PromptSource } from './handoff';
 
 function params(link: string): URLSearchParams {
   const url = new URL(link);
@@ -34,5 +34,15 @@ describe('PROMPT_KINDS', () => {
   it('ogni tipo ha il proprio placeholder', () => {
     const placeholders = new Set(PROMPT_KINDS.map((row) => row.placeholder));
     expect(placeholders.size).toBe(PROMPT_KINDS.length);
+  });
+});
+
+describe('sourceTrigger', () => {
+  it('dice Import finché non si sceglie una sorgente', () => {
+    expect(sourceTrigger(null)).toBe('Import');
+  });
+
+  it('mostra il nome della sorgente scelta', () => {
+    expect(sourceTrigger(PromptSource.Folder)).toBe('Local folder');
   });
 });
