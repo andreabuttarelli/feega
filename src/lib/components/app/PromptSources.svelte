@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Connect, PROMPT_SOURCES, PROMPT_SOURCE_ORDER, PromptSource, sourceName, type SourcePick } from '$lib/home/prompt-sources';
-  import { githubConnect, githubStatus } from '$lib/canvas/code-import-client';
+  import { env as publicEnv } from '$env/dynamic/public';
+  import { isLocalMode } from '$lib/local-user';
+  import { AppMode, Connect, PROMPT_SOURCES, PromptSource, sourceName, sourcesFor, type SourcePick } from '$lib/home/prompt-sources';
+  import { githubConnect, githubStatus, uploadFolder } from '$lib/canvas/code-import-client';
+  import { canPickDirectory, listedFolder, pickDirectory } from '$lib/code-upload/pick-folder';
+  import { SNAPSHOT_MESSAGES, type Snapshot } from '$lib/code-upload/snapshot';
 
   let { pick = $bindable(null), projectId = null, pickAgain = null }: { pick: SourcePick | null; projectId?: string | null; pickAgain?: PromptSource | null } = $props();
 
@@ -10,6 +14,12 @@
   let folderName = $state('');
   let githubConnected = $state(true);
   let folderInput = $state<HTMLInputElement | null>(null);
+  let uploading = $state<string | null>(null);
+  let uploadNote = $state<string | null>(null);
+
+  const mode = isLocalMode(publicEnv) ? AppMode.Local : AppMode.Cloud;
+  const order = sourcesFor(mode);
+  const UPLOAD_FAILED = 'The folder could not be uploaded. Try again.';
 
   onMount(() => {
     if (pickAgain) {
@@ -38,12 +48,48 @@
     }
   }
 
-  function folderFromInput(e: Event) {
-    const first = (e.currentTarget as HTMLInputElement).files?.[0];
-    const name = first?.webkitRelativePath.split('/')[0];
+  async function pickUpload() {
+    uploadNote = null;
+    if (!canPickDirectory()) {
+      folderInput?.click();
+      return;
+    }
+    await uploaded(await pickDirectory());
+  }
+
+  async function folderFromInput(e: Event) {
+    const list = (e.currentTarget as HTMLInputElement).files;
+    if (mode === AppMode.Cloud) {
+      await uploaded(await listedFolder(list));
+      return;
+    }
+    const name = list?.[0]?.webkitRelativePath.split('/')[0];
     if (name) {
       folderPicked(name);
     }
+  }
+
+  async function uploaded(snapshot: Snapshot | null) {
+    if (!snapshot) {
+      return;
+    }
+    if (!snapshot.ok) {
+      uploadNote = SNAPSHOT_MESSAGES[snapshot.refusal];
+      return;
+    }
+    if (!projectId) {
+      pick = { source: PromptSource.Upload, value: snapshot.name };
+      return;
+    }
+    uploading = snapshot.name;
+    const done = await uploadFolder(projectId, snapshot.name, snapshot.archive).finally(() => (uploading = null));
+    if (!done.ok) {
+      uploadNote = UPLOAD_FAILED;
+      return;
+    }
+    editing = null;
+    pick = { source: PromptSource.Upload, value: done.value };
+    uploadNote = snapshot.skipped.length ? `Left out ${snapshot.skipped.length} file${snapshot.skipped.length === 1 ? '' : 's'} over 1 MB.` : null;
   }
 
   function folderPicked(name: string) {
@@ -55,7 +101,8 @@
   const START: Record<PromptSource, () => void> = {
     [PromptSource.Github]: () => open(PromptSource.Github),
     [PromptSource.Figma]: () => open(PromptSource.Figma),
-    [PromptSource.Folder]: () => void pickFolder()
+    [PromptSource.Folder]: () => void pickFolder(),
+    [PromptSource.Upload]: () => void pickUpload()
   };
 
   function open(source: PromptSource) {
@@ -97,13 +144,22 @@
 </script>
 
 <div class="sources" data-testid="prompt-sources">
-  {#each PROMPT_SOURCE_ORDER as source (source)}
+  {#each order as source (source)}
     <button type="button" class="source" data-source={source} aria-pressed={pick?.source === source || editing === source} onclick={START[source]}>{PROMPT_SOURCES[source].label}</button>
   {/each}
   <input bind:this={folderInput} class="sr-only" type="file" webkitdirectory tabindex="-1" aria-hidden="true" onchange={folderFromInput} />
 </div>
 
-{#if editing}
+{#if uploading}<p class="note" data-testid="upload-progress">Uploading {uploading}…</p>{/if}
+{#if uploadNote}<p class="note" data-testid="upload-note">{uploadNote}</p>{/if}
+
+{#if editing === PromptSource.Upload}
+  <div class="entry" data-testid="source-entry">
+    <p class="note">A folder can't be kept through sign-in: pick it again. It is imported once, with no sync back to your files.</p>
+    <button type="button" onclick={pickUpload}>pick folder</button>
+    <button type="button" onclick={() => (editing = null)} aria-label="Cancel">×</button>
+  </div>
+{:else if editing}
   <div class="entry" data-testid="source-entry">
     {#if editing === PromptSource.Folder}
       <p class="note">
@@ -120,6 +176,7 @@
   <div class="chip" data-testid="source-chip" data-source={pick.source}>
     <span class="kind">{PROMPT_SOURCES[pick.source].label}</span>
     <span class="name">{sourceName(pick.source, pick.value)}</span>
+    {#if pick.source === PromptSource.Upload}<span class="kind" data-testid="source-once">imported once, no sync</span>{/if}
     {#if pick.source === PromptSource.Github && projectId && !githubConnected}
       <button type="button" class="link" onclick={connectGithub}>connect GitHub</button>
     {/if}
