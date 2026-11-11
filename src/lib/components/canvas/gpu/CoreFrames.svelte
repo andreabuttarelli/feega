@@ -458,7 +458,7 @@
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const textureBytes = $derived(textureBudget(budget.textureBytes, { width: area.width * resolution, height: area.height * resolution }));
-  const real = $derived(resident(whole, view, area, textureBytes));
+  const real = $derived(resident(whole, view, area, textureBytes, budget.offscreen));
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
   const stacking = (id: string) => rank.get(id) ?? 0;
@@ -521,10 +521,14 @@
     onready(new Set(chains.filter((c) => !c[0].group.endsWith(BLOCKS) && c[0].group !== c[c.length - 1].group).map((c) => c[0].id)));
   });
 
+  let settled: Promise<unknown> = Promise.resolve();
+  const surfaceWidth = $derived(Math.round(area.width * resolution));
+  const surfaceHeight = $derived(Math.round(area.height * resolution));
+
   $effect(() => {
     const target = canvas;
-    const width = Math.round(area.width * resolution);
-    const height = Math.round(area.height * resolution);
+    const width = surfaceWidth;
+    const height = surfaceHeight;
     if (!target || !width || !height) {
       return;
     }
@@ -532,8 +536,12 @@
     let made: CoreRaster | null = null;
     const tried = backend;
     markStartup(StartupStep.GpuAsked);
-    void BACKENDS[tried](target, width, height, budget.pictureSide).then(
+    const attaching = settled.then(() => (gone ? null : BACKENDS[tried](target, width, height, budget.pictureSide)));
+    void attaching.then(
       (r) => {
+        if (!r) {
+          return;
+        }
         made = r;
         if (gone) {
           release(r);
@@ -546,6 +554,7 @@
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
+        r.setCanvasTiles?.(budget.canvasTiles);
         r.setTiles?.(TILED);
         raster = r;
         markStartup(StartupStep.GpuReady);
@@ -567,6 +576,10 @@
         }
         backend = next.backend;
       }
+    );
+    settled = attaching.then(
+      () => undefined,
+      () => undefined
     );
     return () => {
       gone = true;

@@ -11,9 +11,17 @@ export const CACHE_SHARE = 0.5;
 
 export const pictureBytes = (items: readonly Item[]): number => items.reduce((sum, i) => sum + (i.kind === ItemKind.Image ? i.size.width * i.size.height * RGBA_BYTES : 0), 0);
 
-export function resident(frames: readonly HeldFrame[], view: Viewport, screen: Screen, budget: number): HeldFrame[] {
+export enum Offscreen {
+  Resident = 'resident',
+  Dropped = 'dropped'
+}
+
+export function resident(frames: readonly HeldFrame[], view: Viewport, screen: Screen, budget: number, offscreen = Offscreen.Resident): HeldFrame[] {
   const seen = textured(frames.map((f) => ({ id: f.id, ...f.box, bytes: f.bytes })), view, screen, budget);
   const media = new Set(seen);
+  if (offscreen === Offscreen.Dropped) {
+    return frames.filter((f) => f.bytes === 0 || media.has(f.id));
+  }
   let spent = frames.filter((f) => media.has(f.id)).reduce((sum, f) => sum + f.bytes, 0);
   const centre = { x: (screen.width / 2 - view.x) / view.zoom, y: (screen.height / 2 - view.y) / view.zoom };
   const distance = (f: HeldFrame) => Math.hypot(f.box.x + f.box.w / 2 - centre.x, f.box.y + f.box.h / 2 - centre.y);

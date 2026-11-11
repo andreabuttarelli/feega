@@ -499,3 +499,33 @@ fn whole_canvas_tiles_survive_eviction() {
 
     assert!(keys.iter().all(|k| !gone.contains(k)));
 }
+
+#[test]
+fn a_canvas_without_whole_canvas_tiles_bakes_and_pins_none() {
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+    let mut tiles = Tiles::default();
+    tiles.set_canvas_tiles(0);
+    let near = tiles.canvas_ahead(canvas, camera(0.4), SCREEN);
+    assert!(near.is_empty());
+
+    let mut held = Tiles::default();
+    let keys = held.canvas_ahead(canvas, camera(0.4), SCREEN);
+    keys.iter().for_each(|k| held.hold(*k));
+    held.set_canvas(canvas);
+    held.set_canvas_tiles(0);
+
+    let gone = held.evict_beyond(camera(0.4), SCREEN, 0);
+
+    assert!(keys.iter().any(|k| gone.contains(k)));
+}
+
+#[test]
+fn a_smaller_whole_canvas_allowance_bakes_at_most_that_many_tiles() {
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+    let mut tiles = Tiles::default();
+    tiles.set_canvas_tiles(40);
+
+    let keys = tiles.canvas_ahead(canvas, camera(0.4), SCREEN);
+
+    assert!(!keys.is_empty() && keys.len() <= 40);
+}
