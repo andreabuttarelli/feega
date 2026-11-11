@@ -171,7 +171,7 @@
   import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
-  import { imageSourceTile } from '$lib/canvas/free-image';
+  import { elementDocs, imageSourceTile } from '$lib/canvas/free-image';
   import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
   import { fetchKey, framesOnCanvas, pickedToFetch, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { frameSources } from '$lib/canvas/core/frame-sources';
@@ -352,7 +352,9 @@
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
-  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
+  let lastElementDocs: ReturnType<typeof elementDocs> = new Map();
+  const freeImageDocs = $derived.by(() => (lastElementDocs = elementDocs(tiles, (id) => liveOf(id)?.doc ?? null, lastElementDocs)));
+  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, freeImageDocs.get(t.id) ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -370,7 +372,7 @@
     }
   });
   $effect(() => {
-    const seen = visibleIds(placed.filter((t) => sticky.has(t.id)), view, area);
+    const seen = visibleIds([...sticky.keys()].flatMap((id) => byId.get(id) ?? []), view, area);
     const keep = new Map([...sticky].filter(([id]) => seen.has(id)));
     if (keep.size !== untrack(() => sticky.size)) {
       sticky = keep;
@@ -378,7 +380,8 @@
   });
   const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
-  const liveCode = $derived([...visibleIds(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)), view, area)].slice(0, LIVE_CODE_CAP));
+  const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)));
+  const liveCode = $derived([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
   const domIds = $derived.by(() => {
     const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
@@ -401,6 +404,15 @@
   const coreFrames = $derived(framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}));
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
+  const OVERLAY_REACH = 0.5;
+  let overlaySeen = new Set<string>();
+  const seenOverlays = $derived.by(() => {
+    const reach = { x: view.x + area.width * OVERLAY_REACH, y: view.y + area.height * OVERLAY_REACH, zoom: view.zoom };
+    const next = cullIndex.visible(reach, { width: area.width * (1 + 2 * OVERLAY_REACH), height: area.height * (1 + 2 * OVERLAY_REACH) });
+    return sameSet(overlaySeen, next) ? overlaySeen : (overlaySeen = next);
+  });
+  const keptOverlays = $derived.by(() => new Set([inside?.nodeId, typing?.nodeId, cropping?.nodeId].filter((id): id is string => !!id)));
+  const shownOverlays = $derived(overlayFrames.filter((f) => seenOverlays.has(f.id) || keptOverlays.has(f.id)));
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
   const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
@@ -3450,6 +3462,7 @@
   const stackOrder = $derived(placed.map((t) => t.id));
   const viewZoom = $derived(view.zoom);
   const coreTheme = $derived(coreLook ? { ...coreLook, panel: coreLook.paper } : null);
+  const runningTiles = $derived(placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })));
   const coreOverlay = $derived(
     coreTheme && coreType
       ? overlayOf({
@@ -3464,7 +3477,7 @@
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
-          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
+          running: runningTiles,
           chrome: coreChrome
         })
       : NO_OVERLAY
@@ -4360,7 +4373,7 @@
         <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
       {/each}
     </div>
-    <FrameOverlays {view} frames={overlayFrames}>
+    <FrameOverlays {view} frames={shownOverlays}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}

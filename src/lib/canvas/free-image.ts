@@ -31,3 +31,11 @@ export function imageSourceTile<T extends SourceTile>(tile: T, doc: MotionDoc | 
 
   return { ...tile, connectable: true, connectors: [], output, node: tileNode({ id: tile.id, medium: ELEMENT }) };
 }
+
+type DocOf = (id: string) => MotionDoc | null;
+
+export function elementDocs(tiles: readonly SourceTile[], docOf: DocOf, last: ReadonlyMap<string, MotionDoc | null>): ReadonlyMap<string, MotionDoc | null> {
+  const next = new Map(tiles.filter((t) => t.kind === ELEMENT).map((t) => [t.id, docOf(t.id)]));
+  const same = next.size === last.size && [...next].every(([id, doc]) => last.get(id) === doc);
+  return same ? last : next;
+}
