@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { EdgeLook, type CoreTheme } from './overlay';
@@ -112,5 +112,17 @@ describe('world overlay, node by node', () => {
 
     expect(after.fixed[0]).toBe(before.fixed[0]);
     expect(after.fixed.at(-1)).not.toBe(before.fixed.at(-1));
+  });
+
+  it('a zoom frame that rebuilds equal chrome compares it without serialising', () => {
+    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+    parts({ ...base, chrome: [tile('a', 0), tile('b', 200)] });
+    const serialised = vi.spyOn(JSON, 'stringify');
+    const again = parts({ ...base, curves: [{ edge: edge(), curve: { ...curve } }], chrome: [tile('a', 0), tile('b', 200)] });
+    const calls = serialised.mock.calls.length;
+    serialised.mockRestore();
+
+    expect(again.fixed.length).toBeGreaterThan(0);
+    expect(calls).toBe(0);
   });
 });

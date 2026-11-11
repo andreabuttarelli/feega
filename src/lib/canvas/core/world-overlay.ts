@@ -52,8 +52,19 @@ let built = new Map<string, Built>();
 
 type Built = { from: Record<string, unknown>; items: PathItem[] };
 
-const alike = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
-const sameFields = (a: Record<string, unknown>, b: Record<string, unknown>) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => alike(a[k], b[k]));
+function alike(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  return sameFields(a as Record<string, unknown>, b as Record<string, unknown>);
+}
+function sameFields(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => alike(a[k], b[k]));
+}
 
 function zoomFree(o: Fixed): PathItem[] {
   if (fixedFor && FIXED_KEYS.every((k) => fixedFor![k] === o[k])) {
