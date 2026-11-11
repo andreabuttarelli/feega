@@ -1,7 +1,7 @@
 const KEEP = 600;
 const FRAMES_KEPT = 2400;
 
-export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number };
+export type CoreFrameCount = { at: number; ms: number; moving: boolean; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; unsharp: number; uncovered: number; pending: boolean };
 
 export type TextureReport = { count: number; bytes: number; largest: string[] };
 
@@ -72,11 +72,11 @@ export function addTally(json: string) {
   }
 }
 
-export function countFrame(began: number, counts: Float64Array | undefined, moving: boolean) {
+export function countFrame(began: number, counts: Float64Array | undefined, moving: boolean, pending: boolean) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   const frames = (stats.frames ??= []);
-  const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0] = counts ?? [];
-  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes });
+  const [plans = 0, walked = 0, planMs = 0, bakes = 0, bakeMs = 0, uploadBytes = 0, unsharp = 0, uncovered = 0] = counts ?? [];
+  frames.push({ at: began, ms: performance.now() - began, moving, plans, walked, planMs, bakes, bakeMs, uploadBytes, unsharp, uncovered, pending });
   if (frames.length > FRAMES_KEPT) {
     frames.shift();
   }

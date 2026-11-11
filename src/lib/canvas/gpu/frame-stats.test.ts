@@ -8,14 +8,14 @@ describe('countFrame', () => {
   });
 
   it('keeps what the core did in each frame, named, beside the frame length and whether the camera moved', () => {
-    countFrame(performance.now(), Float64Array.from([2, 20000, 1.5, 3, 4.5, 4096]), true);
+    countFrame(performance.now(), Float64Array.from([2, 20000, 1.5, 3, 4.5, 4096, 7, 5]), true, true);
 
-    expect(window.__gpuCanvas?.frames?.[0]).toMatchObject({ moving: true, plans: 2, walked: 20000, planMs: 1.5, bakes: 3, bakeMs: 4.5, uploadBytes: 4096 });
+    expect(window.__gpuCanvas?.frames?.[0]).toMatchObject({ moving: true, plans: 2, walked: 20000, planMs: 1.5, bakes: 3, bakeMs: 4.5, uploadBytes: 4096, unsharp: 7, uncovered: 5, pending: true });
   });
 
   it('counts zero work for a core that reports none', () => {
-    countFrame(performance.now(), undefined, false);
+    countFrame(performance.now(), undefined, false, false);
 
-    expect(window.__gpuCanvas?.frames?.[0]).toMatchObject({ moving: false, plans: 0, bakes: 0, uploadBytes: 0 });
+    expect(window.__gpuCanvas?.frames?.[0]).toMatchObject({ moving: false, plans: 0, bakes: 0, uploadBytes: 0, unsharp: 0, pending: false });
   });
 });

@@ -895,7 +895,7 @@
     into.setCamera(at.x, at.y, at.zoom);
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
-    countFrame(began, into.frameCounts?.(), gesture.active());
+    countFrame(began, into.frameCounts?.(), gesture.active(), pending);
     if (!pending && !gesture.active()) {
       takeThumbs(canvas, shown);
     }
