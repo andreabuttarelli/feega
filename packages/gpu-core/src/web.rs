@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{keep_rastering, Input, Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -34,7 +34,7 @@ const UNMOVED: Lookup = Lookup { scale: 1.0, x: 0.0, y: 0.0 };
 
 const NOT_TIMED: u64 = u64::MAX;
 const TILE_BUDGET_GESTURE_MS: f64 = 4.0;
-const TILE_BUDGET_STILL_MS: f64 = 12.0;
+const TILE_BUDGET_STILL_MS: f64 = 8.0;
 const SPARE_TILES: usize = 32;
 const REST_AFTER_MS: f64 = 200.0;
 const EVICT_DOWN_TO_PERCENT: usize = 90;
@@ -132,6 +132,10 @@ fn held_texture(device: &wgpu::Device, (width, height): (u32, u32)) -> wgpu::Tex
         usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
         view_formats: &[],
     })
+}
+
+fn input_now() -> Input {
+    if input_pending() { Input::Pending } else { Input::Quiet }
 }
 
 fn input_pending() -> bool {
@@ -726,7 +730,8 @@ impl WebCore {
         }
         let mut spent = spent;
         loop {
-            if spent && js_sys::Date::now() - started > budget {
+            if !keep_rastering(spent, js_sys::Date::now() - started, budget, input_now()) {
+                self.pending = true;
                 return Ok(false);
             }
             let Some(block) = self.rest.as_mut().and_then(Rest::next) else { return Ok(self.rest.as_ref().is_some_and(Rest::adoptable)) };

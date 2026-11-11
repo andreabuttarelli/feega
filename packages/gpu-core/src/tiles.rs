@@ -454,3 +454,13 @@ pub fn path_for(m: Moment) -> Path {
     }
     Path::Exact
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Input {
+    Pending,
+    Quiet,
+}
+
+pub fn keep_rastering(spent: bool, elapsed_ms: f64, budget_ms: f64, input: Input) -> bool {
+    input == Input::Quiet && !(spent && elapsed_ms > budget_ms)
+}

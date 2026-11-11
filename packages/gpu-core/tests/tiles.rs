@@ -529,3 +529,13 @@ fn a_smaller_whole_canvas_allowance_bakes_at_most_that_many_tiles() {
 
     assert!(!keys.is_empty() && keys.len() <= 40);
 }
+
+#[test]
+fn rest_raster_stops_for_pending_input_even_before_its_budget() {
+    use gpu_core::tiles::{keep_rastering, Input};
+
+    assert!(keep_rastering(true, 2.0, 8.0, Input::Quiet));
+    assert!(!keep_rastering(true, 2.0, 8.0, Input::Pending));
+    assert!(!keep_rastering(true, 9.0, 8.0, Input::Quiet));
+    assert!(keep_rastering(false, 9.0, 8.0, Input::Quiet));
+}
