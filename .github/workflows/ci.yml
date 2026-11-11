@@ -40,7 +40,9 @@ jobs:
         run: npx vite build && rm -rf .vercel/output build
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install --with-deps chromium && exit 0
+          npx playwright install chromium
 
       - name: Unit tests
         run: npx vitest run

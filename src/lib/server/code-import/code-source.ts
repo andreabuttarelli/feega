@@ -5,7 +5,8 @@ import type { FileChange, ReadFile } from './write-back';
 
 export enum SourceKind {
   Github = 'github',
-  Folder = 'folder'
+  Folder = 'folder',
+  Upload = 'upload'
 }
 
 export type PublishAsk = { branch: string; title: string; body: string };
