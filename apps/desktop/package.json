@@ -25,10 +25,7 @@
       "updates.cjs",
       "files.cjs",
       "server.cjs",
-      "chrome.cjs",
-      "native-canvas.cjs",
-      "preload.cjs",
-      "native/*.node"
+      "chrome.cjs"
     ],
     "directories": {
       "buildResources": "build",
@@ -80,9 +77,6 @@
       "category": "Graphics"
     },
     "artifactName": "feega-${version}-${os}-${arch}.${ext}",
-    "asarUnpack": [
-      "native/*.node"
-    ],
     "fileAssociations": [
       {
         "ext": "feega",

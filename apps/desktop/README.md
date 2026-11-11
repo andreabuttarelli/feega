@@ -1,7 +1,8 @@
 # Feega desktop
 
-Electron app for macOS (ADR 0021) running feega in local mode: a bundled node server per open
-`.feega` file, no account. `FEEGA_URL=<url>` runs the old shell over a hosted app instead.
+Electron app for macOS (ADR 0021) over the hosted app (`https://oh.feega.app`, override with
+`FEEGA_URL=<url>`): login, OAuth through the system browser back via `feega://auth/callback`.
+Opening a `.feega` file switches to local mode: a bundled node server for that file, no account.
 
 ```bash
 cd apps/desktop
