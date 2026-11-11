@@ -32,7 +32,7 @@ export async function importCode(ask: CodeAsk, fetchFn: typeof fetch = fetch): P
   return got.ok ? { ok: true, landed: got.value } : got;
 }
 
-export async function tokensFound(projectId: string, where: { repo: string } | { folder: string }, fetchFn: typeof fetch = fetch): Promise<number> {
+export async function tokensFound(projectId: string, where: { repo: string } | { folder: string } | { upload: string }, fetchFn: typeof fetch = fetch): Promise<number> {
   const got = await asked<{ tokens: number }>(`/api/v1/projects/${projectId}/code-import/tokens?${new URLSearchParams(where)}`, {}, fetchFn);
   return got.ok ? got.value.tokens : 0;
 }
