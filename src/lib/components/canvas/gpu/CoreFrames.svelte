@@ -41,7 +41,7 @@
   import { Reach, assetTier, keptTier } from '$lib/canvas/core/asset-tier';
   import type { AssetSize } from '$lib/canvas/asset-url';
   import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
-  import { debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
+  import { backendLog, debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
@@ -56,17 +56,20 @@
   import { describe, factsOf, signatureOf, undrawn, type NodeFacts } from '$lib/canvas/core/core-debug';
   import { Motion, hudLine, watchCrashes } from '$lib/canvas/gpu/crash-watch';
   import { liftOut, liftedPut, movingGroup, restGroup, type Lift, type Lifted } from '$lib/canvas/core/lifted-drag';
-  import { AttachStep, afterAttachFailure, backendAfterLoss, isTrap } from '$lib/canvas/gpu/gpu-loss';
+  import { AttachStep, GpuBackend, afterAttachFailure, backendAfterLoss, isTrap, type BackendSwitch } from '$lib/canvas/gpu/gpu-loss';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
 
-  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), order = [], live = new Map(), known = () => null, cards = [], posters = [], overlay = NO_OVERLAY, lift = null, look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, place = null, sourceUrl, onready, onsource = () => {}, onthumb = () => {}, onfallback, onbackend = () => {} }: { frames: FrameAt[]; edited?: ReadonlySet<string>; order?: readonly string[]; live?: ReadonlyMap<string, LiveDoc>; known?: (f: FrameAt) => FrameDoc | null; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: CoreOverlay; lift?: Lift | null; look?: Look; view: Viewport; area: { width: number; height: number }; place?: { projectId: string; canvasId: string; orgId?: string } | null; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onsource?: (id: string, source: FrameDoc) => void; onthumb?: (id: string, revision: number, blob: Blob, size: { width: number; height: number }) => void; onfallback: (why: string) => void; onbackend?: (change: BackendSwitch) => void } = $props();
 
   markStartup(StartupStep.Mounted);
   debugStart();
 
-  const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
+  const NATIVE = { name: GpuBackend.Native, create: createCoreNative };
+  const WEBGPU = { name: GpuBackend.WebGpu, create: createCore };
+  const WEBGL = { name: GpuBackend.WebGl, create: createCoreGl };
+  const BACKENDS = nativeCanvasOffered() ? [NATIVE, WEBGPU, WEBGL] : [WEBGPU, WEBGL];
   const budget = BUDGET[currentDevice()];
 
   let canvas = $state<HTMLCanvasElement | null>(null);
@@ -593,7 +596,7 @@
     let made: CoreRaster | null = null;
     const tried = backend;
     markStartup(StartupStep.GpuAsked);
-    const attaching = settled.then(() => (gone ? null : BACKENDS[tried](target, width, height, budget.pictureSide)));
+    const attaching = settled.then(() => (gone ? null : BACKENDS[tried].create(target, width, height, budget.pictureSide)));
     void attaching.then(
       (r) => {
         if (!r) {
@@ -631,7 +634,7 @@
           attempt++;
           return;
         }
-        backend = next.backend;
+        switchTo(next.backend, e instanceof Error ? e.message : String(e));
       }
     );
     settled = attaching.then(
@@ -841,6 +844,14 @@
 
   let losses = 0;
 
+  function switchTo(next: number, why: string) {
+    const from = BACKENDS[backend].name;
+    const to = BACKENDS[next].name;
+    backendLog(from, to, why);
+    onbackend({ from, to, why });
+    backend = next;
+  }
+
   function release(gone: CoreRaster) {
     try {
       gone.dispose();
@@ -858,7 +869,7 @@
     const next = backendAfterLoss(backend, losses, BACKENDS.length);
     if (next !== backend) {
       losses = 0;
-      backend = next;
+      switchTo(next, why instanceof Error ? why.message : String(why));
     }
     raster = null;
     attempt++;
