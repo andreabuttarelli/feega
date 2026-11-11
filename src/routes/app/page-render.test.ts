@@ -90,7 +90,7 @@ describe('the /app home: the recents, one prompt', () => {
 
     expect(body).toContain('data-testid="home-agent"');
     expect(body).toContain('claude mcp add --transport http feega https://mcp.feega.app/mcp');
-    expect(body).toContain('npm install -g feega-cli');
+    expect(body).not.toContain('feega-cli');
     expect(body).toContain('data-testid="agent-copy"');
     expect(body).toContain('href="https://docs.feega.app/integrations/mcp/"');
   });

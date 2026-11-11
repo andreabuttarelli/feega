@@ -9,10 +9,6 @@
   let active = $state(clients[0].id);
   let copied = $state<string | null>(null);
   const client = $derived(clients.find((c) => c.id === active) ?? clients[0]);
-  const groups = $derived([
-    { id: 'mcp', label: 'mcp', steps: client.mcp },
-    { id: 'cli', label: 'cli', steps: client.cli }
-  ]);
 
   async function copy(snippet: string) {
     await navigator.clipboard.writeText(snippet);
@@ -31,9 +27,7 @@
     {/each}
   </div>
   <div class="panel" role="tabpanel" aria-labelledby={`agent-tab-${client.id}`}>
-    {#each groups as group (group.id)}
-      <h3>{group.label}</h3>
-      {#each snippetsOf(group.steps) as step (step.snippet)}
+      {#each snippetsOf(client.mcp) as step (step.snippet)}
         <div class="snippet" data-testid="agent-snippet">
           <pre>{step.snippet}</pre>
           <button type="button" class="copy" data-testid="agent-copy" aria-label={copied === step.snippet ? 'Copied' : 'Copy'} onclick={() => copy(step.snippet ?? '')}>
@@ -41,7 +35,6 @@
           </button>
         </div>
       {/each}
-    {/each}
   </div>
   <a class="docs" href={AGENT_DOCS_URL} target="_blank" rel="noopener" data-testid="agent-docs">setup guide on docs.feega.app</a>
 </section>
@@ -57,8 +50,7 @@
     background: var(--ui-panel-raised);
   }
 
-  h2,
-  h3 {
+  h2 {
     margin: 0;
     font-family: var(--sans);
     font-size: var(--ui-type-section);
