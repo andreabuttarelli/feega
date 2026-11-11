@@ -412,6 +412,7 @@ impl<R: Runner> Fx<'_, R> {
                     let r = px(f.args.first()) * s;
                     self.blur(src, r, r)
                 }
+                "drop-shadow" if !perceptible(px(f.args.get(2)) * HALF, 0.0, (px(f.args.first()), px(f.args.get(1))), space) => src,
                 "drop-shadow" => {
                     let colour = f.args.get(3..).map(|rest| rest.join(" ")).filter(|c| !c.is_empty()).and_then(|c| rgba_of(&c)).unwrap_or(BLACK);
                     self.shadow(&src, vector(space, px(f.args.first()), px(f.args.get(1))), px(f.args.get(2)) * HALF * s, colour)
@@ -426,6 +427,7 @@ impl<R: Runner> Fx<'_, R> {
         let out = filters.iter().fold(start, |img, f| match f {
             Filter::Css { fns } => self.css_graph(img, fns, space),
             Filter::Svg { nodes } => nodes.iter().fold(img, |i, node| match effect_shadow(node) {
+                Some(shadow) if !shadow.perceptible(space) => i,
                 Some(shadow) => self.effect_shadow(i, &shadow, space),
                 None => self.svg_graph(i, node, space, origin),
             }),
@@ -443,6 +445,12 @@ fn vector(space: Linear, dx: f64, dy: f64) -> (f64, f64) {
 }
 
 const SIGMAS: f64 = 3.0;
+const MIN_SHADOW_DEVICE_PX: f64 = 2.0;
+
+fn perceptible(sigma: f64, spread: f64, offset: (f64, f64), space: Linear) -> bool {
+    let (dx, dy) = vector(space, offset.0, offset.1);
+    sigma.max(spread) * scale(space) + dx.hypot(dy) >= MIN_SHADOW_DEVICE_PX
+}
 const SVG_REGION_SHARE: f64 = 0.1;
 const SUBREGION: [&str; 4] = ["x", "y", "width", "height"];
 const SVG_OWN_REGION: [&str; 5] = ["x", "y", "width", "height", "filterUnits"];
@@ -468,6 +476,7 @@ fn css_reach(f: &CssFunction, space: Linear) -> Option<f64> {
     }
     match f.name.as_str() {
         "blur" => Some(px(0) * s * SIGMAS),
+        "drop-shadow" if !perceptible(px(2) * HALF, 0.0, (px(0), px(1)), space) => Some(0.0),
         "drop-shadow" => {
             let (dx, dy) = vector(space, px(0), px(1));
             Some(dx.abs().max(dy.abs()) + px(2) * HALF * s * SIGMAS)
@@ -476,7 +485,10 @@ fn css_reach(f: &CssFunction, space: Linear) -> Option<f64> {
     }
 }
 
-fn svg_reach(filter: &SvgNode) -> Option<Reach> {
+fn svg_reach(filter: &SvgNode, space: Linear) -> Option<Reach> {
+    if effect_shadow(filter).is_some_and(|s| !s.perceptible(space)) {
+        return Some(Reach::default());
+    }
     let own_region = SVG_OWN_REGION.iter().any(|k| filter.attrs.contains_key(*k));
     let frame_space = filter.children.iter().any(|c| FRAME_SPACE_PRIMITIVES.contains(&c.tag.as_str()));
     (!own_region && !frame_space).then_some(Reach { share: SVG_REGION_SHARE, px: 0.0 })
@@ -486,7 +498,7 @@ pub fn reach(filters: &[Filter], space: Linear) -> Option<Reach> {
     filters.iter().try_fold(Reach::default(), |acc, f| {
         let own = match f {
             Filter::Css { fns } => fns.iter().map(|f| css_reach(f, space)).sum::<Option<f64>>().map(|px| Reach { share: 0.0, px }),
-            Filter::Svg { nodes } => nodes.iter().map(svg_reach).try_fold(Reach::default(), |a, r| r.map(|r| a.plus(r))),
+            Filter::Svg { nodes } => nodes.iter().map(|n| svg_reach(n, space)).try_fold(Reach::default(), |a, r| r.map(|r| a.plus(r))),
         };
         own.map(|r| acc.plus(r))
     })
@@ -504,6 +516,12 @@ struct EffectShadow {
     offset: (f64, f64),
     sigma: f64,
     colour: Rgba,
+}
+
+impl EffectShadow {
+    fn perceptible(&self, space: Linear) -> bool {
+        perceptible(self.sigma, self.spread.map_or(0.0, |(r, _)| r), self.offset, space)
+    }
 }
 
 fn effect_shadow(filter: &SvgNode) -> Option<EffectShadow> {
