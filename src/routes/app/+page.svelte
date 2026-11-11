@@ -4,6 +4,7 @@
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { preloadCode } from '$app/navigation';
+  import { tick } from 'svelte';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
   import AgentCard from '$lib/components/app/AgentCard.svelte';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
@@ -24,7 +25,7 @@
   import type { PromptSource, SourcePick } from '$lib/home/prompt-sources';
   import { DEFAULT_KIND, PROMPT_KINDS } from '$lib/home/prompt-kinds';
   import { page } from '$app/state';
-  import { handoffOf } from '$lib/home/handoff';
+  import { HANDOFF_PARAMS, HandoffStart, handoffOf } from '$lib/home/handoff';
 
   let { data, form } = $props();
 
@@ -57,18 +58,32 @@
       field?.focus();
     }
     const timer = setInterval(() => (turn += 1), EXAMPLE_TURN_MS);
-    prefillHandoff();
+    void prefillHandoff();
     return () => clearInterval(timer);
   });
 
-  function prefillHandoff() {
+  async function prefillHandoff() {
     const handoff = handoffOf(page.url.searchParams);
     if (!handoff) {
       return;
     }
+    const send = data.handoffStart === HandoffStart.Send;
+    forgetHandoff();
+
     brief = handoff.text;
     kind = handoff.kind;
     pickAgain = handoff.source;
+    if (!send) {
+      return;
+    }
+    await tick();
+    composer?.requestSubmit();
+  }
+
+  function forgetHandoff() {
+    const url = new URL(page.url);
+    HANDOFF_PARAMS.forEach((name) => url.searchParams.delete(name));
+    history.replaceState(history.state, '', url);
   }
 
   $effect(() => {

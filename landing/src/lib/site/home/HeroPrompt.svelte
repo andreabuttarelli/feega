@@ -30,7 +30,7 @@
     if (!canSend) {
       return;
     }
-    window.location.href = handoffLink({ text, kind, source, images: images.length });
+    window.location.href = handoffLink({ text, kind, source, images: images.length }, crypto.randomUUID());
   }
 
   function keyed(e: KeyboardEvent) {
