@@ -37,6 +37,7 @@ fn inside(q: vec2<f32>) -> bool {
 fn straight(c: vec4<f32>) -> vec4<f32> { return select(vec4<f32>(0.0), vec4<f32>(c.rgb / c.a, c.a), c.a > 0.0); }
 fn premul(c: vec4<f32>) -> vec4<f32> { let d = clamp(c, vec4<f32>(0.0), vec4<f32>(1.0)); return vec4<f32>(d.rgb * d.a, d.a); }
 fn centre(xy: vec2<i32>) -> vec2<f32> { return vec2<f32>(xy) + 0.5; }
+fn filtered(q: vec2<f32>) -> vec4<f32> { return textureSampleLevel(a, linear, q / vec2<f32>(textureDimensions(a)), 0.0); }
 "#;
 
 const STRAIGHT_FOOTER: &str = r#"
@@ -270,17 +271,28 @@ fn run(xy: vec2<i32>) -> vec4<f32> { return texel(a, xy); }
 "#;
 
 const BLUR: &str = r#"
-fn tap(q: vec2<f32>) -> vec4<f32> { return textureSampleLevel(a, linear, q / vec2<f32>(textureDimensions(a)), 0.0); }
 fn run(xy: vec2<i32>) -> vec4<f32> {
   let dir = vec2<f32>(p[0], p[1]);
   let at = centre(xy);
-  var sum = tap(at) * p[4];
+  var sum = filtered(at) * p[4];
   for (var i = 1u; i < u32(p[2]); i++) {
     let o = dir * p[3u + 2u * i];
-    sum += (tap(at + o) + tap(at - o)) * p[4u + 2u * i];
+    sum += (filtered(at + o) + filtered(at - o)) * p[4u + 2u * i];
   }
   return sum;
 }
+"#;
+
+const DOWN: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> {
+  let c = vec2<f32>(xy) * 2.0 + 1.0;
+  let d = 0.75;
+  return 0.25 * (filtered(c + vec2<f32>(-d, -d)) + filtered(c + vec2<f32>(d, -d)) + filtered(c + vec2<f32>(-d, d)) + filtered(c + vec2<f32>(d, d)));
+}
+"#;
+
+const UP: &str = r#"
+fn run(xy: vec2<i32>) -> vec4<f32> { return filtered(centre(xy) / p[0]); }
 "#;
 
 const FOLD: &str = r#"
@@ -561,6 +573,8 @@ pub enum Op {
     Premultiply,
     BlurPremultiplied,
     Blur,
+    Down,
+    Up,
     Blend,
     Fold,
     Lens,
@@ -569,7 +583,7 @@ pub enum Op {
     InnerShadow,
 }
 
-const SOURCES: [(Op, &str, Storage); 19] = [
+const SOURCES: [(Op, &str, Storage); 21] = [
     (Op::Matrix, MATRIX, Storage::Straight),
     (Op::Table, TABLE, Storage::Straight),
     (Op::Offset, OFFSET, Storage::Straight),
@@ -583,6 +597,8 @@ const SOURCES: [(Op, &str, Storage); 19] = [
     (Op::Premultiply, PREMULTIPLY, Storage::Premultiplied),
     (Op::BlurPremultiplied, BLUR, Storage::Premultiplied),
     (Op::Blur, BLUR, Storage::Straight),
+    (Op::Down, DOWN, Storage::Premultiplied),
+    (Op::Up, UP, Storage::Straight),
     (Op::Blend, BLEND, Storage::Straight),
     (Op::Fold, FOLD, Storage::Straight),
     (Op::Lens, LENS, Storage::Straight),
@@ -668,8 +684,8 @@ pub struct WgpuRunner<'a> {
 impl Runner for WgpuRunner<'_> {
     type Tex = Pooled;
 
-    fn run(&self, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
-        self.passes.run(self.device, op, inputs, params)
+    fn run(&self, op: Op, inputs: [&Pooled; 2], params: &[f32], size: (u32, u32)) -> Pooled {
+        self.passes.run(self.device, op, inputs, params, size)
     }
 
     fn size(tex: &Pooled) -> (u32, u32) {
@@ -724,10 +740,10 @@ impl FilterPasses {
         self.shelves.borrow().bytes()
     }
 
-    pub fn run(&self, device: &wgpu::Device, op: Op, inputs: [&Pooled; 2], params: &[f32]) -> Pooled {
+    pub fn run(&self, device: &wgpu::Device, op: Op, inputs: [&Pooled; 2], params: &[f32], size: (u32, u32)) -> Pooled {
         let pipeline = &self.pipelines.iter().find(|(o, _)| *o == op).expect("every op has a pipeline").1;
         let [a, b] = inputs;
-        let out = self.texture(device, a.width(), a.height());
+        let out = self.texture(device, size.0, size.1);
         let padded: Vec<u8> = params.iter().chain(std::iter::once(&0.0)).flat_map(|v| v.to_le_bytes()).collect();
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: None, contents: &padded, usage: wgpu::BufferUsages::STORAGE });
         let view = |t: &wgpu::Texture| t.create_view(&wgpu::TextureViewDescriptor::default());

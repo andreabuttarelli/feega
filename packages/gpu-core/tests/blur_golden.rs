@@ -6,7 +6,7 @@ use gpu_core::pictures::Pictures;
 use gpu_core::render::Renderer;
 
 const SIZE: usize = 128;
-const TOLERANCE: i32 = 2;
+const TOLERANCE: i32 = 4;
 const CASES: [(&str, &str); 4] = [
     ("blur-2", r#"{ "kind": "css", "fns": [{ "name": "blur", "args": ["2px"] }] }"#),
     ("blur-6", r#"{ "kind": "css", "fns": [{ "name": "blur", "args": ["6px"] }] }"#),

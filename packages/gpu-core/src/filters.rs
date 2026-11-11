@@ -5,7 +5,7 @@ use serde_json::{Map, Value};
 use crate::colour::rgba_of;
 use crate::display_list::{CssFunction, Filter, MaskMode, Rgba, SvgNode};
 use crate::filter_passes::Op;
-use crate::kernel::gaussian;
+use crate::kernel::{decimation, gaussian};
 use crate::turbulence::{lattice_of, stitched_frequency, CHANNELS, LATTICE};
 
 const MAX_TABLE: usize = 32;
@@ -95,7 +95,7 @@ fn lookup(table: &[(&str, f32)], key: &str, fallback: f32) -> f32 {
 pub trait Runner {
     type Tex: Clone;
 
-    fn run(&self, op: Op, inputs: [&Self::Tex; 2], params: &[f32]) -> Self::Tex;
+    fn run(&self, op: Op, inputs: [&Self::Tex; 2], params: &[f32], size: (u32, u32)) -> Self::Tex;
     fn size(tex: &Self::Tex) -> (u32, u32);
 }
 
@@ -120,7 +120,11 @@ pub struct Fx<'a, R: Runner> {
 
 impl<R: Runner> Fx<'_, R> {
     fn op(&self, op: Op, a: &R::Tex, b: &R::Tex, params: &[f32]) -> Img<R::Tex> {
-        Img { tex: self.runner.run(op, [a, b], params), region: None }
+        Img { tex: self.runner.run(op, [a, b], params, R::size(a)), region: None }
+    }
+
+    fn resized(&self, op: Op, a: &R::Tex, params: &[f32], size: (u32, u32)) -> Img<R::Tex> {
+        Img { tex: self.runner.run(op, [a, a], params, size), region: None }
     }
 
     fn size(t: &R::Tex) -> (f64, f64) {
@@ -176,9 +180,19 @@ impl<R: Runner> Fx<'_, R> {
             params.extend(taps.iter().flat_map(|t| [t.offset, t.weight]));
             self.op(op, &img.tex, &img.tex, &params)
         };
-        let across = if sy > 0.0 { Op::BlurPremultiplied } else { Op::Blur };
         let premultiplied = self.op(Op::Premultiply, &src.tex, &src.tex, &[]);
-        along(along(premultiplied, sx, (1.0, 0.0), across), sy, (0.0, 1.0), Op::Blur)
+        let plan = decimation(sx);
+        if sx != sy || plan.levels == 0 {
+            let across = if sy > 0.0 { Op::BlurPremultiplied } else { Op::Blur };
+            return along(along(premultiplied, sx, (1.0, 0.0), across), sy, (0.0, 1.0), Op::Blur);
+        }
+        let full = R::size(&src.tex);
+        let small = (0..plan.levels).fold(premultiplied, |img, _| {
+            let (w, h) = R::size(&img.tex);
+            self.resized(Op::Down, &img.tex, &[], (w.div_ceil(2), h.div_ceil(2)))
+        });
+        let soft = along(along(small, plan.sigma, (1.0, 0.0), Op::BlurPremultiplied), plan.sigma, (0.0, 1.0), Op::BlurPremultiplied);
+        self.resized(Op::Up, &soft.tex, &[(1u32 << plan.levels) as f32], full)
     }
 
     fn offset(&self, src: &Img<R::Tex>, d: (f64, f64), alpha: bool) -> Img<R::Tex> {

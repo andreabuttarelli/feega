@@ -4,7 +4,7 @@ use gpu_core::display_list::{CssFunction, Filter};
 use gpu_core::filter_passes::Op;
 use gpu_core::filters::{Fx, Runner};
 
-const BLUR_OPS: [Op; 3] = [Op::Premultiply, Op::BlurPremultiplied, Op::Blur];
+const BLUR_OPS: [Op; 5] = [Op::Premultiply, Op::BlurPremultiplied, Op::Blur, Op::Down, Op::Up];
 
 #[derive(Default)]
 struct Recording {
@@ -14,7 +14,7 @@ struct Recording {
 impl Runner for Recording {
     type Tex = (u32, u32);
 
-    fn run(&self, op: Op, inputs: [&(u32, u32); 2], _: &[f32]) -> (u32, u32) {
+    fn run(&self, op: Op, inputs: [&(u32, u32); 2], _: &[f32], _: (u32, u32)) -> (u32, u32) {
         self.ops.borrow_mut().push(op);
         *inputs[0]
     }

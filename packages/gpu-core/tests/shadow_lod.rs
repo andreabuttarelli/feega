@@ -12,7 +12,7 @@ struct Recording {
 impl Runner for Recording {
     type Tex = (u32, u32);
 
-    fn run(&self, op: Op, inputs: [&(u32, u32); 2], _: &[f32]) -> (u32, u32) {
+    fn run(&self, op: Op, inputs: [&(u32, u32); 2], _: &[f32], _: (u32, u32)) -> (u32, u32) {
         self.ops.borrow_mut().push(op);
         *inputs[0]
     }
