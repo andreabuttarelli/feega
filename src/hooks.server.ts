@@ -29,6 +29,8 @@ import { landingPath } from '$lib/server/tenancy/landing';
 import { carriesStartUrl, startUrlRedirect } from '$lib/server/onboarding/start-url-entry';
 import type { RequestEvent } from '@sveltejs/kit';
 import { THEME_COOKIE, THEME_COOKIE_MAX_AGE_S, THEME_METADATA_KEY, ThemePref, htmlThemeAttrs, parseThemePref } from '$lib/theme';
+import { handoffOf } from '$lib/home/handoff';
+import { HOME_DRAFT_COOKIE, HOME_DRAFT_MAX_AGE_S } from '$lib/home/home-draft';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -46,12 +48,10 @@ function isSessionCookie(name: string): boolean {
   return name === SESSION_COOKIE_NAME || name.startsWith(SESSION_COOKIE_PREFIX);
 }
 
-const SIGNED_OUT_PROMPT = '/new';
-
 async function rootRedirectTarget(event: RequestEvent): Promise<string> {
   const { session, user } = await event.locals.safeGetSession();
   if (!session || !user) {
-    return SIGNED_OUT_PROMPT;
+    return '/login';
   }
 
   const db = await event.locals.db();
@@ -160,6 +160,13 @@ const csrf: Handle = async ({ event, resolve }) => {
 
 const DASHBOARD_PREFIX = '/app';
 
+function keepHandoff(event: RequestEvent): void {
+  if (event.url.pathname !== DASHBOARD_PREFIX || !handoffOf(event.url.searchParams)) {
+    return;
+  }
+  event.cookies.set(HOME_DRAFT_COOKIE, event.url.search, { path: '/', maxAge: HOME_DRAFT_MAX_AGE_S, sameSite: 'lax', httpOnly: true });
+}
+
 async function refuseSignedOutDashboard(event: RequestEvent): Promise<void> {
   const path = event.url.pathname;
   if (path !== DASHBOARD_PREFIX && !path.startsWith(`${DASHBOARD_PREFIX}/`)) {
@@ -167,7 +174,8 @@ async function refuseSignedOutDashboard(event: RequestEvent): Promise<void> {
   }
   const { session } = await event.locals.safeGetSession();
   if (!session) {
-    throw redirect(303, path === DASHBOARD_PREFIX ? SIGNED_OUT_PROMPT : '/login');
+    keepHandoff(event);
+    throw redirect(303, '/login');
   }
 }
 
