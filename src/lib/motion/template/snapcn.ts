@@ -34,4 +34,6 @@ export const portEntry = (port: PortShape, family: PortFamily): TemplateEntry =>
   )
 });
 
-export const SNAPCN_TEMPLATES: TemplateEntry[] = SNAPCN_PORTS.map((port) => portEntry(port, { prefix: SNAPCN_PREFIX, clip: SNAPCN_CLIP, component: componentName }));
+export const templateOf = (port: SnapcnPort, prefix: string): TemplateEntry => portEntry(port, { prefix, clip: SNAPCN_CLIP, component: componentName });
+
+export const SNAPCN_TEMPLATES: TemplateEntry[] = SNAPCN_PORTS.map((port) => templateOf(port, SNAPCN_PREFIX));

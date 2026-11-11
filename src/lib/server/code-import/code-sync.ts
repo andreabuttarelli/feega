@@ -9,7 +9,9 @@ import type { GithubCall } from './github';
 import { repoOf } from './repo';
 import { rebased, tokenCall } from './repo-sync';
 import { baselined } from '$lib/canvas/code-look';
-import { applyEdits, editsOf, patchOf, type FileChange } from './write-back';
+import { patchOf, type FileChange } from './write-back';
+import { frameEdits } from './token-write';
+import type { TokenMap } from './design-tokens';
 import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
 import { githubSource, SourceKind, type CodeSource } from './code-source';
@@ -81,7 +83,7 @@ async function linkedOf(scope: CodeScope, nodeId: string): Promise<Linked | null
   return parsed?.success ? SOURCES[parsed.data.kind as SourceKind](scope, parsed.data) : null;
 }
 
-type Changed = { linked: Linked; rev: string; files: FileChange[]; skipped: string[] };
+type Changed = { linked: Linked; rev: string; files: FileChange[]; skipped: string[]; tokens: TokenMap };
 
 async function changed(scope: CodeScope, nodeId: string): Promise<Changed | SyncRefusal> {
   const linked = await linkedOf(scope, nodeId);
@@ -93,8 +95,8 @@ async function changed(scope: CodeScope, nodeId: string): Promise<Changed | Sync
   if (!rev) {
     return SyncOutcome.Unreachable;
   }
-  const done = await applyEdits(editsOf(frame.doc), linked.source.read(rev));
-  return { linked, rev, ...done };
+  const done = await frameEdits(frame.doc, linked.origin.tokens, linked.source.read(rev));
+  return { linked, rev, files: done.files, skipped: done.skipped, tokens: done.map };
 }
 
 export type CodeChanges = { outcome: SyncOutcome.Ok; kind: string; repo: string; sha: string; patch: string; files: string[]; skipped: string[] };
@@ -125,18 +127,19 @@ export async function codePublish(scope: CodeScope, nodeId: string, now = Date.n
     return { outcome: UNPUBLISHED[done.linked.origin.kind as SourceKind] };
   }
   if (done.linked.origin.kind === SourceKind.Folder) {
-    await settle(scope, nodeId, done.linked);
+    await settle(scope, nodeId, done.linked, done.tokens);
   }
   return { outcome: SyncOutcome.Ok, ...out, skipped: done.skipped };
 }
 
-async function settle(scope: CodeScope, nodeId: string, linked: Linked): Promise<void> {
+async function settle(scope: CodeScope, nodeId: string, linked: Linked, tokens: TokenMap): Promise<void> {
   const store = frameStore(scope.db, scope);
   const frame = await store.read(nodeId);
   if (frame) {
     await store.write(nodeId, frame.version, baselined(frame.doc), 'Wrote edits to the folder');
   }
-  await rememberOrigin(scope, nodeId, { ...linked.origin, sha: await linked.source.head(null) });
+  const written = linked.origin.tokens ? { tokens } : {};
+  await rememberOrigin(scope, nodeId, { ...linked.origin, ...written, sha: await linked.source.head(null) });
 }
 
 export type CodePulled = { outcome: SyncOutcome.Ok | SyncOutcome.UpToDate; sha: string; carried: number; conflicts: string[]; skipped: string[] };

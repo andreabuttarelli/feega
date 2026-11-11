@@ -21,17 +21,19 @@ path = "src/export.rs"
 gpu = []
 
 [dependencies]
-vello = "0.11.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rustc-hash = "2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+vello = "0.11.0"
 gpu-text = { path = "../gpu-text" }
 pollster = "0.4"
 png = "0.17"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+vello = { version = "0.11.0", default-features = false, features = ["wgpu", "glyphless"] }
+wgpu = { version = "30.0.0", default-features = false, features = ["std", "wgsl", "webgpu"] }
 wasm-bindgen = "=0.2.129"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["HtmlCanvasElement", "HtmlImageElement", "HtmlVideoElement", "ImageBitmap", "WebGl2RenderingContext", "WebGlTexture", "WebGlFramebuffer", "WebGlProgram", "WebGlShader", "WebGlUniformLocation", "WebGlVertexArrayObject"] }
@@ -41,7 +43,10 @@ js-sys = "0.3"
 
 [profile.release]
 opt-level = "s"
-lto = true
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
 
 [profile.dev]
 opt-level = 1

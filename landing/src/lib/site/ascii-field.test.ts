@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RAMP, envelope, fieldAt, glyphFor, gridSize, tint } from './ascii-field';
+import { FLAG_COUNT, FLAG_HOLD_MS, RAMP, envelope, flagTint, fieldAt, glyphFor, gridSize, tint } from './ascii-field';
 
 describe('ascii field', () => {
   it('stays in 0..1', () => {
@@ -66,6 +66,31 @@ describe('tint', () => {
   it('keeps every stop bright on black', () => {
     for (let t = 0; t <= 1; t += 0.1) {
       expect(Math.max(...tint(t))).toBeGreaterThanOrEqual(170);
+    }
+  });
+});
+
+describe('flag cycle', () => {
+  const close = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) <= 1);
+
+  it('holds one flag, then the next', () => {
+    expect(close(flagTint(0.5, 1000, 0), flagTint(0.5, 0, 0))).toBe(true);
+    expect(close(flagTint(0.5, FLAG_HOLD_MS + 10, 0), flagTint(0.5, 0, 1))).toBe(true);
+  });
+
+  it('cross-fades without a jump', () => {
+    for (let ms = 0; ms < FLAG_HOLD_MS * 2; ms += 16) {
+      const a = flagTint(0.3, ms, 2);
+      const b = flagTint(0.3, ms + 16, 2);
+      expect(Math.max(...a.map((v, i) => Math.abs(v - b[i])))).toBeLessThan(12);
+    }
+  });
+
+  it('keeps every flag visible on black', () => {
+    for (let f = 0; f < FLAG_COUNT; f++) {
+      for (let t = 0; t <= 1; t += 0.05) {
+        expect(Math.max(...flagTint(t, 0, f))).toBeGreaterThanOrEqual(150);
+      }
     }
   });
 });

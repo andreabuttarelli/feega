@@ -15,7 +15,8 @@ vi.mock('$lib/server/tenancy/landing', async (orig) => {
         recordTermsAcceptance: async () => undefined,
         acceptInvite: async () => ({ outcome: 'invalid' }) as never,
         homePathFor: async () => '/app',
-        startPathFor: async (_db, _deps, _user, _org, url) => (url === STRIPE ? SITE : '/wrong')
+        startPathFor: async (_db, _deps, _user, _org, url) => (url === STRIPE ? SITE : '/wrong'),
+        track: async () => undefined
       })
   };
 });

@@ -4,7 +4,7 @@
   import { isLocalMode } from '$lib/local-user';
   import { canPickDirectory, listedFolder, pickDirectory } from '$lib/code-upload/pick-folder';
   import { SNAPSHOT_MESSAGES, type Snapshot } from '$lib/code-upload/snapshot';
-  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, uploadFolder, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
+  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, tokensFound, uploadFolder, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
 
   let { projectId, canvasId, at, onimported, onclose }: { projectId: string; canvasId: string; at: { x: number; y: number }; onimported: (landed: CodeLanded) => void; onclose: () => void } = $props();
 
@@ -59,9 +59,33 @@
 
   const linked = (raw: string) => (HTTP.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
 
+  const LOOKUP_DELAY_MS = 400;
+  let designSystem = $state(true);
+  let designTouched = $state(false);
+  let found = $state<number | null>(null);
+
+  const lookup = $derived(source === Source.Repo && repo.trim() ? { repo: linked(repo) } : source === Source.Folder && folder.trim() ? { folder: folder.trim() } : null);
+
+  $effect(() => {
+    const where = lookup;
+    found = null;
+    if (!where) {
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const count = await tokensFound(projectId, where);
+      if (lookup === where) {
+        found = count;
+        designSystem = designTouched ? designSystem : count > 0;
+      }
+    }, LOOKUP_DELAY_MS);
+    return () => clearTimeout(timer);
+  });
+
+
   const TARGETS: Record<Source, () => CodeTarget> = {
-    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
-    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
+    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
+    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
     [Source.Upload]: () => ({ upload: uploaded?.path ?? '', routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
     [Source.Storybook]: () => ({ storybook: linked(storybook) })
   };
@@ -228,6 +252,20 @@
           {/each}
           <p class="ui-note">Each page lands once per theme and width, side by side. Language, login, flags and loading or error states are not switched.</p>
         </fieldset>
+        {#if lookup}
+        <fieldset class="ui-conditions" data-testid="code-import-design">
+          <label><input type="checkbox" bind:checked={designSystem} onchange={() => (designTouched = true)} data-testid="code-import-design-system" /> Design system</label>
+          <p class="ui-note" data-testid="code-import-design-count">
+            {#if found === null}
+              Looks for CSS tokens: @theme, :root, .dark.
+            {:else if found > 0}
+              {found} tokens found. They become variables with Light and Dark modes, bound to the layers, and a Design system board.
+            {:else}
+              No CSS tokens found in this project.
+            {/if}
+          </p>
+        </fieldset>
+        {/if}
       {/if}
       <div class="ui-row ui-end">
         <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !ready} data-testid="code-import-run">{busy ? (source !== Source.Storybook ? 'Starting the app…' : 'Reading the stories…') : 'Import'}</button>

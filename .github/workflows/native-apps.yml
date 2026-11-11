@@ -2,10 +2,10 @@ name: Native apps
 
 on:
   pull_request:
-    paths: ['apps/**', '.github/workflows/native-apps.yml']
+    paths: ['apps/**', 'packages/gpu-core/**', '.github/workflows/native-apps.yml']
   push:
     branches: [dev]
-    paths: ['apps/**', '.github/workflows/native-apps.yml']
+    paths: ['apps/**', 'packages/gpu-core/**', '.github/workflows/native-apps.yml']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -51,7 +51,8 @@ jobs:
       - run: npm ci
       - run: npm run build:native:universal
       - run: lipo -archs native/feega_native_canvas.node
-      - run: npx electron-builder --mac dir --universal --publish never
+      - run: npx electron-builder --mac dir --arm64 --publish never
+      - run: test ! -e dist/mac-arm64/Feega.app/Contents/Resources/app.asar.unpacked/native
 
   ios:
     runs-on: macos-latest

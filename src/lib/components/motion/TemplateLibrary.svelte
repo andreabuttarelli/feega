@@ -1,12 +1,16 @@
 <script lang="ts">
-  import IconButton from './IconButton.svelte';
-  import { Action } from '$lib/motion/actions';
   import X from '@lucide/svelte/icons/x';
+  import Trash from '@lucide/svelte/icons/trash-2';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { FIELD_INPUT, FOCUS_RING, IconButton, IconSize, Kbd, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
+  import { cn } from '$lib/utils.js';
+  import { spatialStep } from '$lib/motion/template/browser';
+  import { catalogue, matching } from '$lib/motion/template/catalogue';
+  import { filterGroup, groupItems, isOwn, shortName, Tab } from '$lib/motion/template/library-groups';
   import { postPageAction } from '$lib/api/page-action';
   import MotionPreview from './MotionPreview.svelte';
   import { newMotionDoc, MotionFormat, type MotionDoc } from '@feega/motion-core/motion/doc';
-  import { FIELD_TYPE_LABEL } from '@feega/motion-core/motion/template/field-model';
-  import { BUILTIN_PREFIX } from '$lib/motion/template/builtins';
   import { insertTemplate, type TemplateEntry } from '$lib/motion/template/library';
 
   let {
@@ -35,14 +39,22 @@
     onclose: () => void;
   } = $props();
 
+  const TABS: SegmentOption[] = [
+    { value: Tab.Browse, label: 'Browse' },
+    { value: Tab.Save, label: 'Save selection' }
+  ];
+
   let picked = $state<string | null>(null);
   let sounds = $state(true);
   const chosen = $derived(picked ?? initial);
-  let list = $state<HTMLUListElement | null>(null);
+  let grid = $state<HTMLDivElement | null>(null);
+  let query = $state('');
+  let group = $state<string | null>(null);
+  let tab = $state<Tab>(Tab.Browse);
 
   $effect(() => {
-    if (initial && list) {
-      list.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+    if (initial && grid) {
+      grid.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' });
     }
   });
   let name = $state('');
@@ -51,7 +63,13 @@
   let previewFrame = $state(0);
   let previewPlaying = $state(true);
 
+  const items = $derived(catalogue(templates));
+  const groups = $derived(groupItems(items).map((g) => g.title));
+  const shown = $derived(groupItems(matching(filterGroup(items, group), query, null)));
+  const ordered = $derived(shown.flatMap((g) => g.items));
   const entry = $derived(templates.find((t) => t.id === chosen) ?? templates[0] ?? null);
+  const item = $derived(items.find((i) => i.id === entry?.id) ?? null);
+  const saveLabel = $derived(selectedComp ? 'the selected precomp' : 'the whole video');
   const sample = $derived.by(() => {
     if (!entry) {
       return null;
@@ -76,7 +94,13 @@
     }
     error = '';
     name = '';
-    onsaved((result.data as { entry: TemplateEntry }).entry);
+    description = '';
+    const saved = (result.data as { entry: TemplateEntry }).entry;
+    onsaved(saved);
+    picked = saved.id;
+    group = null;
+    query = '';
+    tab = Tab.Browse;
   }
 
   async function remove(id: string) {
@@ -87,155 +111,203 @@
       onremoved(id);
     }
   }
-</script>
 
-<div class="scrim" role="presentation" onclick={onclose}></div>
-<div class="dialog" role="dialog" aria-modal="true" aria-label="Templates" data-testid="template-library">
-  <header><span>Templates</span><IconButton action={Action.Close} onclick={onclose} /></header>
+  const cards = () => [...(grid?.querySelectorAll<HTMLButtonElement>('[data-template]') ?? [])];
 
-  <div class="split">
-    <ul class="list" bind:this={list}>
-      {#each templates as t (t.id)}
-        <li>
-          <button type="button" class:on={entry?.id === t.id} onclick={() => (picked = t.id)}>{t.template.name}</button>
-          {#if !t.id.startsWith(BUILTIN_PREFIX)}<button type="button" class="remove" aria-label="Delete template" onclick={() => remove(t.id)}><X size={12} /></button>{/if}
-        </li>
-      {/each}
-    </ul>
-
-    {#if entry}
-      <div class="detail">
-        {#if sample}
-          <div class="preview" style={`aspect-ratio: ${sample.width} / ${sample.height};`}><MotionPreview html={compose(sample)} width={sample.width} height={sample.height} fps={sample.fps} bind:frame={previewFrame} bind:playing={previewPlaying} /></div>
-        {/if}
-        <p>{entry.template.description}</p>
-        <p class="fields">{entry.template.doc.fields.map((f) => `${f.label} · ${FIELD_TYPE_LABEL[f.type]}`).join(' — ')}</p>
-        <label class="sounds"><input type="checkbox" bind:checked={sounds} data-testid="template-sounds" /> Add its sounds (key taps, clicks)</label>
-        <button type="button" class="primary" data-testid="insert-template" onclick={() => oninsert(entry, sounds)}>Insert at playhead</button>
-      </div>
-    {/if}
-  </div>
-
-  <section class="save">
-    <h3>Save {selectedComp ? 'the selected precomp' : 'this video'} as a template</h3>
-    <input placeholder="Name" bind:value={name} maxlength="60" />
-    <input placeholder="Description" bind:value={description} maxlength="200" />
-    <button type="button" disabled={!name.trim()} onclick={save}>Save to library</button>
-    {#if error}<p class="error">{error}</p>{/if}
-  </section>
-</div>
-
-<style>
-  .scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    background: rgb(0 0 0 / 0.4);
+  function move(e: KeyboardEvent, at: number) {
+    if (e.key === 'Enter' && entry) {
+      e.preventDefault();
+      picked = ordered[at].id;
+      const target = templates.find((t) => t.id === picked);
+      if (target) {
+        oninsert(target, sounds);
+      }
+      return;
+    }
+    const all = cards();
+    const next = spatialStep(all.map((c) => c.getBoundingClientRect()), at, e.key);
+    if (next === null) {
+      return;
+    }
+    e.preventDefault();
+    all[next]?.focus();
   }
 
-  .dialog {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(820px, calc(100vw - 32px));
-    max-height: calc(100vh - 32px);
-    overflow: auto;
-    z-index: 41;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-    background: var(--ui-bg);
-    color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-  }
-
-  header {
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .split {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 12px;
-  }
-
-  .list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-height: 420px;
-    overflow: auto;
-  }
-
-  .list li {
-    display: flex;
-  }
-
-  .list button {
-    flex: 1;
-    text-align: left;
-    padding: 4px 6px;
-    background: none;
-    border: 0;
-    color: inherit;
-  }
-
-  .list button.on {
-    background: var(--ui-surface);
-  }
-
-  .list .remove {
-    flex: 0;
-  }
-
-  .preview {
-    width: 100%;
-    max-height: 360px;
-    container-type: size;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-  }
-
-  .detail {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .preview {
-    aspect-ratio: 16 / 9;
-  }
-
-  .fields {
-    font-size: 11px;
-    color: var(--ui-ink-2);
-  }
-
-  .save {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .save h3 {
-    width: 100%;
-    margin: 0;
-    font-size: 12px;
-  }
-
-  .error {
-    color: var(--ui-ink-2);
-  }
-
-  @media (max-width: 640px) {
-    .split {
-      grid-template-columns: 1fr;
+  function insertById(id: string) {
+    const target = templates.find((t) => t.id === id);
+    if (target) {
+      oninsert(target, sounds);
     }
   }
-</style>
+
+  function clearFilters() {
+    query = '';
+    group = null;
+  }
+</script>
+
+<Dialog.Root open onOpenChange={(open) => !open && onclose()}>
+  <Dialog.Portal>
+    <Dialog.Overlay class="z-70" />
+    <Dialog.Content
+      showCloseButton={false}
+      data-testid="template-library"
+      aria-label="Templates"
+      class="z-71 flex h-[min(720px,calc(100dvh-32px))] w-[min(1040px,calc(100vw-32px))] flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+    >
+      <header class="flex h-(--ui-header-h) shrink-0 items-center gap-3 border-b border-ui-divider pr-1.5 pl-3">
+        <Dialog.Title class="text-ui-title font-semibold tracking-[var(--ui-tracking-title)]">Templates</Dialog.Title>
+        <SegmentedControl label="Templates view" options={TABS} value={tab} onchange={(v) => (tab = v as Tab)} class="ml-auto w-56" />
+        <IconButton label="Close" shortcut="Escape" size={IconSize.Lg} onclick={onclose}><X /></IconButton>
+      </header>
+
+      {#if tab === Tab.Browse}
+        <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] overflow-y-auto md:grid-cols-[minmax(0,1fr)_340px] md:overflow-hidden">
+          <section class="flex min-h-0 flex-col" aria-label="Template list">
+            <div class="flex flex-col gap-2 px-3 pt-3">
+              <input
+                type="search"
+                placeholder="Search templates"
+                aria-label="Search templates"
+                bind:value={query}
+                data-testid="template-search"
+                class={cn(FIELD_INPUT, 'h-8 text-base sm:text-ui-body')}
+              />
+              {#if groups.length > 1}
+                <div class="flex gap-1 overflow-x-auto [scrollbar-width:none]" role="group" aria-label="Group">
+                  {#each groups as g (g)}
+                    <button
+                      type="button"
+                      aria-pressed={group === g}
+                      onclick={() => (group = group === g ? null : g)}
+                      class={cn('h-6 shrink-0 rounded-full px-2.5 text-ui-label text-ui-text-2 transition-colors duration-(--ui-dur-fast) hover:bg-ui-wash hover:text-ui-text aria-pressed:bg-ui-selected aria-pressed:text-ui-accent-text pointer-coarse:h-9', FOCUS_RING)}
+                    >
+                      {g}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+
+            <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-3 pt-4 pb-6" bind:this={grid} data-testid="template-grid">
+              {#each shown as g (g.title)}
+                <section aria-label={g.title}>
+                  <h3 class="mb-2 text-ui-section font-semibold tracking-[var(--ui-tracking-caps)] text-ui-text-3 uppercase">{g.title}</h3>
+                  <ul class="grid list-none grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-3 gap-y-4 p-0">
+                    {#each g.items as i (i.id)}
+                      {@const at = ordered.indexOf(i)}
+                      <li class="group relative">
+                        <button
+                          type="button"
+                          data-template={i.id}
+                          aria-current={entry?.id === i.id}
+                          aria-label={`${i.name}, ${i.seconds.toFixed(1)} seconds`}
+                          onclick={() => (picked = i.id)}
+                          ondblclick={() => insertById(i.id)}
+                          onkeydown={(e) => move(e, at)}
+                          class={cn('flex w-full cursor-pointer flex-col text-left', FOCUS_RING)}
+                        >
+                          <span class={cn('relative block aspect-video w-full overflow-hidden rounded-md bg-ui-sunken', entry?.id === i.id && 'shadow-[var(--ui-ring)]')}>
+                            {#if i.preview}
+                              <img src={i.preview.poster} alt="" loading="lazy" decoding="async" class="absolute inset-0 size-full object-cover" />
+                            {:else}
+                              <span class="grid size-full place-items-center p-2 text-center text-ui-caption text-ui-text-3">{shortName(i)}</span>
+                            {/if}
+                          </span>
+                          <span class="mt-1.5 truncate text-ui-body font-medium text-ui-text">{shortName(i)}</span>
+                          <span class="font-(family-name:--ui-mono) text-ui-caption text-ui-text-3 tabular-nums">{i.seconds.toFixed(1)}s</span>
+                        </button>
+                        {#if isOwn(i.id)}
+                          <IconButton
+                            label="Delete template"
+                            size={IconSize.Md}
+                            onclick={() => remove(i.id)}
+                            class="absolute top-1.5 right-1.5 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+                          >
+                            <Trash />
+                          </IconButton>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
+                </section>
+              {:else}
+                <div class="flex flex-col items-start gap-3 py-8" data-testid="templates-empty">
+                  {#if query.trim() || group}
+                    <p class="text-ui-body text-ui-text-2">No template matches.</p>
+                    <Button variant="secondary" size="sm" onclick={clearFilters}>Clear filters</Button>
+                  {:else}
+                    <p class="text-ui-body text-ui-text-2">No templates yet. Save a precomp to start your library.</p>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </section>
+
+          <aside class="flex min-h-0 flex-col border-t border-ui-divider md:border-t-0 md:border-l" aria-label="Template details" data-testid="template-detail">
+            {#if entry && item}
+              <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
+              <h3 class="m-0 text-ui-title font-semibold tracking-[var(--ui-tracking-title)] text-ui-text">{shortName(item)}</h3>
+              {#if sample}
+                <div class="w-full overflow-hidden rounded-md bg-ui-sunken" style={`aspect-ratio: ${sample.width} / ${sample.height};`}>
+                  <MotionPreview html={compose(sample)} width={sample.width} height={sample.height} fps={sample.fps} loop muted bind:frame={previewFrame} bind:playing={previewPlaying} />
+                </div>
+              {/if}
+              {#if item.description}<p class="m-0 text-ui-body text-ui-text-2">{item.description}</p>{/if}
+              {#if item.fields.length}
+                <section aria-label="Editable fields">
+                  <h4 class="mb-1.5 text-ui-section font-semibold tracking-[var(--ui-tracking-caps)] text-ui-text-3 uppercase">Fields</h4>
+                  <dl class="m-0 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-ui-label">
+                    {#each item.fields as f (f.label)}
+                      <dt class="truncate text-ui-text">{f.label}</dt>
+                      <dd class="m-0 text-ui-text-3">{f.type}</dd>
+                    {/each}
+                  </dl>
+                </section>
+              {/if}
+              </div>
+              <div class="flex shrink-0 flex-col gap-3 border-t border-ui-divider p-4">
+                <label class="flex cursor-pointer items-center gap-2 text-ui-body text-ui-text">
+                  <input type="checkbox" bind:checked={sounds} data-testid="template-sounds" class="size-4 accent-(--ui-accent-solid)" />
+                  Add its sounds (key taps, clicks)
+                </label>
+                <Button size="lg" data-testid="insert-template" onclick={() => oninsert(entry, sounds)}>Insert at playhead</Button>
+              </div>
+            {:else}
+              <p class="p-4 text-ui-body text-ui-text-2">Select a template to preview it.</p>
+            {/if}
+          </aside>
+        </div>
+
+        <footer class="hidden shrink-0 items-center gap-4 border-t border-ui-divider px-3 py-2 text-ui-caption text-ui-text-3 pointer-fine:flex">
+          <span class="flex items-center gap-1.5"><Kbd shortcut="ArrowUp" /><Kbd shortcut="ArrowDown" /><Kbd shortcut="ArrowLeft" /><Kbd shortcut="ArrowRight" /> move</span>
+          <span class="flex items-center gap-1.5"><Kbd shortcut="Enter" /> insert</span>
+          <span class="flex items-center gap-1.5"><Kbd shortcut="Escape" /> close</span>
+        </footer>
+      {:else}
+        <form
+          class="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 sm:max-w-md"
+          onsubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <p class="m-0 text-ui-body text-ui-text-2">Save {saveLabel} to your library as a reusable template.</p>
+          <label class="flex flex-col gap-1.5 text-ui-label text-ui-text">
+            Name
+            <input class={FIELD_INPUT} bind:value={name} maxlength="60" required data-testid="template-name" />
+          </label>
+          <label class="flex flex-col gap-1.5 text-ui-label text-ui-text">
+            Description
+            <input class={FIELD_INPUT} bind:value={description} maxlength="200" data-testid="template-description" />
+          </label>
+          <div class="flex items-center gap-3">
+            <Button type="submit" disabled={!name.trim()} data-testid="save-template">Save to library</Button>
+            {#if !name.trim()}<span class="text-ui-caption text-ui-text-3">Enter a name to save.</span>{/if}
+          </div>
+          {#if error}<p class="m-0 text-ui-label text-ui-danger" role="alert">{error}</p>{/if}
+        </form>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>

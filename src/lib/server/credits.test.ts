@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { productionCredits } from './plan-budget';
-import { FREE_CREDITS } from '$lib/plans';
 import {
   creditQuota,
   currentBillingPeriod,
@@ -28,10 +27,10 @@ describe('creditQuota', () => {
     expect(creditQuota('scale')).toBe(creditQuota('pro'));
   });
 
-  it('defaults to the free quota for free/unknown plan', () => {
-    expect(creditQuota(null)).toBe(FREE_CREDITS);
-    expect(creditQuota(undefined)).toBe(FREE_CREDITS);
-    expect(creditQuota('some-unknown-plan')).toBe(FREE_CREDITS);
+  it('a free or unknown plan has no monthly quota: its credits are the one-time signup grant', () => {
+    expect(creditQuota(null)).toBe(0);
+    expect(creditQuota(undefined)).toBe(0);
+    expect(creditQuota('some-unknown-plan')).toBe(0);
   });
 
   it('gives the free plan no credits', () => {

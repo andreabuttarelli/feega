@@ -4,6 +4,8 @@ export const RENDERCOMP_ADDED_ON = '2026-11-11';
 export const SNAPCN_ADDED_ON = '2026-11-10';
 const RENDERCOMP_ID_PREFIX = 'builtin:rendercomp-';
 const SNAPCN_ID_PREFIX = 'builtin:snapcn-';
+export const UI_LOOPS_ADDED_ON = '2026-11-11';
+const UI_LOOP_ID_PREFIXES = ['builtin:magicui-', 'builtin:animata-', 'builtin:lucide-'];
 
 export const ADDED: readonly AddedRow[] = [
   { on: '2026-10-15', ids: [
@@ -154,6 +156,9 @@ const addedById = new Map(ADDED.flatMap((row) => row.ids.map((id) => [id, row.on
 export function addedOn(id: string): string {
   if (id.startsWith(RENDERCOMP_ID_PREFIX)) {
     return RENDERCOMP_ADDED_ON;
+  }
+  if (UI_LOOP_ID_PREFIXES.some((prefix) => id.startsWith(prefix))) {
+    return UI_LOOPS_ADDED_ON;
   }
   if (id.startsWith(SNAPCN_ID_PREFIX)) {
     return SNAPCN_ADDED_ON;
