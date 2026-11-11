@@ -1,10 +1,12 @@
 import type { Page } from '@playwright/test';
 
-export type CoreWork = { frames: number; moving: number; movingBaked: number; movingPlanned: number; coreP95: number; coreMax: number; bakeP95: number; planP95: number; walkedMax: number; uploadMax: number };
+export type CoreWork = { frames: number; moving: number; movingBaked: number; movingPlanned: number; coreP95: number; coreMax: number; bakeP95: number; planP95: number; walkedMax: number; uploadMax: number; uncoveredFrames: number };
 
-export type Frames = { fpsAvg: number; fpsP5: number; p50: number; p95: number; p99: number; max: number; over8: number; over11: number; over17: number; over33: number; frames: number; workP95: number; core: CoreWork };
+export type Frames = { fpsAvg: number; fpsP5: number; p50: number; p95: number; p99: number; max: number; over8: number; over11: number; over17: number; over33: number; frames: number; workP95: number; core: CoreWork; fpsSeries: number[]; gapsInOrder: number[] };
 
-type CoreFrameCount = { moving: boolean; ms: number; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number };
+type CoreFrameCount = { moving: boolean; ms: number; plans: number; walked: number; planMs: number; bakes: number; bakeMs: number; uploadBytes: number; uncovered?: number };
+
+const SERIES_WINDOW_MS = 250;
 
 const PRO_MOTION_MS = 1000 / 120;
 const BUDGET_MISS_MS = 11;
@@ -70,8 +72,11 @@ export async function measure(page: Page, ms: number, gesture: (until: number) =
     const probe = (window as unknown as { __frames: { gaps: number[]; work: number[]; counting: boolean } }).__frames;
     probe.counting = false;
     const counted = (window as unknown as { __gpuCanvas?: { frames?: CoreFrameCount[] } }).__gpuCanvas?.frames ?? [];
-    return { gaps: [...probe.gaps].sort((a, b) => a - b), work: [...probe.work].sort((a, b) => a - b), counted: [...counted] };
+    return { gaps: [...probe.gaps], work: [...probe.work].sort((a, b) => a - b), counted: [...counted] };
   });
+  const ordered = [...gaps];
+  const series = fpsSeries(gaps);
+  gaps.sort((a, b) => a - b);
   const at = (list: number[], share: number) => list[Math.min(list.length - 1, Math.floor(list.length * share))] ?? 0;
   const mean = gaps.reduce((sum, g) => sum + g, 0) / Math.max(1, gaps.length);
   const round = (n: number) => Math.round(n * 10) / 10;
@@ -88,8 +93,26 @@ export async function measure(page: Page, ms: number, gesture: (until: number) =
     over33: gaps.filter((g) => g > DROPPED_MS + 1).length,
     frames: gaps.length,
     workP95: round(at(work, 0.95)),
-    core: coreWork(counted)
+    core: coreWork(counted),
+    fpsSeries: series,
+    gapsInOrder: ordered
   };
+}
+
+function fpsSeries(gaps: number[]): number[] {
+  const series: number[] = [];
+  let spent = 0;
+  let frames = 0;
+  for (const gap of gaps) {
+    spent += gap;
+    frames += 1;
+    if (spent >= SERIES_WINDOW_MS) {
+      series.push(Math.round((frames * 1000) / spent));
+      spent = 0;
+      frames = 0;
+    }
+  }
+  return series;
 }
 
 function coreWork(counted: CoreFrameCount[]): CoreWork {
@@ -107,7 +130,8 @@ function coreWork(counted: CoreFrameCount[]): CoreWork {
     bakeP95: p95(sorted((f) => f.bakeMs)),
     planP95: p95(sorted((f) => f.planMs)),
     walkedMax: Math.max(0, ...moving.map((f) => f.walked)),
-    uploadMax: Math.max(0, ...moving.map((f) => f.uploadBytes))
+    uploadMax: Math.max(0, ...moving.map((f) => f.uploadBytes)),
+    uncoveredFrames: counted.filter((f) => (f.uncovered ?? 0) > 0).length
   };
 }
 
