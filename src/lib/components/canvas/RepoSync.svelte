@@ -95,8 +95,8 @@
         note = REFUSALS[done.error] ?? 'Could not pull from GitHub.';
         return;
       }
-      const { outcome, sha, carried, conflicts } = done.value;
-      note = outcome === 'up_to_date' ? `Already at ${sha.slice(0, 7)}.` : `Pulled ${sha.slice(0, 7)}, ${carried} edit${carried === 1 ? '' : 's'} kept.${conflicts.length ? ` ${conflicts.length} conflict${conflicts.length === 1 ? '' : 's'}: ${conflicts.join('; ')}` : ''}`;
+      const { outcome, sha, carried, conflicts, tokens = [] } = done.value;
+      note = outcome === 'up_to_date' ? `Already at ${sha.slice(0, 7)}.` : `Pulled ${sha.slice(0, 7)}, ${carried} edit${carried === 1 ? '' : 's'} kept.${tokens.length ? ` Tokens: ${tokens.join('; ')}.` : ''}${conflicts.length ? ` ${conflicts.length} conflict${conflicts.length === 1 ? '' : 's'}: ${conflicts.join('; ')}` : ''}`;
       await load();
     });
 </script>

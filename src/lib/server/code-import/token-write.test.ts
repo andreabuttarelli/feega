@@ -65,13 +65,38 @@ describe('writeTokens', () => {
     expect(changedLines(done.files[0].before, done.files[0].after).map(([, , after]) => after)).toEqual(['  --color-primary: var(--foreground);', '  --primary: oklch(1 0 0);']);
   });
 
-  it('un modo senza dichiarazione nel codice non si scrive, e lo dice', async () => {
+  it('un modo senza dichiarazione si aggiunge in fondo al blocco di quel modo, nel formato della sorgente', async () => {
     const { read, variables, map } = await imported('tailwind4');
 
-    const done = await writeTokens(edited(variables, 'app Colors/brand-blue', 'Dark', '#000000'), map, read);
+    const twice = edited(edited(variables, 'app Colors/brand-blue', 'Dark', '#000000'), 'app Colors/primary', 'Dark', '#ff0066');
+    const done = await writeTokens(twice, map, read);
+
+    expect(done.skipped).toEqual([]);
+    expect(changedLines(done.files[0].before, done.files[0].after).slice(0, 2)).toEqual([
+      [22, '\t--color-primary: #f0f0f0;', '\t--color-primary: #ff0066;'],
+      [29, '}', '\t--color-brand-blue: #000000;']
+    ]);
+    expect(done.files[0].after.split('\n')[29]).toBe('}');
+    expect(done.map['app Colors/brand-blue'].origins.Dark).toBe('src/app.css:29:1');
+    expect(done.map['app Colors/brand-blue'].raw.Dark).toBe('#000000');
+  });
+
+  it("aggiungere una riga sposta l'origine dei token dichiarati più in basso nello stesso file", async () => {
+    const { read, variables, map } = await imported('tailwind4');
+    const before = map['app Colors/primary'].origins.Dark;
+    const done = await writeTokens(edited(variables, 'app Colors/brand-blue', 'Dark', '#000000'), { ...map, 'app Colors/primary': { ...map['app Colors/primary'], origins: { ...map['app Colors/primary'].origins, Dark: 'src/app.css:40:1' } } }, read);
+    expect(before).toBe('src/app.css:22:1');
+    expect(done.map['app Colors/primary'].origins.Dark).toBe('src/app.css:41:1');
+  });
+
+  it('un modo senza blocco nel file non si scrive, e lo dice', async () => {
+    const { read, variables, map } = await imported('tailwind4');
+    const nowhere = { ...map, 'app Colors/surface': { ...map['app Colors/surface'] } };
+
+    const done = await writeTokens(edited(variables, 'app Colors/surface', 'Dark', '#000000'), nowhere, read);
 
     expect(done.files).toEqual([]);
-    expect(done.skipped).toEqual(['--color-brand-blue: no Dark declaration in the code, #000000 not written']);
+    expect(done.skipped).toEqual(['--color-surface: no Dark block in src/theme/extra.css, #000000 not written']);
   });
 
   it('se il codice è cambiato dall’import vince il codice, e il valore della tela è nel resoconto', async () => {

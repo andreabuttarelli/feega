@@ -57,7 +57,7 @@ export type RepoPublished = { url: string | null; branch: string | null; files: 
 
 export type RepoHead = { kind: 'github' | 'folder' | 'upload'; sha: string | null; head: string | null };
 
-export type RepoPulled = { outcome: 'ok' | 'up_to_date'; sha: string; carried: number; conflicts: string[]; skipped: string[] };
+export type RepoPulled = { outcome: 'ok' | 'up_to_date'; sha: string; carried: number; conflicts: string[]; skipped: string[]; tokens?: string[] };
 
 const syncPath = (projectId: string, nodeId: string, rest: string) => `/api/v1/projects/${projectId}/code-import/${nodeId}/${rest}`;
 

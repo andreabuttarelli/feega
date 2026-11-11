@@ -15,7 +15,7 @@ export type Token = { name: string; kind: TokenKind; values: Record<string, Toke
 
 export type TokenSet = { tokens: Token[]; modes: string[]; skipped: string[] };
 
-export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number };
+export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean };
 
 export type TokenMap = Record<string, TokenEntry>;
 
