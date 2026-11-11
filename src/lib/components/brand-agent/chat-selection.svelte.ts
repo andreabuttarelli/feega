@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { withoutDismissed, type SelectionChip } from '$lib/chat-selection';
 
 export class ChatSelection {
@@ -11,7 +12,9 @@ export class ChatSelection {
   publish(chips: SelectionChip[]) {
     const ids = new Set(chips.map((chip) => chip.id));
     this.#live = chips;
-    this.#dismissed = new Set([...this.#dismissed].filter((id) => ids.has(id)));
+    untrack(() => {
+      this.#dismissed = new Set([...this.#dismissed].filter((id) => ids.has(id)));
+    });
   }
 
   dismiss(id: string) {
