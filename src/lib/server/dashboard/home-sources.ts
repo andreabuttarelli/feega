@@ -22,6 +22,7 @@ const fromCode = async (done: ReturnType<typeof importCodeInto>) => {
 const IMPORTERS: Record<PromptSource, Importer> = {
   [PromptSource.Github]: (scope, canvasId, value) => fromCode(importCodeInto(actorOf(scope), canvasId, { repo: value, routes: [], at: ORIGIN })),
   [PromptSource.Folder]: (scope, canvasId, value) => fromCode(importCodeInto(actorOf(scope), canvasId, { folder: value, routes: [], at: ORIGIN })),
+  [PromptSource.Upload]: (scope, canvasId, value) => fromCode(importCodeInto(actorOf(scope), canvasId, { upload: value, routes: [], at: ORIGIN })),
   [PromptSource.Figma]: async (scope, canvasId, value) => {
     const out = await importFigmaInto(actorOf(scope), canvasId, { url: value, nodeIds: null, at: ORIGIN });
     return out.outcome === FigmaOutcome.Ok ? { frameIds: out.frameIds } : { refusal: out.outcome };
