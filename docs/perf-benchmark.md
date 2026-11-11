@@ -122,3 +122,26 @@ Lines are buffered for 100 ms and printed in time order. Each frame gets a colla
 the asked, source, built, put and drawn durations once it is drawn. `[images]` logs asset tier
 switches; `[tiles]` logs gesture and rest render starts, raster passes per frame (from the render
 tally), cache evictions and settle. Nothing is subscribed or built when off.
+
+## Frame budget (90 fps)
+
+`npm run perf:budget` is a local pre-merge check, not a CI job: hosted runners have no GPU. It runs
+`tests/perf/canvas-frame-budget.spec.ts` in headed Chromium with vsync and the frame-rate cap off,
+so a frame gap is the real frame cost instead of the display interval. Per target it pans, zooms,
+toggles fit (Shift+1 / Shift+0) and drags a frame, `BUDGET_RUNS` (default 3) fresh contexts each,
+and fails a gesture when its p95 is over 11.1 ms (90 fps) or more than 2% of its frames are.
+
+Targets (`BUDGET_TARGETS`, comma list):
+
+- `landings` — the landings fixture above, served by `scripts/local.mjs`.
+- `heavy` — the copy of the heavy canvas on the test account (project
+  `9af789a4-da22-4231-bf6c-68bcb10b0377`, canvas `bf55d313-9155-4de3-a5ef-c3c0259e98e2`), served by
+  `node build/index.js` with `.env` and logged in with `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`.
+
+```bash
+npm run build:node
+flock ~/Documents/feega-videos/perf/bench.lock npm run perf:budget
+```
+
+Results land in `perf-results/frame-budget-<target>.json` (`BUDGET_OUT` overrides). The thresholds
+live in `scripts/perf/frame-budget.mjs`.
