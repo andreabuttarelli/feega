@@ -247,6 +247,16 @@ vec4 run(ivec2 xy) {
   return sum;
 }";
 
+const DOWN: &str = "
+vec4 run(ivec2 xy) {
+  vec2 c = vec2(xy) * 2.0 + 1.0;
+  float d = 0.75;
+  return 0.25 * (bilinear(a, c + vec2(-d, -d)) + bilinear(a, c + vec2(d, -d)) + bilinear(a, c + vec2(-d, d)) + bilinear(a, c + vec2(d, d)));
+}";
+
+const UP: &str = "
+vec4 run(ivec2 xy) { return bilinear(a, centre(xy) / p(0)); }";
+
 const BLEND: &str = "
 float lum(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
 vec3 clipColour(vec3 c) {
@@ -506,7 +516,7 @@ vec4 run(ivec2 xy) {
   return sum / total;
 }";
 
-const SOURCES: [(Op, &str); 19] = [
+const SOURCES: [(Op, &str); 21] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -520,6 +530,8 @@ const SOURCES: [(Op, &str); 19] = [
     (Op::Premultiply, PREMULTIPLY),
     (Op::BlurPremultiplied, BLUR),
     (Op::Blur, BLUR),
+    (Op::Down, DOWN),
+    (Op::Up, UP),
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
     (Op::Lens, LENS),
@@ -610,10 +622,10 @@ impl GlRunner {
         texture
     }
 
-    fn pass(&self, program: &WebGlProgram, inputs: [&Tex; 2], values: &[f32]) -> Tex {
+    fn pass(&self, program: &WebGlProgram, inputs: [&Tex; 2], values: &[f32], size: (u32, u32)) -> Tex {
         let gl = &self.gl;
         let [a, b] = inputs;
-        let out = texture(gl, a.width, a.height);
+        let out = texture(gl, size.0, size.1);
         let params = self.params(values);
         gl.bind_framebuffer(Gl::FRAMEBUFFER, Some(&self.fbo));
         gl.framebuffer_texture_2d(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0, Gl::TEXTURE_2D, Some(&out.texture), 0);
@@ -637,16 +649,16 @@ impl GlRunner {
     }
 
     pub fn flipped(&self, tex: &Tex) -> Tex {
-        self.pass(&self.flip, [tex, tex], &[])
+        self.pass(&self.flip, [tex, tex], &[], (tex.width, tex.height))
     }
 }
 
 impl Runner for GlRunner {
     type Tex = Tex;
 
-    fn run(&self, op: Op, inputs: [&Tex; 2], params: &[f32]) -> Tex {
+    fn run(&self, op: Op, inputs: [&Tex; 2], params: &[f32], size: (u32, u32)) -> Tex {
         let program = &self.programs.iter().find(|(o, _)| *o == op).expect("every op has a program").1;
-        self.pass(program, inputs, params)
+        self.pass(program, inputs, params, size)
     }
 
     fn size(tex: &Tex) -> (u32, u32) {

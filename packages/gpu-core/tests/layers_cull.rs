@@ -34,7 +34,7 @@ struct Flat;
 impl Runner for Flat {
     type Tex = (u32, u32);
 
-    fn run(&self, _: Op, inputs: [&(u32, u32); 2], _: &[f32]) -> (u32, u32) {
+    fn run(&self, _: Op, inputs: [&(u32, u32); 2], _: &[f32], _: (u32, u32)) -> (u32, u32) {
         *inputs[0]
     }
 
