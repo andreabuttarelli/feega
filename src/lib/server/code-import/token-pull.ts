@@ -97,6 +97,27 @@ function rebound(doc: MotionDoc, local: MotionDoc, key: string): MotionDoc {
   return mapEveryTrack(doc, (tracks) => tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(bind) })) as MotionTrack[]);
 }
 
+function boardsOf(doc: MotionDoc): Map<string, MotionClip> {
+  const clips = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
+  const byId = new Map(clips.map((c) => [c.id, c]));
+  const onRoot = (c: MotionClip) => !c.parent || !byId.get(c.parent)?.parent;
+  return new Map(clips.filter((c) => c.name && onRoot(c)).map((c) => [c.name!, c]));
+}
+
+function withBoardModes(doc: MotionDoc, local: MotionDoc): MotionDoc {
+  const mine = boardsOf(local);
+  const theirs = new Set([...boardsOf(doc).values()].map((c) => c.id));
+  const moded = (c: MotionClip): MotionClip => {
+    const was = theirs.has(c.id) ? mine.get(c.name!) : undefined;
+    if (!was) {
+      return c;
+    }
+    const { modes: _theirs, ...rest } = c;
+    return was.modes ? { ...rest, modes: was.modes } : rest;
+  };
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(moded) })) as MotionTrack[] };
+}
+
 function canvasOnly(pull: Pull): void {
   const imported = new Set(Object.keys(pull.local.map));
   for (const [name, collection] of Object.entries(pull.local.doc.variables ?? {})) {
@@ -158,5 +179,5 @@ export function pulledTokens(local: TokenSide, upstream: TokenSide): PulledToken
 
   pull.report.push(...added.filter((k) => !renamed.has(k)).map((k) => `${tokenId(upstream.map[k])}: added`));
   canvasOnly(pull);
-  return { doc: resolveVariables({ ...doc, variables: pull.variables }), map: pull.map, report: pull.report, conflicts: pull.conflicts };
+  return { doc: resolveVariables(withBoardModes({ ...doc, variables: pull.variables }, local.doc)), map: pull.map, report: pull.report, conflicts: pull.conflicts };
 }

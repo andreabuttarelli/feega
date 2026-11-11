@@ -98,6 +98,14 @@ describe('pulledTokens', () => {
     expect(done.report.some((r) => r.startsWith('--color-muted: removed in the code, kept on the canvas as an orphan'))).toBe(true);
   });
 
+  it('a mode chosen on the canvas for a board stays on the board of the same name', () => {
+    const board = (doc: MotionDoc, modes?: Record<string, string>) => ({ ...doc, tracks: [{ ...doc.tracks[0], clips: [{ ...newClip({ id: `b${Math.random()}`, from: 0, durationInFrames: 30, component: 'Shape', props: { shape: 'rect' } }), parent: null, name: '/', ...(modes ? { modes } : {}) }] }] }) as MotionDoc;
+    const local = side([PRIMARY]);
+    const upstream = side([PRIMARY]);
+    const done = pulledTokens({ doc: board(local.doc, { [C]: 'Dark' }), map: local.map }, { doc: board(upstream.doc), map: upstream.map });
+    expect(done.doc.tracks[0].clips[0].modes).toEqual({ [C]: 'Dark' });
+  });
+
   it('variables made on the canvas and the active mode survive the pull', () => {
     const local = side([PRIMARY]);
     const mine = { ...local.doc, variables: { ...local.doc.variables!, [C]: { ...local.doc.variables![C], active: 'Dark' }, Mine: { modes: ['Default'], vars: { accent: { type: VarType.Colour, values: { Default: '#ff00ff' } } } } } } as MotionDoc;
