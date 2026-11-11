@@ -6,6 +6,13 @@ use crate::retained::Camera;
 pub const TILE_PX: u32 = 256;
 pub const TILE_GUTTER_PX: u32 = 2;
 pub const TILE_BYTES: u64 = ((TILE_PX + 2 * TILE_GUTTER_PX) as u64).pow(2) * 4;
+pub const CANVAS_TILES: usize = 320;
+
+fn canvas_step(extent: Rect, camera: Camera) -> i32 {
+    let fits = |step: i32| keys_over(extent, step).len() <= CANVAS_TILES;
+    (step_of(camera.zoom) - COARSER_STEPS..=step_of(camera.zoom)).rev().find(|s| fits(*s)).unwrap_or(step_of(camera.zoom) - COARSER_STEPS)
+}
+
 pub const TILE_BUDGET_BYTES: u64 = 384 << 20;
 const SCREENS_KEPT: u64 = 12;
 
@@ -129,6 +136,7 @@ pub struct TileFrame {
 
 #[derive(Default)]
 pub struct Tiles {
+    canvas: Option<Rect>,
     held: FxHashSet<TileKey>,
     stale: FxHashSet<TileKey>,
     last_drawn: rustc_hash::FxHashMap<TileKey, u64>,
@@ -213,6 +221,17 @@ impl Tiles {
         keys
     }
 
+    pub fn set_canvas(&mut self, extent: Rect) {
+        self.canvas = Some(extent);
+    }
+
+    pub fn canvas_ahead(&self, extent: Rect, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        let centre = seen_world(camera, screen).center();
+        let mut keys: Vec<TileKey> = keys_over(extent, canvas_step(extent, camera)).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+        keys.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
+        keys
+    }
+
     pub fn hold(&mut self, key: TileKey) {
         self.held.insert(key);
         self.stale.remove(&key);
@@ -265,7 +284,10 @@ impl Tiles {
         }
     }
 
-    fn pinned(camera: Camera, screen: (u32, u32), key: TileKey) -> bool {
+    fn pinned(&self, camera: Camera, screen: (u32, u32), key: TileKey) -> bool {
+        if self.canvas.is_some_and(|c| key.step == canvas_step(c, camera)) {
+            return true;
+        }
         let step = step_of(camera.zoom);
         let world = seen_world(camera, screen);
         let near = |reach: f64| world.inflate(reach, reach);
@@ -285,7 +307,7 @@ impl Tiles {
         let step = step_of(camera.zoom);
         let centre = seen_world(camera, screen).center();
         let distance = |k: &TileKey| (k.step - step).abs() as f64 * 1e9 + k.world().center().distance(centre);
-        let mut loose: Vec<TileKey> = self.held.iter().copied().filter(|k| !Self::pinned(camera, screen, *k)).collect();
+        let mut loose: Vec<TileKey> = self.held.iter().copied().filter(|k| !self.pinned(camera, screen, *k)).collect();
         loose.sort_by(|a, b| {
             let used = |k: &TileKey| self.last_drawn.get(k).copied().unwrap_or(0);
             used(a).cmp(&used(b)).then(distance(b).total_cmp(&distance(a)))
