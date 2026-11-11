@@ -126,3 +126,25 @@ describe('world overlay, node by node', () => {
     expect(calls).toBe(0);
   });
 });
+
+describe('world overlay across stroke zoom steps', () => {
+  const frame = (strokeZoom: number, ring = NodeChrome.None) => ({ id: 'f', x: 0, y: 0, width: 400, height: 300, inputs: [], outputs: [{ type: 'text', state: PortState.Quiet }], label: 'Hero', icon: null, tag: '#ff0000', zoom: 1, ring, handles: ring === NodeChrome.Selected, ringColor: '#7c5cff', names: false, strokeZoom, layers: ChromeLayers.Whole }) as never;
+  const base = { curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };
+
+  it('hands back the same fixed part when no node draws a ring', () => {
+    const before = parts({ ...base, chrome: [frame(1)] });
+    const after = parts({ ...base, chrome: [frame(1.04)] });
+
+    expect(after.fixed).toBe(before.fixed);
+  });
+
+  it('builds again only the ring and handles of a selected node, not its label and ports', () => {
+    const before = parts({ ...base, selected: ['f'], chrome: [frame(1, NodeChrome.Selected)] });
+    const after = parts({ ...base, selected: ['f'], chrome: [frame(1.04, NodeChrome.Selected)] });
+    const kept = (clip: string) => after.fixed.find((i) => i.clip === clip) === before.fixed.find((i) => i.clip === clip);
+
+    expect(kept('f:label')).toBe(true);
+    expect(kept('f:port-out')).toBe(true);
+    expect(kept('f:ring')).toBe(false);
+  });
+});

@@ -969,10 +969,6 @@
     if (patch) {
       into.patchUses(patch);
     }
-    const quiet = !gesture.active();
-    for (const part of quiet ? sentOverlay.changed(overlay) : []) {
-      into.setOverlay(part, overlay[part]);
-    }
     return shown;
   }
 
@@ -984,7 +980,7 @@
   let sharpOwed = false;
 
   const cacheAt = () => (zooming.active() || edited.size ? cacheZoom(view.zoom) : 0);
-  const sceneDue = (quiet: boolean) => staleScene || (sceneBusy && quiet) || cacheAt() !== stagedCache || (quiet && sentOverlay.waiting(overlay));
+  const sceneDue = (quiet: boolean) => staleScene || (sceneBusy && quiet) || cacheAt() !== stagedCache;
 
   function restage(into: CoreRaster) {
     staleScene = false;
@@ -1006,6 +1002,9 @@
     const quiet = !gesture.active();
     if (sceneDue(quiet) || (sceneBusy && uploadOwed(into, owed).length)) {
       restage(into);
+    }
+    for (const part of quiet ? sentOverlay.changed(overlay) : []) {
+      into.setOverlay(part, overlay[part]);
     }
     const at = deviceView();
     into.setMotion?.(quiet ? CoreMotion.Still : CoreMotion.Gesture);
@@ -1101,8 +1100,13 @@
   });
 
   $effect(() => {
-    void [raster, held, whole, edited, overlay, lift, sight, area.width, area.height];
+    void [raster, held, whole, edited, lift, sight, area.width, area.height];
     staleScene = true;
+    pacer.invalidate();
+  });
+
+  $effect(() => {
+    void overlay;
     pacer.invalidate();
   });
 

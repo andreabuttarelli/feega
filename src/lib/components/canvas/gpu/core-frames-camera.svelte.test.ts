@@ -247,6 +247,23 @@ describe('CoreFrames camera', () => {
     expect(walks).toEqual({});
   });
 
+  it('an overlay handed again with the same parts walks none of them', async () => {
+    const fixed: unknown[] = [];
+    const live: unknown[] = [];
+    const props = $state({ frames: [], cards: manyCards(), overlay: { fixed, live }, view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props: props as never });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    await settled();
+    const frames = calls.frames;
+
+    props.overlay = { fixed, live };
+    flushSync();
+
+    await vi.waitFor(() => expect(calls.frames).toBeGreaterThan(frames));
+    expect(walks).toEqual({});
+  });
+
   it('a zoom that stays in one cache step walks none of them after its first tick', async () => {
     const props = $state({ frames: [], cards: manyCards(), view: { x: 0, y: 0, zoom: 1 }, area: { width: 400, height: 300 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
     app = mount(CoreFrames, { target: document.body, props });
