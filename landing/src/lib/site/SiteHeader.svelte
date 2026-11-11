@@ -51,8 +51,6 @@
     display: flex;
     justify-content: space-between;
     align-items: start;
-    max-width: 430px;
-    margin: 0 auto;
     padding: 12px;
     font-family: 'Inter', sans-serif;
     font-variation-settings: normal;
@@ -141,7 +139,6 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      max-width: none;
       padding: 0 20px;
     }
 
@@ -183,7 +180,6 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      max-width: 810px;
       padding: 16px 16px 0;
     }
 
