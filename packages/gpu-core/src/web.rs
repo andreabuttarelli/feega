@@ -480,6 +480,10 @@ impl WebCore {
         self.tile_budget = bytes as u64;
     }
 
+    pub fn set_canvas_tiles(&mut self, allowed: u32) {
+        self.tiles.set_canvas_tiles(allowed as usize);
+    }
+
     pub fn set_tiles(&mut self, on: bool) {
         self.tiled = on;
     }

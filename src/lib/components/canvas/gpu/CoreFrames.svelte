@@ -458,7 +458,7 @@
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const textureBytes = $derived(textureBudget(budget.textureBytes, { width: area.width * resolution, height: area.height * resolution }));
-  const real = $derived(resident(whole, view, area, textureBytes));
+  const real = $derived(resident(whole, view, area, textureBytes, budget.offscreen));
 
   const rank = $derived(new Map(order.map((id, i) => [id, i])));
   const stacking = (id: string) => rank.get(id) ?? 0;
@@ -554,6 +554,7 @@
         sentOverlay = new SentParts();
         r.setBudget?.(textureBudget(budget.textureBytes, { width, height }));
         r.setTileBudget?.(budget.tileBytes);
+        r.setCanvasTiles?.(budget.canvasTiles);
         r.setTiles?.(TILED);
         raster = r;
         markStartup(StartupStep.GpuReady);
