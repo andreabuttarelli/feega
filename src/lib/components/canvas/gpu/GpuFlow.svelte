@@ -412,6 +412,7 @@
   }
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}));
+  const frameById = $derived(new Map(coreFrames.map((f) => [f.id, f])));
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
   const OVERLAY_REACH = 0.5;
@@ -1715,7 +1716,7 @@
   function saverOf(nodeId: string) {
     const held = savers.get(nodeId);
     const live = liveOf(nodeId);
-    const frame = coreFrames.find((f) => f.id === nodeId);
+    const frame = frameById.get(nodeId);
     if (held || !live || !frame) {
       return held ?? null;
     }
@@ -2131,7 +2132,7 @@
 
   function pickerOf(nodeId: string) {
     typesetLanded;
-    const frame = coreFrames.find((f) => f.id === nodeId);
+    const frame = frameById.get(nodeId);
     const live = liveOf(nodeId);
     if (!frame || !live) {
       return null;
@@ -2391,7 +2392,7 @@
 
   function marqueeRect(nodeId: string) {
     const m = bandDrag?.nodeId === nodeId ? bandDrag : null;
-    const frame = coreFrames.find((f) => f.id === nodeId);
+    const frame = frameById.get(nodeId);
     if (!m || !frame) {
       return null;
     }
