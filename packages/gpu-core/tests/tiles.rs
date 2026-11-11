@@ -450,3 +450,22 @@ fn tiles_warm_later_after_an_upload_than_after_a_gesture() {
     assert!(!after_upload.due(1400.0));
     assert!(after_upload.due(1600.0));
 }
+
+#[test]
+fn the_cheap_coarse_levels_warm_while_uploads_still_hold_the_rest() {
+    use gpu_core::tiles::Warmup;
+    let mut warm = Warmup::default();
+    warm.moved(0.0);
+    warm.uploaded(400.0);
+
+    assert!(warm.coarse_due(600.0));
+    assert!(!warm.due(600.0));
+}
+
+#[test]
+fn the_cheap_levels_are_only_the_far_coarse_ones() {
+    let ahead = Tiles::default().coarse_ahead(camera(1.0), SCREEN);
+
+    assert!(!ahead.is_empty());
+    assert!(ahead.iter().all(|k| k.step <= -8));
+}

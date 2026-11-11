@@ -203,6 +203,16 @@ impl Tiles {
         }).collect()
     }
 
+    pub fn coarse_ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        let world = seen_world(camera, screen);
+        let step = step_of(camera.zoom);
+        let centre = world.center();
+        let mut keys: Vec<TileKey> = BAKED.iter().filter(|l| l.steps <= -RESERVE_STEPS_DOWN).flat_map(|level| keys_over(level.area(world), step + level.steps)).chain(self.reserve(camera, screen)).filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+        keys.sort_by(|a, b| b.step.cmp(&a.step).then(a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre))));
+        keys.dedup();
+        keys
+    }
+
     pub fn hold(&mut self, key: TileKey) {
         self.held.insert(key);
         self.stale.remove(&key);
@@ -355,17 +365,27 @@ pub enum Building {
 
 pub struct Warmup {
     stirred_at: f64,
+    moved_at: f64,
 }
 
 impl Default for Warmup {
     fn default() -> Self {
-        Warmup { stirred_at: f64::NEG_INFINITY }
+        Warmup { stirred_at: f64::NEG_INFINITY, moved_at: f64::NEG_INFINITY }
     }
 }
 
 impl Warmup {
     pub fn stirred(&mut self, now_ms: f64) {
         self.stirred_at = self.stirred_at.max(now_ms);
+    }
+
+    pub fn moved(&mut self, now_ms: f64) {
+        self.stirred(now_ms);
+        self.moved_at = self.moved_at.max(now_ms);
+    }
+
+    pub fn coarse_due(&self, now_ms: f64) -> bool {
+        now_ms - self.moved_at >= WARM_AFTER_MS
     }
 
     pub fn uploaded(&mut self, now_ms: f64) {
