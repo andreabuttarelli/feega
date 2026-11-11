@@ -102,7 +102,7 @@ export type StoryboardLink = { canvasId: string; placed: string[] };
 
 const linkSchema = z.object({ canvasId: z.string().min(1), placed: z.array(z.string()) });
 
-export const codeOriginSchema = z.object({ kind: z.enum(['github', 'folder']).default('github'), repo: z.string().min(3).max(500), branch: z.string().max(200).nullable(), sha: z.string().max(64).nullable(), routes: z.array(z.string().max(300)).max(8), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(12).optional() });
+export const codeOriginSchema = z.object({ kind: z.enum(['github', 'folder', 'upload']).default('github'), repo: z.string().min(3).max(500), branch: z.string().max(200).nullable(), sha: z.string().max(64).nullable(), routes: z.array(z.string().max(300)).max(8), conditions: z.array(z.object({ scheme: z.enum(['light', 'dark']), width: z.number().int().min(240).max(3840) })).max(12).optional() });
 
 export type CodeOriginData = z.infer<typeof codeOriginSchema>;
 

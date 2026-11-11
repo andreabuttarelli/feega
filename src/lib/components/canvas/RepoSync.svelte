@@ -11,7 +11,13 @@
   const PATCH_MIME = 'text/x-diff';
   const RELOAD_MS = 800;
   const WATCH_MS = 3_000;
-  const PUBLISH_LABEL = { github: 'Open pull request', folder: 'Write to folder' } as const;
+  type KindRow = { title: string; publish: string | null; syncs: boolean; name: (repo: string) => string };
+  const lastPart = (repo: string) => repo.split('/').at(-1) ?? repo;
+  const KINDS: Record<RepoChanges['kind'], KindRow> = {
+    github: { title: 'GitHub', publish: 'Open pull request', syncs: true, name: (repo) => repo },
+    folder: { title: 'Folder', publish: 'Write to folder', syncs: true, name: (repo) => repo },
+    upload: { title: 'Folder', publish: null, syncs: false, name: lastPart }
+  };
   const REFUSALS: Record<string, string> = {
     no_changes: 'Nothing to send: no edit maps to the code yet.',
     no_github: 'Connect GitHub to open a pull request. You can still download the patch.',
@@ -21,6 +27,7 @@
   };
 
   let changes = $state<RepoChanges | null>(null);
+  const kind = $derived(KINDS[changes?.kind ?? 'github']);
   let fromCode = $state(true);
   let busy = $state(false);
   let branch = $state('');
@@ -44,7 +51,7 @@
       return;
     }
     const url = URL.createObjectURL(new Blob([changes.patch], { type: PATCH_MIME }));
-    Object.assign(document.createElement('a'), { href: url, download: `${changes.repo.split('/')[1]}-feega.patch` }).click();
+    Object.assign(document.createElement('a'), { href: url, download: `${lastPart(changes.repo)}-feega.patch` }).click();
     URL.revokeObjectURL(url);
   }
 
@@ -97,8 +104,8 @@
 {#if fromCode}
   <section class="sync" data-testid="repo-sync" aria-label="Code sync">
     <header>
-      <strong>{changes?.kind === 'folder' ? 'Folder' : 'GitHub'}</strong>
-      {#if changes}<span class="repo" title={changes.sha}>{changes.repo}@{changes.sha.slice(0, 7)}</span>{/if}
+      <strong>{kind.title}</strong>
+      {#if changes}<span class="repo" title={changes.sha}>{kind.name(changes.repo)}{#if kind.syncs}@{changes.sha.slice(0, 7)}{/if}</span>{/if}
     </header>
 
     {#if changes}
@@ -111,14 +118,16 @@
       {#if changes.patch}<CodeBlock code={changes.patch} label="Copy patch" testid="repo-sync-patch" copytestid="repo-sync-copy" />{/if}
       <div class="actions">
         <Button size="sm" variant="secondary" disabled={!changes.patch} onclick={download} data-testid="repo-sync-download"><Download size={14} /> Patch</Button>
-        <Button size="sm" disabled={busy || !changes.patch} onclick={publish} data-testid="repo-sync-publish"><GitPullRequest size={14} /> {PUBLISH_LABEL[changes.kind]}</Button>
+        {#if kind.publish}<Button size="sm" disabled={busy || !changes.patch} onclick={publish} data-testid="repo-sync-publish"><GitPullRequest size={14} /> {kind.publish}</Button>{/if}
       </div>
     {/if}
 
-    <div class="actions">
+    {#if !kind.syncs}<p class="note" data-testid="repo-sync-once">Imported once, no sync: edits stay on the canvas. Download the patch to apply them to your files.</p>{/if}
+
+    {#if kind.syncs}<div class="actions">
       <input class="branch" placeholder="branch (default: imported)" bind:value={branch} aria-label="Branch to pull" data-testid="repo-sync-branch" />
       <Button size="sm" variant="secondary" disabled={busy} onclick={pull} data-testid="repo-sync-pull"><RefreshCw size={14} /> Pull</Button>
-    </div>
+    </div>{/if}
 
     {#if note}<p class="note" data-testid="repo-sync-note">{note}{#if link} <a href={link} target="_blank" rel="noopener">{link}</a>{/if}</p>{/if}
   </section>
