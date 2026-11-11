@@ -1,11 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
-import { instrument, measure, wheelZoom } from '../e2e/fixtures/frame-sweeps';
+import { instrument, measure, wheelZoom, type CoreWork } from '../e2e/fixtures/frame-sweeps';
 import { ZOOM_FIXTURE_CENTRE, ZOOM_FIXTURE_PLACE } from '../../scripts/perf/zoom-fixture.mjs';
 import { median } from '../../scripts/perf/bench-stats.mjs';
 
-type BenchRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number; sharpMs: number };
+type BenchRun = { fps: number; p95: number; p99: number; over11: number; worst: number; frames: number; cpuMs: number; sharpMs: number; core: CoreWork };
 
 enum BenchCase {
   Steady = 'steady',
@@ -121,7 +121,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
     writeFileSync(join(OUT, 'zoomed-settled.png'), await shot(page));
   }
   await context.close();
-  return { fps: zoom.fpsAvg, p95: zoom.p95, worst: zoom.max, frames: zoom.frames, cpuMs, sharpMs };
+  return { fps: zoom.fpsAvg, p95: zoom.p95, p99: zoom.p99, over11: zoom.over11, worst: zoom.max, frames: zoom.frames, cpuMs, sharpMs, core: zoom.core };
 }
 
 test('zoom benchmark on the synthetic heavy canvas', async ({ baseURL }) => {

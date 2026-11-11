@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addTally } from '$lib/canvas/gpu/frame-stats';
+  import { addTally, countFrame } from '$lib/canvas/gpu/frame-stats';
   import { sharedFrames } from '$lib/motion/gpu/shared-frames';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '@feega/motion-core/motion/gpu-full/display-list';
   import { smoothingOf } from '@feega/motion-core/motion/gpu-full/text/painter';
@@ -893,7 +893,9 @@
     }
     into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
     into.setCamera(at.x, at.y, at.zoom);
-    const { outcome, pending, skipped } = into.frame(performance.now());
+    const began = performance.now();
+    const { outcome, pending, skipped } = into.frame(began);
+    countFrame(began, into.frameCounts?.(), gesture.active());
     if (!pending && !gesture.active()) {
       takeThumbs(canvas, shown);
     }
