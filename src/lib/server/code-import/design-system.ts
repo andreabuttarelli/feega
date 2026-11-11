@@ -59,12 +59,14 @@ export function designed(design: Design, plan: UrlPlan, ask: DesignAsk): Designe
   const made = variablesOf(design.set, ask.repo, { scale, used: usedTokens(design, ask.captures), active: base, multiples: spacingMultiples(classesOf(ask.captures)) });
   const counted: BoundCount = { byClass: 0, byRule: 0, byValue: 0, unbound: 0 };
 
-  const items = plan.plan.items.map((item) => {
+  const bound = (into: BoundCount) => (item: UrlPlan['sets'][number]) => {
     const done = boundToTokens(item.doc, { ...made, rules: design.rules, base, boards: { ...ask.boards, [DESIGN_BOARD]: base } });
-    (Object.keys(counted) as (keyof BoundCount)[]).forEach((k) => (counted[k] += done.bound[k]));
+    (Object.keys(into) as (keyof BoundCount)[]).forEach((k) => (into[k] += done.bound[k]));
     return { ...item, doc: boardBound(done.doc) };
-  });
+  };
+  const items = plan.plan.items.map(bound(counted));
+  const sets = plan.sets.map(bound({ ...counted }));
 
   const skipped = [...design.set.skipped, ...made.dropped].map((s) => `${SKIPPED_PREFIX}: ${s}`);
-  return { plan: { ...plan, plan: { ...plan.plan, items } }, map: made.map, report: { tokens: Object.keys(made.map).length, ...counted }, skipped };
+  return { plan: { ...plan, sets, plan: { ...plan.plan, items } }, map: made.map, report: { tokens: Object.keys(made.map).length, ...counted }, skipped };
 }
