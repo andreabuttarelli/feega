@@ -22,12 +22,12 @@ const keyFieldsOf = (port: SnapcnPort) => {
   return [...content, ...['mode', 'background'].filter((k) => k in props)].slice(0, KEY_FIELDS_MAX).map(snakeKey);
 };
 
-const templateOf = (port: SnapcnPort): TemplateEntry => ({
-  id: `${SNAPCN_PREFIX}${port.id}`,
+export const templateOf = (port: SnapcnPort, prefix: string): TemplateEntry => ({
+  id: `${prefix}${port.id}`,
   template: lazyTemplate(
     () => customTemplateDoc({ name: port.id, component: componentName(port.id), code: snapcnComponent(port), props: propsOf(port), fonts: fontsOf(port), varPrefix: '', vars: [], clip: SNAPCN_CLIP, seconds: port.frames / port.fps, fps: port.fps, size: { width: port.width, height: port.height } }),
     { name: port.title, description: port.about.slice(0, DESCRIPTION_MAX), keyFields: keyFieldsOf(port) }
   )
 });
 
-export const SNAPCN_TEMPLATES: TemplateEntry[] = SNAPCN_PORTS.map(templateOf);
+export const SNAPCN_TEMPLATES: TemplateEntry[] = SNAPCN_PORTS.map((p) => templateOf(p, SNAPCN_PREFIX));

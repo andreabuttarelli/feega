@@ -89,3 +89,36 @@ Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/
 Paper Shaders
 Copyright 2026 Paper
 ```
+
+## Portions derived from Magic UI (MIT)
+
+Source: https://github.com/magicuidesign/magicui (LICENSE.md, commit 1ac985adca3cdfab9b1739253fd14209687c4e9c).
+Twenty components (meteors, ripple, marquee, number ticker, word rotate, typing animation, morphing text,
+animated gradient text, shiny text, aurora text, line shadow text, orbiting circles, spinning text, flickering grid,
+animated grid pattern, border beam, shine border, animated list, circular progress bar, hyper text) are
+translated from React, Framer Motion and CSS keyframes to feega custom components in
+`packages/motion-core/src/motion/uiloops/`; upstream comments removed, APIs changed.
+
+```
+MIT License
+
+Copyright (c) Magic UI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

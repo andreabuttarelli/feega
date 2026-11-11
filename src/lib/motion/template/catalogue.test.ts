@@ -7,7 +7,7 @@ import { SectionRole } from './card';
 import { ComponentKind, FORMATS_OF_MODE, POSTER_FORMATS, byShape, catalogue, libraryFormat, componentKind, matching, metaLine, posterShelf, previewOf, rolesIn, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
 import { DocMode } from '@feega/motion-core/motion/still';
 import PREVIEWED from './previews.json';
-import { addedOn } from './added';
+import { addedOn, SNAPCN_ADDED_ON } from './added';
 
 const entry = (id: string) => {
   const found = builtinTemplate(id);
@@ -89,12 +89,13 @@ describe('the newest templates lead every catalogue', () => {
     expect(undated).toEqual([]);
   });
 
-  it('lists snapcn first, then older ones by date', () => {
+  it('lists the newest ports first, then older ones by date', () => {
     const items = catalogue(BUILTIN_TEMPLATES);
     const dates = items.map((i) => addedOn(i.id));
 
     expect(dates).toEqual([...dates].sort((a, b) => b.localeCompare(a)));
-    expect(items[0].id.startsWith('builtin:snapcn-')).toBe(true);
+    expect(items[0].id.startsWith('builtin:magicui-')).toBe(true);
+    expect(items.some((i) => i.id.startsWith('builtin:snapcn-') && addedOn(i.id) === SNAPCN_ADDED_ON)).toBe(true);
   });
 
   it('puts the newest poster first on the poster shelf', () => {
