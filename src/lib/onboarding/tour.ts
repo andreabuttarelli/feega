@@ -22,7 +22,7 @@ export enum TourEvent {
 export const TOUR_LAUNCHED_AT = '2026-10-10T00:00:00Z';
 export const TOUR_SEEN_STORAGE_KEY = 'feega:tour-seen';
 export const TOUR_SEEN_PATH = '/api/onboarding-tour';
-export const MAKE_VIDEO_PATH = '/app#video-brief';
+export const MAKE_VIDEO_PATH = '/app';
 
 export type TourSeen = { seenAt: string | null } | null;
 

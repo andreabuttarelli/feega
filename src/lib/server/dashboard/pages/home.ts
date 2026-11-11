@@ -8,14 +8,10 @@ import { listMemberships, setActiveOrg } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
 import { createCanvas } from '$lib/server/repos/canvas';
 import { SUPPORT_TOOLS } from '$lib/tools';
-import { PROJECT_PARAM, toolScope } from '$lib/server/dashboard/tool-scope';
+import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { CanvasPick } from '$lib/server/motion/start';
-import { handoffPath } from '$lib/canvas/chat-handoff';
-import { loadAttachments } from '$lib/server/chat-attachments/register';
-import { parseAttachments } from '$lib/chat-attachments';
 import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
 import { motionEditorPath } from '$lib/canvas/motion-node';
-import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefMessage, briefName } from '$lib/motion/video-brief';
 import { FeegaImport, importStoredCanvasFile, signCanvasFileUpload } from '$lib/server/canvas/feega-file';
 import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 
@@ -39,15 +35,7 @@ export const load = async (event: Parameters<PageServerLoad>[0]) => {
     }
   }
 
-  const attachProjectId = await attachTarget(event, recentProjectId);
-  return { templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
-};
-
-async function attachTarget(event: Parameters<PageServerLoad>[0], recentProjectId: string | null): Promise<string | null> {
-  if (recentProjectId && !event.url.searchParams.has(PROJECT_PARAM)) {
-    return recentProjectId;
-  }
-  return toolScope(event).then((scope) => scope.projectId, () => null);
+  return { tools: SUPPORT_TOOLS };
 }
 
 async function workspaceOf(event: Parameters<typeof signedInDb>[0] & { cookies: { get: (name: string) => string | undefined } }) {
@@ -62,22 +50,6 @@ function projectSlug(): string {
 }
 
 export const actions: Actions = {
-  video: async (event) => {
-    const form = await event.request.formData();
-    const typed = String(form.get('brief') ?? '').trim().slice(0, BRIEF_MAX);
-    const attachmentIds = parseAttachments(form.getAll('attachment'));
-    if (!typed && !attachmentIds.length) {
-      return fail(HTTP_BAD_REQUEST, { error: 'Paste a URL or describe your video' });
-    }
-
-    const brief = typed || FILES_ONLY_BRIEF;
-    const scope = await toolScope(event, String(form.get('projectId') ?? '') || null);
-    const attachments = attachmentIds.length ? await loadAttachments(scope.db, { orgId: scope.orgId, projectId: scope.projectId, ids: attachmentIds }) : [];
-    const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: scope.projectId, name: briefName(brief) });
-
-    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: scope.projectId, canvasId: canvas.id }, briefMessage(brief), attachments.map((a) => a.assetId)));
-  },
-
   fromTemplate: async (event) => {
     const form = await event.request.formData();
     const body = fromTemplateBody.safeParse({ template: form.get('template'), format: form.get('format') || undefined, project: form.get('projectId') || undefined });

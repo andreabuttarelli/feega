@@ -39,9 +39,6 @@ const listMemberships = vi.fn(async () => [
 const setActiveOrg = vi.fn(async () => {});
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships, setActiveOrg }));
 
-const loadAttachments = vi.fn(async (_db: unknown, input: { ids: string[] }) => input.ids.filter((id) => id !== 'stranger').map((id) => ({ assetId: id, kind: 'image', name: `${id}.png`, mimeType: 'image/png', bytes: 1 })));
-vi.mock('$lib/server/chat-attachments/register', () => ({ loadAttachments }));
-
 const importStoredCanvasFile = vi.fn(async (_db: unknown, input: { path: string; projectFor: (name: string) => Promise<string> }) =>
   input.path.endsWith('bad.feega') ? { outcome: 'refused', refusal: 'damaged' } : { outcome: 'imported', canvas: { id: 'c-imported', projectId: await input.projectFor('Launch kit'), name: 'Launch kit', viewport: null } }
 );
@@ -89,11 +86,10 @@ describe('/app is the dashboard for a returning user', () => {
   it('un ritorno alla home non rifà il giro d’ingresso: guscio e progetto vengono dal layout', async () => {
     const parent = async () => ({ org: { id: 'org-a' }, projects: [{ id: 'p1', name: 'Launch' }] });
 
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent } as never)) as { attachProjectId: string | null };
+    await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent } as never);
 
     expect(homePathFor).not.toHaveBeenCalled();
     expect(listMemberships).not.toHaveBeenCalled();
-    expect(data.attachProjectId).toBe('p1');
   });
 
   it('a first-run or campaign arrival is sent on to its canvas', async () => {
@@ -131,63 +127,16 @@ describe('/app is the dashboard for a returning user', () => {
     expect(out).toMatchObject({ status: 400, data: { error: expect.stringContaining('damaged') } });
   });
 
-  it('a prompt opens a new canvas of its own and hands the words to the canvas chat', async () => {
-    const brief = 'https://acme.com';
-    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief }) } as never));
-
-    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', name: 'acme.com' });
-    expect(createNode).not.toHaveBeenCalled();
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=Make+a+launch+film+of+https%3A%2F%2Facme.com' });
+  it('the home has no prompt action', () => {
+    expect(actions).not.toHaveProperty('video');
   });
 
-  it('a described idea reaches the chat with the words as typed', async () => {
-    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
+  it('the home loads no brief suggestions and names no upload project', async () => {
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as unknown as Record<string, unknown>;
 
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal' });
-  });
-
-  it('attachments uploaded on the home ride with the brief into the first turn', async () => {
-    const body = form({ brief: 'A logo reveal', projectId: 'p1' });
-    const fd = await body.formData();
-    fd.append('attachment', 'a1');
-    fd.append('attachment', 'stranger');
-    fd.append('attachment', 'a2');
-    const request = new Request('http://x/app', { method: 'POST', body: fd });
-    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request } as never));
-
-    expect(loadAttachments).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', ids: ['a1', 'stranger', 'a2'] });
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal&attach=a1%2Ca2' });
-  });
-
-  it('files alone are a brief', async () => {
-    const fd = new FormData();
-    fd.set('brief', '');
-    fd.append('attachment', 'a1');
-    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: new Request('http://x/app', { method: 'POST', body: fd }) } as never));
-
-    expect(redirected.location).toContain('attach=a1');
-  });
-
-  it('the home names the project its uploads land in', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as { attachProjectId: string | null };
-
-    expect(data.attachProjectId).toBe('p1');
-  });
-
-  it('an empty brief is refused before anything is created', async () => {
-    const refused = (await actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: '  ' }) } as never)) as { status: number };
-
-    expect(refused.status).toBe(400);
-    expect(createNode).not.toHaveBeenCalled();
-  });
-
-  it('the home loads the brief suggestions and no catalogue: templates live on their own page', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as unknown as Record<string, unknown> & { templates: unknown[] };
-
-    expect(data.templates.length).toBeGreaterThan(0);
+    expect(data).not.toHaveProperty('templates');
+    expect(data).not.toHaveProperty('attachProjectId');
     expect(data).not.toHaveProperty('components');
-    expect(data).not.toHaveProperty('posters');
-    expect(data).not.toHaveProperty('gallery');
     expect(listGallery).not.toHaveBeenCalled();
   });
 
