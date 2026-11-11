@@ -51,6 +51,9 @@ const importUrlInto = vi.fn(async (_scope: unknown, _canvasId: string, _ask: { u
 vi.mock('$lib/server/url-import/canvas-import', () => ({ importUrlInto }));
 vi.mock('$lib/server/tool-guard', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
 
+const moveAssets = vi.fn(async () => {});
+vi.mock('$lib/server/repos/assets', async (original) => ({ ...(await original<object>()), moveAssets }));
+
 const { load, actions } = await import('$lib/server/dashboard/pages/home');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
@@ -138,8 +141,10 @@ describe('/app is the dashboard for a returning user', () => {
   it('a bare URL is imported onto the new canvas before the chat starts from its frame', async () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'https://acme.com' }) } as never));
 
-    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', name: 'acme.com' });
-    expect(importUrlInto).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org-a', projectId: 'p1', userId: 'u1' }), 'c-new', expect.objectContaining({ url: 'https://acme.com' }));
+    expect(createProject).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-a', name: 'acme.com' }));
+    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p-new', name: 'acme.com' });
+    expect(importUrlInto).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org-a', projectId: 'p-new', userId: 'u1' }), 'c-new', expect.objectContaining({ url: 'https://acme.com' }));
+    expect(redirected.location).toMatch(/^\/p\/p-new\/c\/c-new\?/);
     const prompt = new URL(redirected.location ?? '', 'http://x').searchParams.get('prompt') ?? '';
     expect(prompt).toContain('Make a launch film of https://acme.com');
     expect(prompt).toContain('f-site');
@@ -174,6 +179,13 @@ describe('/app is the dashboard for a returning user', () => {
     expect(importUrlInto).not.toHaveBeenCalled();
   });
 
+  it('a user with no project still gets a new project and canvas', async () => {
+    const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
+
+    expect(redirected.location).toMatch(/^\/p\/p-new\/c\/c-new\?/);
+    expect(listProjects).not.toHaveBeenCalled();
+  });
+
   it('a kind outside the chip table is refused before anything is created', async () => {
     const refused = (await actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A deck', kind: 'spreadsheet' }) } as never)) as { status: number };
 
@@ -191,12 +203,14 @@ describe('/app is the dashboard for a returning user', () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request } as never));
 
     expect(loadAttachments).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', ids: ['a1', 'stranger', 'a2'] });
+    expect(moveAssets).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p-new', ids: ['a1', 'a2'] });
     expect(redirected.location).toContain('&attach=a1%2Ca2');
   });
 
   it('files alone are a brief', async () => {
     const fd = new FormData();
     fd.set('brief', '');
+    fd.set('projectId', 'p1');
     fd.append('attachment', 'a1');
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: new Request('http://x/app', { method: 'POST', body: fd }) } as never));
 

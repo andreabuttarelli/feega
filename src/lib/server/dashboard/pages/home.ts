@@ -6,6 +6,7 @@ import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { signedInDb } from '$lib/server/dashboard/app-shell';
 import { listMemberships, setActiveOrg } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
+import { moveAssets } from '$lib/server/repos/assets';
 import { createCanvas } from '$lib/server/repos/canvas';
 import { SUPPORT_TOOLS } from '$lib/tools';
 import { PROJECT_PARAM, toolScope } from '$lib/server/dashboard/tool-scope';
@@ -61,7 +62,7 @@ async function workspaceOf(event: Parameters<typeof signedInDb>[0] & { cookies: 
   return membership ? { db, userId: user.id, orgId: membership.org.id } : null;
 }
 
-async function importBriefUrl(scope: ToolScope, canvasId: string, brief: string): Promise<Imported | null> {
+async function importBriefUrl(scope: Pick<ToolScope, 'db' | 'orgId' | 'userId' | 'projectId'>, canvasId: string, brief: string): Promise<Imported | null> {
   const url = urlIn(brief);
   if (!url) {
     return null;
@@ -90,12 +91,23 @@ export const actions: Actions = {
     }
 
     const brief = typed || FILES_ONLY_BRIEF;
-    const scope = await toolScope(event, String(form.get('projectId') ?? '') || null);
-    const attachments = attachmentIds.length ? await loadAttachments(scope.db, { orgId: scope.orgId, projectId: scope.projectId, ids: attachmentIds }) : [];
-    const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: scope.projectId, name: briefName(brief) });
+    const workspace = await workspaceOf(event);
+    if (!workspace) {
+      return fail(HTTP_NOT_FOUND, { error: 'No workspace' });
+    }
+
+    const uploadedIn = String(form.get('projectId') ?? '');
+    const attachments = uploadedIn && attachmentIds.length ? await loadAttachments(workspace.db, { orgId: workspace.orgId, projectId: (await toolScope(event, uploadedIn)).projectId, ids: attachmentIds }) : [];
+    const name = briefName(brief);
+    const project = await createProject(workspace.db, { orgId: workspace.orgId, name, slug: projectSlug() });
+    const assetIds = attachments.map((a) => a.assetId);
+    await moveAssets(workspace.db, { orgId: workspace.orgId, projectId: project.id, ids: assetIds });
+
+    const scope = { db: workspace.db, orgId: workspace.orgId, userId: workspace.userId, projectId: project.id };
+    const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: project.id, name });
     const imported = await importBriefUrl(scope, canvas.id, brief);
 
-    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: scope.projectId, canvasId: canvas.id }, kindBrief(kind, brief, imported), attachments.map((a) => a.assetId)));
+    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: project.id, canvasId: canvas.id }, kindBrief(kind, brief, imported), assetIds));
   },
 
   fromTemplate: async (event) => {

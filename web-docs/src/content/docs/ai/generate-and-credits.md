@@ -21,7 +21,7 @@ A blocked or failed run shows **Retry**: same prompt, same model, new attempt.
 
 The organisation's credit balance is always visible at the top of the canvas; click it to open billing. Each generation spends credits by medium and model, and the balance updates after every run.
 
-The canvas chat agent works without credits on the free plan: it runs on Claude Haiku for 20 messages per person, then asks for a plan. With credits it runs Claude Opus 5.5 by default.
+The canvas chat agent works without credits on the free plan: it runs on Claude Haiku for 20 messages per person, without spending credits, then asks for a plan. With credits it runs Claude Opus 5.5 by default.
 
 ## Improve prompt
 

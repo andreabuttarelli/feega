@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { Db } from '$lib/server/db/client';
 import { pickOf } from '$lib/server/project-agent/model-route';
-import { AGENT_PLANS, capReached, planModel, tierOf } from '$lib/server/project-agent/agent-plan';
+import { AGENT_PLANS, billedAs, capReached, planModel, tierOf } from '$lib/server/project-agent/agent-plan';
 import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -120,7 +120,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     return blockedPrompt(screened.error);
   }
 
-  return startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick });
+  return billedAs(plan, () => startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick }));
 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {

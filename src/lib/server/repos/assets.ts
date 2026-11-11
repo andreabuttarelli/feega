@@ -262,3 +262,13 @@ export async function deleteAsset(db: Db, input: { orgId: string; assetId: strin
     throw error;
   }
 }
+
+export async function moveAssets(db: Db, input: { orgId: string; projectId: string; ids: string[] }): Promise<void> {
+  if (!input.ids.length) {
+    return;
+  }
+  const { error } = await db.from('assets').update({ project_id: input.projectId }).eq('org_id', input.orgId).in('id', input.ids);
+  if (error) {
+    throw new Error(error.message);
+  }
+}

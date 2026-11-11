@@ -192,6 +192,12 @@ export function withCreditExempt<T>(fn: () => T): T {
   return creditExemptStorage.run(true, fn);
 }
 
+const unbilledStorage = new AsyncLocalStorage<boolean>();
+
+export function withoutDebit<T>(fn: () => T): T {
+  return unbilledStorage.run(true, fn);
+}
+
 /** True when the current async scope is exempt from the credit gate. */
 export function isCreditExempt(): boolean {
   return creditExemptStorage.getStore() === true;
@@ -436,6 +442,9 @@ function creditsOf(entry: AiCallLog, costUsd: number): number {
 }
 
 function billedToUser(entry: AiCallLog): boolean {
+  if (unbilledStorage.getStore() === true) {
+    return false;
+  }
   return !HOUSE_PAID_LABEL_PREFIXES.some((prefix) => entry.label.startsWith(prefix));
 }
 

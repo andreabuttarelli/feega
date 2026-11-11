@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import { CostTier, type ChatModelOption } from '$lib/chat-model';
 
-const calls = vi.hoisted(() => ({ gate: null as Response | null, turns: 0, models: [] as string[], providerOptions: [] as unknown[], logged: [] as Array<{ model?: string }>, systems: [] as string[] }));
+const calls = vi.hoisted(() => ({ unbilled: 0, gate: null as Response | null, turns: 0, models: [] as string[], providerOptions: [] as unknown[], logged: [] as Array<{ model?: string }>, systems: [] as string[] }));
 
 function finishingModel() {
   return new MockLanguageModelV4({
@@ -62,7 +62,11 @@ vi.mock('$lib/server/ai-log', () => ({
   extractSdkUsage: () => ({}),
   logAiCall: (entry: { model?: string }) => calls.logged.push(entry),
   withBrandContext: (_id: string, fn: () => void) => fn(),
-  withOrgContext: (_id: string, fn: () => void) => fn()
+  withOrgContext: (_id: string, fn: () => void) => fn(),
+  withoutDebit: <T>(fn: () => T): T => {
+    calls.unbilled += 1;
+    return fn();
+  }
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => calls.gate, gateOrgAiAction: async () => calls.gate }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
@@ -103,6 +107,7 @@ describe('the agent runs on the plan of who pays', () => {
     calls.logged.length = 0;
     calls.gate = null;
     calls.turns = 0;
+    calls.unbilled = 0;
   });
 
   it('a paid plan runs Opus 5.5', async () => {
@@ -114,6 +119,12 @@ describe('the agent runs on the plan of who pays', () => {
     calls.gate = new Response('{}', { status: NO_CREDITS });
     await settled(await POST(postEvent({ model: 'anthropic/claude-opus-5.5' })));
     expect(calls.models).toEqual(['anthropic/claude-haiku-4.5']);
+    expect(calls.unbilled).toBe(1);
+  });
+
+  it('a paid turn is debited as usual', async () => {
+    await settled(await POST(postEvent({})));
+    expect(calls.unbilled).toBe(0);
   });
 
   it('a free plan stops at 20 turns with the paywall, before spending', async () => {
