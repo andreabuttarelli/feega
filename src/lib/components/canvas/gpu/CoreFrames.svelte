@@ -36,6 +36,7 @@
   import { liveGenerations } from '$lib/canvas/core/live-generations';
   import { latestOnly } from '$lib/canvas/core/latest-only';
   import { heldBuilds } from '$lib/canvas/core/held-build';
+  import { customPictures as customPicturesOf } from '$lib/canvas/core/custom-pictures';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
   import { Reach, assetTier, keptTier } from '$lib/canvas/core/asset-tier';
@@ -101,14 +102,15 @@
   const READ_TIMEOUT_MS = 8000;
   const domRead = readPool({ lanes: READ_LANES, timeoutMs: READ_TIMEOUT_MS });
   const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
-  const customPictures = new Map<string, CustomFrame['picture']>();
+  const customPictures = customPicturesOf();
+  const liveRead = (id: string) => `${id}:live`;
   const thumbs = thumbStore();
   const thumbPictures = new Map<string, Picture>();
   const thumbAsked = new Set<string>();
   const thumbTaken = new Set<string>();
   const THUMB = ':thumb';
   const VECTORS = ':vectors';
-  const pictures: Pictures = (item) => thumbPictures.get(item.clip) ?? [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
+  const pictures: Pictures = (item) => thumbPictures.get(item.clip) ?? customPictures.of(item) ?? media.pictures(item);
 
   async function mountReads(host: HTMLElement, source: FrameDoc, prepared: Prepared): Promise<CustomReads> {
     const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('@feega/motion-core/motion/gpu-full/dom/custom'), import('@feega/motion-core/motion/hyperframes/compose'), import('@feega/motion-core/motion/interactive/settings')]);
@@ -185,6 +187,9 @@
     const held = await heldMain.of(f.id, [source.doc, source.tokens, source.assets, f.scenes], { f, source });
     const frame = frameOfLive(source);
     const custom = await held.reads?.readAt(frame).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
+    if (custom) {
+      customPictures.set(liveRead(f.id), custom.picture);
+    }
     return drawFrame(held.prepared, frame, custom?.reads);
   }
 
@@ -453,6 +458,7 @@
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
       liveBuilt.delete(id);
       heldMain.drop(id);
+      customPictures.drop(liveRead(id));
       const saved = frames.find((f) => f.id === id);
       if (saved && saved.revision === liveAtRevision.get(id)) {
         continue;
