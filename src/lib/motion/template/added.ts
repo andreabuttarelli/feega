@@ -2,6 +2,8 @@ export type AddedRow = { on: string; ids: readonly string[] };
 
 export const SNAPCN_ADDED_ON = '2026-11-10';
 const SNAPCN_ID_PREFIX = 'builtin:snapcn-';
+export const HF_ADDED_ON = '2026-11-11';
+const HF_ID_PREFIX = 'builtin:hyperframes-';
 
 export const ADDED: readonly AddedRow[] = [
   { on: '2026-10-15', ids: [
@@ -152,6 +154,9 @@ const addedById = new Map(ADDED.flatMap((row) => row.ids.map((id) => [id, row.on
 export function addedOn(id: string): string {
   if (id.startsWith(SNAPCN_ID_PREFIX)) {
     return SNAPCN_ADDED_ON;
+  }
+  if (id.startsWith(HF_ID_PREFIX)) {
+    return HF_ADDED_ON;
   }
   return addedById.get(id) ?? '';
 }
