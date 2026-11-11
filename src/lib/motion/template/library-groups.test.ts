@@ -16,7 +16,7 @@ const items = [
 ];
 
 describe('library groups', () => {
-  it('groups built-ins by name prefix, own templates under Your library first', () => {
+  it('groups built-ins by name prefix, own templates first and the unprefixed ones last', () => {
     expect(groupItems(items).map((g) => [g.title, g.items.length])).toEqual([[YOUR_LIBRARY, 1], ['Launch', 2], ['Scene', 1], ['Other', 1]]);
   });
 

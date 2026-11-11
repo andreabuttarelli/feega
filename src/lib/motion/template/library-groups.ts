@@ -34,10 +34,8 @@ export function groupItems(items: readonly CatalogueItem[]): LibraryGroup[] {
     const title = groupTitle(item);
     groups.set(title, [...(groups.get(title) ?? []), item]);
   }
-  const own = groups.get(YOUR_LIBRARY);
-  groups.delete(YOUR_LIBRARY);
-  const list = [...groups].map(([title, rows]) => ({ title, items: rows }));
-  return own ? [{ title: YOUR_LIBRARY, items: own }, ...list] : list;
+  const rank = (title: string) => (title === YOUR_LIBRARY ? 0 : title === OTHER_GROUP ? 2 : 1);
+  return [...groups].map(([title, rows]) => ({ title, items: rows })).sort((a, b) => rank(a.title) - rank(b.title));
 }
 
 export function filterGroup(items: readonly CatalogueItem[], group: string | null): CatalogueItem[] {
