@@ -10,7 +10,10 @@ export enum SnapcnCategory {
   Caption = 'captions',
   Cursor = 'cursor',
   Social = 'social',
-  Transition = 'transitions'
+  Transition = 'transitions',
+  Background = 'backgrounds',
+  Effect = 'effects',
+  Icon = 'icons'
 }
 
 export type SnapcnView = { root: HTMLElement; width: number; height: number; fps: number; frames: number; props: Record<string, unknown> };

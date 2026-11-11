@@ -28,6 +28,7 @@
   import { Liveness } from '@feega/motion-core/motion/interactive/settings';
   import { applyInteractivePreset } from '$lib/motion/interactive/presets';
   import type { VarValues } from '@feega/motion-core/motion/interactive/vars';
+  import { insertThenClose } from '$lib/motion/template/insert-flow';
   import { carryEdits, insertTemplate, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
@@ -159,28 +160,28 @@
     return carried.ok ? { ...placed, doc: carried.doc } : carried;
   }
 
-  async function addTemplateSounds(withTemplate: MotionDoc, clipId: string, at: MotionDoc) {
+  async function addTemplateSounds(withTemplate: MotionDoc, clipId: string, at: MotionDoc, held: FrameEditSession) {
     const form = new FormData();
     form.set('doc', JSON.stringify(withTemplate));
     form.set('clipId', clipId);
     const result = await postPageAction(editorUrl, 'templateSounds', form);
     if (result.type !== 'success') {
-      session.notice = 'The template is in; its sounds could not be added.';
+      held.notice = 'The template is in; its sounds could not be added.';
       return;
     }
-    if (session.history.present !== at) {
-      session.notice = 'The video changed while its sounds were made: insert the template again to add them.';
+    if (held.history.present !== at) {
+      held.notice = 'The video changed while its sounds were made: insert the template again to add them.';
       return;
     }
     onedit({ ok: true, doc: (result.data as { doc: MotionDoc }).doc }, 'Added template sounds');
   }
 
   async function insertEntry(entry: TemplateEntry, sounds: boolean, draft: Instance | null = null) {
-    onclose();
-    const placed = placedWith(entry, draft);
-    onedit(placed, `Inserted ${entry.template.name}`);
+    const held = session;
+    const placed = insertThenClose({ place: () => placedWith(entry, draft), edit: (result) => onedit(result, `Inserted ${entry.template.name}`), close: onclose });
+    const at = held.history.present;
     if (placed.ok && sounds) {
-      await addTemplateSounds(placed.doc, placed.clipId, session.history.present);
+      await addTemplateSounds(placed.doc, placed.clipId, at, held);
     }
   }
 

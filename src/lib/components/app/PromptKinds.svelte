@@ -1,44 +1,60 @@
 <script lang="ts">
-  import { PROMPT_KINDS, PROMPT_KIND_ORDER, type PromptKind } from '$lib/home/prompt-kinds';
+  import type { Component } from 'svelte';
+  import Clapperboard from '@lucide/svelte/icons/clapperboard';
+  import AppWindow from '@lucide/svelte/icons/app-window';
+  import { PROMPT_KINDS, PROMPT_KIND_ORDER, PromptKind } from '$lib/home/prompt-kinds';
 
   let { kind = $bindable() }: { kind: PromptKind } = $props();
+
+  const KIND_ICONS: Record<PromptKind, Component<{ size?: number }>> = {
+    [PromptKind.Motion]: Clapperboard,
+    [PromptKind.Website]: AppWindow
+  };
 </script>
 
 <div class="kinds" role="group" aria-label="What to make" data-testid="prompt-kinds">
   {#each PROMPT_KIND_ORDER as option (option)}
-    <button type="button" data-kind={option} aria-pressed={kind === option} onclick={() => (kind = option)}>{PROMPT_KINDS[option].label}</button>
+    {@const Icon = KIND_ICONS[option]}
+    <button type="button" data-kind={option} aria-pressed={kind === option} onclick={() => (kind = option)}>
+      <Icon size={16} />
+      <span>{PROMPT_KINDS[option].label}</span>
+    </button>
   {/each}
 </div>
 
 <style>
   .kinds {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--ui-space-1);
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
   button {
-    height: var(--ui-row);
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--ui-space-2);
+    height: var(--ui-row-lg);
     padding: 0 var(--ui-space-3);
     border: 0;
-    border-radius: var(--ui-radius-full);
-    background: var(--ui-input);
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
     color: var(--ui-text-secondary);
     font: inherit;
-    font-size: var(--ui-type-label);
+    font-size: var(--ui-type-body);
+    white-space: nowrap;
     cursor: pointer;
     transition: background var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
   }
 
   button:hover {
-    background: var(--ui-input-hover);
     color: var(--ui-text);
   }
 
   button[aria-pressed='true'] {
-    background: var(--ui-accent-solid);
-    color: var(--ui-on-accent);
+    background: var(--ui-input);
+    color: var(--ui-text);
   }
 
   button:focus-visible {

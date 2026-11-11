@@ -279,6 +279,10 @@ impl World {
         std::mem::replace(&mut self.scene_damage, Damage::none())
     }
 
+    pub fn use_count(&self) -> usize {
+        self.uses.len()
+    }
+
     pub fn scene(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
         let uses = self.uses.iter().filter(|u| !self.lifted(u)).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), cache: false, hold: false, ..u.clone() }));
         DisplayList { width, height, background: None, items: uses.collect(), faces: Vec::new(), fragments: Default::default() }

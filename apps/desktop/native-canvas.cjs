@@ -20,8 +20,8 @@ const Channel = {
 const DEBUG_FLAG = 'FEEGA_NATIVE_DEBUG';
 const SENDABLE = new Set(['picture', 'putGroup', 'appendGroup', 'patchGroup', 'dropGroup', 'patchUses', 'setOverlay', ...(process.env[DEBUG_FLAG] ? ['snapshot'] : [])]);
 
-function wanted(env, platform) {
-  return env[ENV_FLAG] === ENABLED && platform === SUPPORTED_PLATFORM;
+function wanted(env, platform, packaged) {
+  return !packaged && env[ENV_FLAG] === ENABLED && platform === SUPPORTED_PLATFORM;
 }
 
 function addonPath(dir) {

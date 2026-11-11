@@ -7,6 +7,9 @@ import type { PageTree } from '$lib/server/url-import/page-tree';
 import { CodeImportOutcome, Crop, importBoards, importCodeAt } from './import-code';
 import { BASE_CONDITIONS, Scheme } from './render-conditions';
 import { RunFailure, type RepoRunner } from './sandbox-runner';
+import { fixture } from '../../../../tests/fixtures/design-tokens/read';
+import { DesignSystem } from './design-system';
+import { DESIGN_BOARD } from './design-board';
 
 const APP = 'https://sb-1.vercel.run';
 const button = (id: string, use: number, x: number, label: string) => ({
@@ -194,6 +197,42 @@ describe('importCodeAt', () => {
     const clips = (docs.get('frame-1')!.doc as { tracks: { clips: { source?: { cond?: string } }[] }[] }).tracks.flatMap((t) => t.clips);
     const sourced = clips.filter((c) => c.source);
     expect(sourced.map((c) => c.source!.cond ?? null)).toEqual(expect.arrayContaining([null, 'dark@1280']));
+  });
+});
+
+describe('importCodeAt design system', () => {
+  type Doc = { variables?: Record<string, { modes: string[]; active?: string }>; tracks: { clips: { name?: string }[] }[] };
+
+  it('legge i token del repo alla revisione avviata: variabili con i modi, una tavola Design system, la mappa dei token', async () => {
+    const revs: (string | null)[] = [];
+    const { ask, docs } = askOf({ routes: ['/'], code: (rev) => (revs.push(rev), fixture('tailwind4')) });
+
+    const done = await importCodeAt(ask);
+
+    const doc = docs.get('frame-1')!.doc as Doc;
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/'], design: { tokens: 13 } });
+    expect(doc.variables!['app Colors']).toMatchObject({ modes: ['Light', 'Dark'], active: 'Light' });
+    expect(doc.tracks.flatMap((t) => t.clips).some((c) => c.name === DESIGN_BOARD)).toBe(true);
+    expect(done.outcome === CodeImportOutcome.Ok && done.tokenMap!['app Colors/primary'].origins).toEqual({ Light: 'src/app.css:6:1', Dark: 'src/app.css:22:1' });
+    expect(revs).toEqual([null]);
+  });
+
+  it('con Design system spento non crea variabili né tavola', async () => {
+    const { ask, docs } = askOf({ routes: ['/'], code: () => fixture('tailwind4'), designSystem: DesignSystem.Off });
+
+    const done = await importCodeAt(ask);
+
+    expect((docs.get('frame-1')!.doc as Doc).variables).toBeUndefined();
+    expect(done).not.toHaveProperty('design');
+  });
+
+  it('un repo senza token importa come prima', async () => {
+    const { ask, docs } = askOf({ routes: ['/'], code: () => async () => null });
+
+    const done = await importCodeAt(ask);
+
+    expect(done.outcome).toBe(CodeImportOutcome.Ok);
+    expect((docs.get('frame-1')!.doc as Doc).variables).toBeUndefined();
   });
 });
 

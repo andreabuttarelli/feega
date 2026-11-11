@@ -59,11 +59,31 @@ export type Axis = { id: string; label: string; support: AxisSupport; reason: st
 export const CONDITION_AXES: Axis[] = [
   { id: 'theme', label: 'Theme (light, dark)', support: AxisSupport.Switchable, reason: 'The page opens with prefers-color-scheme, color-scheme and the stored theme key set to the chosen scheme, so class, data-attribute and media-query themes follow. Custom named themes are not enumerated.' },
   { id: 'viewport', label: 'Viewport and breakpoints', support: AxisSupport.Switchable, reason: 'The page opens at the chosen width, so media and container queries resolve for it.' },
-  { id: 'tokens', label: 'Design tokens and CSS variables', support: AxisSupport.Applied, reason: 'The browser resolves them to values before capture. They are not linked to feega variables, so an edit writes the element, not the token.' },
+  { id: 'tokens', label: 'Design tokens and CSS variables', support: AxisSupport.Applied, reason: 'Tokens the repo declares become feega variables with a mode per theme, bound to the layers that use them; an edit to a variable writes the token. The sources read are listed in TOKEN_SOURCES.' },
   { id: 'styles', label: 'Global styles, resets, layouts, providers', support: AxisSupport.Applied, reason: 'The real route is rendered with its stylesheets and wrappers.' },
   { id: 'fonts', label: 'Font loading', support: AxisSupport.Applied, reason: 'Loaded faces are read from the page and from its stylesheets.' },
   { id: 'motion', label: 'Reduced motion, contrast', support: AxisSupport.Applied, reason: 'Frames are captured at rest, with the browser defaults for both.' },
   { id: 'variants', label: 'Component variants', support: AxisSupport.Applied, reason: 'Every variant the route renders becomes a component variant. A variant the route does not render is not imported.' },
   { id: 'locale', label: 'Locale and text direction', support: AxisSupport.Unsupported, reason: 'The browser language is fixed, so the default catalog is shown. Right-to-left is not simulated.' },
   { id: 'state', label: 'Auth, feature flags, env vars, loading, empty and error states', support: AxisSupport.Unsupported, reason: 'The dev server renders what its own configuration and data give. States are not forced.' }
+];
+
+export enum TokenSupport {
+  Supported = 'supported',
+  Unsupported = 'unsupported'
+}
+
+export type TokenSource = { id: string; label: string; support: TokenSupport; reason: string };
+
+export const TOKEN_SOURCES: TokenSource[] = [
+  { id: 'tailwind4', label: 'Tailwind v4 @theme / @theme inline', support: TokenSupport.Supported, reason: 'Colours, radii, spacing and font families are read from the CSS text; the Light mode.' },
+  { id: 'css-variables', label: 'CSS custom properties in :root, .dark, [data-theme=…]', support: TokenSupport.Supported, reason: 'Each theme selector is a mode; prefers-color-scheme media queries count as Light or Dark.' },
+  { id: 'shadcn', label: 'shadcn components.json + its stylesheet', support: TokenSupport.Supported, reason: 'components.json names the stylesheet; @theme inline aliases point at the :root and .dark values.' },
+  { id: 'type-scale', label: 'Type scale, shadows, breakpoints, easing (--text-*, --shadow-*, …)', support: TokenSupport.Unsupported, reason: 'Listed as left out: they become text and effect styles in a later stage.' },
+  { id: 'computed', label: 'calc() and other computed values', support: TokenSupport.Unsupported, reason: 'Not a literal: a variable holds one value per mode.' },
+  { id: 'width-media', label: 'Tokens inside @media (min-width…)', support: TokenSupport.Unsupported, reason: 'A width is not a theme; breakpoint modes would mix with Light and Dark.' },
+  { id: 'tailwind3', label: 'Tailwind v3 tailwind.config.js', support: TokenSupport.Unsupported, reason: 'The config is code: it would have to run, which only the sandbox may do. A later stage.' },
+  { id: 'preprocessors', label: 'SCSS / LESS variables', support: TokenSupport.Unsupported, reason: 'Compiled away before the page renders: nothing ties a layer back to them.' },
+  { id: 'js-themes', label: 'JS theme objects (styled-components, Emotion, MUI)', support: TokenSupport.Unsupported, reason: 'Values are computed at runtime by app code, which is never run outside the sandbox.' },
+  { id: 'w3c-json', label: 'W3C design-tokens JSON', support: TokenSupport.Unsupported, reason: 'A later stage.' }
 ];

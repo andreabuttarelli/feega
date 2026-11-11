@@ -9,7 +9,7 @@ pub const TILE_BYTES: u64 = ((TILE_PX + 2 * TILE_GUTTER_PX) as u64).pow(2) * 4;
 pub const CANVAS_TILES: usize = 320;
 
 fn canvas_step(extent: Rect, camera: Camera, allowed: usize) -> i32 {
-    let fits = |step: i32| keys_over(extent, step).len() <= allowed;
+    let fits = |step: i32| count_over(extent, step) <= allowed as f64;
     (step_of(camera.zoom) - COARSER_STEPS..=step_of(camera.zoom)).rev().find(|s| fits(*s)).unwrap_or(step_of(camera.zoom) - COARSER_STEPS)
 }
 
@@ -146,6 +146,11 @@ pub struct Tiles {
 
 fn seen_world(camera: Camera, (w, h): (u32, u32)) -> Rect {
     Rect::new(-camera.x / camera.zoom, -camera.y / camera.zoom, (w as f64 - camera.x) / camera.zoom, (h as f64 - camera.y) / camera.zoom)
+}
+
+fn count_over(world: Rect, step: i32) -> f64 {
+    let side = TILE_PX as f64 / step_zoom(step);
+    ((world.x1 / side).ceil() - (world.x0 / side).floor()) * ((world.y1 / side).ceil() - (world.y0 / side).floor())
 }
 
 fn keys_over(world: Rect, step: i32) -> Vec<TileKey> {
@@ -296,8 +301,13 @@ impl Tiles {
         }
     }
 
-    fn pinned(&self, camera: Camera, screen: (u32, u32), key: TileKey) -> bool {
-        if self.canvas_allowed() > 0 && self.canvas.is_some_and(|c| key.step == canvas_step(c, camera, self.canvas_allowed())) {
+    fn whole_step(&self, camera: Camera) -> Option<i32> {
+        let canvas = self.canvas.filter(|_| self.canvas_allowed() > 0)?;
+        Some(canvas_step(canvas, camera, self.canvas_allowed()))
+    }
+
+    fn pinned(camera: Camera, screen: (u32, u32), whole: Option<i32>, key: TileKey) -> bool {
+        if whole == Some(key.step) {
             return true;
         }
         let step = step_of(camera.zoom);
@@ -319,7 +329,8 @@ impl Tiles {
         let step = step_of(camera.zoom);
         let centre = seen_world(camera, screen).center();
         let distance = |k: &TileKey| (k.step - step).abs() as f64 * 1e9 + k.world().center().distance(centre);
-        let mut loose: Vec<TileKey> = self.held.iter().copied().filter(|k| !self.pinned(camera, screen, *k)).collect();
+        let whole = self.whole_step(camera);
+        let mut loose: Vec<TileKey> = self.held.iter().copied().filter(|k| !Self::pinned(camera, screen, whole, *k)).collect();
         loose.sort_by(|a, b| {
             let used = |k: &TileKey| self.last_drawn.get(k).copied().unwrap_or(0);
             used(a).cmp(&used(b)).then(distance(b).total_cmp(&distance(a)))

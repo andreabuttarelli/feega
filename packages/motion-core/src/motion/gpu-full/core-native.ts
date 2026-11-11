@@ -5,7 +5,10 @@ export type NativePlacement = { x: number; y: number; width: number; height: num
 export type NativeCamera = { x: number; y: number; zoom: number };
 export type Rgb = [number, number, number];
 
+export const NATIVE_PROTOCOL = 1;
+
 export type NativeCanvasBridge = {
+  protocol: number;
   attach: (placement: NativePlacement, width: number, height: number, background: Rgb) => Promise<void>;
   picture: (clip: string, rgba: ArrayBuffer, width: number, height: number) => void;
   putGroup: (key: string, json: string) => void;
@@ -159,7 +162,7 @@ function follow(canvas: Element, start: NativePlacement, move: (to: NativePlacem
 
 const bridgeOf = (): NativeCanvasBridge | null => (typeof window === 'undefined' ? null : ((window as { feegaNativeCanvas?: NativeCanvasBridge }).feegaNativeCanvas ?? null));
 
-export const nativeCanvasOffered = (): boolean => bridgeOf() !== null;
+export const nativeCanvasOffered = (): boolean => bridgeOf()?.protocol === NATIVE_PROTOCOL;
 
 export async function createCoreNative(canvas: HTMLCanvasElement, width: number, height: number): Promise<CoreRaster> {
   const bridge = bridgeOf();

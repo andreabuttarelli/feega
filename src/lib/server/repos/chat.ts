@@ -226,11 +226,3 @@ export async function turnRunning(db: Db, input: { orgId: string; threadId: stri
 async function closeCutReply(db: Db, input: { orgId: string; id: string }) {
   await db.from('chat_messages').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('org_id', input.orgId).eq('id', input.id).eq('status', STREAMING);
 }
-
-export async function countUserTurns(db: Db, userId: string): Promise<number> {
-  const { count, error } = await db.from('chat_messages').select('id', { count: 'exact', head: true }).eq('role', 'user').eq('actor_kind', 'user').eq('actor_id', userId);
-  if (error) {
-    throw new Error(error.message);
-  }
-  return count ?? 0;
-}

@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { test, expect, chromium, webkit, type Browser, type BrowserContext, type CDPSession, type Page } from '@playwright/test';
-import { instrument, measure, wheelPan, wheelZoom, type Frames } from '../e2e/fixtures/frame-sweeps';
+import { instrument, measure, wheelPan, wheelZoom, type CoreWork, type Frames } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
 import { mid } from '../../scripts/perf/bench-stats.mjs';
 
@@ -19,7 +19,7 @@ enum Gesture {
   DragElement = 'drag-element'
 }
 
-type GestureRun = { fps: number; presentFps: number; p95: number; worst: number; frames: number; cpuMs: number | null; swaps: number | null; longMs: number; longest: number; inputP95: number; inputWorst: number };
+type GestureRun = { fps: number; presentFps: number; p95: number; p99: number; over11: number; core: CoreWork; worst: number; frames: number; cpuMs: number | null; swaps: number | null; longMs: number; longest: number; inputP95: number; inputWorst: number };
 type MainThread = { longMs: number; longest: number; inputP95: number; inputWorst: number };
 type BenchRun = Record<Gesture, GestureRun> & { sharpMs: number; editMs: number };
 type Hotspot = { fn: string; url: string; selfMs: number };
@@ -375,7 +375,7 @@ async function gestureRun(page: Page, cdp: CDPSession | null, gesture: Gesture, 
   if (profile) {
     writeFileSync(join(OUT, `landings-${gesture}.cpuprofile`), JSON.stringify(profile));
   }
-  return { frames: { fps: frames.fpsAvg, presentFps: Math.round((presented * MS_PER_S) / GESTURE_MS), p95: frames.p95, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps, ...main }, spots: profile ? hotspots(profile) : [] };
+  return { frames: { fps: frames.fpsAvg, presentFps: Math.round((presented * MS_PER_S) / GESTURE_MS), p95: frames.p95, p99: frames.p99, over11: frames.over11, core: frames.core, worst: frames.max, frames: frames.frames, cpuMs: before === null || after === null ? null : Math.round(after - before), swaps, ...main }, spots: profile ? hotspots(profile) : [] };
 }
 
 async function untilChanged(page: Page, from: Buffer): Promise<number> {
@@ -447,7 +447,7 @@ async function run(browser: Browser, base: string, index: number, profiled: bool
 
 function medianOf(runs: BenchRun[]) {
   const pick = (values: (number | null)[]) => (values.some((v) => v === null) ? null : mid(values as number[]));
-  const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'presentFps', 'p95', 'worst', 'cpuMs', 'longMs', 'longest', 'inputP95', 'inputWorst'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
+  const gestures = Object.fromEntries(benched().map((g) => [g, Object.fromEntries((['fps', 'presentFps', 'p95', 'p99', 'over11', 'worst', 'cpuMs', 'longMs', 'longest', 'inputP95', 'inputWorst'] as const).map((k) => [k, pick(runs.map((r) => r[g][k]))]))]));
   return { ...gestures, sharpMs: mid(runs.map((r) => r.sharpMs)), editMs: mid(runs.map((r) => r.editMs)) };
 }
 

@@ -1,3 +1,4 @@
+import { ProductEvent, track } from '$lib/server/product-events/track';
 import { SPAWN_AGENT } from '$lib/server/agents/spawn';
 import { PLATFORM_TIMING, landingWatch } from '$lib/server/agents/turn-core';
 import { spawnAgentTool, spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
@@ -154,6 +155,9 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
     abortSignal: cut.signal,
     stopWhen: [agentStopWhen(t0), overTurnCap(() => spent), ({ steps }) => pickAwaits(steps)],
     onStepFinish: (step) => {
+      if (!steps.length) {
+        void track(ProductEvent.AgentFirstOutput, { userId, orgId }, {});
+      }
       spent += spentUsd([extractSdkUsage(step.usage)], [model], gatewayRate);
       steps.push(step);
       void reply.progress(finishedTurn(steps));
@@ -185,7 +189,12 @@ export async function startProjectTurn(input: ProjectTurnInput): Promise<Respons
 
   runInBackground(
     async () => {
-      await result.consumeStream({ onError: (e) => console.error('[project-agent] turn failed after client left', e) });
+      await result.consumeStream({
+        onError: (e) => {
+          console.error('[project-agent] turn failed after client left', e);
+          void track(ProductEvent.AgentFailed, { userId, orgId }, { code: 'turn_error' });
+        }
+      });
       watch.stop();
       await reply.finish(finishedTurn(steps), ReplyStatus.Failed);
     },

@@ -1,3 +1,4 @@
+import { FREE_CREDITS } from '$lib/plans';
 import { randomBytes } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
 import { createServiceRoleDb } from '$lib/server/db/client';
@@ -91,7 +92,26 @@ export async function createFirstOrgWith(db: Db, input: { userId: string; name: 
     throw memberError;
   }
 
+  await grantSignupCredits(db, { orgId: org.id, userId: input.userId }).catch((e) => console.error('[bootstrap] signup credits not granted', e));
   return { orgId: org.id, slug: org.slug, role: 'owner' };
+}
+
+export const SIGNUP_GRANT_NOTE = 'signup_grant';
+const UNIQUE_VIOLATION = '23505';
+
+async function grantSignupCredits(db: Db, input: { orgId: string; userId: string }): Promise<void> {
+  const { data: granted, error: readError } = await db.from('credit_ledger').select('id').eq('created_by', input.userId).eq('note', SIGNUP_GRANT_NOTE).limit(1);
+  if (readError) {
+    throw readError;
+  }
+  if (granted?.length) {
+    return;
+  }
+
+  const { error } = await db.from('credit_ledger').insert({ org_id: input.orgId, kind: 'grant', source: 'promo', amount: FREE_CREDITS, created_by: input.userId, note: SIGNUP_GRANT_NOTE });
+  if (error && error.code !== UNIQUE_VIOLATION) {
+    throw error;
+  }
 }
 
 export function createFirstOrg(input: { userId: string; name: string }): Promise<FirstOrg> {

@@ -5,11 +5,11 @@ export enum PromptKind {
   Website = 'website'
 }
 
-export type PromptKindRow = { label: string; hint: string; format: FramePreset; fromUrl: (url: string) => string };
+export type PromptKindRow = { label: string; placeholder: string; hint: string; format: FramePreset; fromUrl: (url: string) => string };
 
 export const PROMPT_KINDS: Record<PromptKind, PromptKindRow> = {
-  [PromptKind.Motion]: { label: 'motion video', hint: 'Make it a motion video.', format: FramePreset.Presentation, fromUrl: (url) => `Make a launch film of ${url}` },
-  [PromptKind.Website]: { label: 'website design', hint: 'Make it a website design.', format: FramePreset.Desktop, fromUrl: (url) => `Redesign ${url}` }
+  [PromptKind.Motion]: { label: 'motion video', placeholder: 'Describe a launch video, or paste your website…', hint: 'Make it a motion video.', format: FramePreset.Presentation, fromUrl: (url) => `Make a launch film of ${url}` },
+  [PromptKind.Website]: { label: 'website design', placeholder: 'Describe a landing page, or paste a site to redesign…', hint: 'Make it a website design.', format: FramePreset.Desktop, fromUrl: (url) => `Redesign ${url}` }
 };
 
 export const DEFAULT_KIND = PromptKind.Motion;
