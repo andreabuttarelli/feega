@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { formatOf, type MotionDoc } from '@feega/motion-core/motion/doc';
 import type { MotionNode } from '$lib/canvas/motion-node';
-import { applyOps, diffDoc, type DocOp } from '$lib/motion/doc-ops';
+import { applyOps, clashes, diffDoc, type DocOp } from '$lib/motion/doc-ops';
 import { RevisionOutcome, readRevision, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -12,17 +12,19 @@ import { CoreEvent, motionEdits } from '$lib/core-usage';
 export enum OpsOutcome {
   Written = 'written',
   Invalid = 'invalid',
-  Busy = 'busy'
+  Busy = 'busy',
+  Conflict = 'conflict'
 }
 
 export type OpsCommit =
   | { outcome: OpsOutcome.Written; head: MotionHead; rebased: boolean }
   | { outcome: OpsOutcome.Invalid; error: string }
-  | { outcome: OpsOutcome.Busy };
+  | { outcome: OpsOutcome.Busy }
+  | { outcome: OpsOutcome.Conflict; head: MotionHead };
 
 type FrameScope = { orgId: string; nodeId: string; node: Pick<MotionNode, 'format'> };
 
-export type OpsAsk = FrameScope & { baseVersion: number; ops: readonly DocOp[]; actor: Actor; summary: string | null; checkpoint?: Checkpoint };
+export type OpsAsk = FrameScope & { baseVersion: number; baseDoc?: MotionDoc; ops: readonly DocOp[]; actor: Actor; summary: string | null; checkpoint?: Checkpoint };
 
 export const COMMIT_ATTEMPTS = 5;
 
@@ -30,6 +32,11 @@ function noteEdits(ask: { nodeId: string; actor: Actor }, ops: readonly DocOp[])
   for (const kind of motionEdits(ops)) {
     coreEvent(ask.actor.id, CoreEvent.MotionEdited, { frame_id: ask.nodeId, kind });
   }
+}
+
+async function overwrites(db: Db, ask: OpsAsk, head: MotionHead): Promise<boolean> {
+  const base = ask.baseDoc ?? (await readRevision(db, { orgId: ask.orgId, nodeId: ask.nodeId, version: ask.baseVersion }))?.doc;
+  return !base || clashes(ask.ops, diffDoc(base, head.doc));
 }
 
 export async function commitOps(db: Db, ask: OpsAsk): Promise<OpsCommit> {
@@ -43,6 +50,9 @@ export async function commitOps(db: Db, ask: OpsAsk): Promise<OpsCommit> {
     const rebased = head.version !== ask.baseVersion;
     if (!ask.ops.length) {
       return { outcome: OpsOutcome.Written, head, rebased };
+    }
+    if (rebased && (await overwrites(db, ask, head))) {
+      return { outcome: OpsOutcome.Conflict, head };
     }
 
     const write = await saveMotionDoc(db, { ...scope, expectedVersion: head.version, doc: applyOps(head.doc, ask.ops), actor: ask.actor, summary: ask.summary, checkpoint: ask.checkpoint });
@@ -73,13 +83,14 @@ export async function commitDoc(db: Db, ask: DocAsk): Promise<OpsCommit> {
   if (write.outcome === RevisionOutcome.Invalid) {
     return { outcome: OpsOutcome.Invalid, error: write.error };
   }
-  return commitOps(db, { ...ask, baseVersion: ask.base.version, ops });
+  return commitOps(db, { ...ask, baseVersion: ask.base.version, baseDoc: ask.base.doc, ops });
 }
 
 const REVISION_WRITE: { [K in OpsOutcome]: (commit: Extract<OpsCommit, { outcome: K }>) => RevisionWrite } = {
   [OpsOutcome.Written]: (commit) => ({ outcome: RevisionOutcome.Written, head: commit.head }),
   [OpsOutcome.Invalid]: (commit) => ({ outcome: RevisionOutcome.Invalid, error: commit.error }),
-  [OpsOutcome.Busy]: () => ({ outcome: RevisionOutcome.Conflict })
+  [OpsOutcome.Busy]: () => ({ outcome: RevisionOutcome.Conflict }),
+  [OpsOutcome.Conflict]: () => ({ outcome: RevisionOutcome.Conflict })
 };
 
 export function revisionWriteOf(commit: OpsCommit): RevisionWrite {

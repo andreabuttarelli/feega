@@ -18,10 +18,11 @@ const RETRY_CAP_MS = 30000;
 
 export enum Delivery {
   Refused = 'refused',
-  Unreachable = 'unreachable'
+  Unreachable = 'unreachable',
+  Conflict = 'conflict'
 }
 
-export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string; delivery?: Delivery };
+export type SendResult = { ok: true; version: number; doc: MotionDoc | undefined } | { ok: false; error: string; delivery?: Delivery; head?: Revision };
 
 const UNREACHABLE: SendResult = { ok: false, error: 'offline', delivery: Delivery.Unreachable };
 
@@ -308,6 +309,11 @@ export class FrameEditSession {
       this.follow(landed(base, sent, this.history.present, { version: result.version, doc: result.doc as MotionDoc }));
       this.saveState = SaveState.Saved;
       this.keepDraft();
+    } else if (result.head) {
+      this.adopt(result.head);
+      this.saveState = SaveState.Saved;
+      this.notice = result.error;
+      this.port.draft(null);
     } else {
       this.saveState = SaveState.Failed;
       this.notice = result.error;

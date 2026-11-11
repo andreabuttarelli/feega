@@ -514,3 +514,19 @@ describe('waiting for the doc to reach the server', () => {
     await expect(open().session.settled()).resolves.toBeUndefined();
   });
 });
+
+describe('a save overtaken by a newer version', () => {
+  it('loads the newer head, says so, and does not send the stale edit again', async () => {
+    const newer = longer(120);
+    const { session, port } = open(async () => ({ ok: false, error: 'changed elsewhere', delivery: Delivery.Conflict, head: { version: 5, doc: newer } }));
+    session.apply({ ok: true, doc: longer(60) }, 'Longer');
+
+    await vi.runAllTimersAsync();
+
+    expect(session.history.present).toEqual(newer);
+    expect(session.version).toBe(5);
+    expect(session.notice).toBe('changed elsewhere');
+    expect(session.saveState).toBe(SaveState.Saved);
+    expect(port.send).toHaveBeenCalledTimes(1);
+  });
+});
