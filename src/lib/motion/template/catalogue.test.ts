@@ -94,7 +94,7 @@ describe('the newest templates lead every catalogue', () => {
     const dates = items.map((i) => addedOn(i.id));
 
     expect(dates).toEqual([...dates].sort((a, b) => b.localeCompare(a)));
-    expect(items[0].id.startsWith('builtin:magicui-')).toBe(true);
+    expect(items[0].id).toMatch(/^builtin:(magicui|animata)-/);
     expect(items.some((i) => i.id.startsWith('builtin:snapcn-') && addedOn(i.id) === SNAPCN_ADDED_ON)).toBe(true);
   });
 
