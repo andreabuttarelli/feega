@@ -401,6 +401,15 @@
   const coreFrames = $derived(framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}));
   const editIds = $derived(editableIds(selected, DOM_CAP, new Set([...coreFrames.map((f) => f.id), ...placed.filter((t) => t.kind === SECTION_TYPE).map((t) => t.id)])));
   const overlayFrames = $derived(coreFrames.map((f) => ({ id: f.id, ...f.box, rotation: byId.get(f.id)?.rotation ?? 0, bar: 0, doc: { width: f.box.w, height: f.box.h } })));
+  const OVERLAY_REACH = 0.5;
+  let overlaySeen = new Set<string>();
+  const seenOverlays = $derived.by(() => {
+    const reach = { x: view.x + area.width * OVERLAY_REACH, y: view.y + area.height * OVERLAY_REACH, zoom: view.zoom };
+    const next = cullIndex.visible(reach, { width: area.width * (1 + 2 * OVERLAY_REACH), height: area.height * (1 + 2 * OVERLAY_REACH) });
+    return sameSet(overlaySeen, next) ? overlaySeen : (overlaySeen = next);
+  });
+  const keptOverlays = $derived.by(() => new Set([inside?.nodeId, typing?.nodeId, cropping?.nodeId].filter((id): id is string => !!id)));
+  const shownOverlays = $derived(overlayFrames.filter((f) => seenOverlays.has(f.id) || keptOverlays.has(f.id)));
   const prototypeDocs = $derived(new Map(coreFrames.flatMap((f) => (liveOf(f.id) ? [[f.id, liveOf(f.id)!.doc] as const] : []))));
   const arrowLinks = $derived(prototypeLinks(prototypeDocs));
   const playerFrames = $derived(coreFrames.filter((f) => kindOfNode(f.id) === FrameKind.Frame && liveOf(f.id)).map((f) => ({ id: f.id, name: tileLabel(byId.get(f.id)!), live: liveOf(f.id)! })));
@@ -4361,7 +4370,7 @@
         <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
       {/each}
     </div>
-    <FrameOverlays {view} frames={overlayFrames}>
+    <FrameOverlays {view} frames={shownOverlays}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
         {#if edit}
