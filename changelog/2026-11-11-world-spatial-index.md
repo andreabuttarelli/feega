@@ -28,5 +28,6 @@ per frame on the scaled landings canvas went from 72 / 252 / 468 (10k / 50k / 10
 every size; on a synthetic grid of 10k / 100k frames from 60,000 / 600,000 to 8–60, and the list
 build from 11–22 ms / 104–124 ms to 1–10 µs.
 
-Known gap: a group's dropped size is not refreshed (`drop_group` touches only before dropping), so
-a use of a dropped group keeps its old bounds; it only changes which plans report it missing.
+`Compositor::drop_group` touches a group before and after dropping it, so a use of a dropped group
+loses its bounds (it is then a candidate everywhere and every plan reports it missing, as before);
+`web.rs`, `web_gl.rs` and the native worker call it instead of touching and dropping by hand.

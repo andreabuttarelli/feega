@@ -141,6 +141,7 @@ impl Twin {
         self.indexed.drop_group(key);
         self.oracle.drop_group(key);
         self.sizes.remove(key);
+        world.touch(key, None);
     }
 }
 
@@ -148,6 +149,7 @@ fn same(a: &Plan, b: &Plan, what: &str) {
     assert_eq!(format!("{:?}", a.screen.items), format!("{:?}", b.screen.items), "{what}: screen items");
     assert_eq!(format!("{:?}", a.rasters.iter().map(|r| (&r.clip, &r.list.items)).collect::<Vec<_>>()), format!("{:?}", b.rasters.iter().map(|r| (&r.clip, &r.list.items)).collect::<Vec<_>>()), "{what}: rasters");
     assert_eq!((&a.evicted, a.pending, &a.finished, &a.waiting), (&b.evicted, b.pending, &b.finished, &b.waiting), "{what}: cache bookkeeping");
+    assert_eq!(a.skipped, b.skipped, "{what}: skipped");
 }
 
 fn use_json(clip: &str, group: &str, at: (f64, f64), scale: f64, cache: bool, hold: bool) -> String {
@@ -252,6 +254,25 @@ fn meets(model: &Model, twin: &Twin, camera: Affine, w: u32, h: u32) -> Vec<Stri
     };
     let lifted = |k: &Kept| k.u.hold && k.rest != Some(k.u.matrix);
     model.uses.iter().filter(|k| !lifted(k) && on_screen(k)).map(|k| k.u.clip.clone()).collect()
+}
+
+fn reach_of(k: &Kept, sizes: &HashMap<String, (f64, f64)>) -> Option<Rect> {
+    let &(w, h) = sizes.get(&k.u.group)?;
+    let t = Matrix::new(k.u.matrix);
+    let corners = [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)].map(|(x, y)| t * Point::new(x, y));
+    Some(corners.iter().fold(Rect::from_points(corners[0], corners[0]), |r, p| r.union_pt(*p)))
+}
+
+#[test]
+fn the_extent_follows_every_insert_move_resize_and_remove() {
+    for seed in 0..SEEDS {
+        random_world(seed, false, |world, twin, model, _, what| {
+            let wanted = model.uses.iter().filter_map(|k| reach_of(k, &twin.sizes)).reduce(|a, b| a.union(b));
+            let got = world.extent();
+            let close = |a: Rect, b: Rect| [a.x0 - b.x0, a.y0 - b.y0, a.x1 - b.x1, a.y1 - b.y1].iter().all(|d| d.abs() < 1e-6);
+            assert!(match (got, wanted) { (Some(a), Some(b)) => close(a, b), (None, None) => true, _ => false }, "{what}: extent {got:?}, wanted {wanted:?}");
+        });
+    }
 }
 
 #[test]

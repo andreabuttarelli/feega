@@ -131,8 +131,7 @@ impl Core {
                 self.compositor.touch(&to, &self.library);
             }
             Command::DropGroup(key) => {
-                self.compositor.touch(&key, &self.library);
-                self.library.drop_group(&key);
+                self.compositor.drop_group(&key, &mut self.library);
             }
             Command::PatchUses(json) => self.compositor.patch(parse_patch(&json).map_err(failure)?, &self.library),
             Command::Snapshot(path) => {

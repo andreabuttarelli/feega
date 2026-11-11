@@ -407,3 +407,13 @@ fn damage_the_tiles_took_repaints_the_held_texture_on_the_next_exact_frame() {
 
     assert_ne!(frame.outcome, Some(Outcome::Reused));
 }
+
+#[test]
+fn a_dropped_group_leaves_the_canvas_extent() {
+    let (mut c, mut lib) = scene();
+    assert!(c.extent().is_some());
+
+    c.drop_group("g", &mut lib);
+
+    assert_eq!(c.extent(), None);
+}

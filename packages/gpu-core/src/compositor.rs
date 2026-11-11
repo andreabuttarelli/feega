@@ -85,6 +85,12 @@ impl Compositor {
         self.world.touch(group, library.size_of(group));
     }
 
+    pub fn drop_group(&mut self, group: &str, library: &mut Library) {
+        self.touch(group, library);
+        library.drop_group(group);
+        self.touch(group, library);
+    }
+
     pub fn touch_picture(&mut self, clip: &str, library: &Library) {
         for group in library.groups_drawing(clip) {
             self.touch(&group, library);
