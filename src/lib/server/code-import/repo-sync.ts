@@ -3,7 +3,7 @@ import { changedLook, LOOK, LookKey, mapClips, minSideOf } from '$lib/canvas/cod
 import type { ProviderCall } from '$lib/server/connections/account-links';
 import type { GithubCall } from './github';
 import type { RepoRef } from './repo';
-import type { FileChange, ReadFile } from './write-back';
+import { unbound, type FileChange, type ReadFile } from './write-back';
 
 const HTTP_OK_MIN = 200;
 const HTTP_OK_MAX = 299;
@@ -93,7 +93,8 @@ const wasKey = (clip: MotionClip) => `${fileOf(clip.source!.at)}|${clip.source!.
 export function rebased(local: MotionDoc, upstream: MotionDoc): Rebased {
   const side = minSideOf(local);
   const upSide = minSideOf(upstream);
-  const edited = clipsOf(local).filter((c) => c.source && Object.keys(changedLook(c, side)).length);
+  const ownLook = (c: MotionClip) => unbound(c, changedLook(c, side));
+  const edited = clipsOf(local).filter((c) => c.source && Object.keys(ownLook(c)).length);
   const sourced = clipsOf(upstream).filter((c) => c.source);
   const byAt = new Map(sourced.map((c) => [`${c.source!.at}|${c.source!.cond ?? ''}`, c]));
   const byWas = new Map(sourced.map((c) => [wasKey(c), c]));
@@ -108,7 +109,7 @@ export function rebased(local: MotionDoc, upstream: MotionDoc): Rebased {
       continue;
     }
     let next = plans.get(theirs.id) ?? theirs;
-    for (const [key, value] of Object.entries(changedLook(mine, side))) {
+    for (const [key, value] of Object.entries(ownLook(mine))) {
       if (theirs.source!.was[key] !== mine.source!.was[key]) {
         conflicts.push(`${mine.source!.at}: ${key} changed on GitHub too, kept GitHub's`);
         continue;

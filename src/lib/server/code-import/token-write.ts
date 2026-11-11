@@ -4,6 +4,7 @@ import { aliasOf, lengthPx, type TokenEntry, type TokenMap } from './design-toke
 import { colourOf, writtenLike } from './token-colour';
 import type { MotionDoc } from '@feega/motion-core/motion/doc';
 import { applyEdits, atOf, editsOf, type FileChange, type ReadFile } from './write-back';
+import { parseSheets } from './css-tokens';
 
 export type TokensWritten = { files: FileChange[]; skipped: string[]; map: TokenMap };
 
@@ -18,6 +19,8 @@ const isAlias = (v: unknown): v is VarAlias => typeof v === 'object' && v !== nu
 const trimmed = (n: number) => String(Number(n.toFixed(PLACES)));
 const shown = (v: Value) => (isAlias(v) ? v.alias : String(v));
 
+const aliasTargets = (map: TokenMap) => new Map(Object.entries(map).flatMap(([key, entry]) => (entry.factor ? [] : [[entry.name, key] as const])));
+
 type Reading = { type: VarType; entry: TokenEntry; byName: Map<string, string> };
 
 function importedValue(r: Reading, raw: string): Value | null {
@@ -30,7 +33,7 @@ function importedValue(r: Reading, raw: string): Value | null {
     [VarType.Colour]: () => colourOf(raw),
     [VarType.Number]: () => {
       const px = lengthPx(raw);
-      return px === null ? null : px * (r.entry.scale ?? 1);
+      return px === null ? null : px * (r.entry.scale ?? 1) * (r.entry.factor ?? 1);
     },
     [VarType.String]: () => raw,
     [VarType.Boolean]: () => null
@@ -59,7 +62,7 @@ function textOf(r: Reading, raw: string, now: Value, map: TokenMap): string | nu
   const WRITERS: Record<VarType, () => string | null> = {
     [VarType.Colour]: () => (typeof now === 'string' ? writtenLike(raw, now) : null),
     [VarType.Number]: () => {
-      const px = Number(now) / (r.entry.scale ?? 1);
+      const px = Number(now) / (r.entry.scale ?? 1) / (r.entry.factor ?? 1);
       return REM.test(raw) ? `${trimmed(px / REM_PX)}rem` : `${trimmed(px)}px`;
     },
     [VarType.String]: () => String(now),
@@ -81,6 +84,41 @@ function replaced(text: string, line: number, name: string, was: string, next: s
   return lines.join('\n');
 }
 
+type Appended = { text: string; line: number; column: number; inserted: boolean };
+
+const INDENT = /^\s*/;
+const DEFAULT_INDENT = '\t';
+
+function appended(text: string, path: string, mode: string, declaration: string): Appended | null {
+  const block = parseSheets([{ path, text }]).blocks.findLast((b) => b.mode === mode);
+  if (!block) {
+    return null;
+  }
+  const lines = text.split('\n');
+  const at = block.close.line - 1;
+  const closing = lines[at];
+  const before = closing.slice(0, block.close.column);
+  if (before.trim()) {
+    lines[at] = `${before.trimEnd()} ${declaration}; ${closing.slice(block.close.column)}`;
+    return { text: lines.join('\n'), line: block.close.line, column: before.trimEnd().length + 1, inserted: false };
+  }
+  const previous = lines.slice(0, at).findLast((l) => l.trim());
+  const indent = previous && !previous.trim().endsWith('{') ? INDENT.exec(previous)![0] : `${before}${DEFAULT_INDENT}`;
+  lines.splice(at, 0, `${indent}${declaration};`);
+  return { text: lines.join('\n'), line: block.close.line, column: indent.length, inserted: true };
+}
+
+function shifted(map: TokenMap, file: string, from: number): void {
+  for (const entry of Object.values(map)) {
+    for (const [mode, origin] of Object.entries(entry.origins)) {
+      const at = atOf(origin);
+      if (at && at.file === file && at.line >= from) {
+        entry.origins[mode] = `${at.file}:${at.line + 1}:${at.column}`;
+      }
+    }
+  }
+}
+
 const outside = (raw: string) => isAbsolute(raw) || normalize(raw).startsWith('..');
 
 const variableAt = (variables: Variables | undefined, key: string): { variable: Variable; modes: string[] } | null => {
@@ -90,8 +128,29 @@ const variableAt = (variables: Variables | undefined, key: string): { variable: 
   return collection && variable ? { variable, modes: collection.modes } : null;
 };
 
+export function editedModes(variables: Variables | undefined, map: TokenMap): Map<string, string[]> {
+  const byName = aliasTargets(map);
+  const edited = new Map<string, string[]>();
+  for (const [key, entry] of Object.entries(map)) {
+    const found = variableAt(variables, key);
+    if (!found) {
+      continue;
+    }
+    const reading: Reading = { type: found.variable.type, entry, byName };
+    const inherited = Object.values(entry.raw)[0];
+    const modes = found.modes.filter((mode) => {
+      const [now, raw] = [found.variable.values[mode], entry.raw[mode] ?? inherited];
+      return now !== undefined && raw !== undefined && !sameValue(importedValue(reading, raw), now);
+    });
+    if (modes.length) {
+      edited.set(key, modes);
+    }
+  }
+  return edited;
+}
+
 export async function writeTokens(variables: Variables | undefined, map: TokenMap, read: ReadFile): Promise<TokensWritten> {
-  const byName = new Map(Object.entries(map).map(([key, entry]) => [entry.name, key]));
+  const byName = aliasTargets(map);
   const before = new Map<string, string | null>();
   const after = new Map<string, string>();
   const skipped: string[] = [];
@@ -104,9 +163,12 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
     return after.get(file) ?? before.get(file) ?? null;
   };
 
+  const written = new Map<string, string>();
+  const missing: { key: string; entry: TokenEntry; mode: string; text: string; file: string }[] = [];
+
   for (const [key, entry] of Object.entries(map)) {
     const found = variableAt(variables, key);
-    if (!found) {
+    if (!found || entry.orphan) {
       continue;
     }
     const reading: Reading = { type: found.variable.type, entry, byName };
@@ -118,18 +180,28 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
       if (now === undefined || raw === undefined || sameValue(importedValue(reading, raw), now)) {
         continue;
       }
-      const origin = entry.origins[mode];
-      if (!origin) {
-        skipped.push(`${entry.name}: no ${mode} declaration in the code, ${shown(now)} not written`);
-        continue;
-      }
+      const origin = entry.origins[mode] ?? Object.values(entry.origins)[0];
+      const own = Boolean(entry.origins[mode]);
       const at = atOf(origin);
       if (!at || outside(origin)) {
         skipped.push(`${entry.name}: ${origin} is outside the repository`);
         continue;
       }
       const text = textOf(reading, raw, now, map);
+      if (!own && text !== null) {
+        missing.push({ key, entry, mode, text, file: at.file });
+        continue;
+      }
       const file = await current(at.file);
+      const spot = `${origin}|${entry.name}`;
+      const already = written.get(spot);
+      if (already !== undefined && text !== null) {
+        if (already !== text) {
+          skipped.push(`${entry.name} (${mode}): ${key} asks for ${text}, but another multiple of it already wrote ${already}`);
+        }
+        next[key].raw[mode] = already;
+        continue;
+      }
       const changed = text === null || file === null ? null : replaced(file, at.line, entry.name, raw, text);
       if (text === null) {
         skipped.push(`${entry.name} (${mode}): ${shown(now)} cannot be written as CSS`);
@@ -140,8 +212,24 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
         continue;
       }
       after.set(at.file, changed);
+      written.set(spot, text);
       next[key].raw[mode] = text;
     }
+  }
+
+  for (const add of missing) {
+    const file = await current(add.file);
+    const done = file === null ? null : appended(file, add.file, add.mode, `${add.entry.name}: ${add.text}`);
+    if (!done) {
+      skipped.push(`${add.entry.name}: no ${add.mode} block in ${add.file}, ${add.text} not written`);
+      continue;
+    }
+    after.set(add.file, done.text);
+    if (done.inserted) {
+      shifted(next, add.file, done.line);
+    }
+    next[add.key].origins[add.mode] = `${add.file}:${done.line}:${done.column}`;
+    next[add.key].raw[add.mode] = add.text;
   }
 
   const files = [...after].map(([path, text]) => ({ path, before: before.get(path) ?? '', after: text })).filter((f) => f.before !== f.after);

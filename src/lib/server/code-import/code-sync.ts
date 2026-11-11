@@ -11,6 +11,7 @@ import { rebased, tokenCall } from './repo-sync';
 import { baselined } from '$lib/canvas/code-look';
 import { patchOf, type FileChange } from './write-back';
 import { frameEdits } from './token-write';
+import { pulledTokens } from './token-pull';
 import type { TokenMap } from './design-tokens';
 import { CodeImportOutcome } from './import-code';
 import { importCodeInto, rememberOrigin, type CodeImportAsk, type CodeScope } from './canvas-import';
@@ -142,7 +143,7 @@ async function settle(scope: CodeScope, nodeId: string, linked: Linked, tokens: 
   await rememberOrigin(scope, nodeId, { ...linked.origin, ...written, sha: await linked.source.head(null) });
 }
 
-export type CodePulled = { outcome: SyncOutcome.Ok | SyncOutcome.UpToDate; sha: string; carried: number; conflicts: string[]; skipped: string[] };
+export type CodePulled = { outcome: SyncOutcome.Ok | SyncOutcome.UpToDate; sha: string; carried: number; conflicts: string[]; skipped: string[]; tokens: string[] };
 
 export async function codePull(scope: CodeScope, nodeId: string, branch?: string): Promise<CodePulled | { outcome: SyncRefusal; error?: string }> {
   const linked = await linkedOf(scope, nodeId);
@@ -157,7 +158,7 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
     return { outcome: SyncOutcome.Unreachable };
   }
   if (rev === linked.origin.sha) {
-    return { outcome: SyncOutcome.UpToDate, sha: rev, carried: 0, conflicts: [], skipped: [] };
+    return { outcome: SyncOutcome.UpToDate, sha: rev, carried: 0, conflicts: [], skipped: [], tokens: [] };
   }
 
   const fresh = await importCodeInto(scope, local.canvasId, { ...linked.link(rev), routes: linked.origin.routes, conditions: conditionsOf(linked.origin.conditions), at: local.at ?? { x: 0, y: 0 } });
@@ -171,12 +172,13 @@ export async function codePull(scope: CodeScope, nodeId: string, branch?: string
   }
 
   const merged = rebased(local.doc, upstream.doc);
-  const written = await store.write(nodeId, local.version, merged.doc, `Pulled ${linked.origin.repo}@${rev.slice(0, 7)}`);
+  const tokens = linked.origin.tokens && fresh.tokenMap ? pulledTokens({ doc: local.doc, map: linked.origin.tokens }, { doc: merged.doc, map: fresh.tokenMap }) : null;
+  const written = await store.write(nodeId, local.version, tokens?.doc ?? merged.doc, `Pulled ${linked.origin.repo}@${rev.slice(0, 7)}`);
   if (written.outcome !== RevisionOutcome.Written) {
     return { outcome: SyncOutcome.Conflict };
   }
-  await rememberOrigin(scope, nodeId, { ...linked.origin, branch: target, sha: rev });
-  return { outcome: SyncOutcome.Ok, sha: rev, carried: merged.carried, conflicts: merged.conflicts, skipped: fresh.skipped };
+  await rememberOrigin(scope, nodeId, { ...linked.origin, branch: target, sha: rev, ...(tokens ? { tokens: tokens.map } : {}) });
+  return { outcome: SyncOutcome.Ok, sha: rev, carried: merged.carried, conflicts: [...merged.conflicts, ...(tokens?.conflicts ?? [])], skipped: fresh.skipped, tokens: tokens?.report ?? [] };
 }
 
 export type CodeHead = { kind: string; sha: string | null; head: string | null };

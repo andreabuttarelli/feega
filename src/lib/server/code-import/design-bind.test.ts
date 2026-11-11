@@ -7,8 +7,10 @@ import { codePlan } from './code-doc';
 import { boardsOf, conditioned } from './boards';
 import { parseSheets, readSheets } from './css-tokens';
 import { tokenSetOf, variablesOf } from './design-tokens';
-import { boundToTokens } from './design-bind';
-import { setActiveMode, variableValue } from '$lib/motion/variables';
+import { boundToTokens, spacingMultiples } from './design-bind';
+import { defineVariable, setActiveMode, variableValue } from '$lib/motion/variables';
+import { VarType } from '@feega/motion-core/motion/variables-model';
+import { instanceTracks } from '@feega/motion-core/motion/layout/resolve';
 import { conditionKey, Scheme } from './render-conditions';
 
 type Rgb = { r: number; g: number; b: number; a: number };
@@ -88,6 +90,18 @@ describe('boundToTokens', () => {
     expect(bound).toMatchObject({ byClass: 2, byRule: 1, byValue: 1 });
   });
 
+  it('Tailwind 4: p-4 e gap-2 si legano al multiplo di --spacing, il resto della scala no', async () => {
+    const parsed = parseSheets(await readSheets(fixture('tailwind4')));
+    const classes = ['p-4', 'gap-2', 'p-[13px]', 'gap-x-3', 'text-primary'];
+    expect(spacingMultiples(classes)).toEqual([2, 4]);
+    const vars = variablesOf(tokenSetOf(parsed), 'traidue.com', { active: 'Light', multiples: spacingMultiples(classes) });
+    const stack: RestNode = { ...block('Stack', '#ffffff', 'div', 'p-4 gap-2', 10), layoutMode: 'VERTICAL', paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 16, itemSpacing: 8, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', children: [text('a', '#123456', '', 30), text('b', '#123456', '', 60)] };
+
+    const { doc } = boundToTokens(docOf(page('/', '#ffffff', [stack])), { ...vars, rules: parsed.rules, base: 'Light', boards: {} });
+
+    expect(clipWith(doc, 'p-4 gap-2').bind).toMatchObject({ 'autoLayout.padding': 'traidue Spacing/4', 'autoLayout.gap': 'traidue Spacing/2' });
+  });
+
   it('traidue: primary, success ed error sono tutti #111111 in Light e #f0f0f0 in Dark — senza classe nessun valore li distingue', async () => {
     const { parsed, made: vars } = await made();
     const tree = page('/', '#ffffff', [text('Callout', '#111111', 'font-bold', 10), text('Callout dark tone', '#f0f0f0', '', 40)]);
@@ -108,7 +122,7 @@ describe('boundToTokens', () => {
     expect(dark.ok && variableValue(dark.doc.variables, 'traidue Colors/primary')).toBe('#f0f0f0');
   });
 
-  it('i livelli di una tavola Dark non vengono legati finché il modo è uno per frame, e vengono contati', async () => {
+  it('una tavola Dark è la stessa struttura legata, risolta nel modo Dark della sua tavola', async () => {
     const { parsed, made: vars } = await made();
     const tree = boardsOf('traidue', [
       { label: '/', tree: LIGHT_PAGE(), uses: [] },
@@ -117,8 +131,41 @@ describe('boundToTokens', () => {
 
     const { doc, bound } = boundToTokens(docOf(tree), { ...vars, rules: parsed.rules, base: 'Light', boards: { '/': 'Light', '/ · dark': 'Dark' } });
 
-    const named = doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.name === 'By class');
-    expect(named.map((c) => c.bind?.color ?? null).sort()).toEqual(['traidue Colors/primary', null].sort());
-    expect(bound.otherMode).toBeGreaterThan(0);
+    const named = () => doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.name === 'By class');
+    expect(named().map((c) => c.bind?.color)).toEqual(['traidue Colors/primary', 'traidue Colors/primary']);
+    expect(clipNamed(doc, '/ · dark').modes).toEqual({ 'traidue Colors': 'Dark' });
+    expect(clipNamed(doc, '/').modes).toBeUndefined();
+    expect(named().map((c) => c.props.color)).toEqual(['#111111', '#f0f0f0']);
+    expect(bound).not.toHaveProperty('otherMode');
+
+    const edited = defineVariable(doc, 'traidue Colors', 'primary', { type: VarType.Colour, values: { Light: '#1565c0', Dark: '#ffd54f' } });
+    const after = edited.ok ? edited.doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.name === 'By class').map((c) => c.props.color) : [];
+    expect(after).toEqual(['#1565c0', '#ffd54f']);
+  });
+
+  it("un'istanza su una tavola Dark perde l'override letterale che il modo Dark già dà, e segue il token", async () => {
+    const { parsed, made: vars } = await made();
+    const badge = (hex: string): RestNode => ({ ...block('Badge', hex, 'span', 'badge', 300), use: 0 });
+    const light = { ...LIGHT_PAGE(), root: { ...LIGHT_PAGE().root, children: [badge('#777777')] } };
+    const dark = conditioned({ ...light, root: { ...light.root, fills: [{ type: 'SOLID', color: rgb('#141414') }], children: [badge('#888888')] } }, conditionKey({ scheme: Scheme.Dark, width: 1280 }));
+    const marked = boardsOf('traidue', [
+      { label: '/', tree: light, uses: [{ component: 'Badge', props: {} }] },
+      { label: '/ · dark', tree: dark, uses: [{ component: 'Badge', props: {} }] }
+    ]);
+    const planned = codePlan(marked.tree, marked.uses, nid)!.plan.items[0].doc;
+
+    const { doc } = boundToTokens(planned, { ...vars, rules: parsed.rules, base: 'Light', boards: { '/': 'Light', '/ · dark': 'Dark' } });
+
+    const hosts = doc.tracks.flatMap((t) => t.clips as MotionClip[]).filter((c) => c.component === 'Precomp');
+    const fills = (d: MotionDoc) => hosts.map((h) => {
+      const host = d.tracks.flatMap((t) => t.clips as MotionClip[]).find((c) => c.id === h.id)!;
+      const comp = d.comps[String(host.props.comp)];
+      return instanceTracks(d, host, comp, { width: d.width, height: d.height }).flatMap((t) => t.clips as MotionClip[]).find((c) => c.bind?.fill)?.props.fill;
+    });
+    expect(hosts).toHaveLength(2);
+    expect(fills(doc)).toEqual(['#777777', '#888888']);
+    expect(hosts[1].props.overrides).toBeUndefined();
+    const edited = defineVariable(doc, 'traidue Colors', 'muted', { type: VarType.Colour, values: { Light: '#aaaaaa', Dark: '#222222' } });
+    expect(edited.ok && fills(edited.doc)).toEqual(['#aaaaaa', '#222222']);
   });
 });

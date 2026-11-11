@@ -14,7 +14,7 @@ Design system board, and the same branch/PR round trip for tokens that layers al
 | Target | Today | Where |
 |---|---|---|
 | Variables with types | **Yes**: colour, number, string, boolean | `packages/motion-core/src/motion/variables-model.ts` |
-| Modes (theme = mode) | **Yes**, per collection; the active mode is per frame (`collection.active`), not per board or layer | same; `activeMode` in `src/lib/motion/variables.ts` |
+| Modes (theme = mode) | **Yes**, per collection; the frame's mode is `collection.active`, and any clip may override it for its subtree (`clip.modes`, stage 2); instances under an override carry `props.modeValues` | same; `resolveVariables` in `src/lib/motion/variables.ts` |
 | Aliases (semantic → primitive) | **Yes**: a mode value may be `{ alias: "Collection/var" }`, across collections, resolved with a cycle guard | `variables-model.ts`, `valueOf` in `src/lib/motion/variables.ts` |
 | Layer property → variable | **Yes**: `clip.bind[target] = "Collection/var"`; the literal stays in `props`, rewritten on resolve; a bound field refuses a direct patch | `doc.ts` `bind`, `timeline.ts` (`unbind it first`), `bindableTargets` |
 | Bindable targets | Colour/number/text/toggle fields, `fill`, `stroke`, `autoLayout.gap`/`crossGap`/`padding` (one value, all sides), `radius` (rect shapes). **Not** font family (`Control.Font`), border width, opacity, effects, text size in px (props are frame-relative) | `src/lib/motion/variables.ts` |
@@ -166,8 +166,8 @@ With bindings, the dark render is the light board in the Dark mode, not a second
 Dark captures are still taken, but only to verify bindings (rule above) and to find layers whose
 dark look is not a token (kept as today's separate dark board for those routes).
 
-This needs a mode override below the frame (Q1). Until it exists, a frame shows one mode, and
-the light/dark switch is the collection mode switch in Properties.
+Stage 2 ships the override (Q1): a Dark capture is kept as its own board, bound like the light one
+and set to Dark, so a layer whose dark look is not a token keeps its literal, per layer.
 
 ### Design system board
 
@@ -245,6 +245,7 @@ like layer edits: one branch, one PR.
 | SCSS / LESS variables | tokens read-only, no bindings | compiled away: the page holds literals, nothing to trace a layer back to |
 | JS/TS theme objects (styled-components, Emotion, MUI `createTheme`) | literal object exports only, read-only | values computed at runtime; evaluating them means running app code outside the sandbox's dev server |
 | vanilla-extract, Panda, Stitches, UnoCSS | via plain CSS variables if they emit them | the source of truth is generated code |
+| Plain-CSS rules with descendant selectors (`article .prose h2 { color: var(--x) }`) | not traced | `el.matches()` on our static selectors is deterministic, but choosing the winning declaration needs the full cascade (specificity, order, `@layer`, `!important`, inline); the consistency check cannot catch a wrong winner when tokens share a value (traidue's `primary`/`success`). CDP `CSS.getMatchedStylesForNode` gives the true cascade but costs a round trip per node (~1 500 per page) inside the capture budget. On traidue those elements are `{@html}` output with no source location anyway |
 | Angular, React Native, Flutter | unsupported | no component reading in the page (Angular) / no DOM (RN, Flutter) |
 
 ### Security
