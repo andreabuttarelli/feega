@@ -41,6 +41,7 @@ const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const QUERY = process.env.BENCH_TILES === 'off' ? '?coreTiles=0' : '';
 const ONLY = process.env.BENCH_SCENARIOS?.split(',') ?? null;
 const PROFILED = process.env.BENCH_PROFILE === '1';
+const DUMPED = process.env.BENCH_DUMP === '1';
 const SPEED = (process.env.BENCH_SPEED ?? Speed.Fast) as Speed;
 const STRETCH: Record<Speed, number> = { [Speed.Fast]: 1, [Speed.Medium]: 2.5, [Speed.Slow]: 6 };
 const EASE: Record<Speed, Ease> = { [Speed.Fast]: Ease.Flick, [Speed.Medium]: Ease.Smooth, [Speed.Slow]: Ease.Smooth };
@@ -171,8 +172,11 @@ const percentile = (values: number[], p: number) => {
   return sorted.length ? Math.round(sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)]) : 0;
 };
 
-async function levels(page: Page, since: number): Promise<Levels> {
-  const frames = await page.evaluate((after) => ((window as unknown as { __gpuCanvas?: { frames?: LevelFrame[] } }).__gpuCanvas?.frames ?? []).filter((f) => f.at > after).map(({ at, step, unsharp }) => ({ at, step, unsharp })), since);
+async function levels(page: Page, since: number, name: Scenario): Promise<Levels> {
+  const frames = await page.evaluate((after) => ((window as unknown as { __gpuCanvas?: { frames?: LevelFrame[] } }).__gpuCanvas?.frames ?? []).filter((f) => f.at > after), since);
+  if (DUMPED) {
+    writeFileSync(join(OUT, `${name}-frames-${Date.now()}.json`), JSON.stringify(frames));
+  }
   const { times, superseded } = levelSharpMs(frames);
   return { levels: times.length + superseded, levelSharpP50: percentile(times, 0.5), levelSharpP95: percentile(times, 0.95), superseded };
 }
@@ -188,10 +192,11 @@ async function scenario(page: Page, cdp: CDPSession, name: Scenario, profiled: b
   const cpuBefore = await taskMs(cdp);
   const frames = await measure(page, lengthOf(script), play);
   const cpuMs = Math.round((await taskMs(cdp)) - cpuBefore);
+  const settled = await settle(page, since);
   if (profiled) {
     writeFileSync(join(OUT, `${name}.cpuprofile`), JSON.stringify((await cdp.send('Profiler.stop')).profile));
   }
-  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...(await settle(page, since)), ...(await levels(page, since)) };
+  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...settled, ...(await levels(page, since, name)) };
 }
 
 async function run(index: number, base: string, browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<Partial<Record<Scenario, ScenarioRun>>> {
