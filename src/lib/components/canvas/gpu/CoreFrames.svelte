@@ -45,7 +45,7 @@
   import { backendLog, debugActive, debugStart, gestureLog, renderLog, tierLog } from '$lib/canvas/core/debug-log';
   import { readClips, type CustomFrame, type CustomReads } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
-  import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, drawable, fillOrder, firstDrawn, inView, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { OnScreen, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
@@ -577,7 +577,7 @@
 
   const waiting = $derived.by(() => {
     const ready = new Set(real.map((f) => f.id));
-    return fillOrder([...placeholders.values()], sight.view, area).filter((p) => !ready.has(p.id) && !(p.stand === Stand.Frame && settledFrames.has(p.id) && !posterIds.has(p.id))).length;
+    return inView([...placeholders.values()], sight.view, area).filter((p) => !ready.has(p.id) && !(p.stand === Stand.Frame && settledFrames.has(p.id) && !posterIds.has(p.id))).length;
   });
 
   $effect(() => {
@@ -653,7 +653,7 @@
     };
   });
 
-  let cacheBytes = $state(0);
+  let cacheBytes = 0;
   const IDLE_MS = 50;
   const PICTURES_PER_FRAME = 4;
   const UPLOAD_BUDGET_MS = 8;
@@ -662,7 +662,6 @@
   let sent = new SentUses();
   let sentOverlay = new SentParts();
   const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
-  let paintedLabel = $state('');
 
   let lifting: { key: number; group: string; lifted: Lifted | null } | null = null;
   const liftLists = new Map<string, DisplayList>();
@@ -1022,8 +1021,11 @@
     }
     sharpOwed &&= pending;
     painted[outcome]++;
-    paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
+    if (canvas) {
+      canvas.dataset.painted = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
+      canvas.dataset.cacheBytes = String(cacheBytes);
+    }
     const tally = into.renderTally?.() ?? '{}';
     addTally(tally);
     if (debugActive()) {
@@ -1126,7 +1128,7 @@
   <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {/if}
 {#key `${backend}:${attempt}`}
-  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
+  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => l.unsupported.length).length}></canvas>
 {/key}
 
 <style>
