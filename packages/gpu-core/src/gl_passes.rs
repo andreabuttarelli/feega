@@ -226,14 +226,23 @@ vec4 run(ivec2 xy) {
   return inside(q) ? bilinear(a, q) : vec4(0.0);
 }";
 
+const PREMULTIPLY: &str = "
+vec4 run(ivec2 xy) { return texel(a, xy); }";
+
 const BLUR: &str = "
+vec4 tap(ivec2 xy, vec2 dir, float offset) {
+  float s = floor(offset);
+  ivec2 near = xy + ivec2(dir * s);
+  return mix(texel(a, near), texel(a, near + ivec2(dir)), offset - s);
+}
 vec4 run(ivec2 xy) {
-  ivec2 dir = ivec2(int(p(0)), int(p(1)));
+  vec2 dir = vec2(p(0), p(1));
   int taps = int(p(2));
-  vec4 sum = texel(a, xy) * p(3);
+  vec4 sum = texel(a, xy) * p(4);
   for (int i = 1; i < 64; i++) {
     if (i >= taps) { break; }
-    sum += (texel(a, xy + dir * i) + texel(a, xy - dir * i)) * p(3 + i);
+    float o = p(3 + 2 * i);
+    sum += (tap(xy, dir, o) + tap(xy, -dir, o)) * p(4 + 2 * i);
   }
   return sum;
 }";
@@ -497,7 +506,7 @@ vec4 run(ivec2 xy) {
   return sum / total;
 }";
 
-const SOURCES: [(Op, &str); 17] = [
+const SOURCES: [(Op, &str); 19] = [
     (Op::Matrix, MATRIX),
     (Op::Table, TABLE),
     (Op::Offset, OFFSET),
@@ -508,6 +517,8 @@ const SOURCES: [(Op, &str); 17] = [
     (Op::Turbulence, TURBULENCE),
     (Op::Tile, TILE),
     (Op::Displace, DISPLACE),
+    (Op::Premultiply, PREMULTIPLY),
+    (Op::BlurPremultiplied, BLUR),
     (Op::Blur, BLUR),
     (Op::Blend, BLEND),
     (Op::Fold, FOLD),
