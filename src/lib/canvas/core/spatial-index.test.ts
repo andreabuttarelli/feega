@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SpatialIndex } from './spatial-index';
 import { visibleIds } from '$lib/canvas/gpu/camera';
 
@@ -51,5 +51,29 @@ describe('spatial index', () => {
     const view = { x: -40, y: -40, zoom: 0.5 };
     const screen = { width: 800, height: 600 };
     expect(index.visible(view, screen)).toEqual(visibleIds(items, view, screen));
+  });
+
+  it('a pan inside the same cells matches the linear culling at every step', () => {
+    let seed = 11;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const scene = Array.from({ length: 500 }, (_, i) => ({ id: `n${i}`, x: rnd() * 20000 - 10000, y: rnd() * 20000 - 10000, w: 20 + rnd() * 600, h: 20 + rnd() * 600 }));
+    const index = new SpatialIndex(scene);
+    const screen = { width: 1440, height: 900 };
+    for (let step = 0; step < 300; step++) {
+      const view = { x: -step * 7, y: step * 3, zoom: 0.8 };
+      expect(index.visible(view, screen)).toEqual(visibleIds(scene, view, screen));
+    }
+  });
+
+  it('a pan that stays inside the same cells does not walk the grid again', () => {
+    const scene = Array.from({ length: 400 }, (_, i) => ({ id: `n${i}`, x: (i % 20) * 300, y: Math.floor(i / 20) * 300, w: 100, h: 100 }));
+    const index = new SpatialIndex(scene);
+    const screen = { width: 1440, height: 900 };
+    index.visible({ x: -100, y: -100, zoom: 1 }, screen);
+    const reads = vi.spyOn(Map.prototype, 'get');
+    index.visible({ x: -101, y: -101, zoom: 1 }, screen);
+    const walked = reads.mock.calls.length;
+    reads.mockRestore();
+    expect(walked).toBe(0);
   });
 });
