@@ -164,7 +164,7 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import { DrawTool } from '$lib/motion/draw-tool';
   import { NEW_TEXT_SIZING } from '@feega/motion-core/motion/text-sizing';
   import { FrameKind, frameNodeSize, frameResize, tileFollowsDoc, FRAME_PARAM, motionNodePath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
-  import { NameTag } from '$lib/canvas/node-label';
+  import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { NodeFlag, flagHeld, flagsOf, toggledFlags } from '$lib/canvas/node-flags';
   import type { HostBox } from '$lib/motion/element-host';
@@ -185,7 +185,8 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import type { SceneDrop } from '$lib/canvas/scene-drop';
   import { DragPhase, DropVerdict, frameUnderPointer, type ElementOut, type FrameTarget, type PointerPoint, type StageRect } from '$lib/canvas/canvas-drop';
-  import { canvasSelection } from '$lib/canvas/canvas-selection';
+  import { canvasSelection, canvasSelectionChips } from '$lib/canvas/canvas-selection';
+  import { canvasChips } from '$lib/chat-selection';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import type { ComponentDrag } from '$lib/canvas/component-drag';
@@ -1929,6 +1930,12 @@ import { batchOf, pickBatch, selectView, unreachableBatch, type BatchView, type 
   $effect(() => {
     canvasSelection.set(selectedIds);
     return () => canvasSelection.set([]);
+  });
+
+  $effect(() => {
+    const rows = nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName || (isNodeType(n.type) ? NODE_KIND_LABEL[n.type] : n.type) }));
+    canvasSelectionChips.set(canvasChips([...new Set(selectedIds.map(baseNodeId))], rows));
+    return () => canvasSelectionChips.set([]);
   });
 
   $effect(() => {

@@ -12,8 +12,6 @@
     <div class="ready">
       <h2>Ready?</h2>
       <a href={APP_URL}><span>Let's start now</span></a>
-      <DownloadMac class="dl" />
-      <a class="dl-guide" href={MAC_GUIDE_URL}>Unsigned app: how to open it</a>
     </div>
 
     <div class="col">
@@ -21,6 +19,8 @@
       <a href="/">Product</a>
       <a href={APP_URL}>Sign In</a>
       <a href="/blog">Compare</a>
+      <DownloadMac class="dl" />
+      <a class="dl-guide" href={MAC_GUIDE_URL}>Unsigned app: how to open it</a>
     </div>
 
     <div class="col">
@@ -80,14 +80,15 @@
     letter-spacing: -0.04em;
   }
 
-  .ready :global(.dl) {
-    display: block;
+  .col :global(.dl) {
+    padding-bottom: 2px;
   }
 
-  .ready :global(.dl svg) {
+  .col :global(.dl svg) {
     width: 0.8em;
     height: 0.8em;
-    margin-right: 8px;
+    margin-right: 6px;
+    vertical-align: -1px;
   }
 
   .dl-guide {

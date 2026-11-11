@@ -1,8 +1,11 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, expect, it, vi } from 'vitest';
 import type { AppTab } from '$lib/server/web/browser';
 import type { FrameStore } from '$lib/server/motion/move-element';
 import type { PageTree } from '$lib/server/url-import/page-tree';
-import { CodeImportOutcome, importCodeAt } from './import-code';
+import { CodeImportOutcome, Crop, importBoards, importCodeAt } from './import-code';
+import { BASE_CONDITIONS, Scheme } from './render-conditions';
 import { RunFailure, type RepoRunner } from './sandbox-runner';
 
 const APP = 'https://sb-1.vercel.run';
@@ -21,7 +24,7 @@ const TREE: PageTree = {
   width: 400,
   height: 200,
   truncated: false,
-  root: { id: '1', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 200 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], children: [button('2', 0, 10, 'Save'), button('3', 1, 100, 'Cancel'), button('4', 2, 200, 'Delete')] }
+  root: { id: '1', type: 'FRAME', absoluteBoundingBox: { x: 0, y: 0, width: 400, height: 200 }, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 } }], children: [{ ...button('2', 0, 10, 'Save'), source: { at: 'src/a.tsx:3:1', tag: 'button', cls: '' } },  button('3', 1, 100, 'Cancel'), button('4', 2, 200, 'Delete')] }
 };
 
 const USES = [
@@ -37,15 +40,17 @@ function tabOf() {
     scroll: vi.fn(async () => undefined),
     reveal: vi.fn(async () => ({ height: 900, hidden: 0 })),
     settle: vi.fn(async () => undefined),
+    scheme: vi.fn(async () => undefined),
+    viewport: vi.fn(async () => undefined),
     seeAll: vi.fn(async () => undefined),
     sample: vi.fn(async () => 0),
     overlay: vi.fn(async () => null),
     click: vi.fn(async () => undefined),
     press: vi.fn(async () => undefined),
     marks: vi.fn(async () => USES),
-    tree: vi.fn(async () => TREE),
+    tree: vi.fn(async (): Promise<PageTree> => TREE),
     close: vi.fn(async () => 0.002)
-  } as unknown as AppTab & { marks: ReturnType<typeof vi.fn>; goto: ReturnType<typeof vi.fn> };
+  } as unknown as AppTab & { marks: ReturnType<typeof vi.fn>; goto: ReturnType<typeof vi.fn>; scheme: ReturnType<typeof vi.fn>; viewport: ReturnType<typeof vi.fn> };
 }
 
 function storeOf() {
@@ -169,5 +174,49 @@ describe('importCodeAt', () => {
     const { ask } = askOf({ runner: null });
 
     expect((await importCodeAt(ask)).outcome).toBe(CodeImportOutcome.NoSandbox);
+  });
+
+  it('una condizione chiesta apre ogni scheda con quel tema e quella larghezza, e la tavola lo dice', async () => {
+    const { ask, tab } = askOf({ routes: ['/'], conditions: [BASE_CONDITIONS, { scheme: Scheme.Dark, width: 390 }] });
+
+    const done = await importCodeAt(ask);
+
+    expect(tab.scheme.mock.calls.map((c) => c[0])).toEqual([Scheme.Light, Scheme.Dark]);
+    expect(tab.viewport.mock.calls.map((c) => c[0])).toEqual([1280, 390]);
+    expect(done).toMatchObject({ outcome: CodeImportOutcome.Ok, pages: ['/', '/ · dark · 390px'] });
+  });
+
+  it('i clip di una tavola dark portano la condizione, quelli della tavola base no', async () => {
+    const { ask, docs } = askOf({ routes: ['/'], conditions: [BASE_CONDITIONS, { scheme: Scheme.Dark, width: 1280 }] });
+
+    await importCodeAt(ask);
+
+    const clips = (docs.get('frame-1')!.doc as { tracks: { clips: { source?: { cond?: string } }[] }[] }).tracks.flatMap((t) => t.clips);
+    const sourced = clips.filter((c) => c.source);
+    expect(sourced.map((c) => c.source!.cond ?? null)).toEqual(expect.arrayContaining([null, 'dark@1280']));
+  });
+});
+
+describe('importBoards images', () => {
+  it('porta alla tela i byte di un\'immagine servita dal dev server', async () => {
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+    const server = createServer((req, res) => {
+      res.setHeader('content-type', 'image/png');
+      res.end(png);
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const seen: string[] = [];
+    const { ask, tab } = askOf({ importImage: async (url) => (seen.push(url), 'asset-1') });
+    const tree = structuredClone(TREE);
+    tree.url = `${origin}/`;
+    tree.root.children = [{ id: '9', type: 'RECTANGLE', absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 }, fills: [{ type: 'IMAGE', imageRef: `${origin}/hero.png`, scaleMode: 'FILL' }] } as never];
+    vi.mocked(tab.tree).mockResolvedValue(tree);
+
+    await importBoards({ ...ask, name: 'app', pages: [{ label: '/', url: `${origin}/` }], names: [], crop: Crop.Page }).finally(() => server.close());
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].startsWith('data:image/png;base64,')).toBe(true);
+    expect(Buffer.from(seen[0].split(',')[1], 'base64').equals(png)).toBe(true);
   });
 });

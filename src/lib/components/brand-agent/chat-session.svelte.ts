@@ -1,6 +1,7 @@
 import { applyChatStreamEvent, closeDanglingToolCalls, emptyStreamState, readSseEvents, type ChatStreamState } from '$lib/chat-stream-events';
 import { failureOfStatus, type Failure, type ToolCall } from './chat-view';
 import type { ChatAttachment } from '$lib/chat-attachments';
+import type { SelectionChip } from '$lib/chat-selection';
 
 export type ChatMessage = {
   role: 'user' | 'assistant';
@@ -9,6 +10,7 @@ export type ChatMessage = {
   at?: number | null;
   tools?: ToolCall[];
   attachments?: ChatAttachment[];
+  selection?: SelectionChip[];
   reasoning?: string;
   live?: boolean;
   streaming?: true;
@@ -133,8 +135,11 @@ export class ChatSession {
     turns.running++;
     this.#abort = new AbortController();
 
+    const context = this.context();
+    const selection = (context.selection as SelectionChip[] | undefined) ?? [];
+
     if (echo === 'append-user') {
-      this.messages = [...this.messages, { role: 'user', content: text, at: Date.now(), ...(attachments.length ? { attachments } : {}) }];
+      this.messages = [...this.messages, { role: 'user', content: text, at: Date.now(), ...(attachments.length ? { attachments } : {}), ...(selection.length ? { selection } : {}) }];
     }
     this.messages = [...this.messages, { role: 'assistant', content: '', pending: true, at: Date.now(), tools: [], live: true }];
     this.revision++;
@@ -143,7 +148,7 @@ export class ChatSession {
       const res = await this.#fetch(this.#endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...this.context(), message: text, ...(attachments.length ? { attachments: attachments.map((a) => a.assetId) } : {}) }),
+        body: JSON.stringify({ ...context, message: text, ...(attachments.length ? { attachments: attachments.map((a) => a.assetId) } : {}) }),
         signal: this.#abort.signal
       });
       if (!res.ok || !res.body) {

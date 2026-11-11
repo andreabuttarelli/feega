@@ -3,7 +3,7 @@ import { Direction } from '@feega/motion-core/motion/layout/auto-layout';
 
 export type LookValue = string | number;
 
-export type CodeSpot = { at: string; tag: string; cls: string };
+export type CodeSpot = { at: string; tag: string; cls: string; cond?: string };
 export type Look = Record<string, LookValue>;
 
 export enum LookKey {

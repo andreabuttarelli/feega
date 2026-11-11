@@ -18,6 +18,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { latestAnswer, readAnswer } from '$lib/reference-pick';
 import { stopTurn } from '$lib/server/repos/chat-reply';
+import { readChips } from '$lib/chat-selection';
 import type { RequestHandler } from './$types';
 
 /**
@@ -79,7 +80,8 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     return json({ error: CAP_REACHED, message: capped }, { status: HTTP_FORBIDDEN });
   }
 
-  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection: askedSelection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
+  const selection = readChips(askedSelection);
   const parsedFrame = openFrameSchema.safeParse(askedFrame);
   const frame: OpenFrame | null = parsedFrame.success ? parsedFrame.data : null;
   const text = message?.trim() ?? '';

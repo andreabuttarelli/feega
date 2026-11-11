@@ -1,4 +1,5 @@
 import type { Browser, CDPSession, HTTPRequest, Page } from 'puppeteer-core';
+import { Scheme } from './colour-scheme';
 import { RequestVerdict, requestVerdict } from './screenshot';
 import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
@@ -45,6 +46,7 @@ export type AppTab = Tab & {
   seeAll: () => Promise<void>;
   sample: (walk?: Walk) => Promise<number>;
   viewport: (width: number) => Promise<void>;
+  scheme: (scheme: Scheme) => Promise<void>;
   settle: (ms: number) => Promise<void>;
   marks: (names: string[]) => Promise<ComponentUse[]>;
   overlay: () => Promise<Overlay | null>;
@@ -108,14 +110,16 @@ async function gate(request: HTTPRequest, allowed: string | null): Promise<void>
   await request.continue(headers ? { headers } : undefined).catch(() => undefined);
 }
 
-const LIGHT_SCHEME = [{ name: 'prefers-color-scheme', value: 'light' }];
-const LIGHT_HINT = { 'sec-ch-prefers-color-scheme': 'light' };
+const SCHEME_HINT = (scheme: Scheme) => ({ 'sec-ch-prefers-color-scheme': scheme });
+const STORED_THEME_KEY = 'theme';
+const PIN_ATTRIBUTE = 'data-feega-scheme';
 
-function lightOnly(): void {
+function pinScheme(scheme: string): void {
   const SCHEME = /prefers-color-scheme/;
+  const opposite = scheme === 'dark' ? 'light' : 'dark';
   const answered = window.matchMedia.bind(window);
   const fixed = (query: string): MediaQueryList => ({
-    matches: /light/.test(query) && !/dark/.test(query),
+    matches: query.includes(scheme) && !query.includes(opposite),
     media: query,
     onchange: null,
     addListener: () => undefined,
@@ -126,8 +130,19 @@ function lightOnly(): void {
   });
   window.matchMedia = (query: string) => (SCHEME.test(query) ? fixed(query) : answered(query));
   const style = document.createElement('style');
-  style.textContent = ':root{color-scheme:light!important}';
-  const pin = () => document.documentElement?.appendChild(style);
+  style.setAttribute(PIN_ATTRIBUTE, scheme);
+  style.textContent = `:root{color-scheme:${scheme}!important}`;
+  const pin = () => {
+    document.querySelectorAll(`style[${PIN_ATTRIBUTE}]`).forEach((old) => old.remove());
+    document.documentElement?.appendChild(style);
+  };
+  if (scheme === 'dark') {
+    try {
+      localStorage.setItem(STORED_THEME_KEY, scheme);
+    } catch (blocked) {
+      void blocked;
+    }
+  }
   if (document.documentElement) {
     pin();
     return;
@@ -140,11 +155,15 @@ function lightOnly(): void {
   }).observe(document, { childList: true });
 }
 
+async function pinned(page: Page, scheme: Scheme): Promise<void> {
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
+  await page.evaluateOnNewDocument(pinScheme, scheme);
+  await page.setExtraHTTPHeaders(SCHEME_HINT(scheme));
+}
+
 async function fenced(page: Page, allowed: string | null = null): Promise<void> {
   await page.setViewport({ ...VIEWPORT, deviceScaleFactor: 1 });
-  await page.emulateMediaFeatures(LIGHT_SCHEME);
-  await page.evaluateOnNewDocument(lightOnly);
-  await page.setExtraHTTPHeaders(LIGHT_HINT);
+  await pinned(page, Scheme.Light);
   await page.setBypassCSP(true);
   await page.setRequestInterception(true);
   page.on('request', (request) => void gate(request, allowed));
@@ -477,6 +496,7 @@ function tabOf(page: Page, close: () => Promise<number>, left: () => number): Ap
     },
     sample: (walk) => page.evaluate(inViewSampled, walk),
     viewport: (width) => page.setViewport({ ...VIEWPORT, width, deviceScaleFactor: 1 }),
+    scheme: (scheme) => pinned(page, scheme),
     settle: async (ms) => {
       await quiet(ms);
       await page.evaluate((fontsMs) => Promise.race([document.fonts.ready, new Promise((done) => setTimeout(done, fontsMs))]), FONTS_MS).catch(() => undefined);

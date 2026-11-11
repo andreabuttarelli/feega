@@ -60,6 +60,12 @@ Signal: with the pointer still over a frame, a wheel zoom makes its hover outlin
 
 ## Motion editor
 
+### A playing frame's picture trails the playhead by seconds
+**Signal:** the timeline time is right, the frame on the canvas lags further the longer it plays; the worker answers in a few ms. **Move:** the frame is one the worker refuses (empty media placeholder, Custom/Device3D/Composition clip) and goes through the main-thread path. Measure from `rebuildLive` start to landing, not the worker round trip; anything time-invariant done per tick there (prepare, mounting a DOM reader) is the cause.
+
+### Local mode serves 500 on a motion frame without a service-role key
+**Signal:** `vite dev` with the local-mode env and no `.env` answers `SUPABASE_SERVICE_ROLE_KEY not configured` from `createAssetSigningDb` on canvas and `add_template`. **Move:** for a probe, export a dummy `SUPABASE_SERVICE_ROLE_KEY=local`; never borrow the main checkout's `.env`, it points at the hosted project.
+
 ### A PR that adds or changes a tool fails the tool surface pins
 
 **Signal:** `tool-surface-pin.test.ts` or `cli/mcp/tool-list-pin.test.ts` red with a snapshot mismatch on a PR that changed a tool on purpose. **Move:** `npx vitest run -u src/lib/server/edit/tool-surface-pin.test.ts cli/mcp/tool-list-pin.test.ts`, read the snapshot diff (only your tool changes), commit it. The src pin stores one fingerprint per tool/op, one entry each: PRs touching different tools do not conflict; a real conflict means the same tool changed twice. Keep the second `exports[...]` block without the `>` in the cli snapshot (the `bun test` key): vitest `-u` drops it as obsolete. On a rebase conflict in a `.snap`, skip your pin commit and regenerate.
@@ -3793,5 +3799,19 @@ Signal: swapping `build/client/gpu-core/gpu_core_bg.wasm` by hand to try a gpu-c
 ### The load bench draws on a software GPU
 Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start (CPU profile: `(program)`, `useProgram`), and fetches look slow because `responseEnd` waits behind it. Cause: headless Chromium renders WebGL with SwiftShader (`UNMASKED_RENDERER_WEBGL` says SwiftShader); shader compiles and draws run on the CPU. Headed Chrome on the Mac's GPU (ANGLE Metal) shows no long task over 200 ms on the same canvas. Move: read bench times as CPU-GL numbers; check the renderer string before chasing a long task, and confirm a startup cost in headed Chrome before fixing it.
 
+## Code import
+
+### A code import always came out light, 1280 wide
+
+**Signal:** a dark-mode app imports with a white page; `web/browser.ts` pins `prefers-color-scheme: light`, `color-scheme: light` and a 1280 viewport on every tab, and a write-back of a colour lands as an inline `style` that beats a `dark:` class. **Move:** the conditions an import renders under are one record (`code-import/render-conditions.ts`), the tab takes them through `tab.scheme()` and `tab.viewport()`, and each sourced clip carries `source.cond`; write-back keys edits by element and condition. A browser test of a theme or width runs with `CHROMIUM_PATH` set: under `NODE_ENV=test` `localChromium()` returns null and the launcher tries to download a serverless build.
+
 ### WebKit logs `gpu lost` right after the core attaches
 **Signal:** `[core] gpu lost, attaching again device lost` about 3 s into every WebKit load; Chromium is clean. **Move:** count attaches, not losses: two `WebCore.attach` on the same canvas in flight means freeing the stale one loses the live device. Put `$inspect.trace()` in the attach effect to see which dependency re-ran it; attaches are serialized in `CoreFrames.svelte`.
+
+## A store method called from an effect must not read what it writes
+
+**Signal:** the canvas page stays on the `feega` splash, `pageerror` says `effect_update_depth_exceeded`, nothing in the console names a file. **Move:** the effect called `chatSelection.publish`, which read `#dismissed` to prune it and then wrote it: the read made the effect depend on its own write. Read the state you are about to overwrite inside `untrack`. Local mode hides the chat (`LocalOff.Chat`), so verify chat UI by flipping that line to `() => false` in the worktree and reverting before the commit.
+
+## Local mode must resolve before any Supabase key check
+
+**Signal:** 500 `SUPABASE_SERVICE_ROLE_KEY not configured` in local mode with no `.env`, only on routes that use the service-role or admin client. **Move:** `createClient` already routes to `localStore()`, but a key guard placed before it throws first; check `localStore()` ahead of every env-key guard in `db/client.ts` and `supabase-admin.ts`. Test: `src/lib/server/db/client.local.test.ts`.

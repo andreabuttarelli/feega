@@ -3,6 +3,7 @@
   import { lazyPlay } from '../lazy-video';
   import NpxChip from './NpxChip.svelte';
   import HeroPrompt from './HeroPrompt.svelte';
+  import AsciiField from './AsciiField.svelte';
 
   const POSTER = '/site/home/canvas-poster.webp';
 </script>
@@ -13,6 +14,8 @@
 </svelte:head>
 
 <section class="hero" id="hero">
+  <AsciiField />
+
   <h1><span data-agent-id="hero-title-a">Design inside your code</span> <span data-agent-id="hero-title-b">with your agents and team.</span></h1>
 
   <p class="lead" data-agent-id="hero-lead">Paste any website. Claude rebuilds it as editable layers, animates it on a real timeline, and you ship it as video or code.</p>
@@ -40,7 +43,13 @@
     max-width: 430px;
     margin: 0 auto;
     padding: 140px 20px 0;
+    position: relative;
     text-align: center;
+  }
+
+  .hero > :global(:not(.field)) {
+    position: relative;
+    z-index: 1;
   }
 
   h1 {

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { env as publicEnv } from '$env/dynamic/public';
   import { isLocalMode } from '$lib/local-user';
-  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, type CodeLanded, type CodeTarget, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
+  import { githubBranches, githubConnect, githubDisconnect, githubRepos, githubStatus, importCode, repoLink, type CodeLanded, type CodeTarget, type RenderCondition, type GithubRepo, type GithubStatus } from '$lib/canvas/code-import-client';
 
   let { projectId, canvasId, at, onimported, onclose }: { projectId: string; canvasId: string; at: { x: number; y: number }; onimported: (landed: CodeLanded) => void; onclose: () => void } = $props();
 
@@ -36,16 +36,32 @@
   let branches = $state<string[]>([]);
   let branch = $state('');
 
+  const SCHEMES = [
+    { id: 'light', label: 'Light' },
+    { id: 'dark', label: 'Dark' }
+  ] as const;
+  const WIDTHS = [
+    { id: 1280, label: 'Desktop 1280' },
+    { id: 768, label: 'Tablet 768' },
+    { id: 390, label: 'Phone 390' }
+  ] as const;
+  let schemes = $state<string[]>(['light']);
+  let widths = $state<number[]>([1280]);
+
+  const conditions = $derived(
+    schemes.flatMap((scheme) => widths.map((width) => ({ scheme: scheme as RenderCondition['scheme'], width })))
+  );
+
   const linked = (raw: string) => (HTTP.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
 
   const TARGETS: Record<Source, () => CodeTarget> = {
-    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean) }),
-    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean) }),
+    [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
+    [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
     [Source.Storybook]: () => ({ storybook: linked(storybook) })
   };
 
   const READY: Record<Source, () => boolean> = { [Source.Repo]: () => Boolean(repo.trim()), [Source.Folder]: () => Boolean(folder.trim()), [Source.Storybook]: () => Boolean(storybook.trim()) };
-  const ready = $derived(READY[source]());
+  const ready = $derived(READY[source]() && conditions.length > 0);
 
   async function refresh() {
     const status = await githubStatus(projectId);
@@ -164,6 +180,18 @@
         <p class="ui-note">A public Storybook: each story is read without running the app, its components become main components, their args variants.</p>
         <input class="rounded-sm" type="text" inputmode="url" placeholder="https://storybook.example.com" aria-label="Storybook" bind:value={storybook} data-testid="code-import-storybook" />
       {/if}
+      {#if source !== Source.Storybook}
+        <fieldset class="ui-conditions" data-testid="code-import-conditions">
+          <legend>Render under</legend>
+          {#each SCHEMES as s (s.id)}
+            <label><input type="checkbox" value={s.id} bind:group={schemes} data-testid={`code-import-scheme-${s.id}`} /> {s.label}</label>
+          {/each}
+          {#each WIDTHS as w (w.id)}
+            <label><input type="checkbox" value={w.id} bind:group={widths} data-testid={`code-import-width-${w.id}`} /> {w.label}</label>
+          {/each}
+          <p class="ui-note">Each page lands once per theme and width, side by side. Language, login, flags and loading or error states are not switched.</p>
+        </fieldset>
+      {/if}
       <div class="ui-row ui-end">
         <button class="ui-btn primary rounded-sm" type="submit" disabled={busy || !ready} data-testid="code-import-run">{busy ? (source !== Source.Storybook ? 'Starting the app…' : 'Reading the stories…') : 'Import'}</button>
       </div>
@@ -188,6 +216,11 @@
   .ui-row { display: flex; gap: 8px; }
   .ui-end { justify-content: flex-end; }
   .ui-form input, .ui-form select { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line, #e3e3e6); background: var(--paper, #fff); color: var(--ink, #1d1d1f); }
+  .ui-conditions { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 0; border: 0; font-size: 13px; }
+  .ui-conditions legend { padding: 0; margin-bottom: 4px; color: var(--ink-soft, #6e6e73); }
+  .ui-conditions label { display: flex; align-items: center; gap: 4px; }
+  .ui-conditions input { flex: none; padding: 0; }
+  .ui-conditions .ui-note { flex-basis: 100%; }
   .ui-note { margin: 0; font-size: 13px; color: var(--ink-soft, #6e6e73); }
   .ui-github { font-size: 12px; }
   .ui-link { font: inherit; padding: 0; border: 0; background: none; color: var(--ink, #1d1d1f); text-decoration: underline; cursor: pointer; }
