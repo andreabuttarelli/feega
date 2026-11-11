@@ -9,7 +9,23 @@ export type HeldFrame = PutFrame & { bytes: number };
 const RGBA_BYTES = 4;
 export const CACHE_SHARE = 0.5;
 
-export const pictureBytes = (items: readonly Item[]): number => items.reduce((sum, i) => sum + (i.kind === ItemKind.Image ? i.size.width * i.size.height * RGBA_BYTES : 0), 0);
+const bytesOfList = new WeakMap<readonly Item[], number>();
+
+const summed = (items: readonly Item[]): number => items.reduce((sum, i) => sum + (i.kind === ItemKind.Image ? i.size.width * i.size.height * RGBA_BYTES : 0), 0);
+
+export function pictureBytes(items: readonly Item[]): number {
+  const known = bytesOfList.get(items);
+  if (known !== undefined) {
+    return known;
+  }
+  const bytes = summed(items);
+  bytesOfList.set(items, bytes);
+  return bytes;
+}
+
+const CACHE_STEPS_PER_OCTAVE = 4;
+
+export const cacheZoom = (zoom: number): number => 2 ** (Math.ceil(Math.log2(zoom) * CACHE_STEPS_PER_OCTAVE) / CACHE_STEPS_PER_OCTAVE);
 
 export enum Offscreen {
   Resident = 'resident',
@@ -36,10 +52,10 @@ export function resident(frames: readonly HeldFrame[], view: Viewport, screen: S
   return frames.filter((f) => f.bytes === 0 || media.has(f.id));
 }
 
-const textureBytes = (f: HeldFrame, view: Viewport) => Math.ceil(f.box.w * view.zoom) * Math.ceil(f.box.h * view.zoom) * RGBA_BYTES;
+const textureBytes = (f: HeldFrame, zoom: number) => Math.ceil(f.box.w * zoom) * Math.ceil(f.box.h * zoom) * RGBA_BYTES;
 
-export function cached(frames: readonly HeldFrame[], view: Viewport, screen: Screen, budget: number): HeldFrame[] {
-  const fits = new Set(textured(frames.map((f) => ({ id: f.id, ...f.box, bytes: textureBytes(f, view) })), view, screen, budget * CACHE_SHARE));
+export function cached(frames: readonly HeldFrame[], view: Viewport, screen: Screen, budget: number, zoom = view.zoom): HeldFrame[] {
+  const fits = new Set(textured(frames.map((f) => ({ id: f.id, ...f.box, bytes: textureBytes(f, zoom) })), view, screen, budget * CACHE_SHARE));
   return frames.map((f) => ({ ...f, cache: fits.has(f.id) }));
 }
 

@@ -9,7 +9,9 @@ export type Declared = { name: string; raw: string; mode: string; at: DeclAt };
 
 export type VarRule = { selector: string; property: string; token: string };
 
-export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[] };
+export type ThemeBlock = { mode: string; close: DeclAt };
+
+export type Parsed = { declared: Declared[]; rules: VarRule[]; skipped: string[]; blocks: ThemeBlock[] };
 
 export const LIGHT = 'Light';
 export const DARK = 'Dark';
@@ -155,11 +157,20 @@ function declare(out: Collected, stack: Block[], text: string, start: number, en
   out.declared.push({ name, raw, mode: context.mode, at: place(start + lead) });
 }
 
+function closed(out: Collected, stack: Block[], firstDeclared: number, at: DeclAt): void {
+  const context = contextOf(stack);
+  const own = out.declared.slice(firstDeclared).some((d) => d.at.file === at.file);
+  if (own && context.mode && !context.outside) {
+    out.blocks.push({ mode: context.mode, close: at });
+  }
+}
+
 function parseOne(sheet: Sheet, out: Collected): void {
   const text = blanked(sheet.text);
   const starts = lineStarts(text);
   const place = (offset: number) => atOf(starts, sheet.path, offset);
   const stack: Block[] = [];
+  const declaredIn: number[] = [];
   let from = 0;
   let quote = '';
   let parens = 0;
@@ -180,12 +191,14 @@ function parseOne(sheet: Sheet, out: Collected): void {
     }
     if (ch === '{') {
       stack.push(blockOf(text.slice(from, i).trim()));
+      declaredIn.push(out.declared.length);
       from = i + 1;
     } else if (ch === ';' || ch === '}') {
       if (stack.length) {
         declare(out, stack, text, from, i, place);
       }
       if (ch === '}') {
+        closed(out, stack, declaredIn.pop() ?? out.declared.length, place(i));
         stack.pop();
       }
       from = i + 1;
@@ -194,7 +207,7 @@ function parseOne(sheet: Sheet, out: Collected): void {
 }
 
 export function parseSheets(sheets: Sheet[]): Parsed {
-  const out: Collected = { declared: [], rules: [], skipped: [] };
+  const out: Collected = { declared: [], rules: [], skipped: [], blocks: [] };
   sheets.forEach((sheet) => parseOne(sheet, out));
   return out;
 }

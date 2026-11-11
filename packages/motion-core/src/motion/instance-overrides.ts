@@ -14,9 +14,10 @@ export function withOverride(clip: MotionClip, override: Record<string, unknown>
 export function overridden(tracks: MotionTrack[], host: MotionClip, main?: MotionComp['component']): MotionTrack[] {
   const overrides = host.props.overrides as Overrides | undefined;
   const values = host.props.propValues as PropertyValues | undefined;
-  if (!overrides && !main?.properties) {
+  const modeValues = host.props.modeValues as Overrides | undefined;
+  if (!overrides && !modeValues && !main?.properties) {
     return tracks;
   }
-  const merged = (c: MotionClip) => ({ ...propertyOverride(main, values, c), ...overrides?.[c.id] });
+  const merged = (c: MotionClip) => ({ ...propertyOverride(main, values, c), ...modeValues?.[c.id], ...overrides?.[c.id] });
   return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (Object.keys(merged(c)).length ? withOverride(c, merged(c)) : c)) }));
 }

@@ -3,13 +3,21 @@
   import { cn } from '$lib/utils.js';
   import type { MotionClip, MotionDoc } from '@feega/motion-core/motion/doc';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
-  import { bindableTargets, typeOfVariable, unbindVariable, variableEntries } from '$lib/motion/variables';
+  import { bindableTargets, inheritedModeOf, layerModeOf, setLayerMode, typeOfVariable, unbindVariable, variableEntries } from '$lib/motion/variables';
   import { bindFromLibrary } from '$lib/motion/variable-library';
   import { variableLibrary } from '$lib/canvas/variable-library.svelte';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 
   const NONE = '';
+  const INHERITED = '';
+
+  const themed = $derived(Object.entries(doc.variables ?? {}).filter(([, c]) => c.modes.length > 1));
+
+  function pickMode(collection: string, mode: string) {
+    const next = mode === INHERITED ? null : mode;
+    commit(setLayerMode(doc, clip.id, collection, next), next ? `${collection} ${next} on this layer` : `${collection} inherited`);
+  }
 
   const offered = $derived({ ...variableLibrary.collections, ...doc.variables });
   const entries = $derived(variableEntries(offered));
@@ -36,6 +44,14 @@
 
 {#if entries.length || bound.length}
   <Section title="Variables">
+    {#each themed as [collection, c] (collection)}
+      <Field label={`${collection} mode`} id={`layer-mode-${collection}`}>
+        <select id={`layer-mode-${collection}`} class={cn(FIELD_INPUT, 'w-full')} data-testid={`layer-mode-${collection}`} value={layerModeOf(doc, clip.id, collection) ?? INHERITED} onchange={(e) => pickMode(collection, e.currentTarget.value)}>
+          <option value={INHERITED}>Inherited ({inheritedModeOf(doc, clip.id, collection)})</option>
+          {#each c.modes as mode (mode)}<option value={mode}>{mode}</option>{/each}
+        </select>
+      </Field>
+    {/each}
     {#each bound as [prop, name] (prop)}
       <div class="flex items-center justify-between gap-2" data-testid="variable-binding" data-target={prop}>
         <span class="truncate" title={prop}>{prop}</span>

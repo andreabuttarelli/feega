@@ -2,7 +2,7 @@ import type { UrlPlan } from '$lib/server/url-import/url-doc';
 import type { RestNode } from '$lib/server/figma/rest-message';
 import type { Capture } from './boards';
 import { parseSheets, readSheets, type VarRule } from './css-tokens';
-import { boundToTokens, type BoundCount } from './design-bind';
+import { boundToTokens, spacingMultiples, type BoundCount } from './design-bind';
 import { boardBound, designBoard, DESIGN_BOARD } from './design-board';
 import { tokenSetOf, variableName, variablesOf, type TokenMap, type TokenSet } from './design-tokens';
 import type { RenderConditions } from './render-conditions';
@@ -39,13 +39,15 @@ function classesIn(node: RestNode, out: Set<string>): Set<string> {
   return out;
 }
 
+const classesOf = (captures: Capture[]) => [...captures.reduce((all, c) => classesIn(c.tree.root, all), new Set<string>())];
+
 function usedTokens(design: Design, captures: Capture[]): Set<string> {
-  const classes = [...captures.reduce((all, c) => classesIn(c.tree.root, all), new Set<string>())];
+  const classes = classesOf(captures);
   return new Set(design.set.tokens.filter((t) => classes.some((c) => c.endsWith(`-${variableName(t.name)}`))).map((t) => t.name));
 }
 
 export function withBoard(design: Design, repo: string, captures: Capture[]): Capture[] {
-  const { variables } = variablesOf(design.set, repo, { used: usedTokens(design, captures) });
+  const { variables } = variablesOf(design.set, repo, { used: usedTokens(design, captures), multiples: spacingMultiples(classesOf(captures)) });
   return [{ label: DESIGN_BOARD, tree: designBoard(variables), uses: [] }, ...captures];
 }
 
@@ -54,15 +56,17 @@ export type DesignAsk = { repo: string; base: RenderConditions; boards: Record<s
 export function designed(design: Design, plan: UrlPlan, ask: DesignAsk): Designed {
   const base = modeOfScheme(ask.base);
   const scale = plan.plan.items[0] ? plan.plan.items[0].doc.width / ask.width : 1;
-  const made = variablesOf(design.set, ask.repo, { scale, used: usedTokens(design, ask.captures), active: base });
-  const counted: BoundCount = { byClass: 0, byRule: 0, byValue: 0, unbound: 0, otherMode: 0 };
+  const made = variablesOf(design.set, ask.repo, { scale, used: usedTokens(design, ask.captures), active: base, multiples: spacingMultiples(classesOf(ask.captures)) });
+  const counted: BoundCount = { byClass: 0, byRule: 0, byValue: 0, unbound: 0 };
 
-  const items = plan.plan.items.map((item) => {
+  const bound = (into: BoundCount) => (item: UrlPlan['sets'][number]) => {
     const done = boundToTokens(item.doc, { ...made, rules: design.rules, base, boards: { ...ask.boards, [DESIGN_BOARD]: base } });
-    (Object.keys(counted) as (keyof BoundCount)[]).forEach((k) => (counted[k] += done.bound[k]));
+    (Object.keys(into) as (keyof BoundCount)[]).forEach((k) => (into[k] += done.bound[k]));
     return { ...item, doc: boardBound(done.doc) };
-  });
+  };
+  const items = plan.plan.items.map(bound(counted));
+  const sets = plan.sets.map(bound({ ...counted }));
 
   const skipped = [...design.set.skipped, ...made.dropped].map((s) => `${SKIPPED_PREFIX}: ${s}`);
-  return { plan: { ...plan, plan: { ...plan.plan, items } }, map: made.map, report: { tokens: Object.keys(made.map).length, ...counted }, skipped };
+  return { plan: { ...plan, sets, plan: { ...plan.plan, items } }, map: made.map, report: { tokens: Object.keys(made.map).length, ...counted }, skipped };
 }

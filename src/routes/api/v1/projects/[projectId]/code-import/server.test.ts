@@ -58,7 +58,7 @@ describe('POST /api/v1/projects/:id/code-import', () => {
   });
 
   it('Design system è acceso se non lo si spegne, e la risposta conta token e livelli legati', async () => {
-    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0, design: { tokens: 15, byClass: 9, byRule: 0, byValue: 2, unbound: 4, otherMode: 0 }, tokenMap: {} });
+    importCodeAt.mockResolvedValue({ outcome: 'ok', frameId: 'f1', name: 'app', undo: [], skipped: [], truncated: false, pages: ['/'], components: 0, variants: 0, instances: 0, design: { tokens: 15, byClass: 9, byRule: 0, byValue: 2, unbound: 4 }, tokenMap: {} });
 
     const on = await call({ canvasId: 'c1', repo: 'https://github.com/a/b', x: 0, y: 0 }, 'u-ds-on');
     expect(on.body).toMatchObject({ design: { tokens: 15, byClass: 9 } });

@@ -14,11 +14,12 @@ export const GET: RequestHandler = async (event) => {
 
   const repo = event.url.searchParams.get('repo') ?? undefined;
   const folder = event.url.searchParams.get('folder') ?? undefined;
-  const source = repo ?? folder;
+  const upload = event.url.searchParams.get('upload') ?? undefined;
+  const source = repo ?? folder ?? upload;
   if (!source || source.length > MAX_SOURCE) {
     return json({ error: 'invalid' }, { status: BAD_REQUEST });
   }
 
-  const tokens = await tokensFound({ ...scope, actor: { kind: 'user', id: scope.userId } }, repo ? { repo } : { folder });
+  const tokens = await tokensFound({ ...scope, actor: { kind: 'user', id: scope.userId } }, repo ? { repo } : upload ? { upload } : { folder });
   return json({ tokens: tokens ?? 0 });
 };

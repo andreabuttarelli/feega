@@ -2,16 +2,18 @@ import { Control } from '@feega/motion-core/motion/components';
 import { fieldsOf } from './inspector';
 import { fillReplaces } from '@feega/motion-core/motion/fill/elements';
 import { FillType } from '@feega/motion-core/motion/fill/model';
-import { findClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { compOf, findClip, type MotionClip, type MotionDoc, type MotionTrack } from '@feega/motion-core/motion/doc';
+import { MAX_COMP_DEPTH } from '@feega/motion-core/motion/precomp';
 import { mapEveryTrack } from './doc-scopes';
 import type { OpResult } from '@feega/motion-core/motion/timeline';
-import { DEFAULT_MODE, VarType, keyOf, splitKey, variableSchema, variablesSchema, type Collection, type VarAlias, type VarInput, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
+import { DEFAULT_MODE, VarType, keyOf, splitKey, variableSchema, variablesSchema, type Collection, type LayerModes, type VarAlias, type VarInput, type VarLiteral, type Variables } from '@feega/motion-core/motion/variables-model';
 
 export { VarType };
 
 export enum VariableAction {
   Define = 'define',
   Mode = 'mode',
+  LayerMode = 'layer_mode',
   AddMode = 'add_mode',
   Bind = 'bind',
   Unbind = 'unbind',
@@ -62,15 +64,19 @@ function activeMode(collection: Collection): string {
   return collection.active && collection.modes.includes(collection.active) ? collection.active : collection.modes[0];
 }
 
-function valueOf(variables: Variables, key: string, seen: readonly string[] = []): VarLiteral | undefined {
+type Modes = Record<string, string>;
+
+const NO_MODES: Modes = {};
+
+function valueOf(variables: Variables, key: string, seen: readonly string[] = [], modes: Modes = NO_MODES): VarLiteral | undefined {
   const at = splitKey(key);
   const collection = at ? variables[at[0]] : undefined;
   const variable = at ? collection?.vars[at[1]] : undefined;
   if (!collection || !variable || seen.includes(key)) {
     return undefined;
   }
-  const raw = variable.values[activeMode(collection)];
-  return isAlias(raw) ? valueOf(variables, raw.alias, [...seen, key]) : raw;
+  const raw = variable.values[modes[at![0]] ?? activeMode(collection)];
+  return isAlias(raw) ? valueOf(variables, raw.alias, [...seen, key], modes) : raw;
 }
 
 function typeOfKey(variables: Variables | undefined, key: string): VarType | undefined {
@@ -162,10 +168,10 @@ function withRadius(clip: MotionClip, frame: Frame, value: VarLiteral): MotionCl
   return { ...clip, props: { ...clip.props, corners: [], roundness: Math.min(MAX_ROUNDNESS, Math.max(0, value / short)) } };
 }
 
-function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame): MotionClip {
+function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame, modes: Modes): MotionClip {
   let next = clip;
   for (const [target, key] of Object.entries(clip.bind ?? {})) {
-    const value = valueOf(variables, key);
+    const value = valueOf(variables, key, [], modes);
     if (value === undefined) {
       continue;
     }
@@ -178,14 +184,129 @@ function resolvedClip(variables: Variables, clip: MotionClip, frame: Frame): Mot
   return next;
 }
 
+const frameModes = (variables: Variables): Modes => Object.fromEntries(Object.entries(variables).map(([name, c]) => [name, activeMode(c)]));
+
+function knownModes(variables: Variables, own: LayerModes | undefined): Modes {
+  return Object.fromEntries(Object.entries(own ?? {}).filter(([collection, mode]) => variables[collection]?.modes.includes(mode)));
+}
+
+type ModesOf = (clip: MotionClip) => Modes;
+
+function scopeModes(variables: Variables, clips: readonly MotionClip[], outer: Modes): ModesOf {
+  const byId = new Map(clips.map((c) => [c.id, c]));
+  const seen = new Map<string, Modes>();
+  const of = (clip: MotionClip, depth: number): Modes => {
+    const known = seen.get(clip.id);
+    if (known) {
+      return known;
+    }
+    const parent = clip.parent ? byId.get(clip.parent) : undefined;
+    const above = parent && depth < byId.size ? of(parent, depth + 1) : outer;
+    const own = clip.modes ? { ...above, ...knownModes(variables, clip.modes) } : above;
+    seen.set(clip.id, own);
+    return own;
+  };
+  return (clip) => of(clip, 0);
+}
+
+const sameModes = (a: Modes, b: Modes) => Object.keys(a).every((k) => a[k] === b[k]);
+
+const clipsOf = (tracks: readonly MotionTrack[]) => tracks.flatMap((t) => t.clips as MotionClip[]);
+
+const LAYER_KEYS = ['autoLayout'] as const;
+
+function changed(from: MotionClip, to: MotionClip): Record<string, unknown> {
+  const keys = new Set([...Object.keys(from.props), ...Object.keys(to.props)]);
+  const props = [...keys].filter((k) => JSON.stringify(from.props[k]) !== JSON.stringify(to.props[k])).map((k) => [k, to.props[k]]);
+  const level = LAYER_KEYS.filter((k) => JSON.stringify(from[k]) !== JSON.stringify(to[k])).map((k) => [k, to[k]]);
+  return Object.fromEntries([...props, ...level]);
+}
+
+type Instance = { doc: MotionDoc; variables: Variables; base: Modes };
+
+function instanceValues(at: Instance, compId: string, modes: Modes, depth: number): Record<string, Record<string, unknown>> | undefined {
+  const comp = at.doc.comps[compId];
+  if (!comp || depth > MAX_COMP_DEPTH || sameModes(modes, at.base)) {
+    return undefined;
+  }
+  const clips = clipsOf(comp.tracks);
+  const [inside, home] = [scopeModes(at.variables, clips, modes), scopeModes(at.variables, clips, at.base)];
+  const frame = comp.frame ?? at.doc;
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const clip of clips) {
+    const own = clip.bind ? changed(resolvedClip(at.variables, clip, frame, home(clip)), resolvedClip(at.variables, clip, frame, inside(clip))) : {};
+    const inner = compOf(clip);
+    const below = inner ? instanceValues(at, inner, inside(clip), depth + 1) : undefined;
+    const nested = inner && JSON.stringify(below) !== JSON.stringify(instanceValues(at, inner, home(clip), depth + 1)) ? { modeValues: below ?? {} } : {};
+    const entry = { ...own, ...nested };
+    if (Object.keys(entry).length) {
+      out[clip.id] = entry;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function withModeValues(clip: MotionClip, values: Record<string, Record<string, unknown>> | undefined): MotionClip {
+  if (!values && clip.props.modeValues === undefined) {
+    return clip;
+  }
+  const { modeValues: _old, ...props } = clip.props;
+  return { ...clip, props: values ? { ...props, modeValues: values } : props };
+}
+
+function resolvedScope(at: Instance, tracks: MotionTrack[], frame: Frame): MotionTrack[] {
+  const modesOf = scopeModes(at.variables, clipsOf(tracks), at.base);
+  const resolveOne = (c: MotionClip) => {
+    const bound = c.bind ? resolvedClip(at.variables, c, frame, modesOf(c)) : c;
+    const comp = compOf(bound);
+    return comp ? withModeValues(bound, instanceValues(at, comp, modesOf(c), 0)) : bound;
+  };
+  return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(resolveOne) })) as MotionTrack[];
+}
+
 export function resolveVariables(doc: MotionDoc): MotionDoc {
   const variables = doc.variables;
   if (!variables) {
     return doc;
   }
-  const resolved = (tracks: MotionTrack[], frame: Frame) => tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.bind ? resolvedClip(variables, c as MotionClip, frame) : c)) })) as MotionTrack[];
-  const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: resolved(comp.tracks, comp.frame ?? doc) }]));
-  return { ...doc, tracks: resolved(doc.tracks, doc), comps };
+  const at: Instance = { doc, variables, base: frameModes(variables) };
+  const comps = Object.fromEntries(Object.entries(doc.comps).map(([id, comp]) => [id, { ...comp, tracks: resolvedScope(at, comp.tracks, comp.frame ?? doc) }]));
+  return { ...doc, tracks: resolvedScope(at, doc.tracks, doc), comps };
+}
+
+export function setLayerMode(doc: MotionDoc, clipId: string, collection: string, mode: string | null): OpResult {
+  const existing = doc.variables?.[collection];
+  if (!existing) {
+    return { ok: false, error: `no collection ${collection}` };
+  }
+  if (mode !== null && !existing.modes.includes(mode)) {
+    return { ok: false, error: `${collection} has modes ${existing.modes.join(', ')}` };
+  }
+  if (!scopeOf(doc, clipId).length) {
+    return { ok: false, error: `no clip ${clipId}` };
+  }
+  const edit = (clip: MotionClip): MotionClip => {
+    const { [collection]: _gone, ...rest } = clip.modes ?? {};
+    const modes = mode === null ? rest : { ...rest, [collection]: mode };
+    const { modes: _old, ...bare } = clip;
+    return Object.keys(modes).length ? { ...bare, modes } : bare;
+  };
+  const edited = mapEveryTrack(doc, (tracks) => tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map((c) => (c.id === clipId ? edit(c) : c)) })) as MotionTrack[]);
+  return { ok: true, doc: resolveVariables(edited) };
+}
+
+const scopeOf = (doc: MotionDoc, clipId: string): MotionClip[] => [doc.tracks, ...Object.values(doc.comps).map((c) => c.tracks)].map(clipsOf).find((clips) => clips.some((c) => c.id === clipId)) ?? [];
+
+export function layerModeOf(doc: MotionDoc, clipId: string, collection: string): string | null {
+  return scopeOf(doc, clipId).find((c) => c.id === clipId)?.modes?.[collection] ?? null;
+}
+
+export function inheritedModeOf(doc: MotionDoc, clipId: string, collection: string): string {
+  const clips = scopeOf(doc, clipId);
+  const parent = clips.find((c) => c.id === clipId)?.parent;
+  const above = parent ? clips.find((c) => c.id === parent) : undefined;
+  const variables = doc.variables ?? {};
+  return (above ? scopeModes(variables, clips, frameModes(variables))(above)[collection] : undefined) ?? activeModeOf(doc, collection);
 }
 
 export function defineVariable(doc: MotionDoc, collection: string, name: string, input: VarInput, modes?: readonly string[]): OpResult {

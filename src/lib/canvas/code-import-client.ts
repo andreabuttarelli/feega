@@ -1,6 +1,6 @@
 const UNAVAILABLE = 'unavailable';
 
-export type DesignLanded = { tokens: number; byClass: number; byRule: number; byValue: number; unbound: number; otherMode: number };
+export type DesignLanded = { tokens: number; byClass: number; byRule: number; byValue: number; unbound: number };
 
 export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded };
 
@@ -32,7 +32,7 @@ export async function importCode(ask: CodeAsk, fetchFn: typeof fetch = fetch): P
   return got.ok ? { ok: true, landed: got.value } : got;
 }
 
-export async function tokensFound(projectId: string, where: { repo: string } | { folder: string }, fetchFn: typeof fetch = fetch): Promise<number> {
+export async function tokensFound(projectId: string, where: { repo: string } | { folder: string } | { upload: string }, fetchFn: typeof fetch = fetch): Promise<number> {
   const got = await asked<{ tokens: number }>(`/api/v1/projects/${projectId}/code-import/tokens?${new URLSearchParams(where)}`, {}, fetchFn);
   return got.ok ? got.value.tokens : 0;
 }
@@ -57,7 +57,7 @@ export type RepoPublished = { url: string | null; branch: string | null; files: 
 
 export type RepoHead = { kind: 'github' | 'folder' | 'upload'; sha: string | null; head: string | null };
 
-export type RepoPulled = { outcome: 'ok' | 'up_to_date'; sha: string; carried: number; conflicts: string[]; skipped: string[] };
+export type RepoPulled = { outcome: 'ok' | 'up_to_date'; sha: string; carried: number; conflicts: string[]; skipped: string[]; tokens?: string[] };
 
 const syncPath = (projectId: string, nodeId: string, rest: string) => `/api/v1/projects/${projectId}/code-import/${nodeId}/${rest}`;
 

@@ -7,7 +7,8 @@ enum BenchFixture {
   Zoom = 'zoom',
   Landings = 'landings',
   Load = 'load',
-  Budget = 'budget'
+  Budget = 'budget',
+  Camera = 'camera'
 }
 
 const PORT = Number(process.env.BENCH_PORT ?? 5288);
@@ -17,7 +18,8 @@ const FIXTURE: Record<BenchFixture, { file: string; make: string | null; spec: R
   [BenchFixture.Zoom]: { file: join(tmpdir(), 'feega-zoom-bench.feega'), make: 'node scripts/perf/zoom-fixture.mjs', spec: /canvas-zoom-bench/ },
   [BenchFixture.Landings]: { file: LANDINGS_FILE, make: existsSync(LANDINGS_FILE) ? null : 'node scripts/perf/landings-fixture.mjs', spec: /canvas-landings-bench/ },
   [BenchFixture.Load]: { file: LANDINGS_FILE, make: null, spec: /canvas-load-bench/ },
-  [BenchFixture.Budget]: { file: LANDINGS_FILE, make: null, spec: /canvas-frame-budget/ }
+  [BenchFixture.Budget]: { file: LANDINGS_FILE, make: null, spec: /canvas-frame-budget/ },
+  [BenchFixture.Camera]: { file: LANDINGS_FILE, make: null, spec: /camera-tick-bench/ }
 };
 const { file, make, spec } = FIXTURE[FIXTURE_KIND];
 const SERVED = join(tmpdir(), `feega-${FIXTURE_KIND}-served.feega`);
@@ -45,5 +47,5 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: { baseURL: `http://127.0.0.1:${PORT}` },
-  webServer: FIXTURE_KIND === BenchFixture.Load ? undefined : [FIXTURE_SERVER, ...(FIXTURE_KIND === BenchFixture.Budget ? [APP_SERVER] : [])]
+  webServer: [BenchFixture.Load, BenchFixture.Camera].includes(FIXTURE_KIND) ? undefined : [FIXTURE_SERVER, ...(FIXTURE_KIND === BenchFixture.Budget ? [APP_SERVER] : [])]
 });

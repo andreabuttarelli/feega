@@ -1,1 +1,1 @@
-export const CORE_VERSION = '87813928b699';
+export const CORE_VERSION = 'e685ada98bb4';

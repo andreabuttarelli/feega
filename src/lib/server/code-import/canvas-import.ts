@@ -23,7 +23,7 @@ import { importStorybookAt } from './import-storybook';
 import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
 import { githubFor } from './github-runtime';
-import { snapshotSha, uploadedArchive, uploadOf } from './upload-source';
+import { snapshotSha, uploadedArchive, uploadOf, uploadSource } from './upload-source';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
 import type { CodeOriginData } from '$lib/canvas/motion-node';
 
@@ -121,9 +121,10 @@ async function importUploadInto(scope: CodeScope, land: LandAsk, ask: CodeImport
     return { outcome: CodeImportOutcome.Invalid };
   }
 
-  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, routes, conditions: ask.conditions, runner: sandboxOf(scope), archive });
+  const code = () => uploadSource(archive).read('');
+  const done = await importRepoAt({ ...land, repo: { owner: UPLOAD_OWNER, repo: upload.name, ref: null }, routes, conditions: ask.conditions, runner: sandboxOf(scope), archive, code, designSystem: ask.designSystem });
   if (done.outcome === CodeImportOutcome.Ok) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Upload, repo: upload.path, branch: null, sha: snapshotSha(archive), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}) });
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Upload, repo: upload.path, branch: null, sha: snapshotSha(archive), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
   }
   return done;
 }
@@ -157,7 +158,12 @@ export async function rememberOrigin(scope: CodeScope, nodeId: string, origin: C
   await patchNodeData(scope.db, { orgId: scope.orgId, nodeId, patch: { code: origin }, check: DataCheck.None, actor: scope.actor });
 }
 
-export async function tokensFound(scope: CodeScope, where: { repo?: string; folder?: string }): Promise<number | null> {
+export async function tokensFound(scope: CodeScope, where: { repo?: string; folder?: string; upload?: string }): Promise<number | null> {
+  if (where.upload !== undefined) {
+    const upload = uploadOf(scope.orgId, where.upload);
+    const archive = upload ? await uploadedArchive(scope.db, upload) : null;
+    return archive ? tokenCount(uploadSource(archive).read('')) : null;
+  }
   if (where.folder !== undefined) {
     const root = localModeRefusal(env) === null ? folderOf(where.folder) : null;
     return root ? tokenCount(folderSource(root).read('')) : null;

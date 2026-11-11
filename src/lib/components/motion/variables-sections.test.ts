@@ -3,7 +3,7 @@ import { render } from 'svelte/server';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '@feega/motion-core/motion/doc';
 import { addClip, type OpResult } from '@feega/motion-core/motion/timeline';
 import { VarType } from '@feega/motion-core/motion/variables-model';
-import { bindVariable, defineVariable } from '$lib/motion/variables';
+import { bindVariable, defineVariable, setLayerMode } from '$lib/motion/variables';
 import VariablesSection from './VariablesSection.svelte';
 import VariablesLibrarySection from './VariablesLibrarySection.svelte';
 
@@ -28,6 +28,15 @@ describe('the variables sections', () => {
     expect(body).toContain('data-testid="variable-pick"');
     expect(body).toContain('Theme/surface');
     expect(body).toContain('data-testid="variable-unbind-fill"');
+  });
+
+  it('the clip section shows the mode the layer takes for each collection with modes, and its own override', () => {
+    const inherited = render(VariablesSection, { props: { doc: bound, clip: findClip(bound, 's1')!.clip, commit: () => {} } }).body;
+    expect(inherited).toContain('data-testid="layer-mode-Theme"');
+    expect(inherited).toContain('Inherited');
+    const dark = must(setLayerMode(bound, 's1', 'Theme', 'Dark'));
+    const body = render(VariablesSection, { props: { doc: dark, clip: findClip(dark, 's1')!.clip, commit: () => {} } }).body;
+    expect(body).toMatch(/<option value="Dark"[^>]*selected/);
   });
 
   it('the library lists collections with their modes and a value per mode', () => {

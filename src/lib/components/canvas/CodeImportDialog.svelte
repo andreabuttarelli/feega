@@ -64,7 +64,7 @@
   let designTouched = $state(false);
   let found = $state<number | null>(null);
 
-  const lookup = $derived(source === Source.Repo && repo.trim() ? { repo: linked(repo) } : source === Source.Folder && folder.trim() ? { folder: folder.trim() } : null);
+  const lookup = $derived(source === Source.Repo && repo.trim() ? { repo: linked(repo) } : source === Source.Folder && folder.trim() ? { folder: folder.trim() } : source === Source.Upload && uploaded ? { upload: uploaded.path } : null);
 
   $effect(() => {
     const where = lookup;
@@ -86,7 +86,7 @@
   const TARGETS: Record<Source, () => CodeTarget> = {
     [Source.Repo]: () => ({ repo: linked(repo), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
     [Source.Folder]: () => ({ folder: folder.trim(), routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
-    [Source.Upload]: () => ({ upload: uploaded?.path ?? '', routes: routes.split(/[\s,]+/).filter(Boolean), conditions }),
+    [Source.Upload]: () => ({ upload: uploaded?.path ?? '', routes: routes.split(/[\s,]+/).filter(Boolean), conditions, designSystem }),
     [Source.Storybook]: () => ({ storybook: linked(storybook) })
   };
 

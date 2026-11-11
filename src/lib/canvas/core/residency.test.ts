@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CACHE_SHARE, cached, Offscreen, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
+import { ItemKind, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
+import { CACHE_SHARE, cacheZoom, cached, Offscreen, pictureBytes, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -40,6 +41,17 @@ describe('frame residency', () => {
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, texture / CACHE_SHARE).map((f) => f.cache)).toEqual([true, false, false]);
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, (3 * texture) / CACHE_SHARE).every((f) => f.cache)).toBe(true);
   });
+
+  it('sizes cache textures at the top of the zoom step, so a zoom within the step never outgrows the budget', () => {
+    const texture = 200 * 200 * 4;
+    const frames = [frame('a', 0, 0), frame('b', 200, 0)];
+    const zoom = 1.9;
+
+    expect(cacheZoom(zoom)).toBeGreaterThanOrEqual(zoom);
+    expect(cacheZoom(zoom)).toBe(cacheZoom(zoom * 1.01));
+    expect(cached(frames, { x: 0, y: 0, zoom }, screen, (2 * texture - 1) / CACHE_SHARE, cacheZoom(zoom)).map((f) => f.cache)).toEqual([true, false]);
+    expect(cached(frames, { x: 0, y: 0, zoom }, screen, (2 * texture - 1) / CACHE_SHARE).map((f) => f.cache)).toEqual([true, true]);
+  });
 });
 
 describe('a view at rest', () => {
@@ -78,5 +90,25 @@ describe('a frame being dragged', () => {
   it('holds nothing while nothing moves', () => {
     const shown = cached([frame('a', 0, 0)], view, screen, 1e9);
     expect(heldWhileMoving(shown, new Set())[0].hold).toBeUndefined();
+  });
+});
+
+describe('picture bytes', () => {
+  const counted = () => {
+    const reads = { n: 0 };
+    const image = { size: { width: 10, height: 10 } } as Item;
+    Object.defineProperty(image, 'kind', { get: () => (reads.n++, ItemKind.Image) });
+    return { items: [image] as readonly Item[], reads };
+  };
+
+  it('counts four bytes per image pixel', () => {
+    expect(pictureBytes(counted().items)).toBe(400);
+  });
+
+  it('walks a list once, however many frames ask for it during a gesture', () => {
+    const { items, reads } = counted();
+    pictureBytes(items);
+    pictureBytes(items);
+    expect(reads.n).toBe(1);
   });
 });
