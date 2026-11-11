@@ -58,6 +58,8 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 
 ## Import a local folder
 
+On feega.app, the **Folder** tab picks a project folder on your computer and uploads it once. node_modules, build output (`dist`, `build`, `.next`, …), what `.gitignore` leaves out and files over 1 MB are skipped; the rest may total 25 MB. It runs in the same sandbox as a GitHub repository, never on feega's servers. It is **imported once, no sync**: code mode shows the patch to download, with no write-back and no pull.
+
 In local mode (`npx feega`), the **Folder** tab takes the absolute path of a project on your computer. Its `dev` script runs here, the pages are read with your local Chrome, and the frame stays linked to the folder as above. Images served by the dev server are not copied yet.
 
 ## What works
@@ -98,7 +100,7 @@ The import answers `frameId`, `pages` (the paths or stories that landed), `compo
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Uploaded folder (web): `POST /api/v1/projects/:id/code-uploads` `{ name }` returns `{ path, uploadUrl }`; PUT the gzipped tarball to `uploadUrl`, then `POST /api/v1/projects/:id/code-import` `{ canvasId, upload: path, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
 Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, x, y }` (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
 
