@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ItemKind, type Item } from '@feega/motion-core/motion/gpu-full/display-list';
-import { CACHE_SHARE, cached, Offscreen, pictureBytes, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
+import { CACHE_SHARE, cacheZoom, cached, Offscreen, pictureBytes, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -40,6 +40,17 @@ describe('frame residency', () => {
 
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, texture / CACHE_SHARE).map((f) => f.cache)).toEqual([true, false, false]);
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, (3 * texture) / CACHE_SHARE).every((f) => f.cache)).toBe(true);
+  });
+
+  it('sizes cache textures at the top of the zoom step, so a zoom within the step never outgrows the budget', () => {
+    const texture = 200 * 200 * 4;
+    const frames = [frame('a', 0, 0), frame('b', 200, 0)];
+    const zoom = 1.9;
+
+    expect(cacheZoom(zoom)).toBeGreaterThanOrEqual(zoom);
+    expect(cacheZoom(zoom)).toBe(cacheZoom(zoom * 1.01));
+    expect(cached(frames, { x: 0, y: 0, zoom }, screen, (2 * texture - 1) / CACHE_SHARE, cacheZoom(zoom)).map((f) => f.cache)).toEqual([true, false]);
+    expect(cached(frames, { x: 0, y: 0, zoom }, screen, (2 * texture - 1) / CACHE_SHARE).map((f) => f.cache)).toEqual([true, true]);
   });
 });
 
