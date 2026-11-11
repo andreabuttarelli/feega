@@ -6,7 +6,6 @@ const { fileIn, withExtension, savedBounds, saveBounds, EXTENSION } = require('.
 const { startServer, freePort, LOOPBACK } = require('./server.cjs');
 const { frameless, overlay, offlinePage, unreachable } = require('./chrome.cjs');
 const { start, authReturn, staysInside, keepInside, settingsUrl, droppedCanvas, DEEP_LINK_SCHEME } = require('./routing.cjs');
-const nativeCanvas = require('./native-canvas.cjs');
 
 const START_URL_ENV = 'FEEGA_URL';
 const hosted = start(process.env[START_URL_ENV]);
@@ -16,11 +15,12 @@ const windowStatePath = () => path.join(app.getPath('userData'), 'window.json');
 const freshFile = () => path.join(app.getPath('documents'), `Untitled${EXTENSION}`);
 const FILE_FILTERS = [{ name: 'feega canvas', extensions: [EXTENSION.slice(1)] }];
 const PRELOAD_FILE = 'preload.cjs';
+const SECURE_PREFERENCES = { contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true };
 const TRANSPARENT = '#00000000';
 const DOCS_URL = 'https://docs.feega.app';
 const INSTALL_GUIDE_URL = `${DOCS_URL}/desktop/install-macos/`;
-const nativeCanvasOn = nativeCanvas.wanted(process.env, process.platform);
-const NativeCanvas = nativeCanvasOn ? nativeCanvas.loadAddon(__dirname) : null;
+const nativeCanvas = app.isPackaged ? null : require('./native-canvas.cjs');
+const NativeCanvas = nativeCanvas?.wanted(process.env, process.platform, app.isPackaged) ? nativeCanvas.loadAddon(__dirname) : null;
 const userAgent = (window) => `${window.webContents.getUserAgent()} FeegaNative/${app.getVersion()}`;
 
 let home = hosted;
@@ -176,9 +176,9 @@ function leave(url) {
 function windowOptions() {
   const base = { width: 1440, height: 900, ...savedBounds(windowStatePath()), minWidth: 800, minHeight: 600, title: 'Feega', backgroundColor: '#0c0c0c', ...frameless(process.platform, nativeTheme.shouldUseDarkColors) };
   if (!NativeCanvas) {
-    return base;
+    return { ...base, webPreferences: SECURE_PREFERENCES };
   }
-  return { ...base, transparent: true, backgroundColor: TRANSPARENT, webPreferences: { preload: path.join(__dirname, PRELOAD_FILE) } };
+  return { ...base, transparent: true, backgroundColor: TRANSPARENT, webPreferences: { ...SECURE_PREFERENCES, preload: path.join(__dirname, PRELOAD_FILE) } };
 }
 
 function installNativeCanvas() {
