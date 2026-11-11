@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { FREE_CREDITS, PLANS } from '$lib/plans';
+import { PLANS } from '$lib/plans';
 import { swallow } from '$lib/server/swallow';
 import { billedCreditsFor } from '$lib/credit-ladder';
 
@@ -29,20 +29,16 @@ export type CreditsUsage = {
 };
 
 // ── Plan quotas ──────────────────────────────────────────────────────────────────
-// Free (no plan): the monthly FREE_CREDITS grant. Paid tiers share credits with
-// src/lib/plans.ts (PlanCards / pricing) so UI and entitlement cannot drift.
-// `scale` (legacy grandfathered tier, not in PLANS) is mapped to the Pro quota
-// explicitly so it never falls back to the free grant.
+const FREE_MONTHLY_QUOTA = 0;
+
 const CREDIT_QUOTAS: Record<string, number> = {
-  '': FREE_CREDITS,
+  '': FREE_MONTHLY_QUOTA,
   ...Object.fromEntries(PLANS.map((p) => [p.key, p.credits])),
-  // Legacy grandfathered tier — stessa quota di Pro (scale paga come Pro). Agganciato alla voce di
-  // Pro e non a una cifra copiata: quando il prezzo di Pro cambia, questa lo segue.
-  scale: PLANS.find((p) => p.key === 'pro')?.credits ?? FREE_CREDITS
+  scale: PLANS.find((p) => p.key === 'pro')?.credits ?? FREE_MONTHLY_QUOTA
 };
 
 export function creditQuota(plan: string | null | undefined): number {
-  return CREDIT_QUOTAS[plan ?? ''] ?? FREE_CREDITS;
+  return CREDIT_QUOTAS[plan ?? ''] ?? FREE_MONTHLY_QUOTA;
 }
 
 // ── Date helpers ─────────────────────────────────────────────────────────────────

@@ -35,7 +35,8 @@ function deps(outcome: Awaited<ReturnType<LandingDeps['acceptInvite']>>, termsAc
       return outcome;
     }),
     homePathFor: vi.fn(async (..._args: Parameters<LandingDeps['homePathFor']>) => '/p/proj/c/canvas'),
-    startPathFor: vi.fn(async (..._args: Parameters<LandingDeps['startPathFor']>) => '/p/site/c/canvas?start_url=x')
+    startPathFor: vi.fn(async (..._args: Parameters<LandingDeps['startPathFor']>) => '/p/site/c/canvas?start_url=x'),
+    track: vi.fn(async () => {})
   };
 }
 
@@ -133,6 +134,20 @@ describe('a start url carried through sign-in', () => {
   });
 });
 
+describe('a first sign-in is a signup', () => {
+  it('records signup_completed once, when the terms are first accepted', async () => {
+    const d = deps({ outcome: 'invalid' });
+    await landingPath(DB, USER, cookies(), null, d);
+    expect(d.track).toHaveBeenCalledWith('signup_completed', { userId: 'u1' }, {});
+  });
+
+  it('a returning user is not a signup', async () => {
+    const d = deps({ outcome: 'invalid' }, '2026-01-01');
+    await landingPath(DB, USER, cookies(), null, d);
+    expect(d.track).not.toHaveBeenCalled();
+  });
+});
+
 describe('a home prompt typed while signed out', () => {
   it('lands on the home, where the prompt resumes, and the cookie is spent', async () => {
     const d = deps({ outcome: 'invalid' });
@@ -145,13 +160,21 @@ describe('a home prompt typed while signed out', () => {
     expect(jar).not.toHaveProperty(HOME_DRAFT_COOKIE);
   });
 
-  it('a handoff query survives the login and lands on /app with it', async () => {
+  it('a handoff query survives the login and lands on /app marked as resumed', async () => {
+    const jar: Record<string, string> = { [HOME_DRAFT_COOKIE]: '?prompt=launch&kind=motion&go=n1' };
+
+    const path = await landingPath(DB, USER, cookies(jar), null, deps({ outcome: 'invalid' }));
+
+    expect(path).toBe('/app?prompt=launch&kind=motion&go=n1&resumed=1');
+    expect(jar).not.toHaveProperty(HOME_DRAFT_COOKIE);
+  });
+
+  it('a handoff from an older landing link gets its own single-use nonce', async () => {
     const jar: Record<string, string> = { [HOME_DRAFT_COOKIE]: '?prompt=launch&kind=motion' };
 
     const path = await landingPath(DB, USER, cookies(jar), null, deps({ outcome: 'invalid' }));
 
-    expect(path).toBe('/app?prompt=launch&kind=motion');
-    expect(jar).not.toHaveProperty(HOME_DRAFT_COOKIE);
+    expect(new URL(path, 'http://x').searchParams.get('go')).toBeTruthy();
   });
 
   it('without it, the usual canvas', async () => {

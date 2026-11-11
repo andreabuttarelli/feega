@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import { CostTier, type ChatModelOption } from '$lib/chat-model';
 
-const calls = vi.hoisted(() => ({ unbilled: 0, gate: null as Response | null, turns: 0, models: [] as string[], providerOptions: [] as unknown[], logged: [] as Array<{ model?: string }>, systems: [] as string[] }));
+const calls = vi.hoisted(() => ({ gate: null as Response | null, models: [] as string[], providerOptions: [] as unknown[], logged: [] as Array<{ model?: string }>, systems: [] as string[], events: [] as Array<{ event: string; actor: Record<string, unknown>; props: Record<string, unknown> }> }));
 
 function finishingModel() {
   return new MockLanguageModelV4({
@@ -62,11 +62,7 @@ vi.mock('$lib/server/ai-log', () => ({
   extractSdkUsage: () => ({}),
   logAiCall: (entry: { model?: string }) => calls.logged.push(entry),
   withBrandContext: (_id: string, fn: () => void) => fn(),
-  withOrgContext: (_id: string, fn: () => void) => fn(),
-  withoutDebit: <T>(fn: () => T): T => {
-    calls.unbilled += 1;
-    return fn();
-  }
+  withOrgContext: (_id: string, fn: () => void) => fn()
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => calls.gate, gateOrgAiAction: async () => calls.gate }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
@@ -78,8 +74,11 @@ vi.mock('$lib/server/repos/chat', () => ({
   openThread: async () => 'thread-1',
   loadTurns: async () => [],
   promptHistory: () => [],
-  saveTurn: async () => undefined,
-  countUserTurns: async () => calls.turns
+  saveTurn: async () => undefined
+}));
+vi.mock('$lib/server/product-events/track', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$lib/server/product-events/track')>()),
+  track: async (event: string, actor: Record<string, unknown>, props: Record<string, unknown>) => void calls.events.push({ event, actor, props })
 }));
 vi.mock('$lib/server/project-agent/project-tools', () => ({ createProjectTools: () => ({}) }));
 vi.mock('$lib/server/project-agent/tool-surface', () => ({ openAgentTools: async () => ({ tools: {}, close: async () => undefined }) }));
@@ -105,40 +104,28 @@ describe('the agent runs on the plan of who pays', () => {
   beforeEach(() => {
     calls.models.length = 0;
     calls.logged.length = 0;
+    calls.events.length = 0;
     calls.gate = null;
-    calls.turns = 0;
-    calls.unbilled = 0;
   });
 
-  it('a paid plan runs Opus 5.5', async () => {
+  it('every plan runs Opus 5.5', async () => {
     await settled(await POST(postEvent({})));
     expect(calls.models).toEqual(['anthropic/claude-opus-5.5']);
   });
 
-  it('a free plan runs Haiku, whatever model was asked', async () => {
-    calls.gate = new Response('{}', { status: NO_CREDITS });
-    await settled(await POST(postEvent({ model: 'anthropic/claude-opus-5.5' })));
-    expect(calls.models).toEqual(['anthropic/claude-haiku-4.5']);
-    expect(calls.unbilled).toBe(1);
-  });
-
-  it('a paid turn is debited as usual', async () => {
-    await settled(await POST(postEvent({})));
-    expect(calls.unbilled).toBe(0);
-  });
-
-  it('a free plan stops at 20 turns with the paywall, before spending', async () => {
+  it('no credits left stops the turn with the paywall, before spending, and records it', async () => {
     calls.gate = new Response('{"error":"credits"}', { status: NO_CREDITS });
-    calls.turns = 20;
     const res = await POST(postEvent({}));
     expect(res.status).toBe(NO_CREDITS);
     expect(calls.models).toEqual([]);
+    expect(calls.events.map((e) => e.event)).toEqual(['credits_exhausted']);
+    expect(calls.events[0].actor).toMatchObject({ userId: 'u-1', orgId: 'org-1' });
   });
 
-  it('the 20th free turn still runs', async () => {
-    calls.gate = new Response('{}', { status: NO_CREDITS });
-    calls.turns = 19;
+  it('a turn that starts is recorded, with no prompt text', async () => {
     await settled(await POST(postEvent({})));
-    expect(calls.models).toEqual(['anthropic/claude-haiku-4.5']);
+    const started = calls.events.find((e) => e.event === 'agent_started');
+    expect(started).toBeDefined();
+    expect(JSON.stringify(started)).not.toContain('bakery');
   });
 });

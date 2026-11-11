@@ -1,3 +1,4 @@
+import { CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 // Per-brand pricing tiers — the single source of truth for plan display + selection.
 // Shared by the public /pricing page, onboarding and the activate paywall. Display data
 // only, safe to import in the browser.
@@ -29,8 +30,7 @@ export function videosFromCredits(credits: number): number {
   return Math.floor(credits / VIDEO_COST_CREDITS);
 }
 
-/** Free-tier monthly credit grant (no Stripe plan). */
-export const FREE_CREDITS = 0;
+export const FREE_CREDITS = CREDITS_PER_USD_GRANT;
 
 /*
  * NON reintrodurre `apiValueEur/Usd` (il "valore API" accanto ai crediti sul pricing): quei numeri
