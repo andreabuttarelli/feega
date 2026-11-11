@@ -48,7 +48,7 @@
     font-family: 'Instrument Serif', serif;
     font-variation-settings: normal;
     font-size: 48px;
-    line-height: 0.8;
+    line-height: 0.95;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -97,6 +97,12 @@
     gap: 8px;
     width: 100%;
     margin-top: 100px;
+  }
+
+  @media (max-width: 809.98px) {
+    .start {
+      width: 100%;
+    }
   }
 
   @media (min-width: 1200px) {
