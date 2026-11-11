@@ -31,9 +31,25 @@ describe('ascii field', () => {
     expect(gridSize(390, 700, 10).cols).toBeGreaterThan(0);
   });
 
-  it('starts from brand orange on the left', () => {
-    expect(tint(0)).toEqual([255, 81, 0]);
-    expect(tint(1)).not.toEqual([255, 81, 0]);
+  it('runs the pride rainbow from red to violet', () => {
+    const [r0, , b0] = tint(0);
+    const [r1, , b1] = tint(1);
+    expect(r0).toBeGreaterThan(b0);
+    expect(b1).toBeGreaterThan(100);
+  });
+
+  it('passes through yellow and green', () => {
+    const samples = Array.from({ length: 101 }, (_, i) => tint(i / 100));
+    expect(samples.some(([r, g, b]) => r > 200 && g > 200 && b < 80)).toBe(true);
+    expect(samples.some(([r, g, b]) => g > r + 40 && g > b + 40)).toBe(true);
+  });
+
+  it('blends between stripes without hard bands', () => {
+    for (let t = 0; t < 1; t += 0.01) {
+      const a = tint(t);
+      const b = tint(t + 0.01);
+      expect(Math.max(...a.map((v, i) => Math.abs(v - b[i])))).toBeLessThan(32);
+    }
   });
 });
 

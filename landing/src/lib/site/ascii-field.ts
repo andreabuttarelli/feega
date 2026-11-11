@@ -4,12 +4,18 @@ export const MAX_CELLS = 12000;
 
 type Rgb = [number, number, number];
 
-const STOPS: Rgb[] = [
-  [255, 81, 0],
-  [255, 140, 70],
-  [220, 120, 190],
-  [140, 150, 255]
-];
+const PRIDE_RAINBOW = ['#E40303', '#FF8C00', '#FFED00', '#008026', '#004DFF', '#750787'];
+
+const MIN_PEAK = 200;
+
+const parse = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb;
+
+function lifted(rgb: Rgb): Rgb {
+  const gain = Math.max(1, MIN_PEAK / Math.max(...rgb));
+  return rgb.map((v) => Math.min(255, Math.round(v * gain))) as Rgb;
+}
+
+const STOPS: Rgb[] = PRIDE_RAINBOW.map(parse);
 
 const WAVES = [
   { kx: 0.11, ky: 0.07, r: 1.6, off: 0 },
@@ -52,7 +58,7 @@ export function tint(t: number): Rgb {
   const i = Math.min(STOPS.length - 2, Math.floor(p));
   const f = p - i;
   const [a, b] = [STOPS[i], STOPS[i + 1]];
-  return [0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * f)) as Rgb;
+  return lifted([0, 1, 2].map((k) => a[k] + (b[k] - a[k]) * f) as Rgb);
 }
 
 export function envelope(nx: number, ny: number): number {
