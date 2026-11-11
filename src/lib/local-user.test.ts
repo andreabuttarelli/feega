@@ -58,4 +58,13 @@ describe('in locale niente nodi che chiedono il cloud', () => {
     expect(CLOUD_ADDABLE.has('products')).toBe(true);
     expect(CLOUD_ADDABLE.has('doc')).toBe(false);
   });
+
+  it('ogni nodo che genera è spento senza una key, audio e 3D compresi', async () => {
+    const { AI_ADDABLE } = await import('./canvas/addable');
+    const { GEN_MEDIUMS } = await import('./canvas/gen-node');
+
+    for (const medium of GEN_MEDIUMS) {
+      expect(AI_ADDABLE.has(medium)).toBe(true);
+    }
+  });
 });
