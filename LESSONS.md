@@ -3815,3 +3815,11 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## Local mode must resolve before any Supabase key check
 
 **Signal:** 500 `SUPABASE_SERVICE_ROLE_KEY not configured` in local mode with no `.env`, only on routes that use the service-role or admin client. **Move:** `createClient` already routes to `localStore()`, but a key guard placed before it throws first; check `localStore()` ahead of every env-key guard in `db/client.ts` and `supabase-admin.ts`. Test: `src/lib/server/db/client.local.test.ts`.
+
+### A custom clip with a prop called `name` loses its component
+
+**Signal:** a new port makes every template test fail with `Custom: name a custom component name, e.g. NodeGraph`. **Move:** `customTemplateDoc` spreads the port's prop defaults after `name: component`, so a prop called `name` overwrites the component name. Call it `person`, `label`, `title`; `hyperframes/catalog.test.ts` now rejects it.
+
+### Re-running `component-previews.ts` without ids rewrites every preview
+
+**Signal:** `git status` lists hundreds of modified `static/component-previews/*` after one run. **Move:** always pass the ids (`builtin:<id> ...`, in batches of 8 with `xargs -n 8`); the manifest then merges instead of being replaced. Restore the strays with `git checkout -- static/component-previews`.
