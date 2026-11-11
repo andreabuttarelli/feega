@@ -912,7 +912,7 @@
       (window as Window & { __gpuMem?: object }).__gpuMem = { ...crashes.sample, put: put.size, pictured: pictured.size };
       debugFrame(outcome, skipped, shown);
     }
-    return pending || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
+    return pending || (into.warming?.() ?? false) || zooming.active() || (!quiet && sentOverlay.waiting(overlay)) || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;
