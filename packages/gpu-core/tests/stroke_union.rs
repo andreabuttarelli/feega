@@ -27,6 +27,8 @@ impl Canvas for Recording {
     fn push_clip(&mut self, _: Fill, _: Affine, _: &BezPath) {}
 
     fn pop(&mut self) {}
+
+    fn shade(&mut self, _: Affine, _: &gpu_core::shades::Shade) {}
 }
 
 #[test]

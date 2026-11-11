@@ -35,6 +35,8 @@ impl Canvas for Recorder {
 
     fn pop(&mut self) {}
 
+    fn shade(&mut self, _: Affine, _: &gpu_core::shades::Shade) {}
+
     fn fragment(&mut self, _: &Scene, _: Affine) -> bool {
         self.fragments += 1;
         true
