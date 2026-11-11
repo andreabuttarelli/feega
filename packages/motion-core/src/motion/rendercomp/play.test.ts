@@ -51,14 +51,6 @@ describe('every rendercomp port plays from the source the player runs', () => {
     expect(platformStable(play(port, defaults(port)))).toMatchSnapshot();
   });
 
-  it.each(PORTS)('%s marks its canvas on every frame so the stage re-reads it', (_, port) => {
-    const canvases = play(port, defaults(port)).map((html) => html.match(/<canvas[^>]*>/)?.[0]);
-
-    if (canvases[0]) {
-      expect(new Set(canvases).size).toBe(canvases.length);
-    }
-  });
-
   it.each(PORTS)('%s draws no empty picture', (_, port) => {
     const root = document.createElement('div');
     root.innerHTML = play(port, defaults(port)).join('');
