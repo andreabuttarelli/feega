@@ -7,7 +7,7 @@ import { codePlan } from './code-doc';
 import { boardsOf, conditioned } from './boards';
 import { parseSheets, readSheets } from './css-tokens';
 import { tokenSetOf, variablesOf } from './design-tokens';
-import { boundToTokens } from './design-bind';
+import { boundToTokens, spacingMultiples } from './design-bind';
 import { defineVariable, setActiveMode, variableValue } from '$lib/motion/variables';
 import { VarType } from '@feega/motion-core/motion/variables-model';
 import { instanceTracks } from '@feega/motion-core/motion/layout/resolve';
@@ -88,6 +88,18 @@ describe('boundToTokens', () => {
     expect(clipWith(doc, 'bg-card rounded-card').bind).toMatchObject({ fill: 'traidue Colors/card' });
     expect(clipWith(doc, 'btn-cta').bind).toMatchObject({ fill: 'traidue Colors/brand-blue' });
     expect(bound).toMatchObject({ byClass: 2, byRule: 1, byValue: 1 });
+  });
+
+  it('Tailwind 4: p-4 e gap-2 si legano al multiplo di --spacing, il resto della scala no', async () => {
+    const parsed = parseSheets(await readSheets(fixture('tailwind4')));
+    const classes = ['p-4', 'gap-2', 'p-[13px]', 'gap-x-3', 'text-primary'];
+    expect(spacingMultiples(classes)).toEqual([2, 4]);
+    const vars = variablesOf(tokenSetOf(parsed), 'traidue.com', { active: 'Light', multiples: spacingMultiples(classes) });
+    const stack: RestNode = { ...block('Stack', '#ffffff', 'div', 'p-4 gap-2', 10), layoutMode: 'VERTICAL', paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: 16, itemSpacing: 8, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', children: [text('a', '#123456', '', 30), text('b', '#123456', '', 60)] };
+
+    const { doc } = boundToTokens(docOf(page('/', '#ffffff', [stack])), { ...vars, rules: parsed.rules, base: 'Light', boards: {} });
+
+    expect(clipWith(doc, 'p-4 gap-2').bind).toMatchObject({ 'autoLayout.padding': 'traidue Spacing/4', 'autoLayout.gap': 'traidue Spacing/2' });
   });
 
   it('traidue: primary, success ed error sono tutti #111111 in Light e #f0f0f0 in Dark — senza classe nessun valore li distingue', async () => {

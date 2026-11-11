@@ -8,7 +8,7 @@ import { bindableTargets, resolveVariables } from '$lib/motion/variables';
 import { sameColour } from '$lib/server/url-import/page-tokens';
 import { uniformRadius } from '$lib/server/url-import/corner-radius';
 import type { VarRule } from './css-tokens';
-import type { TokenMap } from './design-tokens';
+import { SPACING_BASE, tokenId, type TokenMap } from './design-tokens';
 import { parseKey } from './render-conditions';
 
 export enum Evidence {
@@ -75,6 +75,14 @@ const TARGETS: Target[] = [
   { key: 'autoLayout.gap', type: VarType.Number, utility: /^gap-(.+)$/, token: (n) => `--spacing-${n}`, properties: ['gap'], read: (c) => c.autoLayout?.gap },
   { key: 'autoLayout.padding', type: VarType.Number, utility: /^p-(.+)$/, token: (n) => `--spacing-${n}`, properties: ['padding'], read: evenPadding }
 ];
+
+const MULTIPLE = /^\d+(?:\.\d+)?$/;
+
+export function spacingMultiples(classes: Iterable<string>): number[] {
+  const scaled = TARGETS.filter((t) => t.token('').startsWith(`${SPACING_BASE}-`));
+  const found = [...classes].flatMap((c) => scaled.map((t) => t.utility.exec(c)?.[1]).filter((n): n is string => Boolean(n) && MULTIPLE.test(n!)));
+  return [...new Set(found.map(Number))].sort((a, b) => a - b);
+}
 
 const BINDABLE_KEY: Record<string, (clip: MotionClip) => boolean> = {
   radius: isShape
@@ -256,7 +264,7 @@ function withoutModeLiterals(doc: MotionDoc): MotionDoc {
 }
 
 export function boundToTokens(doc: MotionDoc, ask: BindAsk): { doc: MotionDoc; bound: BoundCount } {
-  const byName = new Map(Object.entries(ask.map).map(([key, entry]) => [entry.name, key]));
+  const byName = new Map(Object.entries(ask.map).map(([key, entry]) => [tokenId(entry), key]));
   const keys = Object.entries(ask.variables).flatMap(([c, col]) => Object.keys(col.vars).map((v) => `${c}/${v}`));
   const ctx: Context = { ...ask, byName, allModes: modesOf(ask.variables), keys };
   const count: BoundCount = { [Evidence.Class]: 0, [Evidence.Rule]: 0, [Evidence.Value]: 0, unbound: 0 };

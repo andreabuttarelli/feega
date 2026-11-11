@@ -2,7 +2,7 @@ import type { MotionClip, MotionDoc, MotionTrack } from '@feega/motion-core/moti
 import { MAX_COLLECTIONS, MAX_VARIABLES, splitKey, type Collection, type Variable, type Variables } from '@feega/motion-core/motion/variables-model';
 import { mapEveryTrack } from '$lib/motion/doc-scopes';
 import { resolveVariables } from '$lib/motion/variables';
-import type { TokenEntry, TokenMap } from './design-tokens';
+import { tokenId, type TokenEntry, type TokenMap } from './design-tokens';
 import { editedModes } from './token-write';
 
 export type TokenSide = { doc: MotionDoc; map: TokenMap };
@@ -126,8 +126,8 @@ function canvasOnly(pull: Pull): void {
 
 export function pulledTokens(local: TokenSide, upstream: TokenSide): PulledTokens {
   const pull: Pull = { local, upstream, variables: structuredClone(upstream.doc.variables ?? {}), map: structuredClone(upstream.map), report: [], conflicts: [] };
-  const theirs = new Map(Object.entries(upstream.map).map(([key, e]) => [e.name, key]));
-  const mine = new Map(Object.entries(local.map).map(([key, e]) => [e.name, key]));
+  const theirs = new Map(Object.entries(upstream.map).map(([key, e]) => [tokenId(e), key]));
+  const mine = new Map(Object.entries(local.map).map(([key, e]) => [tokenId(e), key]));
   const added = [...theirs].filter(([name]) => !mine.has(name)).map(([, key]) => key);
   const renamed = new Set<string>();
   let doc = upstream.doc;
@@ -141,7 +141,7 @@ export function pulledTokens(local: TokenSide, upstream: TokenSide): PulledToken
     const rename = renameOf(pull, from, added.filter((k) => !renamed.has(k)));
     if (rename) {
       renamed.add(rename);
-      pull.report.push(`${name} renamed to ${upstream.map[rename].name}`);
+      pull.report.push(`${name} renamed to ${tokenId(upstream.map[rename])}`);
       carried(pull, name, from, rename);
       continue;
     }
@@ -156,7 +156,7 @@ export function pulledTokens(local: TokenSide, upstream: TokenSide): PulledToken
     pull.report.push(`${name}: removed in the code, kept on the canvas as an orphan: ${users} layer${users === 1 ? '' : 's'} still bound`);
   }
 
-  pull.report.push(...added.filter((k) => !renamed.has(k)).map((k) => `${upstream.map[k].name}: added`));
+  pull.report.push(...added.filter((k) => !renamed.has(k)).map((k) => `${tokenId(upstream.map[k])}: added`));
   canvasOnly(pull);
   return { doc: resolveVariables({ ...doc, variables: pull.variables }), map: pull.map, report: pull.report, conflicts: pull.conflicts };
 }

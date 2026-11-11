@@ -15,7 +15,11 @@ export type Token = { name: string; kind: TokenKind; values: Record<string, Toke
 
 export type TokenSet = { tokens: Token[]; modes: string[]; skipped: string[] };
 
-export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean };
+export type TokenEntry = { name: string; origins: Record<string, string>; raw: Record<string, string>; scale?: number; orphan?: boolean; factor?: number };
+
+export const SPACING_BASE = '--spacing';
+
+export const tokenId = (entry: TokenEntry) => (entry.factor ? `${entry.name}-${entry.factor}` : entry.name);
 
 export type TokenMap = Record<string, TokenEntry>;
 
@@ -138,7 +142,7 @@ export function tokenSetOf(parsed: Parsed): TokenSet {
   return { tokens: valid, modes: ordered([...new Set(valid.flatMap((t) => Object.keys(t.values)))]), skipped };
 }
 
-export type Options = { scale?: number; used?: ReadonlySet<string>; active?: string };
+export type Options = { scale?: number; used?: ReadonlySet<string>; active?: string; multiples?: readonly number[] };
 
 export type Made = { variables: Variables; map: TokenMap; dropped: string[] };
 
@@ -211,6 +215,17 @@ export function variablesOf(set: TokenSet, repo: string, options: Options = {}):
         raw: Object.fromEntries(own.map((m) => [m, token.values[m].raw])),
         ...(VAR_TYPE[token.kind] === VarType.Number ? { scale } : {})
       };
+    }
+    const base = list.find((t) => t.name === SPACING_BASE);
+    for (const factor of base ? (options.multiples ?? []) : []) {
+      const varName = variableName(`${SPACING_BASE}-${factor}`);
+      if (vars[varName] || Object.keys(vars).length >= MAX_VARIABLES) {
+        continue;
+      }
+      const own = modes.filter((m) => base!.values[m]);
+      const first = Object.values(base!.values)[0];
+      vars[varName] = { type: VarType.Number, values: Object.fromEntries(modes.map((m) => [m, lengthPx((base!.values[m] ?? first).raw)! * scale * factor])) };
+      map[keyOf(name, varName)] = { name: SPACING_BASE, origins: Object.fromEntries(own.map((m) => [m, atText(base!.values[m].at)])), raw: Object.fromEntries(own.map((m) => [m, base!.values[m].raw])), scale, factor };
     }
     const active = options.active && modes.includes(options.active) ? { active: options.active } : {};
     variables[name] = { modes, ...active, vars };

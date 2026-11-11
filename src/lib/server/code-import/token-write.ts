@@ -19,6 +19,8 @@ const isAlias = (v: unknown): v is VarAlias => typeof v === 'object' && v !== nu
 const trimmed = (n: number) => String(Number(n.toFixed(PLACES)));
 const shown = (v: Value) => (isAlias(v) ? v.alias : String(v));
 
+const aliasTargets = (map: TokenMap) => new Map(Object.entries(map).flatMap(([key, entry]) => (entry.factor ? [] : [[entry.name, key] as const])));
+
 type Reading = { type: VarType; entry: TokenEntry; byName: Map<string, string> };
 
 function importedValue(r: Reading, raw: string): Value | null {
@@ -31,7 +33,7 @@ function importedValue(r: Reading, raw: string): Value | null {
     [VarType.Colour]: () => colourOf(raw),
     [VarType.Number]: () => {
       const px = lengthPx(raw);
-      return px === null ? null : px * (r.entry.scale ?? 1);
+      return px === null ? null : px * (r.entry.scale ?? 1) * (r.entry.factor ?? 1);
     },
     [VarType.String]: () => raw,
     [VarType.Boolean]: () => null
@@ -60,7 +62,7 @@ function textOf(r: Reading, raw: string, now: Value, map: TokenMap): string | nu
   const WRITERS: Record<VarType, () => string | null> = {
     [VarType.Colour]: () => (typeof now === 'string' ? writtenLike(raw, now) : null),
     [VarType.Number]: () => {
-      const px = Number(now) / (r.entry.scale ?? 1);
+      const px = Number(now) / (r.entry.scale ?? 1) / (r.entry.factor ?? 1);
       return REM.test(raw) ? `${trimmed(px / REM_PX)}rem` : `${trimmed(px)}px`;
     },
     [VarType.String]: () => String(now),
@@ -127,7 +129,7 @@ const variableAt = (variables: Variables | undefined, key: string): { variable: 
 };
 
 export function editedModes(variables: Variables | undefined, map: TokenMap): Map<string, string[]> {
-  const byName = new Map(Object.entries(map).map(([key, entry]) => [entry.name, key]));
+  const byName = aliasTargets(map);
   const edited = new Map<string, string[]>();
   for (const [key, entry] of Object.entries(map)) {
     const found = variableAt(variables, key);
@@ -148,7 +150,7 @@ export function editedModes(variables: Variables | undefined, map: TokenMap): Ma
 }
 
 export async function writeTokens(variables: Variables | undefined, map: TokenMap, read: ReadFile): Promise<TokensWritten> {
-  const byName = new Map(Object.entries(map).map(([key, entry]) => [entry.name, key]));
+  const byName = aliasTargets(map);
   const before = new Map<string, string | null>();
   const after = new Map<string, string>();
   const skipped: string[] = [];
@@ -161,6 +163,7 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
     return after.get(file) ?? before.get(file) ?? null;
   };
 
+  const written = new Map<string, string>();
   const missing: { key: string; entry: TokenEntry; mode: string; text: string; file: string }[] = [];
 
   for (const [key, entry] of Object.entries(map)) {
@@ -190,6 +193,15 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
         continue;
       }
       const file = await current(at.file);
+      const spot = `${origin}|${entry.name}`;
+      const already = written.get(spot);
+      if (already !== undefined && text !== null) {
+        if (already !== text) {
+          skipped.push(`${entry.name} (${mode}): ${key} asks for ${text}, but another multiple of it already wrote ${already}`);
+        }
+        next[key].raw[mode] = already;
+        continue;
+      }
       const changed = text === null || file === null ? null : replaced(file, at.line, entry.name, raw, text);
       if (text === null) {
         skipped.push(`${entry.name} (${mode}): ${shown(now)} cannot be written as CSS`);
@@ -200,6 +212,7 @@ export async function writeTokens(variables: Variables | undefined, map: TokenMa
         continue;
       }
       after.set(at.file, changed);
+      written.set(spot, text);
       next[key].raw[mode] = text;
     }
   }

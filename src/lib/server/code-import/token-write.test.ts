@@ -99,6 +99,18 @@ describe('writeTokens', () => {
     expect(done.skipped).toEqual(['--color-surface: no Dark block in src/theme/extra.css, #000000 not written']);
   });
 
+  it('un multiplo di --spacing scrive la base divisa per il suo fattore, una volta sola', async () => {
+    const read = fixture('tailwind4');
+    const { variables, map } = variablesOf(tokenSetOf(parseSheets(await readSheets(read))), 'app', { multiples: [2, 4] });
+
+    const same = await writeTokens(edited(edited(variables, 'app Spacing/4', 'Light', 20), 'app Spacing/2', 'Light', 10), map, read);
+    expect(same.skipped).toEqual([]);
+    expect(changedLines(same.files[0].before, same.files[0].after)).toEqual([[3, '\t--spacing: 0.25rem;', '\t--spacing: 0.3125rem;']]);
+
+    const clash = await writeTokens(edited(edited(variables, 'app Spacing/4', 'Light', 20), 'app Spacing/2', 'Light', 12), map, read);
+    expect(clash.skipped).toHaveLength(1);
+  });
+
   it('se il codice è cambiato dall’import vince il codice, e il valore della tela è nel resoconto', async () => {
     const { variables, map } = await imported('tailwind4');
     const original = (await fixture('tailwind4')('src/app.css'))!;

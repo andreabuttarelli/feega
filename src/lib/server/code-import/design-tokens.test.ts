@@ -54,6 +54,16 @@ describe('tokenSetOf', () => {
 });
 
 describe('variablesOf', () => {
+  it('Tailwind 4: ogni multiplo di --spacing usato da una classe diventa una variabile, a meno che il repo dichiari già --spacing-N', async () => {
+    const made = variablesOf(await setOf('tailwind4'), 'app', { multiples: [4, 0.5] });
+
+    expect(made.variables['app Spacing'].vars['4']).toEqual({ type: VarType.Number, values: { Light: 16 } });
+    expect(made.map['app Spacing/4']).toMatchObject({ name: '--spacing', factor: 4, raw: { Light: '0.25rem' }, origins: { Light: 'src/theme/extra.css:3:1' } });
+    expect(made.variables['app Spacing'].vars['0_5'].values.Light).toBe(2);
+    expect(made.map['app Spacing/0_5']).toMatchObject({ name: '--spacing-0.5' });
+  });
+
+
   it('traidue-like: una collezione Colors con Light e Dark, i nomi del repo, e la mappa che riporta ogni valore alla sua dichiarazione', async () => {
     const made = variablesOf(await setOf('tailwind4'), 'traidue.com');
     const colors = made.variables['traidue Colors'];
@@ -62,7 +72,7 @@ describe('variablesOf', () => {
     expect(colors.modes).toEqual(['Light', 'Dark']);
     expect(colors.vars.primary).toEqual({ type: VarType.Colour, values: { Light: '#111111', Dark: '#f0f0f0' } });
     expect(colors.vars['brand-blue'].values).toEqual({ Light: '#5bcefa', Dark: '#5bcefa' });
-    expect(made.variables['traidue Spacing'].vars).toEqual({ gutter: { type: VarType.Number, values: { Light: 24 } }, '0_5': { type: VarType.Number, values: { Light: 2 } } });
+    expect(made.variables['traidue Spacing'].vars).toEqual({ gutter: { type: VarType.Number, values: { Light: 24 } }, '0_5': { type: VarType.Number, values: { Light: 2 } }, spacing: { type: VarType.Number, values: { Light: 4 } } });
     expect(made.variables['traidue Type'].vars.sans).toEqual({ type: VarType.String, values: { Light: "'Inter', system-ui, sans-serif" } });
     expect(made.map['traidue Colors/primary']).toEqual({ name: '--color-primary', origins: { Light: 'src/app.css:6:1', Dark: 'src/app.css:22:1' }, raw: { Light: '#111111', Dark: '#f0f0f0' } });
     expect(made.map['traidue Colors/brand-blue'].origins).toEqual({ Light: 'src/app.css:13:1' });
