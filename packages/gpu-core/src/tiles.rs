@@ -140,6 +140,7 @@ pub struct Tiles {
     canvas_tiles: Option<usize>,
     held: FxHashSet<TileKey>,
     stale: FxHashSet<TileKey>,
+    imported: FxHashSet<TileKey>,
     last_drawn: rustc_hash::FxHashMap<TileKey, u64>,
     tick: u64,
 }
@@ -268,12 +269,41 @@ impl Tiles {
     }
 
     pub fn invalidate(&mut self, world: Rect) {
-        let changed: Vec<TileKey> = self.held.iter().filter(|k| k.world().overlaps(world)).copied().collect();
+        let changed: Vec<TileKey> = self.held.iter().filter(|k| k.world().overlaps(world) && !self.imported.contains(k)).copied().collect();
         self.stale.extend(changed);
     }
 
     pub fn clear(&mut self) {
-        self.stale.extend(self.held.iter().copied());
+        let all: Vec<TileKey> = self.held.iter().filter(|k| !self.imported.contains(k)).copied().collect();
+        self.stale.extend(all);
+    }
+
+    pub fn import(&mut self, key: TileKey) {
+        self.hold(key);
+        self.imported.insert(key);
+    }
+
+    pub fn importing(&self) -> bool {
+        self.imported.iter().any(|k| self.held.contains(k))
+    }
+
+    pub fn release(&mut self) {
+        self.imported.clear();
+    }
+
+    pub fn settle(&mut self, key: TileKey) {
+        self.imported.remove(&key);
+    }
+
+    pub fn forget(&mut self, key: TileKey) {
+        self.imported.remove(&key);
+        if self.held.contains(&key) {
+            self.stale.insert(key);
+        }
+    }
+
+    pub fn fresh(&self) -> Vec<TileKey> {
+        self.held.iter().filter(|k| !self.stale.contains(k) && !self.imported.contains(k)).copied().collect()
     }
 
     pub fn queue(&self, missing: Vec<TileKey>) -> Queue {

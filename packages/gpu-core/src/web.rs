@@ -188,6 +188,37 @@ fn tile_texture(device: &wgpu::Device, side: u32) -> wgpu::Texture {
     })
 }
 
+fn read_back(device: &wgpu::Device, queue: &wgpu::Queue, target: &wgpu::Texture, width: u32, height: u32) -> js_sys::Promise {
+    let row = width * POSTER_BYTES;
+    let padded = row.div_ceil(POSTER_ROW_ALIGN) * POSTER_ROW_ALIGN;
+    let buffer = device.create_buffer(&wgpu::BufferDescriptor { label: None, size: u64::from(padded * height), usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo { texture: target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyBufferInfo { buffer: &buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded), rows_per_image: None } },
+        wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+    );
+    queue.submit([encoder.finish()]);
+    js_sys::Promise::new(&mut |resolve, reject| {
+        let mapped = buffer.clone();
+        buffer.slice(..).map_async(wgpu::MapMode::Read, move |done| {
+            if let Err(e) = done {
+                let _ = reject.call1(&JsValue::NULL, &failed(e));
+                return;
+            }
+            let pixels: Vec<u8> = match mapped.slice(..).get_mapped_range() {
+                Ok(view) => view.chunks(padded as usize).flat_map(|r| r[..row as usize].iter().copied()).collect(),
+                Err(e) => {
+                    let _ = reject.call1(&JsValue::NULL, &failed(e));
+                    return;
+                }
+            };
+            mapped.unmap();
+            let _ = resolve.call1(&JsValue::NULL, &js_sys::Uint8Array::from(&pixels[..]));
+        });
+    })
+}
+
 fn texel(texture: &wgpu::Texture, x: u32, y: u32) -> wgpu::TexelCopyTextureInfo<'_> {
     wgpu::TexelCopyTextureInfo { texture, mip_level: 0, origin: wgpu::Origin3d { x, y, z: 0 }, aspect: wgpu::TextureAspect::All }
 }
@@ -502,6 +533,46 @@ impl WebCore {
         self.tiled = on;
     }
 
+    pub fn fresh_tiles(&mut self) -> Vec<f64> {
+        if self.drew_tiles {
+            return vec![];
+        }
+        self.take_tile_damage();
+        self.tiles.fresh().into_iter().filter(|k| self.tile_textures.contains_key(k)).flat_map(|k| [k.step as f64, k.tx as f64, k.ty as f64]).collect()
+    }
+
+    pub fn read_tile(&self, step: i32, tx: f64, ty: f64) -> Option<js_sys::Promise> {
+        let key = TileKey { step, tx: tx as i64, ty: ty as i64 };
+        let texture = self.tile_textures.get(&key)?;
+        Some(read_back(&self.device, &self.queue, texture, texture.width(), texture.height()))
+    }
+
+    pub fn put_tile(&mut self, step: i32, tx: f64, ty: f64, pixels: &[u8]) -> bool {
+        let key = TileKey { step, tx: tx as i64, ty: ty as i64 };
+        let side = TILE_PX + 2 * TILE_GUTTER_PX;
+        if pixels.len() != (side * side * POSTER_BYTES) as usize {
+            return false;
+        }
+        let texture = self.tile_textures.remove(&key).or_else(|| self.spare_tiles.pop()).unwrap_or_else(|| tile_texture(&self.device, side));
+        self.queue.write_texture(texel(&texture, 0, 0), pixels, wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(side * POSTER_BYTES), rows_per_image: None }, wgpu::Extent3d { width: side, height: side, depth_or_array_layers: 1 });
+        self.tile_textures.insert(key, texture);
+        self.tiles.import(key);
+        self.pending = true;
+        true
+    }
+
+    pub fn release_tiles(&mut self) {
+        self.tiles.release();
+    }
+
+    pub fn settle_tile(&mut self, step: i32, tx: f64, ty: f64) {
+        self.tiles.settle(TileKey { step, tx: tx as i64, ty: ty as i64 });
+    }
+
+    pub fn forget_tile(&mut self, step: i32, tx: f64, ty: f64) {
+        self.tiles.forget(TileKey { step, tx: tx as i64, ty: ty as i64 });
+    }
+
     fn fill_coarse(&mut self) -> Result<bool, JsValue> {
         let started = js_sys::Date::now();
         let screen = (self.target.width(), self.target.height());
@@ -669,7 +740,7 @@ impl WebCore {
         let refresh: Vec<TileKey> = one_at_a_time(stale).into_iter().chain(one_at_a_time(queue.blurry)).collect();
         let left_blank = queue.blank.clone();
         let blank = batches(&queue.blank);
-        let must = if gesture { 0 } else { blank.len() };
+        let must = if gesture || self.tiles.importing() { 0 } else { blank.len() };
         for (i, batch) in blank.into_iter().chain(batches(&refresh)).enumerate() {
             if i >= must && rastered > 0 && js_sys::Date::now() - started > budget {
                 break;
@@ -681,7 +752,7 @@ impl WebCore {
         self.counted.unsharp = tiles.missing.len() as u32;
         let underlaid = self.compositor.held_look(self.camera).is_some_and(|(_, stretch)| crate::tiles::underlay_shows(stretch));
         self.counted.uncovered = if underlaid { 0 } else { left_blank.iter().filter(|k| !self.tiles.holds(**k)).count() as u32 };
-        let resting = matches!(self.motion, CoreMotion::Still) && tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && js_sys::Date::now() - self.changed_at >= REST_AFTER_MS;
+        let resting = matches!(self.motion, CoreMotion::Still) && tiles.missing.iter().all(|k| self.tiles.covered_within(*k, NEAR_STEPS)) && js_sys::Date::now() - self.changed_at >= REST_AFTER_MS && !self.tiles.importing();
         let mut exact = false;
         if resting {
             exact = self.raster_rest(started, budget, rastered > 0)?;
@@ -774,7 +845,7 @@ impl WebCore {
             self.adopted = None;
         }
         let moving = matches!(self.motion, CoreMotion::Gesture);
-        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.adopted.is_none() && self.drew_tiles && self.tiles_show_all() };
+        let moment = || Moment { gesture: moving, lifting: self.compositor.holding() || !self.compositor.lifts(&self.library).is_empty(), settling: self.tiles.importing() || (self.adopted.is_none() && self.drew_tiles && self.tiles_show_all()) };
         if self.tiled && path_for(moment()) == Path::Tiles {
             self.adopted = None;
             self.drew_tiles = true;
@@ -845,11 +916,15 @@ impl WebCore {
         self.forget_rest();
     }
 
-    fn warm_tiles(&mut self) -> Result<(), JsValue> {
+    fn take_tile_damage(&mut self) {
         match self.compositor.take_tile_damage() {
             Damage::All => self.tiles.clear(),
             Damage::Rects(rects) => rects.iter().for_each(|r| self.tiles.invalidate(*r)),
         }
+    }
+
+    fn warm_tiles(&mut self) -> Result<(), JsValue> {
+        self.take_tile_damage();
         let screen = (self.target.width(), self.target.height());
         let started = js_sys::Date::now();
         let queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
@@ -941,33 +1016,6 @@ impl WebCore {
         let pictures: Pictures = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), v.clone())).collect();
         let target = layer_texture(&self.device, width, height);
         self.engine.draw(&self.device, &self.queue, &list, &pictures, &target.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
-        let row = width * POSTER_BYTES;
-        let padded = row.div_ceil(POSTER_ROW_ALIGN) * POSTER_ROW_ALIGN;
-        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor { label: None, size: u64::from(padded * height), usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            wgpu::TexelCopyBufferInfo { buffer: &buffer, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(padded), rows_per_image: None } },
-            wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
-        );
-        self.queue.submit([encoder.finish()]);
-        Ok(js_sys::Promise::new(&mut |resolve, reject| {
-            let mapped = buffer.clone();
-            buffer.slice(..).map_async(wgpu::MapMode::Read, move |done| {
-                if let Err(e) = done {
-                    let _ = reject.call1(&JsValue::NULL, &failed(e));
-                    return;
-                }
-                let pixels: Vec<u8> = match mapped.slice(..).get_mapped_range() {
-                    Ok(view) => view.chunks(padded as usize).flat_map(|r| r[..row as usize].iter().copied()).collect(),
-                    Err(e) => {
-                        let _ = reject.call1(&JsValue::NULL, &failed(e));
-                        return;
-                    }
-                };
-                mapped.unmap();
-                let _ = resolve.call1(&JsValue::NULL, &js_sys::Uint8Array::from(&pixels[..]));
-            });
-        }))
+        Ok(read_back(&self.device, &self.queue, &target, width, height))
     }
 }
