@@ -45,7 +45,7 @@ export function planModel(plan: AgentPlan, choice: ChatModelChoice, pick: Pick, 
 
 const DEBIT_SCOPE: Record<Debit, <T>(fn: () => T) => T> = {
   [Debit.Ledger]: (fn) => fn(),
-  [Debit.None]: withoutDebit
+  [Debit.None]: (fn) => withoutDebit(fn)
 };
 
 export function billedAs<T>(plan: AgentPlan, fn: () => T): T {
