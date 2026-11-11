@@ -55,7 +55,7 @@ export function designed(design: Design, plan: UrlPlan, ask: DesignAsk): Designe
   const base = modeOfScheme(ask.base);
   const scale = plan.plan.items[0] ? plan.plan.items[0].doc.width / ask.width : 1;
   const made = variablesOf(design.set, ask.repo, { scale, used: usedTokens(design, ask.captures), active: base });
-  const counted: BoundCount = { byClass: 0, byRule: 0, byValue: 0, unbound: 0, otherMode: 0 };
+  const counted: BoundCount = { byClass: 0, byRule: 0, byValue: 0, unbound: 0 };
 
   const items = plan.plan.items.map((item) => {
     const done = boundToTokens(item.doc, { ...made, rules: design.rules, base, boards: { ...ask.boards, [DESIGN_BOARD]: base } });
