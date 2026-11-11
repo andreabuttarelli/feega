@@ -89,12 +89,12 @@ describe('the newest templates lead every catalogue', () => {
     expect(undated).toEqual([]);
   });
 
-  it('lists snapcn first, then older ones by date', () => {
+  it('lists the newest port family first, then older ones by date', () => {
     const items = catalogue(BUILTIN_TEMPLATES);
     const dates = items.map((i) => addedOn(i.id));
 
     expect(dates).toEqual([...dates].sort((a, b) => b.localeCompare(a)));
-    expect(items[0].id.startsWith('builtin:snapcn-')).toBe(true);
+    expect(items[0].id.startsWith('builtin:remocn-')).toBe(true);
   });
 
   it('puts the newest poster first on the poster shelf', () => {

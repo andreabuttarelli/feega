@@ -26,7 +26,7 @@ const toneOf = (hex: string): EdgeTone => {
 
 const formatOf = (port: SnapcnPort) => (port.height > port.width ? MotionFormat.Vertical : MotionFormat.Landscape);
 
-const cardOf = (port: SnapcnPort): TemplateCard => {
+export const cardOf = (port: SnapcnPort): TemplateCard => {
   const c = CATEGORY_CARD[port.category];
   const tone = toneOf(port.background);
   return {

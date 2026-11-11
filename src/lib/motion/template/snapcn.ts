@@ -9,14 +9,14 @@ import { lazyTemplate } from './lazy';
 
 export const SNAPCN_PREFIX = `${BUILTIN_PREFIX}snapcn-`;
 export const SNAPCN_CLIP = 'snapcn';
-const DESCRIPTION_MAX = 200;
+export const DESCRIPTION_MAX = 200;
 const SNAPCN_FONTS = ['Inter', 'Geist', 'Space Grotesk', 'Outfit', 'Montserrat', 'Instrument Serif'];
 
-const fontsOf = (port: SnapcnPort) => [...new Set([...port.fonts, ...SNAPCN_FONTS])];
+export const fontsOf = (port: SnapcnPort) => [...new Set([...port.fonts, ...SNAPCN_FONTS])];
 
 const CONTENT_KEYS = 3;
 
-const keyFieldsOf = (port: SnapcnPort) => {
+export const keyFieldsOf = (port: SnapcnPort) => {
   const props = propsOf(port);
   const content = Object.keys(props).filter((k) => props[k].group === 'Content').slice(0, CONTENT_KEYS);
   return [...content, ...['mode', 'background'].filter((k) => k in props)].slice(0, KEY_FIELDS_MAX).map(snakeKey);
