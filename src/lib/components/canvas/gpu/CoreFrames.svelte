@@ -21,7 +21,7 @@
   import { cacheZoom, cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { worldUses, type Turn } from '$lib/canvas/core/screen-uses';
-  import { NO_SIGHT, sameSight, sightOf, widened, type Sight } from '$lib/canvas/core/sight';
+  import { NO_SIGHT, sameSight, sightOf, slackened, stillHolds, widened, type Sight, type Taken } from '$lib/canvas/core/sight';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
   import { memoSources } from '$lib/canvas/core/source-memo';
@@ -384,7 +384,8 @@
   }
 
   $effect(() => {
-    for (const f of fillOrder(frames, sight.view, area)) {
+    const seen = slackened(sight.view, area);
+    for (const f of fillOrder(frames, seen.view, seen.area)) {
       if (!thumbAsked.has(baseKey(f))) {
         thumbAsked.add(baseKey(f));
         void showThumb(f);
@@ -562,11 +563,7 @@
     });
   });
   const held = $derived(chains.map((c) => c[0]));
-  const standIndex = $derived(new SpatialIndex(chains.map((c) => ({ id: c[0].id, ...c[0].box }))));
-  const nearTails = () => {
-    const near = standIndex.visible(view, area);
-    return chains.filter((c) => near.has(c[0].id)).map((c) => c[c.length - 1]);
-  };
+  const nearTails = () => chains.filter((c) => sight.onScreen.has(c[0].id)).map((c) => c[c.length - 1]);
   const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? thumbLists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
 
   const waiting = $derived.by(() => {
@@ -1059,7 +1056,17 @@
 
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame), () => raster?.busy?.() ?? false);
 
+  let taken: Taken | null = null;
+  let takenFrom: SpatialIndex | null = null;
+
   $effect(() => {
+    if (placeIndex === takenFrom && taken && stillHolds(taken, view, area)) {
+      pacer.invalidate();
+      return;
+    }
+
+    taken = { view, area };
+    takenFrom = placeIndex;
     const next = sightOf(placeIndex, view, area);
     if (!sameSight(untrack(() => sight), next)) {
       sight = next;
