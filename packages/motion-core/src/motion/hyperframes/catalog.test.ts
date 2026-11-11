@@ -5,7 +5,7 @@ import { hfComponent, hfSource } from './model';
 
 const ISOLATED_GLOBALS = ['root', 'props', 'tl', 'duration', 'fps'];
 
-const BRANDS = /\b(slack|spotify|chatgpt|openai|tiktok|instagram|youtube|reddit|twitter|iphone|macos|ios|apple|google|claude|anthropic|heygen|hyperframes|facebook|linkedin|notion|stripe|figma|github|netflix|amazon)\b/i;
+const BRANDS = /(?<![-\w])(slack|spotify|chatgpt|openai|tiktok|instagram|youtube|reddit|twitter|iphone|macos|ios|apple|google|claude|anthropic|heygen|hyperframes|facebook|linkedin|notion|stripe|figma|github|netflix|amazon)(?![-\w])/i;
 
 const ids = HF_PORTS.map((p) => [p.id, p] as const);
 
