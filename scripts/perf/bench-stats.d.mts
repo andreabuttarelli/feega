@@ -4,3 +4,5 @@ export declare const median: (runs: Record<Metric, number>[]) => Record<Metric, 
 export declare const mid: (values: number[]) => number;
 export type AdapterInfo = { vendor: string; architecture: string; description: string };
 export declare const softwareAdapter: (info: AdapterInfo | null) => boolean;
+export type LevelFrame = { at: number; step: number; unsharp: number };
+export declare const levelSharpMs: (frames: LevelFrame[]) => { times: number[]; superseded: number };

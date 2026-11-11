@@ -73,6 +73,7 @@ impl TileKey {
 
 pub const BATCH_TILES: i64 = 2;
 pub const BAKE_BATCH_TILES: i64 = 3;
+pub const GESTURE_BATCH_TILES: i64 = 1;
 
 pub struct Batch {
     pub step: i32,
@@ -105,6 +106,10 @@ pub fn batches(missing: &[TileKey]) -> Vec<Batch> {
     batches_of(missing, BATCH_TILES)
 }
 
+pub fn gesture_batches(missing: &[TileKey]) -> Vec<Batch> {
+    batches_of(missing, GESTURE_BATCH_TILES)
+}
+
 pub fn bake_batches(missing: &[TileKey]) -> Vec<Batch> {
     batches_of(missing, BAKE_BATCH_TILES)
 }
@@ -123,10 +128,35 @@ fn batches_of(missing: &[TileKey], side: i64) -> Vec<Batch> {
     out
 }
 
+#[derive(Default)]
+pub struct RasterCredit {
+    ms: f64,
+}
+
+impl RasterCredit {
+    pub fn earn(&mut self, budget_ms: f64) {
+        self.ms = (self.ms + budget_ms).min(budget_ms);
+    }
+
+    pub fn spend(&mut self, ms: f64) {
+        self.ms -= ms;
+    }
+
+    pub fn allows(&self) -> bool {
+        self.ms > 0.0
+    }
+}
+
 pub struct Queue {
     pub blank: Vec<TileKey>,
     pub blurry: Vec<TileKey>,
     pub stale: Vec<TileKey>,
+}
+
+impl Queue {
+    pub fn order(self) -> Vec<TileKey> {
+        self.blank.into_iter().chain(self.blurry).chain(self.stale).collect()
+    }
 }
 
 pub struct TileFrame {
@@ -206,6 +236,14 @@ impl Tiles {
         coarser.chain(finer).any(|step| keys_over(world, step).iter().all(|k| self.held.contains(k)))
     }
 
+    fn shown_sharper(&self, key: TileKey) -> bool {
+        (key.step + 1..=key.step + FINER_STEPS).any(|step| keys_over(key.world(), step).iter().all(|k| self.held.contains(k)))
+    }
+
+    pub fn unsharp(&self, missing: &[TileKey]) -> usize {
+        missing.iter().filter(|k| !self.shown_sharper(**k)).count()
+    }
+
     pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
         let world = seen_world(camera, screen);
         let step = step_of(camera.zoom);
@@ -282,8 +320,8 @@ impl Tiles {
             let list = match () {
                 _ if self.stale.contains(&key) => &mut queue.stale,
                 _ if !self.covered(key) => &mut queue.blank,
-                _ if !self.covered_within(key, NEAR_STEPS) => &mut queue.blurry,
-                _ => continue,
+                _ if self.shown_sharper(key) => continue,
+                _ => &mut queue.blurry,
             };
             list.push(key);
         }

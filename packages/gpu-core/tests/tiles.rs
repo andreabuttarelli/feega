@@ -256,7 +256,7 @@ fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_scree
 }
 
 #[test]
-fn during_a_gesture_a_tile_within_twice_its_sharpness_is_good_enough() {
+fn a_tile_within_twice_its_sharpness_is_near_enough_to_start_the_rest_picture() {
     let mut tiles = Tiles::default();
     tiles.frame(camera(step_zoom(-4)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
     let key = tiles.frame(camera(1.0), SCREEN).missing[0];
@@ -542,4 +542,79 @@ fn evicting_thousands_of_tiles_zoomed_in_on_a_wide_canvas_takes_milliseconds() {
     tiles.evict_beyond(camera(4.0), SCREEN, 100);
 
     assert!(started.elapsed().as_millis() < 200, "evicting took {:?}", started.elapsed());
+}
+
+#[test]
+fn a_missing_tile_shown_by_sharper_held_tiles_is_not_unsharp() {
+    let mut tiles = Tiles::default();
+    let coarse = tiles.frame(camera(1.0), SCREEN).missing;
+    tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+    assert_eq!(tiles.unsharp(&coarse), 0);
+
+    let mut blurry = Tiles::default();
+    blurry.frame(camera(step_zoom(-2)), SCREEN).missing.iter().for_each(|k| blurry.hold(*k));
+    assert_eq!(blurry.unsharp(&coarse), coarse.len());
+}
+
+#[test]
+fn during_a_gesture_every_blurry_visible_tile_is_queued_centre_out_before_the_stale_ones() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(-1)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let visible = tiles.frame(camera(1.0), SCREEN).missing;
+    let changed = visible[0];
+    tiles.hold(changed);
+    tiles.invalidate(changed.world());
+
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    let blurry: Vec<TileKey> = visible.iter().copied().filter(|k| *k != changed).collect();
+    assert_eq!(order[..blurry.len()], blurry[..]);
+    assert_eq!(order[blurry.len()..], [changed]);
+}
+
+#[test]
+fn during_a_gesture_tiles_shown_by_sharper_held_ones_are_not_queued() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    assert!(order.is_empty());
+}
+
+#[test]
+fn during_a_gesture_tiles_raster_one_at_a_time_in_queue_order() {
+    let tiles = Tiles::default();
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    let one_by_one: Vec<Vec<TileKey>> = gpu_core::tiles::gesture_batches(&order).into_iter().map(|b| b.keys).collect();
+
+    assert_eq!(one_by_one, order.iter().map(|k| vec![*k]).collect::<Vec<_>>());
+}
+
+#[test]
+fn an_expensive_tile_during_a_gesture_waits_for_the_frames_it_overspent() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    assert!(credit.allows());
+    credit.spend(12.0);
+    assert!(!credit.allows());
+
+    credit.earn(4.0);
+    credit.earn(4.0);
+    assert!(!credit.allows());
+    credit.earn(4.0);
+    assert!(credit.allows());
+}
+
+#[test]
+fn cheap_tiles_fill_one_frame_budget_and_idle_frames_do_not_bank_more() {
+    let mut credit = gpu_core::tiles::RasterCredit::default();
+    credit.earn(4.0);
+    credit.earn(4.0);
+    credit.earn(4.0);
+    (0..7).for_each(|_| credit.spend(0.5));
+    assert!(credit.allows());
+    credit.spend(0.5);
+    assert!(!credit.allows());
 }

@@ -4,7 +4,7 @@ import { test, expect, chromium, type CDPSession, type Page } from '@playwright/
 import { instrument, measure, type Frames } from '../e2e/fixtures/frame-sweeps';
 import { ZOOM_FIXTURE_CENTRE, ZOOM_FIXTURE_PLACE } from '../../scripts/perf/zoom-fixture.mjs';
 import { LANDINGS_FIXTURE_CENTRE, LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
-import { median } from '../../scripts/perf/bench-stats.mjs';
+import { levelSharpMs, median, type LevelFrame } from '../../scripts/perf/bench-stats.mjs';
 import { Ease, WHEEL_ZOOM, dragPan, panPath, playDrag, playWheel, zoomPath, type DragPoint, type Point, type Step } from '../../scripts/perf/gestures';
 
 enum Fixture {
@@ -29,7 +29,8 @@ enum Scenario {
 }
 
 type Settle = { sharpMs: number; settledMs: number; restBakes: number; asked: number; built: number };
-type ScenarioRun = Frames & Settle & { cpuMs: number; fpsByThird: number[] | null };
+type Levels = { levels: number; levelSharpP50: number; levelSharpP95: number; superseded: number };
+type ScenarioRun = Frames & Settle & Levels & { cpuMs: number; fpsByThird: number[] | null };
 type Script = { wheel: Step[]; from?: number } | { drag: DragPoint[] };
 
 const FIXTURE = (process.env.BENCH_CASE ?? Fixture.Zoom) as Fixture;
@@ -40,6 +41,7 @@ const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const QUERY = process.env.BENCH_TILES === 'off' ? '?coreTiles=0' : '';
 const ONLY = process.env.BENCH_SCENARIOS?.split(',') ?? null;
 const PROFILED = process.env.BENCH_PROFILE === '1';
+const DUMPED = process.env.BENCH_DUMP === '1';
 const SPEED = (process.env.BENCH_SPEED ?? Speed.Fast) as Speed;
 const STRETCH: Record<Speed, number> = { [Speed.Fast]: 1, [Speed.Medium]: 2.5, [Speed.Slow]: 6 };
 const EASE: Record<Speed, Ease> = { [Speed.Fast]: Ease.Flick, [Speed.Medium]: Ease.Smooth, [Speed.Slow]: Ease.Smooth };
@@ -165,6 +167,20 @@ async function settle(page: Page, since: number): Promise<Settle> {
   }, { end, since, sharpAt, settledAt, giveUp: SHARP_GIVE_UP_MS });
 }
 
+const percentile = (values: number[], p: number) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted.length ? Math.round(sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)]) : 0;
+};
+
+async function levels(page: Page, since: number, name: Scenario): Promise<Levels> {
+  const frames = await page.evaluate((after) => ((window as unknown as { __gpuCanvas?: { frames?: LevelFrame[] } }).__gpuCanvas?.frames ?? []).filter((f) => f.at > after), since);
+  if (DUMPED) {
+    writeFileSync(join(OUT, `${name}-frames-${Date.now()}.json`), JSON.stringify(frames));
+  }
+  const { times, superseded } = levelSharpMs(frames);
+  return { levels: times.length + superseded, levelSharpP50: percentile(times, 0.5), levelSharpP95: percentile(times, 0.95), superseded };
+}
+
 async function scenario(page: Page, cdp: CDPSession, name: Scenario, profiled: boolean): Promise<ScenarioRun> {
   const script = SCRIPTS[name]();
   const since = await page.evaluate(() => performance.now());
@@ -176,10 +192,11 @@ async function scenario(page: Page, cdp: CDPSession, name: Scenario, profiled: b
   const cpuBefore = await taskMs(cdp);
   const frames = await measure(page, lengthOf(script), play);
   const cpuMs = Math.round((await taskMs(cdp)) - cpuBefore);
+  const settled = await settle(page, since);
   if (profiled) {
     writeFileSync(join(OUT, `${name}.cpuprofile`), JSON.stringify((await cdp.send('Profiler.stop')).profile));
   }
-  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...(await settle(page, since)) };
+  return { ...frames, cpuMs, fpsByThird: fpsByThird(script, frames.gapsInOrder), ...settled, ...(await levels(page, since, name)) };
 }
 
 async function run(index: number, base: string, browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<Partial<Record<Scenario, ScenarioRun>>> {
@@ -212,7 +229,7 @@ test('gesture benchmark: gradual zoom and pan through real input', async ({ base
   const runs: Partial<Record<Scenario, ScenarioRun>>[] = [];
   for (let i = 0; i < RUNS; i++) {
     runs.push(await run(i, baseURL!, browser));
-    console.log(`run ${i + 1}/${RUNS} ${JSON.stringify(Object.fromEntries(Object.entries(runs.at(-1)!).map(([k, v]) => [k, { fps: v.fpsAvg, cpuMs: v.cpuMs, p50: v.p50, p95: v.p95, p99: v.p99, worst: v.max, over11: v.over11, thirds: v.fpsByThird, sharpMs: v.sharpMs, settledMs: v.settledMs, restBakes: v.restBakes, asked: v.asked, built: v.built }])))}`);
+    console.log(`run ${i + 1}/${RUNS} ${JSON.stringify(Object.fromEntries(Object.entries(runs.at(-1)!).map(([k, v]) => [k, { fps: v.fpsAvg, cpuMs: v.cpuMs, p50: v.p50, p95: v.p95, p99: v.p99, worst: v.max, over11: v.over11, thirds: v.fpsByThird, sharpMs: v.sharpMs, settledMs: v.settledMs, levels: v.levels, levelP50: v.levelSharpP50, levelP95: v.levelSharpP95, superseded: v.superseded, restBakes: v.restBakes, asked: v.asked, built: v.built }])))}`);
   }
   await browser.close();
   const medians = Object.fromEntries(Object.values(Scenario).filter((s) => runs[0][s]).map((s) => [s, median(runs.map((r) => ({ fps: r[s]!.fpsAvg, p95: r[s]!.p95, worst: r[s]!.max, cpuMs: r[s]!.cpuMs, sharpMs: r[s]!.sharpMs })))]));
