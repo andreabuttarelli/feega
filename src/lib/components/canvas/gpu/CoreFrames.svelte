@@ -84,7 +84,10 @@
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata, frames: sharedFrames() });
-  const tier = $derived(assetTier(view.zoom));
+  let tier = $state(assetTier(untrack(() => view.zoom)));
+  $effect(() => {
+    tier = assetTier(view.zoom);
+  });
   $effect(() => tierLog(tier, untrack(() => view.zoom)));
   let sight = $state.raw<Sight>(NO_SIGHT);
   const imaged = new Set<string>();

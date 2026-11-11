@@ -347,7 +347,10 @@
   let known = new Set<string>();
 
   const assetUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, AssetSize.Full);
-  const tier = $derived(assetTier(view.zoom));
+  let tier = $state(assetTier(untrack(() => view.zoom)));
+  $effect(() => {
+    tier = assetTier(view.zoom);
+  });
   const tierUrl = (size: AssetSize) => (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, size);
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
@@ -381,7 +384,13 @@
   const LIVE_CODE_CAP = 4;
   const IFRAME_TYPE = 'iframe';
   const liveCodeTiles = $derived(placed.filter((t) => t.kind === IFRAME_TYPE && isLiveCode(summaries.get(t.id)?.data)));
-  const liveCode = $derived([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
+  let liveCode = $state.raw(new Set<string>());
+  $effect(() => {
+    const next = new Set([...visibleIds(liveCodeTiles, view, area)].slice(0, LIVE_CODE_CAP));
+    if (!sameSet(untrack(() => liveCode), next)) {
+      liveCode = next;
+    }
+  });
   const domIds = $derived.by(() => {
     const next = new Set([...editIds, ...sticky.keys(), ...liveCode, ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
@@ -436,7 +445,10 @@
   };
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
   const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold, coreType.gen) : null);
-  const labelZoom = $derived(labelZoomStep(view.zoom));
+  let labelZoom = $state(labelZoomStep(untrack(() => view.zoom)));
+  $effect(() => {
+    labelZoom = labelZoomStep(view.zoom);
+  });
   const strokeZoom = $derived(strokeZoomStep(view.zoom));
   const basesAt = (size: AssetSize) => {
     const text = coreType;
