@@ -543,3 +543,72 @@ fn evicting_thousands_of_tiles_zoomed_in_on_a_wide_canvas_takes_milliseconds() {
 
     assert!(started.elapsed().as_millis() < 200, "evicting took {:?}", started.elapsed());
 }
+
+#[test]
+fn an_imported_tile_is_drawn_and_survives_the_loading_damage() {
+    let mut tiles = Tiles::default();
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+    tiles.import(key);
+
+    tiles.invalidate(key.world());
+    tiles.clear();
+
+    assert!(tiles.importing());
+    assert!(tiles.frame(camera(1.0), SCREEN).draw.contains(&key));
+    assert!(tiles.queue(vec![key]).stale.is_empty());
+}
+
+#[test]
+fn a_released_import_turns_stale_on_the_next_damage() {
+    let mut tiles = Tiles::default();
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+    tiles.import(key);
+    tiles.release();
+
+    tiles.invalidate(key.world());
+
+    assert!(!tiles.importing());
+    assert_eq!(tiles.queue(vec![key]).stale, vec![key]);
+}
+
+#[test]
+fn a_forgotten_import_is_stale_at_once() {
+    let mut tiles = Tiles::default();
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+    tiles.import(key);
+
+    tiles.forget(key);
+
+    assert_eq!(tiles.queue(vec![key]).stale, vec![key]);
+    assert!(!tiles.importing());
+}
+
+#[test]
+fn only_rastered_tiles_are_fresh_for_export() {
+    let mut tiles = Tiles::default();
+    let missing = tiles.frame(camera(1.0), SCREEN).missing;
+    let (rastered, imported, stale) = (missing[0], missing[1], missing[2]);
+    tiles.hold(rastered);
+    tiles.import(imported);
+    tiles.hold(stale);
+    tiles.invalidate(stale.world().inset(-1.0));
+    tiles.hold(rastered);
+
+    assert_eq!(tiles.fresh(), vec![rastered]);
+}
+
+#[test]
+fn a_settled_import_stays_fresh_and_takes_later_damage() {
+    let mut tiles = Tiles::default();
+    let missing = tiles.frame(camera(1.0), SCREEN).missing;
+    let (settled, waiting) = (missing[0], missing[1]);
+    tiles.import(settled);
+    tiles.import(waiting);
+
+    tiles.settle(settled);
+
+    assert!(tiles.importing());
+    assert!(tiles.queue(vec![settled]).stale.is_empty());
+    tiles.invalidate(settled.world());
+    assert_eq!(tiles.queue(vec![settled]).stale, vec![settled]);
+}

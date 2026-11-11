@@ -17,6 +17,10 @@
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
+  import { tileDisk, type TileDisk } from '$lib/canvas/core/tile-disk';
+  import { tileStore } from '$lib/canvas/core/tile-store';
+  import { tileCodec } from '$lib/canvas/core/tile-codec';
+  import { Basis, stepOf, tileWorld, viewTiles, type TileLayer, type WorldBox } from '$lib/canvas/core/tile-cache';
   import { cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
@@ -281,6 +285,9 @@
         bestTier.set(f.id, keptTier(at, bestTier.get(f.id), Reach.Near));
       }
       const group = ready === Readiness.Whole || held === OnScreen.Thumb ? key : `${key}${VECTORS}`;
+      if (ready === Readiness.Whole) {
+        wholeGroups.set(f.id, group);
+      }
       const shown = loaded.get(f.id);
       loaded.set(f.id, group);
       markFrame(f.id, ready === Readiness.Whole ? Step.Whole : Step.Vectors);
@@ -289,6 +296,7 @@
     void showStaged(media.ready(built.list), held, (ready) => (ready === Readiness.Whole ? vectorsFirst.after(() => present(ready)) : present(ready)));
   }
 
+  const wholeGroups = new Map<string, string>();
   const thumbLists = new Map<string, DisplayList>();
   let thumbShown = $state(new Map<string, HeldFrame>());
   const presented = new Set<string>();
@@ -611,6 +619,8 @@
         r.setTileBudget?.(budget.tileBytes);
         r.setCanvasTiles?.(budget.canvasTiles);
         r.setTiles?.(TILED);
+        disk = TILED && DISK_CACHE && place && r.heldTiles ? tileDisk({ store: diskStore, codec: diskCodec, raster: r.heldTiles, look: () => ({ canvasId: place.canvasId, paper: look.paper, line: look.line, resolution }), layers: tileLayers, busy: () => gesture.active() || edited.size > 0 || (raster?.warming?.() ?? false), viewStep: () => stepOf(view.zoom * resolution), encoded: logEncoded }) : null;
+        restored = '';
         raster = r;
         markStartup(StartupStep.GpuReady);
       },
@@ -748,6 +758,7 @@
   const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('coreDebug');
   const TIMELINE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('loadTimeline');
   const TILED = typeof location !== 'undefined' && tilesOn(location.search, storedTiles());
+  const DISK_CACHE = typeof location !== 'undefined' && !new URLSearchParams(location.search).has('noTileDisk');
   const MAX_LISTED = 12;
   const OVERSCAN_SHARE = 8;
   const OVERSCAN_MAX = 128;
@@ -880,6 +891,101 @@
   }
 
   let sharpMarked = false;
+  let disk: TileDisk | null = null;
+  let restored = '';
+  let saving = false;
+  const diskStore = tileStore(budget.diskTileBytes);
+  const diskCodec = tileCodec(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/tile-codec.worker.ts', import.meta.url), { type: 'module' }) : null));
+  const SAVE_QUIET_MS = 600;
+  const turnedBox = (box: WorldBox, turn: unknown) => (turn ? { x: box.x - Math.max(box.w, box.h) / 2, y: box.y - Math.max(box.w, box.h) / 2, w: box.w + Math.max(box.w, box.h), h: box.h + Math.max(box.w, box.h) } : box);
+  const shownWhole = (f: FrameAt): boolean => {
+    const base = baseNodeId(f.id);
+    if (base !== f.id) {
+      const of = frames.find((b) => b.id === base);
+      return of !== undefined && shownWhole(of);
+    }
+    const group = wholeGroups.get(f.id);
+    return group !== undefined && group.startsWith(baseKey(f)) && loaded.get(f.id) === group && pictured.has(group);
+  };
+
+  function tileLayers(basis: Basis): TileLayer[] {
+    const unstable = (f: FrameAt) => edited.has(f.id) || live.has(f.id) || (basis === Basis.Shown && !shownWhole(f));
+    const frameLayers = frames.map((f) => ({ id: f.id, content: unstable(f) ? null : `${baseKey(f)}${f.turn ? `~${f.turn.degrees}` : ''}`, box: turnedBox(f.box, f.turn) }));
+    const cardLayers = [...cards, ...posters].map((c) => ({ id: c.frame.id, content: `${c.key}${c.turn ? `~${JSON.stringify(c.turn)}` : ''}`, box: turnedBox(c.frame.box, c.turn) }));
+    const rank = new Map(order.map((id, i) => [id, i]));
+    return [...frameLayers, ...cardLayers].sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  }
+
+  const boxesMeet = (a: WorldBox, b: WorldBox) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  function logEncoded(ms: number, bytes: number, key: { step: number; tx: number; ty: number }) {
+    if (debugActive()) {
+      console.info(`[tile-cache] encoded ${bytes} B in ${ms.toFixed(1)} ms ${key.step}/${key.tx}/${key.ty}`);
+    }
+  }
+
+  function restoreTiles(into: CoreRaster) {
+    const seen = `${Math.round(view.x)},${Math.round(view.y)},${view.zoom}#${layersEpoch}`;
+    if (restored === seen || sharpMarked || gesture.active() || !disk || !frames.length) {
+      return;
+    }
+    restored = seen;
+    const at = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
+    const screen = { width: area.width * resolution, height: area.height * resolution };
+    void disk.restore(at, screen).then(({ count, covered, view: restoredView }) => {
+      if (raster !== into) {
+        return;
+      }
+      const restoredKeys = new Set(restoredView.map((k) => `${k.step}_${k.tx}_${k.ty}`));
+      const tiles = viewTiles(at, screen);
+      for (const f of frames) {
+        const under = tiles.filter((k) => boxesMeet(tileWorld(k), f.box));
+        if (under.length && under.every((k) => restoredKeys.has(`${k.step}_${k.tx}_${k.ty}`))) {
+          vectorsFirst.presented(f.id);
+        }
+      }
+      if (count > 0) {
+        pacer.invalidate();
+      }
+      if (covered) {
+        markFrame('all', Step.Cached);
+      }
+      if (debugActive()) {
+        console.info(`[tile-cache] restored ${count} tiles, view covered: ${covered}`);
+      }
+    });
+  }
+
+  function saveTiles() {
+    if (saving || !disk || !sharpMarked) {
+      return;
+    }
+    saving = true;
+    const from = disk;
+    setTimeout(
+      () =>
+        idle(() =>
+          void from.save().then(
+            (all) => {
+              saving = false;
+              if (!all) {
+                saveTiles();
+              }
+            },
+            () => (saving = false)
+          )
+        ),
+      SAVE_QUIET_MS
+    );
+  }
+
+  let layersEpoch = 0;
+
+  $effect(() => {
+    void [frames, cards, posters, edited, live, order, look.paper, look.line];
+    layersEpoch++;
+    disk?.check();
+  });
 
   function paintOn(into: CoreRaster): boolean {
     const tails = nearTails();
@@ -948,11 +1054,13 @@
     }
     into.setMotion?.(gesture.active() ? CoreMotion.Gesture : CoreMotion.Still);
     into.setCamera(at.x, at.y, at.zoom);
+    restoreTiles(into);
     const began = performance.now();
     const { outcome, pending, skipped } = into.frame(began);
     countFrame(began, into.frameCounts?.(), gesture.active(), pending);
     if (!pending && !gesture.active()) {
       takeThumbs(canvas, shown);
+      saveTiles();
     }
     const onScreenIds = fillOrder(frames, view, area).map((f) => f.id);
     if (frames.length) {
@@ -961,7 +1069,13 @@
     if (frames.length && vectorsFirst.settle(onScreenIds)) {
       markFrame('all', Step.AllVectors);
     }
-    if (!pending && !sharpMarked && held.length && held.every((f) => pictured.has(f.group) && lists.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS))) {
+    const allWhole = held.length > 0 && held.every((f) => pictured.has(f.group) && lists.has(f.group) && !f.group.startsWith('placeholder') && !f.group.endsWith(THUMB) && !f.group.endsWith(VECTORS));
+    disk?.settle();
+    if (allWhole && disk?.importing()) {
+      disk.release();
+      pacer.invalidate();
+    }
+    if (!pending && !sharpMarked && allWhole) {
       sharpMarked = true;
       markFrame('all', Step.Sharp);
     }

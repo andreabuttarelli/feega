@@ -19,6 +19,7 @@
   import { canvasRouteOf } from '$lib/canvas/canvas-action-url';
   import { LocalOff, isOff } from '$lib/local-user';
   import { Density } from '$lib/canvas/layer-density';
+  import { forgetCanvasTiles } from '$lib/canvas/core/tile-store';
 
   type CanvasRow = { id: string; name: string; href: string };
 
@@ -93,8 +94,10 @@
       return;
     }
     onpick();
-    void canvasPages.run(PageAction.Delete, { id: current.id }, canvases, current.href).then((outcome) => {
+    const gone = current.id;
+    void canvasPages.run(PageAction.Delete, { id: gone }, canvases, current.href).then((outcome) => {
       if (outcome === OpOutcome.Landed) {
+        void forgetCanvasTiles(gone);
         void canvasPages.open(next.href);
       }
     });
