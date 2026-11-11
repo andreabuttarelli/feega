@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { test, expect, chromium, type Browser, type Page } from '@playwright/test';
 import { instrument, wheelPan } from '../e2e/fixtures/frame-sweeps';
 import { LANDINGS_FIXTURE_PLACE } from '../../scripts/perf/landings-fixture.mjs';
-import { budgetOf, FRAME_BUDGET_MS } from '../../scripts/perf/frame-budget.mjs';
+import { budgetOf, FRAME_BUDGET_MS } from '../../scripts/perf/frame-budget';
 
 enum Gesture {
   Pan = 'pan',

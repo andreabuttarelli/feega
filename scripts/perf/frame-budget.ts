@@ -4,11 +4,11 @@ const MAX_OVER_SHARE = 0.02;
 
 export const FRAME_BUDGET_MS = MS_PER_S / TARGET_FPS;
 
-const round = (n) => Math.round(n * 10) / 10;
+const round = (n: number) => Math.round(n * 10) / 10;
 
-const at = (sorted, share) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * share))] ?? 0;
+const at = (sorted: number[], share: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * share))] ?? 0;
 
-export function budgetOf(gaps) {
+export function budgetOf(gaps: number[]) {
   const sorted = [...gaps].sort((a, b) => a - b);
   const p95 = round(at(sorted, 0.95));
   const over = sorted.filter((g) => g > FRAME_BUDGET_MS).length;

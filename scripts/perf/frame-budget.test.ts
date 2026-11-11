@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { budgetOf, FRAME_BUDGET_MS } from './frame-budget.mjs';
+import { budgetOf, FRAME_BUDGET_MS } from './frame-budget';
 
 const frames = (fast: number, slow: number) => [...Array(fast).fill(5), ...Array(slow).fill(20)];
 

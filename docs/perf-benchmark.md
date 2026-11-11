@@ -144,4 +144,4 @@ flock ~/Documents/feega-videos/perf/bench.lock npm run perf:budget
 ```
 
 Results land in `perf-results/frame-budget-<target>.json` (`BUDGET_OUT` overrides). The thresholds
-live in `scripts/perf/frame-budget.mjs`.
+live in `scripts/perf/frame-budget.ts`.
