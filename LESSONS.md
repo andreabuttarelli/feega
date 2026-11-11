@@ -3795,3 +3795,7 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 
 ### WebKit logs `gpu lost` right after the core attaches
 **Signal:** `[core] gpu lost, attaching again device lost` about 3 s into every WebKit load; Chromium is clean. **Move:** count attaches, not losses: two `WebCore.attach` on the same canvas in flight means freeing the stale one loses the live device. Put `$inspect.trace()` in the attach effect to see which dependency re-ran it; attaches are serialized in `CoreFrames.svelte`.
+
+## A store method called from an effect must not read what it writes
+
+**Signal:** the canvas page stays on the `feega` splash, `pageerror` says `effect_update_depth_exceeded`, nothing in the console names a file. **Move:** the effect called `chatSelection.publish`, which read `#dismissed` to prune it and then wrote it: the read made the effect depend on its own write. Read the state you are about to overwrite inside `untrack`. Local mode hides the chat (`LocalOff.Chat`), so verify chat UI by flipping that line to `() => false` in the worktree and reverting before the commit.
