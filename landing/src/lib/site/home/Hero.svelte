@@ -2,7 +2,7 @@
   import { CANVAS_VIDEO, TICKER_VIDEOS } from '../home';
   import { lazyPlay } from '../lazy-video';
   import NpxChip from './NpxChip.svelte';
-  import UrlField from './UrlField.svelte';
+  import HeroPrompt from './HeroPrompt.svelte';
 
   const POSTER = '/site/home/canvas-poster.webp';
 </script>
@@ -13,12 +13,12 @@
 </svelte:head>
 
 <section class="hero" id="hero">
-  <h1><span data-agent-id="hero-title-a">The motion canvas</span> <span data-agent-id="hero-title-b">for Claude Code</span></h1>
+  <h1><span data-agent-id="hero-title-a">Design inside your code</span> <span data-agent-id="hero-title-b">with your agents and team.</span></h1>
 
   <p class="lead" data-agent-id="hero-lead">Paste any website. Claude rebuilds it as editable layers, animates it on a real timeline, and you ship it as video or code.</p>
 
   <div class="start" data-agent-id="hero-start">
-    <UrlField id="hero-url" />
+    <HeroPrompt />
   </div>
 
   <p class="run"><span>or run it locally:</span> <NpxChip /></p>
@@ -47,8 +47,8 @@
     color: #fff;
     font-family: 'Instrument Serif', serif;
     font-variation-settings: normal;
-    font-size: 72px;
-    line-height: 57.6px;
+    font-size: 48px;
+    line-height: 0.95;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -64,8 +64,14 @@
 
   .start {
     width: calc(100% - 32px);
-    max-width: 560px;
-    margin-top: 22px;
+    max-width: 680px;
+    margin-top: 28px;
+  }
+
+  @media (max-width: 809.98px) {
+    .start {
+      width: 100%;
+    }
   }
 
   .run {
@@ -97,6 +103,12 @@
     gap: 8px;
     width: 100%;
     margin-top: 100px;
+  }
+
+  @media (max-width: 809.98px) {
+    .start {
+      width: 100%;
+    }
   }
 
   @media (min-width: 1200px) {

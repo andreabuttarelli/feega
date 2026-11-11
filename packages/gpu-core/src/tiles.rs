@@ -8,8 +8,8 @@ pub const TILE_GUTTER_PX: u32 = 2;
 pub const TILE_BYTES: u64 = ((TILE_PX + 2 * TILE_GUTTER_PX) as u64).pow(2) * 4;
 pub const CANVAS_TILES: usize = 320;
 
-fn canvas_step(extent: Rect, camera: Camera) -> i32 {
-    let fits = |step: i32| keys_over(extent, step).len() <= CANVAS_TILES;
+fn canvas_step(extent: Rect, camera: Camera, allowed: usize) -> i32 {
+    let fits = |step: i32| keys_over(extent, step).len() <= allowed;
     (step_of(camera.zoom) - COARSER_STEPS..=step_of(camera.zoom)).rev().find(|s| fits(*s)).unwrap_or(step_of(camera.zoom) - COARSER_STEPS)
 }
 
@@ -137,6 +137,7 @@ pub struct TileFrame {
 #[derive(Default)]
 pub struct Tiles {
     canvas: Option<Rect>,
+    canvas_tiles: Option<usize>,
     held: FxHashSet<TileKey>,
     stale: FxHashSet<TileKey>,
     last_drawn: rustc_hash::FxHashMap<TileKey, u64>,
@@ -225,9 +226,20 @@ impl Tiles {
         self.canvas = Some(extent);
     }
 
+    pub fn set_canvas_tiles(&mut self, allowed: usize) {
+        self.canvas_tiles = Some(allowed);
+    }
+
+    fn canvas_allowed(&self) -> usize {
+        self.canvas_tiles.unwrap_or(CANVAS_TILES)
+    }
+
     pub fn canvas_ahead(&self, extent: Rect, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        if self.canvas_allowed() == 0 {
+            return Vec::new();
+        }
         let centre = seen_world(camera, screen).center();
-        let mut keys: Vec<TileKey> = keys_over(extent, canvas_step(extent, camera)).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+        let mut keys: Vec<TileKey> = keys_over(extent, canvas_step(extent, camera, self.canvas_allowed())).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
         keys.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
         keys
     }
@@ -285,7 +297,7 @@ impl Tiles {
     }
 
     fn pinned(&self, camera: Camera, screen: (u32, u32), key: TileKey) -> bool {
-        if self.canvas.is_some_and(|c| key.step == canvas_step(c, camera)) {
+        if self.canvas_allowed() > 0 && self.canvas.is_some_and(|c| key.step == canvas_step(c, camera, self.canvas_allowed())) {
             return true;
         }
         let step = step_of(camera.zoom);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Offscreen } from '$lib/canvas/core/residency';
 import { Device, BUDGET, buildLanes, deviceOf, previewHtml, textureBudget } from './memory-budget';
 
 describe('memory budget', () => {
@@ -55,13 +56,18 @@ describe('device profile', () => {
   const MB = 1024 * 1024;
 
   it('a desktop keeps the values it had before phones got their own profile', () => {
-    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4 });
+    expect(BUDGET[Device.Desktop]).toEqual({ textureBytes: 256 * MB, tileBytes: 384 * MB, pictureSide: 4096, resolution: 2, framesInFlight: 6, retainMs: 15_000, buildLanes: 4, canvasTiles: 320, offscreen: Offscreen.Resident });
   });
 
   it('a desktop builds frames on one lane per spare core, up to four', () => {
     expect(buildLanes(Device.Desktop, 16)).toBe(4);
     expect(buildLanes(Device.Desktop, 3)).toBe(2);
     expect(buildLanes(Device.Desktop, 1)).toBe(1);
+  });
+
+  it('a phone bakes no whole-canvas tiles and keeps no offscreen frames', () => {
+    expect(BUDGET[Device.Phone].canvasTiles).toBe(0);
+    expect(BUDGET[Device.Phone].offscreen).toBe(Offscreen.Dropped);
   });
 
   it('a phone builds frames on a single worker, however many cores it reports', () => {

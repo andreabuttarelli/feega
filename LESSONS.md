@@ -3798,3 +3798,6 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ### A code import always came out light, 1280 wide
 
 **Signal:** a dark-mode app imports with a white page; `web/browser.ts` pins `prefers-color-scheme: light`, `color-scheme: light` and a 1280 viewport on every tab, and a write-back of a colour lands as an inline `style` that beats a `dark:` class. **Move:** the conditions an import renders under are one record (`code-import/render-conditions.ts`), the tab takes them through `tab.scheme()` and `tab.viewport()`, and each sourced clip carries `source.cond`; write-back keys edits by element and condition. A browser test of a theme or width runs with `CHROMIUM_PATH` set: under `NODE_ENV=test` `localChromium()` returns null and the launcher tries to download a serverless build.
+
+### WebKit logs `gpu lost` right after the core attaches
+**Signal:** `[core] gpu lost, attaching again device lost` about 3 s into every WebKit load; Chromium is clean. **Move:** count attaches, not losses: two `WebCore.attach` on the same canvas in flight means freeing the stale one loses the live device. Put `$inspect.trace()` in the attach effect to see which dependency re-ran it; attaches are serialized in `CoreFrames.svelte`.

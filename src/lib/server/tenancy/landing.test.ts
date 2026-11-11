@@ -5,6 +5,7 @@ import { landingPath, type LandingDeps } from '$lib/server/tenancy/landing';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { EntryVia } from '$lib/server/tenancy/entry';
 import { START_URL_COOKIE } from '$lib/server/onboarding/start-url-cookie';
+import { HOME_DRAFT_COOKIE } from '$lib/home/home-draft';
 
 const USER = { id: 'u1', email: 'b@esempio.it' } as User;
 const DB = {} as never;
@@ -129,5 +130,22 @@ describe('a start url carried through sign-in', () => {
 
     expect(d.startPathFor).not.toHaveBeenCalled();
     expect(jar).not.toHaveProperty(START_URL_COOKIE);
+  });
+});
+
+describe('a home prompt typed while signed out', () => {
+  it('lands on the home, where the prompt resumes, and the cookie is spent', async () => {
+    const d = deps({ outcome: 'invalid' });
+    const jar: Record<string, string> = { [HOME_DRAFT_COOKIE]: '1' };
+
+    const path = await landingPath(DB, USER, cookies(jar), null, d);
+
+    expect(path).toBe('/app');
+    expect(d.homePathFor).toHaveBeenCalled();
+    expect(jar).not.toHaveProperty(HOME_DRAFT_COOKIE);
+  });
+
+  it('without it, the usual canvas', async () => {
+    expect(await landingPath(DB, USER, cookies(), null, deps({ outcome: 'invalid' }))).toBe('/p/proj/c/canvas');
   });
 });

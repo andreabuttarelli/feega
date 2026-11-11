@@ -6,6 +6,7 @@ import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { signedInDb } from '$lib/server/dashboard/app-shell';
 import { listMemberships, setActiveOrg } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
+import { moveAssets } from '$lib/server/repos/assets';
 import { createCanvas } from '$lib/server/repos/canvas';
 import { SUPPORT_TOOLS } from '$lib/tools';
 import { PROJECT_PARAM, toolScope } from '$lib/server/dashboard/tool-scope';
@@ -15,7 +16,14 @@ import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { parseAttachments } from '$lib/chat-attachments';
 import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
 import { motionEditorPath } from '$lib/canvas/motion-node';
-import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefMessage, briefName } from '$lib/motion/video-brief';
+import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefName } from '$lib/motion/video-brief';
+import { kindBrief, kindOf, urlIn, type Landed } from '$lib/home/prompt-kinds';
+import { sourceOf, type SourcePick } from '$lib/home/prompt-sources';
+import { importSource } from '$lib/server/dashboard/home-sources';
+import { importUrlInto } from '$lib/server/url-import/canvas-import';
+import { UrlImportOutcome } from '$lib/server/url-import/import-url';
+import { assertPublicUrl } from '$lib/server/tool-guard';
+import type { ToolScope } from '$lib/server/dashboard/tool-scope';
 import { FeegaImport, importStoredCanvasFile, signCanvasFileUpload } from '$lib/server/canvas/feega-file';
 import { FEEGA_REFUSAL_MESSAGE } from '$lib/canvas/feega-file';
 
@@ -56,6 +64,26 @@ async function workspaceOf(event: Parameters<typeof signedInDb>[0] & { cookies: 
   return membership ? { db, userId: user.id, orgId: membership.org.id } : null;
 }
 
+function pickOf(form: FormData): SourcePick | null | undefined {
+  const raw = form.get('source');
+  const value = String(form.get('sourceValue') ?? '').trim();
+  if (!raw || !value) {
+    return null;
+  }
+  const source = sourceOf(raw);
+  return source ? { source, value } : undefined;
+}
+
+async function importBriefUrl(scope: Pick<ToolScope, 'db' | 'orgId' | 'userId' | 'projectId'>, canvasId: string, brief: string): Promise<Landed | null> {
+  const url = urlIn(brief);
+  if (!url) {
+    return null;
+  }
+
+  const done = await importUrlInto({ ...scope, actor: { kind: 'user', id: scope.userId } }, canvasId, { url, at: { x: 0, y: 0 }, guard: assertPublicUrl });
+  return done.outcome === UrlImportOutcome.Ok ? { what: url, frameIds: [done.frameId] } : null;
+}
+
 function projectSlug(): string {
   const suffix = [...crypto.getRandomValues(new Uint8Array(SLUG_BYTES))].map((b) => b.toString(16).padStart(2, '0')).join('');
   return `project-${suffix}`;
@@ -66,16 +94,33 @@ export const actions: Actions = {
     const form = await event.request.formData();
     const typed = String(form.get('brief') ?? '').trim().slice(0, BRIEF_MAX);
     const attachmentIds = parseAttachments(form.getAll('attachment'));
+    const kind = kindOf(form.get('kind'));
+    const pick = pickOf(form);
+    if (!kind || pick === undefined) {
+      return fail(HTTP_BAD_REQUEST, { error: 'Pick what to make' });
+    }
     if (!typed && !attachmentIds.length) {
-      return fail(HTTP_BAD_REQUEST, { error: 'Paste a URL or describe your video' });
+      return fail(HTTP_BAD_REQUEST, { error: 'Paste a URL or describe what to make' });
     }
 
     const brief = typed || FILES_ONLY_BRIEF;
-    const scope = await toolScope(event, String(form.get('projectId') ?? '') || null);
-    const attachments = attachmentIds.length ? await loadAttachments(scope.db, { orgId: scope.orgId, projectId: scope.projectId, ids: attachmentIds }) : [];
-    const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: scope.projectId, name: briefName(brief) });
+    const workspace = await workspaceOf(event);
+    if (!workspace) {
+      return fail(HTTP_NOT_FOUND, { error: 'No workspace' });
+    }
 
-    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: scope.projectId, canvasId: canvas.id }, briefMessage(brief), attachments.map((a) => a.assetId)));
+    const uploadedIn = String(form.get('projectId') ?? '');
+    const attachments = uploadedIn && attachmentIds.length ? await loadAttachments(workspace.db, { orgId: workspace.orgId, projectId: (await toolScope(event, uploadedIn)).projectId, ids: attachmentIds }) : [];
+    const name = briefName(brief);
+    const project = await createProject(workspace.db, { orgId: workspace.orgId, name, slug: projectSlug() });
+    const assetIds = attachments.map((a) => a.assetId);
+    await moveAssets(workspace.db, { orgId: workspace.orgId, projectId: project.id, ids: assetIds });
+
+    const scope = { db: workspace.db, orgId: workspace.orgId, userId: workspace.userId, projectId: project.id };
+    const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: project.id, name });
+    const imported = pick ? await importSource(scope, canvas.id, pick) : await importBriefUrl(scope, canvas.id, brief);
+
+    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: project.id, canvasId: canvas.id }, kindBrief(kind, brief, imported), assetIds));
   },
 
   fromTemplate: async (event) => {

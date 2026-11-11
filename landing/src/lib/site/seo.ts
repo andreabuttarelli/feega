@@ -1,4 +1,4 @@
 export const HOME_META = {
-  title: 'Feega: the motion canvas for Claude Code',
-  description: 'Feega is an open-source motion canvas: paste any website, animate it on a real timeline, ship it as video or code. Works with Claude Code.'
+  title: 'Feega: design inside your code with your agents and team',
+  description: 'Feega: design inside your code with your agents and team. Website designs and motion videos on an open-source canvas, from GitHub, a folder or Figma.'
 } as const;
