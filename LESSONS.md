@@ -3805,3 +3805,7 @@ Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start
 ## A store method called from an effect must not read what it writes
 
 **Signal:** the canvas page stays on the `feega` splash, `pageerror` says `effect_update_depth_exceeded`, nothing in the console names a file. **Move:** the effect called `chatSelection.publish`, which read `#dismissed` to prune it and then wrote it: the read made the effect depend on its own write. Read the state you are about to overwrite inside `untrack`. Local mode hides the chat (`LocalOff.Chat`), so verify chat UI by flipping that line to `() => false` in the worktree and reverting before the commit.
+
+## Local mode must resolve before any Supabase key check
+
+**Signal:** 500 `SUPABASE_SERVICE_ROLE_KEY not configured` in local mode with no `.env`, only on routes that use the service-role or admin client. **Move:** `createClient` already routes to `localStore()`, but a key guard placed before it throws first; check `localStore()` ahead of every env-key guard in `db/client.ts` and `supabase-admin.ts`. Test: `src/lib/server/db/client.local.test.ts`.
