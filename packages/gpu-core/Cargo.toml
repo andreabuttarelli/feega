@@ -26,13 +26,13 @@ serde_json = "1"
 rustc-hash = "2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-vello = "0.12.0"
+vello = { version = "0.12.0", features = ["bump_estimate"] }
 gpu-text = { path = "../gpu-text" }
 pollster = "0.4"
 png = "0.17"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-vello = { version = "0.12.0", default-features = false, features = ["wgpu", "glyphless"] }
+vello = { version = "0.12.0", default-features = false, features = ["wgpu", "glyphless", "bump_estimate"] }
 wgpu = { version = "30.0.0", default-features = false, features = ["std", "wgsl", "webgpu"] }
 wasm-bindgen = "=0.2.129"
 wasm-bindgen-futures = "0.4"
