@@ -340,6 +340,7 @@ impl Rest {
 }
 
 pub const WARM_AFTER_MS: f64 = 500.0;
+const WARM_AFTER_UPLOAD_MS: f64 = 1500.0;
 const SHARP_STRETCH: f64 = 1.25;
 
 pub fn underlay_shows(stretch: f64) -> bool {
@@ -364,7 +365,11 @@ impl Default for Warmup {
 
 impl Warmup {
     pub fn stirred(&mut self, now_ms: f64) {
-        self.stirred_at = now_ms;
+        self.stirred_at = self.stirred_at.max(now_ms);
+    }
+
+    pub fn uploaded(&mut self, now_ms: f64) {
+        self.stirred(now_ms + WARM_AFTER_UPLOAD_MS - WARM_AFTER_MS);
     }
 
     pub fn due(&self, now_ms: f64) -> bool {

@@ -437,3 +437,16 @@ fn tiles_do_not_warm_while_frames_are_still_building() {
     assert!(!warm.due_when(500.0, Building::Frames));
     assert!(warm.due_when(500.0, Building::Nothing));
 }
+
+#[test]
+fn tiles_warm_later_after_an_upload_than_after_a_gesture() {
+    use gpu_core::tiles::Warmup;
+    let mut after_gesture = Warmup::default();
+    after_gesture.stirred(0.0);
+    let mut after_upload = Warmup::default();
+    after_upload.uploaded(0.0);
+
+    assert!(after_gesture.due(600.0));
+    assert!(!after_upload.due(1400.0));
+    assert!(after_upload.due(1600.0));
+}
