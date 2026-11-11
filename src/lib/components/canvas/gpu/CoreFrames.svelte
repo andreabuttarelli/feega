@@ -30,6 +30,7 @@
   import { listed } from '$lib/canvas/core/frame-lists';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
   import { liveGenerations } from '$lib/canvas/core/live-generations';
+  import { latestOnly } from '$lib/canvas/core/latest-only';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { tieredAssets } from '$lib/canvas/core/tiered-assets';
   import { Reach, assetTier, keptTier, reachOf } from '$lib/canvas/core/asset-tier';
@@ -381,6 +382,8 @@
     liveAtRevision.set(f.id, f.revision);
   }
 
+  const rebuildLatest = latestOnly<string, { f: FrameAt; source: LiveDoc }>((_id, { f, source }) => rebuildLive(f, source));
+
   $effect(() => {
     for (const f of frames) {
       const source = live.get(f.id);
@@ -390,7 +393,7 @@
       if (source && (!sameLive(liveBuilt.get(f.id), source) || liveStamp.get(f.id) !== f.scenes)) {
         liveBuilt.set(f.id, source);
         liveStamp.set(f.id, f.scenes);
-        void rebuildLive(f, source);
+        rebuildLatest(f.id, { f, source });
       }
     }
     for (const id of [...liveGroup.keys()].filter((id) => !live.has(id))) {
