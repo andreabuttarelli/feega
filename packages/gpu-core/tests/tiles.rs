@@ -294,8 +294,8 @@ fn a_changed_tile_on_screen_is_queued_to_raster_again_even_while_it_still_shows(
 fn tiles_warm_a_moment_after_the_last_gesture() {
     let mut warm = gpu_core::tiles::Warmup::default();
     warm.stirred(0.0);
-    assert!(!warm.due(100.0));
-    assert!(warm.due(200.0));
+    assert!(!warm.due(400.0));
+    assert!(warm.due(600.0));
 }
 
 #[test]
