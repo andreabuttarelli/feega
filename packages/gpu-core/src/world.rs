@@ -167,6 +167,10 @@ impl World {
         }).collect()
     }
 
+    pub fn extent(&self, sizes: impl Fn(&str) -> Option<(f64, f64)>) -> Option<Rect> {
+        self.uses.iter().filter_map(|u| reach(u, sizes(&u.group))).reduce(|a, b| a.union(b))
+    }
+
     pub fn holding(&self) -> bool {
         self.uses.iter().any(|u| u.hold)
     }

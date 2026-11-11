@@ -21,7 +21,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
-  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toFetch, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
@@ -413,7 +413,7 @@
   });
 
   $effect(() => {
-    const waiting = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup);
+    const waiting = toBuild(withoutViews(frames), view, area, keyOf, asked, liveGroup);
 
     const room = IN_FLIGHT[currentDevice()] - inFlight;
     if (room <= 0) {
@@ -449,8 +449,8 @@
 
   $effect(() => {
     const onScreen = cardIndex.visible(view, area);
-    for (const c of shownCards) {
-      if (onScreen.has(c.key) && !cardLists.has(c.key) && !readying.has(c.key)) {
+    for (const c of [...shownCards].sort((a, b) => Number(onScreen.has(b.key)) - Number(onScreen.has(a.key)))) {
+      if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
         void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, withoutPictures(c.frame.list, look, (i) => !pictures(i)))));
       }
