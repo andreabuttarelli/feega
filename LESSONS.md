@@ -3792,3 +3792,9 @@ Signal: swapping `build/client/gpu-core/gpu_core_bg.wasm` by hand to try a gpu-c
 
 ### The load bench draws on a software GPU
 Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start (CPU profile: `(program)`, `useProgram`), and fetches look slow because `responseEnd` waits behind it. Cause: headless Chromium renders WebGL with SwiftShader (`UNMASKED_RENDERER_WEBGL` says SwiftShader); shader compiles and draws run on the CPU. Headed Chrome on the Mac's GPU (ANGLE Metal) shows no long task over 200 ms on the same canvas. Move: read bench times as CPU-GL numbers; check the renderer string before chasing a long task, and confirm a startup cost in headed Chrome before fixing it.
+
+## Code import
+
+### A code import always came out light, 1280 wide
+
+**Signal:** a dark-mode app imports with a white page; `web/browser.ts` pins `prefers-color-scheme: light`, `color-scheme: light` and a 1280 viewport on every tab, and a write-back of a colour lands as an inline `style` that beats a `dark:` class. **Move:** the conditions an import renders under are one record (`code-import/render-conditions.ts`), the tab takes them through `tab.scheme()` and `tab.viewport()`, and each sourced clip carries `source.cond`; write-back keys edits by element and condition. A browser test of a theme or width runs with `CHROMIUM_PATH` set: under `NODE_ENV=test` `localChromium()` returns null and the launcher tries to download a serverless build.

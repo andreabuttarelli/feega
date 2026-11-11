@@ -4,7 +4,8 @@ import { urlPlan } from '$lib/server/url-import/url-doc';
 import type { OpenAppBrowser } from '$lib/server/web/browser';
 import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
-import { boardsOf, cropped, type Capture } from './boards';
+import { boardsOf, conditioned, cropped, type Capture } from './boards';
+import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions } from './render-conditions';
 import { repoOf, routesOf, type RepoRef } from './repo';
 import type { RepoRunner } from './sandbox-runner';
 
@@ -63,13 +64,13 @@ export type CodeOrigin = { repo: string; branch: string | null; sha: string | nu
 
 export type CodeImported = ({ outcome: CodeImportOutcome.Ok; frameId: string; origin?: CodeOrigin; name: string; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[] } & ComponentCount) | Refusal;
 
-export type CodePage = { label: string; url: string };
+export type CodePage = { label: string; url: string; conditions?: RenderConditions };
 
 export type LandAsk = Omit<PageAsk, 'url' | 'planner'>;
 
 export type RepoArchive = (repo: RepoRef) => Promise<Uint8Array | null>;
 
-export type CodeAsk = LandAsk & { repo: string; routes: string[]; runner: RepoRunner | null; archive?: RepoArchive | null };
+export type CodeAsk = LandAsk & { repo: string; routes: string[]; conditions?: RenderConditions[]; runner: RepoRunner | null; archive?: RepoArchive | null };
 
 const refused = (outcome: Refusal['outcome'], error?: string): Refusal => ({ outcome, ...(error ? { error } : {}) });
 
@@ -108,14 +109,17 @@ async function captured(open: OpenAppBrowser, pages: CodePage[], names: string[]
       continue;
     }
     const found = { uses: [] as ComponentUse[] };
+    const conditions = page.conditions ?? BASE_CONDITIONS;
     const tab = await open();
+    await tab.scheme(conditions.scheme).catch(() => undefined);
+    await tab.viewport(conditions.width).catch(() => undefined);
     const tree = await pageTreeAt(tab, new URL(page.url), window.settleMs, marksPlanner(names, found)).finally(() => tab.close());
     if ('outcome' in tree) {
       missed.push(`${page.label}: ${Missed.Unopened}`);
       last = tree.outcome === UrlImportOutcome.Ok ? null : refused(FROM_URL_IMPORT[tree.outcome], tree.error);
       continue;
     }
-    captures.push({ label: page.label, tree, uses: found.uses });
+    captures.push({ label: page.label, tree: conditioned(tree, conditionKey(conditions)), uses: found.uses });
   }
   return { captures, missed, last };
 }
@@ -166,7 +170,7 @@ export async function importCodeAt(ask: CodeAsk): Promise<CodeImported> {
     return refused(CodeImportOutcome.RunFailed, `${run.failure}: ${run.detail}`);
   }
 
-  const pages = routes.map((route) => ({ label: route, url: new URL(route, run.app.url).toString() }));
+  const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, run.app.url).toString(), conditions: v.conditions }));
   const origin = { repo: `${repo.owner}/${repo.repo}`, branch: repo.ref, sha: run.app.sha };
   const done = await importBoards({ ...ask, name: repo.repo, pages, names: run.app.names, crop: Crop.Page }).finally(() => run.app.stop().catch(() => undefined));
   return done.outcome === CodeImportOutcome.Ok ? { ...done, origin } : done;

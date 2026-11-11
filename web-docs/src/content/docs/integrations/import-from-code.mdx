@@ -23,6 +23,28 @@ Open the insert menu (**+**), go to **Import**, choose **From code…**.
 - **Private repositories**: press **Connect GitHub**, sign in to GitHub in the tab that opens, come back. The dialog then lists your repositories and their branches. Feega downloads the code on its servers and copies it into the sandbox; your GitHub sign-in never reaches the sandbox.
 - **Storybook**: switch to the Storybook tab and paste the Storybook link. Up to 12 stories, spread across components, become boards; stories that do not fit in about two and a half minutes are listed as left out. Nothing is installed or started, so it is the fastest way to bring in a component library, including components no page renders.
 
+## Theme and width
+
+The import opens the app in a real browser, so everything the app does at render time (global styles, resets, fonts, layouts and providers around the route, CSS variables and design tokens resolved to their values) is already in the screen. Two conditions you can choose:
+
+| Condition | In the app | Notes |
+|---|---|---|
+| Theme | **Render under** in the import dialog: Light, Dark | The page is opened with `prefers-color-scheme`, `color-scheme` and the stored `theme` key set to the choice, so media-query, class and data-attribute themes follow. Named custom themes are not listed. |
+| Width | Desktop 1280, Tablet 768, Phone 390 | Media and container queries resolve at that width. |
+
+Choose several and every page lands once per combination, side by side in the same frame, named like `/ · dark · 390px`. Pull re-renders the same combinations.
+
+| Not switched | Why |
+|---|---|
+| Locale, text direction | The browser language is fixed: the default catalog is shown. |
+| Login, feature flags, env vars, loading, empty and error states | The dev server renders what its own setup gives. |
+| Tokens as feega variables | Values are resolved, not linked: an edit writes the element, not the token. |
+| A component variant the route does not render | Only what appears on the page is imported. |
+
+### Edits on a dark board
+
+Tailwind projects only: a change on a dark board is written as a `dark:` class (`dark:bg-[#101010]`) and replaces the earlier `dark:` class of the same kind. A change on a light board edits the plain class and leaves the `dark:` ones alone. Without Tailwind a dark edit is listed as not written back, and so is any edit made at a width other than desktop, because a plain rule would change every width.
+
 ## Edit the code from the canvas
 
 A frame imported from GitHub or a folder remembers where each layer comes from in the code. Change a text, a text colour or size, a fill, or the gap, padding or direction of a stack, then open **code mode** (the `</>` button): the **GitHub** (or **Folder**) section lists the files the edits touch and shows the patch.
@@ -30,7 +52,7 @@ A frame imported from GitHub or a folder remembers where each layer comes from i
 - **Patch** downloads it as a `.patch` file (`git apply` it in your checkout).
 - **Open pull request** creates a new `feega/…` branch on the repository and a pull request against its default branch. Nothing is ever committed to the default branch. It needs GitHub connected.
 - **Write to folder** (folder imports) writes the files and, when the folder is a git repository, also commits them on a new `feega/…` branch, leaving your current branch as it was. The app's dev server reloads, so the page shows the edit.
-- Styles land as an inline `style` on the element (`style={{ … }}` in JSX). Texts are replaced where the element holds them; texts that come from an inlang/Paraglide message (`{m.home_title()}`) are changed in the message file of the language shown. A text built by other code is listed as not written back.
+- Styles land as an inline `style` on the element (`style={{ … }}` in JSX), or as Tailwind classes when the project uses Tailwind. Texts are replaced where the element holds them; texts that come from an inlang/Paraglide message (`{m.home_title()}`) are changed in the message file of the language shown. A text built by other code is listed as not written back.
 
 **Pull** brings the code back: new commits on the imported branch (or the branch you type), or file changes in the folder, are re-read and drawn into the same frame. Your canvas edits are kept; where the code changed the same property of the same element, the code wins and the conflict is listed. For a folder, code mode watches the files and pulls on its own while the frame is open.
 
@@ -61,6 +83,7 @@ In local mode (`npx feega`), the **Folder** tab takes the absolute path of a pro
 
 ```bash
 feega canvas import-code $PROJECT https://github.com/owner/repo --route / /settings /users --canvas <canvas> --x 0 --y 0
+feega canvas import-code $PROJECT https://github.com/owner/repo --route / --scheme light dark --width 1280 390 --canvas <canvas>   # one board per theme and width
 feega canvas import-storybook $PROJECT https://storybook.example.com --canvas <canvas> --x 0 --y 0
 feega canvas github $PROJECT connect      # prints a link to open in the browser
 feega canvas github $PROJECT repos
@@ -75,8 +98,8 @@ The import answers `frameId`, `pages` (the paths or stories that landed), `compo
 
 ## MCP and API
 
-Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
+Over MCP: `canvas_tool({ project_id, op: "import_code", input: { canvasId, repo, routes, conditions?: [{ scheme: "light" | "dark", width }], x, y } })`, or `{ canvasId, storybook, stories?, x, y }`. Folder (local mode): `{ canvasId, folder, routes, x, y }`. Sync: ops `code_changes`, `code_publish`, `code_pull` (`{ nodeId, branch? }`). REST: `GET /api/v1/projects/:id/code-import/:nodeId/changes`, `POST …/publish`, `POST …/pull`, `GET …/head`. GitHub: ops `github_status`, `github_connect`, `github_repos`, `github_branches` (`{ repo: "owner/name" }`), `github_disconnect`.
 
-Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, x, y }` (`routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
+Over HTTP: `POST /api/v1/projects/{projectId}/code-import` with `{ canvasId, repo, routes?, conditions?, x, y }` (`conditions` up to 6, `routes` up to 8, default `["/"]`; the older single `route` still works) or `{ canvasId, storybook, stories?, x, y }`. Errors: `invalid` (400), `run_failed` (422, with `detail`: the install or dev server output), `unreadable` (422), `rate_limited` (429), `no_sandbox` / `no_browser` (503), `failed` (502).
 
 GitHub: `GET /api/v1/projects/{projectId}/github` (`{ configured, connected, label }`), `POST …/github/connect` (`{ url }` to open), `GET …/github/repos`, `GET …/github/branches?repo=owner/name`, `DELETE …/github`. `not_configured` (501) when the server has no GitHub connection set up, `not_connected` (409) before you connect.
