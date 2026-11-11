@@ -6,7 +6,7 @@
   import PromptKinds from '$lib/components/app/PromptKinds.svelte';
   import { DEFAULT_KIND } from '$lib/home/prompt-kinds';
   import PromptSources from '$lib/components/app/PromptSources.svelte';
-  import { OverLogin, PROMPT_SOURCES, type SourcePick } from '$lib/home/prompt-sources';
+  import { briefFor, OverLogin, PROMPT_SOURCES, type PromptSource, type SourcePick } from '$lib/home/prompt-sources';
   import { saveDraft } from '$lib/home/home-draft';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
   import { CHAT_ATTACH_ACCEPT } from '$lib/chat-attachments';
@@ -22,8 +22,9 @@
   const repickFolder = $derived(pick !== null && PROMPT_SOURCES[pick.source].overLogin === OverLogin.PickAgain);
   let saving = $state(false);
   let asksImages = $state(false);
+  let handoffSource = $state<PromptSource | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
-  const canSend = $derived(!saving && (!!brief.trim() || files.length > 0));
+  const canSend = $derived(!saving && (!!brief.trim() || files.length > 0 || pick !== null));
 
   onMount(() => {
     const handoff = handoffOf(page.url.searchParams);
@@ -33,7 +34,8 @@
     brief = handoff.text;
     kind = handoff.kind;
     asksImages = handoff.waitsForImages;
-    if (!asksImages) {
+    handoffSource = handoff.source;
+    if (!asksImages && !handoffSource) {
       void send();
     }
   });
@@ -58,7 +60,7 @@
       return;
     }
     saving = true;
-    await saveDraft(sessionStorage, { text: brief, kind, files, pick });
+    await saveDraft(sessionStorage, { text: briefFor(kind, brief, pick), kind, files, pick });
     await goto(SIGN_IN);
   }
 </script>
@@ -83,7 +85,7 @@
       {/if}
       <textarea name="brief" data-testid="video-brief" placeholder={PLACEHOLDER} aria-label={PLACEHOLDER} maxlength={BRIEF_MAX} rows="3" bind:value={brief} onkeydown={keyed}></textarea>
       <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
-      <PromptSources bind:pick />
+      {#key handoffSource}<PromptSources bind:pick pickAgain={handoffSource} />{/key}
       <div class="row">
         <button type="button" class="attach" onclick={() => picker?.click()}>attach</button>
         <button type="submit" class="send" data-testid="brief-send" disabled={!canSend} aria-label="Start" title="Start">

@@ -30,4 +30,14 @@ describe('/new: a handoff from the landing', () => {
     }
     expect(location).toBeNull();
   });
+
+  it('stays open for a source picked with no words', async () => {
+    let location: string | null = null;
+    try {
+      await load({ url: new URL('https://oh.feega.app/new?source=github'), locals: { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }) } } as never);
+    } catch (e) {
+      location = (e as { location: string }).location;
+    }
+    expect(location).toBeNull();
+  });
 });
