@@ -1,11 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
-import { instrument, measure, wheelZoom } from '../e2e/fixtures/frame-sweeps';
+import { instrument, measure, wheelZoom, type CoreWork } from '../e2e/fixtures/frame-sweeps';
 import { ZOOM_FIXTURE_CENTRE, ZOOM_FIXTURE_PLACE } from '../../scripts/perf/zoom-fixture.mjs';
 import { median, softwareAdapter } from '../../scripts/perf/bench-stats.mjs';
 
-type BenchRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number; sharpMs: number };
+type BenchRun = { fps: number; p95: number; p99: number; over11: number; worst: number; frames: number; cpuMs: number; sharpMs: number; core: CoreWork };
 
 enum BenchCase {
   Steady = 'steady',
@@ -20,6 +20,7 @@ const RUNS = Number(process.env.BENCH_RUNS ?? 5);
 const CPU_THROTTLE = Number(process.env.BENCH_CPU ?? 4);
 const OUT = process.env.BENCH_OUT ?? 'perf-results';
 const TRACE_OVER_MS = Number(process.env.BENCH_TRACE_OVER_MS ?? 0);
+const PROFILED = process.env.BENCH_PROFILE === '1';
 const CI_GPU_ARGS = ['--enable-unsafe-webgpu', '--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--use-webgpu-adapter=swiftshader', '--enable-features=Vulkan', '--ignore-gpu-blocklist', '--disable-gpu-vsync'];
 const VIEWPORT = { width: 1440, height: 900 };
 const LOCAL_USER_ID = '00000000-0000-4000-8000-00000000f002';
@@ -107,7 +108,14 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
   console.log(`webgpu adapter: ${await page.evaluate(async () => !!(await (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu?.requestAdapter()))}`);
   const cpuBefore = await taskMs(cdp);
   const gesture = () => measure(page, GESTURE_MS, (until) => (CASE === BenchCase.FirstZoom ? zoomIn(page, until) : wheelZoom(page, until)));
+  if (PROFILED) {
+    await cdp.send('Profiler.enable');
+    await cdp.send('Profiler.start');
+  }
   const { result: zoom, events } = TRACE_OVER_MS ? await traced(cdp, gesture) : { result: await gesture(), events: [] };
+  if (PROFILED) {
+    writeFileSync(join(OUT, `zoom-run${index}.cpuprofile`), JSON.stringify((await cdp.send('Profiler.stop')).profile));
+  }
   const cpuMs = Math.round((await taskMs(cdp)) - cpuBefore);
   if (TRACE_OVER_MS && zoom.max > TRACE_OVER_MS) {
     writeFileSync(join(OUT, `trace-run${index}-${Math.round(zoom.max)}ms.json`), JSON.stringify({ traceEvents: events }));
@@ -121,7 +129,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
     writeFileSync(join(OUT, 'zoomed-settled.png'), await shot(page));
   }
   await context.close();
-  return { fps: zoom.fpsAvg, p95: zoom.p95, worst: zoom.max, frames: zoom.frames, cpuMs, sharpMs };
+  return { fps: zoom.fpsAvg, p95: zoom.p95, p99: zoom.p99, over11: zoom.over11, worst: zoom.max, frames: zoom.frames, cpuMs, sharpMs, core: zoom.core };
 }
 
 test('zoom benchmark on the synthetic heavy canvas', async ({ baseURL }) => {

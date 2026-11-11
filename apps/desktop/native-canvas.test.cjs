@@ -35,6 +35,17 @@ test('the native canvas is opt-in and macOS only', () => {
   assert.ok(!wanted({ FEEGA_NATIVE_CANVAS: '1' }, 'win32'));
 });
 
+test('a packaged app never turns the native canvas on, flag or not', () => {
+  assert.ok(!wanted({ FEEGA_NATIVE_CANVAS: '1' }, 'darwin', true));
+  assert.ok(wanted({ FEEGA_NATIVE_CANVAS: '1' }, 'darwin', false));
+});
+
+test('the release package ships neither the native addon nor its preload', () => {
+  const build = require('./package.json').build;
+  assert.ok(!build.files.some((f) => f.includes('.node') || f.includes('preload') || f.includes('native-canvas')));
+  assert.ok(!(build.asarUnpack ?? []).length);
+});
+
 test('a packaged app loads the addon from the unpacked archive', () => {
   assert.ok(addonPath('/A/app.asar').includes('app.asar.unpacked'));
 });

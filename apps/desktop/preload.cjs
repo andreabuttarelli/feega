@@ -1,5 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const PROTOCOL = 1;
+
 const Channel = {
   Attach: 'native-canvas:attach',
   Send: 'native-canvas:send',
@@ -19,6 +21,7 @@ ipcRenderer.on(Channel.Report, (_event, message) => {
 const send = (method) => (...args) => ipcRenderer.send(Channel.Send, method, ...args);
 
 contextBridge.exposeInMainWorld('feegaNativeCanvas', {
+  protocol: PROTOCOL,
   attach: (placement, width, height, background) => {
     latest = '';
     return ipcRenderer.invoke(Channel.Attach, placement, width, height, background);

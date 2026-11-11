@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { attachedOf, backgroundOf, createCoreNative, openHole, type NativeCanvasBridge } from '@feega/motion-core/motion/gpu-full/core-native';
+import { attachedOf, backgroundOf, createCoreNative, nativeCanvasOffered, openHole, NATIVE_PROTOCOL, type NativeCanvasBridge } from '@feega/motion-core/motion/gpu-full/core-native';
 
 function fakeBridge(report = '{"report":"idle","pending":false,"cacheBytes":0}') {
   const calls: [string, ...unknown[]][] = [];
@@ -10,6 +10,7 @@ function fakeBridge(report = '{"report":"idle","pending":false,"cacheBytes":0}')
       calls.push([name, ...args]);
     };
   const bridge: NativeCanvasBridge = {
+    protocol: NATIVE_PROTOCOL,
     attach: vi.fn(async (...args: unknown[]) => void calls.push(['attach', ...args])),
     picture: log('picture'),
     putGroup: log('putGroup'),
@@ -177,5 +178,19 @@ describe('the live overlay on the native engine', () => {
     core.set_live_overlay('[{"b":2}]');
 
     expect(calls.filter(([name]) => name === 'setOverlay').at(-1)).toEqual(['setOverlay', '[{"a":1},{"b":2}]']);
+  });
+});
+
+describe('an app release older or newer than the web app', () => {
+  it('offers the native canvas only when its protocol matches', () => {
+    const { bridge } = fakeBridge();
+    (window as { feegaNativeCanvas?: unknown }).feegaNativeCanvas = bridge;
+    expect(nativeCanvasOffered()).toBe(true);
+
+    (window as { feegaNativeCanvas?: unknown }).feegaNativeCanvas = { ...bridge, protocol: NATIVE_PROTOCOL + 1 };
+    expect(nativeCanvasOffered()).toBe(false);
+
+    (window as { feegaNativeCanvas?: unknown }).feegaNativeCanvas = { ...bridge, protocol: undefined };
+    expect(nativeCanvasOffered()).toBe(false);
   });
 });

@@ -27,6 +27,18 @@ export const atOf = (raw: string): SourceAt | null => {
 
 const label = (at: SourceAt) => `${at.file}:${at.line}`;
 
+const LOOK_OF_BINDING: Record<string, LookKey> = {
+  color: LookKey.Color,
+  fill: LookKey.Fill,
+  'autoLayout.gap': LookKey.Gap,
+  'autoLayout.padding': LookKey.Padding
+};
+
+function unbound(clip: MotionClip, look: Look): Look {
+  const owned = new Set(Object.keys(clip.bind ?? {}).map((target) => LOOK_OF_BINDING[target]));
+  return Object.fromEntries(Object.entries(look).filter(([key]) => !owned.has(key as LookKey)));
+}
+
 const allClips = (doc: MotionDoc): MotionClip[] => [...doc.tracks, ...Object.values(doc.comps).flatMap((c) => c.tracks)].flatMap((t) => t.clips as MotionClip[]);
 
 export function editsOf(doc: MotionDoc): SourceEdit[] {
@@ -34,7 +46,7 @@ export function editsOf(doc: MotionDoc): SourceEdit[] {
   const byAt = new Map<string, SourceEdit>();
   for (const clip of allClips(doc)) {
     const at = clip.source ? atOf(clip.source.at) : null;
-    const look = at ? changedLook(clip, side) : {};
+    const look = at ? unbound(clip, changedLook(clip, side)) : {};
     const key = `${clip.source?.at}|${clip.source?.cond ?? ''}`;
     if (!at || !Object.keys(look).length || byAt.has(key)) {
       continue;

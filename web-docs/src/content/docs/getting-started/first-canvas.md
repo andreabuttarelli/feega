@@ -9,7 +9,7 @@ sidebar:
 
 Next to attach, three sources bring existing work in before the agent starts: **GitHub** (a repository URL; connect GitHub for a private one), **Local folder** (pick the folder: on feega.app it is uploaded once and run in a sandbox, with no sync back to your files; in local mode it stays linked to the folder) and **Import from Figma** (a file URL; needs your Figma token in profile settings). The source shows as a chip in the composer. On send it is imported onto the new canvas first, and the agent gets the brief together with the imported frames.
 
-No account yet? Type your prompt on [feega.app](https://feega.app). It waits through sign-in or sign-up and fills the composer on your home; press send when ready. Attach images and pick a local folder after sign-in.
+Type your prompt on [feega.app](https://feega.app). If you are not signed in, it waits through sign-in or sign-up. Then a new canvas opens and the agent starts on it by itself, with no second click. Reloading or going back never sends it twice. A prompt that needs more from you (a GitHub repo or Figma file to pick, images to attach, a local folder) fills the composer and waits for you to finish and press send.
 
 On the free plan the agent runs on Claude Haiku for your first 20 messages; paid plans run Claude Opus 5.5. See [Credits](/ai/generate-and-credits/).
 

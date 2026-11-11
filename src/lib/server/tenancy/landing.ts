@@ -9,6 +9,8 @@ import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
 import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { takeStartUrl } from '$lib/server/onboarding/start-url-cookie';
+import { resumedQuery } from '$lib/home/handoff';
+import { ProductEvent, track } from '$lib/server/product-events/track';
 
 export const INVITE_PARAM = 'invite_token';
 export const INVITE_ERROR_PARAM = 'invite_error';
@@ -19,13 +21,17 @@ export type LandingDeps = {
   acceptInvite: typeof acceptInvite;
   homePathFor: typeof homePathFor;
   startPathFor: typeof startPathFor;
+  track: typeof track;
 };
 
-const LANDING_DEPS: LandingDeps = { ensureProfile, recordTermsAcceptance, acceptInvite, homePathFor, startPathFor };
+const LANDING_DEPS: LandingDeps = { ensureProfile, recordTermsAcceptance, acceptInvite, homePathFor, startPathFor, track };
 
 async function recordFirstAcceptance(db: Db, deps: LandingDeps, userId: string, termsAcceptedAt: string | null) {
-  if (termsAcceptedAt) return;
+  if (termsAcceptedAt) {
+    return;
+  }
   await deps.recordTermsAcceptance(db, userId, CURRENT_TERMS_VERSION);
+  await deps.track(ProductEvent.SignupCompleted, { userId }, {});
 }
 
 function takeHomeDraft(cookies: Cookies): string | null {
@@ -35,7 +41,7 @@ function takeHomeDraft(cookies: Cookies): string | null {
   }
 
   cookies.delete(HOME_DRAFT_COOKIE, { path: '/' });
-  return pending.startsWith('?') ? `${DASHBOARD_PATH}${pending}` : DASHBOARD_PATH;
+  return pending.startsWith('?') ? `${DASHBOARD_PATH}${resumedQuery(pending, () => crypto.randomUUID())}` : DASHBOARD_PATH;
 }
 
 export function inviteTokenIn(params: URLSearchParams | FormData): string | null {

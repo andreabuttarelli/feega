@@ -301,7 +301,7 @@ impl World {
     }
 
     pub fn overlay(&self, camera: Affine, width: u32, height: u32) -> DisplayList {
-        let held = self.uses.flagged().into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
+        let held = self.visit(self.uses.flagged()).into_iter().filter(|u| self.lifted(u) && self.shifted_from_rest(u).is_none()).map(|u| Item::Use(UseItem { matrix: times(camera, u.matrix), ..u.clone() }));
         let items = held.chain(OVERLAY_PARTS.iter().flat_map(|p| {
             let part = &self.overlays[p.index()];
             match &part.at {

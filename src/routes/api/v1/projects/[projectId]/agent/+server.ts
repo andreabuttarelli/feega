@@ -1,7 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { Db } from '$lib/server/db/client';
 import { pickOf } from '$lib/server/project-agent/model-route';
-import { AGENT_PLANS, billedAs, capReached, planModel, tierOf } from '$lib/server/project-agent/agent-plan';
+import { planModel } from '$lib/server/project-agent/agent-plan';
+import { ProductEvent, track } from '$lib/server/product-events/track';
 import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -9,7 +10,7 @@ import { CAP_REACHED, capRefusal, liveCapReader } from '$lib/server/spend-caps/g
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findReachableProject } from '$lib/server/projects/lookup';
-import { countUserTurns, openThread, loadTurns, promptHistory, turnRunning } from '$lib/server/repos/chat';
+import { openThread, loadTurns, promptHistory, turnRunning } from '$lib/server/repos/chat';
 import { openFrameSchema, type OpenFrame } from '$lib/server/project-agent/frame-tools';
 import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
 import { screenModelInput } from '$lib/server/moderation/model-input';
@@ -70,8 +71,9 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const brand = project.brandId ? await loadBriefBrand(db, { orgId, brandId: project.brandId }) : null;
 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
-  const plan = AGENT_PLANS[tierOf(gated)];
-  if (gated && capReached(plan, await countUserTurns(db, user.id))) {
+  const actor = { userId: user.id, orgId };
+  if (gated) {
+    await track(ProductEvent.CreditsExhausted, actor, {});
     return gated;
   }
 
@@ -95,9 +97,10 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const resolved = resolveChoice(await offeredChatModels(), { model: askedModel, reasoning: askedReasoning });
   if (!resolved.ok) {
+    await track(ProductEvent.AgentFailed, actor, { code: resolved.error });
     return json({ error: resolved.error }, { status: 400 });
   }
-  const { model, reasoning } = planModel(plan, resolved.choice, pickOf(askedModel), text);
+  const { model, reasoning } = planModel(resolved.choice, pickOf(askedModel), text);
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,
@@ -119,10 +122,12 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
 
   const screened = await screening;
   if (!screened.ok) {
+    await track(ProductEvent.AgentFailed, actor, { code: 'prompt_blocked' });
     return blockedPrompt(screened.error);
   }
 
-  return billedAs(plan, () => startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick }));
+  await track(ProductEvent.AgentStarted, actor, { model });
+  return startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick });
 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {

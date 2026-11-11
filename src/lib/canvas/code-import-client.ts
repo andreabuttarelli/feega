@@ -1,10 +1,12 @@
 const UNAVAILABLE = 'unavailable';
 
-export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number };
+export type DesignLanded = { tokens: number; byClass: number; byRule: number; byValue: number; unbound: number; otherMode: number };
+
+export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number; design?: DesignLanded };
 
 export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
 
-export type CodeTarget = { repo: string; routes: string[]; conditions?: RenderCondition[] } | { folder: string; routes: string[]; conditions?: RenderCondition[] } | { upload: string; routes: string[]; conditions?: RenderCondition[] } | { storybook: string };
+export type CodeTarget = { repo: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } | { folder: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } | { upload: string; routes: string[]; conditions?: RenderCondition[]; designSystem?: boolean } | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 
@@ -28,6 +30,11 @@ const JSON_POST = (body: unknown): RequestInit => ({ method: 'POST', headers: { 
 export async function importCode(ask: CodeAsk, fetchFn: typeof fetch = fetch): Promise<{ ok: true; landed: CodeLanded } | { ok: false; error: string; detail?: string }> {
   const got = await asked<CodeLanded>(`/api/v1/projects/${ask.projectId}/code-import`, JSON_POST({ canvasId: ask.canvasId, ...ask.target, x: ask.at.x, y: ask.at.y }), fetchFn);
   return got.ok ? { ok: true, landed: got.value } : got;
+}
+
+export async function tokensFound(projectId: string, where: { repo: string } | { folder: string }, fetchFn: typeof fetch = fetch): Promise<number> {
+  const got = await asked<{ tokens: number }>(`/api/v1/projects/${projectId}/code-import/tokens?${new URLSearchParams(where)}`, {}, fetchFn);
+  return got.ok ? got.value.tokens : 0;
 }
 
 const githubPath = (projectId: string, rest = '') => `/api/v1/projects/${projectId}/github${rest}`;

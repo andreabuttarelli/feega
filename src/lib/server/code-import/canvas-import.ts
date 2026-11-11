@@ -8,13 +8,15 @@ import { assertPublicUrl } from '$lib/server/tool-guard';
 import { rateWindow } from '$lib/server/figma/rate-window';
 import { liveBrowser } from '$lib/server/web/live';
 import { pageAssets } from '$lib/server/url-import/canvas-import';
-import { CodeImportOutcome, Crop, importBoards, importCodeAt, importRepoAt, type CodeImported, type LandAsk } from './import-code';
+import { CodeImportOutcome, Crop, designFor, importBoards, importCodeAt, importRepoAt, type CodeImported, type CodeReader, type LandAsk } from './import-code';
+import { DesignSystem, tokenCount } from './design-system';
+import { rawReader } from './repo-sync';
 import { basename } from 'node:path';
 import { localModeRefusal } from '$lib/server/local/local-mode';
 import { localBrowser } from '$lib/server/web/browser';
 import { chromiumPage } from '$lib/server/motion/chromium-frames';
-import { devServerOf, folderHead, folderNames, folderOf } from './folder-source';
-import { routesOf } from './repo';
+import { devServerOf, folderHead, folderNames, folderOf, folderSource } from './folder-source';
+import { repoOf, routesOf } from './repo';
 import { SourceKind } from './code-source';
 import { BASE_CONDITIONS, variantsOf, type RenderConditions } from './render-conditions';
 import { importStorybookAt } from './import-storybook';
@@ -34,7 +36,15 @@ const limiter = rateWindow({ limit: IMPORTS_PER_WINDOW, windowMs: IMPORT_WINDOW_
 
 export type CodeScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
-export type CodeImportAsk = { repo?: string; folder?: string; upload?: string; routes: string[]; conditions?: RenderConditions[]; storybook?: string; stories?: string[]; at: { x: number; y: number } };
+export type CodeImportAsk = { repo?: string; folder?: string; upload?: string; routes: string[]; conditions?: RenderConditions[]; designSystem?: DesignSystem; storybook?: string; stories?: string[]; at: { x: number; y: number } };
+
+async function githubReader(scope: CodeScope, repo: string): Promise<CodeReader | null> {
+  const ref = repoOf(repo);
+  const call = ref ? await githubFor(scope.db, scope).call().catch(() => null) : null;
+  return ref ? (rev) => rawReader(ref, rev ?? ref.ref ?? 'HEAD', call) : null;
+}
+
+const tokensOf = (done: CodeImported) => (done.outcome === CodeImportOutcome.Ok && done.tokenMap ? { tokens: done.tokenMap } : {});
 
 function metered(runner: RepoRunner, scope: CodeScope): RepoRunner {
   return async (repo, archive) => {
@@ -82,9 +92,10 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
     return importStorybookAt({ ...land, storybook: ask.storybook, stories: ask.stories });
   }
 
-  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, conditions: ask.conditions, runner: sandboxOf(scope), archive: githubFor(scope.db, scope).archive });
+  const code = await githubReader(scope, ask.repo ?? '');
+  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, conditions: ask.conditions, runner: sandboxOf(scope), archive: githubFor(scope.db, scope).archive, code, designSystem: ask.designSystem });
   if (done.outcome === CodeImportOutcome.Ok && done.origin) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Github, ...done.origin, routes: ask.routes.length ? ask.routes : ['/'], ...(ask.conditions ? { conditions: ask.conditions } : {}) });
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Github, ...done.origin, routes: ask.routes.length ? ask.routes : ['/'], ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
   }
   return done;
 }
@@ -134,13 +145,23 @@ async function importFolderInto(scope: CodeScope, land: LandAsk, ask: CodeImport
     }
   };
   const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, served.url).toString(), conditions: v.conditions }));
-  const done = await importBoards({ ...land, open: localBrowser(chromiumPage, origin), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page });
+  const design = await designFor({ code: () => folderSource(root).read(''), designSystem: ask.designSystem }, null);
+  const done = await importBoards({ ...land, open: localBrowser(chromiumPage, origin), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page, design });
   if (done.outcome === CodeImportOutcome.Ok) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Folder, repo: root, branch: null, sha: await folderHead(root), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}) });
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Folder, repo: root, branch: null, sha: await folderHead(root), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}), ...tokensOf(done) });
   }
   return done;
 }
 
 export async function rememberOrigin(scope: CodeScope, nodeId: string, origin: CodeOriginData): Promise<void> {
   await patchNodeData(scope.db, { orgId: scope.orgId, nodeId, patch: { code: origin }, check: DataCheck.None, actor: scope.actor });
+}
+
+export async function tokensFound(scope: CodeScope, where: { repo?: string; folder?: string }): Promise<number | null> {
+  if (where.folder !== undefined) {
+    const root = localModeRefusal(env) === null ? folderOf(where.folder) : null;
+    return root ? tokenCount(folderSource(root).read('')) : null;
+  }
+  const code = await githubReader(scope, where.repo ?? '');
+  return code ? tokenCount(code(null)).catch(() => null) : null;
 }
