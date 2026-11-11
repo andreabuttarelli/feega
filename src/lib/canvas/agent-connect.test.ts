@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConnectMode, REMOTE_MCP_URL, connectClients, connectMode } from './agent-connect';
+import { AGENT_DOCS_URL, CLI_COMMANDS, ConnectMode, REMOTE_MCP_URL, connectClients, connectMode, homeAgentClients } from './agent-connect';
 
 const snippets = (mode: ConnectMode, origin: string) => connectClients(mode, origin).flatMap((c) => c.steps.map((s) => s.snippet ?? ''));
 
@@ -28,5 +28,25 @@ describe('connectClients', () => {
 
   it('an origin without a port falls back to 5173', () => {
     expect(snippets(ConnectMode.Local, 'http://localhost')[0]).toContain('--port 5173');
+  });
+});
+
+describe('homeAgentClients', () => {
+  it('lists Claude Code, Codex and Cursor, each with its MCP and CLI commands', () => {
+    const clients = homeAgentClients();
+
+    expect(clients.map((c) => c.name)).toEqual(['Claude Code', 'Codex', 'Cursor']);
+    for (const c of clients) {
+      expect(c.mcp.some((s) => s.snippet?.includes(REMOTE_MCP_URL))).toBe(true);
+      expect(c.cli.map((s) => s.snippet)).toEqual(CLI_COMMANDS);
+    }
+  });
+
+  it('the CLI commands are the documented install and login', () => {
+    expect(CLI_COMMANDS).toEqual(['npm install -g feega-cli', 'feega login']);
+  });
+
+  it('points at the MCP docs page', () => {
+    expect(AGENT_DOCS_URL).toBe('https://docs.feega.app/integrations/mcp/');
   });
 });

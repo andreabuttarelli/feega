@@ -5,6 +5,7 @@
   import { _ } from 'svelte-i18n';
   import { preloadCode } from '$app/navigation';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
+  import AgentCard from '$lib/components/app/AgentCard.svelte';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
   import NewCanvasButton from '$lib/components/app/NewCanvasButton.svelte';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
@@ -155,6 +156,7 @@
           nothing here yet. <a href="#video-brief">describe what you want</a> and feega opens a canvas for it, or start a blank one with new canvas.
         </p>
       {/if}
+      <AgentCard />
     </div>
   </div>
 

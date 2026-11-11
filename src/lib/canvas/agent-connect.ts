@@ -1,4 +1,10 @@
+import { DOCS_ORIGIN } from '$lib/docs-guides';
+
 export const REMOTE_MCP_URL = 'https://mcp.feega.app/mcp';
+export const AGENT_DOCS_URL = `${DOCS_ORIGIN}/integrations/mcp/`;
+export const CLI_COMMANDS = ['npm install -g feega-cli', 'feega login'];
+
+const HOME_CLIENT_IDS = ['claude-code', 'codex', 'cursor'];
 
 const LOCAL_SERVER_NAME = 'feega-local';
 const DEFAULT_LOCAL_PORT = '5173';
@@ -79,4 +85,13 @@ export function connectClients(mode: ConnectMode, origin: string): ConnectClient
   }
 
   return localClients(new URL(origin).port || DEFAULT_LOCAL_PORT);
+}
+
+export type HomeAgentClient = { id: string; name: string; mcp: ConnectStep[]; cli: ConnectStep[] };
+
+export function homeAgentClients(): HomeAgentClient[] {
+  const cli = CLI_COMMANDS.map((snippet) => ({ text: snippet === 'feega login' ? 'Sign in:' : 'Install the CLI:', snippet }));
+  return cloudClients()
+    .filter((c) => HOME_CLIENT_IDS.includes(c.id))
+    .map((c) => ({ id: c.id, name: c.name, mcp: c.steps, cli }));
 }
