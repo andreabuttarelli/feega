@@ -1,4 +1,6 @@
 [
+  "builtin:animata-glitch-text",
+  "builtin:animata-jitter-text",
   "builtin:bracket-gradient",
   "builtin:card-cascade",
   "builtin:circular-carousel",

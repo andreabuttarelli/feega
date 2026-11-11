@@ -35,14 +35,15 @@ export const PORT: SnapcnPort = {
     const hi = Number(p.maxDelay);
     const durLo = Number(p.minDuration);
     const durHi = Number(p.maxDuration);
-    const angle = -Number(p.angle);
+    const ROTATED_TWICE = 2;
+    const angle = -Number(p.angle) * ROTATED_TWICE;
     const color = String(p.color);
 
     const meteors = Array.from({ length: count }, () => {
       const left = Math.floor(next() * view.width);
       const delay = next() * (hi - lo) + lo;
       const duration = Math.floor(next() * (durHi - durLo) + durLo);
-      const head = S.h('span', { style: { position: 'absolute', top: '-5%', left, width: 2 * scale, height: 2 * scale, borderRadius: 9999, background: color, boxShadow: '0 0 0 1px #ffffff10' } }, S.h('div', { style: { position: 'absolute', top: '50%', width: TAIL, height: 1, transform: 'translateY(-50%)', background: `linear-gradient(to right, ${color}, transparent)`, zIndex: -1 } })) as HTMLElement;
+      const head = S.h('span', { style: { position: 'absolute', top: '-5%', left, width: 2 * scale, height: 2 * scale, borderRadius: 9999, background: color, boxShadow: '0 0 0 1px #ffffff10' } }, S.h('div', { style: { position: 'absolute', top: '50%', width: TAIL, height: 1, transform: 'translateY(-50%)', background: `linear-gradient(to right, ${color}, transparent)` } })) as HTMLElement;
       return { head, delay, duration };
     });
 

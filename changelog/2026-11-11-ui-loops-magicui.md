@@ -1,8 +1,10 @@
-# Magic UI loops as motion templates
+# Magic UI and Animata loops as motion templates
 
 Twenty MIT components from Magic UI (meteors, ripple, marquee, number ticker, word rotate, typing, morphing text,
 gradient/shiny/aurora/line-shadow text, orbiting circles, spinning text, flickering and animated grids, border
 beam, shine border, animated list, circular progress, hyper text) are builtin templates `builtin:magicui-<id>`.
+
+Animata (MIT, `LICENSE.md`, Copyright (c) Animata) adds glitch text and jitter text as `builtin:animata-*`.
 
 Why: backgrounds, text accents and card effects were the gap in the library next to the snapcn product scenes.
 

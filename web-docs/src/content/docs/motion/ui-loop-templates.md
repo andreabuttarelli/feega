@@ -5,7 +5,7 @@ sidebar:
   order: 13
 ---
 
-Twenty components of [Magic UI](https://magicui.design) (MIT) are built-in motion templates: backgrounds
+Twenty components of [Magic UI](https://magicui.design) and two of [Animata](https://animata.design) (glitch and jitter text), both MIT, are built-in motion templates: backgrounds
 (meteors, ripple, flickering grid, animated grid pattern), text effects (typing, morphing text, word rotate,
 number ticker, hyper text, gradient, shiny, aurora and line-shadow text, spinning text) and card accents
 (marquee, orbiting circles, border beam, shine border, animated list, circular progress). Each keeps the
@@ -28,4 +28,4 @@ feega motion ask <nodeId> "add the number ticker counting to 12,000"
 
 ## Licence
 
-Magic UI is MIT, Copyright (c) Magic UI; the notice is in `THIRD_PARTY_NOTICES.md`.
+Magic UI is MIT, Copyright (c) Magic UI; Animata is MIT, Copyright (c) Animata; the notices is in `THIRD_PARTY_NOTICES.md`.

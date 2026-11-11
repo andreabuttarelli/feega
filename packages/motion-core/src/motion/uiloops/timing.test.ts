@@ -59,10 +59,10 @@ describe('css keyframes and framer springs, reproduced numerically', () => {
     expect(copy.style.transform).toBe('translateX(calc(-25% - 4px))');
   });
 
-  it('meteors travel along their angle and fade after 70 percent', () => {
+  it('meteors travel along an axis turned twice by the angle, as the rotate property and the keyframe both apply it', () => {
     const port = portOf('magicui-meteors');
     const [head] = [...playAt(port, { ...defaultsOf(port), number: 1, minDelay: 0, maxDelay: 0, minDuration: 10, maxDuration: 10, scale: 1 }, [150]).querySelectorAll('span')] as HTMLElement[];
-    expect(head.style.transform).toContain('rotate(-215deg)');
+    expect(head.style.transform).toContain('rotate(-430deg)');
     expect(head.style.transform).toContain('translateX(-250px)');
   });
 
@@ -100,5 +100,33 @@ describe('css keyframes and framer springs, reproduced numerically', () => {
     expect(shown(0)).toBe(1);
     expect(shown(31)).toBe(2);
     expect(shown(100)).toBe(4);
+  });
+
+  it('jitter text starts on the first keyframe, ends the burst at rest and holds', () => {
+    const port = portOf('animata-jitter-text');
+    const props = { ...defaultsOf(port), scale: 1 };
+    const label = (frame: number) => playAt(port, props, [frame]).querySelector('span') as HTMLElement;
+    expect(label(0).style.transform).toBe('translate(0px, 1.5px) rotate(0.5deg)');
+    expect(label(18).style.transform).toBe('translate(0px, 0px) rotate(0deg)');
+    expect(label(25).style.transform).toBe('translate(0px, 0px) rotate(0deg)');
+  });
+
+  it('jitter text plays its burst backwards on the next lap', () => {
+    const port = portOf('animata-jitter-text');
+    const props = { ...defaultsOf(port), scale: 1 };
+    const label = (frame: number) => playAt(port, props, [frame]).querySelector('span') as HTMLElement;
+    expect(label(33).style.transform).toBe('translate(0px, 0px) rotate(0deg)');
+    expect(label(51).style.transform).toBe('translate(0px, 1.5px) rotate(0.5deg)');
+  });
+
+  it('glitch text rests until 86 percent of the loop, then jolts the ghosts apart', () => {
+    const port = portOf('animata-glitch-text');
+    const props = { ...defaultsOf(port), duration: 3 };
+    const ghosts = (frame: number) => [...playAt(port, props, [frame]).querySelectorAll('span > span')] as HTMLElement[];
+    expect(ghosts(0)[0].style.transform).toBe('translate(0em, 0em)');
+    const [a] = ghosts(81);
+    expect(a.style.opacity).toBe('1');
+    expect(numbers(a.style.transform)[0]).toBeCloseTo(-0.05, 6);
+    expect(numbers(a.style.transform)[1]).toBeCloseTo(-0.0175, 6);
   });
 });
