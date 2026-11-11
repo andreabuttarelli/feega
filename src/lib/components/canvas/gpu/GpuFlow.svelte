@@ -171,7 +171,7 @@
   import { editableIds } from '$lib/canvas/frame-live';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { elementGlyph } from '$lib/canvas/layers';
-  import { imageSourceTile } from '$lib/canvas/free-image';
+  import { elementDocs, imageSourceTile } from '$lib/canvas/free-image';
   import { emptyAreaRinged, frameRinged } from '$lib/canvas/layers';
   import { fetchKey, framesOnCanvas, pickedToFetch, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { frameSources } from '$lib/canvas/core/frame-sources';
@@ -351,7 +351,9 @@
 
   let turning = $state<ReadonlyMap<string, number>>(new Map());
   let spin = $state<{ box: Box; degrees: number } | null>(null);
-  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, liveOf(t.id)?.doc ?? null)));
+  let lastElementDocs: ReturnType<typeof elementDocs> = new Map();
+  const freeImageDocs = $derived.by(() => (lastElementDocs = elementDocs(tiles, (id) => liveOf(id)?.doc ?? null, lastElementDocs)));
+  const placed = $derived(backToFront(tiles).map((t) => imageSourceTile({ ...t, ...(overrides.get(t.id) ?? {}), ...(turning.has(t.id) ? { rotation: turning.get(t.id) } : {}) }, freeImageDocs.get(t.id) ?? null)));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
