@@ -176,7 +176,7 @@
   import { fetchKey, framesOnCanvas, pickedToFetch, sameLive, toFetch, type FrameAt } from '$lib/canvas/core/frame-source';
   import { frameSources } from '$lib/canvas/core/frame-sources';
   import { ChromeLayers, NO_OVERLAY, overlayOf } from '$lib/canvas/core/world-overlay';
-  import { labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
+  import { labelStepOf, labelZoomStep, strokeZoomStep } from '$lib/canvas/core/label-size';
   import { SIGHT_SLACK, grown, stillHolds, type Taken } from '$lib/canvas/core/sight';
   import { nodeHitRects } from '$lib/canvas/core/node-hit';
   import type { ChromeTile, Glyphs } from '$lib/canvas/core/chrome';
@@ -492,11 +492,17 @@
     if (!draw) {
       return [];
     }
-    return cardBases.map(({ card: base, turn, poster }) => {
-      const card: CardTile = { ...base, zoom: labelZoom };
+    const next = new Map<string, number>();
+    const cards = cardBases.map(({ card: base, turn, poster }) => {
+      const zoom = labelStepOf(base.id, labelZoom, seenIds, labelSteps);
+      next.set(base.id, zoom);
+      const card: CardTile = { ...base, zoom };
       return { key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn, poster };
     });
+    labelSteps = next;
+    return cards;
   });
+  let labelSteps = new Map<string, number>();
   const addsBeside = (t: Tile) => holdsDoc(t.kind ?? '') && kindOfNode(t.id) === FrameKind.Frame;
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);
   const coreChrome = $derived.by(() => {
