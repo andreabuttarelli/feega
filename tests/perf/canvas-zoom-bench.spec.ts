@@ -100,7 +100,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
     await route.continue();
   });
 
-  await page.goto(`${base}/p/${ZOOM_FIXTURE_PLACE.projectId}/c/${ZOOM_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${ZOOM_FIXTURE_PLACE.projectId}/c/${ZOOM_FIXTURE_PLACE.canvasId}${process.env.BENCH_QUERY ?? ""}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
 
