@@ -393,3 +393,16 @@ fn every_plan_counts_itself_and_the_uses_it_walked() {
     assert_eq!((planned.plans, planned.walked), (2, 2));
     assert_eq!(c.take_planned().plans, 0);
 }
+
+#[test]
+fn damage_the_tiles_took_repaints_the_held_texture_on_the_next_exact_frame() {
+    let (mut c, mut lib) = scene();
+    let mut fake = Fake::default();
+    c.frame(&mut fake, &mut lib, at(0.0, 0.0, 1.0), 0.0, &mut || 0.0).unwrap();
+    c.patch(parse_patch(r#"{ "put": [{ "kind": "use", "clip": "a", "group": "g", "matrix": [1, 0, 0, 1, 300, 0] }], "drop": [] }"#).unwrap(), &lib);
+
+    c.take_damage();
+    let frame = c.frame(&mut fake, &mut lib, at(30.0, 0.0, 1.0), 16.0, &mut || 0.0).unwrap();
+
+    assert_ne!(frame.outcome, Some(Outcome::Reused));
+}

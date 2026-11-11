@@ -47,8 +47,8 @@
     color: #fff;
     font-family: 'Instrument Serif', serif;
     font-variation-settings: normal;
-    font-size: 72px;
-    line-height: 57.6px;
+    font-size: 48px;
+    line-height: 0.95;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
@@ -66,6 +66,12 @@
     width: calc(100% - 32px);
     max-width: 680px;
     margin-top: 28px;
+  }
+
+  @media (max-width: 809.98px) {
+    .start {
+      width: 100%;
+    }
   }
 
   .run {
@@ -97,6 +103,12 @@
     gap: 8px;
     width: 100%;
     margin-top: 100px;
+  }
+
+  @media (max-width: 809.98px) {
+    .start {
+      width: 100%;
+    }
   }
 
   @media (min-width: 1200px) {

@@ -11,9 +11,9 @@ export enum PromptSource {
   Figma = 'figma'
 }
 
-export const PROMPT_KINDS: { kind: PromptKind; label: string }[] = [
-  { kind: PromptKind.Motion, label: 'motion video' },
-  { kind: PromptKind.Website, label: 'website design' }
+export const PROMPT_KINDS: { kind: PromptKind; label: string; placeholder: string }[] = [
+  { kind: PromptKind.Motion, label: 'motion video', placeholder: 'Describe a launch video, or paste your website…' },
+  { kind: PromptKind.Website, label: 'website design', placeholder: 'Describe a landing page, or paste a site to redesign…' }
 ];
 
 export const PROMPT_SOURCES: { source: PromptSource; label: string }[] = [
