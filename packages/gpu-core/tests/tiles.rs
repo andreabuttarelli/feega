@@ -256,7 +256,7 @@ fn a_sharper_step_replaces_the_one_on_screen_only_once_it_covers_the_whole_scree
 }
 
 #[test]
-fn during_a_gesture_a_tile_within_twice_its_sharpness_is_good_enough() {
+fn a_tile_within_twice_its_sharpness_is_near_enough_to_start_the_rest_picture() {
     let mut tiles = Tiles::default();
     tiles.frame(camera(step_zoom(-4)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
     let key = tiles.frame(camera(1.0), SCREEN).missing[0];
@@ -554,4 +554,40 @@ fn a_missing_tile_shown_by_sharper_held_tiles_is_not_unsharp() {
     let mut blurry = Tiles::default();
     blurry.frame(camera(step_zoom(-2)), SCREEN).missing.iter().for_each(|k| blurry.hold(*k));
     assert_eq!(blurry.unsharp(&coarse), coarse.len());
+}
+
+#[test]
+fn during_a_gesture_every_blurry_visible_tile_is_queued_centre_out_before_the_stale_ones() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(-1)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let visible = tiles.frame(camera(1.0), SCREEN).missing;
+    let changed = visible[0];
+    tiles.hold(changed);
+    tiles.invalidate(changed.world());
+
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    let blurry: Vec<TileKey> = visible.iter().copied().filter(|k| *k != changed).collect();
+    assert_eq!(order[..blurry.len()], blurry[..]);
+    assert_eq!(order[blurry.len()..], [changed]);
+}
+
+#[test]
+fn during_a_gesture_tiles_shown_by_sharper_held_ones_are_not_queued() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(2)), (SCREEN.0 * 2, SCREEN.1 * 2)).missing.iter().for_each(|k| tiles.hold(*k));
+
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    assert!(order.is_empty());
+}
+
+#[test]
+fn during_a_gesture_tiles_raster_one_at_a_time_in_queue_order() {
+    let tiles = Tiles::default();
+    let order = tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).order();
+
+    let one_by_one: Vec<Vec<TileKey>> = gpu_core::tiles::gesture_batches(&order).into_iter().map(|b| b.keys).collect();
+
+    assert_eq!(one_by_one, order.iter().map(|k| vec![*k]).collect::<Vec<_>>());
 }

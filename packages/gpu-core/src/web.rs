@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_of, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, gesture_batches, step_of, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::tally::now_ms;
@@ -661,17 +661,13 @@ impl WebCore {
         let budget = if matches!(self.motion, CoreMotion::Gesture) { TILE_BUDGET_GESTURE_MS } else { TILE_BUDGET_STILL_MS };
         let started = js_sys::Date::now();
         let mut rastered = 0;
-        let queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
-        let gesture = matches!(self.motion, CoreMotion::Gesture);
-        let mut stale = queue.stale;
-        stale.sort_by_key(|k| !self.snapshots.values().any(|shot| k.world().overlaps(shot.rest)));
-        let one_at_a_time = |keys: Vec<TileKey>| if gesture { keys.into_iter().take(1).collect() } else { keys };
-        let refresh: Vec<TileKey> = one_at_a_time(stale).into_iter().chain(one_at_a_time(queue.blurry)).collect();
+        let mut queue = self.tiles.queue(self.tiles.frame(self.camera, screen).missing);
+        queue.stale.sort_by_key(|k| !self.snapshots.values().any(|shot| k.world().overlaps(shot.rest)));
         let left_blank = queue.blank.clone();
-        let blank = batches(&queue.blank);
-        let must = if gesture { 0 } else { blank.len() };
-        for (i, batch) in blank.into_iter().chain(batches(&refresh)).enumerate() {
-            if i >= must && rastered > 0 && js_sys::Date::now() - started > budget {
+        let order = queue.order();
+        let blocks = if matches!(self.motion, CoreMotion::Gesture) { gesture_batches(&order) } else { batches(&order) };
+        for batch in blocks {
+            if rastered > 0 && js_sys::Date::now() - started > budget {
                 break;
             }
             self.raster_batch(&batch)?;
