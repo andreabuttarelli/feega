@@ -86,11 +86,16 @@ describe('ownImages', () => {
     const own = await serve((_, res) => {
       res.writeHead(200, { 'content-type': 'image/png' });
       const chunk = Buffer.alloc(1_000_000);
-      const timer = setInterval(() => {
-        sent += chunk.length;
-        res.write(chunk);
-      }, 1);
-      res.on('close', () => clearInterval(timer));
+      const send = () => {
+        while (!res.destroyed) {
+          sent += chunk.length;
+          if (!res.write(chunk)) {
+            res.once('drain', send);
+            return;
+          }
+        }
+      };
+      send();
     });
 
     expect(await ownImages(importerOf([]), [own])(`${own}/big.png`)).toBeNull();
