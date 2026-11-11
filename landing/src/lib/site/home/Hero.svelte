@@ -47,8 +47,8 @@
     color: #fff;
     font-family: 'Instrument Serif', serif;
     font-variation-settings: normal;
-    font-size: 72px;
-    line-height: 57.6px;
+    font-size: 48px;
+    line-height: 0.8;
     letter-spacing: -0.04em;
     font-weight: 400;
   }
