@@ -63,4 +63,49 @@ describe('write-back', () => {
     expect(done.files.find((f) => f.path === 'messages/it.json')?.after).toContain('"home_intro": "Benvenut* su traidue"');
     expect(done.skipped).toHaveLength(1);
   });
+
+  it('una modifica sotto dark in un progetto Tailwind scrive la variante dark: e lascia intatto il chiaro', async () => {
+    const page = '<div class="bg-white text-black">x</div>\n';
+    const files: Record<string, string> = { 'a.svelte': page, 'package.json': '{"devDependencies":{"tailwindcss":"^4"}}' };
+    const dark = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { fill: '#101010' }, was: { fill: '#ffffff' }, cond: 'dark@1280' };
+    const done = await applyEdits([dark], async (path) => files[path] ?? null);
+    expect(done.files[0].after).toBe('<div class="bg-white text-black dark:bg-[#101010]">x</div>\n');
+    expect(done.files[0].after).not.toContain('style=');
+  });
+
+  it('una seconda modifica dark sostituisce la precedente invece di impilarla', async () => {
+    const files: Record<string, string> = { 'a.svelte': '<div class="bg-white dark:bg-zinc-900">x</div>\n', 'package.json': '{"dependencies":{"tailwindcss":"3"}}' };
+    const dark = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { fill: '#101010' }, was: { fill: '#18181b' }, cond: 'dark@1280' };
+    const done = await applyEdits([dark], async (path) => files[path] ?? null);
+    expect(done.files[0].after).toBe('<div class="bg-white dark:bg-[#101010]">x</div>\n');
+  });
+
+  it('una modifica sotto il chiaro, in Tailwind, scrive la classe base e non tocca il dark:', async () => {
+    const files: Record<string, string> = { 'a.svelte': '<div class="bg-white dark:bg-zinc-900">x</div>\n', 'package.json': '{"dependencies":{"tailwindcss":"3"}}' };
+    const light = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { fill: '#fafafa' }, was: { fill: '#ffffff' } };
+    const done = await applyEdits([light], async (path) => files[path] ?? null);
+    expect(done.files[0].after).toBe('<div class="dark:bg-zinc-900 bg-[#fafafa]">x</div>\n');
+  });
+
+  it('dark senza Tailwind non si scrive: si salta e si dice perché, mai uno style inline che schiaccia il chiaro', async () => {
+    const files: Record<string, string> = { 'a.svelte': '<div class="card">x</div>\n' };
+    const dark = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { fill: '#101010' }, was: { fill: '#ffffff' }, cond: 'dark@1280' };
+    const done = await applyEdits([dark], async (path) => files[path] ?? null);
+    expect(done.files).toEqual([]);
+    expect(done.skipped[0]).toMatch(/a\.svelte:1.*dark/);
+  });
+
+  it('una larghezza diversa dal desktop non si scrive: sarebbe una regola per tutte le larghezze', async () => {
+    const files: Record<string, string> = { 'a.svelte': '<div class="bg-white">x</div>\n', 'package.json': '{"dependencies":{"tailwindcss":"3"}}' };
+    const phone = { at: { file: 'a.svelte', line: 1, column: 0 }, look: { fill: '#101010' }, was: { fill: '#ffffff' }, cond: 'light@390' };
+    const done = await applyEdits([phone], async (path) => files[path] ?? null);
+    expect(done.files).toEqual([]);
+    expect(done.skipped[0]).toMatch(/390/);
+  });
+
+  it('la stessa riga vista in chiaro e in dark dà due modifiche, non una', () => {
+    const clip = (id: string, color: string, cond?: string) => ({ id, component: 'Rectangle', props: { fills: [{ type: 'solid', color }] }, source: { at: 'src/x.svelte:3:4', ...(cond ? { cond } : {}), was: { fill: '#ffffff' } } });
+    const doc = { width: 100, height: 100, tracks: [{ clips: [clip('a', '#fafafa'), clip('b', '#101010', 'dark@1280')] }], comps: {} } as unknown as MotionDoc;
+    expect(editsOf(doc).map((e) => [e.cond ?? null, e.look])).toEqual([[null, { fill: '#fafafa' }], ['dark@1280', { fill: '#101010' }]]);
+  });
 });

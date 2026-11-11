@@ -83,3 +83,11 @@ export function cropped(tree: PageTree, margin: number): PageTree {
   const children = (tree.root.children ?? []).map((c) => moved(c, by));
   return { ...tree, width, height, root: { ...tree.root, absoluteBoundingBox: { x: 0, y: 0, width, height }, children } };
 }
+
+const withCond = (node: RestNode, cond: string): RestNode => ({
+  ...node,
+  ...(node.source ? { source: { ...node.source, cond } } : {}),
+  ...(node.children ? { children: node.children.map((c) => withCond(c, cond)) } : {})
+});
+
+export const conditioned = (tree: PageTree, cond: string | undefined): PageTree => (cond ? { ...tree, root: withCond(tree.root, cond) } : tree);

@@ -2,7 +2,9 @@ const UNAVAILABLE = 'unavailable';
 
 export type CodeLanded = { nodes: unknown[]; undo: unknown[]; skipped: string[]; truncated: boolean; pages: string[]; components: number; variants: number; instances: number };
 
-export type CodeTarget = { repo: string; routes: string[] } | { folder: string; routes: string[] } | { storybook: string };
+export type RenderCondition = { scheme: 'light' | 'dark'; width: number };
+
+export type CodeTarget = { repo: string; routes: string[]; conditions?: RenderCondition[] } | { folder: string; routes: string[]; conditions?: RenderCondition[] } | { storybook: string };
 
 export type CodeAsk = { projectId: string; canvasId: string; target: CodeTarget; at: { x: number; y: number } };
 
