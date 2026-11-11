@@ -17,7 +17,7 @@
   import { spliceOf } from '@feega/motion-core/canvas/core/group-diff';
   import { storedTiles, tilesOn } from '$lib/canvas/core/tiles-switch';
   import { cached, uncached, pictureBytes, resident, heldWhileMoving, type HeldFrame } from '$lib/canvas/core/residency';
-  import { BUDGET, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
+  import { BUDGET, buildLanes, currentDevice, textureBudget } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
@@ -38,7 +38,6 @@
   import { readClips, type CustomFrame } from '@feega/motion-core/motion/gpu-full/dom/custom';
   import type { Picture, Pictures } from '@feega/motion-core/motion/gpu-full/raster';
   import { Stand, drawable, fillOrder, firstDrawn, layersOf, onScreenFirst, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
-  import { Device } from '$lib/canvas/gpu/memory-budget';
   import { OnScreen, VectorGate, showStaged, shownBefore } from '$lib/canvas/core/staged-show';
   import { uploadWithin } from '$lib/canvas/core/picture-uploads';
   import { Step, markFrame, noteImages } from '$lib/canvas/core/frame-timeline';
@@ -60,7 +59,6 @@
   markStartup(StartupStep.Mounted);
   debugStart();
 
-  const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
   const BACKENDS = nativeCanvasOffered() ? [createCoreNative, createCore, createCoreGl] : [createCore, createCoreGl];
   const budget = BUDGET[currentDevice()];
 
@@ -117,9 +115,8 @@
   }
 
   const smoothing = smoothingOf(navigator.userAgent);
-  const BUILD_LANES_MAX = 4;
-  const buildLanes = Math.max(1, Math.min(BUILD_LANES_MAX, (typeof navigator === 'object' ? navigator.hardwareConcurrency : 2) - 1));
-  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? (markStartup(StartupStep.WorkerSpawned), new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' })) : null), buildLanes);
+  const lanes = buildLanes(currentDevice(), typeof navigator === 'object' ? navigator.hardwareConcurrency : 2);
+  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? (markStartup(StartupStep.WorkerSpawned), new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' })) : null), lanes);
 
   async function fetchScene(id: string): Promise<FrameDoc | null> {
     const res = await fetch(new URL(sourceUrl(id), location.href).href);
@@ -415,7 +412,7 @@
   $effect(() => {
     const waiting = toFetch(fillOrder(withoutViews(frames), view, area), keyOf, asked, liveGroup);
 
-    const room = IN_FLIGHT[currentDevice()] - inFlight;
+    const room = budget.framesInFlight - inFlight;
     if (room <= 0) {
       return;
     }
@@ -474,7 +471,6 @@
 
   const rebuilding = $derived(new Set([...shownCards.filter((c) => !cardLists.has(c.key)).map((c) => c.frame.id), ...frames.filter((f) => !lists.has(groupOf(f))).map((f) => f.id)]));
   const drawnLast = new Map<string, HeldFrame>();
-  const RETAIN_MS: Record<Device, number> = { [Device.Desktop]: 15_000, [Device.Phone]: 0 };
   const lastSeen = new Map<string, number>();
   const placeIndex = $derived(new SpatialIndex([...placeholders.values()].map((p) => ({ id: p.id, ...p.box }))));
   const retained = (now: number) => {
@@ -485,7 +481,7 @@
     for (const [id, at] of lastSeen) {
       if (!placeholders.has(id)) {
         lastSeen.delete(id);
-      } else if (now - at < RETAIN_MS[currentDevice()]) {
+      } else if (now - at < budget.retainMs) {
         keep.add(id);
       }
     }
