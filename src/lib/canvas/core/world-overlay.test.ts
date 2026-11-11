@@ -8,7 +8,7 @@ import { PortState } from './chrome';
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', paper2: '#f9f9f9', line: '#e5e5e5', line2: '#d2d2d7', chip: '#f2f2f2', chipInk: '#141414', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const edge = (over: Partial<{ id: string; source: string; target: string; mode: string }> = {}) => ({ id: 'e', source: 'a', target: 'b', ...over });
 const glyphs = ((text: string, size: number) => ({ contours: [[0, 0, size, 0, size, size]], width: text.length * size, height: size })) as never;
-const none = { peers: [], outlines: [], ghost: null, hovered: null, running: [], chrome: [], glyphs };
+const none = { peers: [], outlines: [], ghost: null, running: [], chrome: [], glyphs };
 const overlayOf = (o: WorldOverlay) => {
   const { fixed, live } = parts(o);
   return [...fixed, ...live];
@@ -31,7 +31,7 @@ describe('world overlay', () => {
   });
 
   it('adds peers outlines and cursors, on top', () => {
-    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, glyphs, ghost: null, hovered: null, running: [], chrome: [], peers: [{ id: 'p', name: 'Ann', color: '#ff0000', at: { x: 5, y: 5 } }], outlines: [{ key: 'p:n', box: { x: 0, y: 0, w: 10, h: 10 }, color: '#ff0000' }] });
+    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, glyphs, ghost: null, running: [], chrome: [], peers: [{ id: 'p', name: 'Ann', color: '#ff0000', at: { x: 5, y: 5 } }], outlines: [{ key: 'p:n', box: { x: 0, y: 0, w: 10, h: 10 }, color: '#ff0000' }] });
     expect(items.map((i) => i.clip.split(':').at(-1))).toEqual(['peer-outline', 'peer-cursor', 'peer-tag', 'peer-tag']);
   });
 
@@ -43,11 +43,6 @@ describe('world overlay', () => {
     expect(refused[0].paint).not.toEqual(ok.at(-1)!.paint);
   });
 
-  it('outlines the node under the pointer', () => {
-    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, hovered: { x: 0, y: 0, w: 10, h: 10 } });
-    expect(items.map((i) => i.clip.split(':').at(-1))).toEqual(['hover']);
-  });
-
   it('rings every running node in the accent', () => {
     const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, running: [{ id: 'n', x: 0, y: 0, w: 10, h: 10 }] });
     expect(items.map((i) => i.clip)).toEqual(['n:running']);
@@ -55,7 +50,7 @@ describe('world overlay', () => {
 });
 
 describe('node chrome in the overlay', () => {
-  const at = { id: 'n', x: 0, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, hovered: false, ringColor: '#7c5cff', names: false };
+  const at = { id: 'n', x: 0, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, ringColor: '#7c5cff', names: false };
 
   it('rings and handles a selected node on top of the wires, every frame', () => {
     const items = overlayOf({ curves: [{ edge: edge(), curve }], selected: ['n'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [at] });
@@ -88,7 +83,7 @@ describe('node chrome in the overlay', () => {
 
 describe('world overlay across zoom', () => {
   it('keeps the wire and chrome items when only the zoom changes', () => {
-    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], theme, ...none, hovered: { x: 0, y: 0, w: 10, h: 10 } };
+    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: { x: 0, y: 0, w: 10, h: 10 }, guides: [], theme, ...none };
     const near = overlayOf({ ...base, zoom: 1 });
     const far = overlayOf({ ...base, zoom: 0.5 });
 
@@ -97,18 +92,18 @@ describe('world overlay across zoom', () => {
   });
 
   it('hands back the same fixed part and a new live part when only the zoom changes', () => {
-    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], theme, ...none, hovered: { x: 0, y: 0, w: 10, h: 10 } };
+    const base = { curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: { x: 0, y: 0, w: 10, h: 10 }, guides: [], theme, ...none };
     const near = parts({ ...base, zoom: 1 });
     const far = parts({ ...base, zoom: 0.5 });
 
     expect(far.fixed).toBe(near.fixed);
     expect(far.fixed.map((i) => i.clip.split(':')[1])).toEqual(['wire']);
-    expect(far.live.map((i) => i.clip.split(':').at(-1))).toEqual(['hover']);
+    expect(far.live.map((i) => i.clip.split(':').at(-1))).toEqual(['marquee', 'marquee']);
   });
 });
 
 describe('world overlay, node by node', () => {
-  const tile = (id: string, x: number) => ({ id, x, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, hovered: false, ringColor: '#7c5cff', names: false });
+  const tile = (id: string, x: number) => ({ id, x, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, ringColor: '#7c5cff', names: false });
 
   it('keeps the chrome items of a node that did not change when another one does', () => {
     const base = { curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none };

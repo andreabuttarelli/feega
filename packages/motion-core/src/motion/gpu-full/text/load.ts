@@ -31,9 +31,9 @@ function fallbackUrls(points: readonly number[]): string[] {
       grouped.set(fallback, [...(grouped.get(fallback) ?? []), cp]);
     }
   }
-  return [...grouped].map(([fallback, own]) => {
+  return [...grouped.keys()].map((fallback) => {
     const families = fallback.families.map((f) => `family=${f.replaceAll(' ', '+')}`).join('&');
-    return `https://fonts.googleapis.com/css2?${families}&text=${encodeURIComponent(String.fromCodePoint(...own))}&display=block`;
+    return `https://fonts.googleapis.com/css2?${families}&display=block`;
   });
 }
 const CUSTOM = 'Custom';

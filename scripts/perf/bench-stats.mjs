@@ -13,3 +13,7 @@ export const mid = (values) => {
 };
 
 export const median = (runs) => Object.fromEntries(Object.keys(METRICS).map((key) => [key, mid(runs.map((r) => r[key]))]));
+
+const SOFTWARE = /swiftshader|llvmpipe|software/i;
+
+export const softwareAdapter = (info) => Boolean(info && SOFTWARE.test(`${info.vendor} ${info.architecture} ${info.description}`));

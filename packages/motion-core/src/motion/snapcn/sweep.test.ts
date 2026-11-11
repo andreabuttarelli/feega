@@ -59,3 +59,9 @@ describe('a picked clip plays as a video, whatever its url looks like', () => {
     expect([...root.querySelectorAll('video')].map((v) => v.getAttribute('src') ?? (v as HTMLVideoElement).src)).toContain(CLIP);
   });
 });
+
+describe('a template with nothing picked draws no empty picture, so the frame capture does not fail on it', () => {
+  it.each(SNAPCN_PORTS.map((p) => [p.id, p]))('%s', (_, port) => {
+    expect([...play(port, defaults(port)).querySelectorAll('img')].filter((img) => !img.getAttribute('src'))).toHaveLength(0);
+  });
+});

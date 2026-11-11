@@ -1,4 +1,3 @@
-import { HOVER_SCREEN_PX, strokeWorld } from './label-size';
 import type { PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { dashes } from '@feega/motion-core/motion/gpu-full/stroke';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
@@ -14,7 +13,6 @@ export enum OverlayPart {
   PeerCursor = 'peer-cursor',
   PeerTag = 'peer-tag',
   Ghost = 'ghost',
-  Hover = 'hover',
   Running = 'running'
 }
 
@@ -39,7 +37,6 @@ const PEER_ARROW = [0, 0, 0, 16, 4.5, 12, 11, 12];
 const PEER_TAG = { x: 10, y: 16, h: 18, pad: 5, size: 11, line: 14 };
 const PEER_TEXT = '#ffffff';
 const REFUSED = '#c0392b';
-const HOVER_ALPHA = 0.5;
 const RUNNING_LINE = 1.5;
 
 const WIRE_COLOUR: Record<EdgeLook, (t: CoreTheme) => string> = {
@@ -86,10 +83,6 @@ export function peerItems(p: CorePeer, zoom: number, glyphs: Glyphs): PathItem[]
 
 export function ghostItems(c: Curve, ok: boolean, zoom: number, theme: CoreTheme): PathItem[] {
   return [solid(`ghost:${OverlayPart.Ghost}`, line(cubic(c), OVERLAY_LINE / zoom), ok ? theme.accent : REFUSED)];
-}
-
-export function hoverItems(b: Box, zoom: number, theme: CoreTheme): PathItem[] {
-  return [solid(`hover:${OverlayPart.Hover}`, line(rect(b.x, b.y, b.w, b.h), strokeWorld(HOVER_SCREEN_PX, zoom), true), theme.accent, HOVER_ALPHA)];
 }
 
 function roundRing(b: Box, width: number, radius: number): number[][] {

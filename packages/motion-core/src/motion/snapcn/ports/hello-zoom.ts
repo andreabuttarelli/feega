@@ -15,7 +15,7 @@ export const PORT: SnapcnPort = {
   props: {
     words: { type: 'string', title: 'Flicker words (comma separated)', default: 'React, Remotion, shadcn, Next.js, Vite, Tailwind, TypeScript', group: 'Content', maxLength: 300 },
     lead: { type: 'string', title: 'Lead word', default: 'Hello', group: 'Content', maxLength: 40 },
-    rest: { type: 'string', title: 'Rest of line', default: 'snapcn.', group: 'Content', maxLength: 60 },
+    rest: { type: 'string', title: 'Rest of line', default: 'feega.', group: 'Content', maxLength: 60 },
     nextWord: { type: 'string', title: 'Next word', default: 'npx', group: 'Content', maxLength: 40 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'sans', group: 'Style' },
     fontWeight: { type: 'number', title: 'Font weight', default: 700, minimum: 100, maximum: 900, step: 100, group: 'Style' },

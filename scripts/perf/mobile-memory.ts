@@ -5,7 +5,7 @@ import { instrument, measure } from '../../tests/e2e/fixtures/frame-sweeps';
 const BASE = process.env.PERF_BASE ?? 'http://localhost:5188';
 const OUT = process.env.PERF_OUT ?? new URL('./out/', import.meta.url).pathname;
 const TAG = process.env.PERF_TAG ?? 'run';
-const FIXTURE = JSON.parse(readFileSync(new URL('./fixture.json', import.meta.url), 'utf8')) as { projectId: string; canvasId: string };
+const FIXTURE = (process.env.PERF_CANVAS ? {} : JSON.parse(readFileSync(new URL('./fixture.json', import.meta.url), 'utf8'))) as { projectId: string; canvasId: string };
 const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true };
 const SESSION_MS = Number(process.env.PERF_SESSION_MS ?? 5 * 60_000);
 const LEG_MS = 20_000;
@@ -15,11 +15,19 @@ const FPS_MS = 6000;
 const TSX_NAME_SHIM = 'window.__name = (f) => f;';
 const MB = 1024 * 1024;
 
-type Sample = { t: number; wasm: number; textures: number; textureBytes: number; bitmaps: number; bitmapBytes: number; videos: number; heap: number };
+type Sample = { t: number; wasm: number; textures: number; textureBytes: number; bitmaps: number; bitmapBytes: number; videos: number; heap: number; workers: number };
 
 function probeMemory() {
-  type Mem = { wasm: WebAssembly.Memory[]; textures: Map<object, number>; bitmaps: Map<object, number>; videos: Set<object> };
-  const mem: Mem = { wasm: [], textures: new Map(), bitmaps: new Map(), videos: new Set() };
+  type Mem = { wasm: WebAssembly.Memory[]; textures: Map<object, number>; bitmaps: Map<object, number>; videos: Set<object>; workers: number };
+  const mem: Mem = { wasm: [], textures: new Map(), bitmaps: new Map(), videos: new Set(), workers: 0 };
+
+  const Spawn = window.Worker;
+  window.Worker = class extends Spawn {
+    constructor(...args: ConstructorParameters<typeof Worker>) {
+      super(...args);
+      mem.workers++;
+    }
+  };
   (window as unknown as { __mem: Mem }).__mem = mem;
 
   const keep = (exports: WebAssembly.Exports) => Object.values(exports).forEach((v) => v instanceof WebAssembly.Memory && mem.wasm.push(v));
@@ -76,11 +84,11 @@ function probeMemory() {
 
 const sample = (page: Page, t: number): Promise<Sample> =>
   page.evaluate((t) => {
-    const mem = (window as unknown as { __mem: { wasm: WebAssembly.Memory[]; textures: Map<object, number>; bitmaps: Map<object, number>; videos: Set<HTMLVideoElement> } }).__mem;
+    const mem = (window as unknown as { __mem: { wasm: WebAssembly.Memory[]; textures: Map<object, number>; bitmaps: Map<object, number>; videos: Set<HTMLVideoElement>; workers: number } }).__mem;
     const sum = (m: Map<object, number>) => [...m.values()].reduce((a, b) => a + b, 0);
     const heap = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0;
     const live = [...mem.videos].filter((v) => v.src || v.currentSrc).length;
-    return { t, wasm: mem.wasm.reduce((a, m) => a + m.buffer.byteLength, 0), textures: mem.textures.size, textureBytes: sum(mem.textures), bitmaps: mem.bitmaps.size, bitmapBytes: sum(mem.bitmaps), videos: live, heap };
+    return { t, wasm: mem.wasm.reduce((a, m) => a + m.buffer.byteLength, 0), textures: mem.textures.size, textureBytes: sum(mem.textures), bitmaps: mem.bitmaps.size, bitmapBytes: sum(mem.bitmaps), videos: live, heap, workers: mem.workers };
   }, t);
 
 async function leg(page: Page, until: number, dir: number) {
@@ -121,10 +129,12 @@ async function main() {
   page.on('crash', () => (fellBack = 'page crashed'));
   await page.goto(`${BASE}/p/${process.env.PERF_PROJECT ?? FIXTURE.projectId}/c/${process.env.PERF_CANVAS ?? FIXTURE.canvasId}`);
   await page.waitForSelector('[data-testid=core-canvas]', { timeout: 60_000 });
-  await page.waitForTimeout(SETTLE_MS);
-
   const start = Date.now();
-  const samples: Sample[] = [await sample(page, 0)];
+  const samples: Sample[] = [];
+  while (Date.now() - start < SETTLE_MS) {
+    await page.waitForTimeout(SAMPLE_MS);
+    samples.push(await sample(page, Date.now() - start));
+  }
   const fps = [await measure(page, FPS_MS, (until) => leg(page, until, 1))];
   for (let n = 0; Date.now() - start < SESSION_MS; n++) {
     const until = Math.min(Date.now() + LEG_MS, start + SESSION_MS);
@@ -152,6 +162,7 @@ async function main() {
     bitmaps: row('bitmaps', false),
     bitmapMb: row('bitmapBytes', true),
     videos: row('videos', false),
+    workers: row('workers', false),
     heapMb: row('heap', true),
     fps
   };

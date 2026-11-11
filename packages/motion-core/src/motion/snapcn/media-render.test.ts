@@ -24,13 +24,13 @@ describe('snapcn ports draw the media the pickers resolve', () => {
     expect(sources).toEqual(expect.arrayContaining(RING));
   });
 
-  it('logo-assemble keeps its placeholders when nothing is picked', () => {
+  it('logo-assemble shows the feega mark when no logo is picked', () => {
     const port = snapcnPort('logo-assemble')!;
     const root = document.createElement('div');
     const clean = Object.fromEntries(Object.entries(defaultsOf(port)).map(([key, value]) => [key, value ?? '']));
     port.draw(S, { root, width: port.width, height: port.height, fps: port.fps, frames: port.frames, props: clean })(0);
 
-    expect(root.querySelectorAll('img')).toHaveLength(0);
+    expect([...root.querySelectorAll('img')].map((img) => img.getAttribute('src'))).toEqual([S.markSrc]);
     expect(root.children.length).toBeGreaterThan(0);
   });
 });

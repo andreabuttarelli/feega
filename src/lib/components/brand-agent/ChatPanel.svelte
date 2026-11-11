@@ -24,6 +24,7 @@
   import { PrefillMode, type ChatPrefill } from './chat-prefill';
   import { ChatUploads } from './chat-uploads.svelte';
   import type { ChatAttachment } from '$lib/chat-attachments';
+  import { chatSelection } from './chat-selection.svelte';
 
   let {
     projectId = '',
@@ -294,6 +295,7 @@
             at={message.at}
             tools={message.tools}
             attachments={message.attachments}
+            selection={message.selection}
             {canvasId}
             reasoning={message.reasoning}
             live={message.live}
@@ -354,6 +356,8 @@
         uploading={uploads?.busy ?? false}
         onfiles={uploads ? (files) => uploads.add(files) : undefined}
         onremove={(id) => uploads?.remove(id)}
+        selection={motionNodeId ? [] : chatSelection.chips}
+        onunselect={(id) => chatSelection.dismiss(id)}
       >
         {#snippet controls()}
           {#if models.choice && models.groups.length}

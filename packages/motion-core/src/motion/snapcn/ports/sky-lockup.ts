@@ -13,9 +13,9 @@ export const PORT: SnapcnPort = {
   background: '#ffffff',
   fonts: ['Geist', 'Poppins'],
   props: {
-    wordmark: { type: 'string', title: 'Wordmark', default: 'snapcn', group: 'Content', maxLength: 40 },
-    before: { type: 'string', title: 'Words left of the mark', default: 'your animations', group: 'Content', maxLength: 120 },
-    after: { type: 'string', title: 'Words right of the mark', default: 'as one install', group: 'Content', maxLength: 120 },
+    wordmark: { type: 'string', title: 'Wordmark', default: 'feega', group: 'Content', maxLength: 40 },
+    before: { type: 'string', title: 'Words left of the mark', default: 'your videos', group: 'Content', maxLength: 120 },
+    after: { type: 'string', title: 'Words right of the mark', default: 'on one canvas', group: 'Content', maxLength: 120 },
     sky: { type: 'string', title: 'Sky image', format: PropFormat.Asset, assetKind: 'image', default: null, group: 'Content', maxLength: 2000 },
     fontFamily: { type: 'string', title: 'Tagline font', format: PropFormat.Font, default: 'Geist', group: 'Style' },
     fontWeight: { type: 'number', title: 'Tagline weight', default: 500, minimum: 100, maximum: 900, step: 100, group: 'Style' },
@@ -70,7 +70,7 @@ export const PORT: SnapcnPort = {
     const LEAVE_FADE = [ 1, 1, 1, 1, 0.983, 0.98, 0.975, 0.971, 0.953, 0.943, 0.919, 0.904, 0.883, ];
     const LETTER_RISE = [ 16.2, 12.15, 10.26, 8.64, 7.29, 5.94, 5, 4.19, 3.51, 2.84, 2.29, 1.89, 1.49, 1.13, 0.81, 0.54, 0.32, 0.14, 0, ];
     const LETTER_FADE = [1, 0.7, 0.34, 0];
-    const SNAPCN_MARK = { width: 723, height: 632, shapes: [ "M92.2 44.6C66.0 51.0 44.4 67.9 32.7 91.1C23.3 109.8 23.5 104.2 23.5 284.9C23.5 442.1 23.6 450.7 26.4 459.0C34.0 482.0 49.6 494.3 78.2 500.0C93.9 503.1 98.1 505.1 107.3 513.6C115.6 521.2 118.9 530.6 118.9 546.7C119.1 565.7 125.5 577.4 139.7 584.9L147.9 589.1L301.2 589.6C439.4 590.1 455.5 589.8 464.3 587.6C476.0 584.3 485.1 577.1 491.0 565.8L495.3 557.8L495.7 508.6C496.0 481.5 496.0 455.0 495.7 450.0L495.3 440.6L490.4 448.5C484.8 457.7 474.6 466.5 463.8 471.3L456.1 474.9L329.4 475.4C236.9 475.7 200.3 475.4 194.0 474.1C174.0 469.8 153.7 455.2 143.2 437.5C133.0 420.3 132.9 417.5 133.3 308.3L133.8 210.5L137.5 201.4C144.4 184.0 160.5 168.5 179.8 160.9L188.6 157.3L318.4 156.8C445.0 156.5 448.5 156.5 458.5 159.6C471.0 163.5 481.8 171.2 489.5 181.8L495.3 190.0L495.7 137.7C496.2 80.3 495.3 72.3 487.0 60.4C482.3 53.5 471.6 46.2 463.2 43.8C459.7 42.9 391.7 42.2 279.3 42.4C134.9 42.6 99.2 42.9 92.2 44.6ZM594.6 173.2C543.5 203.9 501.0 229.7 500.4 230.7C499.8 231.6 499.3 270.4 499.6 316.7L500.0 401.2L522.6 415.5C535.2 423.3 555.2 435.8 567.2 443.1C579.3 450.5 611.5 470.4 638.7 487.3C666.0 504.2 689.8 517.9 691.5 517.9C693.2 517.9 695.7 516.9 697.0 515.4C699.1 513.3 699.5 493.4 699.5 319.2C699.5 197.0 698.8 123.9 697.9 121.4C696.8 118.3 695.4 117.4 692.1 117.4C689.3 117.5 655.8 136.6 594.6 173.2Z", ], };
+    const BRAND_MARK = { width: S.mark.width, height: S.mark.height, shapes: [S.mark.d] };
     const p = view.props;
     const t = S.themeOf(String(p.mode));
     const card = String(t.card);
@@ -81,7 +81,7 @@ export const PORT: SnapcnPort = {
     const LOCKUP_FRAME = 12;
     const LINE_FRAME = 44;
     const LAYOUT_FRAME = 72;
-    const logo = SNAPCN_MARK;
+    const logo = BRAND_MARK;
     const speed = Number(p.speed);
     const wordmark = String(p.wordmark);
     const before = String(p.before);
@@ -162,7 +162,7 @@ export const PORT: SnapcnPort = {
     };
 
     const sky = String(p.sky ?? '');
-    const img = S.h('img', { src: sky || null, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover', display: sky ? null : 'none' } }) as HTMLElement;
+    const img = sky ? (S.h('img', { src: sky, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover' } }) as HTMLElement) : null;
     const host = S.h('div', { style: { position: 'absolute', inset: 0 } }) as HTMLElement;
     view.root.replaceChildren(S.fill({ background: card, overflow: 'hidden' }, img, host));
     const tileStroke = S.mixOklch(String(t.border), card, TILE_LINE);
@@ -188,7 +188,9 @@ export const PORT: SnapcnPort = {
       const logoScale = LOCKUP_MARK / Math.max(logo.width, logo.height);
       const lineScale = sample(LINE_SCALE, s);
       const lineDrift = sample(LINE_X, s);
-      img.style.transform = `scale(${1 + SKY_ZOOM.from * Math.exp(-s / SKY_ZOOM.tau)})`;
+      if (img) {
+        img.style.transform = `scale(${1 + SKY_ZOOM.from * Math.exp(-s / SKY_ZOOM.tau)})`;
+      }
       const swing = sample(WIPE_LEAN, s);
       const lean = 1 + swing * swing;
       const wipe = sample(WIPE, s);

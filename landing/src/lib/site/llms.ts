@@ -10,7 +10,7 @@ import { GUIDES, GUIDES_INDEX, GUIDES_PATH, guidePath } from './guides';
 import { CONNECT_COMMAND, MCP_TOOLS, MCP_URL } from './guides/shared';
 import { plainText } from './text';
 
-const SUMMARY = 'Feega is motion design for Claude Code: an open-source (Apache-2.0) infinite canvas where people and AI agents design, animate and generate together. Claude Code, Codex and Cursor edit motion videos and frames through an MCP server, then render to MP4. It runs locally from one .feega file with no account, or in the cloud at ' + APP_URL + '.';
+const SUMMARY = 'Feega lets you design inside your code with your agents and team: an open-source (Apache-2.0) infinite canvas where people and AI agents design, animate and generate together. Claude Code, Codex and Cursor edit motion videos and frames through an MCP server, then render to MP4. It runs locally from one .feega file with no account, or in the cloud at ' + APP_URL + '.';
 
 export const PAGE_TITLES: Record<string, string> = {
   '/': HOME_META.title,

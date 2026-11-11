@@ -105,3 +105,20 @@ fn spreads_a_diamond_gradient_by_distance_along_both_axes() {
     assert!((red_at(&pixels, 24, 40) - 128).abs() < 16, "half way on a diagonal: {}", red_at(&pixels, 24, 40));
     assert!(red_at(&pixels, 62, 62) > 240, "past the tip: {}", red_at(&pixels, 62, 62));
 }
+
+#[cfg(feature = "gpu")]
+#[test]
+fn a_frame_with_more_tiles_than_the_default_budget_still_paints() {
+    const SIDES: (u32, u32) = (1280, 720);
+    const LAYERS: usize = 620;
+    let (w, h) = SIDES;
+    let rect = |colour: &str| format!(r#"{{ "kind": "path", "clip": "frame", "contours": [[0, 0, {w}, 0, {w}, {h}, 0, {h}]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": {colour} }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blur": 0, "blend": "normal" }}"#);
+    let mut items: Vec<String> = (0..LAYERS).map(|_| rect("[0, 0, 1, 1]")).collect();
+    items.push(rect("[1, 0, 0, 1]"));
+    let list = parse(&format!(r#"{{ "width": {w}, "height": {h}, "background": [0, 0, 0, 1], "items": [{}] }}"#, items.join(","))).unwrap();
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    let pixels = renderer.render(&list, &Pictures::new()).unwrap().pixels;
+    let centre = ((h as usize / 2) * w as usize + w as usize / 2) * 4;
+
+    assert_eq!(&pixels[centre..centre + 4], &[255, 0, 0, 255]);
+}

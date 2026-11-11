@@ -6,6 +6,8 @@
   import type { ChatAttachment } from '$lib/chat-attachments';
   import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import ChatAttachments from './ChatAttachments.svelte';
+  import ChatSelectionChips from './ChatSelectionChips.svelte';
+  import type { SelectionChip } from '$lib/chat-selection';
   import { UploadStatus } from './chat-uploads.svelte';
 
   const REASONING_PLACEHOLDER = '\u200b';
@@ -21,6 +23,7 @@
     live = false,
     first = true,
     attachments = [],
+    selection = [],
     canvasId = ''
   }: {
     role: 'user' | 'assistant';
@@ -33,6 +36,7 @@
     live?: boolean;
     first?: boolean;
     attachments?: ChatAttachment[];
+    selection?: SelectionChip[];
     canvasId?: string;
   } = $props();
 
@@ -60,6 +64,7 @@
     {#if chips.length}
       <div class="user-files"><ChatAttachments items={chips} /></div>
     {/if}
+    <ChatSelectionChips chips={selection} />
     {#if content}
       <div class="user-body">{content}</div>
     {/if}

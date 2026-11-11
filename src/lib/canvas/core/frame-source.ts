@@ -5,7 +5,7 @@ import { ItemKind, type DisplayList, type Item, type Scissor } from '@feega/moti
 import { mul2d, type Affine } from '@feega/motion-core/motion/affine';
 import type { Rgba } from '@feega/motion-core/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
-import { onScreenFirst } from './placeholders';
+import { nearestFirst, onScreenFirst } from './placeholders';
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
 
@@ -46,6 +46,9 @@ export const toFetch = <F extends { id: string }>(frames: readonly F[], keyOf: (
 
 export const toWarm = <F extends { id: string; box: Box }>(frames: readonly F[], view: Viewport, screen: Screen, keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
   toFetch(onScreenFirst(frames, view, screen), keyOf, asked, drawnLive);
+
+export const toBuild = <F extends { id: string; box: Box }>(frames: readonly F[], view: Viewport, screen: Screen, keyOf: (f: F) => string, asked: ReadonlySet<string>, drawnLive: { has: (id: string) => boolean }): F[] =>
+  toFetch(nearestFirst(frames, view, screen), keyOf, asked, drawnLive);
 
 export const fetchKey = (f: { id: string; revision: number }) => `${f.id}:${f.revision}`;
 

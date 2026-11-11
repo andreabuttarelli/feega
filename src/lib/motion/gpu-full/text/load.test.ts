@@ -98,7 +98,7 @@ describe('loadFonts', () => {
 
     const ticked = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Added ✓' } }, 'tick'));
     await fontLoader(read)(ticked, {}, FEEGA_TOKENS);
-    expect(asked.find((url) => url.includes('Symbols'))).toContain(`text=${encodeURIComponent('✓')}`);
+    expect(asked.find((url) => url.includes('Symbols'))).not.toContain('text=');
   });
 
   it('asks the fallback fonts for the letters a font lacks past Latin, Greek in a mono title', async () => {
@@ -106,15 +106,15 @@ describe('loadFonts', () => {
     const greek = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'αβ', font: 'mono' } }, 'greek'));
     await fontLoader({ text: async (url: string) => (asked.push(url), CSS), bytes: async () => new Uint8Array() })(greek, {}, FEEGA_TOKENS);
 
-    expect(asked.find((url) => url.includes('family=Noto+Sans&'))).toContain(`text=${encodeURIComponent('αβ')}`);
+    expect(asked.find((url) => url.includes('family=Noto+Sans&'))).not.toContain('text=');
   });
   it('asks a colourless emoji font for the emoji and a CJK font for the ideographs, never the symbol fonts that cannot cover them', async () => {
     const asked: string[] = [];
     const mixed = must(addClip(titled, { component: 'Title', from: 0, durationInFrames: 30, props: { text: '你好 😀 ✓' } }, 'mixed'));
     await fontLoader({ text: async (url: string) => (asked.push(url), CSS), bytes: async () => new Uint8Array() })(mixed, {}, FEEGA_TOKENS);
 
-    expect(asked.find((url) => url.includes('family=Noto+Emoji'))).toContain(`text=${encodeURIComponent('😀')}`);
-    expect(asked.find((url) => url.includes('family=Noto+Sans+SC'))).toContain(`text=${encodeURIComponent('你好')}`);
-    expect(asked.find((url) => url.includes('Symbols'))).toContain(`text=${encodeURIComponent('✓')}&`);
+    expect(asked.find((url) => url.includes('family=Noto+Emoji'))).not.toContain('text=');
+    expect(asked.find((url) => url.includes('family=Noto+Sans+SC'))).not.toContain('text=');
+    expect(asked.find((url) => url.includes('Symbols'))).not.toContain('text=');
   });
 });

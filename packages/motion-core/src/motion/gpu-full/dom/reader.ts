@@ -3,7 +3,7 @@ import { DOM_READ_REPLY, DOM_READ_REQUEST, type DomReadReply, type DomReadReques
 
 export type Compose = (only?: ReadonlySet<string>) => string;
 
-export type DomReader = { readAt: (time: number) => Promise<DomReadReply>; dispose: () => void };
+export type DomReader = { readAt: (time: number, only?: string[]) => Promise<DomReadReply>; dispose: () => void };
 
 const READ_TIMEOUT_MS = 60_000;
 
@@ -21,7 +21,7 @@ export async function mountDomReader(host: HTMLElement, compose: Compose, clips:
   let asked = 0;
   const waiting = new Set<(reason: Error) => void>();
 
-  const readAt = (time: number) =>
+  const readAt = (time: number, only: string[] = clips) =>
     new Promise<DomReadReply>((resolve, reject) => {
       const id = String(++asked);
       const timer = setTimeout(() => finish(() => reject(new Error(`custom components did not answer within ${READ_TIMEOUT_MS / 1000}s`))), READ_TIMEOUT_MS);
@@ -40,7 +40,7 @@ export async function mountDomReader(host: HTMLElement, compose: Compose, clips:
       const abandon = (reason: Error) => finish(() => reject(reason));
       waiting.add(abandon);
       addEventListener('message', onMessage);
-      const request: DomReadRequest = { type: DOM_READ_REQUEST, id, time, clips };
+      const request: DomReadRequest = { type: DOM_READ_REQUEST, id, time, clips: only };
       frame.contentWindow?.postMessage(request, '*');
     });
 

@@ -268,16 +268,6 @@ fn during_a_gesture_a_tile_within_twice_its_sharpness_is_good_enough() {
 }
 
 #[test]
-fn while_idle_the_tiles_around_the_screen_and_one_step_sharper_are_fetched_ahead() {
-    let tiles = Tiles::default();
-    let ahead = tiles.ahead(camera(1.0), SCREEN);
-    let step = step_of(1.0);
-
-    assert!(ahead.iter().any(|k| k.step == step && !k.screen(camera(1.0)).overlaps(Rect::new(0.0, 0.0, SCREEN.0 as f64, SCREEN.1 as f64))));
-    assert!(ahead.iter().any(|k| k.step == step + 1));
-}
-
-#[test]
 fn zooming_out_over_sharper_tiles_needs_no_raster_during_the_gesture() {
     let mut tiles = Tiles::default();
     tiles.frame(camera(step_zoom(2)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
@@ -301,13 +291,11 @@ fn a_changed_tile_on_screen_is_queued_to_raster_again_even_while_it_still_shows(
 }
 
 #[test]
-fn tiles_warm_only_after_a_second_without_rasters_or_uploads() {
+fn tiles_warm_a_moment_after_the_last_gesture() {
     let mut warm = gpu_core::tiles::Warmup::default();
     warm.stirred(0.0);
-    assert!(!warm.due(900.0));
-    warm.stirred(900.0);
-    assert!(!warm.due(1500.0));
-    assert!(warm.due(1900.0));
+    assert!(!warm.due(400.0));
+    assert!(warm.due(600.0));
 }
 
 #[test]
@@ -348,4 +336,196 @@ fn idle_baking_rasters_bigger_blocks_than_a_gesture() {
     assert_eq!(baked.iter().map(|b| b.keys.len()).sum::<usize>(), missing.len());
     assert!(baked.len() < batches(&missing).len());
     assert!(baked.iter().all(|b| b.keys.len() <= (BAKE_BATCH_TILES * BAKE_BATCH_TILES) as usize));
+}
+
+#[test]
+fn a_tile_drawn_before_its_frame_was_ready_is_dropped_where_other_tiles_cover_it() {
+    let mut tiles = Tiles::default();
+    tiles.frame(camera(step_zoom(-1)), SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+
+    assert!(!tiles.hold_lacking(key));
+    assert!(!tiles.holds(key));
+}
+
+#[test]
+fn a_tile_drawn_before_its_frame_was_ready_is_shown_where_nothing_covers_it_and_drawn_again() {
+    let mut tiles = Tiles::default();
+    let key = tiles.frame(camera(1.0), SCREEN).missing[0];
+
+    assert!(tiles.hold_lacking(key));
+    assert!(tiles.holds(key));
+    assert!(tiles.queue(tiles.frame(camera(1.0), SCREEN).missing).stale.contains(&key));
+}
+
+fn held_after_baking(tiles: &mut Tiles, at: Camera) {
+    tiles.frame(at, SCREEN).missing.iter().for_each(|k| tiles.hold(*k));
+    tiles.ahead(at, SCREEN).iter().for_each(|k| tiles.hold(*k));
+}
+
+#[test]
+fn baked_ahead_a_zoom_in_to_twice_the_scale_draws_only_held_sharp_tiles() {
+    let mut tiles = Tiles::default();
+    held_after_baking(&mut tiles, camera(1.0));
+    let zoomed = Camera { x: -(SCREEN.0 as f64) / 2.0, y: -(SCREEN.1 as f64) / 2.0, zoom: 2.0 };
+
+    assert!(tiles.frame(zoomed, SCREEN).missing.is_empty());
+}
+
+#[test]
+fn baked_ahead_a_zoom_out_to_half_the_scale_never_falls_back_further_than_one_doubling() {
+    let mut tiles = Tiles::default();
+    held_after_baking(&mut tiles, camera(1.0));
+    let out = Camera { x: SCREEN.0 as f64 / 4.0, y: SCREEN.1 as f64 / 4.0, zoom: 0.5 };
+
+    let frame = tiles.frame(out, SCREEN);
+
+    assert!(frame.missing.is_empty(), "{} missing", frame.missing.len());
+}
+
+#[test]
+fn the_screen_ring_is_baked_before_the_sharper_and_coarser_levels() {
+    let ahead = Tiles::default().ahead(camera(1.0), SCREEN);
+    let first_other = ahead.iter().position(|k| k.step != 0).expect("other levels");
+
+    assert!(ahead[..first_other].iter().all(|k| k.step == 0));
+    assert!(ahead.iter().any(|k| k.step == 4));
+    assert!(ahead.iter().any(|k| k.step == -4));
+}
+
+#[test]
+fn baked_levels_on_screen_survive_eviction() {
+    let mut tiles = Tiles::default();
+    held_after_baking(&mut tiles, camera(1.0));
+    let baked: Vec<TileKey> = tiles.ahead(camera(1.0), SCREEN);
+    let wanted: Vec<TileKey> = Tiles::default().ahead(camera(1.0), SCREEN);
+
+    let gone = tiles.evict_beyond(camera(1.0), SCREEN, 0);
+
+    assert!(baked.is_empty());
+    assert!(wanted.iter().all(|k| !gone.contains(k)));
+}
+
+#[test]
+fn the_held_screen_shows_under_the_current_tiles_while_it_is_no_softer_than_a_quarter_stretch() {
+    use gpu_core::tiles::underlay_shows;
+
+    assert!(underlay_shows(1.0));
+    assert!(underlay_shows(1.2));
+    assert!(!underlay_shows(1.3));
+    assert!(underlay_shows(0.3));
+}
+
+#[test]
+fn baked_ahead_a_zoom_out_to_a_sixteenth_shows_no_blank_tile() {
+    let mut tiles = Tiles::default();
+    held_after_baking(&mut tiles, camera(1.0));
+    tiles.reserve(camera(1.0), SCREEN).iter().for_each(|k| tiles.hold(*k));
+    let far = Camera { x: SCREEN.0 as f64 * 15.0 / 32.0, y: SCREEN.1 as f64 * 15.0 / 32.0, zoom: 1.0 / 16.0 };
+
+    let queue = tiles.queue(tiles.frame(far, SCREEN).missing);
+
+    assert!(queue.blank.is_empty(), "{} blank", queue.blank.len());
+}
+
+#[test]
+fn tiles_do_not_warm_while_frames_are_still_building() {
+    use gpu_core::tiles::{Building, Warmup};
+    let mut warm = Warmup::default();
+    warm.stirred(0.0);
+
+    assert!(!warm.due_when(500.0, Building::Frames));
+    assert!(warm.due_when(500.0, Building::Nothing));
+}
+
+#[test]
+fn tiles_warm_later_after_an_upload_than_after_a_gesture() {
+    use gpu_core::tiles::Warmup;
+    let mut after_gesture = Warmup::default();
+    after_gesture.stirred(0.0);
+    let mut after_upload = Warmup::default();
+    after_upload.uploaded(0.0);
+
+    assert!(after_gesture.due(600.0));
+    assert!(!after_upload.due(1400.0));
+    assert!(after_upload.due(1600.0));
+}
+
+#[test]
+fn the_cheap_coarse_levels_warm_while_uploads_still_hold_the_rest() {
+    use gpu_core::tiles::Warmup;
+    let mut warm = Warmup::default();
+    warm.moved(0.0);
+    warm.uploaded(400.0);
+
+    assert!(warm.coarse_due(600.0));
+    assert!(!warm.due(600.0));
+}
+
+#[test]
+fn the_cheap_levels_are_only_the_far_coarse_ones() {
+    let ahead = Tiles::default().coarse_ahead(camera(1.0), SCREEN);
+
+    assert!(!ahead.is_empty());
+    assert!(ahead.iter().all(|k| k.step <= -8));
+}
+
+#[test]
+fn the_whole_canvas_is_baked_at_the_sharpest_step_its_tile_budget_allows() {
+    use gpu_core::tiles::CANVAS_TILES;
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+
+    let keys = Tiles::default().canvas_ahead(canvas, camera(0.4), SCREEN);
+
+    assert!(!keys.is_empty() && keys.len() <= CANVAS_TILES);
+    let step = keys[0].step;
+    assert!(keys.iter().all(|k| k.step == step));
+    let union = keys.iter().map(|k| k.world()).reduce(|a, b| a.union(b)).unwrap();
+    assert!(union.contains(canvas.origin()) && union.x1 >= canvas.x1 && union.y1 >= canvas.y1);
+    let finer = step + 1;
+    let side = 256.0 / step_zoom(finer);
+    assert!(((canvas.width() / side).ceil() * (canvas.height() / side).ceil()) as usize > CANVAS_TILES);
+}
+
+#[test]
+fn whole_canvas_tiles_survive_eviction() {
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+    let mut tiles = Tiles::default();
+    let keys = tiles.canvas_ahead(canvas, camera(0.4), SCREEN);
+    keys.iter().for_each(|k| tiles.hold(*k));
+    tiles.set_canvas(canvas);
+
+    let gone = tiles.evict_beyond(camera(0.4), SCREEN, 0);
+
+    assert!(keys.iter().all(|k| !gone.contains(k)));
+}
+
+#[test]
+fn a_canvas_without_whole_canvas_tiles_bakes_and_pins_none() {
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+    let mut tiles = Tiles::default();
+    tiles.set_canvas_tiles(0);
+    let near = tiles.canvas_ahead(canvas, camera(0.4), SCREEN);
+    assert!(near.is_empty());
+
+    let mut held = Tiles::default();
+    let keys = held.canvas_ahead(canvas, camera(0.4), SCREEN);
+    keys.iter().for_each(|k| held.hold(*k));
+    held.set_canvas(canvas);
+    held.set_canvas_tiles(0);
+
+    let gone = held.evict_beyond(camera(0.4), SCREEN, 0);
+
+    assert!(keys.iter().any(|k| gone.contains(k)));
+}
+
+#[test]
+fn a_smaller_whole_canvas_allowance_bakes_at_most_that_many_tiles() {
+    let canvas = Rect::new(0.0, 0.0, 12000.0, 9000.0);
+    let mut tiles = Tiles::default();
+    tiles.set_canvas_tiles(40);
+
+    let keys = tiles.canvas_ahead(canvas, camera(0.4), SCREEN);
+
+    assert!(!keys.is_empty() && keys.len() <= 40);
 }

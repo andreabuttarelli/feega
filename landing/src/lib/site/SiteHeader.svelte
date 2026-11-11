@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { APP_URL, GITHUB_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
+  import DownloadMac from './DownloadMac.svelte';
+  import { APP_URL, HEADER_LINKS, MENU_LINKS, SOCIAL_LINKS } from './links';
 
   let open = $state(false);
 </script>
@@ -14,7 +15,7 @@
   </nav>
 
   <div class="actions">
-    <a class="chip star" href={GITHUB_URL}><span>Star us</span></a>
+    <DownloadMac class="chip star" />
     <a class="chip cta" href={APP_URL}><span>Let’s start</span></a>
   </div>
 
@@ -50,8 +51,6 @@
     display: flex;
     justify-content: space-between;
     align-items: start;
-    max-width: 430px;
-    margin: 0 auto;
     padding: 12px;
     font-family: 'Inter', sans-serif;
     font-variation-settings: normal;
@@ -61,7 +60,14 @@
     font-weight: 500;
   }
 
-  .chip {
+  :global(.star svg) {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    vertical-align: -2px;
+  }
+
+  .bar :global(.chip) {
     display: block;
     padding: 8px 4px 10px;
     background: #fff;
@@ -133,7 +139,6 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      max-width: none;
       padding: 0 20px;
     }
 
@@ -152,16 +157,16 @@
       justify-self: start;
     }
 
-    .star {
+    .bar :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }
 
-    .cta {
+    .bar .cta {
       background: #ff5100;
     }
 
-    .actions span {
+    .actions :global(span) {
       border-bottom: 1px solid currentColor;
     }
 
@@ -175,7 +180,6 @@
     .bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      max-width: 810px;
       padding: 16px 16px 0;
     }
 
@@ -194,16 +198,16 @@
       justify-self: start;
     }
 
-    .star {
+    .bar :global(.star) {
       background: #4f4f4f;
       color: #fff;
     }
 
-    .cta {
+    .bar .cta {
       background: #ff5100;
     }
 
-    .actions span {
+    .actions :global(span) {
       border-bottom: 1px solid currentColor;
     }
 

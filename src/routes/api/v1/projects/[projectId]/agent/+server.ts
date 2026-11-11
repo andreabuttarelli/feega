@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { Db } from '$lib/server/db/client';
-import { pickOf, turnModel } from '$lib/server/project-agent/model-route';
+import { pickOf } from '$lib/server/project-agent/model-route';
+import { AGENT_PLANS, billedAs, capReached, planModel, tierOf } from '$lib/server/project-agent/agent-plan';
 import { startProjectTurn, type BriefBrand } from '$lib/server/project-agent/turn';
 import { offeredChatModels, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -8,7 +9,7 @@ import { CAP_REACHED, capRefusal, liveCapReader } from '$lib/server/spend-caps/g
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listCanvases } from '$lib/server/repos/canvas';
 import { findReachableProject } from '$lib/server/projects/lookup';
-import { openThread, loadTurns, promptHistory, turnRunning } from '$lib/server/repos/chat';
+import { countUserTurns, openThread, loadTurns, promptHistory, turnRunning } from '$lib/server/repos/chat';
 import { openFrameSchema, type OpenFrame } from '$lib/server/project-agent/frame-tools';
 import { AGENT_MAX_DURATION_S } from '$lib/server/project-agent/limits';
 import { screenModelInput } from '$lib/server/moderation/model-input';
@@ -17,6 +18,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { latestAnswer, readAnswer } from '$lib/reference-pick';
 import { stopTurn } from '$lib/server/repos/chat-reply';
+import { readChips } from '$lib/chat-selection';
 import type { RequestHandler } from './$types';
 
 /**
@@ -68,14 +70,18 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const brand = project.brandId ? await loadBriefBrand(db, { orgId, brandId: project.brandId }) : null;
 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
-  if (gated) return gated;
+  const plan = AGENT_PLANS[tierOf(gated)];
+  if (gated && capReached(plan, await countUserTurns(db, user.id))) {
+    return gated;
+  }
 
   const capped = await capRefusal(await liveCapReader(db), { orgId, userId: user.id, projectId: project.id });
   if (capped) {
     return json({ error: CAP_REACHED, message: capped }, { status: HTTP_FORBIDDEN });
   }
 
-  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection: askedSelection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
+  const selection = readChips(askedSelection);
   const parsedFrame = openFrameSchema.safeParse(askedFrame);
   const frame: OpenFrame | null = parsedFrame.success ? parsedFrame.data : null;
   const text = message?.trim() ?? '';
@@ -91,7 +97,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   if (!resolved.ok) {
     return json({ error: resolved.error }, { status: 400 });
   }
-  const { model, reasoning } = turnModel(resolved.choice, pickOf(askedModel), text);
+  const { model, reasoning } = planModel(plan, resolved.choice, pickOf(askedModel), text);
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,
@@ -116,7 +122,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     return blockedPrompt(screened.error);
   }
 
-  return startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick });
+  return billedAs(plan, () => startProjectTurn({ db, userId: user.id, accessToken: session.access_token, origin: url.origin, orgId, project, brand, text, attachments, model, reasoning, frame, selection, canvases, canvasId, threadId, turns, history, pick }));
 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {

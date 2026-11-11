@@ -97,6 +97,7 @@
   import { ImagesOutcome, figmaImageAssets, type ImagesAnswer } from '$lib/canvas/figma/fetch-images';
   import { imagesFilled, type FigmaJob } from '$lib/canvas/figma/images';
   import { quadBox, quadStyle } from '$lib/canvas/quad-box';
+  import { hoverRingStyle } from '$lib/canvas/hover-ring';
   import { DocAccess, FrameEditSession } from '$lib/motion/frame-edit-session.svelte';
   import { nextDoc, stepOf, type PeerStep } from '$lib/motion/frame-step';
   import type { OpResult } from '@feega/motion-core/motion/timeline';
@@ -476,7 +477,7 @@
       const on = savers.get(v.nodeId)?.breakpoint === v.breakpointId && selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
       const { x, y, w, h } = v.frame.box;
-      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, hovered: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
+      return [{ id: v.frame.id, x, y, width: w, height: h, ...portMarks({ ...t, connectable: false }), label: `${v.name} ${v.width}`, icon: text.icons.get(t.kind as NodeType) ?? null, tag: null, zoom: labelZoom, ring: on ? chrome.ring : NodeChrome.None, handles: false, ringColor: ringColour(), names: false, strokeZoom, addBeside: false, radius: cardRadiusOf(t.kind ?? ''), turn: undefined, layers: ChromeLayers.Whole }];
     });
     const tiles = placed.flatMap((t) => {
       const handed = handedOver(t) && !holdsDoc(t.kind ?? '');
@@ -485,17 +486,25 @@
       }
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video, typedFreeText());
-      const openId = layersSource.video?.nodeId ?? null;
-      const ringed = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
       const layers = holdsDoc(t.kind ?? '') ? ChromeLayers.Whole : handed ? ChromeLayers.Ports : ChromeLayers.State;
-      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !ringed) {
+      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None) {
         return [];
       }
       const marks = portMarks(t);
       const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null, tag: tagHexOf(t.id), zoom: labelZoom } : { label: null, icon: null };
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered: ringed, ringColor: ringColour(), names: on, strokeZoom, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, ringColor: ringColour(), names: on, strokeZoom, addBeside: addsBeside(t) && (on || hovered === t.id || addLinger === t.id), radius: cardRadiusOf(t.kind ?? ''), turn: turnOf(t), layers }];
     });
     return [...tiles, ...views];
+  });
+  const hoverRings = $derived.by(() => {
+    const openId = layersSource.video?.nodeId ?? null;
+    const ringed = (t: Tile) => {
+      const on = selected.includes(t.id);
+      const outlined = (!on && frameRinged(layersSource.hovered, t.id, openId, hovered)) || emptyAreaRinged(layersSource.hovered, t.id, openId, hovered);
+      const solo = hovered === t.id && !on && layersSource.hovered?.nodeId !== t.id;
+      return (outlined || solo) && nodeChrome(t.id, on, layersSource.video, typedFreeText()).ring !== NodeChrome.Selected;
+    };
+    return placed.filter(ringed).map((t) => ({ id: t.id, x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation, radius: cardRadiusOf(t.kind ?? '') }));
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
   const nodeCards = $derived(coreCards.filter((c) => !c.poster));
@@ -3454,7 +3463,6 @@
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
-          hovered: hovered && !selected.includes(hovered) && layersSource.hovered?.nodeId !== hovered ? (byId.get(hovered) ?? null) : null,
           running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ ...t, radius: cardRadiusOf(t.kind ?? '') })),
           chrome: coreChrome
         })
@@ -4346,6 +4354,11 @@
         <CoreFrames bind:this={core} frames={drawnFrames} edited={heldInGesture} order={stackOrder} live={coreLive} known={knownSource} cards={nodeCards} posters={posterCards} overlay={coreOverlay} lift={elementLift} look={coreLook ?? undefined} {view} {area} place={{ projectId: page.params.projectId ?? '', canvasId: page.params.canvasId ?? '', orgId: (page.data as { orgId?: string }).orgId }} sourceUrl={coreSource} onready={drawnByCore} onsource={adoptSource} onthumb={postThumb} onfallback={coreOff} />
       </svelte:boundary>
     {/if}
+    <div class="hover-rings" data-testid="node-hover-rings">
+      {#each hoverRings as ring (ring.id)}
+        <div class="hover-ring" data-testid="node-hover-ring" data-node={ring.id} style={highlightStyle(HighlightKind.Node) + ';' + hoverRingStyle(view, ring)}></div>
+      {/each}
+    </div>
     <FrameOverlays {view} frames={overlayFrames}>
       {#snippet children(frame)}
         {@const edit = typingMark(frame.id)}
@@ -4769,6 +4782,21 @@
     z-index: 1;
     left: 0;
     top: 0;
+  }
+
+  .hover-rings {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 2;
+  }
+
+  .hover-ring {
+    position: absolute;
+    box-sizing: border-box;
+    border-style: solid;
+    border-color: var(--highlight);
   }
 
   .pick-outline {

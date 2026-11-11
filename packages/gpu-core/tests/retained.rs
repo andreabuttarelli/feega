@@ -300,7 +300,32 @@ fn a_picture_built_elsewhere_is_adopted_so_the_next_change_rasters_only_its_dama
 
     r.adopt(camera, 0.0);
 
-    assert!(matches!(r.step(camera, Damage::none(), 1000.0), Step::Present));
+    assert_eq!(outcome(&r.step(camera, Damage::none(), 1000.0)), Some(Outcome::Partial));
+    assert!(matches!(r.step(camera, Damage::none(), 1008.0), Step::Idle));
     let damaged = r.step(camera, Damage::Rects(vec![Rect::new(0.0, 0.0, 10.0, 10.0)]), 1016.0);
     assert_eq!(outcome(&damaged), Some(Outcome::Partial));
+}
+
+#[test]
+fn an_adopted_picture_repaints_the_overscan_ring_before_a_pan_can_show_it() {
+    let mut r = Retained::new(W, H);
+    rendered(&mut r, at(5000.0, 5000.0, 1.0), 0.0);
+    let camera = at(10.0, 20.0, 1.0);
+    r.adopt(camera, 0.0);
+
+    let Step::Raster(ring) = rendered(&mut r, at(40.0, 20.0, 1.0), 1000.0) else { panic!("the foreign ring must be repainted") };
+
+    assert_eq!(ring.camera, camera);
+    assert_eq!(area(&ring.rects), 950.0 * 750.0 - 800.0 * 600.0);
+    assert!(matches!(rendered(&mut r, at(50.0, 20.0, 1.0), 1016.0), Step::Present));
+}
+
+#[test]
+fn the_underlay_of_an_adopted_picture_reaches_only_its_painted_middle() {
+    let mut r = Retained::new(W, H);
+    r.adopt(at(0.0, 0.0, 1.0), 0.0);
+
+    assert_eq!(r.painted(), Rect::new(O, O, O + 800.0, O + 600.0));
+    rendered(&mut r, at(0.0, 0.0, 1.0), 16.0);
+    assert_eq!(r.painted(), Rect::new(0.0, 0.0, 950.0, 750.0));
 }

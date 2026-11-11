@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#000000',
   fonts: ['Inter'],
   props: {
-    titles: { type: 'string', title: 'Titles (one per line)', default: 'snapcn Pro\nsnapcn.dev', group: 'Content', maxLength: 400 },
+    titles: { type: 'string', title: 'Titles (one per line)', default: 'feega Pro\nfeega.app', group: 'Content', maxLength: 400 },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'sans', group: 'Style' },
     fontSize: { type: 'number', title: 'Font size (px on 1920)', default: 110.96, minimum: 12, maximum: 400, step: 1, group: 'Style' },
     fontWeight: { type: 'number', title: 'Font weight', default: 500, minimum: 100, maximum: 900, step: 100, group: 'Style' },
@@ -67,8 +67,8 @@ export const PORT: SnapcnPort = {
 
     const first = STOPS[0][0] as number;
     const span = (STOPS[STOPS.length - 1][0] as number) - first || 1;
-    const gradient = S.h('linearGradient', { id: 'snapcn-title-sweep', gradientUnits: 'userSpaceOnUse', y1: 0, y2: 0 }, STOPS.map(([at, color]) => S.h('stop', { offset: ((at as number) - first) / span, stopColor: color })));
-    const text = S.h('text', { textAnchor: 'middle', fill: 'url(#snapcn-title-sweep)', style: { fontFamily: family, fontWeight, letterSpacing: `${tracking}em`, wordSpacing: `${wordSpacing}em`, textRendering: 'geometricPrecision' } });
+    const gradient = S.h('linearGradient', { id: 'title-sweep-ink', gradientUnits: 'userSpaceOnUse', y1: 0, y2: 0 }, STOPS.map(([at, color]) => S.h('stop', { offset: ((at as number) - first) / span, stopColor: color })));
+    const text = S.h('text', { textAnchor: 'middle', fill: 'url(#title-sweep-ink)', style: { fontFamily: family, fontWeight, letterSpacing: `${tracking}em`, wordSpacing: `${wordSpacing}em`, textRendering: 'geometricPrecision' } });
     const group = S.h('g', null, text);
     const svg = S.h('svg', { viewBox: `0 0 ${STAGE_W} ${STAGE_H}`, width: view.width, height: view.height, style: { position: 'absolute', inset: 0, overflow: 'hidden' } }, S.h('defs', null, gradient), group);
     view.root.replaceChildren(S.fill({ background: 'transparent' }, svg));

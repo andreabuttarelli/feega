@@ -6,6 +6,13 @@ use crate::retained::Camera;
 pub const TILE_PX: u32 = 256;
 pub const TILE_GUTTER_PX: u32 = 2;
 pub const TILE_BYTES: u64 = ((TILE_PX + 2 * TILE_GUTTER_PX) as u64).pow(2) * 4;
+pub const CANVAS_TILES: usize = 320;
+
+fn canvas_step(extent: Rect, camera: Camera, allowed: usize) -> i32 {
+    let fits = |step: i32| keys_over(extent, step).len() <= allowed;
+    (step_of(camera.zoom) - COARSER_STEPS..=step_of(camera.zoom)).rev().find(|s| fits(*s)).unwrap_or(step_of(camera.zoom) - COARSER_STEPS)
+}
+
 pub const TILE_BUDGET_BYTES: u64 = 384 << 20;
 const SCREENS_KEPT: u64 = 12;
 
@@ -18,7 +25,18 @@ const STEP_SLACK: f64 = 1e-9;
 const COARSER_STEPS: i32 = 40;
 const FINER_STEPS: i32 = 4;
 pub const NEAR_STEPS: i32 = 4;
-const AHEAD_RING: f64 = 0.5;
+struct Baked {
+    steps: i32,
+    reach: f64,
+}
+
+impl Baked {
+    fn area(&self, world: Rect) -> Rect {
+        world.inflate(world.width() * (self.reach - 1.0) / 2.0, world.height() * (self.reach - 1.0) / 2.0)
+    }
+}
+
+const BAKED: [Baked; 5] = [Baked { steps: 0, reach: 1.5 }, Baked { steps: 4, reach: 1.0 }, Baked { steps: -4, reach: 2.5 }, Baked { steps: -12, reach: 9.0 }, Baked { steps: -16, reach: 17.0 }];
 const RESERVE_STEPS_DOWN: i32 = 8;
 const RESERVE_REACH: f64 = 3.0;
 
@@ -118,6 +136,8 @@ pub struct TileFrame {
 
 #[derive(Default)]
 pub struct Tiles {
+    canvas: Option<Rect>,
+    canvas_tiles: Option<usize>,
     held: FxHashSet<TileKey>,
     stale: FxHashSet<TileKey>,
     last_drawn: rustc_hash::FxHashMap<TileKey, u64>,
@@ -184,16 +204,58 @@ impl Tiles {
     pub fn ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
         let world = seen_world(camera, screen);
         let step = step_of(camera.zoom);
-        let ring = world.inflate(world.width() * AHEAD_RING, world.height() * AHEAD_RING);
         let centre = world.center();
-        let mut keys: Vec<TileKey> = keys_over(ring, step).into_iter().chain(keys_over(world, step + 1)).filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
-        keys.sort_by(|a, b| (a.step != step).cmp(&(b.step != step)).then(a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre))));
+        BAKED.iter().flat_map(|level| {
+            let mut keys: Vec<TileKey> = keys_over(level.area(world), step + level.steps).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+            keys.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
+            keys
+        }).collect()
+    }
+
+    pub fn coarse_ahead(&self, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        let world = seen_world(camera, screen);
+        let step = step_of(camera.zoom);
+        let centre = world.center();
+        let mut keys: Vec<TileKey> = BAKED.iter().filter(|l| l.steps <= -RESERVE_STEPS_DOWN).flat_map(|level| keys_over(level.area(world), step + level.steps)).chain(self.reserve(camera, screen)).filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+        keys.sort_by(|a, b| b.step.cmp(&a.step).then(a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre))));
+        keys.dedup();
+        keys
+    }
+
+    pub fn set_canvas(&mut self, extent: Rect) {
+        self.canvas = Some(extent);
+    }
+
+    pub fn set_canvas_tiles(&mut self, allowed: usize) {
+        self.canvas_tiles = Some(allowed);
+    }
+
+    fn canvas_allowed(&self) -> usize {
+        self.canvas_tiles.unwrap_or(CANVAS_TILES)
+    }
+
+    pub fn canvas_ahead(&self, extent: Rect, camera: Camera, screen: (u32, u32)) -> Vec<TileKey> {
+        if self.canvas_allowed() == 0 {
+            return Vec::new();
+        }
+        let centre = seen_world(camera, screen).center();
+        let mut keys: Vec<TileKey> = keys_over(extent, canvas_step(extent, camera, self.canvas_allowed())).into_iter().filter(|k| !self.held.contains(k) || self.stale.contains(k)).collect();
+        keys.sort_by(|a, b| a.world().center().distance(centre).total_cmp(&b.world().center().distance(centre)));
         keys
     }
 
     pub fn hold(&mut self, key: TileKey) {
         self.held.insert(key);
         self.stale.remove(&key);
+    }
+
+    pub fn hold_lacking(&mut self, key: TileKey) -> bool {
+        if self.covered(key) {
+            return false;
+        }
+        self.held.insert(key);
+        self.stale.insert(key);
+        true
     }
 
     pub fn holds(&self, key: TileKey) -> bool {
@@ -234,15 +296,20 @@ impl Tiles {
         }
     }
 
-    fn pinned(camera: Camera, screen: (u32, u32), key: TileKey) -> bool {
+    fn pinned(&self, camera: Camera, screen: (u32, u32), key: TileKey) -> bool {
+        if self.canvas_allowed() > 0 && self.canvas.is_some_and(|c| key.step == canvas_step(c, camera, self.canvas_allowed())) {
+            return true;
+        }
         let step = step_of(camera.zoom);
         let world = seen_world(camera, screen);
         let near = |reach: f64| world.inflate(reach, reach);
-        match key.step {
-            s if s == step => key.world().overlaps(near(key.side())),
-            s if s == step - RESERVE_STEPS_DOWN => key.world().overlaps(near(world.width().max(world.height()) * (RESERVE_REACH - 1.0) / 2.0)),
-            _ => false,
+        if key.step == step && key.world().overlaps(near(key.side())) {
+            return true;
         }
+        if key.step == step - RESERVE_STEPS_DOWN {
+            return key.world().overlaps(near(world.width().max(world.height()) * (RESERVE_REACH - 1.0) / 2.0));
+        }
+        BAKED.iter().any(|level| key.step == step + level.steps && key.world().overlaps(level.area(world)))
     }
 
     pub fn evict_beyond(&mut self, camera: Camera, screen: (u32, u32), keep: usize) -> Vec<TileKey> {
@@ -252,7 +319,7 @@ impl Tiles {
         let step = step_of(camera.zoom);
         let centre = seen_world(camera, screen).center();
         let distance = |k: &TileKey| (k.step - step).abs() as f64 * 1e9 + k.world().center().distance(centre);
-        let mut loose: Vec<TileKey> = self.held.iter().copied().filter(|k| !Self::pinned(camera, screen, *k)).collect();
+        let mut loose: Vec<TileKey> = self.held.iter().copied().filter(|k| !self.pinned(camera, screen, *k)).collect();
         loose.sort_by(|a, b| {
             let used = |k: &TileKey| self.last_drawn.get(k).copied().unwrap_or(0);
             used(a).cmp(&used(b)).then(distance(b).total_cmp(&distance(a)))
@@ -316,25 +383,55 @@ impl Rest {
     }
 }
 
-pub const WARM_AFTER_MS: f64 = 1000.0;
+pub const WARM_AFTER_MS: f64 = 500.0;
+const WARM_AFTER_UPLOAD_MS: f64 = 1500.0;
+const SHARP_STRETCH: f64 = 1.25;
+
+pub fn underlay_shows(stretch: f64) -> bool {
+    stretch <= SHARP_STRETCH
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Building {
+    Frames,
+    Nothing,
+}
 
 pub struct Warmup {
     stirred_at: f64,
+    moved_at: f64,
 }
 
 impl Default for Warmup {
     fn default() -> Self {
-        Warmup { stirred_at: f64::NEG_INFINITY }
+        Warmup { stirred_at: f64::NEG_INFINITY, moved_at: f64::NEG_INFINITY }
     }
 }
 
 impl Warmup {
     pub fn stirred(&mut self, now_ms: f64) {
-        self.stirred_at = now_ms;
+        self.stirred_at = self.stirred_at.max(now_ms);
+    }
+
+    pub fn moved(&mut self, now_ms: f64) {
+        self.stirred(now_ms);
+        self.moved_at = self.moved_at.max(now_ms);
+    }
+
+    pub fn coarse_due(&self, now_ms: f64) -> bool {
+        now_ms - self.moved_at >= WARM_AFTER_MS
+    }
+
+    pub fn uploaded(&mut self, now_ms: f64) {
+        self.stirred(now_ms + WARM_AFTER_UPLOAD_MS - WARM_AFTER_MS);
     }
 
     pub fn due(&self, now_ms: f64) -> bool {
         now_ms - self.stirred_at >= WARM_AFTER_MS
+    }
+
+    pub fn due_when(&self, now_ms: f64, building: Building) -> bool {
+        building == Building::Nothing && self.due(now_ms)
     }
 }
 

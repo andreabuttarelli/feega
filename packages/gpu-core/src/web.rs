@@ -16,7 +16,7 @@ use crate::groups::{report, Library, Limits, Motion, Plan};
 use crate::pictures::Pictures;
 use crate::reproject::{Draw, Output, Reprojector, Tile};
 use crate::retained::{Camera, Damage, Lookup, Quality};
-use crate::tiles::{NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
+use crate::tiles::{Building, NEAR_STEPS, Drawn, path_for, Moment, Path, Warmup, tiles_kept, TILE_BUDGET_BYTES, TILE_GUTTER_PX, batches, bake_batches, step_zoom, Batch, Rest, TileKey, Tiles, TILE_PX};
 use crate::world::{parse_overlay, parse_patch, OverlayPart};
 use crate::texture_budget::split;
 use crate::Skipped;
@@ -77,6 +77,7 @@ pub struct WebCore {
     reprojector: Reprojector,
     lost: Arc<AtomicBool>,
     in_flight: Arc<AtomicU32>,
+    warming: bool,
     scratch: Option<wgpu::Texture>,
     motion: CoreMotion,
     rastered_at: f64,
@@ -320,11 +321,11 @@ impl WebCore {
         let spare = held_texture(&device, compositor.size());
         let reprojector = Reprojector::new(&device);
         let camera = Camera { x: 0.0, y: 0.0, zoom: 1.0 };
-        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, target, pictures: Pictures::new(), textures: HashMap::new(), arriving: HashMap::new(), library, cached: Pictures::new(), limits, pending: false, compositor, camera, retained, spare, reprojector, lost, in_flight: Arc::new(AtomicU32::new(0)), warming: false, scratch: None, motion: CoreMotion::Still, rastered_at: f64::NEG_INFINITY, gpu_full_ms: Arc::new(AtomicU64::new(NOT_TIMED)), tiled: false, overlay_tex: None, tiles: Tiles::default(), tile_textures: HashMap::new(), spare_tiles: Vec::new(), atlases: HashMap::new(), rest: None, adopted: None, drew_tiles: false, warmup: Warmup::default(), tile_budget: TILE_BUDGET_BYTES, snapshots: HashMap::new(), changed_at: f64::NEG_INFINITY, rest_shown: Vec::new(), rest_spare: HashMap::new() })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
+        self.warmup.uploaded(js_sys::Date::now());
         let source = external(source)?;
         let fits = self.textures.get(clip).is_some_and(|t| t.width() == width && t.height() == height);
         if !fits {
@@ -340,7 +341,7 @@ impl WebCore {
     }
 
     pub fn picture_rows(&mut self, clip: &str, source: JsValue, width: u32, height: u32, top: u32, rows: u32) -> Result<bool, JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
+        self.warmup.uploaded(js_sys::Date::now());
         let source = external(source)?;
         if top == 0 {
             self.arriving.insert(clip.into(), upload_target(&self.device, width, height));
@@ -390,7 +391,7 @@ impl WebCore {
     }
 
     pub fn put_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
+        self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -398,14 +399,14 @@ impl WebCore {
     }
 
     pub fn append_group(&mut self, key: &str, list_json: &[u8]) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
+        self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse(utf8(list_json)?).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }
 
     pub fn put_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
+        self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(key, &self.library);
         self.library.put_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
@@ -413,14 +414,14 @@ impl WebCore {
     }
 
     pub fn append_group_packed(&mut self, key: &str, list_json: &[u8], floats: Vec<f64>, ends: Vec<u32>) -> Result<(), JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
+        self.warmup.uploaded(js_sys::Date::now());
         self.library.append_group(key, &parse_packed(utf8(list_json)?, floats, ends).map_err(failed)?);
         self.compositor.touch(key, &self.library);
         Ok(())
     }
 
     pub fn patch_group(&mut self, from: &str, to: &str, splice_json: &[u8]) -> Result<bool, JsValue> {
-        self.warmup.stirred(js_sys::Date::now());
+        self.warmup.uploaded(js_sys::Date::now());
         self.compositor.touch(to, &self.library);
         let patched = self.library.patch_group(from, to, &parse_splice(utf8(splice_json)?).map_err(failed)?);
         self.compositor.touch(to, &self.library);
@@ -451,14 +452,14 @@ impl WebCore {
     pub fn set_live_overlay(&mut self, items_json: &[u8]) -> Result<(), JsValue> {
         self.compositor.set_overlay(OverlayPart::Live, parse_overlay(utf8(items_json)?).map_err(failed)?, &mut self.library);
         self.changed_at = js_sys::Date::now();
-        self.warmup.stirred(self.changed_at);
+        self.warmup.moved(self.changed_at);
         Ok(())
     }
 
     pub fn set_motion(&mut self, motion: CoreMotion) {
         if matches!(motion, CoreMotion::Gesture) {
             self.changed_at = js_sys::Date::now();
-            self.warmup.stirred(self.changed_at);
+            self.warmup.moved(self.changed_at);
         }
         self.motion = motion;
         self.library.set_motion(motion.into());
@@ -479,8 +480,25 @@ impl WebCore {
         self.tile_budget = bytes as u64;
     }
 
+    pub fn set_canvas_tiles(&mut self, allowed: u32) {
+        self.tiles.set_canvas_tiles(allowed as usize);
+    }
+
     pub fn set_tiles(&mut self, on: bool) {
         self.tiled = on;
+    }
+
+    fn fill_coarse(&mut self) -> Result<bool, JsValue> {
+        let started = js_sys::Date::now();
+        let screen = (self.target.width(), self.target.height());
+        let wanted = self.tiles.coarse_ahead(self.camera, screen);
+        for batch in bake_batches(&wanted) {
+            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
+                return Ok(true);
+            }
+            self.raster_batch(&batch)?;
+        }
+        Ok(false)
     }
 
     fn fill_reserve(&mut self) -> Result<bool, JsValue> {
@@ -516,7 +534,9 @@ impl WebCore {
         let (cols, rows) = batch.span();
         let size = (cols * TILE_PX + 2 * TILE_GUTTER_PX, rows * TILE_PX + 2 * TILE_GUTTER_PX);
         let plan = self.compositor.plan_at(&mut self.library, camera, size, self.limits);
-        let (list, _) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let building = plan.pending;
+        let (list, missing) = self.engine.hold(&mut self.cached, plan, &self.pictures, &self.device, &self.queue).map_err(failed)?;
+        let lacking = building || !missing.is_empty();
         let pictures: Pictures = self.pictures.iter().chain(self.cached.iter()).map(|(k, v)| (k.clone(), v.clone())).collect();
         let atlas = self.atlases.remove(&size).unwrap_or_else(|| layer_texture(&self.device, size.0, size.1));
         self.engine.draw(&self.device, &self.queue, &list, &pictures, &atlas.create_view(&wgpu::TextureViewDescriptor::default())).map_err(failed)?;
@@ -524,11 +544,19 @@ impl WebCore {
         let side = TILE_PX + 2 * TILE_GUTTER_PX;
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         for key in &batch.keys {
+            if lacking && self.tile_textures.contains_key(key) {
+                continue;
+            }
+            if lacking && !self.tiles.hold_lacking(*key) {
+                continue;
+            }
             let texture = self.tile_textures.remove(key).or_else(|| self.spare_tiles.pop()).unwrap_or_else(|| tile_texture(&self.device, side));
             let (x, y) = (((key.tx - corner.tx) as u32) * TILE_PX, ((key.ty - corner.ty) as u32) * TILE_PX);
             encoder.copy_texture_to_texture(texel(&atlas, x, y), texel(&texture, 0, 0), wgpu::Extent3d { width: side, height: side, depth_or_array_layers: 1 });
             self.tile_textures.insert(*key, texture);
-            self.tiles.hold(*key);
+            if !lacking {
+                self.tiles.hold(*key);
+            }
         }
         self.queue.submit([encoder.finish()]);
         self.atlases.insert(size, atlas);
@@ -552,7 +580,12 @@ impl WebCore {
             multiview_mask: None,
         }));
         let c = self.camera;
-        let still = draw.iter().filter_map(|key| placed(*key, self.tile_textures.get(key)?, c, screen));
+        let step = crate::tiles::step_of(c.zoom);
+        let tile_of = |key: &TileKey| placed(*key, self.tile_textures.get(key)?, c, screen);
+        let painted = self.compositor.held_painted();
+        let covered = |look: Lookup| Rect::new(((painted.x0 - look.x) / look.scale).ceil(), ((painted.y0 - look.y) / look.scale).ceil(), ((painted.x1 - look.x) / look.scale).floor(), ((painted.y1 - look.y) / look.scale).floor()).intersect(screen);
+        let underlay = self.compositor.held_look(c).filter(|(_, stretch)| crate::tiles::underlay_shows(*stretch)).map(|(look, _)| Tile { source: &self.retained, look, within: covered(look) }).filter(|t| t.within.area() > 0.0);
+        let still = draw.iter().filter(|k| k.step != step).filter_map(tile_of).chain(underlay).chain(draw.iter().filter(|k| k.step == step).filter_map(tile_of));
         let lifted = self.snapshots.values().flat_map(|shot| {
             let moved = Camera { x: c.x + shot.by.0 * c.zoom, y: c.y + shot.by.1 * c.zoom, zoom: c.zoom };
             let frame = Rect::new(shot.rest.x0 * c.zoom + moved.x, shot.rest.y0 * c.zoom + moved.y, shot.rest.x1 * c.zoom + moved.x, shot.rest.y1 * c.zoom + moved.y).intersect(screen);
@@ -748,15 +781,19 @@ impl WebCore {
                 cost.store((js_sys::Date::now() - started).to_bits(), Ordering::Relaxed);
             }
         });
-        if frame.rastered > 0 || moving {
-            self.warmup.stirred(js_sys::Date::now());
+        if moving {
+            self.warmup.moved(js_sys::Date::now());
         }
-        let idle = self.warmup.due(js_sys::Date::now());
+        let building = if self.library.is_building() { Building::Frames } else { Building::Nothing };
+        let idle = self.warmup.due_when(js_sys::Date::now(), building);
+        let coarse = building == Building::Nothing && self.warmup.coarse_due(js_sys::Date::now());
+        let mut coarse_left = false;
         if self.tiled && !frame.pending && idle {
             self.warm_tiles()?;
-        } else if self.tiled {
-            self.pending |= !idle;
+        } else if self.tiled && !frame.pending && coarse {
+            coarse_left = self.fill_coarse()?;
         }
+        self.warming = self.tiled && building == Building::Nothing && (!idle || coarse_left);
         Ok(frame.report())
     }
 
@@ -799,8 +836,31 @@ impl WebCore {
             }
             self.raster_batch(&batch)?;
         }
-        self.pending |= self.fill_reserve()?;
+        if self.fill_reserve()? {
+            self.pending = true;
+            return Ok(());
+        }
+        self.pending |= self.fill_canvas()?;
         Ok(())
+    }
+
+    fn fill_canvas(&mut self) -> Result<bool, JsValue> {
+        let Some(extent) = self.compositor.extent(&self.library) else { return Ok(false) };
+        self.tiles.set_canvas(extent);
+        let started = js_sys::Date::now();
+        let screen = (self.target.width(), self.target.height());
+        let wanted = self.tiles.canvas_ahead(extent, self.camera, screen);
+        for batch in bake_batches(&wanted) {
+            if js_sys::Date::now() - started > TILE_BUDGET_GESTURE_MS || input_pending() {
+                return Ok(true);
+            }
+            self.raster_batch(&batch)?;
+        }
+        Ok(false)
+    }
+
+    pub fn warming(&self) -> bool {
+        self.warming
     }
 
     pub fn cache_pending(&self) -> bool {

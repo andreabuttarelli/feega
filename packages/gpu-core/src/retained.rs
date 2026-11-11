@@ -124,7 +124,14 @@ struct Held {
     quality: Quality,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ring {
+    Painted,
+    Foreign,
+}
+
 pub struct Retained {
+    ring: Ring,
     width: u32,
     height: u32,
     overscan: u32,
@@ -195,7 +202,7 @@ pub fn tiles(rect: Rect, width: u32, height: u32) -> Vec<Rect> {
 impl Retained {
     pub fn new(width: u32, height: u32) -> Self {
         let overscan = (width.min(height) / OVERSCAN_SHARE).min(OVERSCAN_MAX);
-        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, full_ms: 0.0, gpu_ms: 0.0 }
+        Retained { ring: Ring::Painted, width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, full_ms: 0.0, gpu_ms: 0.0 }
     }
 
     pub fn overscan(&self) -> u32 {
@@ -235,9 +242,24 @@ impl Retained {
     pub fn adopt(&mut self, camera: Camera, now_ms: f64) {
         let c = camera.snapped();
         self.held = Some(Held { camera: c, quality: Quality::Sharp });
+        self.ring = Ring::Foreign;
         self.shown = None;
         self.zoom_seen = c.zoom;
         self.zoom_moved_at = now_ms - ZOOM_IDLE_MS;
+    }
+
+    pub fn painted(&self) -> Rect {
+        let o = self.overscan as f64;
+        match self.ring {
+            Ring::Painted => self.whole(),
+            Ring::Foreign => Rect::new(o, o, o + self.width as f64, o + self.height as f64),
+        }
+    }
+
+    pub fn held_look(&self, camera: Camera) -> Option<(Lookup, f64)> {
+        let held = self.held?;
+        let look = self.lookup(camera);
+        Some((look, 1.0 / (look.scale * held.quality.scale())))
     }
 
     pub fn lookup(&self, camera: Camera) -> Lookup {
@@ -312,6 +334,12 @@ impl Retained {
         let Damage::Rects(damaged) = damage else {
             return self.full(c, Quality::Sharp);
         };
+        if self.ring == Ring::Foreign {
+            let ring = subtract(self.whole(), self.painted());
+            self.ring = Ring::Painted;
+            let edits: Vec<Rect> = damaged.iter().map(|r| self.pixels(held.camera, *r)).filter(|r| r.area() > 0.0).collect();
+            return self.raster(held.camera, held.quality, None, ring.into_iter().chain(edits).collect());
+        }
         if held.camera.zoom != c.zoom {
             if gesture && self.cost() <= LIVE_FULL_MS {
                 return self.full(c, Quality::Sharp);

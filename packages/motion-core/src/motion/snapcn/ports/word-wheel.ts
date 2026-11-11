@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Jost'],
   props: {
-    headline: { type: 'string', title: 'Lead-in', default: 'snapcn for', group: 'Content', maxLength: 80 },
+    headline: { type: 'string', title: 'Lead-in', default: 'feega for', group: 'Content', maxLength: 80 },
     words: { type: 'string', title: 'Words (comma separated)', default: 'Launches, Founders, Indie hackers, Agencies, Designers, Startups, Dev tools, Solo builders, Changelogs', group: 'Content', maxLength: 600 },
     spin: { type: 'number', title: 'Rows travelled (0 = word count)', default: 0, minimum: 0, maximum: 60, step: 1, group: 'Motion' },
     fontFamily: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Jost', group: 'Style' },

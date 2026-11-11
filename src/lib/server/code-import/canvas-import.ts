@@ -16,6 +16,7 @@ import { chromiumPage } from '$lib/server/motion/chromium-frames';
 import { devServerOf, folderHead, folderNames, folderOf } from './folder-source';
 import { routesOf } from './repo';
 import { SourceKind } from './code-source';
+import { BASE_CONDITIONS, variantsOf, type RenderConditions } from './render-conditions';
 import { importStorybookAt } from './import-storybook';
 import { logAiCall } from '$lib/server/ai-log';
 import { sandboxRunner, sandboxUsd, type RepoRunner } from './sandbox-runner';
@@ -32,7 +33,7 @@ const limiter = rateWindow({ limit: IMPORTS_PER_WINDOW, windowMs: IMPORT_WINDOW_
 
 export type CodeScope = { db: Db; orgId: string; userId: string; projectId: string; actor: Actor };
 
-export type CodeImportAsk = { repo?: string; folder?: string; routes: string[]; storybook?: string; stories?: string[]; at: { x: number; y: number } };
+export type CodeImportAsk = { repo?: string; folder?: string; routes: string[]; conditions?: RenderConditions[]; storybook?: string; stories?: string[]; at: { x: number; y: number } };
 
 function metered(runner: RepoRunner, scope: CodeScope): RepoRunner {
   return async (repo, archive) => {
@@ -78,9 +79,9 @@ export async function importCodeInto(scope: CodeScope, canvasId: string, ask: Co
   }
 
   const access = farmAccess(env);
-  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, runner: access ? metered(sandboxRunner(access), scope) : null, archive: githubFor(scope.db, scope).archive });
+  const done = await importCodeAt({ ...land, repo: ask.repo ?? '', routes: ask.routes, conditions: ask.conditions, runner: access ? metered(sandboxRunner(access), scope) : null, archive: githubFor(scope.db, scope).archive });
   if (done.outcome === CodeImportOutcome.Ok && done.origin) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Github, ...done.origin, routes: ask.routes.length ? ask.routes : ['/'] });
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Github, ...done.origin, routes: ask.routes.length ? ask.routes : ['/'], ...(ask.conditions ? { conditions: ask.conditions } : {}) });
   }
   return done;
 }
@@ -101,10 +102,10 @@ async function importFolderInto(scope: CodeScope, land: LandAsk, ask: CodeImport
       throw new Error('outside the folder dev server');
     }
   };
-  const pages = routes.map((route) => ({ label: route, url: new URL(route, served.url).toString() }));
+  const pages = variantsOf(routes, ask.conditions ?? [BASE_CONDITIONS]).map((v) => ({ label: v.label, url: new URL(v.route, served.url).toString(), conditions: v.conditions }));
   const done = await importBoards({ ...land, open: localBrowser(chromiumPage, origin), guard: only, name: basename(root), pages, names: await folderNames(root), crop: Crop.Page });
   if (done.outcome === CodeImportOutcome.Ok) {
-    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Folder, repo: root, branch: null, sha: await folderHead(root), routes });
+    await rememberOrigin(scope, done.frameId, { kind: SourceKind.Folder, repo: root, branch: null, sha: await folderHead(root), routes, ...(ask.conditions ? { conditions: ask.conditions } : {}) });
   }
   return done;
 }

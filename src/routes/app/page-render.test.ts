@@ -20,20 +20,31 @@ describe('the /app home: the recents, one prompt', () => {
     expect(body).toContain('name="projectId"');
   });
 
-  it('reads create actions, recents, then the prompt', () => {
+  it('reads create actions, the prompt, then the recents', () => {
     const body = page();
     const at = (needle: string) => body.indexOf(needle);
 
     expect(at('data-testid="home-create"')).toBeGreaterThan(-1);
-    expect(at('data-testid="home-create"')).toBeLessThan(at('data-testid="home-recents"'));
-    expect(at('data-testid="home-recents"')).toBeLessThan(at('data-testid="video-brief"'));
+    expect(at('data-testid="home-create"')).toBeLessThan(at('data-testid="video-brief"'));
+    expect(at('data-testid="video-brief"')).toBeLessThan(at('data-testid="home-recents"'));
   });
 
-  it('has no hero box: create actions lead straight to the recents', () => {
+  it('the prompt leads under one lowercase title', () => {
     const body = page();
 
-    expect(body).not.toContain('data-testid="home-hero"');
-    expect(body).not.toContain('design that moves.');
+    expect(body).toMatch(/<h1[^>]*>what do you want to make\?<\/h1>/);
+    expect(body.indexOf('<h1')).toBeLessThan(body.indexOf('data-testid="video-brief"'));
+  });
+
+  it('one chip per kind above the prompt, motion picked, the pick sent with the form', () => {
+    const body = page();
+    const kinds = body.slice(body.indexOf('data-testid="prompt-kinds"'), body.indexOf('data-testid="video-brief"'));
+
+    expect(kinds).toMatch(/data-kind="motion"[^>]*aria-pressed="true"/);
+    expect(kinds).toMatch(/data-kind="website"[^>]*aria-pressed="false"/);
+    expect(kinds).toContain('motion video');
+    expect(kinds).toContain('website design');
+    expect(body).toMatch(/<input type="hidden" name="kind" value="motion"/);
   });
 
   it('creates only a new canvas and imports: no catalogue rows on the home', () => {
@@ -50,7 +61,7 @@ describe('the /app home: the recents, one prompt', () => {
 
   it('a recent is a canvas: a sized lazy thumbnail, its name, its project, and it opens the canvas', () => {
     const body = page();
-    const recents = body.slice(body.indexOf('data-testid="home-recents"'), body.indexOf('data-testid="video-brief"'));
+    const recents = body.slice(body.indexOf('data-testid="home-recents"'));
 
     expect(recents).toContain('href="/p/p1/c/c1"');
     expect(recents).toMatch(/<img src="https:\/\/signed\/poster.jpg"[^>]*loading="lazy"[^>]*width="\d+" height="\d+"/);
@@ -74,14 +85,34 @@ describe('the /app home: the recents, one prompt', () => {
     expect(body).toContain('href="#video-brief"');
   });
 
-  it('the prompt sends to the video action, with three suggestions above it', () => {
+  it('the prompt sends to the video action, with suggestions under it', () => {
     const body = page();
-    const chips = body.slice(body.indexOf('data-testid="brief-examples"'), body.indexOf('data-testid="video-brief"'));
+    const chips = body.slice(body.indexOf('data-testid="brief-examples"'));
 
     expect(body).toMatch(/<form[^>]*action="\?\/video"/);
     expect(body).toMatch(/<textarea[^>]*data-testid="video-brief"/);
     expect(body).toContain(`placeholder="${PLACEHOLDER}"`);
     expect(chips).toMatch(/<button type="button"[^>]*data-brief="A poster series"/);
     expect(body.indexOf('data-testid="video-brief"')).toBeLessThan(body.indexOf('data-testid="brief-send"'));
+  });
+
+  it('shows a connect-your-agent card with a copy button per command and a docs link', () => {
+    const body = page();
+
+    expect(body).toContain('data-testid="home-agent"');
+    expect(body).toContain('claude mcp add --transport http feega https://mcp.feega.app/mcp');
+    expect(body).not.toContain('feega-cli');
+    expect(body).toContain('data-testid="agent-copy"');
+    expect(body).toContain('href="https://docs.feega.app/integrations/mcp/"');
+  });
+
+  it('the composer offers GitHub, a local folder and Figma next to attach', () => {
+    const body = page();
+    const sources = body.slice(body.indexOf('data-testid="prompt-sources"'));
+
+    expect(sources).toMatch(/data-source="github"[^>]*>GitHub</);
+    expect(sources).toMatch(/data-source="folder"[^>]*>Local folder</);
+    expect(sources).toMatch(/data-source="figma"[^>]*>Import from Figma</);
+    expect(sources).toContain('webkitdirectory');
   });
 });

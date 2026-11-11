@@ -1,6 +1,7 @@
 <script lang="ts">
   import { LEGAL_DOCS } from './legal';
-  import { APP_URL, SOCIAL_LINKS } from './links';
+  import DownloadMac from './DownloadMac.svelte';
+  import { APP_URL, MAC_GUIDE_URL, SOCIAL_LINKS } from './links';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
@@ -18,6 +19,8 @@
       <a href="/">Product</a>
       <a href={APP_URL}>Sign In</a>
       <a href="/blog">Compare</a>
+      <DownloadMac class="dl" />
+      <a class="dl-guide" href={MAC_GUIDE_URL}>Unsigned app: how to open it</a>
     </div>
 
     <div class="col">
@@ -75,6 +78,23 @@
     font-size: 37px;
     line-height: 37px;
     letter-spacing: -0.04em;
+  }
+
+  .col :global(.dl) {
+    padding-bottom: 2px;
+  }
+
+  .col :global(.dl svg) {
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+
+  .dl-guide {
+    display: block;
+    font-size: 14px;
+    line-height: 16.8px;
   }
 
   .ready h2 {

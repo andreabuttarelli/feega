@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { CACHE_SHARE, cached, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
+import { CACHE_SHARE, cached, Offscreen, resident, heldWhileEdited, heldWhileMoving, uncached } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
 const frame = (id: string, x: number, images: number, imageEdge = 100) => ({ id, group: `${id}:1`, box: { x, y: 0, w: 100, h: 100 }, size: { width: 100, height: 100 }, bytes: images * imageEdge * imageEdge * 4 });
 
 describe('frame residency', () => {
+  it('a phone drops offscreen frames with images instead of keeping them up to the budget', () => {
+    expect(resident([frame('on', 0, 1), frame('off', 9000, 1)], view, screen, 1e9, Offscreen.Dropped).map((f) => f.id)).toEqual(['on']);
+  });
+
   it('vector frames stay resident wherever they are', () => {
     expect(resident([frame('v', 9000, 0)], view, screen, 0).map((f) => f.id)).toEqual(['v']);
   });
 
-  it('media frames are resident only on screen', () => {
-    expect(resident([frame('on', 0, 1), frame('off', 9000, 1)], view, screen, 1e9).map((f) => f.id)).toEqual(['on']);
+  it('media frames off screen stay resident while the budget allows, so a pan never reveals an empty frame', () => {
+    expect(resident([frame('on', 0, 1), frame('off', 9000, 1)], view, screen, 1e9).map((f) => f.id)).toEqual(['on', 'off']);
+  });
+
+  it('over budget, frames on screen and nearest to it keep their pictures first', () => {
+    const bytes = 100 * 100 * 4;
+    expect(resident([frame('far', 9000, 1), frame('near', 1500, 1), frame('on', 0, 1)], view, screen, 2 * bytes).map((f) => f.id)).toEqual(['near', 'on']);
   });
 
   it('counts the bytes of its pictures, not its whole doc once per picture', () => {

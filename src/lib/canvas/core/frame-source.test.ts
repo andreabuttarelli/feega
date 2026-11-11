@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toFetch, toWarm, untilFound } from './frame-source';
+import { drawsAny, framesOnCanvas, logGaps, onStage, pickedToFetch, sameLive, shownGroup, stagedBox, stillFrame, toBuild, toFetch, toWarm, untilFound } from './frame-source';
 import { ItemKind, type DisplayList, type PathItem } from '@feega/motion-core/motion/gpu-full/display-list';
 import { FillRule, PaintKind } from '@feega/motion-core/motion/gpu-full/paint';
 import { BlendMode } from '@feega/motion-core/motion/blend';
@@ -152,6 +152,19 @@ describe('a free element paints past its own box', () => {
 
     expect([staged.width, staged.height]).toEqual([200, 100]);
     expect(stagedBox({ x: 10, y: 20, w: 100, h: 50 }, staged)).toEqual({ x: 10, y: 20, w: 100, h: 50 });
+  });
+});
+
+describe('frames to build', () => {
+  const box = (x: number) => ({ x, y: 0, w: 100, h: 100 });
+  const view = { x: 0, y: 0, zoom: 1 };
+  const screen = { width: 400, height: 300 };
+  const keyOf = (f: { id: string }) => f.id;
+
+  it('builds every frame on the canvas, nearest the screen first', () => {
+    const frames = [{ id: 'far', box: box(5000) }, { id: 'seen', box: box(50) }, { id: 'near', box: box(600) }];
+
+    expect(toBuild(frames, view, screen, keyOf, new Set(), new Set()).map((f) => f.id)).toEqual(['seen', 'near', 'far']);
   });
 });
 

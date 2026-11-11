@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { test, expect, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 import { instrument, measure, wheelZoom } from '../e2e/fixtures/frame-sweeps';
 import { ZOOM_FIXTURE_CENTRE, ZOOM_FIXTURE_PLACE } from '../../scripts/perf/zoom-fixture.mjs';
-import { median } from '../../scripts/perf/bench-stats.mjs';
+import { median, softwareAdapter } from '../../scripts/perf/bench-stats.mjs';
 
 type BenchRun = { fps: number; p95: number; worst: number; frames: number; cpuMs: number; sharpMs: number };
 
@@ -100,7 +100,7 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
     await route.continue();
   });
 
-  await page.goto(`${base}/p/${ZOOM_FIXTURE_PLACE.projectId}/c/${ZOOM_FIXTURE_PLACE.canvasId}`, { waitUntil: 'commit' });
+  await page.goto(`${base}/p/${ZOOM_FIXTURE_PLACE.projectId}/c/${ZOOM_FIXTURE_PLACE.canvasId}${process.env.BENCH_QUERY ?? ""}`, { waitUntil: 'commit' });
   await page.locator('[data-canvas-surface]').first().waitFor({ timeout: 120_000 });
   await page.waitForTimeout(SETTLE_MS);
 
@@ -127,12 +127,24 @@ async function run(browser: Browser, base: string, index: number): Promise<Bench
 test('zoom benchmark on the synthetic heavy canvas', async ({ baseURL }) => {
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ headless: false, args: process.env.CI ? CI_GPU_ARGS : ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] });
+  const probe = await browser.newPage();
+  await probe.goto(baseURL!, { waitUntil: 'commit' });
+  const adapter = await probe.evaluate(async () => {
+    const found = await (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<{ info: { vendor: string; architecture: string; description: string } } | null> } }).gpu?.requestAdapter();
+    return found ? { vendor: found.info.vendor, architecture: found.info.architecture, description: found.info.description } : null;
+  });
+  await probe.close();
+  if (softwareAdapter(adapter)) {
+    writeFileSync(join(OUT, 'zoom-bench.json'), JSON.stringify({ cpuThrottle: CPU_THROTTLE, adapter, runs: [] }, null, 2));
+    await browser.close();
+    return;
+  }
   const runs: BenchRun[] = [];
   for (let i = 0; i < RUNS; i++) {
     runs.push(await run(browser, baseURL!, i));
     console.log(`run ${i + 1}/${RUNS} ${JSON.stringify(runs.at(-1))}`);
   }
   await browser.close();
-  writeFileSync(join(OUT, 'zoom-bench.json'), JSON.stringify({ cpuThrottle: CPU_THROTTLE, runs, median: median(runs) }, null, 2));
+  writeFileSync(join(OUT, 'zoom-bench.json'), JSON.stringify({ cpuThrottle: CPU_THROTTLE, adapter, runs, median: median(runs) }, null, 2));
   expect(runs.every((r) => r.frames > 0)).toBe(true);
 });

@@ -97,7 +97,7 @@ export const PORT: SnapcnPort = {
       S.h('span', { style: { fontSize: 12, fontWeight: 500, letterSpacing: '-0.01em', color: sh('foreground'), whiteSpace: 'nowrap' } }, String(p.notchLabel)),
       S.h('div', { style: { width: 22, height: 11, borderRadius: 3, border: `1.5px solid ${indicator}`, padding: 1.5, display: 'flex', alignItems: 'center' } }, S.h('div', { style: { width: `${battery}%`, height: '100%', borderRadius: 1, backgroundColor: indicator } }))) as HTMLElement;
     const notch = S.h('div', { style: { position: 'absolute', top: 9, left: '50%', translate: '-50% 0px', height: 30, borderRadius: 999, backgroundColor: sh('background'), overflow: 'hidden', zIndex: 10 } }, idleLayer, loadingLayer, doneLayer) as HTMLElement;
-    const notchWrap = S.h('div', {}, notch) as HTMLElement;
+    const notchWrap = S.h('div', { style: { position: 'relative', zIndex: 10 } }, notch) as HTMLElement;
 
     const inner = Math.max(4, radius - BEZEL);
     const screen = S.h('div', { style: { position: 'relative', width: '100%', height: '100%', borderRadius: `${inner}px ${inner}px 4px 4px`, backgroundColor: glass, overflow: 'hidden' } }, screenContent, p.showNotch === 'off' ? null : notchWrap);
@@ -106,7 +106,7 @@ export const PORT: SnapcnPort = {
       S.h('div', { style: { position: 'absolute', top: 0, left: '50%', translate: '-50% 0px', width: 132, height: 8, borderRadius: '0 0 6px 6px', backgroundColor: S.withAlpha(sh('background'), 0.28) } }));
     const posed = S.h('div', {}, S.h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', perspective: PERSPECTIVE } }, lid, deck)) as HTMLElement;
     const camera = S.h('div', { style: { transformOrigin: 'center center', textRendering: 'geometricPrecision' } }, posed) as HTMLElement;
-    view.root.replaceChildren(S.h('style', {}, '.snapcn-laptop, .snapcn-laptop * { box-sizing: border-box; }'), S.h('div', { className: 'snapcn-laptop', style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: face, fontOpticalSizing: 'none' } }, camera));
+    view.root.replaceChildren(S.h('style', {}, '.laptop-frame-root, .laptop-frame-root * { box-sizing: border-box; }'), S.h('div', { className: 'laptop-frame-root', style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: face, fontOpticalSizing: 'none' } }, camera));
 
     const pose = (frame: number) => {
       if (entrance === 'none') {

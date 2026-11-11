@@ -24,7 +24,6 @@ const tile = (over: Partial<StateTile> = {}): StateTile => ({
   height: 150,
   ring: NodeChrome.None,
   handles: false,
-  hovered: false,
   ringColor: '#7c5cff',
   inputs: [],
   outputs: [],
@@ -80,13 +79,6 @@ describe('outlines at a distance', () => {
     expect(((far.x1 - far.x0) - 1000) * 0.1).toBeGreaterThan(((near.x1 - near.x0) - 1000) * 1);
   });
 
-  it('draws the hover outline thinner than the selection', () => {
-    const hover = box(ofPart(tile({ hovered: true }), ChromePart.Hover)[0].contours);
-    const ring = box(ofPart(tile({ ring: NodeChrome.Selected }), ChromePart.Ring)[0].contours);
-
-    expect(hover[2] - hover[0]).toBeLessThan(ring[2] - ring[0]);
-  });
-
   it('keeps the handles 8px on screen', () => {
     const handle = box(ofPart(tile({ ring: NodeChrome.Selected, handles: true, strokeZoom: 0.25 }), ChromePart.Handle)[0].contours);
 
@@ -119,15 +111,6 @@ describe('tileChrome', () => {
 
     expect(rings).toHaveLength(1);
     expect(box(rings[0].contours)).toEqual([98, 198, 1542, 4936]);
-  });
-
-  it('outlines a hovered tile only while it is not selected', () => {
-    expect(ofPart(tile({ hovered: true }), ChromePart.Hover)).toHaveLength(1);
-    expect(ofPart(tile({ hovered: true, ring: NodeChrome.Selected }), ChromePart.Hover)).toHaveLength(0);
-  });
-
-  it('outlines a frame being edited inside when the pointer is on its empty area, like Figma', () => {
-    expect(ofPart(tile({ hovered: true, ring: NodeChrome.Editing }), ChromePart.Hover)).toHaveLength(1);
   });
 
   it('spaces input ports evenly on the left edge, outside the box, in their connector colour', () => {
@@ -165,8 +148,8 @@ describe('tileChrome', () => {
     expect(box(label.contours)).toEqual([100, 178, 160, 190]);
   });
 
-  it('keeps hover, ring, handles and port names out of the tile chrome, so selecting never changes a card group', () => {
-    const t = tile({ ring: NodeChrome.Selected, handles: true, hovered: true, names: true, inputs: marks('text'), outputs: marks('text'), label: 'Text' });
+  it('keeps ring, handles and port names out of the tile chrome, so selecting never changes a card group', () => {
+    const t = tile({ ring: NodeChrome.Selected, handles: true, names: true, inputs: marks('text'), outputs: marks('text'), label: 'Text' });
 
     expect(tileChrome(t, glyphs)).toEqual(tileChrome(tile({ inputs: marks('text'), outputs: marks('text'), label: 'Text' }), glyphs));
     expect(clips(tileChrome(t, glyphs))).toEqual([ChromePart.PortIn, ChromePart.PortOut, ChromePart.Label]);

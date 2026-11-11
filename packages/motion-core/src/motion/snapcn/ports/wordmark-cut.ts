@@ -13,7 +13,7 @@ export const PORT: SnapcnPort = {
   background: '#faf9f6',
   fonts: ['Inter'],
   props: {
-    word: { type: 'string', title: 'Wordmark', default: 'snapcn.', group: 'Content', maxLength: 40 },
+    word: { type: 'string', title: 'Wordmark', default: 'feega.', group: 'Content', maxLength: 40 },
     dotFrom: { type: 'string', title: 'Dot colour from', format: PropFormat.Color, default: '#3072db', group: 'Style' },
     dotTo: { type: 'string', title: 'Dot colour to', format: PropFormat.Color, default: '#4fd8f5', group: 'Style' },
     warm: { type: 'number', title: 'Warmth of the wide shot', default: 1, minimum: 0, maximum: 2, step: 0.05, group: 'Style' },

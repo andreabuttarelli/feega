@@ -147,6 +147,65 @@ export function matrix4Of(
   return mul4(mul4(translate4(ox, oy), own), translate4(-ox, -oy));
 }
 
+type Styled = Record<string, string | undefined>;
+
+const DEGREE = Math.PI / 180;
+const INDIVIDUAL = ["translate", "rotate", "scale"] as const;
+const AXES: Record<string, [number, number, number]> = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
+
+const move4 = (x: number, y: number, z: number): Matrix4 => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
+
+const scale4 = (x: number, y: number, z: number): Matrix4 => [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1];
+
+function turn4([x, y, z]: [number, number, number], angle: number): Matrix4 {
+  const length = Math.hypot(x, y, z) || 1;
+  const [u, v, w] = [x / length, y / length, z / length];
+  const [s, c] = [Math.sin(angle), Math.cos(angle)];
+  const t = 1 - c;
+  return [t * u * u + c, t * u * v + s * w, t * u * w - s * v, 0, t * u * v - s * w, t * v * v + c, t * v * w + s * u, 0, t * u * w + s * v, t * v * w - s * u, t * w * w + c, 0, 0, 0, 0, 1];
+}
+
+function translated(value: string, size: [number, number]): Matrix4 | null {
+  const [x, y = "0px", z = "0px"] = value.split(/\s+/);
+  const [dx, dy, dz] = [lengthOf(x, size[0]), lengthOf(y, size[1]), lengthOf(z, 0)];
+  return dx === null || dy === null || dz === null ? null : move4(dx, dy, dz);
+}
+
+function rotated(value: string): Matrix4 | null {
+  const parts = value.split(/\s+/);
+  const angle = parseFloat(parts[parts.length - 1]);
+  const axis = parts.length === 1 ? AXES.z : parts.length === 2 ? AXES[parts[0]] : (parts.slice(0, 3).map(Number) as [number, number, number]);
+  return Number.isFinite(angle) && axis ? turn4(axis, angle * DEGREE) : null;
+}
+
+function scaled(value: string): Matrix4 | null {
+  const [x, y = x, z = "1"] = value.split(/\s+/).map(Number).map(String);
+  const [sx, sy, sz] = [Number(x), Number(y), Number(z)];
+  return [sx, sy, sz].every(Number.isFinite) ? scale4(sx, sy, sz) : null;
+}
+
+const INDIVIDUAL_OF: Record<(typeof INDIVIDUAL)[number], (value: string, size: [number, number]) => Matrix4 | null> = {
+  translate: translated,
+  rotate: rotated,
+  scale: scaled,
+};
+
+export const transformed = (style: Styled) => !isNone(style.transform) || INDIVIDUAL.some((k) => !isNone(style[k]));
+
+export function transform4Of(style: Styled, size: [number, number]): Matrix4 | null {
+  const own = matrix4Of(style.transform, style["transform-origin"]);
+  const parts = INDIVIDUAL.filter((k) => !isNone(style[k])).map((k) => INDIVIDUAL_OF[k](String(style[k]).trim(), size));
+  if (!own || parts.some((m) => m === null)) {
+    return null;
+  }
+  if (!parts.length) {
+    return own;
+  }
+  const [ox, oy] = originOf(style["transform-origin"]);
+  const extra = (parts as Matrix4[]).reduce((acc, m) => mul4(acc, m), IDENTITY4);
+  return mul4(mul4(mul4(translate4(ox, oy), extra), translate4(-ox, -oy)), own);
+}
+
 export const affineOf = (m: Matrix4): Affine | null =>
   Math.abs(m[3]) < 1e-12 &&
   Math.abs(m[7]) < 1e-12 &&

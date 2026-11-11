@@ -49,6 +49,9 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A fresh core raster per still costs seconds, whatever its size
 **Signal:** a batch of small stills (component thumbnails, posters) takes 1–2 s each; timings show `raster.draw` in a few ms and the first `createImageBitmap(canvas)` eating the rest, the same at 1920×1080 and at 192×50. **Move:** the cost is the new GL context compiling its shaders on first readback, not pixels. Create one raster (`stillRaster` in `core-export.ts`) and reuse it for the whole batch; dispose it when idle.
 
+### A hover outline drawn by the core grows and shrinks during a zoom
+Signal: with the pointer still over a frame, a wheel zoom makes its hover outline 2px, 4px, 6px thick and its gap wider than the node, then snaps back when the gesture ends; the DOM pick box of an element stays right. Cause: core overlay items are world-space strokes built at the zoom of the last quiet moment, and `CoreFrames` only re-sends overlay parts when no gesture is active, so the retained screen scales them with the camera. Move: anything that must keep a screen-space size through a gesture (hover outlines, 1px gaps) is a DOM element placed from `view` (`hover-ring.ts`), not a core overlay item. Measure it with the colour run at a fixed column in screenshots taken mid-zoom, not at rest.
+
 ## Providers
 
 ### Kie publishes its price list and its request schemas, you just have to find them
@@ -56,6 +59,12 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 **Signal:** a Kie price in `ai_models` differs from the billed one, or a Kie model exists that the picker lacks. **Move:** do not edit a table. Prices: `POST api.kie.ai/client/v1/model-pricing/page` (no key, 100 rows max per page; a bigger page answers 422). Wires: the OpenAPI block in `docs.kie.ai/market/*.md`, listed by `docs.kie.ai/llms.txt`. A price line joins a model through `?model=` in its `anchor`, else the page slug; lines on a shared page (Seedream 5) cannot be joined.
 
 ## Motion editor
+
+### A playing frame's picture trails the playhead by seconds
+**Signal:** the timeline time is right, the frame on the canvas lags further the longer it plays; the worker answers in a few ms. **Move:** the frame is one the worker refuses (empty media placeholder, Custom/Device3D/Composition clip) and goes through the main-thread path. Measure from `rebuildLive` start to landing, not the worker round trip; anything time-invariant done per tick there (prepare, mounting a DOM reader) is the cause.
+
+### Local mode serves 500 on a motion frame without a service-role key
+**Signal:** `vite dev` with the local-mode env and no `.env` answers `SUPABASE_SERVICE_ROLE_KEY not configured` from `createAssetSigningDb` on canvas and `add_template`. **Move:** for a probe, export a dummy `SUPABASE_SERVICE_ROLE_KEY=local`; never borrow the main checkout's `.env`, it points at the hosted project.
 
 ### A PR that adds or changes a tool fails the tool surface pins
 
@@ -68,6 +77,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 ### A snapcn port that works in tests throws in the player
 
 **Signal:** a port renders in a unit test of `port.draw` but the frame is empty in the browser, with `ReferenceError` in the player. **Move:** the player runs `draw.toString()`, so module-scope constants are gone. Keep every value inside `draw`; `sweep.test.ts` executes `snapcnSource` and catches it.
+
+### A GPU export is black or empty while the HTML render is right
+
+**Signal:** `npm run bench:gpu-parity -- --doc=<doc.json>` shows SSIM ≈ 0 with the core side black, no gaps reported; worse at higher resolution. **Move:** vello dropped the frame for lack of tile buffer. Dump the display list (`listWire`) and render it with `packages/gpu-core/target/release/gpu-core-render` to reproduce natively, then look for many large paths or repeated full-frame clips. Rebuild the wasm with `npm run build:gpu-core` after changing the core.
+
+### Parity's HTML side is not the truth for Google fonts
+
+**Signal:** parity SSIM 0.3–0.9 with the HTML frames in a serif fallback while the core frames look right. **Move:** the headless harness does not load the template's Google fonts; compare the sheets by eye before calling the core wrong.
 
 ### A Playwright spec cannot import motion-core: build the page with vite-node first
 
@@ -3781,3 +3798,20 @@ Signal: swapping `build/client/gpu-core/gpu_core_bg.wasm` by hand to try a gpu-c
 
 ### The load bench draws on a software GPU
 Signal: the load bench shows a 0.9–2.3 s main-thread long task at canvas start (CPU profile: `(program)`, `useProgram`), and fetches look slow because `responseEnd` waits behind it. Cause: headless Chromium renders WebGL with SwiftShader (`UNMASKED_RENDERER_WEBGL` says SwiftShader); shader compiles and draws run on the CPU. Headed Chrome on the Mac's GPU (ANGLE Metal) shows no long task over 200 ms on the same canvas. Move: read bench times as CPU-GL numbers; check the renderer string before chasing a long task, and confirm a startup cost in headed Chrome before fixing it.
+
+## Code import
+
+### A code import always came out light, 1280 wide
+
+**Signal:** a dark-mode app imports with a white page; `web/browser.ts` pins `prefers-color-scheme: light`, `color-scheme: light` and a 1280 viewport on every tab, and a write-back of a colour lands as an inline `style` that beats a `dark:` class. **Move:** the conditions an import renders under are one record (`code-import/render-conditions.ts`), the tab takes them through `tab.scheme()` and `tab.viewport()`, and each sourced clip carries `source.cond`; write-back keys edits by element and condition. A browser test of a theme or width runs with `CHROMIUM_PATH` set: under `NODE_ENV=test` `localChromium()` returns null and the launcher tries to download a serverless build.
+
+### WebKit logs `gpu lost` right after the core attaches
+**Signal:** `[core] gpu lost, attaching again device lost` about 3 s into every WebKit load; Chromium is clean. **Move:** count attaches, not losses: two `WebCore.attach` on the same canvas in flight means freeing the stale one loses the live device. Put `$inspect.trace()` in the attach effect to see which dependency re-ran it; attaches are serialized in `CoreFrames.svelte`.
+
+## A store method called from an effect must not read what it writes
+
+**Signal:** the canvas page stays on the `feega` splash, `pageerror` says `effect_update_depth_exceeded`, nothing in the console names a file. **Move:** the effect called `chatSelection.publish`, which read `#dismissed` to prune it and then wrote it: the read made the effect depend on its own write. Read the state you are about to overwrite inside `untrack`. Local mode hides the chat (`LocalOff.Chat`), so verify chat UI by flipping that line to `() => false` in the worktree and reverting before the commit.
+
+## Local mode must resolve before any Supabase key check
+
+**Signal:** 500 `SUPABASE_SERVICE_ROLE_KEY not configured` in local mode with no `.env`, only on routes that use the service-role or admin client. **Move:** `createClient` already routes to `localStore()`, but a key guard placed before it throws first; check `localStore()` ahead of every env-key guard in `db/client.ts` and `supabase-admin.ts`. Test: `src/lib/server/db/client.local.test.ts`.

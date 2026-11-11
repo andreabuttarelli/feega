@@ -4,14 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Item } from '@feega/motion-core/motion/gpu-full/display-list';
 
-const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, lose: false, splices: [] as { from: string; to: string; items: number }[] }));
+const calls = vi.hoisted(() => ({ cameras: [] as number[][], patches: [] as unknown[], overlays: 0, parts: [] as string[], frames: 0, puts: [] as string[], attached: 0, open: 0, overlapped: 0, lose: false, splices: [] as { from: string; to: string; items: number }[] }));
 
 vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
   createCore: () => {
     calls.attached++;
+    calls.overlapped = Math.max(calls.overlapped, calls.open);
+    calls.open++;
     const lost = calls.lose;
     calls.lose = false;
-    return Promise.resolve({
+    return Promise.resolve().then(() => (calls.open--, undefined)).then(() => ({
       lost: () => lost,
       pictureBytes: () => 0,
       putGroup: (key: string) => calls.puts.push(key),
@@ -28,7 +30,7 @@ vi.mock('@feega/motion-core/motion/gpu-full/core-web', () => ({
         calls.frames++;
         return { outcome: 'reused', pending: false };
       }
-    });
+    }));
   },
   createCoreGl: () => new Promise(() => undefined)
 }));
@@ -123,5 +125,32 @@ describe('CoreFrames camera', () => {
     flushSync();
 
     await vi.waitFor(() => expect(calls.attached).toBe(2));
+  });
+
+  it('a new area object of the same size keeps the gpu attached once, or WebKit loses the device that won', async () => {
+    const props = $state({ frames: [], cards: [card], view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    await vi.waitFor(() => expect(calls.patches.length).toBeGreaterThan(0));
+    const attached = calls.attached;
+
+    props.area = { width: 100, height: 80 };
+    flushSync();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(calls.attached).toBe(attached);
+  });
+
+  it('a resize while the gpu is attaching waits for that attach, or freeing it kills the one after on the same canvas', async () => {
+    const props = $state({ frames: [], cards: [card], view: { x: 0, y: 0, zoom: 1 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined });
+    calls.overlapped = 0;
+    app = mount(CoreFrames, { target: document.body, props });
+    flushSync();
+    props.area = { width: 120, height: 80 };
+    flushSync();
+    await vi.waitFor(() => expect(calls.open).toBe(0));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(calls.overlapped).toBe(0);
   });
 });
