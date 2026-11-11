@@ -111,7 +111,7 @@ describe('the /app home: the recents, one prompt', () => {
     const sources = body.slice(body.indexOf('data-testid="prompt-sources"'));
 
     expect(sources).toMatch(/data-source="github"[^>]*>GitHub</);
-    expect(sources).toMatch(/data-source="folder"[^>]*>Local folder</);
+    expect(sources).toMatch(/data-source="upload"[^>]*>Local folder</);
     expect(sources).toMatch(/data-source="figma"[^>]*>Import from Figma</);
     expect(sources).toContain('webkitdirectory');
   });
