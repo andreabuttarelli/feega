@@ -87,6 +87,7 @@ const CLIP: Record<string, Access> = {
   styleRef: { write: ['named_style'], read: 'styleRef' },
   paintStyleRef: { write: ['named_style'], read: 'paintStyleRef' },
   bind: { write: ['variable', 'bind_variable', 'unbind_variable'], read: 'bind' },
+  modes: { write: ['variable'], read: 'modes' },
   source: { fixed: 'written by import_code: where the layer lives in the code and the look it was drawn with; code_changes reads it' },
   effectStyleRef: { write: ['named_style'], read: 'effectStyleRef' },
   expressions: { write: ['set_expression', 'expression_to_keys', 'pulse_with_music'], read: 'expressions' },

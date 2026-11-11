@@ -45,8 +45,8 @@ function instanceContent(doc: MotionDoc, size: Size, measure: TextMeasure): Cont
       return null;
     }
     const space = comp.frame ?? size;
-    const own = { overrides: clip.props.overrides, values: clip.props.propValues };
-    const key = own.overrides || own.values ? `${id}${JSON.stringify(own)}` : id;
+    const own = { overrides: clip.props.overrides, values: clip.props.propValues, modes: clip.props.modeValues };
+    const key = own.overrides || own.values || own.modes ? `${id}${JSON.stringify(own)}` : id;
     if (!cache.has(key)) {
       cache.set(key, null);
       cache.set(key, compBounds({ ...comp, tracks: instanceTracks(doc, clip, comp, size, measure) }, space, content));
