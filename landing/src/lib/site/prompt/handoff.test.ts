@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HANDOFF_PROMPT_MAX, handoffLink, PromptKind, PromptSource } from './handoff';
+import { HANDOFF_PROMPT_MAX, handoffLink, PROMPT_KINDS, PromptKind, PromptSource } from './handoff';
 
 function params(link: string): URLSearchParams {
   const url = new URL(link);
@@ -27,5 +27,12 @@ describe('the hero prompt hands off to the app', () => {
   it('caps a long prompt', () => {
     const got = params(handoffLink({ text: 'a'.repeat(HANDOFF_PROMPT_MAX * 2), kind: PromptKind.Motion, source: null, images: 0 }));
     expect(got.get('prompt')).toHaveLength(HANDOFF_PROMPT_MAX);
+  });
+});
+
+describe('PROMPT_KINDS', () => {
+  it('ogni tipo ha il proprio placeholder', () => {
+    const placeholders = new Set(PROMPT_KINDS.map((row) => row.placeholder));
+    expect(placeholders.size).toBe(PROMPT_KINDS.length);
   });
 });

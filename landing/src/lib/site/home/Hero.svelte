@@ -68,6 +68,12 @@
     margin-top: 28px;
   }
 
+  @media (max-width: 809.98px) {
+    .start {
+      width: 100%;
+    }
+  }
+
   .run {
     display: flex;
     align-items: center;
