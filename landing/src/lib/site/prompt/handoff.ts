@@ -36,3 +36,9 @@ export function handoffLink(handoff: Handoff): string {
   }
   return `${APP_URL}/new?${params}`;
 }
+
+export const SOURCE_TRIGGER_EMPTY = 'Import';
+
+export function sourceTrigger(source: PromptSource | null): string {
+  return PROMPT_SOURCES.find((row) => row.source === source)?.label ?? SOURCE_TRIGGER_EMPTY;
+}
