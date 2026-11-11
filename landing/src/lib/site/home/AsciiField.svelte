@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { envelope, fieldAt, glyphFor, gridSize, tint } from '../ascii-field';
+  import { FLAG_COUNT, envelope, fieldAt, flagTint, glyphFor, gridSize } from '../ascii-field';
 
   const LOOP_MS = 24000;
   const FRAME_MS = 1000 / 30;
@@ -9,6 +9,7 @@
   const MOBILE_CELL = 11;
   const MOBILE_MAX = 810;
   const SCALE = 0.09;
+  const TINT_STEPS = 64;
   const EDGE_FLOOR = 0.6;
 
   let canvas: HTMLCanvasElement;
@@ -24,6 +25,8 @@
     let visible = true;
     let raf = 0;
     let last = 0;
+    const startFlag = Math.floor(Math.random() * FLAG_COUNT);
+    const t0 = performance.now();
 
     const size = () => {
       const dpr = Math.min(devicePixelRatio || 1, MAX_DPR);
@@ -37,7 +40,15 @@
       ctx.textBaseline = 'middle';
     };
 
-    const draw = (phase: number) => {
+    const palette = (clockMs: number) =>
+      Array.from({ length: TINT_STEPS }, (_, i) => {
+        const [r, g, b] = flagTint(i / (TINT_STEPS - 1), clockMs, startFlag);
+        return `rgb(${r},${g},${b})`;
+      });
+
+    const draw = (now: number) => {
+      const phase = (now % LOOP_MS) / LOOP_MS;
+      const colours = palette(still ? 0 : now - t0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const { cols, rows, cell } = grid;
 
@@ -53,8 +64,7 @@
             continue;
           }
 
-          const [r, g, b] = tint(1 - e);
-          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillStyle = colours[Math.round((1 - e) * (TINT_STEPS - 1))];
           ctx.globalAlpha = 0.3 + d * 0.45;
           ctx.fillText(glyph, c * cell + cell / 2, row * cell + cell / 2);
         }
@@ -68,7 +78,7 @@
       }
 
       last = now;
-      draw((now % LOOP_MS) / LOOP_MS);
+      draw(now);
     };
 
     const sync = () => {
@@ -87,12 +97,12 @@
 
     const ro = new ResizeObserver(() => {
       size();
-      draw((performance.now() % LOOP_MS) / LOOP_MS);
+      draw(performance.now());
     });
 
     const start = () => {
       size();
-      draw(0);
+      draw(t0);
       canvas.classList.add('on');
       ro.observe(canvas);
       io.observe(canvas);
