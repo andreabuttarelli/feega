@@ -7,6 +7,7 @@ use vello::Scene;
 use crate::canvas::{mix, Canvas};
 use crate::fragments::{compose, Fragments};
 use crate::display_list::{Cover, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Look, MaskLayer, MaskMode, Paint, PathItem, Ramp, Rgba, Size, Stop};
+use crate::shades::{shade_of, Side};
 use crate::pictures::{crop_rect, image_rect, tile_cells, Pictures, Placed as Window};
 use crate::Skipped;
 
@@ -133,7 +134,7 @@ fn skip(skipped: &mut Vec<Skipped>, clip: &str, what: &str) {
     skipped.push(Skipped { clip: clip.into(), what: what.into() });
 }
 
-fn clip_covers(look: &Look) -> Option<Vec<&Cover>> {
+pub fn clip_covers(look: &Look) -> Option<Vec<&Cover>> {
     if look.backdrop.is_some() {
         return None;
     }
@@ -161,7 +162,7 @@ fn clipped<C: Canvas>(scene: &mut C, look: &Look, paint: impl FnOnce(&mut C)) {
 }
 
 pub fn layer_worthy(item: &Item) -> bool {
-    item.look().is_some_and(needs_layer)
+    item.look().is_some_and(needs_layer) && shade_of(item).is_none()
 }
 
 fn layered<C: Canvas>(scene: &mut C, blend: &str, opacity: f32, frame: Rect, paint: impl FnOnce(&mut C)) {
@@ -187,7 +188,14 @@ fn scissored<C: Canvas>(scene: &mut C, look: &Look, paint: impl FnOnce(&mut C)) 
 
 fn content<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, frame: Rect) {
     match item {
-        Item::Path(path) => draw(scene, path, frame),
+        Item::Path(path) => match shade_of(item) {
+            Some(shade) if shade.side == Side::Behind => {
+                scene.shade(Affine::new(path.look.matrix), &shade);
+                draw(scene, path, frame);
+            }
+            Some(shade) => scene.shade(Affine::new(path.look.matrix), &shade),
+            None => draw(scene, path, frame),
+        },
         Item::Image(image) => {
             if let Some(data) = pictures.get(&image.clip) {
                 draw_image(scene, image, data);
@@ -397,7 +405,7 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
     let mut shared = SharedScissor { open: None };
     let mut clips = SharedClips { open: Vec::new() };
     for (i, item) in items.iter().enumerate() {
-        if !matches!(item, Item::Path(_) | Item::Image(_) | Item::Layer(_)) || item.look().is_some_and(|l| needs_layer(l) || l.backdrop.is_some()) || layers.blended.contains_key(&i) {
+        if !matches!(item, Item::Path(_) | Item::Image(_) | Item::Layer(_)) || layer_worthy(item) || item.look().is_some_and(|l| l.backdrop.is_some()) || layers.blended.contains_key(&i) {
             clips.close(scene);
             shared.close(scene);
         }
@@ -429,7 +437,7 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
                 None => skip(&mut skipped, item.clip(), "backdrop"),
             }
         }
-        if needs_layer(look) {
+        if layer_worthy(item) {
             match layers.bodies.get(&i) {
                 Some(layer) => scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| placed(s, layer))),
                 None if layers.culled.contains(&i) => {}
