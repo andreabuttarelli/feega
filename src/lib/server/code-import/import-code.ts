@@ -6,6 +6,7 @@ import type { ComponentUse } from './component-marks';
 import { codePlan } from './code-doc';
 import { boardsOf, conditioned, cropped, type Capture } from './boards';
 import { BASE_CONDITIONS, conditionKey, variantsOf, type RenderConditions } from './render-conditions';
+import { ownImages } from './page-images';
 import { repoOf, routesOf, type RepoRef } from './repo';
 import type { RepoRunner } from './sandbox-runner';
 
@@ -143,7 +144,7 @@ export async function importBoards(ask: BoardsAsk): Promise<CodeImported> {
 
   const boards = boardsOf(ask.name, captures.map(CROPS[ask.crop]));
   const [tree, uses] = [await withSheetFonts(ask, boards.tree), boards.uses];
-  const done = await landPlan(ask, codePlan(tree, uses, ask.newId, await fontsFor(ask, tree)), tree.truncated);
+  const done = await landPlan({ ...ask, importImage: ownImages(ask.importImage, ask.pages.map((p) => p.url)) }, codePlan(tree, uses, ask.newId, await fontsFor(ask, tree)), tree.truncated);
   if (done.outcome !== UrlImportOutcome.Ok) {
     return refused(FROM_URL_IMPORT[done.outcome], done.error);
   }
