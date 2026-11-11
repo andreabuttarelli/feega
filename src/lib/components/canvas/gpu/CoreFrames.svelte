@@ -21,6 +21,7 @@
   import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { SentParts, SentUses } from '$lib/canvas/core/use-diff';
   import { NO_OVERLAY, type CoreOverlay } from '$lib/canvas/core/world-overlay';
+  import { memoSources } from '$lib/canvas/core/source-memo';
   import { drawsAny, frameOfLive, logGaps, onStage, sameLive, shownGroup, stagedBox, toBuild, toWarm, untilFound, frameSourceUrl, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor, showsPoster } from '$lib/canvas/core/frame-poster';
@@ -163,8 +164,10 @@
 
   const sourceOf = (f: FrameAt) => frameSourceUrl(sourceUrl, f, place?.orgId);
 
+  const readSource = memoSources((f: FrameAt) => frameSources(sourceOf(f)));
+
   async function fetchAndBuild(f: FrameAt, at: AssetSize) {
-    const fetched = await frameSources(sourceOf(f));
+    const fetched = await readSource(f);
     if (!fetched) {
       return null;
     }
