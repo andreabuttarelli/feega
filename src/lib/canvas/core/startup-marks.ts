@@ -32,7 +32,7 @@ type Mark = { name: string; startTime: number };
 type Resource = { name: string; startTime: number; responseEnd: number };
 
 const RESOURCES: { step: string; matches: (url: string) => boolean }[] = [
-  { step: 'wasm-fetch', matches: (u) => u.includes('gpu_core_bg.wasm') },
+  { step: 'wasm-fetch', matches: (u) => /gpu_core(_gl)?_bg\.wasm/.test(u) },
   { step: 'font-fetch', matches: (u) => /\.(woff2?|ttf|otf)(\?|$)/.test(u) },
   { step: 'sources-fetch', matches: (u) => /\/motion\/sources\?/.test(u) },
   { step: 'worker-fetch', matches: (u) => u.includes('frame-build.worker') }
