@@ -1,0 +1,73 @@
+{
+  "name": "feega",
+  "displayName": "Feega",
+  "description": "Open .feega canvases in your editor: motion video, UI and graphic design that your agent edits over MCP.",
+  "version": "0.1.0",
+  "publisher": "feega",
+  "license": "Apache-2.0",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andreabuttarelli/feega",
+    "directory": "vscode"
+  },
+  "homepage": "https://docs.feega.app/integrations/editor/",
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": [
+    "Visualization",
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "design",
+    "canvas",
+    "motion",
+    "video",
+    "mcp",
+    "figma",
+    "agent"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "workspaceContains:**/*.feega"
+  ],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "feega.canvas",
+        "displayName": "Feega canvas",
+        "selector": [
+          {
+            "filenamePattern": "*.feega"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "feega.newCanvas",
+        "title": "New canvas",
+        "category": "Feega"
+      },
+      {
+        "command": "feega.importFolder",
+        "title": "Import this folder into a canvas",
+        "category": "Feega"
+      }
+    ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "feega.local",
+        "label": "Feega (local canvas)"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node --test",
+    "package": "npx -y @vscode/vsce package --no-dependencies",
+    "test:e2e": "node test/run.js"
+  }
+}

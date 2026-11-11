@@ -19,6 +19,21 @@ already downloaded. Options:
 `--port 8080`, `--no-open`. If the file does not exist it is created; every change is written back to it within a second, and again when
 you stop the server with Ctrl-C.
 
+## Import the folder you are in
+
+Run `npx feega` inside a project with a `dev` script (React, Vue, Svelte, Next and similar) and it
+asks once, when the `.feega` file does not exist yet:
+
+```sh
+$ npx feega
+feega: import the current folder (my-app) into the canvas? (Y/n)
+```
+
+Yes starts the project's dev server, captures its home page and draws it as a frame, the same as
+[Import from code](/integrations/import-from-code/) with a local folder. Publishing the frame writes
+your canvas edits back to the folder's files. `--import` imports without asking (also outside a
+terminal), `--no-import` never asks.
+
 ## From a clone
 
 ```sh
