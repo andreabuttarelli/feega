@@ -132,6 +132,7 @@ pub struct Retained {
     shown: Option<Camera>,
     zoom_seen: f64,
     zoom_moved_at: f64,
+    stale_margins: bool,
     full_ms: f64,
     gpu_ms: f64,
 }
@@ -195,7 +196,7 @@ pub fn tiles(rect: Rect, width: u32, height: u32) -> Vec<Rect> {
 impl Retained {
     pub fn new(width: u32, height: u32) -> Self {
         let overscan = (width.min(height) / OVERSCAN_SHARE).min(OVERSCAN_MAX);
-        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, full_ms: 0.0, gpu_ms: 0.0 }
+        Retained { width, height, overscan, held: None, shown: None, zoom_seen: 0.0, zoom_moved_at: f64::NEG_INFINITY, stale_margins: false, full_ms: 0.0, gpu_ms: 0.0 }
     }
 
     pub fn overscan(&self) -> u32 {
@@ -235,6 +236,7 @@ impl Retained {
     pub fn adopt(&mut self, camera: Camera, now_ms: f64) {
         let c = camera.snapped();
         self.held = Some(Held { camera: c, quality: Quality::Sharp });
+        self.stale_margins = true;
         self.shown = None;
         self.zoom_seen = c.zoom;
         self.zoom_moved_at = now_ms - ZOOM_IDLE_MS;
@@ -315,6 +317,12 @@ impl Retained {
         let Some(held) = self.held else {
             return self.full(c, Quality::Sharp);
         };
+        if self.stale_margins && c != held.camera {
+            self.stale_margins = false;
+            let o = self.overscan as f64;
+            let screen = Rect::new(o, o, o + self.width as f64, o + self.height as f64);
+            return self.raster(held.camera, held.quality, None, subtract(self.whole(), screen));
+        }
         let Damage::Rects(damaged) = damage else {
             return self.full(c, Quality::Sharp);
         };

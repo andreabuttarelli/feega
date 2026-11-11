@@ -304,3 +304,15 @@ fn a_picture_built_elsewhere_is_adopted_so_the_next_change_rasters_only_its_dama
     let damaged = r.step(camera, Damage::Rects(vec![Rect::new(0.0, 0.0, 10.0, 10.0)]), 1016.0);
     assert_eq!(outcome(&damaged), Some(Outcome::Partial));
 }
+
+#[test]
+fn an_adopted_picture_covers_only_the_screen_so_a_pan_rasters_the_margin_it_reveals() {
+    let mut r = Retained::new(W, H);
+    let camera = at(10.0, 20.0, 1.0);
+    r.adopt(camera, 0.0);
+    r.step(camera, Damage::none(), 1000.0);
+
+    let Step::Raster(revealed) = r.step(at(50.0, 20.0, 1.0), Damage::none(), 1016.0) else { panic!("the revealed margin was presented from stale pixels") };
+
+    assert!(area(&revealed.rects) > 0.0);
+}
