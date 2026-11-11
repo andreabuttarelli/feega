@@ -360,7 +360,7 @@ export async function safeFetchBytes(
   };
 }
 
-async function readAllOrReject(res: Response, maxBytes: number): Promise<Buffer> {
+export async function readAllOrReject(res: Response, maxBytes: number): Promise<Buffer> {
   if (!res.body) return Buffer.alloc(0);
   const reader = res.body.getReader();
   const chunks: Buffer[] = [];
